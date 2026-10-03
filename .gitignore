@@ -1,0 +1,40 @@
+# Build output
+/build/
+/out/
+/target/
+*.o
+*.obj
+*.pdb
+*.ilk
+
+# Rust
+**/*.rs.bk
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# pixi / conda environments
+.pixi/
+
+# KIMCAD local project data (caches, oplog, index) — never committed
+.kimcad/
+
+# Qt
+*.qm
+*.user
+CMakeLists.txt.user*
+
+# Large test files are fetched by script, not committed
+/tests/corpus/large/
+
+# IDEs / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
