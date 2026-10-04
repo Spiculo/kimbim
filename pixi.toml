@@ -12,6 +12,7 @@ maturin = ">=1.15,<2"
 pytest = ">=8"
 rust = ">=1.85"
 git = ">=2.45"
+pip = "*"
 
 [tasks]
 build = "maturin develop --release --skip-install"
