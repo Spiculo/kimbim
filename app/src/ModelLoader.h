@@ -20,6 +20,7 @@ public:
     {
     }
     void requestStop() { m_stop = true; }
+    void reset() { m_stop = false; } // re-arm before queueing a new load (from the GUI thread)
 
 public slots:
     void load(const QString& path);

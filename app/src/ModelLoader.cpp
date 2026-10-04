@@ -7,7 +7,12 @@ namespace kimcad {
 
 void ModelLoader::load(const QString& path)
 {
-    m_stop = false;
+    // Do NOT clear m_stop here: a close can request a stop before this queued call starts.
+    // The GUI thread re-arms the loader with reset() before queueing a new load.
+    if (m_stop) {
+        emit finished(0, true);
+        return;
+    }
     PythonEngine& py = PythonEngine::instance();
     QString error;
     const QJsonObject info = py.callJson("open_model", {path}, &error).object();

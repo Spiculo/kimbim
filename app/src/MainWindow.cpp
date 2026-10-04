@@ -220,6 +220,7 @@ void MainWindow::openFile(const QString& path)
     m_loadedElements = 0;
     m_loadTimer.start();
     statusBar()->showMessage(tr("Opening %1...").arg(QFileInfo(path).fileName()));
+    m_loader->reset();
     QMetaObject::invokeMethod(m_loader, "load", Qt::QueuedConnection, Q_ARG(QString, path));
 }
 
