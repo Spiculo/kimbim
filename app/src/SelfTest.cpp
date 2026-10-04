@@ -2,15 +2,19 @@
 #include "SelfTest.h"
 
 #include <QApplication>
+#include <QScreen>
+#include <QDir>
 #include <QElapsedTimer>
+#include <QEventLoop>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QTemporaryDir>
+#include <QTimer>
 
 #include <cstdio>
 
-#include "ElementBatch.h"
-#include "MeshChunk.h"
+#include "MainWindow.h"
+#include "ModelTreePanel.h"
 #include "PythonEngine.h"
 #include "Viewport.h"
 
@@ -18,12 +22,11 @@ namespace kimcad {
 
 namespace {
 
-int report(QJsonObject result)
+int report(const QJsonObject& result)
 {
-    const bool ok = result.value("ok").toBool();
     std::printf("%s\n", QJsonDocument(result).toJson(QJsonDocument::Compact).constData());
     std::fflush(stdout);
-    return ok ? 0 : 1;
+    return result.value("ok").toBool() ? 0 : 1;
 }
 
 int fail(const QString& error)
@@ -33,75 +36,84 @@ int fail(const QString& error)
 
 } // namespace
 
+// Drives the real MainWindow (background loader thread, progressive batches), then measures.
 int runSelfTest(const SelfTestOptions& options)
 {
     QString error;
-    PythonEngine& py = PythonEngine::instance();
-    if (!py.start(&error))
+    if (!PythonEngine::instance().start(&error))
         return fail(error);
 
     QTemporaryDir tmp;
     QString path = options.path;
     if (path == QLatin1String(":fixture:")) {
-        path = tmp.filePath(QStringLiteral("Proyecto ñ/fixture.ifc"));
         QDir().mkpath(tmp.filePath(QStringLiteral("Proyecto ñ")));
-        if (!py.callJson("_write_test_model", {path}, &error).object().value("ok").toBool())
+        path = tmp.filePath(QStringLiteral("Proyecto ñ/fixture.ifc"));
+        if (!PythonEngine::instance().callJson("_write_test_model", {path}, &error).object().value("ok").toBool())
             return fail(error);
     }
 
-    QElapsedTimer timer;
+    MainWindow window(nullptr, /*quiet=*/true, options.chunkSize);
+    window.show();
+    QApplication::processEvents();
+
+    QEventLoop loop;
+    QString loadError;
+    bool stopped = false;
+    QElapsedTimer timer, quitTimer;
+    qint64 quitMs = -1;
+    QObject::connect(&window, &MainWindow::loadFailed, &loop, [&](const QString& e) { loadError = e; loop.quit(); });
+    QObject::connect(&window, &MainWindow::loadFinished, &loop, [&](int, bool s) {
+        stopped = s;
+        if (!options.quitDuringLoad) // in quit mode only the close ends the test
+            loop.quit();
+    });
+    if (options.quitDuringLoad) {
+        QObject::connect(&window, &MainWindow::firstChunkShown, &loop, [&] {
+            QTimer::singleShot(0, &loop, [&] {
+                quitTimer.start();
+                window.close(); // must stop the loader thread promptly
+                quitMs = quitTimer.elapsed();
+                loop.quit();
+            });
+        });
+    }
+    QTimer::singleShot(20 * 60 * 1000, &loop, [&] { loadError = QStringLiteral("timeout"); loop.quit(); });
     timer.start();
-    const QJsonObject info = py.callJson("open_model", {path}, &error).object();
-    if (!info.value("ok").toBool())
-        return fail(info.value("error").toString(error));
+    window.openFile(path);
+    loop.exec();
 
-    Viewport viewport;
-    viewport.resize(1280, 800);
-    viewport.show();
-    QApplication::processEvents();
+    if (!loadError.isEmpty())
+        return fail(loadError);
+    if (options.quitDuringLoad)
+        return report(QJsonObject{{"ok", quitMs >= 0 && quitMs < 5000 && !window.isLoading()},
+            {"quit_during_load", true}, {"quit_ms", double(quitMs)}});
 
-    const QJsonObject started = py.callJson("start_meshing", {QStringLiteral("0")}, &error).object();
-    if (!started.value("ok").toBool())
-        return fail(started.value("error").toString(error));
-    bool done = false;
-    while (!done) {
-        MeshChunk chunk;
-        if (!fetchMeshChunk(py, 1000, &chunk, &done, &error))
-            return fail(error);
-        if (!done)
-            viewport.addBatch(new ElementBatch(std::move(chunk)));
-        QApplication::processEvents();
-        if (options.quitDuringLoad && viewport.batchCount() > 0)
-            return report(QJsonObject{{"ok", true}, {"quit_during_load", true}, {"batches", viewport.batchCount()}});
-    }
-    viewport.fitAll();
-    QApplication::processEvents();
+    Viewport* viewport = window.viewport();
     const double loadS = double(timer.elapsed()) / 1000.0;
+    QApplication::processEvents();
+    const double fps = viewport->measureFps(options.frames);
 
-    const double fps = viewport.measureFps(options.frames);
-
-    QJsonObject result{{"ok", true},
-        {"schema", info.value("schema")},
-        {"elements", viewport.elementCount()},
-        {"batches", viewport.batchCount()},
-        {"triangles", double(viewport.triangleCount())},
+    QJsonObject result{{"ok", !stopped},
+        {"elements", viewport->elementCount()},
+        {"batches", viewport->batchCount()},
+        {"triangles", double(viewport->triangleCount())},
         {"load_s", loadS},
         {"fps", fps}};
 
     // Pick check: project an element's centre to the screen, pick there, expect that element back.
-    // Elements can hide each other, so try up to 20 and report how many picked back to themselves.
-    const double dpr = viewport.devicePixelRatioF();
-    const int w = int(viewport.width() * dpr), h = int(viewport.height() * dpr);
+    // Elements can hide each other, so try up to 20; "missed" (hit nothing) must stay 0.
+    const double dpr = viewport->devicePixelRatioF();
+    const int w = int(viewport->width() * dpr), h = int(viewport->height() * dpr);
     int tried = 0, matched = 0, missed = 0;
     QString picked;
-    for (const QString& guid : viewport.guids()) {
+    for (const QString& guid : viewport->guids()) {
         if (tried >= 20)
             break;
         int x = 0, y = 0;
-        if (!viewport.projectCenterOf(guid, &x, &y) || x < 0 || y < 0 || x >= w || y >= h)
+        if (!viewport->projectCenterOf(guid, &x, &y) || x < 0 || y < 0 || x >= w || y >= h)
             continue;
         ++tried;
-        const QString got = viewport.pickAt(x, y);
+        const QString got = viewport->pickAt(x, y);
         if (got.isEmpty())
             ++missed;
         if (got == guid) {
@@ -112,10 +124,26 @@ int runSelfTest(const SelfTestOptions& options)
     }
     result.insert(QStringLiteral("pick_tried"), tried);
     result.insert(QStringLiteral("pick_matched"), matched);
-    result.insert(QStringLiteral("pick_missed"), missed); // hit nothing (a front element hit counts as occlusion)
+    result.insert(QStringLiteral("pick_missed"), missed);
     result.insert(QStringLiteral("picked"), picked);
+
+    // Selection sync: a viewport selection must select the same element in the tree.
+    if (!picked.isEmpty()) {
+        viewport->selectGuids({picked});
+        emit viewport->selectionChanged(viewport->selectedGuids());
+        QApplication::processEvents();
+        result.insert(QStringLiteral("tree_follows_selection"), window.treePanel()->currentGuid() == picked);
+    }
     if (options.planCut >= 0)
         result.insert(QStringLiteral("plan_cut"), options.planCut);
+    if (!options.screenshot.isEmpty()) {
+        window.viewport()->fitAll();
+        for (int i = 0; i < 10; ++i)
+            QApplication::processEvents();
+        // grabWindow captures the composited screen, including the OpenGL viewport.
+        const QPixmap shot = window.screen()->grabWindow(window.winId());
+        result.insert(QStringLiteral("screenshot"), shot.save(options.screenshot) ? options.screenshot : QString());
+    }
     return report(result);
 }
 

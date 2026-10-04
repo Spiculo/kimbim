@@ -32,6 +32,13 @@ int main(int argc, char* argv[])
     parser.addOption(frames);
     parser.addOption(quitDuringLoad);
     parser.addOption(planCut);
+    QCommandLineOption chunk(QStringLiteral("chunk"), QStringLiteral("Self-test: elements per mesh chunk."),
+        QStringLiteral("n"), QStringLiteral("1000"));
+    parser.addOption(chunk);
+    QCommandLineOption screenshot(QStringLiteral("screenshot"), QStringLiteral("Self-test: save a PNG of the window."),
+        QStringLiteral("png"));
+    parser.addOption(screenshot);
+    parser.addPositionalArgument(QStringLiteral("file"), QStringLiteral("IFC file to open."), QStringLiteral("[file.ifc]"));
     parser.process(app);
 
     if (parser.isSet(version)) {
@@ -46,10 +53,14 @@ int main(int argc, char* argv[])
         options.frames = parser.value(frames).toInt();
         options.quitDuringLoad = parser.isSet(quitDuringLoad);
         options.planCut = parser.isSet(planCut) ? parser.value(planCut).toDouble() : -1;
+        options.chunkSize = qMax(1, parser.value(chunk).toInt());
+        options.screenshot = parser.value(screenshot);
         return kimcad::runSelfTest(options);
     }
 
     kimcad::MainWindow window;
     window.show();
+    if (!parser.positionalArguments().isEmpty())
+        window.openFile(parser.positionalArguments().first());
     return app.exec();
 }

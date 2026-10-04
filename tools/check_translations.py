@@ -15,7 +15,9 @@ def main() -> int:
         for msg in ctx.iter("message"):
             src = msg.findtext("source")
             tr = msg.find("translation")
-            if tr is None or tr.get("type") in ("unfinished", "obsolete", "vanished") or not (tr.text or "").strip():
+            forms = [f.text for f in tr.findall("numerusform")] if tr is not None else []
+            empty = not any((f or "").strip() for f in forms) if msg.get("numerus") == "yes" else not (tr is not None and (tr.text or "").strip())
+            if tr is None or tr.get("type") in ("unfinished", "obsolete", "vanished") or empty:
                 if tr is not None and tr.get("type") in ("obsolete", "vanished"):
                     continue  # strings no longer in the code are ignored
                 problems.append(f"{name}: {src!r}")

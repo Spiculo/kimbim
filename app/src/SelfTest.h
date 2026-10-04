@@ -10,6 +10,8 @@ struct SelfTestOptions {
     int frames = 60;              // orbit frames to measure
     bool quitDuringLoad = false;  // request quit after the first chunk (shutdown while loading)
     double planCut = -1;          // >= 0: apply a plan cut at this height before measuring
+    int chunkSize = 1000;         // elements per mesh chunk / batch
+    QString screenshot;           // non-empty: save a PNG of the whole window at the end
 };
 
 // Opens the model in a real window, loads it, measures, prints one JSON line to stdout.

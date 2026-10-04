@@ -194,8 +194,14 @@ void ElementBatch::Compute(const Handle(PrsMgr_PresentationManager)&, const Hand
         if (!isHidden(i))
             addElement(*arr, i, true);
     Handle(Graphic3d_Group) group = prs->NewGroup();
+    // A colour-driven ("aspect") material, so per-vertex palette colours are used. The AIS default
+    // (brass) is a physical material that ignores vertex colours.
     Handle(Graphic3d_AspectFillArea3d) aspect = new Graphic3d_AspectFillArea3d(*myDrawer->ShadingAspect()->Aspect());
-    aspect->SetInteriorColor(Quantity_NOC_WHITE); // vertex colours carry the palette
+    Graphic3d_MaterialAspect material(Graphic3d_NameOfMaterial_Plastified);
+    material.SetSpecularColor(Quantity_Color(0.08, 0.08, 0.08, Quantity_TOC_RGB));
+    aspect->SetFrontMaterial(material);
+    aspect->SetBackMaterial(material);
+    aspect->SetInteriorColor(Quantity_NOC_WHITE);
     group->SetGroupPrimitivesAspect(aspect);
     group->AddPrimitiveArray(arr);
 }

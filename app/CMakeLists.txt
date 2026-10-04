@@ -8,6 +8,9 @@ qt_add_library(kimcad_core STATIC
     src/ElementBatch.cpp src/ElementBatch.h
     src/Viewport.cpp src/Viewport.h
     src/SelfTest.cpp src/SelfTest.h
+    src/ModelTreePanel.cpp src/ModelTreePanel.h
+    src/PropertiesPanel.cpp src/PropertiesPanel.h
+    src/ModelLoader.cpp src/ModelLoader.h
 )
 target_include_directories(kimcad_core PUBLIC src)
 target_link_libraries(kimcad_core PUBLIC Qt6::Widgets Python3::Python
@@ -33,10 +36,20 @@ kimcad_test(test_translations)
 kimcad_test(test_python_engine)
 kimcad_test(test_mesh_chunk)
 kimcad_test(test_element_batch)
+kimcad_test(test_model_tree)
 
-# GUI self-test: needs a real OpenGL window (GPU, or Mesa on the Linux CI runner). Label "gui".
-add_test(NAME app_selftest_fixture COMMAND kimcad-app --self-test :fixture: --frames 5)
-set_tests_properties(app_selftest_fixture PROPERTIES
-    LABELS gui
-    ENVIRONMENT "KIMCAD_PYTHON_PATH=${PROJECT_SOURCE_DIR}/python"
-    PASS_REGULAR_EXPRESSION "\"ok\":true.*\"pick_matched\":2.*\"pick_missed\":0")
+# GUI self-tests: need a real OpenGL window (GPU, or Mesa on the Linux CI runner). Label "gui".
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/broken.ifc "ISO-10303-21;
+this is not IFC
+")
+function(kimcad_gui_test name pass_regex)
+    add_test(NAME ${name} COMMAND kimcad-app --self-test ${ARGN})
+    set_tests_properties(${name} PROPERTIES
+        LABELS gui
+        ENVIRONMENT "KIMCAD_PYTHON_PATH=${PROJECT_SOURCE_DIR}/python"
+        PASS_REGULAR_EXPRESSION "${pass_regex}")
+endfunction()
+kimcad_gui_test(app_selftest_fixture
+    "\"ok\":true.*\"pick_matched\":2.*\"pick_missed\":0.*\"tree_follows_selection\":true" :fixture: --frames 5)
+kimcad_gui_test(app_selftest_broken_file "\"ok\":false" ${CMAKE_CURRENT_BINARY_DIR}/broken.ifc)
+kimcad_gui_test(app_selftest_quit_during_load "\"ok\":true,\"quit_during_load\":true" :fixture: --quit-during-load --chunk 1)

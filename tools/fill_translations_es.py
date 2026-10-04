@@ -24,6 +24,29 @@ ES = {
     "KIMCAD %1\nOpen-source native BIM for architects, with version control built in.\nLicense: GPL-3.0-or-later":
         "KIMCAD %1\nBIM nativo de código abierto para arquitectos, con control de versiones integrado.\n"
         "Licencia: GPL-3.0 o posterior",
+    "KIMCAD cannot start": "KIMCAD no puede iniciarse",
+    "Model": "Modelo",
+    "Properties": "Propiedades",
+    "Open IFC": "Abrir IFC",
+    "IFC files (*.ifc)": "Archivos IFC (*.ifc)",
+    "Opening %1...": "Abriendo %1...",
+    "Loading %1 (%2)...": "Cargando %1 (%2)...",
+    "Could not open the model": "No se pudo abrir el modelo",
+    "Search name, type or GlobalId": "Buscar nombre, tipo o GlobalId",
+    "Name": "Nombre",
+    "Type": "Tipo",
+    "Isolate": "Aislar",
+    "Hide": "Ocultar",
+    "Show all": "Mostrar todo",
+    "Yes": "Sí",
+    "No": "No",
+    "Property": "Propiedad",
+    "Value": "Valor",
+    "Error": "Error",
+    "Element": "Elemento",
+    # plural forms: (singular, plural)
+    "Loading... %n element(s)": ("Cargando... %n elemento", "Cargando... %n elementos"),
+    "%n element(s) loaded in %1 s": ("%n elemento cargado en %1 s", "%n elementos cargados en %1 s"),
 }
 
 
@@ -36,7 +59,15 @@ def main():
         if tr is None or tr.get("type") in ("obsolete", "vanished"):
             continue
         if src in ES:
-            tr.text = ES[src]
+            value = ES[src]
+            if msg.get("numerus") == "yes":
+                for child in list(tr):
+                    tr.remove(child)
+                tr.text = None
+                for form in value if isinstance(value, tuple) else (value, value):
+                    ET.SubElement(tr, "numerusform").text = form
+            else:
+                tr.text = value
             tr.attrib.pop("type", None)
             filled += 1
         elif tr.get("type") == "unfinished" or not (tr.text or "").strip():

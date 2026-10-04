@@ -4,58 +4,180 @@
 <context>
     <name>kimcad::MainWindow</name>
     <message>
-        <location filename="../src/MainWindow.cpp" line="17"/>
+        <location filename="../src/MainWindow.cpp" line="38"/>
         <location filename="../tests/test_translations.cpp" line="14"/>
         <source>Ready</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="22"/>
+        <location filename="../src/MainWindow.cpp" line="68"/>
+        <source>KIMCAD cannot start</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="80"/>
         <location filename="../tests/test_translations.cpp" line="12"/>
         <source>&amp;File</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="23"/>
+        <location filename="../src/MainWindow.cpp" line="81"/>
         <location filename="../tests/test_translations.cpp" line="13"/>
         <source>&amp;Open IFC...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="26"/>
+        <location filename="../src/MainWindow.cpp" line="85"/>
         <source>&amp;Quit</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="30"/>
+        <location filename="../src/MainWindow.cpp" line="89"/>
         <source>&amp;View</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="31"/>
+        <location filename="../src/MainWindow.cpp" line="90"/>
         <source>&amp;Fit all</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="34"/>
+        <location filename="../src/MainWindow.cpp" line="94"/>
         <source>&amp;Help</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="35"/>
+        <location filename="../src/MainWindow.cpp" line="95"/>
         <source>&amp;About KIMCAD</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="41"/>
+        <location filename="../src/MainWindow.cpp" line="101"/>
+        <source>Model</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="105"/>
+        <source>Properties</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="114"/>
         <source>About KIMCAD</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="42"/>
+        <location filename="../src/MainWindow.cpp" line="115"/>
         <source>KIMCAD %1
 Open-source native BIM for architects, with version control built in.
 License: GPL-3.0-or-later</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="129"/>
+        <source>Open IFC</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="129"/>
+        <source>IFC files (*.ifc)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="144"/>
+        <source>Opening %1...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="177"/>
+        <source>Loading %1 (%2)...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/MainWindow.cpp" line="187"/>
+        <source>Loading... %n element(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/MainWindow.cpp" line="199"/>
+        <source>%n element(s) loaded in %1 s</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="208"/>
+        <source>Could not open the model</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>kimcad::ModelTreePanel</name>
+    <message>
+        <location filename="../src/ModelTreePanel.cpp" line="22"/>
+        <source>Search name, type or GlobalId</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ModelTreePanel.cpp" line="25"/>
+        <source>Name</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ModelTreePanel.cpp" line="25"/>
+        <source>Type</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ModelTreePanel.cpp" line="145"/>
+        <source>Isolate</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ModelTreePanel.cpp" line="146"/>
+        <source>Hide</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ModelTreePanel.cpp" line="148"/>
+        <source>Show all</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>kimcad::PropertiesPanel</name>
+    <message>
+        <location filename="../src/PropertiesPanel.cpp" line="18"/>
+        <source>Yes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/PropertiesPanel.cpp" line="18"/>
+        <source>No</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/PropertiesPanel.cpp" line="43"/>
+        <source>Property</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/PropertiesPanel.cpp" line="43"/>
+        <source>Value</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/PropertiesPanel.cpp" line="60"/>
+        <source>Error</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/PropertiesPanel.cpp" line="63"/>
+        <source>Element</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

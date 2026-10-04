@@ -84,7 +84,9 @@ def properties(guid: str) -> str:
 
 _iterator = None
 _iterator_done = True
-NOT_DISPLAYED = ["IfcOpeningElement"]  # voids are subtracted from their hosts, never drawn
+# Voids are subtracted from their hosts; spaces are room volumes that would hide walls and windows.
+# Both stay in the tree and properties; spaces get a "show spaces" toggle later.
+NOT_DISPLAYED = ["IfcOpeningElement", "IfcSpace"]
 
 
 def start_meshing(threads: int = 0) -> str:
