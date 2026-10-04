@@ -5,10 +5,15 @@ qt_add_library(kimcad_core STATIC
     src/Translations.cpp src/Translations.h
     src/PythonEngine.cpp src/PythonEngine.h
     src/MeshChunk.cpp src/MeshChunk.h
+    src/ElementBatch.cpp src/ElementBatch.h
+    src/Viewport.cpp src/Viewport.h
+    src/SelfTest.cpp src/SelfTest.h
 )
 target_include_directories(kimcad_core PUBLIC src)
-target_link_libraries(kimcad_core PUBLIC Qt6::Widgets Python3::Python)
-target_compile_definitions(kimcad_core PUBLIC KIMCAD_VERSION="${PROJECT_VERSION}")
+target_link_libraries(kimcad_core PUBLIC Qt6::Widgets Python3::Python
+    TKernel TKMath TKService TKV3d TKOpenGl TKBRep TKG3d)
+target_include_directories(kimcad_core PUBLIC ${OpenCASCADE_INCLUDE_DIR})
+target_compile_definitions(kimcad_core PUBLIC KIMCAD_VERSION="${PROJECT_VERSION}" _USE_MATH_DEFINES)
 qt_add_translations(kimcad_core
     TS_FILES translations/kimcad_en.ts translations/kimcad_es.ts
     RESOURCE_PREFIX /i18n
@@ -27,3 +32,11 @@ endfunction()
 kimcad_test(test_translations)
 kimcad_test(test_python_engine)
 kimcad_test(test_mesh_chunk)
+kimcad_test(test_element_batch)
+
+# GUI self-test: needs a real OpenGL window (GPU, or Mesa on the Linux CI runner). Label "gui".
+add_test(NAME app_selftest_fixture COMMAND kimcad-app --self-test :fixture: --frames 5)
+set_tests_properties(app_selftest_fixture PROPERTIES
+    LABELS gui
+    ENVIRONMENT "KIMCAD_PYTHON_PATH=${PROJECT_SOURCE_DIR}/python"
+    PASS_REGULAR_EXPRESSION "\"ok\":true.*\"pick_matched\":2.*\"pick_missed\":0")
