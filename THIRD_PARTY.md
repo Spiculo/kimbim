@@ -8,6 +8,7 @@ KIMCAD is GPL-3.0-or-later. These are the components it uses, how each is linked
 | Python | PSF-2.0 | Runtime | Separate interpreter |
 | blake3 (Python) | Apache-2.0 / CC0-1.0 | Content hashes | Dynamic |
 | NumPy | BSD-3-Clause | Required by `ifcopenshell.api` | Dynamic |
+| lark | MIT | Parser used by IfcOpenShell utilities | Dynamic |
 | Git | GPL-2.0-only (program) | `git fast-import`, repack, branch | Separate program |
 | gix (gitoxide) | MIT OR Apache-2.0 | Reading the Git object database | Static (Rust) |
 | rayon | MIT OR Apache-2.0 | Parallel reads | Static (Rust) |

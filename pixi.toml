@@ -13,6 +13,7 @@ pytest = ">=8"
 rust = ">=1.85"
 git = ">=2.45"
 pip = "*"
+lark = "*"
 
 [tasks]
 build = "maturin develop --release --skip-install"
@@ -23,3 +24,4 @@ test = { depends-on = ["check-spdx", "test-rust", "test-py"] }
 fetch-corpus = "python tests/corpus/fetch.py"
 golden = { cmd = "pytest -m \"golden and not slow\"", depends-on = ["build"] }
 golden-all = { cmd = "pytest -m golden", depends-on = ["build"] }
+kimcad = { cmd = "python -m kimcad", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/python" } }
