@@ -40,7 +40,7 @@ derived cache  (.kimcad/cache, keyed by record hash + kernel version)
   - frustum culling, and presentation of mesh primitive arrays for large counts.
 - It is LGPL with the OCCT exception, which is already a dependency.
 
-**Spike S2:** load 100k-object models (from the test corpus) as mesh-array presentations rather than BRep presentations, and measure frame rate, memory and selection latency on mid-range hardware. Acceptance targets: about 30 fps while orbiting, under 100 ms to pick.
+**Spike S2 (done, [11](11-spike-results.md#viewer-occt-ais-rendering-picking-and-memory)):** 110k elements run at 32 fps with picking under 20 ms and 232 MB on an integrated GPU, **if elements are batched**. One OCCT object per element gave 2.7 fps and 3.2 GB. So the viewport uses **batched presentations with one selection owner per element** (D42): about 1,000 elements per AIS object, grouped by storey and type. Picking, highlighting, hiding and isolating stay per element. OCCT must be the conda-forge `novtk` build (D43), or Windows falls back to software rendering through Mesa.
 
 ### Later renderer (only if S2 or real usage demands it)
 

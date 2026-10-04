@@ -8,7 +8,7 @@ This code is not production code. It exists to measure and to fail fast.
 | Spike | Folder | Question |
 |-------|--------|----------|
 | S1 | `s1_shared_model/` | Can a C++ host and embedded `ifcopenshell` Python share one in-memory model? |
-| S2 | `s2_geometry/` | How fast can IfcOpenShell tessellate large models (CPU side of the viewer)? |
+| S2 | `s2_geometry/`, `s2_viewer/` | How fast can IfcOpenShell tessellate large models, and can the OCCT viewer render and pick them? |
 | S3 | `s3_records/` | Does IFC → canonical records → IFC round-trip losslessly and deterministically? Do edits stay local? |
 | S4 | `s3_records/` (run on 2 OSs) | Do Windows and Linux produce identical record hashes? |
 | S5 | `s5_git_store/` | Can a Git object database (gitoxide) hold a 1M-record model? |
@@ -42,6 +42,10 @@ cd spikes/s5_git_store && cargo build --release
 target/release/s5_git_store <repo-dir> 1000000            # import via git fast-import
 git -C <repo-dir> repack -adf --window=0                   # no-delta pack for fast reads
 target/release/s5_git_store <repo-dir> 0 0 read            # read-back benchmark
+
+# S2 viewer (pixi environment "s2" adds pythonocc-core + PySide6 on the same OCCT)
+pixi run python spikes/s2_viewer/prepare_meshes.py <model.ifc> spikes/s2_viewer/out/model.npz
+pixi run -e s2 python spikes/s2_viewer/view_bench.py spikes/s2_viewer/out/model.npz batched 1000000000 1000 offscreen
 
 # S1 (Linux/WSL; needs conda-forge ifcopenshell, NOT the pip wheel)
 micromamba create -p ~/kimcad-s1/env -c conda-forge python=3.12 ifcopenshell=0.9.0 cxx-compiler cmake make

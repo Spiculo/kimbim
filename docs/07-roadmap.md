@@ -24,7 +24,7 @@ M4 Libraries + cloning + drawings          R4 Merge + reconciliation
 | Id | Question | Status ([results](11-spike-results.md)) |
 |----|----------|--------|
 | S1 | Can C++ host and embedded `ifcopenshell` Python share one in-memory `IfcFile`? | ✅ Yes on Linux (conda-forge build). Windows run still to do |
-| S2 | Can the OCCT AIS viewer handle 100k objects as mesh arrays? | 🟡 Tessellation: 110k elements in 28 s (hybrid kernel). Rendering frame rate and picking move into M1's exit criteria |
+| S2 | Can the OCCT AIS viewer handle 100k objects as mesh arrays? | ✅ Yes, batched: 110k elements at 32 fps, 232 MB on an integrated GPU; per-element objects fail (2.7 fps, 3.2 GB) (D42, D43) |
 | S3 | Does the record decomposition round-trip the test corpus losslessly? | ✅ Yes: 77/77 valid files lossless, fixed point, deterministic export (D34–D36) |
 | S4 | Do Windows and Linux produce identical record hashes? | ✅ Yes: 77/77 identical state hashes and IFC exports |
 | S5 | How do `gix` writes perform at 1M blobs: commit time, repo size, checkout-to-model time? | ✅ Viable with packs only and no deltas (D39) |

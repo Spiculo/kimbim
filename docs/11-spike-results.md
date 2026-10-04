@@ -8,7 +8,7 @@ Code and instructions: [`spikes/`](../spikes/README.md). Test corpus: 80 buildin
 | Spike | Question | Verdict |
 |-------|----------|---------|
 | S1 | One in-memory model shared by C++ and embedded Python? | **Yes**, with conda-forge's shared-library build. Not possible with the pip wheel. |
-| S2 | Can IfcOpenShell tessellate big models fast enough for the viewer? | **Yes, with the hybrid CGAL/OCCT kernel**: 110k elements in 28 s on 16 threads. Rendering half moves to M1. |
+| S2 | Can IfcOpenShell + the OCCT viewer handle 100k-element models? | **Yes, if elements are drawn in batches**: tessellation 110k elements in 28 s (hybrid kernel); viewer 32 fps and 232 MB on an integrated GPU with batches of 1,000 elements, but 2.7 fps and 3.2 GB with one object per element. |
 | S3 | Lossless, deterministic IFC ↔ records round-trip? Local edits? | **Yes**, after three design rules found by the spike (below). |
 | S4 | Identical hashes on Windows and Linux? | **Yes: 77/77 identical state hashes and byte-identical IFC exports.** |
 | S5 | Git object DB for a 1M-record model? | **Yes, if records are written as packs (never loose objects) and packs avoid deltas.** |
@@ -66,7 +66,34 @@ Hybrid kernel, 16 threads, machine otherwise idle:
 - Use `hybrid-cgal-simple-opencascade` (Bonsai's choice) for display tessellation. Exact OCCT stays available for precise operations (drawings, measuring, clash).
 - Pure CGAL is out: it silently loses elements.
 - Tessellation results are cached per record hash ([05](05-geometry-rendering-drawings.md)), so a model is only tessellated fully once.
-- **Still to do:** frame rate and picking latency need the M0 Qt/OCCT viewport.
+- Frame rate and picking: see the viewer measurements below.
+
+### Viewer: OCCT AIS rendering, picking and memory
+
+**Setup:**
+- Hardware: AMD Ryzen 7 5700U laptop with integrated Radeon graphics, the low end of what architects use. OpenGL 4.6.
+- Software: OCCT 8.0.1 driven through pythonocc-core. Rendering, picking and memory all happen in OCCT's C++, as they would in the app.
+- Code: `spikes/s2_viewer/`. Each element mesh (hybrid kernel, world coordinates) becomes a mesh-only face shown with `AIS_Shape`, so OCCT selection works.
+- Run: 1280×800, camera orbiting over 120 frames, 100 random hover picks.
+
+| Model | Layout | OCCT objects | Load | Frame median / p95 | FPS | Pick p95 | Memory |
+|---|---|---|---|---|---|---|---|
+| Duplex (286 el., 27k tris) | per element | 286 | 0.3 s | 16.6 / 17.2 ms | ≥ 60 (vsync) | 0.3 ms | 110 MB |
+| Schependomlaan (3,589 el., 261k tris) | per element | 3,589 | 3.9 s | 16.8 / 32.4 ms | ≥ 60 (vsync) | 1.8 ms | 200 MB |
+| Schependomlaan | batches of 1,000 | 4 | 3.5 s | 16.6 / 17.5 ms | ≥ 60 (vsync) | 10 ms | 117 MB |
+| **Synthetic 110k el. (1.52M tris)** | per element | 110,000 | 33 s | **374 / 412 ms** | **2.7** | 0.4 ms | **3.2 GB** |
+| **Synthetic 110k el. (1.52M tris)** | **batches of 1,000** | 110 | 22 s | **31.5 / 46 ms** | **31.7** | 18 ms | **232 MB** |
+
+(pythonocc keeps vsync on, so anything under 16.7 ms reads as "≥ 60 fps". Load times include building meshes in Python; C++ will be faster.)
+
+**Findings**
+- **OCCT's cost is per interactive object, not per triangle.** 110,000 separate objects are unusable: 2.7 fps and 3.2 GB. The same geometry in 110 batches meets the targets (≥ 30 fps, pick under 100 ms) on integrated graphics.
+- **Real single-discipline models (a few thousand elements) are fine either way**, at 60 fps.
+- **The conda-forge "all" build of OCCT forces software rendering on Windows.** It pulls VTK, then viskores, then Mesa, whose `opengl32.dll` lands in the environment and is loaded before the GPU driver. The first measurements ran on Mesa llvmpipe (the CPU). Fix: pin OCCT's `novtk` build (D43). Without this, every KIMCAD user on Windows would have had CPU rendering.
+
+**Decisions (D42, D43)**
+- The viewport draws elements in **batches** (about 1,000 elements per OCCT object, grouped by storey and type). Each batch is a custom AIS object with **one selection owner per element**, so picking, highlighting, hiding and isolating stay per element.
+- OCCT is pinned to the `novtk` build in `pixi.toml`, and CI checks the environment contains no `opengl32.dll`.
 
 ## S3 — Canonical records round-trip
 

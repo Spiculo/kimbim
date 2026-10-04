@@ -6,6 +6,8 @@ platforms = ["win-64", "linux-64"]
 [dependencies]
 python = "3.12.*"
 ifcopenshell = "0.9.0.*"
+# OCCT without VTK: the "all" build pulls Mesa (opengl32.dll) into the env, forcing software rendering on Windows (spike S2)
+occt = { version = "8.0.1.*", build = "novtk*" }
 blake3 = ">=1.0"
 numpy = "*"
 maturin = ">=1.15,<2"
@@ -25,3 +27,12 @@ fetch-corpus = "python tests/corpus/fetch.py"
 golden = { cmd = "pytest -m \"golden and not slow\"", depends-on = ["build"] }
 golden-all = { cmd = "pytest -m golden", depends-on = ["build"] }
 kimcad = { cmd = "python -m kimcad", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/python" } }
+
+# Spike S2 (viewer): OCCT AIS viewer through pythonocc-core, same OCCT (8.0.1) as ifcopenshell 0.9
+[feature.s2.dependencies]
+pythonocc-core = { version = "8.0.1.*", build = "novtk*" }
+pyside6 = "*"
+psutil = "*"
+
+[environments]
+s2 = { features = ["s2"], solve-group = "default" }
