@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Re-run S3 on Linux for files matching a filter and merge into out-linux/ results.
 set -euo pipefail
-SRC=/mnt/c/Users/lecot/OneDrive/Projects/kimcad/spikes
+SRC="$(cd "$(dirname "$0")/.." && pwd)"  # the spikes/ folder of this checkout
 DST=~/kimcad-spikes
 cp "$SRC"/s3_records/*.py "$DST/s3_records/"
 cd "$DST/s3_records"
