@@ -19,6 +19,7 @@ These documents guide development. They come from the original spec (`../doc.md`
 | 08 | [Future: Collaboration and Beyond](08-future.md) | Sync, live collaboration, P2P, host, security, AI (deferred) |
 | 09 | [Testing and Quality](09-testing-and-quality.md) | Test corpus, round-trip, determinism, benchmarks |
 | 10 | [Forge Feasibility](10-forge-feasibility.md) | An architect-oriented alternative to GitHub (future) |
+| 11 | [Spike Results](11-spike-results.md) | What spikes S1–S5 measured and what they changed in the design |
 | — | [Decision Log](decisions.md) | Every architectural decision and its status |
 | — | [Open Questions](open-questions.md) | What is still undecided |
 | — | [Glossary](glossary.md) | BIM / IFC / VCS terms |

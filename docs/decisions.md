@@ -38,4 +38,10 @@ To change a decision, add a new entry that supersedes the old one. Never edit hi
 | D30 | Architecture compatible with **IFC4 and IFC4X3** (schema-agnostic code, schema-tagged records, no silent conversion). **MVP ships IFC4**: new projects IFC4; IFC4X3 opens/saves best-effort; full IFC4X3 after MVP | Decided | [02](02-data-model-and-format.md#ifc-schema-version) |
 | D31 | Model resolution default **0.01 mm (1e-5 m)**, matching IFC/IfcOpenShell precision conventions | Decided | [02](02-data-model-and-format.md#4-quantize-at-the-operation-boundary) |
 | D32 | Source code hosted on **GitHub**; local repo initialized with `main` branch | Decided | Owner |
-| D33 | Architect-oriented forge ("KIMCAD Hub"), post-MVP: add-on service on unmodified Forgejo first; fork Forgejo only if needed; **do not fork GitLab** | Proposed | [10](10-forge-feasibility.md) |
+| D33 | Architect-oriented forge ("KIMCAD Hub"), post-MVP: add-on service on unmodified Forgejo first; fork Forgejo only if needed; **do not fork GitLab** | Decided | [10](10-forge-feasibility.md) |
+| D34 | Records classified by **content class**, not instance; shared mutable non-rooted entities get **stable IDs**; loose entities keep multiplicity | Decided (spike S3) | [02](02-data-model-and-format.md#decomposing-the-ifc-graph-into-records), [11](11-spike-results.md) |
+| D35 | Strings stored exactly as parsed (no NFC); INTEGER vs REAL kept distinct; SETs sorted | Decided (spike S3) | [02](02-data-model-and-format.md#canonical-format) |
+| D36 | Import validates input and reports schema-invalid data and duplicate GlobalIds (repair / read-only / cancel) | Proposed (spike S3) | [02](02-data-model-and-format.md#import-policies-from-spike-s3) |
+| D37 | Build dependencies (IfcOpenShell C++ + Python) come from **conda-forge** shared-library builds; pip wheels can't share a model with C++ | Decided (spike S1) | [01](01-architecture.md#python), [11](11-spike-results.md) |
+| D38 | Display tessellation uses the **hybrid CGAL/OCCT kernel**; exact OCCT for precise ops | Decided (spike S2) | [05](05-geometry-rendering-drawings.md#geometry-pipeline) |
+| D39 | Git storage: **packs only** (no loose objects), **no deltas** for record blobs, adaptive sharding, model cache for opening | Decided (spike S5) | [03](03-versioning.md#repository-layout) |

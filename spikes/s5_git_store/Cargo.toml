@@ -1,0 +1,9 @@
+[package]
+name = "s5_git_store"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+blake3 = "1.8.7"
+gix = "0.88"
+rayon = "1.12.0"

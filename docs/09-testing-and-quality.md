@@ -21,7 +21,7 @@ Large files are stored with Git LFS or downloaded by a script, so they are not c
 |-------|----------------|:--------------:|
 | **Round-trip** | IFC → records → IFC is semantically equal; records → IFC → records is a fixed point (identical hashes) | Yes |
 | **Determinism** | Golden record and tree hashes are identical on Windows and Linux CI | Yes |
-| **Canonical format** | JSON canonicalization rules: sorting, numbers, NFC, unset omission | Yes |
+| **Canonical format** | JSON canonicalization rules: key sorting, SET ordering, numbers (INTEGER vs REAL), exact strings, unset omission | Yes |
 | **Merge** | Three-way merge scenarios, including ported `ifcmerge` cases; merge is deterministic and commutative where expected | Yes |
 | **Reconciliation** | Match rates and no false matches on the reconciliation pairs | Yes |
 | **Commands** | Each authoring command: apply → expected change set → undo restores identical records | Yes |

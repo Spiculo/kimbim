@@ -21,15 +21,15 @@ M4 Libraries + cloning + drawings          R4 Merge + reconciliation
 
 ## Spikes (do first; each is small, throwaway, and documented)
 
-| Id | Question | Done when |
-|----|----------|-----------|
-| S1 | Can C++ host and embedded `ifcopenshell` Python share one in-memory `IfcFile`? | Working prototype or a documented alternative ([01](01-architecture.md#python)) |
-| S2 | Can the OCCT AIS viewer handle 100k objects as mesh arrays? | Benchmark report ([05](05-geometry-rendering-drawings.md#phase-1-renderer-opencascade-visualization-ais--v3d-inside-qt)) |
-| S3 | Does the record decomposition round-trip the test corpus losslessly? | Python prototype passes on corpus ([02](02-data-model-and-format.md#round-trip-guarantee)) |
-| S4 | Do Windows and Linux produce identical record hashes? | Same hashes in CI on both ([02](02-data-model-and-format.md#determinism)) |
-| S5 | How do `gix` writes perform at 1M blobs: commit time, repo size, checkout-to-model time? | Benchmark report ([03](03-versioning.md)) |
+| Id | Question | Status ([results](11-spike-results.md)) |
+|----|----------|--------|
+| S1 | Can C++ host and embedded `ifcopenshell` Python share one in-memory `IfcFile`? | ✅ Yes on Linux (conda-forge build). Windows run still to do |
+| S2 | Can the OCCT AIS viewer handle 100k objects as mesh arrays? | 🟡 Tessellation: 110k elements in 28 s (hybrid kernel). Rendering frame rate and picking move into M1's exit criteria |
+| S3 | Does the record decomposition round-trip the test corpus losslessly? | ✅ Yes: 77/77 valid files lossless, fixed point, deterministic export (D34–D36) |
+| S4 | Do Windows and Linux produce identical record hashes? | ✅ Yes: 77/77 identical state hashes and IFC exports |
+| S5 | How do `gix` writes perform at 1M blobs: commit time, repo size, checkout-to-model time? | ✅ Viable with packs only and no deltas (D39) |
 
-S3 and S4 can be prototyped in **Python with `ifcopenshell`** before any Rust is written. That is the cheapest way to validate the data model.
+The spike code lives in [`spikes/`](../spikes/README.md).
 
 ## App track
 

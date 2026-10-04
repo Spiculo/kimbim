@@ -17,6 +17,7 @@ derived cache  (.kimcad/cache, keyed by record hash + kernel version)
 ```
 
 - **Reuse:** the IfcOpenShell geometry iterator already converts every IFC representation type (extrusions, booleans and openings, BReps, tessellations, mapped items/instancing) into meshes and/or OpenCASCADE shapes, in parallel. KIMCAD writes no IFC geometry interpretation of its own.
+- **Kernel (spike S2):** display tessellation uses IfcOpenShell's `hybrid-cgal-simple-opencascade` kernel, the same choice as Bonsai. On the Clinic model (3,258 elements) it took 3.1 s versus 17.9 s for pure OpenCASCADE, with no elements lost. Pure CGAL was faster still but silently dropped elements, so it is not used. Exact OpenCASCADE stays in use for precise work: drawings, measuring and clash.
 - **Incremental:** a change set re-tessellates only the affected objects. When an opening changes, that includes its host wall.
 - **Derived data is never part of the model state** ([02](02-data-model-and-format.md#determinism)).
 - **Instancing:** mapped representations (`IfcMappedItem`, used for repeated types) stay instanced all the way to the GPU.

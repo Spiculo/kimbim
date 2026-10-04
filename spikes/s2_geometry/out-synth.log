@@ -1,0 +1,15 @@
+  generated 10000 walls (27s)
+  generated 20000 walls (55s)
+  generated 30000 walls (85s)
+  generated 40000 walls (113s)
+  generated 50000 walls (142s)
+  generated 60000 walls (169s)
+  generated 70000 walls (194s)
+  generated 80000 walls (222s)
+  generated 90000 walls (249s)
+  generated 100000 walls (274s)
+synth-100000.ifc: 110003 products, 110000 tessellated, 1,520,000 triangles | open 11.4s, tessellate 27.7s on 16 threads, hybrid-cgal-simple-opencascade (3,965 elem/s) | RSS after open 1022 MB, peak 1729 MB
+Duplex_A_20110907.ifc: 295 products, 286 tessellated, 25,056 triangles | open 0.2s, tessellate 0.3s on 16 threads, hybrid-cgal-simple-opencascade (920 elem/s) | RSS after open 66 MB, peak 100 MB
+Clinic_Architectural.ifc: 3298 products, 3258 tessellated, 184,705 triangles | open 1.0s, tessellate 1.6s on 16 threads, hybrid-cgal-simple-opencascade (1,980 elem/s) | RSS after open 153 MB, peak 230 MB
+1807_EP_AR_v18.ifc: 2862 products, 2846 tessellated, 178,735 triangles | open 1.3s, tessellate 9.4s on 16 threads, hybrid-cgal-simple-opencascade (302 elem/s) | RSS after open 200 MB, peak 326 MB
+IFC Schependomlaan.ifc: 3822 products, 3654 tessellated, 261,067 triangles | open 5.5s, tessellate 1.7s on 16 threads, hybrid-cgal-simple-opencascade (2,173 elem/s) | RSS after open 436 MB, peak 611 MB

@@ -18,18 +18,25 @@ IFC entities fall into two kinds:
 | Kind | Examples | Has GlobalId | KIMCAD treatment |
 |------|----------|--------------|------------------|
 | **Rooted** (`IfcRoot` subtypes) | `IfcWall`, `IfcDoor`, `IfcPropertySet`, `IfcRelContainedInSpatialStructure`, `IfcWallType` | yes | **Identity record.** It has a stable KIMCAD ID and changes over time. |
-| **Non-rooted** | `IfcCartesianPoint`, `IfcLocalPlacement`, `IfcExtrudedAreaSolid`, `IfcPropertySingleValue`, `IfcMaterialLayerSet` | no | **Value.** It is immutable and embedded in its owner, or stored as a content-addressed shared value. |
+| **Non-rooted** | `IfcCartesianPoint`, `IfcLocalPlacement`, `IfcExtrudedAreaSolid`, `IfcPropertySingleValue`, `IfcMaterialLayerSet`, `IfcOwnerHistory` | no | **Value**, embedded in its owner, or a **shared node** with a stable ID. |
 
-Rules:
+Rules (validated by spike S3, see [11](11-spike-results.md#s3--canonical-records-round-trip)):
 
-1. **One file per rooted entity.** Its non-rooted subgraph (placement, property values, and so on) is **embedded inline** as nested JSON.
-2. **Shared values.** If more than one rooted entity references a non-rooted entity (a shared material layer set, a shared profile, a mapped representation), it becomes a **shared value record**. It is stored once and referenced by content hash.
-3. **Heavy geometry.** Representation items above a size threshold (large tessellations from Revit exports, for example) are split into **geometry records** referenced by hash. A property-only change then never rewrites geometry. This is the spec's structural sharing (§10) done at the record level.
-4. References to rooted entities use the **KIMCAD ID**. References to values use the **content hash**. Step `#ids` never appear.
-5. **Owned-value references.** Some non-rooted entities are owned by a single rooted entity but referenced from others. The main case is a storey's `IfcLocalPlacement`, which every contained element references through `PlacementRelTo`. These are referenced by **owner path** (`{"owner": <id>, "path": "ObjectPlacement"}`), not by hash. If hash references were used here, moving a storey would change the hash and force a rewrite of every element on it. Rule 2 (shared values) applies only to non-rooted entities that have no single owner.
-6. Inverse attributes are not stored, because they are derived. Relationships are stored once, as the rooted `IfcRel*` entities that IFC already defines.
+1. **One record per rooted entity** (`o/<id>`). Its non-rooted subgraph (placement, property values, and so on) is **embedded inline** as nested JSON.
+2. **Classify by content, never by instance.** Identical non-rooted entities are first grouped into **content classes** (hash-consing). Reference counts are then taken between classes, as distinct (parent class, attribute, index) edges. Real exports contain duplicate identical entities, and an export merges them. If classification depended on instance counts, export → re-import would change the records.
+3. **Inline** when a class has exactly one reference edge.
+4. **Owner-path reference** when several entities reference a class but exactly one rooted entity holds it in a single-valued attribute. The main case is a storey's `IfcLocalPlacement`, referenced by every contained element's `PlacementRelTo`. The value is embedded in the owner, and other references use `{"@a": "<owner id>/<attribute>"}`. Raising a storey therefore changes **one** record (spike S3).
+5. **Shared nodes** (`n/<id>`) for everything else that is referenced from several places: owner history, representation contexts, representation maps, materials, profiles. A shared node gets a **stable ID**: the content hash at first import, **kept when its content later changes**. Without this, one `IfcOwnerHistory` timestamp update rewrote 3,897 of 9,996 records (spike S3). New shared nodes created while editing get fresh IDs (UUIDv7-style), not content hashes, so they cannot collide with an older node's original hash.
+6. **Loose entities** (`l/<hash>`) are entities nothing references, e.g. `IfcStyledItem`. They are keyed by content and stored with a **count**, so identical duplicates survive the round trip.
+7. **Heavy geometry.** Representation items above a size threshold (large tessellations from Revit exports, for example) are split into **geometry records**. A property-only change then never rewrites geometry. This is the spec's structural sharing (§10) done at the record level.
+8. Step `#ids` never appear. Inverse attributes are not stored, because they are derived. Relationships are stored once, as the rooted `IfcRel*` entities that IFC already defines.
 
-This structure is naturally a Merkle DAG. Changing `FireRating` on a wall rewrites only that wall's `IfcPropertySet` record, plus the tree nodes above it (see [03](03-versioning.md)).
+This structure is naturally a Merkle DAG. Measured edit locality (spike S3, Duplex model, 9,996 records): setting one property changes **1** record, moving a wall changes **4**, and raising a storey whose contents follow changes **1**.
+
+### Import policies (from spike S3)
+
+- **Invalid input.** ifcopenshell reads some schema-invalid files that it then refuses to write (e.g. IFC4 ADD1-era `PnIndex`). Import validates every file (`ifcopenshell.validate`) and reports problems. The user then chooses: repair automatically where a known fix exists, import read-only, or cancel.
+- **Duplicate GlobalIds** occur in real exports. Import gives the second and later occurrences new KIMCAD IDs, deterministically in file order, and lists them in the import report.
 
 ## IFC schema version
 
@@ -108,10 +115,13 @@ Example record (illustrative; the exact schema is decided during milestone R1):
 
 Canonicalization rules:
 
-- Keys are sorted, there is no insignificant whitespace, and text is UTF-8 normalized to NFC.
+- Keys are sorted, there is no insignificant whitespace, and text is UTF-8.
+- **Strings are stored exactly as parsed. They are not Unicode-normalized**, because NFC would alter source data and break losslessness (spike S3).
 - Enumerations are stored without the STEP dots.
-- `$` (unset) attributes are omitted, never written as `null`.
-- Numbers follow the [determinism](#determinism) rules.
+- `$` (unset) attributes are omitted, never written as `null`. Derived attributes (`*`) are not stored; the writer regenerates them.
+- **SET aggregates are sorted** by the canonical bytes of their members. LIST, ARRAY and BAG keep their order.
+- Typed values in SELECTs keep their type: `{"@t": "IfcLabel", "v": "x"}`.
+- Numbers follow the [determinism](#determinism) rules. **INTEGER and REAL stay distinct** (`1` vs `1.0`). This is a deliberate deviation from RFC 8785, which would write both as `1`.
 - Every record carries its format version (`"k": "kimcad/1"`), and format changes come with migrations.
 
 ## Round-trip guarantee

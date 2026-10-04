@@ -69,7 +69,7 @@ The KIMCAD desktop app stays the primary authoring interface ([00](00-vision-and
 - It can work with **Forgejo first**, and later also with GitLab or GitHub through their APIs, because it never modifies the forge.
 - Fork Forgejo (option B) only for things the API cannot do. Before forking, try to upstream those changes.
 
-**Verdict: recommended.** It has the lowest maintenance, needs no fork, and reuses the KIMCAD engine. Any piece can later move into a Forgejo fork if needed.
+**Verdict: recommended — Decided (D33).** It has the lowest maintenance, needs no fork, and reuses the KIMCAD engine. Any piece can later move into a Forgejo fork if needed.
 
 ## Architect-oriented features (Hub backlog sketch)
 

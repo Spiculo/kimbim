@@ -21,7 +21,7 @@ What this gives us for free:
 
 What it costs:
 
-- Git uses SHA-1 (or SHA-256) for storage. KIMCAD still uses BLAKE3 for its own value/geometry references inside records, so the two hash spaces are independent.
+- Git uses SHA-1 (or SHA-256) for storage. KIMCAD still uses BLAKE3 for its own content keys (loose and geometry records, and the initial IDs of shared nodes), so the two hash spaces are independent.
 - We must use a custom **merge** (Git's text merge is never used on records) and keep Git from checking out 1M files (see below).
 
 **Library:** `gitoxide` (`gix`, pure Rust, MIT/Apache-2.0) for object and ref access. For network operations where `gix` is still incomplete, call the `git` CLI as a fallback. Bonsai's IfcGit does exactly this.
@@ -43,14 +43,20 @@ Tree structure inside each commit:
 
 ```text
 kimcad.toml
-objects/<aa>/<bb>/<kimcad-id>.json      # rooted entity records
-shared/<aa>/<blake3>.json                # shared values
-geometry/<aa>/<blake3>.json              # heavy geometry records
+objects/<aa>/<bb>/<kimcad-id>.json      # rooted entity records          (o/)
+nodes/<aa>/<bb>/<node-id>.json           # shared nodes, stable ids       (n/)
+loose/<aa>/<hash>.json                   # unreferenced entities + count  (l/)
+geometry/<aa>/<hash>.json                # heavy geometry records
 ```
 
-With two levels of 256-way sharding, a 1M-object model has about 15 records per leaf tree. A one-property commit rewrites a handful of small tree objects.
+**Adaptive sharding** (spike S5): use one 256-way level below about 64k records and two levels above. With two fixed levels, a 10k-record model produced 9,505 tree objects, almost one per record. At 1M records, two levels give about 15 records per leaf tree, so a one-record commit rewrites only a handful of small trees.
 
-**Records are written straight into the object database.** They are never checked out as files, so Windows/Linux filesystems never see a million JSON files. `kimcad export-tree <dir>` materializes them for debugging.
+**Storage rules** (spike S5, see [11](11-spike-results.md#s5--git-object-database-at-scale)):
+
+- **Records are written into the object database as packs, never as loose objects.** On Windows each loose object costs about 7.6 ms, so a 10k-record import took 140 s loose versus 2.9 s as a pack. A 1M-record import as one pack takes about 6.5 minutes. MVP uses `git fast-import`; a native `gix-pack` writer with parallel compression comes later.
+- **Record blobs are packed without deltas** (`repack --window=0`). Deep delta chains made random reads about 30× slower and saved under 2% of space for small records. Without deltas, 100k records read back in 1.7 s sequentially and 0.2 s on 16 threads.
+- **Commit cost does not depend on model size.** A one-record commit takes about 90 ms at 1M records.
+- Records are never checked out as files, so Windows/Linux filesystems never see a million JSON files. `kimcad export-tree <dir>` materializes them for debugging. Opening a project normally reads the local model cache (`.kimcad/cache`, keyed by tree hash), not every record.
 
 ## Project modes: versioning is optional
 

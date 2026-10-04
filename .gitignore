@@ -38,3 +38,8 @@ CMakeLists.txt.user*
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Spike corpus downloads
+/spikes/corpus/files/
+/spikes/**/out/
+/spikes/**/out-*/

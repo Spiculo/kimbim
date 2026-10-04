@@ -45,7 +45,6 @@
 | `serde`, `serde_json` | MIT OR Apache-2.0 | Records |
 | `blake3` | CC0-1.0 OR Apache-2.0 | Value / geometry hashes |
 | `ryu` | Apache-2.0 OR BSL-1.0 | Shortest round-trip float formatting |
-| `unicode-normalization` | MIT OR Apache-2.0 | NFC strings |
 | `gix` (gitoxide) | MIT OR Apache-2.0 | Git object DB / refs |
 | `cxx` | MIT OR Apache-2.0 | Rust ↔ C++ bridge |
 | `cbindgen` | MPL-2.0 (build tool only) | C header generation |
