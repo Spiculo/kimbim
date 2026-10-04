@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: CI
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: prefix-dev/setup-pixi@v0.10.2
+        with:
+          cache: true
+      - name: SPDX, Rust and Python tests
+        run: pixi run test
+      - uses: actions/cache@v6
+        with:
+          path: tests/corpus/files
+          key: corpus-v1-${{ hashFiles('tests/corpus/fetch.py') }}
+      - name: Fetch IFC corpus
+        run: pixi run fetch-corpus
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Golden hashes and Slice 1 exit test (same results on Windows and Linux)
+        run: pixi run golden

@@ -5,6 +5,7 @@ Files are not committed (see .gitignore). Re-running skips files already present
 Usage: python spikes/corpus/fetch.py
 """
 import json
+import os
 import pathlib
 import urllib.parse
 import urllib.request
@@ -38,7 +39,11 @@ SOURCES = [
 
 def tree(repo):
     url = f"https://api.github.com/repos/{repo}/git/trees/main?recursive=1"
-    with urllib.request.urlopen(url) as r:
+    req = urllib.request.Request(url)
+    token = os.environ.get("GITHUB_TOKEN")  # CI runners share IPs; unauthenticated API calls get rate-limited
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+    with urllib.request.urlopen(req) as r:
         return json.load(r)["tree"]
 
 

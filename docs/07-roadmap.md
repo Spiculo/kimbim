@@ -55,18 +55,24 @@ Library browser and bundled library, copy/paste/duplicate/array/mirror/copy-to-s
 
 ## Repo track
 
-### R0 — Workspace
-Cargo workspace, crates skeleton, `kimcad` CLI skeleton, CI.
+### R0 — Workspace ✅
+Cargo workspace, crates skeleton, `kimcad` CLI skeleton, CI. Done in Slice 1 ([plan](superpowers/plans/2026-10-04-slice1-cli-versioning.md)).
 
-### R1 — Canonical records
+### R1 — Canonical records ✅ (Python)
+Done in Slice 1 in Python (`kimcad.records`), byte-identical to the spike golden hashes. A Rust port waits until speed demands it.
+
 Record decomposition, canonical JSON, BLAKE3 references, records → IFC export with deterministic step IDs.
 **Exit:** corpus round-trip is a fixed point; golden hashes match on Windows and Linux.
 
-### R2 — Store and history
+### R2 — Store and history ✅ (except tags)
+Done in Slice 1: `init / commit / status / log / show / export / branch / switch` through the Rust store. Tags come next.
+
 `kimcad init / import / commit / log / show / export / branch / switch / tag` on the gitoxide-backed store; local cache.
 **Exit:** import 100k-object model, change one property, commit; the new commit adds only a handful of objects.
 
-### R3 — Diff
+### R3 — Diff 🟡
+Record-level diff (added/modified/removed per object) done in Slice 1. Property-level detail and speed work remain.
+
 Tree diff, per-category classification, property-level changes, JSON and human output.
 **Exit:** diff time depends on the size of the change, not the size of the model (benchmark).
 

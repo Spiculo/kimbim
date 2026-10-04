@@ -45,3 +45,5 @@ To change a decision, add a new entry that supersedes the old one. Never edit hi
 | D37 | Build dependencies (IfcOpenShell C++ + Python) come from **conda-forge** shared-library builds; pip wheels can't share a model with C++ | Decided (spike S1) | [01](01-architecture.md#python), [11](11-spike-results.md) |
 | D38 | Display tessellation uses the **hybrid CGAL/OCCT kernel**; exact OCCT for precise ops | Decided (spike S2) | [05](05-geometry-rendering-drawings.md#geometry-pipeline) |
 | D39 | Git storage: **packs only** (no loose objects), **no deltas** for record blobs, adaptive sharding, model cache for opening | Decided (spike S5) | [03](03-versioning.md#repository-layout) |
+| D40 | Python ↔ Rust via **PyO3** (`kimcad._core`); C++ ↔ Rust via `cxx` later: two boundaries, for speed | Decided | Owner |
+| D41 | Slice 1 CLI is Python (it needs ifcopenshell); Rust owns storage: writes via `git fast-import`, reads via gix; one shard level until adaptive sharding is needed | Decided | [plan](superpowers/plans/2026-10-04-slice1-cli-versioning.md) |
