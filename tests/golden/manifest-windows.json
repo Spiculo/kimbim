@@ -1,0 +1,322 @@
+{
+ "bsi/IFC 2.3.0.1 (IFC 2x3 TC1)/Simple-Scene/Building-Architecture.ifc": [
+  "4511a41c10af7d5ee248677147591979",
+  "d301e851a5f2d6d6ac72d3833a2dab29"
+ ],
+ "bsi/IFC 2.3.0.1 (IFC 2x3 TC1)/Simple-Scene/Building-Hvac.ifc": [
+  "060ccbe1d7d0f651f02883285e4abcbf",
+  "3e9047c27a29e5e6d1bae1885485cc2e"
+ ],
+ "bsi/IFC 2.3.0.1 (IFC 2x3 TC1)/Simple-Scene/Building-Landscaping.ifc": [
+  "f44d04752df24a4fa4bebe9581225a6b",
+  "0901569f7d1d38882ec8e1432021c4c7"
+ ],
+ "bsi/IFC 2.3.0.1 (IFC 2x3 TC1)/Simple-Scene/Building-Structural.ifc": [
+  "19cca88ab6c09a2b95b95c6e24f157bd",
+  "7356a0f39b5bb4ae73aa3d0c16f32dd4"
+ ],
+ "bsi/IFC 2.3.0.1 (IFC 2x3 TC1)/Simple-Scene/Infra-Bridge.ifc": [
+  "c1cdb1bae49f20865f09ca1a0cc46323",
+  "19144fec88882f343926c9152064bfb5"
+ ],
+ "bsi/IFC 2.3.0.1 (IFC 2x3 TC1)/Simple-Scene/Infra-Electrical.ifc": [
+  "c3937a656fbe400e0573d6f03f40bcb0",
+  "79b9959c8ee1bb0aec77d3e5401afc0c"
+ ],
+ "bsi/IFC 2.3.0.1 (IFC 2x3 TC1)/Simple-Scene/Infra-Landscaping.ifc": [
+  "7592723d1148bbb3ac84048e22834835",
+  "a64fa353853f6993f61829ffc180f66a"
+ ],
+ "bsi/IFC 2.3.0.1 (IFC 2x3 TC1)/Simple-Scene/Infra-Plumbing.ifc": [
+  "34c4d87d8cd36108c16be0f8f1694b71",
+  "5662ab5d8805dfc8c4c41383d8a0977c"
+ ],
+ "bsi/IFC 2.3.0.1 (IFC 2x3 TC1)/Simple-Scene/Infra-Rail.ifc": [
+  "b0128a9f1e32e744e440b16b88f7e365",
+  "210605b604d40ec273287bf1107306c5"
+ ],
+ "bsi/IFC 2.3.0.1 (IFC 2x3 TC1)/Simple-Scene/Infra-Road.ifc": [
+  "9e8b5cb7509caebf8a167ca9edf768ce",
+  "0d9b12cf05adbccc57008b0b5d6d913f"
+ ],
+ "bsi/IFC 4.0.2.1 (IFC 4 ADD2 TC1)/ISO Spec - ReferenceView_V1.2/basin-tessellation.ifc": [
+  "2816623bdd9b04fe47b21a2ee2ca54c5",
+  "9d11655a3ebb0452853df9978c0ca90a"
+ ],
+ "bsi/IFC 4.0.2.1 (IFC 4 ADD2 TC1)/ISO Spec - ReferenceView_V1.2/column-straight-rectangle-tessellation.ifc": [
+  "21ea64bb1cff5cc089abecb232dd5577",
+  "23c2a40d0544c0b21f1def26f429bb86"
+ ],
+ "bsi/IFC 4.0.2.1 (IFC 4 ADD2 TC1)/ISO Spec - ReferenceView_V1.2/tessellated-item.ifc": [
+  "6042098a59ada2b732bb8f5ba1a81818",
+  "6e8be181a15ff4803aaebd35bea14b0d"
+ ],
+ "bsi/IFC 4.0.2.1 (IFC 4 ADD2 TC1)/ISO Spec - ReferenceView_V1.2/tessellation-with-individual-colors.ifc": [
+  "81f4be4e594a2c9117d3679c2624ae44",
+  "08fcacd4161495dcf9a9263c0cfbca0e"
+ ],
+ "bsi/IFC 4.0.2.1 (IFC 4 ADD2 TC1)/ISO Spec - ReferenceView_V1.2/wall-with-opening-and-window.ifc": [
+  "1a676ffa6cfae905f6021e12d2b54671",
+  "642e56189cce3930ba6049bc3948d265"
+ ],
+ "bsi/IFC 4.0.2.1 (IFC 4 ADD2 TC1)/Simple-Scene/Building-Architecture.ifc": [
+  "0188d9c219fd6802b283d48788a5a36c",
+  "55ea63ec7da376dc1979554485862dca"
+ ],
+ "bsi/IFC 4.0.2.1 (IFC 4 ADD2 TC1)/Simple-Scene/Building-Hvac.ifc": [
+  "e06514df39cf908c5f0efc4d750f551b",
+  "b6ca42717018d37fb8ff69f9f4b3c1d4"
+ ],
+ "bsi/IFC 4.0.2.1 (IFC 4 ADD2 TC1)/Simple-Scene/Building-Landscaping.ifc": [
+  "25f6646fc4da33402ae2c3b75d5032df",
+  "0e0249cbf2c48d6267c438a39ebec9f0"
+ ],
+ "bsi/IFC 4.0.2.1 (IFC 4 ADD2 TC1)/Simple-Scene/Building-Structural.ifc": [
+  "86ebe4b6f6af7abecf85bb2766331f10",
+  "2091121953e19333ed25c3066308d02d"
+ ],
+ "bsi/IFC 4.0.2.1 (IFC 4 ADD2 TC1)/Simple-Scene/Infra-Bridge.ifc": [
+  "7aee48623083c1eb17e7f421d85df597",
+  "cc3fa5fe1210e1343f5f72e164d7bc0c"
+ ],
+ "bsi/IFC 4.0.2.1 (IFC 4 ADD2 TC1)/Simple-Scene/Infra-Electrical.ifc": [
+  "74a935d28474d9186c2fc0a67325e0e5",
+  "9c53ceaf6d80a4c77f165255200c8a6b"
+ ],
+ "bsi/IFC 4.0.2.1 (IFC 4 ADD2 TC1)/Simple-Scene/Infra-Landscaping.ifc": [
+  "7a39701a8a6463f7862ad4d6e3c7d73f",
+  "4617a79c5056d6addda32b6158f4a563"
+ ],
+ "bsi/IFC 4.0.2.1 (IFC 4 ADD2 TC1)/Simple-Scene/Infra-Plumbing.ifc": [
+  "bcf0fbfb6d74b1111cb8445c850969c6",
+  "1ec39262c1f6c7ddadee9a286d04269a"
+ ],
+ "bsi/IFC 4.0.2.1 (IFC 4 ADD2 TC1)/Simple-Scene/Infra-Rail.ifc": [
+  "abe9acd46de212c0283ca34f609287ae",
+  "164e29c1034635e3309b7ee8182ce617"
+ ],
+ "bsi/IFC 4.0.2.1 (IFC 4 ADD2 TC1)/Simple-Scene/Infra-Road.ifc": [
+  "de693357851a6a774e70eac9c9ca1ab1",
+  "b6ced4fe0473d9b2b03fb664deab2a1b"
+ ],
+ "bsi/IFC 4.3.2.0 (IFC 4.3 ADD2)/Simple-Scene/Building-Architecture.ifc": [
+  "41d550b8f284b77456cf4c3077878282",
+  "808417cb1802c5e9a295b7d2478478d2"
+ ],
+ "bsi/IFC 4.3.2.0 (IFC 4.3 ADD2)/Simple-Scene/Building-Hvac.ifc": [
+  "b26a391f85cb17e1c7c2a9b627dd05d2",
+  "872279c0188bfd9b06de1600a2713ce7"
+ ],
+ "bsi/IFC 4.3.2.0 (IFC 4.3 ADD2)/Simple-Scene/Building-Landscaping.ifc": [
+  "959223de8e127aec8c60cf73c7a9fd80",
+  "bbf64d401317dc1cf8c68c8083ff2b30"
+ ],
+ "bsi/IFC 4.3.2.0 (IFC 4.3 ADD2)/Simple-Scene/Building-Structural.ifc": [
+  "6e39ba732bd404b963f926e8cb882b2f",
+  "34f67669d696736a2be012ef935cb4b9"
+ ],
+ "bsi/IFC 4.3.2.0 (IFC 4.3 ADD2)/Simple-Scene/Infra-Bridge.ifc": [
+  "009006c5bd25dbd5ce73ab900b0fc316",
+  "df8127079aa78c168b8df428f537faa9"
+ ],
+ "bsi/IFC 4.3.2.0 (IFC 4.3 ADD2)/Simple-Scene/Infra-Electrical.ifc": [
+  "d3a0b37e1b2eb03cdbd8d8025308d963",
+  "6d1956c931baa20cbe7a660e58e46240"
+ ],
+ "bsi/IFC 4.3.2.0 (IFC 4.3 ADD2)/Simple-Scene/Infra-Landscaping.ifc": [
+  "ded8f45917bd76dc0d4009e8564487aa",
+  "a80a8d261956c0105d9c0fabbcb98889"
+ ],
+ "bsi/IFC 4.3.2.0 (IFC 4.3 ADD2)/Simple-Scene/Infra-Plumbing.ifc": [
+  "ec394ac14f6a7b9a173935a634d8d35f",
+  "0bfbb8294c8d7ae7441b56744e5bba0f"
+ ],
+ "bsi/IFC 4.3.2.0 (IFC 4.3 ADD2)/Simple-Scene/Infra-Rail.ifc": [
+  "522860697124c19a8bbdc29e552d2d39",
+  "7adb431c840f85539361758443bd3a73"
+ ],
+ "bsi/IFC 4.3.2.0 (IFC 4.3 ADD2)/Simple-Scene/Infra-Road.ifc": [
+  "9429e8f3d98b304e6d65a4cd29cb3f0b",
+  "d881d2d214504021fc3c12bef74953bd"
+ ],
+ "community/IFC 2.3.0.1 (IFC 2x3)/Duplex Apartment/Duplex_A_20110907.ifc": [
+  "c8878fd388ffe3fc62ecea6780ec737c",
+  "ec10a15b753f9ae954250ed7d949632b"
+ ],
+ "community/IFC 2.3.0.1 (IFC 2x3)/Esplanades/1807_EP_AR_v18.ifc": [
+  "2b91ea50524e69845d3b6d84e646485a",
+  "be62fda1c2746ad49f0837bee2f594df"
+ ],
+ "community/IFC 2.3.0.1 (IFC 2x3)/Medical-Dental Clinic/Clinic_Architectural.ifc": [
+  "bd49fdbfad091dd67983ab9fdf7ac890",
+  "a98f24378e7ee62f31b53db20575e048"
+ ],
+ "community/IFC 2.3.0.1 (IFC 2x3)/Schependomlaan/Design model IFC/IFC Schependomlaan.ifc": [
+  "e201adf60edb40a2ac26b273ef2e438b",
+  "260af8c36d4513d1bfaa3a9077cf704e"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/air-terminal-element.ifc": [
+  "ec39ea073041e87c5f0a699b2999737b",
+  "0b8bc33398f9c374a7a9c4621f039880"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/air-terminal-library-object.ifc": [
+  "2bf0efbc20e46b83043534480b39e21a",
+  "6cba56e97a4f70b455214cff10c70fb9"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/basin-advanced-brep.ifc": [
+  "43e5ee25de437e4d84f7fc6d4b32db70",
+  "8471b6d2a27e847004692eb2f47eb85c"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/basin-faceted-brep.ifc": [
+  "036b4e1505f07c7198fee3845b0499ed",
+  "b01b1ed9e5640cdd5aef2951aed60bb6"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/basin-tessellation.ifc": [
+  "436785b4df8bd26528a7c92d95db427d",
+  "00afef1155a3d2c75bc659ee8e432d9f"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/bath-csg-solid.ifc": [
+  "02e28ae2862b2310e9c2364d650471a4",
+  "a462afd1bbce4e55a2dedfed6382af90"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/beam-curved-i-shape-tessellated.ifc": [
+  "8067b1105c12d4d92669b3a70cd5df86",
+  "977e7721d2db6e76c159ab9a3973461c"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/beam-extruded-solid.ifc": [
+  "23a0c785f1a71e03422d363d9fa66c67",
+  "e0933001f8607dc140a2d37c8f16b690"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/beam-revolved-solid.ifc": [
+  "de66d39f4a0e445804b3c6325e6c3488",
+  "560fab23fdfd571502798ca17dbd76f9"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/beam-standard-case.ifc": [
+  "51538e365b1b48b5902a62d2d11aa78c",
+  "7011f7f6139cebaf29a97aa4ab5877f5"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/beam-straight-i-shape-tessellated.ifc": [
+  "370052f3950cb257490f29dc3d2f0b71",
+  "b96875197c5d7dcdc593b9754a57d977"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/beam-varying-cardinal-points.ifc": [
+  "c01f9f91f19d6ecf41c58243ea91fa64",
+  "df8cfb74ce1b59f9f8710d105b327819"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/beam-varying-extrusion-paths.ifc": [
+  "7928bda4eddf8f7dd03b99c9c6974ae4",
+  "fdf1b480d6fc7839ef6f30142e28d23e"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/beam-varying-profiles.ifc": [
+  "e3e7ffe772ff6f472a5362340fa73a72",
+  "507a44d35dc4b5b5074f6aaf8136c80c"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/brep-model.ifc": [
+  "9276feac8561381ee3341bc623cb9a52",
+  "2bb4c5dc6246058f01aceb34365934ad"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/column-extruded-solid.ifc": [
+  "7bb64547048ac82b84cf38c0b4460a38",
+  "36b36afd00c43f9b640a7e664e47aca6"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/column-straight-rectangle-tessellation.ifc": [
+  "21ea64bb1cff5cc089abecb232dd5577",
+  "23c2a40d0544c0b21f1def26f429bb86"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/construction-scheduling-task.ifc": [
+  "480e9066d378f3806fe2d78f8d83f25a",
+  "be0ce67147348a634b1c144aa7924be6"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/csg-primitive.ifc": [
+  "55f1b28d8ada4cfbeeb26317ae640698",
+  "48556f8449d6fc635a6e82f8090fb2e7"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/cube-advanced-brep.ifc": [
+  "b3ea8f86ca4ff0a282c4d53db718a0d1",
+  "5622326d1c58aadee2a8cb119e004925"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/extruded-solid.ifc": [
+  "07c059750f42af7389c57fd1d73ea832",
+  "01a03a5927754f4a170d5d9405a88f6b"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/geographic-referencing.ifc": [
+  "710bc80b984c17826aedc68a79f465b3",
+  "c6f5a2d2647297fc43c3624748b3794a"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/grid-placement.ifc": [
+  "a37b433a60924b82860516def2bad952",
+  "4629739dedc743db111fb44b23a4c498"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/mapped-shape-with-multiple-items.ifc": [
+  "01d8583eab2114c447ef3acbc16cf6e9",
+  "72355b533ef5f637aac71bee55095159"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/mapped-shape-with-transformation.ifc": [
+  "107216af6fba7b9543cce41aa2d35183",
+  "caa7d8891a719638801afbc4b8c8e0e2"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/mapped-shape-without-transformation.ifc": [
+  "2a9d34c9d3cac463433e5e83fe6dd721",
+  "2347dce9bca1bc3c78f2f8c81c9e2c3b"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/reinforcing-assembly.ifc": [
+  "16199d62f3bdb00ba6b97b9a308750d5",
+  "d5869f07d0f1da5bf486680198d7f30c"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/reinforcing-stirrup.ifc": [
+  "0c903af097a1d252712f7cb09da82fd3",
+  "1455f50909151553900447da09ed63d9"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/slab-openings.ifc": [
+  "5c21b0c099fd747fe3633c1f7f4bcf48",
+  "36832f66127ffea09bf357bbdb2b28f4"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/slab-standard-case.ifc": [
+  "558dc5a15d72eec1e9f09e489aece30c",
+  "192e09c96ec2f8d19e029014a6cf9192"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/slab-tessellated-unique-vertices.ifc": [
+  "e5bda533e4e8fe73fbce7e0c7a09c87b",
+  "5aca9379d377ca9cb8084384f6a86c54"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/structural-curve-member.ifc": [
+  "255698882cbe7378f16092fd387843e3",
+  "0fe59fdf9459d4fc335d35d6cada1145"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/surface-model.ifc": [
+  "43b48fa7ebdf91b1f2921de5d13e0552",
+  "c03c26cf241eb8572ee288d3c2c55c1c"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/tessellated-item.ifc": [
+  "28c35d976bd7c262756e3139a8ea3389",
+  "b0d76f5066da5d2c58d5c1911747f60c"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/tessellation-with-blob-texture.ifc": [
+  null,
+  null
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/tessellation-with-image-texture.ifc": [
+  null,
+  null
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/tessellation-with-individual-colors.ifc": [
+  "b8fb1a5ade512079a505939649422fa9",
+  "75356523e8003b81484d2a7f6e200df0"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/tessellation-with-pixel-texture.ifc": [
+  null,
+  null
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/wall-elemented-case.ifc": [
+  "1d21e6f860133a0756acd9ccb27e2842",
+  "ec7c22b6a3147cc1cf26fca1d4299d2e"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/wall-standard-case.ifc": [
+  "b240ad3d879ddcbf4580604ca0277451",
+  "6ef25d554131f09c03d16cdfe49ff2a8"
+ ],
+ "community/IFC 4.0.2.1 (IFC 4)/ISO Spec archive/wall-with-opening-and-window.ifc": [
+  "a6bcb9a89b02b9241560c784c90dce36",
+  "033635320c6b4f5d76ae5e6f329e31cf"
+ ]
+}
