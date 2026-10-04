@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import pathlib
 import subprocess
 import time as _time
@@ -18,6 +19,7 @@ from .nodeids import decompose_against_head
 from .records import compose
 
 REPACK_THRESHOLD = 10_000  # changed records; D39
+GLOBALID = re.compile(r"[0-9A-Za-z_$]{22}")  # IFC GlobalId: 22 chars of the IFC base-64 alphabet
 
 
 class KimcadError(Exception):
@@ -190,6 +192,12 @@ class Project:
             raise SchemaMismatch(
                 f"{ifc_path} is {f.schema_identifier} but this project is {current}; "
                 "KIMCAD never converts schemas silently (docs/02, D30)"
+            )
+        bad = [r for r in f.by_type("IfcRoot") if not GLOBALID.fullmatch(r.GlobalId or "")]
+        if bad:
+            raise InvalidInput(
+                f"{ifc_path} has {len(bad)} malformed GlobalId(s); KIMCAD needs valid IFC GlobalIds to track objects",
+                [f"#{r.id()} {r.is_a()}: GlobalId {r.GlobalId!r}" for r in bad[:50]],
             )
         records, _ = decompose_against_head(f, self._head_entries(), self.repo.read_blobs)
         try:

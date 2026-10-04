@@ -8,6 +8,7 @@ import json
 import pathlib
 import sys
 
+from . import _core
 from .project import Changes, KimcadError, Project
 
 SYMBOL = {"added": "+", "modified": "~", "removed": "-"}
@@ -123,6 +124,6 @@ def main(argv: list[str] | None = None) -> int:
         for m in getattr(e, "messages", [])[:20]:
             print(f"  {m}", file=sys.stderr)
         return 1
-    except OSError as e:
+    except (OSError, _core.RepoError) as e:
         print(f"kimcad: error: {e}", file=sys.stderr)
         return 1

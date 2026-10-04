@@ -76,3 +76,13 @@ def test_unicode_names_survive_real_pipes(tmp_path):
 def test_not_a_project(tmp_path, capsys):
     code, _, err = run(capsys, "-C", str(tmp_path), "log")
     assert code == 1 and "not a KIMCAD project" in err
+
+
+def test_engine_errors_are_messages_not_tracebacks(tmp_path, capsys, monkeypatch):
+    proj = tmp_path / "p"
+    a = tmp_path / "a.ifc"
+    build_model().write(str(a))
+    run(capsys, "init", str(proj))
+    monkeypatch.setenv("KIMCAD_AUTHOR_NAME", "Evil <x>")
+    code, _, err = run(capsys, "-C", str(proj), "commit", str(a), "-m", "x")
+    assert code == 1 and "invalid author" in err and "Traceback" not in err

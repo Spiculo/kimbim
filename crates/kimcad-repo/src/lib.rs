@@ -25,6 +25,8 @@ pub enum Error {
     InvalidPath(String),
     #[error("invalid object id: {0}")]
     InvalidOid(String),
+    #[error("invalid author identity (empty, or contains '<', '>' or a line break): {0:?}")]
+    InvalidSignature(String),
     #[error("git: {0}")]
     Git(String),
     #[error(transparent)]
@@ -147,6 +149,7 @@ impl Repo {
         for path in changes.keys() {
             validate_path(path)?;
         }
+        validate_signature(author)?;
         let branch = self.current_branch()?;
         let parent = self.head()?;
         let mut child = self
@@ -245,6 +248,15 @@ impl Repo {
         }
         Ok(())
     }
+}
+
+/// fast-import idents are `Name <email> time tz`: these characters would corrupt the stream.
+fn validate_signature(s: &Signature) -> Result<()> {
+    let bad = |v: &str| v.trim().is_empty() || v.contains(['<', '>', '\n', '\r']);
+    if bad(&s.name) || bad(&s.email) {
+        return Err(Error::InvalidSignature(format!("{} <{}>", s.name, s.email)));
+    }
+    Ok(())
 }
 
 fn validate_path(p: &str) -> Result<()> {

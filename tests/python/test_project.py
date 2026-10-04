@@ -104,3 +104,14 @@ def test_branches(project, tmp_path):
     assert project.current_branch() == "option-b" and project.branches() == ["main", "option-b"]
     project.switch("main")
     assert len(project.log()) == 1
+
+
+def test_malformed_globalids_are_reported_not_crashed(project, tmp_path):
+    f = build_model()
+    walls = f.by_type("IfcWall")
+    walls[0].GlobalId = "bad/../id"
+    walls[1].GlobalId = ""
+    with pytest.raises(InvalidInput, match="GlobalId") as e:
+        project.commit(write(f, tmp_path / "bad.ifc"), "x", author=AUTHOR)
+    assert any("bad/../id" in m for m in e.value.messages)
+    assert project.log() == []

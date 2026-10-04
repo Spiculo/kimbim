@@ -92,3 +92,15 @@ fn paths_with_spaces_and_unicode_work() {
     assert!(repo.tree_entries("HEAD").unwrap().contains_key("objects/0f/2O2Fr$t4X7Zf8NOew3FLOH.json"));
     assert_eq!(repo.log("HEAD", 1).unwrap()[0].message.trim(), "ñandú");
 }
+
+#[test]
+fn rejects_signatures_that_would_corrupt_the_commit() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = Repo::init(dir.path()).unwrap();
+    for (name, email) in [("Evil <x>", "e@x.org"), ("Line\nbreak", "e@x.org"), ("Ok", "bad>mail"), ("", "e@x.org")] {
+        let s = Signature { name: name.into(), email: email.into(), time: 1 };
+        let r = repo.commit(&changes(&[("a.json", Some("1"))]), "x", &s);
+        assert!(matches!(r, Err(Error::InvalidSignature(_))), "accepted {name:?} <{email}>");
+    }
+    assert_eq!(repo.head().unwrap(), None);
+}
