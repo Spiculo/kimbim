@@ -46,3 +46,52 @@ def test_write_test_model_helper(tmp_path):
     p = tmp_path / "fixture.ifc"
     assert json.loads(app_bridge._write_test_model(str(p)))["ok"]
     assert json.loads(app_bridge.open_model(str(p)))["elements"] >= 2
+
+
+def _model_with_space(tmp_path):
+    import ifcopenshell.api.aggregate
+    import ifcopenshell.api.root
+
+    f = build_model(walls=3)
+    space = ifcopenshell.api.root.create_entity(f, ifc_class="IfcSpace", name="Room without body")
+    # IFC4: spaces are spatial elements, aggregated under the storey (not contained in it)
+    ifcopenshell.api.aggregate.assign_object(f, products=[space], relating_object=f.by_type("IfcBuildingStorey")[0])
+    p = tmp_path / "m.ifc"
+    f.write(str(p))
+    return f, p
+
+
+def _chunks(max_elements):
+    import struct
+
+    out = []
+    while (c := app_bridge.next_mesh_chunk(max_elements)) is not None:
+        meta, verts, tris = c
+        meta = json.loads(meta)
+        nv, nt = len(verts) // 12, len(tris) // 12
+        assert meta["voff"][-1] == nv and meta["toff"][-1] == nt
+        assert len(meta["guids"]) == len(meta["types"]) == len(meta["voff"]) - 1 == len(meta["toff"]) - 1
+        idx = struct.unpack(f"<{nt * 3}I", tris)
+        assert max(idx) < nv
+        out.append(meta)
+    return out
+
+
+def test_mesh_chunks_cover_all_elements_with_geometry(tmp_path):
+    f, p = _model_with_space(tmp_path)
+    assert json.loads(app_bridge.open_model(str(p)))["ok"]
+    started = json.loads(app_bridge.start_meshing(0))
+    assert started["ok"]
+    chunks = _chunks(2)
+    guids = [g for c in chunks for g in c["guids"]]
+    assert sorted(guids) == sorted(w.GlobalId for w in f.by_type("IfcWall"))  # the space has no body
+    assert [len(c["guids"]) for c in chunks] == [2, 1]
+    # elements without geometry are still in the tree
+    tree = json.loads(app_bridge.spatial_tree())
+    assert "Room without body" in _names(tree, [])
+
+
+def test_meshing_without_open_model_reports_error():
+    app_bridge._model = None
+    assert json.loads(app_bridge.start_meshing(0))["ok"] is False
+    assert app_bridge.next_mesh_chunk(10) is None

@@ -4,6 +4,7 @@
 #include <QTemporaryDir>
 #include <QtTest>
 
+#include "MeshChunk.h"
 #include "PythonEngine.h"
 
 class TestPythonEngine : public QObject {
@@ -34,6 +35,30 @@ private slots:
         QJsonObject tree = py.callJson("spatial_tree", {}, &error).object();
         QCOMPARE(tree.value("type").toString(), QString("IfcProject"));
         QVERIFY(!tree.value("children").toArray().isEmpty());
+    }
+
+    void streamsMeshChunksUntilDone()
+    {
+        QTemporaryDir tmp;
+        const QString path = tmp.filePath(QStringLiteral("chunks.ifc"));
+        auto& py = kimcad::PythonEngine::instance();
+        QString error;
+        py.callJson("_write_test_model", {path}, &error);
+        QVERIFY(py.callJson("open_model", {path}, &error).object().value("ok").toBool());
+        QVERIFY(py.callJson("start_meshing", {QStringLiteral("0")}, &error).object().value("ok").toBool());
+        int elements = 0, chunks = 0;
+        bool done = false;
+        while (!done) {
+            kimcad::MeshChunk chunk;
+            QVERIFY2(kimcad::fetchMeshChunk(py, 1, &chunk, &done, &error), qPrintable(error));
+            if (!done) {
+                elements += chunk.elementCount();
+                ++chunks;
+                QVERIFY(chunk.triangleCount() > 0);
+            }
+        }
+        QCOMPARE(elements, 2); // the two walls of the test model
+        QCOMPARE(chunks, 2);   // max 1 element per chunk
     }
 
     void reportsErrorsInsteadOfThrowing()

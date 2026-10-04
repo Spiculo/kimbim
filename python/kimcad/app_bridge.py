@@ -82,6 +82,62 @@ def properties(guid: str) -> str:
         return _dump({"error": f"{type(ex).__name__}: {ex}", "trace": traceback.format_exc()[-400:]})
 
 
+_iterator = None
+_iterator_done = True
+NOT_DISPLAYED = ["IfcOpeningElement"]  # voids are subtracted from their hosts, never drawn
+
+
+def start_meshing(threads: int = 0) -> str:
+    """Start display tessellation: hybrid CGAL/OCCT kernel (D38), world coordinates."""
+    global _iterator, _iterator_done
+    import multiprocessing
+
+    import ifcopenshell.geom
+
+    _iterator, _iterator_done = None, True
+    if _model is None:
+        return _dump({"ok": False, "error": "no model open"})
+    try:
+        s = ifcopenshell.geom.settings()
+        s.set("use-world-coords", True)
+        n = int(threads) or multiprocessing.cpu_count()
+        it = ifcopenshell.geom.iterator(s, _model, n, exclude=NOT_DISPLAYED, geometry_library="hybrid-cgal-simple-opencascade")
+        if not it.initialize():
+            return _dump({"ok": True, "total": 0})  # nothing to draw
+    except Exception as e:
+        return _dump({"ok": False, "error": f"{type(e).__name__}: {e}"})
+    _iterator, _iterator_done = it, False
+    return _dump({"ok": True, "total": len(_model.by_type("IfcProduct"))})
+
+
+def next_mesh_chunk(max_elements: int = 1000):
+    """Next batch of element meshes as (meta_json, verts f32 LE, tris u32 LE, chunk-local), or None when done."""
+    global _iterator_done
+    import numpy as np
+
+    if _iterator is None or _iterator_done:
+        return None
+    guids, types, verts, tris, voff, toff = [], [], [], [], [0], [0]
+    while len(guids) < int(max_elements):
+        shape = _iterator.get()
+        t = np.asarray(shape.geometry.faces, dtype=np.uint32)
+        if len(t):
+            v = np.asarray(shape.geometry.verts, dtype=np.float32)
+            verts.append(v)
+            tris.append(t + voff[-1])
+            voff.append(voff[-1] + len(v) // 3)
+            toff.append(toff[-1] + len(t) // 3)
+            guids.append(shape.guid)
+            types.append(shape.type)
+        if not _iterator.next():
+            _iterator_done = True
+            break
+    if not guids:
+        return None
+    meta = _dump({"guids": guids, "types": types, "voff": voff, "toff": toff})
+    return meta, np.concatenate(verts).astype("<f4").tobytes(), np.concatenate(tris).astype("<u4").tobytes()
+
+
 def _write_test_model(path: str) -> str:
     """Write a small model (2 walls on one storey) for the app's C++ tests and self-test."""
     from .testing import build_model

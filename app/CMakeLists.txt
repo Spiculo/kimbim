@@ -4,6 +4,7 @@ qt_add_library(kimcad_core STATIC
     src/MainWindow.cpp src/MainWindow.h
     src/Translations.cpp src/Translations.h
     src/PythonEngine.cpp src/PythonEngine.h
+    src/MeshChunk.cpp src/MeshChunk.h
 )
 target_include_directories(kimcad_core PUBLIC src)
 target_link_libraries(kimcad_core PUBLIC Qt6::Widgets Python3::Python)
@@ -25,3 +26,4 @@ endfunction()
 
 kimcad_test(test_translations)
 kimcad_test(test_python_engine)
+kimcad_test(test_mesh_chunk)
