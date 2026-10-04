@@ -1,0 +1,23 @@
+[workspace]
+name = "kimcad"
+channels = ["conda-forge"]
+platforms = ["win-64", "linux-64"]
+
+[dependencies]
+python = "3.12.*"
+ifcopenshell = "0.9.0.*"
+blake3 = ">=1.0"
+numpy = "*"
+maturin = ">=1.15,<2"
+pytest = ">=8"
+rust = ">=1.85"
+git = ">=2.45"
+
+[tasks]
+build = "maturin develop --release --skip-install"
+check-spdx = "python tools/check_spdx.py"
+test-rust = "cargo test --workspace"
+test-py = { cmd = "pytest", depends-on = ["build"] }
+test = { depends-on = ["check-spdx", "test-rust", "test-py"] }
+fetch-corpus = "python tests/corpus/fetch.py"
+golden = { cmd = "pytest -m golden", depends-on = ["build"] }

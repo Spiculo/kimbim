@@ -43,3 +43,11 @@ desktop.ini
 /spikes/corpus/files/
 /spikes/**/out/
 /spikes/**/out-*/
+/.superpowers/
+
+# pixi / build
+/.pixi/
+/tests/corpus/files/
+/python/kimcad/_core*.pyd
+/python/kimcad/_core*.so
+/target/
