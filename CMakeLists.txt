@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Widgets Test LinguistTools)
+find_package(Python3 3.12 EXACT REQUIRED COMPONENTS Interpreter Development.Embed)
 qt_standard_project_setup(I18N_SOURCE_LANGUAGE en I18N_TRANSLATED_LANGUAGES es)
 
 enable_testing()
