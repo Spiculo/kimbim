@@ -42,11 +42,14 @@ public:
     void showAll();
     void addClipPlanes(const std::vector<Handle(Graphic3d_ClipPlane)>& planes);
     void clearClipPlanes();
+    int clipPlaneCount() const { return int(m_clipPlanes.size()); }
     Bnd_Box boundsOf(const QStringList& guids) const; // all visible elements when empty
 
     // Measurement helpers used by --self-test.
     double measureFps(int frames);
     QString pickAt(int x, int y);
+    // Renders the view into an image file through OCCT (independent of screen composition).
+    bool dumpImage(const QString& path);
     bool projectCenterOf(const QString& guid, int* x, int* y) const;
 
     const Handle(AIS_InteractiveContext)& context() const { return m_context; }

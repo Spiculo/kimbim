@@ -356,6 +356,13 @@ double Viewport::measureFps(int frames)
     return median > 0 ? 1000.0 / median : 0;
 }
 
+bool Viewport::dumpImage(const QString& path)
+{
+    ensureWindow();
+    m_view->Redraw();
+    return m_view->Dump(path.toUtf8().constData());
+}
+
 QString Viewport::pickAt(int x, int y)
 {
     ensureWindow();

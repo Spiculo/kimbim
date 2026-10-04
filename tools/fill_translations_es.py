@@ -47,6 +47,10 @@ ES = {
     "&Hide selected": "&Ocultar selección",
     "&Isolate selected": "A&islar selección",
     "&Show all": "&Mostrar todo",
+    "&Plan cut": "&Corte en planta",
+    "Section &box": "Caja de &sección",
+    "Cuts": "Cortes",
+    "Plan cut height": "Altura del corte en planta",
     # plural forms: (singular, plural)
     "Loading... %n element(s)": ("Cargando... %n elemento", "Cargando... %n elementos"),
     "%n element(s) loaded in %1 s": ("%n elemento cargado en %1 s", "%n elementos cargados en %1 s"),

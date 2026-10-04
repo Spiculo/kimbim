@@ -5,6 +5,11 @@
 #include <QMainWindow>
 #include <QThread>
 
+#include <Bnd_Box.hxx>
+
+class QAction;
+class QDoubleSpinBox;
+
 namespace kimcad {
 
 class ModelLoader;
@@ -25,6 +30,7 @@ public:
     Viewport* viewport() const { return m_viewport; }
     ModelTreePanel* treePanel() const { return m_tree; }
     PropertiesPanel* propertiesPanel() const { return m_properties; }
+    void setPlanCutHeight(double metres);
 
 signals:
     void firstChunkShown();
@@ -42,6 +48,8 @@ private:
     void stopLoading();
     void showError(const QString& title, const QString& message);
     void showPropertiesOf(const QString& guid);
+    void buildCutsToolbar();
+    void applyCuts();
 
     void onOpened(const QJsonObject& info);
     void onChunk(const MeshChunk& chunk);
@@ -58,6 +66,10 @@ private:
     PropertiesPanel* m_properties;
     QThread m_thread;
     ModelLoader* m_loader;
+    QAction* m_planCut = nullptr;
+    QAction* m_sectionBox = nullptr;
+    QDoubleSpinBox* m_cutHeight = nullptr;
+    Bnd_Box m_boxBounds; // captured when the section box is switched on
 };
 
 } // namespace kimcad

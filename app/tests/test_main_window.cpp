@@ -59,6 +59,23 @@ private slots:
         QCOMPARE(v->visibleElementCount(), 4);
     }
 
+    void cutActionsAddAndRemoveClipPlanes()
+    {
+        kimcad::MainWindow w(nullptr, true);
+        kimcad::Viewport* v = w.viewport();
+        v->addBatch(batch(4));
+        QCOMPARE(v->clipPlaneCount(), 0);
+        w.setPlanCutHeight(0.5);
+        action(w, "actionPlanCut")->setChecked(true);
+        QCOMPARE(v->clipPlaneCount(), 1);
+        action(w, "actionSectionBox")->setChecked(true); // nothing selected: box around the visible model
+        QCOMPARE(v->clipPlaneCount(), 7);
+        action(w, "actionPlanCut")->setChecked(false);
+        QCOMPARE(v->clipPlaneCount(), 6);
+        action(w, "actionSectionBox")->setChecked(false);
+        QCOMPARE(v->clipPlaneCount(), 0);
+    }
+
     void shortcutsAreTheDocumentedOnes()
     {
         kimcad::MainWindow w(nullptr, true);

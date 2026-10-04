@@ -3,85 +3,105 @@
   <context>
     <name>kimcad::MainWindow</name>
     <message>
-      <location filename="../src/MainWindow.cpp" line="38" />
+      <location filename="../src/MainWindow.cpp" line="43" />
       <location filename="../tests/test_translations.cpp" line="14" />
       <source>Ready</source>
       <translation>Listo</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="68" />
+      <location filename="../src/MainWindow.cpp" line="73" />
       <source>KIMCAD cannot start</source>
       <translation>KIMCAD no puede iniciarse</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="80" />
+      <location filename="../src/MainWindow.cpp" line="85" />
       <location filename="../tests/test_translations.cpp" line="12" />
       <source>&amp;File</source>
       <translation>&amp;Archivo</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="81" />
+      <location filename="../src/MainWindow.cpp" line="86" />
       <location filename="../tests/test_translations.cpp" line="13" />
       <source>&amp;Open IFC...</source>
       <translation>&amp;Abrir IFC...</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="85" />
+      <location filename="../src/MainWindow.cpp" line="90" />
       <source>&amp;Quit</source>
       <translation>&amp;Salir</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="89" />
+      <location filename="../src/MainWindow.cpp" line="94" />
       <source>&amp;View</source>
       <translation>&amp;Ver</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="90" />
+      <location filename="../src/MainWindow.cpp" line="95" />
       <source>&amp;Fit all</source>
       <translation>&amp;Encuadrar todo</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="94" />
+      <location filename="../src/MainWindow.cpp" line="99" />
       <source>&amp;Hide selected</source>
       <translation>&amp;Ocultar selección</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="98" />
+      <location filename="../src/MainWindow.cpp" line="103" />
       <source>&amp;Isolate selected</source>
       <translation>A&amp;islar selección</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="106" />
+      <location filename="../src/MainWindow.cpp" line="111" />
       <source>&amp;Show all</source>
       <translation>&amp;Mostrar todo</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="111" />
+      <location filename="../src/MainWindow.cpp" line="116" />
+      <source>&amp;Plan cut</source>
+      <translation>&amp;Corte en planta</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="121" />
+      <source>Section &amp;box</source>
+      <translation>Caja de &amp;sección</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="134" />
       <source>&amp;Help</source>
       <translation>A&amp;yuda</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="112" />
+      <location filename="../src/MainWindow.cpp" line="135" />
       <source>&amp;About KIMCAD</source>
       <translation>&amp;Acerca de KIMCAD</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="118" />
+      <location filename="../src/MainWindow.cpp" line="141" />
       <source>Model</source>
       <translation>Modelo</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="122" />
+      <location filename="../src/MainWindow.cpp" line="145" />
       <source>Properties</source>
       <translation>Propiedades</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="131" />
+      <location filename="../src/MainWindow.cpp" line="154" />
+      <source>Cuts</source>
+      <translation>Cortes</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="164" />
+      <source>Plan cut height</source>
+      <translation>Altura del corte en planta</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="192" />
       <source>About KIMCAD</source>
       <translation>Acerca de KIMCAD</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="132" />
+      <location filename="../src/MainWindow.cpp" line="193" />
       <source>KIMCAD %1
 Open-source native BIM for architects, with version control built in.
 License: GPL-3.0-or-later</source>
@@ -90,27 +110,27 @@ BIM nativo de código abierto para arquitectos, con control de versiones integra
 Licencia: GPL-3.0 o posterior</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="146" />
+      <location filename="../src/MainWindow.cpp" line="207" />
       <source>Open IFC</source>
       <translation>Abrir IFC</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="146" />
+      <location filename="../src/MainWindow.cpp" line="207" />
       <source>IFC files (*.ifc)</source>
       <translation>Archivos IFC (*.ifc)</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="161" />
+      <location filename="../src/MainWindow.cpp" line="222" />
       <source>Opening %1...</source>
       <translation>Abriendo %1...</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="194" />
+      <location filename="../src/MainWindow.cpp" line="255" />
       <source>Loading %1 (%2)...</source>
       <translation>Cargando %1 (%2)...</translation>
     </message>
     <message numerus="yes">
-      <location filename="../src/MainWindow.cpp" line="204" />
+      <location filename="../src/MainWindow.cpp" line="265" />
       <source>Loading... %n element(s)</source>
       <translation>
         <numerusform>Cargando... %n elemento</numerusform>
@@ -118,7 +138,7 @@ Licencia: GPL-3.0 o posterior</translation>
       </translation>
     </message>
     <message numerus="yes">
-      <location filename="../src/MainWindow.cpp" line="216" />
+      <location filename="../src/MainWindow.cpp" line="277" />
       <source>%n element(s) loaded in %1 s</source>
       <translation>
         <numerusform>%n elemento cargado en %1 s</numerusform>
@@ -126,7 +146,7 @@ Licencia: GPL-3.0 o posterior</translation>
       </translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="225" />
+      <location filename="../src/MainWindow.cpp" line="286" />
       <source>Could not open the model</source>
       <translation>No se pudo abrir el modelo</translation>
     </message>

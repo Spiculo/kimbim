@@ -4,6 +4,9 @@
 #include <QApplication>
 #include <QCloseEvent>
 #include <QDockWidget>
+#include <QDoubleSpinBox>
+#include <QLabel>
+#include <QToolBar>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QJsonObject>
@@ -11,6 +14,7 @@
 #include <QMessageBox>
 #include <QStatusBar>
 
+#include "Cuts.h"
 #include "ElementBatch.h"
 #include "MeshChunk.h"
 #include "ModelLoader.h"
@@ -35,6 +39,7 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     setCentralWidget(m_viewport);
     buildMenus();
     buildDocks();
+    buildCutsToolbar();
     statusBar()->showMessage(tr("Ready"));
 
     m_loader->moveToThread(&m_thread);
@@ -107,6 +112,24 @@ void MainWindow::buildMenus()
     showAll->setObjectName(QStringLiteral("actionShowAll"));
     showAll->setShortcut(Qt::SHIFT | Qt::Key_H);
     connect(showAll, &QAction::triggered, m_viewport, &Viewport::showAll);
+    view->addSeparator();
+    m_planCut = view->addAction(tr("&Plan cut"));
+    m_planCut->setObjectName(QStringLiteral("actionPlanCut"));
+    m_planCut->setCheckable(true);
+    m_planCut->setShortcut(Qt::Key_C);
+    connect(m_planCut, &QAction::toggled, this, &MainWindow::applyCuts);
+    m_sectionBox = view->addAction(tr("Section &box"));
+    m_sectionBox->setObjectName(QStringLiteral("actionSectionBox"));
+    m_sectionBox->setCheckable(true);
+    m_sectionBox->setShortcut(Qt::Key_B);
+    connect(m_sectionBox, &QAction::toggled, this, [this](bool on) {
+        if (on) { // box around the selection, or around everything visible
+            m_boxBounds = m_viewport->boundsOf(m_viewport->selectedGuids());
+            if (!m_boxBounds.IsVoid())
+                m_boxBounds.Enlarge(0.1);
+        }
+        applyCuts();
+    });
 
     QMenu* help = menuBar()->addMenu(tr("&Help"));
     QAction* about = help->addAction(tr("&About KIMCAD"));
@@ -124,6 +147,44 @@ void MainWindow::buildDocks()
     propsDock->setWidget(m_properties);
     addDockWidget(Qt::RightDockWidgetArea, propsDock);
     resizeDocks({treeDock, propsDock}, {300, 320}, Qt::Horizontal);
+}
+
+void MainWindow::buildCutsToolbar()
+{
+    QToolBar* bar = addToolBar(tr("Cuts"));
+    bar->setObjectName(QStringLiteral("CutsToolbar"));
+    bar->addAction(m_planCut);
+    m_cutHeight = new QDoubleSpinBox(bar);
+    m_cutHeight->setObjectName(QStringLiteral("planCutHeight"));
+    m_cutHeight->setRange(-1000.0, 10000.0);
+    m_cutHeight->setDecimals(2);
+    m_cutHeight->setSingleStep(0.1);
+    m_cutHeight->setSuffix(QStringLiteral(" m"));
+    m_cutHeight->setValue(1.2); // typical plan cut height above a floor
+    m_cutHeight->setToolTip(tr("Plan cut height"));
+    bar->addWidget(m_cutHeight);
+    connect(m_cutHeight, &QDoubleSpinBox::valueChanged, this, [this] {
+        if (m_planCut->isChecked())
+            applyCuts();
+    });
+    bar->addSeparator();
+    bar->addAction(m_sectionBox);
+}
+
+void MainWindow::setPlanCutHeight(double metres)
+{
+    m_cutHeight->setValue(metres);
+}
+
+void MainWindow::applyCuts()
+{
+    CutState state;
+    state.planCut = m_planCut->isChecked();
+    state.height = m_cutHeight->value();
+    state.box = m_sectionBox->isChecked();
+    state.bounds = m_boxBounds;
+    m_viewport->clearClipPlanes();
+    m_viewport->addClipPlanes(makePlanes(state));
 }
 
 void MainWindow::showAbout()

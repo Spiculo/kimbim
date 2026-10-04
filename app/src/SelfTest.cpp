@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "SelfTest.h"
 
+#include <QAction>
 #include <QApplication>
 #include <QScreen>
 #include <QDir>
@@ -99,6 +100,13 @@ int runSelfTest(const SelfTestOptions& options)
         {"triangles", double(viewport->triangleCount())},
         {"load_s", loadS},
         {"fps", fps}};
+    const Bnd_Box bounds = viewport->boundsOf({});
+    if (!bounds.IsVoid()) {
+        double x0, y0, z0, x1, y1, z1;
+        bounds.Get(x0, y0, z0, x1, y1, z1);
+        result.insert(QStringLiteral("zmin"), z0);
+        result.insert(QStringLiteral("zmax"), z1);
+    }
 
     // Pick check: project an element's centre to the screen, pick there, expect that element back.
     // Elements can hide each other, so try up to 20; "missed" (hit nothing) must stay 0.
@@ -134,8 +142,15 @@ int runSelfTest(const SelfTestOptions& options)
         QApplication::processEvents();
         result.insert(QStringLiteral("tree_follows_selection"), window.treePanel()->currentGuid() == picked);
     }
-    if (options.planCut >= 0)
+    if (options.planCut >= 0) {
+        window.setPlanCutHeight(options.planCut);
+        if (QAction* cut = window.findChild<QAction*>(QStringLiteral("actionPlanCut")))
+            cut->setChecked(true);
+        QApplication::processEvents();
         result.insert(QStringLiteral("plan_cut"), options.planCut);
+        result.insert(QStringLiteral("planes"), viewport->clipPlaneCount());
+        result.insert(QStringLiteral("fps_with_cut"), viewport->measureFps(options.frames));
+    }
     if (!options.screenshot.isEmpty()) {
         window.viewport()->fitAll();
         for (int i = 0; i < 10; ++i)
@@ -143,6 +158,11 @@ int runSelfTest(const SelfTestOptions& options)
         // grabWindow captures the composited screen, including the OpenGL viewport.
         const QPixmap shot = window.screen()->grabWindow(window.winId());
         result.insert(QStringLiteral("screenshot"), shot.save(options.screenshot) ? options.screenshot : QString());
+        // The window grab needs a composited screen (blank when the screen is locked or off);
+        // the OCCT dump renders the 3D view directly and always works.
+        QString viewportShot = options.screenshot;
+        viewportShot.replace(QStringLiteral(".png"), QStringLiteral("-viewport.png"));
+        result.insert(QStringLiteral("viewport_screenshot"), viewport->dumpImage(viewportShot) ? viewportShot : QString());
     }
     return report(result);
 }

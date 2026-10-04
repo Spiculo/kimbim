@@ -11,6 +11,7 @@ qt_add_library(kimcad_core STATIC
     src/ModelTreePanel.cpp src/ModelTreePanel.h
     src/PropertiesPanel.cpp src/PropertiesPanel.h
     src/ModelLoader.cpp src/ModelLoader.h
+    src/Cuts.cpp src/Cuts.h
 )
 target_include_directories(kimcad_core PUBLIC src)
 target_link_libraries(kimcad_core PUBLIC Qt6::Widgets Python3::Python
@@ -39,6 +40,7 @@ kimcad_test(test_element_batch)
 kimcad_test(test_model_tree)
 kimcad_test(test_visibility)
 kimcad_test(test_main_window)
+kimcad_test(test_cuts)
 
 # GUI self-tests: need a real OpenGL window (GPU, or Mesa on the Linux CI runner). Label "gui".
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/broken.ifc "ISO-10303-21;
@@ -55,3 +57,4 @@ kimcad_gui_test(app_selftest_fixture
     "\"ok\":true.*\"pick_matched\":2.*\"pick_missed\":0.*\"tree_follows_selection\":true" :fixture: --frames 5)
 kimcad_gui_test(app_selftest_broken_file "\"ok\":false" ${CMAKE_CURRENT_BINARY_DIR}/broken.ifc)
 kimcad_gui_test(app_selftest_quit_during_load "\"ok\":true,\"quit_during_load\":true" :fixture: --quit-during-load --chunk 1)
+kimcad_gui_test(app_selftest_plan_cut "\"ok\":true.*\"planes\":1" :fixture: --frames 5 --plan-cut 1.5)
