@@ -37,6 +37,8 @@ kimcad_test(test_python_engine)
 kimcad_test(test_mesh_chunk)
 kimcad_test(test_element_batch)
 kimcad_test(test_model_tree)
+kimcad_test(test_visibility)
+kimcad_test(test_main_window)
 
 # GUI self-tests: need a real OpenGL window (GPU, or Mesa on the Linux CI runner). Label "gui".
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/broken.ifc "ISO-10303-21;

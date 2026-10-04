@@ -90,6 +90,23 @@ void MainWindow::buildMenus()
     QAction* fit = view->addAction(tr("&Fit all"));
     fit->setShortcut(Qt::Key_F);
     connect(fit, &QAction::triggered, m_viewport, &Viewport::fitAll);
+    view->addSeparator();
+    QAction* hide = view->addAction(tr("&Hide selected"));
+    hide->setObjectName(QStringLiteral("actionHideSelected"));
+    hide->setShortcut(Qt::Key_H);
+    connect(hide, &QAction::triggered, this, [this] { m_viewport->setHidden(m_viewport->selectedGuids(), true); });
+    QAction* isolate = view->addAction(tr("&Isolate selected"));
+    isolate->setObjectName(QStringLiteral("actionIsolateSelected"));
+    isolate->setShortcut(Qt::Key_I);
+    connect(isolate, &QAction::triggered, this, [this] {
+        const QStringList selected = m_viewport->selectedGuids();
+        if (!selected.isEmpty())
+            m_viewport->isolate(selected);
+    });
+    QAction* showAll = view->addAction(tr("&Show all"));
+    showAll->setObjectName(QStringLiteral("actionShowAll"));
+    showAll->setShortcut(Qt::SHIFT | Qt::Key_H);
+    connect(showAll, &QAction::triggered, m_viewport, &Viewport::showAll);
 
     QMenu* help = menuBar()->addMenu(tr("&Help"));
     QAction* about = help->addAction(tr("&About KIMCAD"));
