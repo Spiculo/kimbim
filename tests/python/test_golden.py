@@ -13,17 +13,21 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 CORPUS = ROOT / "tests" / "corpus" / "files"
 GOLDEN = json.loads((ROOT / "tests" / "golden" / "manifest-windows.json").read_text())
 LARGE = 5_000_000  # bytes; larger files only run with -m "golden and slow"
-CASES = sorted(k for k, v in GOLDEN.items() if v[0])
+def _case(rel):
+    p = CORPUS / rel
+    large = p.exists() and p.stat().st_size > LARGE
+    return pytest.param(rel, marks=[pytest.mark.slow] if large else [], id=rel)
+
+
+CASES = [_case(k) for k, v in sorted(GOLDEN.items()) if v[0]]
 
 
 @pytest.mark.golden
 @pytest.mark.parametrize("rel", CASES)
-def test_matches_spike_golden_hashes(rel, tmp_path, request):
+def test_matches_spike_golden_hashes(rel, tmp_path):
     path = CORPUS / rel
     if not path.exists():
         pytest.skip("corpus not downloaded (pixi run fetch-corpus)")
-    if path.stat().st_size > LARGE and "slow" not in request.config.getoption("-m"):
-        pytest.skip("large file: run with -m 'golden and slow'")
     want_state, want_export = GOLDEN[rel]
     recs, _ = decompose(ifcopenshell.open(str(path)), format_tag="kimcad-spike/1")
     assert state_hash(recs) == want_state

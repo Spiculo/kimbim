@@ -21,4 +21,5 @@ test-rust = "cargo test --workspace"
 test-py = { cmd = "pytest", depends-on = ["build"] }
 test = { depends-on = ["check-spdx", "test-rust", "test-py"] }
 fetch-corpus = "python tests/corpus/fetch.py"
-golden = { cmd = "pytest -m golden", depends-on = ["build"] }
+golden = { cmd = "pytest -m \"golden and not slow\"", depends-on = ["build"] }
+golden-all = { cmd = "pytest -m golden", depends-on = ["build"] }

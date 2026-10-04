@@ -24,6 +24,6 @@ testpaths = ["tests/python"]
 pythonpath = ["python", "tests/python"]
 markers = [
   "golden: needs the downloaded corpus (pixi run fetch-corpus)",
-  "slow: large models, minutes",
+  "slow: large models, minutes (run with -m \"golden and slow\")",
 ]
 addopts = "-m 'not golden and not slow'"
