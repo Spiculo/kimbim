@@ -29,8 +29,14 @@ jobs:
         run: pixi run golden
       - name: Desktop app - translations complete (English + Spanish)
         run: pixi run check-translations
-      - name: Desktop app - build and tests that need no GPU
+      # On Linux, OCCT connects to an X display as soon as a viewer exists (even without drawing),
+      # so the non-GPU app tests also need a virtual display there.
+      - name: Desktop app - build and tests that need no GPU (Windows)
+        if: runner.os == 'Windows'
         run: pixi run app-test-nogui
+      - name: Desktop app - build and tests that need no GPU (Linux, virtual display)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a -s "-screen 0 1920x1080x24" pixi run app-test-nogui
       # GUI self-tests open a real OpenGL window. Windows runners have no usable OpenGL; on Linux,
       # Xvfb + Mesa (software rendering, fine on CI) works. Non-blocking until proven on the runner.
       - name: Desktop app - GUI self-tests (Linux, virtual display)
