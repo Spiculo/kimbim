@@ -1,0 +1,94 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+use std::collections::BTreeMap;
+
+use kimcad_repo::{Error, Repo, Signature};
+
+fn sig(t: i64) -> Signature {
+    Signature { name: "Test".into(), email: "test@example.org".into(), time: t }
+}
+
+fn changes(items: &[(&str, Option<&str>)]) -> BTreeMap<String, Option<Vec<u8>>> {
+    items.iter().map(|(p, v)| (p.to_string(), v.map(|s| s.as_bytes().to_vec()))).collect()
+}
+
+#[test]
+fn init_open_and_unborn_head() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = Repo::init(dir.path()).unwrap();
+    assert_eq!(repo.head().unwrap(), None);
+    assert_eq!(repo.current_branch().unwrap(), "main");
+    assert!(matches!(Repo::init(dir.path()), Err(Error::AlreadyExists(_))));
+    Repo::open(dir.path()).unwrap();
+    let other = tempfile::tempdir().unwrap();
+    assert!(matches!(Repo::open(other.path()), Err(Error::NotARepo(_))));
+}
+
+#[test]
+fn commit_read_modify_delete_log() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = Repo::init(dir.path()).unwrap();
+    let c1 = repo
+        .commit(&changes(&[("objects/ab/W1.json", Some("{\"a\":1}")), ("kimcad.json", Some("{}"))]), "first", &sig(1_790_000_000))
+        .unwrap();
+    assert_eq!(repo.head().unwrap().as_deref(), Some(c1.as_str()));
+    let e1 = repo.tree_entries("HEAD").unwrap();
+    assert_eq!(e1.keys().cloned().collect::<Vec<_>>(), vec!["kimcad.json", "objects/ab/W1.json"]);
+    let blobs = repo.read_blobs(&[e1["objects/ab/W1.json"].clone()]).unwrap();
+    assert_eq!(blobs[0], b"{\"a\":1}");
+
+    let c2 = repo
+        .commit(
+            &changes(&[("objects/ab/W1.json", Some("{\"a\":2}")), ("kimcad.json", None), ("nodes/cd/N1.json", Some("[]"))]),
+            "second",
+            &sig(1_790_000_100),
+        )
+        .unwrap();
+    let e2 = repo.tree_entries("HEAD").unwrap();
+    assert_eq!(e2.keys().cloned().collect::<Vec<_>>(), vec!["nodes/cd/N1.json", "objects/ab/W1.json"]);
+    assert_eq!(repo.resolve("HEAD~1").unwrap(), c1);
+
+    let log = repo.log("HEAD", 10).unwrap();
+    assert_eq!(log.iter().map(|c| c.message.trim().to_string()).collect::<Vec<_>>(), vec!["second", "first"]);
+    assert_eq!(log[0].id, c2);
+    assert_eq!(log[0].parents, vec![c1.clone()]);
+    assert_eq!(log[0].author_email, "test@example.org");
+    assert_eq!(log[0].time, 1_790_000_100);
+}
+
+#[test]
+fn branches_and_switch() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = Repo::init(dir.path()).unwrap();
+    repo.commit(&changes(&[("a.json", Some("1"))]), "base", &sig(1)).unwrap();
+    repo.create_branch("option-b", "HEAD").unwrap();
+    repo.switch("option-b").unwrap();
+    assert_eq!(repo.current_branch().unwrap(), "option-b");
+    repo.commit(&changes(&[("a.json", Some("2"))]), "on b", &sig(2)).unwrap();
+    assert_eq!(repo.branches().unwrap(), vec!["main", "option-b"]);
+    repo.switch("main").unwrap();
+    assert_eq!(repo.read_blobs(&[repo.tree_entries("HEAD").unwrap()["a.json"].clone()]).unwrap()[0], b"1");
+    assert!(matches!(repo.switch("nope"), Err(Error::UnknownBranch(_))));
+}
+
+#[test]
+fn rejects_bad_paths_and_revs() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = Repo::init(dir.path()).unwrap();
+    for bad in ["", "/abs.json", "a/../b.json", "a//b.json", "a\nb.json", ".git/x"] {
+        let r = repo.commit(&changes(&[(bad, Some("1"))]), "x", &sig(1));
+        assert!(matches!(r, Err(Error::InvalidPath(_))), "accepted {bad:?}");
+    }
+    assert!(matches!(repo.resolve("does-not-exist"), Err(Error::UnknownRev(_))));
+    assert!(matches!(repo.read_blobs(&["zz".into()]), Err(Error::InvalidOid(_))));
+}
+
+#[test]
+fn paths_with_spaces_and_unicode_work() {
+    let dir = tempfile::tempdir().unwrap();
+    let project = dir.path().join("Proyecto ñ");
+    std::fs::create_dir(&project).unwrap();
+    let repo = Repo::init(&project).unwrap();
+    repo.commit(&changes(&[("objects/0f/2O2Fr$t4X7Zf8NOew3FLOH.json", Some("{}"))]), "ñandú", &sig(1)).unwrap();
+    assert!(repo.tree_entries("HEAD").unwrap().contains_key("objects/0f/2O2Fr$t4X7Zf8NOew3FLOH.json"));
+    assert_eq!(repo.log("HEAD", 1).unwrap()[0].message.trim(), "ñandú");
+}
