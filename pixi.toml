@@ -30,6 +30,11 @@ test = { depends-on = ["check-spdx", "test-rust", "test-py"] }
 fetch-corpus = "python tests/corpus/fetch.py"
 golden = { cmd = "pytest -m \"golden and not slow\"", depends-on = ["build"] }
 golden-all = { cmd = "pytest -m golden", depends-on = ["build"] }
+app-configure = "cmake -S . -B build/app -G Ninja -DCMAKE_BUILD_TYPE=Release"
+app-build = { cmd = "cmake --build build/app", depends-on = ["app-configure"] }
+app-test = { cmd = "ctest --test-dir build/app --output-on-failure", depends-on = ["app-build"], env = { KIMCAD_PYTHON_PATH = "$PIXI_PROJECT_ROOT/python" } }
+app = { cmd = "build/app/kimcad-app", depends-on = ["app-build"], env = { KIMCAD_PYTHON_PATH = "$PIXI_PROJECT_ROOT/python" } }
+check-translations = "python tools/check_translations.py"
 kimcad = { cmd = "python -m kimcad", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/python" } }
 
 # Spike S2 (viewer): OCCT AIS viewer through pythonocc-core, same OCCT (8.0.1) as ifcopenshell 0.9

@@ -4,10 +4,10 @@ import pathlib
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-DIRS = ["python", "crates", "tests", "tools"]
-EXTS = {".py", ".rs"}
+DIRS = ["python", "crates", "tests", "tools", "app"]
+EXTS = {".py", ".rs", ".cpp", ".h"}
 TAG = "SPDX-License-Identifier: GPL-3.0-or-later"
-SKIP_PARTS = {"target", "__pycache__", "files"}
+SKIP_PARTS = {"target", "__pycache__", "files", "build"}
 
 
 def main() -> int:
