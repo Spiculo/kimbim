@@ -6,6 +6,17 @@ KIMCAD is a desktop BIM application for Windows and Linux built on open standard
 
 > Status: **early development.** Slice 1 works: versioned IFC projects from the command line. The desktop app comes next. Design docs: [docs/README.md](docs/README.md).
 
+## Try the desktop app
+
+```bash
+pixi install
+pixi run app                      # opens KIMCAD (English or Spanish, following your system)
+pixi run app -- model.ifc --lang es
+pixi run app -- --self-test model.ifc --screenshot shot.png   # load, measure fps/picking, print JSON
+```
+
+Open an IFC file. It appears progressively in the 3D view, with the spatial tree on the left and properties on the right. Click to select (the tree and properties follow). **H** hides, **I** isolates, **Shift+H** shows all, **C** toggles the plan cut (height in the Cuts toolbar), **B** puts a section box around the selection.
+
 ## Try it (command line)
 
 Requires [pixi](https://pixi.sh). Works on Windows and Linux.

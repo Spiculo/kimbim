@@ -33,6 +33,7 @@ golden-all = { cmd = "pytest -m golden", depends-on = ["build"] }
 app-configure = "cmake -S . -B build/app -G Ninja -DCMAKE_BUILD_TYPE=Release"
 app-build = { cmd = "cmake --build build/app", depends-on = ["app-configure"] }
 app-test = { cmd = "ctest --test-dir build/app --output-on-failure", depends-on = ["app-build", "build"], env = { KIMCAD_PYTHON_PATH = "$PIXI_PROJECT_ROOT/python" } }
+app-test-nogui = { cmd = "ctest --test-dir build/app --output-on-failure -LE gui", depends-on = ["app-build", "build"], env = { KIMCAD_PYTHON_PATH = "$PIXI_PROJECT_ROOT/python" } }
 app = { cmd = "build/app/kimcad-app", depends-on = ["app-build", "build"], env = { KIMCAD_PYTHON_PATH = "$PIXI_PROJECT_ROOT/python" } }
 check-translations = "python tools/check_translations.py"
 kimcad = { cmd = "python -m kimcad", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/python" } }

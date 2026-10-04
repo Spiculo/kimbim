@@ -42,6 +42,8 @@ derived cache  (.kimcad/cache, keyed by record hash + kernel version)
 
 **Spike S2 (done, [11](11-spike-results.md#viewer-occt-ais-rendering-picking-and-memory)):** 110k elements run at 32 fps with picking under 20 ms and 232 MB on an integrated GPU, **if elements are batched**. One OCCT object per element gave 2.7 fps and 3.2 GB. So the viewport uses **batched presentations with one selection owner per element** (D42): about 1,000 elements per AIS object, grouped by storey and type. Picking, highlighting, hiding and isolating stay per element. OCCT must be the conda-forge `novtk` build (D43), or Windows falls back to software rendering through Mesa.
 
+**In the app (Slice 2, D45):** the custom `ElementBatch` object draws a 100k-element model at **150 fps** on an integrated GPU (vsync off; 1.4M triangles, 100 batches). That's about 5× faster per frame than the spike's generic OCCT shapes, because each batch is one flat triangle array. Picking hits an element 100% of the time. Cut faces are filled (capping) with each element's own colour.
+
 ### Later renderer (only if S2 or real usage demands it)
 
 - A KIMCAD renderer on **Qt RHI**, Qt's abstraction over Vulkan, Direct3D 11/12 and OpenGL. It would add GPU-driven instancing, LOD, occlusion culling and streaming for 1M+ object models (spec §21, §48).

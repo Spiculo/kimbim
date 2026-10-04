@@ -33,13 +33,23 @@ The spike code lives in [`spikes/`](../spikes/README.md).
 
 ## App track
 
-### M0 — Foundations
-Repo, LICENSE, CMake + Corrosion, pixi environment, CI (Windows + Linux), Qt main window shell, IfcOpenShell linked, embedded Python, `kimcad --version`, i18n pipeline (English + Spanish, `tr()` + Qt Linguist, CI check for untranslated strings).
-**Exit:** CI builds and launches an empty window on both OSs from a clean checkout with one command.
+### M0 — Foundations ✅
+Repo, LICENSE, CMake, pixi environment, CI (Windows + Linux), Qt 6 main window, IfcOpenShell through embedded Python, `kimcad-app --version`, i18n pipeline (English + Spanish, `tr()` + Qt Linguist, CI check for untranslated strings). Done in Slice 2 ([plan](superpowers/plans/2026-10-04-slice2-desktop-viewer.md)).
 
-### M1 — Viewer
-Open IFC, tessellate in the background, 3D viewport, model tree (spatial + class), property panel (read-only), selection, hide/isolate, section box, clipping planes, storey navigation, search/filter.
-**Exit:** opens every file in the test corpus; the 100k-object file stays interactive.
+### M1 — Viewer ✅ (core)
+Done in Slice 2:
+- open IFC (File→Open or command line);
+- background tessellation with progressive batches;
+- OCCT 3D viewport (orbit, pan, zoom; batched elements with per-element picking, D42);
+- model tree (spatial, with search by name, type or GlobalId);
+- read-only properties panel;
+- two-way selection sync;
+- hide, isolate, show all (also per storey from the tree);
+- plan cut with a height control, and a section box.
+
+Measured (`kimcad-app --self-test`, integrated GPU): Duplex at 60 fps (vsync); a 100k-element model loads in about 35 s and renders at 150 fps with vsync off.
+
+Not yet: colour by property, walk mode, measure, saved views, a "show spaces" toggle, section-box handles (the box is around the selection), and a fix for vsync double-waits in a bare top-level viewport.
 
 ### M2 — Object data editor
 Command/undo framework, property and pset editing, materials, types, classifications, bulk edit, schedules, save IFC (Plain mode).

@@ -27,3 +27,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Golden hashes and Slice 1 exit test (same results on Windows and Linux)
         run: pixi run golden
+      - name: Desktop app - translations complete (English + Spanish)
+        run: pixi run check-translations
+      - name: Desktop app - build and tests that need no GPU
+        run: pixi run app-test-nogui
+      # GUI self-tests open a real OpenGL window. Windows runners have no usable OpenGL; on Linux,
+      # Xvfb + Mesa (software rendering, fine on CI) works. Non-blocking until proven on the runner.
+      - name: Desktop app - GUI self-tests (Linux, virtual display)
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        run: xvfb-run -a -s "-screen 0 1920x1080x24" pixi run ctest --test-dir build/app --output-on-failure -L gui
+        env:
+          KIMCAD_PYTHON_PATH: ${{ github.workspace }}/python
