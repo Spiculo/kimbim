@@ -12,6 +12,8 @@
 #include <algorithm>
 
 #include <QInputDialog>
+#include <QMenu>
+#include <QSignalBlocker>
 #include <cmath>
 #include <QLocale>
 #include <QComboBox>
@@ -27,6 +29,8 @@
 #include "Cuts.h"
 #include "ElementBatch.h"
 #include "LevelsBar.h"
+#include "HostTool.h"
+#include "PolygonTool.h"
 #include "WallTool.h"
 #include "MeshChunk.h"
 #include "ModelLoader.h"
@@ -225,6 +229,7 @@ void MainWindow::buildCutsToolbar()
             m_viewport->setPlanView(elevation);
         if (m_viewport->isDrawingMode()) {
             m_wallTool->finish();
+            m_polygonTool->cancel();
             m_viewport->setDrawingMode(true, elevation);
             refreshSnapData();
         }
@@ -461,7 +466,8 @@ bool MainWindow::newProject()
     m_path.clear();
     m_tree->setTree(bridge("spatial_tree"));
     refreshLevels();
-    m_wallTypes->clear();
+    m_types->clear();
+    m_warnedInconsistent = false;
     setWindowTitle(QStringLiteral("KIMCAD — %1[*]").arg(tr("Untitled")));
     afterEdit();
     statusBar()->showMessage(tr("New project"));
@@ -522,19 +528,52 @@ void MainWindow::buildModelingToolbar()
 {
     QToolBar* bar = addToolBar(tr("Modeling"));
     bar->setObjectName(QStringLiteral("modelingToolbar"));
+    QMenu* model = menuBar()->addMenu(tr("&Model"));
     m_wallTool = new WallTool(this);
-    m_wallAction = bar->addAction(tr("&Wall"));
-    m_wallAction->setObjectName(QStringLiteral("actionWallTool"));
-    m_wallAction->setShortcut(Qt::Key_W);
-    m_wallAction->setCheckable(true);
-    m_wallAction->setToolTip(tr("Draw walls: click points, type a length + Enter, Esc to finish. Shift: right angles."));
-    connect(m_wallAction, &QAction::toggled, this, &MainWindow::setWallToolActive);
-    m_wallTypes = new QComboBox(bar);
-    m_wallTypes->setObjectName(QStringLiteral("wallTypeCombo"));
-    m_wallTypes->setToolTip(tr("Wall type"));
-    m_wallTypes->setSizeAdjustPolicy(QComboBox::AdjustToContents);
-    m_wallTypes->setMinimumContentsLength(14);
-    bar->addWidget(m_wallTypes);
+    m_polygonTool = new PolygonTool(this);
+    m_hostTool = new HostTool(this);
+
+    struct Def {
+        Tool tool;
+        const char* name;
+        QString text;
+        Qt::Key key;
+        QString tip;
+    };
+    const Def defs[] = {
+        {Tool::Wall, "actionWallTool", tr("&Wall"), Qt::Key_W,
+            tr("Draw walls: click points, type a length + Enter, Esc to finish. Shift: right angles.")},
+        {Tool::Slab, "actionSlabTool", tr("&Slab"), Qt::Key_S,
+            tr("Draw a slab outline: click points, click the first point or press Enter to close, Esc to cancel")},
+        {Tool::Door, "actionDoorTool", tr("&Door"), Qt::Key_D, tr("Place doors: click on a wall")},
+        {Tool::Window, "actionWindowTool", tr("Wi&ndow"), Qt::Key_N, tr("Place windows: click on a wall")},
+    };
+    for (const Def& d : defs) {
+        QAction* a = bar->addAction(d.text);
+        a->setObjectName(QLatin1String(d.name));
+        a->setShortcut(d.key);
+        a->setCheckable(true);
+        a->setToolTip(d.tip);
+        model->addAction(a);
+        const Tool tool = d.tool;
+        connect(a, &QAction::triggered, this, [this, tool](bool on) { setTool(on ? tool : Tool::None); });
+        m_toolActions.insert(int(d.tool), a);
+    }
+    model->addSeparator();
+    QAction* slabFromWallsAction = model->addAction(tr("Slab from selected &walls"));
+    slabFromWallsAction->setObjectName(QStringLiteral("actionSlabFromWalls"));
+    connect(slabFromWallsAction, &QAction::triggered, this, [this] { slabFromWalls(m_selection); });
+
+    m_types = new QComboBox(bar);
+    m_types->setObjectName(QStringLiteral("typeCombo"));
+    m_types->setToolTip(tr("Type"));
+    m_types->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    m_types->setMinimumContentsLength(16);
+    bar->addWidget(m_types);
+    connect(m_types, &QComboBox::currentIndexChanged, this, [this] {
+        m_hostTool->setWidth(currentType().value("width").toDouble(0.9));
+        updateToolPreview();
+    });
     m_wallHeight = new QDoubleSpinBox(bar);
     m_wallHeight->setObjectName(QStringLiteral("wallHeight"));
     m_wallHeight->setRange(0.1, 100.0);
@@ -543,12 +582,12 @@ void MainWindow::buildModelingToolbar()
     m_wallHeight->setValue(3.0);
     m_wallHeight->setSuffix(QStringLiteral(" m"));
     m_wallHeight->setToolTip(tr("Wall height"));
-    bar->addWidget(m_wallHeight);
+    m_wallHeightAction = bar->addWidget(m_wallHeight);
     m_lengthInput = new QLineEdit(bar);
     m_lengthInput->setObjectName(QStringLiteral("lengthInput"));
     m_lengthInput->setPlaceholderText(tr("Length (m)"));
     m_lengthInput->setMaximumWidth(110);
-    bar->addWidget(m_lengthInput);
+    m_lengthAction = bar->addWidget(m_lengthInput);
     connect(m_lengthInput, &QLineEdit::returnPressed, this, [this] {
         bool ok = false;
         double value = QLocale().toDouble(m_lengthInput->text(), &ok);
@@ -558,49 +597,165 @@ void MainWindow::buildModelingToolbar()
             m_lengthInput->clear();
         m_viewport->setFocus();
     });
+    setTool(Tool::None);
 
     connect(m_viewport, &Viewport::workPointMoved, this, [this](QPointF p, double tolerance, Qt::KeyboardModifiers mods) {
-        m_wallTool->setTolerance(tolerance);
-        m_wallTool->setOrtho(mods & Qt::ShiftModifier);
-        showSnap(m_wallTool->move(p));
+        const bool ortho = mods & Qt::ShiftModifier;
+        switch (m_tool) {
+        case Tool::Wall:
+            m_wallTool->setTolerance(tolerance);
+            m_wallTool->setOrtho(ortho);
+            showSnap(m_wallTool->move(p));
+            break;
+        case Tool::Slab:
+            m_polygonTool->setTolerance(tolerance);
+            m_polygonTool->setOrtho(ortho);
+            m_polygonTool->move(p);
+            break;
+        case Tool::Door:
+        case Tool::Window:
+            m_hostTool->setTolerance(tolerance);
+            m_hostTool->move(p);
+            break;
+        case Tool::None:
+            break;
+        }
     });
     connect(m_viewport, &Viewport::workPointClicked, this, [this](QPointF p, double tolerance, Qt::KeyboardModifiers mods) {
-        m_wallTool->setTolerance(tolerance);
-        m_wallTool->setOrtho(mods & Qt::ShiftModifier);
-        m_wallTool->click(p);
+        const bool ortho = mods & Qt::ShiftModifier;
+        switch (m_tool) {
+        case Tool::Wall:
+            m_wallTool->setTolerance(tolerance);
+            m_wallTool->setOrtho(ortho);
+            m_wallTool->click(p);
+            break;
+        case Tool::Slab:
+            m_polygonTool->setTolerance(tolerance);
+            m_polygonTool->setOrtho(ortho);
+            m_polygonTool->click(p);
+            break;
+        case Tool::Door:
+        case Tool::Window:
+            m_hostTool->setTolerance(tolerance);
+            m_hostTool->click(p);
+            break;
+        case Tool::None:
+            break;
+        }
     });
     connect(m_viewport, &Viewport::drawingEnded, this, [this] {
-        if (m_wallTool->isDrawing())
+        // Esc / right click: stop the current shape, or leave the tool when nothing is in progress.
+        if (m_tool == Tool::Wall && m_wallTool->isDrawing())
             m_wallTool->finish();
+        else if (m_tool == Tool::Slab && m_polygonTool->isDrawing())
+            m_polygonTool->cancel();
         else
-            m_wallAction->setChecked(false);
+            setTool(Tool::None);
+    });
+    connect(m_viewport, &Viewport::drawingConfirmed, this, [this] {
+        if (m_tool == Tool::Wall)
+            m_wallTool->finish();
+        else if (m_tool == Tool::Slab)
+            m_polygonTool->finish();
     });
     connect(m_viewport, &Viewport::lengthKeyTyped, this, [this](const QString& text) {
+        if (m_tool != Tool::Wall)
+            return;
         m_lengthInput->setFocus();
         m_lengthInput->insert(text);
     });
-    connect(m_wallTool, &WallTool::previewChanged, this, [this] {
-        const QJsonObject type = m_wallTypes->currentData().toJsonObject();
-        m_viewport->setWallPreview(m_wallTool->preview(), type.value("thickness").toDouble(), m_wallHeight->value());
-    });
+    connect(m_wallTool, &WallTool::previewChanged, this, &MainWindow::updateToolPreview);
+    connect(m_polygonTool, &PolygonTool::previewChanged, this, &MainWindow::updateToolPreview);
+    connect(m_hostTool, &HostTool::previewChanged, this, &MainWindow::updateToolPreview);
     connect(m_wallTool, &WallTool::wallRequested, this, &MainWindow::createWall);
+    connect(m_polygonTool, &PolygonTool::polygonFinished, this, &MainWindow::createSlab);
+    connect(m_polygonTool, &PolygonTool::rejected, this, [this](const QString& why) { statusBar()->showMessage(why); });
+    connect(m_hostTool, &HostTool::openingRequested, this, &MainWindow::insertOpening);
 }
 
-void MainWindow::refreshWallTypes()
+QJsonObject MainWindow::currentType() const
 {
-    const QString current = m_wallTypes->currentData().toJsonObject().value("guid").toString();
-    m_wallTypes->clear();
-    for (const auto& t : bridge("wall_types").value("types").toArray()) {
-        const QJsonObject o = t.toObject();
-        m_wallTypes->addItem(o.value("name").toString(), o);
-        if (o.value("guid").toString() == current)
-            m_wallTypes->setCurrentIndex(m_wallTypes->count() - 1);
+    return m_types->currentData().toJsonObject();
+}
+
+void MainWindow::refreshTypes()
+{
+    const char* source = nullptr;
+    QStringList args;
+    switch (m_tool) {
+    case Tool::Wall:
+        source = "wall_types";
+        break;
+    case Tool::Slab:
+        source = "slab_types";
+        break;
+    case Tool::Door:
+        source = "opening_types";
+        args << QStringLiteral("door");
+        break;
+    case Tool::Window:
+        source = "opening_types";
+        args << QStringLiteral("window");
+        break;
+    case Tool::None:
+        break;
     }
+    const QString current = currentType().value("guid").toString();
+    const QSignalBlocker block(m_types);
+    m_types->clear();
+    if (!source)
+        return;
+    for (const auto& t : bridge(source, args).value("types").toArray()) {
+        const QJsonObject o = t.toObject();
+        m_types->addItem(o.value("name").toString(), o);
+        if (o.value("guid").toString() == current)
+            m_types->setCurrentIndex(m_types->count() - 1);
+    }
+    m_hostTool->setWidth(currentType().value("width").toDouble(0.9));
 }
 
 void MainWindow::refreshSnapData()
 {
-    m_wallTool->snapper().setWalls(Snapper::parse(bridge("snap_data", {m_levels->activeStorey()})));
+    const QJsonObject data = bridge("snap_data", {m_levels->activeStorey()});
+    const QVector<SnapWall> walls = Snapper::parse(data);
+    m_wallTool->snapper().setWalls(walls);
+    m_polygonTool->snapper().setWalls(walls);
+    m_hostTool->setWalls(walls);
+}
+
+void MainWindow::updateToolPreview()
+{
+    const double z = m_levels ? m_levels->activeElevation() : 0.0;
+    const QJsonObject type = currentType();
+    QVector<Viewport::PreviewBox> boxes;
+    switch (m_tool) {
+    case Tool::Wall:
+        m_viewport->setWallPreview(m_wallTool->preview(), type.value("thickness").toDouble(), m_wallHeight->value());
+        return;
+    case Tool::Slab: {
+        // The outline as thin walls of the slab's depth, its top at the level.
+        QVector<QPointF> pts = m_polygonTool->points();
+        if (const auto hover = m_polygonTool->hover(); hover && !pts.isEmpty())
+            pts << *hover;
+        const double depth = std::max(type.value("thickness").toDouble(), 0.05);
+        for (int i = 0; i + 1 < pts.size(); ++i)
+            boxes.push_back({pts[i], pts[i + 1], 0.05, z - depth, z});
+        break;
+    }
+    case Tool::Door:
+    case Tool::Window:
+        if (const auto host = m_hostTool->hover()) {
+            const double w = type.value("width").toDouble(0.9);
+            const QPointF u(std::cos(host->angle), std::sin(host->angle));
+            const double sill = type.value("sill").toDouble();
+            boxes.push_back({host->centre - u * (w / 2), host->centre + u * (w / 2), host->thickness + 0.06,
+                z + sill, z + sill + type.value("height").toDouble(2.1)});
+        }
+        break;
+    case Tool::None:
+        break;
+    }
+    m_viewport->setPreviewBoxes(boxes);
 }
 
 void MainWindow::showSnap(const Snap& snap)
@@ -617,34 +772,110 @@ void MainWindow::showSnap(const Snap& snap)
     statusBar()->showMessage(text);
 }
 
-void MainWindow::setWallToolActive(bool on)
+void MainWindow::setTool(Tool tool)
 {
-    if (m_wallAction->isChecked() != on) {
-        m_wallAction->setChecked(on); // re-enters through toggled
-        return;
+    if (tool != Tool::None && m_levels->activeStorey().isEmpty()) {
+        showError(tr("Cannot model"), tr("The model has no level. Add a level first."));
+        tool = Tool::None;
     }
-    if (on) {
-        if (m_levels->activeStorey().isEmpty()) {
-            m_wallAction->setChecked(false);
-            showError(tr("Cannot draw walls"), tr("The model has no level. Add a level first."));
-            return;
-        }
-        if (m_wallTypes->count() == 0)
-            refreshWallTypes();
-        refreshSnapData();
-        m_viewport->setDrawingMode(true, m_levels->activeElevation());
-        m_viewport->setFocus();
-        statusBar()->showMessage(tr("Wall: click the start point"));
-    } else {
-        m_wallTool->finish();
+    m_wallTool->finish();
+    m_polygonTool->cancel();
+    m_tool = tool;
+    for (auto it = m_toolActions.constBegin(); it != m_toolActions.constEnd(); ++it) {
+        const QSignalBlocker block(it.value());
+        it.value()->setChecked(it.key() == int(tool));
+    }
+    m_wallHeightAction->setVisible(tool == Tool::Wall);
+    m_lengthAction->setVisible(tool == Tool::Wall);
+    m_types->setVisible(tool != Tool::None);
+    refreshTypes();
+    if (tool == Tool::None) {
         m_viewport->setDrawingMode(false);
         statusBar()->clearMessage();
+        return;
     }
+    refreshSnapData();
+    m_viewport->setDrawingMode(true, m_levels->activeElevation());
+    m_viewport->setFocus();
+    switch (tool) {
+    case Tool::Wall:
+        statusBar()->showMessage(tr("Wall: click the start point"));
+        break;
+    case Tool::Slab:
+        statusBar()->showMessage(tr("Slab: click the outline's points; click the first point or press Enter to close"));
+        break;
+    default:
+        statusBar()->showMessage(tr("Click on a wall to place it"));
+        break;
+    }
+}
+
+bool MainWindow::createSlab(const QVector<QPointF>& outline)
+{
+    QJsonArray pts;
+    for (const QPointF& p : outline)
+        pts.append(QJsonArray{p.x(), p.y()});
+    QJsonObject type = m_tool == Tool::Slab ? currentType() : QJsonObject();
+    if (type.isEmpty()) {
+        const QJsonArray types = bridge("slab_types").value("types").toArray();
+        if (types.isEmpty())
+            return false;
+        type = types.first().toObject();
+    }
+    const QJsonObject r = bridge("create_slab", {m_levels->activeStorey(), type.value("guid").toString(),
+        QString::fromUtf8(QJsonDocument(pts).toJson(QJsonDocument::Compact)), QStringLiteral("0")});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not create the slab: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    return true;
+}
+
+bool MainWindow::slabFromWalls(const QStringList& walls)
+{
+    const QJsonObject outline = bridge("slab_outline_from_walls", {jsonList(walls)});
+    if (!outline.value("ok").toBool()) {
+        showError(tr("Cannot make a slab from these walls"), outline.value("error").toString());
+        return false;
+    }
+    QVector<QPointF> pts;
+    for (const auto& p : outline.value("points").toArray())
+        pts << QPointF(p.toArray().at(0).toDouble(), p.toArray().at(1).toDouble());
+    return createSlab(pts);
+}
+
+bool MainWindow::insertOpening(const Host& host)
+{
+    const QString kind = m_tool == Tool::Window ? QStringLiteral("window") : QStringLiteral("door");
+    QJsonObject type = currentType();
+    if (type.isEmpty()) {
+        const QJsonArray types = bridge("opening_types", {kind}).value("types").toArray();
+        if (types.isEmpty())
+            return false;
+        type = types.first().toObject();
+    }
+    auto num = [](double v) { return QString::number(v, 'g', 17); };
+    const QJsonObject r = bridge("insert_opening", {kind, host.wallGuid, type.value("guid").toString(), num(host.along),
+        num(type.value("width").toDouble()), num(type.value("height").toDouble()), num(type.value("sill").toDouble())});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not place it: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    refreshSnapData();
+    return true;
 }
 
 bool MainWindow::createWall(const WallSegment& s)
 {
-    const QJsonObject type = m_wallTypes->currentData().toJsonObject();
+    QJsonObject type = m_tool == Tool::Wall ? currentType() : QJsonObject();
+    if (type.isEmpty()) {
+        const QJsonArray types = bridge("wall_types").value("types").toArray();
+        if (types.isEmpty())
+            return false;
+        type = types.first().toObject();
+    }
     auto num = [](double v) { return QString::number(v, 'g', 17); };
     const QJsonObject r = bridge("create_wall", {m_levels->activeStorey(), type.value("guid").toString(),
         num(s.p1.x()), num(s.p1.y()), num(s.p2.x()), num(s.p2.y()), num(m_wallHeight->value()), s.joinStart, s.joinEnd});
@@ -707,6 +938,11 @@ void MainWindow::afterEdit(const QJsonObject& result)
 {
     applyGeometry(result.value("geometry").toObject());
     refreshLevels();
+    if (!m_warnedInconsistent && bridge("state").value("inconsistent").toBool()) {
+        m_warnedInconsistent = true;
+        showError(tr("The model may be inconsistent"),
+            tr("An edit failed and could not be undone. Save a copy if you need it, then reopen the file."));
+    }
     if (m_viewport->isDrawingMode())
         refreshSnapData(); // undo/redo can add or remove walls under the tool
     const QJsonObject s = bridge("state");
@@ -800,7 +1036,8 @@ void MainWindow::onOpened(const QJsonObject& info)
     setWindowTitle(QStringLiteral("KIMCAD — %1[*]").arg(QFileInfo(m_path).fileName()));
     setWindowModified(false);
     refreshLevels();
-    m_wallTypes->clear();
+    m_types->clear();
+    m_warnedInconsistent = false;
     m_undo->setEnabled(false);
     m_redo->setEnabled(false);
     QString error;

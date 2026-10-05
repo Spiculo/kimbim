@@ -388,31 +388,44 @@ void Viewport::setDrawingMode(bool on, double workPlaneZ)
 
 void Viewport::setWallPreview(const std::optional<std::pair<QPointF, QPointF>>& axis, double thickness, double height)
 {
+    QVector<PreviewBox> boxes;
+    if (axis && thickness > 0 && height > 0)
+        boxes.push_back({axis->first, axis->second, thickness, m_workZ, m_workZ + height});
+    setPreviewBoxes(boxes);
+}
+
+void Viewport::setPreviewBoxes(const QVector<PreviewBox>& boxes)
+{
     if (!m_preview.IsNull()) {
         m_context->Remove(m_preview, false);
         m_preview.Nullify();
     }
-    if (axis && thickness > 0 && height > 0) {
-        const QPointF a = axis->first, b = axis->second;
+    MeshChunk c;
+    c.voff.push_back(0);
+    c.toff.push_back(0);
+    for (const PreviewBox& box : boxes) {
+        const QPointF a = box.a, b = box.b;
         const double len = std::hypot(b.x() - a.x(), b.y() - a.y());
-        if (len > 1e-6) {
-            const QPointF n(-(b.y() - a.y()) / len * thickness / 2, (b.x() - a.x()) / len * thickness / 2);
-            const QPointF corners[4] = {a - n, b - n, b + n, a + n};
-            MeshChunk c;
-            c.guids << QStringLiteral("preview");
-            c.types << QStringLiteral("IfcWall");
-            for (double z : {m_workZ, m_workZ + height})
-                for (const QPointF& p : corners)
-                    c.verts.insert(c.verts.end(), {float(p.x()), float(p.y()), float(z)});
-            // 12 triangles: bottom, top, 4 sides (8 corners: 0-3 bottom, 4-7 top).
-            const uint32_t t[] = {0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4,
-                1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7};
-            c.tris.assign(std::begin(t), std::end(t));
-            c.voff = {0, 8};
-            c.toff = {0, 12};
-            m_preview = new ElementBatch(std::move(c));
-            m_context->Display(m_preview, 0, -1, false); // shown, never selectable
-        }
+        if (len <= 1e-6 || box.width <= 0 || box.z1 <= box.z0)
+            continue;
+        const QPointF n(-(b.y() - a.y()) / len * box.width / 2, (b.x() - a.x()) / len * box.width / 2);
+        const QPointF corners[4] = {a - n, b - n, b + n, a + n};
+        const uint32_t base = uint32_t(c.verts.size() / 3);
+        for (double z : {box.z0, box.z1})
+            for (const QPointF& p : corners)
+                c.verts.insert(c.verts.end(), {float(p.x()), float(p.y()), float(z)});
+        // 12 triangles: bottom, top, 4 sides (8 corners: 0-3 bottom, 4-7 top).
+        for (uint32_t t : {0u, 2u, 1u, 0u, 3u, 2u, 4u, 5u, 6u, 4u, 6u, 7u, 0u, 1u, 5u, 0u, 5u, 4u,
+                 1u, 2u, 6u, 1u, 6u, 5u, 2u, 3u, 7u, 2u, 7u, 6u, 3u, 0u, 4u, 3u, 4u, 7u})
+            c.tris.push_back(base + t);
+    }
+    if (!c.tris.empty()) {
+        c.guids << QStringLiteral("preview");
+        c.types << QStringLiteral("IfcWall");
+        c.voff.push_back(uint32_t(c.verts.size() / 3));
+        c.toff.push_back(uint32_t(c.tris.size() / 3));
+        m_preview = new ElementBatch(std::move(c));
+        m_context->Display(m_preview, 0, -1, false); // shown, never selectable
     }
     update();
 }
@@ -422,6 +435,10 @@ void Viewport::keyPressEvent(QKeyEvent* e)
     if (m_drawingMode) {
         if (e->key() == Qt::Key_Escape) {
             emit drawingEnded();
+            return;
+        }
+        if (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) {
+            emit drawingConfirmed();
             return;
         }
         const QString text = e->text();
@@ -436,7 +453,7 @@ void Viewport::keyPressEvent(QKeyEvent* e)
 void Viewport::mouseDoubleClickEvent(QMouseEvent* e)
 {
     if (m_drawingMode && e->button() == Qt::LeftButton) {
-        emit drawingEnded();
+        emit drawingConfirmed();
         return;
     }
     QWidget::mouseDoubleClickEvent(e);

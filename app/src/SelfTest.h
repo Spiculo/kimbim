@@ -16,6 +16,7 @@ struct SelfTestOptions {
     QString screenshot;           // non-empty: save a PNG of the whole window at the end
     bool planView = false;        // switch to the plan view of the lowest level before the screenshot
     bool linesOnly = false;       // lines-only display before measuring/screenshot
+    bool house = false;           // new project: walls, slab from walls, a door and a window
     QString drawWalls;            // "x,y;x,y;...": new project, draw this wall polyline with the wall tool
 };
 

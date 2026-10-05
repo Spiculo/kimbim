@@ -2,7 +2,10 @@
 #pragma once
 
 #include <QElapsedTimer>
+#include <QHash>
 #include <QJsonObject>
+#include <QPointF>
+#include <QVector>
 #include <QJsonValue>
 #include <QStringList>
 #include <QMainWindow>
@@ -21,8 +24,11 @@ namespace kimcad {
 
 class LevelsBar;
 class WallTool;
+class PolygonTool;
+class HostTool;
 struct WallSegment;
 struct Snap;
+struct Host;
 
 class ModelLoader;
 class ModelTreePanel;
@@ -59,10 +65,19 @@ public:
     bool newProject();
     bool addLevel(const QString& name, double elevation);
     LevelsBar* levelsBar() const { return m_levels; }
-    // Wall tool (W). Exposed for the self-test, which drives it with plane points.
+    // Modeling tools (M3): one active at a time. Exposed for tests and the self-test, which drive
+    // them with work-plane points.
+    enum class Tool { None, Wall, Slab, Door, Window };
+    void setTool(Tool tool);
+    Tool tool() const { return m_tool; }
     WallTool* wallTool() const { return m_wallTool; }
-    void setWallToolActive(bool on);
+    PolygonTool* polygonTool() const { return m_polygonTool; }
+    HostTool* hostTool() const { return m_hostTool; }
+    void setWallToolActive(bool on) { setTool(on ? Tool::Wall : Tool::None); }
     bool createWall(const WallSegment& segment);
+    bool createSlab(const QVector<QPointF>& outline);
+    bool slabFromWalls(const QStringList& walls);
+    bool insertOpening(const Host& host);
     bool treeHasGuid(const QString& guid) const;
     // Re-mesh changed elements and drop removed ones after an edit/undo/redo ({changed, removed}).
     void applyGeometry(const QJsonObject& geometry);
@@ -96,7 +111,9 @@ private:
     void addLevelDialog();
     void setPlanView(bool plan);
     void buildModelingToolbar();
-    void refreshWallTypes();
+    void refreshTypes();
+    void updateToolPreview();
+    QJsonObject currentType() const;
     void refreshSnapData();
     void showSnap(const Snap& snap);
     void buildCutsToolbar();
@@ -120,9 +137,15 @@ private:
     QStringList m_selection;
     LevelsBar* m_levels = nullptr;
     WallTool* m_wallTool = nullptr;
-    QAction* m_wallAction = nullptr;
-    QComboBox* m_wallTypes = nullptr;
+    PolygonTool* m_polygonTool = nullptr;
+    HostTool* m_hostTool = nullptr;
+    Tool m_tool = Tool::None;
+    QHash<int, QAction*> m_toolActions;
+    QComboBox* m_types = nullptr;
     QDoubleSpinBox* m_wallHeight = nullptr;
+    QAction* m_wallHeightAction = nullptr;
+    QAction* m_lengthAction = nullptr;
+    bool m_warnedInconsistent = false;
     QLineEdit* m_lengthInput = nullptr;
     QAction* m_undo = nullptr;
     QAction* m_redo = nullptr;

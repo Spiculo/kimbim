@@ -13,6 +13,8 @@ qt_add_library(kimcad_core STATIC
     src/LevelsBar.cpp src/LevelsBar.h
     src/Snapper.cpp src/Snapper.h
     src/WallTool.cpp src/WallTool.h
+    src/PolygonTool.cpp src/PolygonTool.h
+    src/HostTool.cpp src/HostTool.h
     src/ModelLoader.cpp src/ModelLoader.h
     src/Cuts.cpp src/Cuts.h
 )
@@ -51,6 +53,8 @@ kimcad_test(test_properties_panel)
 kimcad_test(test_levels_bar)
 kimcad_test(test_snapper)
 kimcad_test(test_wall_tool)
+kimcad_test(test_polygon_tool)
+kimcad_test(test_host_tool)
 
 # GUI self-tests: need a real OpenGL window (GPU, or Mesa on the Linux CI runner). Label "gui".
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/broken.ifc "ISO-10303-21;
@@ -69,6 +73,7 @@ kimcad_gui_test(app_selftest_broken_file "\"ok\":false" ${CMAKE_CURRENT_BINARY_D
 kimcad_gui_test(app_selftest_quit_during_load "\"ok\":true,\"quit_during_load\":true" :fixture: --quit-during-load --chunk 1)
 kimcad_gui_test(app_selftest_plan_cut "\"ok\":true.*\"planes\":1" :fixture: --frames 5 --plan-cut 1.5)
 kimcad_gui_test(app_selftest_draw_walls "\"elements\":4,\"joins\":4,\"ok\":true,\"walls\":4" :new: --draw-walls "0,0 5,0 5,4 0,4 0,0")
+kimcad_gui_test(app_selftest_house "\"doors\":1,\"elements\":7,\"ok\":true,\"openings\":2,\"slabs\":1,\"walls\":4,\"windows\":1" :new: --house)
 kimcad_gui_test(app_selftest_box_select_visible "\"box_selected\":1,.*\"ok\":true" :occlusion: --frames 5 --box-select)
 kimcad_gui_test(app_selftest_box_select_through "\"box_selected\":2,.*\"ok\":true" :occlusion: --frames 5 --box-select --select-through)
 kimcad_gui_test(app_selftest_box_select "\"box_selected\":2.*\"ok\":true.*\"tree_selected\":2" :fixture: --frames 5 --box-select)

@@ -15,6 +15,7 @@
 #include <cstdio>
 
 #include "MainWindow.h"
+#include "HostTool.h"
 #include "WallTool.h"
 
 #include <QRegularExpression>
@@ -99,11 +100,57 @@ static int runDrawWalls(const SelfTestOptions& options)
     return report(result);
 }
 
+// Slice 5: a small house through the real tools: 8 x 6 m walls, slab from walls, door and window.
+static int runHouse(const SelfTestOptions& options)
+{
+    MainWindow window(nullptr, /*quiet=*/true, options.chunkSize);
+    window.show();
+    QApplication::processEvents();
+    if (!window.newProject())
+        return fail(QStringLiteral("new project failed"));
+    window.setTool(MainWindow::Tool::Wall);
+    window.wallTool()->setTolerance(0.05);
+    for (const QPointF& p : {QPointF(0, 0), QPointF(8, 0), QPointF(8, 6), QPointF(0, 6), QPointF(0, 0)}) {
+        window.wallTool()->move(p);
+        window.wallTool()->click(p);
+    }
+    window.setTool(MainWindow::Tool::None);
+    QStringList walls;
+    for (const QString& g : window.viewport()->guids())
+        walls << g;
+    window.slabFromWalls(walls);
+    window.setTool(MainWindow::Tool::Door);
+    window.hostTool()->setTolerance(0.05);
+    window.hostTool()->click(QPointF(4.0, 0.0));
+    window.setTool(MainWindow::Tool::Window);
+    window.hostTool()->setTolerance(0.05);
+    window.hostTool()->click(QPointF(4.0, 6.0));
+    window.setTool(MainWindow::Tool::None);
+    window.viewport()->fitAll();
+    QApplication::processEvents();
+    auto count = [](const char* cls) {
+        QString error;
+        return PythonEngine::instance().callJson("count_entities", {QString::fromLatin1(cls)}, &error)
+            .object().value("count").toInt();
+    };
+    const int nWalls = count("IfcWall"), slabs = count("IfcSlab"), doors = count("IfcDoor"), windows = count("IfcWindow"),
+              openings = count("IfcOpeningElement"), elements = window.viewport()->elementCount();
+    QJsonObject result{{"ok", nWalls == 4 && slabs == 1 && doors == 1 && windows == 1 && openings == 2 && elements == 7},
+        {"walls", nWalls}, {"slabs", slabs}, {"doors", doors}, {"windows", windows}, {"openings", openings},
+        {"elements", elements}};
+    if (!options.screenshot.isEmpty())
+        takeScreenshots(window, options.screenshot, &result);
+    window.close();
+    return report(result);
+}
+
 int runSelfTest(const SelfTestOptions& options)
 {
     QString error;
     if (!PythonEngine::instance().start(&error))
         return fail(error);
+    if (options.house)
+        return runHouse(options);
     if (!options.drawWalls.isEmpty())
         return runDrawWalls(options);
 

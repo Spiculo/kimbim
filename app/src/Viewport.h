@@ -6,6 +6,7 @@
 #include <gp_Pnt.hxx>
 #include <QPointF>
 #include <QSet>
+#include <QVector>
 #include <utility>
 #include <optional>
 #include <V3d_View.hxx>
@@ -54,6 +55,12 @@ public:
     bool isDrawingMode() const { return m_drawingMode; }
     // Rubber-band wall preview: a box along p1-p2 (plan metres); nullopt hides it.
     void setWallPreview(const std::optional<std::pair<QPointF, QPointF>>& axis, double thickness, double height);
+    // General tool preview: boxes along a-b, `width` across, from z0 to z1 (absolute metres).
+    struct PreviewBox {
+        QPointF a, b;
+        double width = 0, z0 = 0, z1 = 0;
+    };
+    void setPreviewBoxes(const QVector<PreviewBox>& boxes);
     void clear();
     void fitAll();
 
@@ -105,7 +112,8 @@ signals:
     // Drawing mode. tolerance = ~10 screen pixels in metres at that point.
     void workPointMoved(QPointF point, double tolerance, Qt::KeyboardModifiers modifiers);
     void workPointClicked(QPointF point, double tolerance, Qt::KeyboardModifiers modifiers);
-    void drawingEnded();
+    void drawingEnded();      // Esc or right click: cancel / stop
+    void drawingConfirmed();  // Enter or double click: finish the current shape
     void lengthKeyTyped(const QString& text);
 
 protected:
