@@ -28,7 +28,9 @@ Open an IFC file. It appears progressively in the 3D view, with the spatial tree
 | New project / add a level | **Ctrl+N** / *Add level…* in the Levels toolbar (the active level is where you draw) |
 | Plan view / 3D view / lines only | **P** / **3** / **L** (line drawing, hidden lines removed) |
 | Draw walls | **W**, then click points (snaps to wall ends, midpoints, perpendiculars, 15° angles; **Shift** for right angles), type a length + **Enter**, **Esc** to finish. Walls join at corners and T's |
-| Delete | **Del** |
+| Draw slabs | **S**, click the outline's points, click the first point or **Enter** to close; or select a closed loop of walls and use *Model › Slab from selected walls* |
+| Place doors / windows | **D** / **N**, then click on a wall (the type sets the size and sill) |
+| Delete | **Del** (deleting a wall also deletes its doors and windows) |
 
 ## Try it (command line)
 

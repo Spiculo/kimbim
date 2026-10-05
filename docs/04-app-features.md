@@ -76,8 +76,8 @@ All modeling goes through commands, with undo/redo ([01](01-architecture.md#engi
 |---------|-----|---------------|
 | Levels (storeys) and grids | P0 | `ifcopenshell.api.spatial`, `grid` — levels ✅ (Slice 4), grids: Slice 6 |
 | Walls: layered (by type), draw by axis, join at corners/T, flip | P0 | ✅ Slice 4 (flip: later). `geometry.create_2pt_wall`, `connect_wall`, `regenerate_wall_representation` — Bonsai's wall logic, already in ifcopenshell 0.9, no port needed |
-| Slabs / floors from outline or from walls | P0 | |
-| Openings + doors + windows hosted in walls (parametric types) | P0 | IfcOpenShell parametric door/window representations (used by Bonsai) |
+| Slabs / floors from outline or from walls | P0 | ✅ Slice 5 (top of slab at the level; from walls = outer faces of a closed loop) |
+| Openings + doors + windows hosted in walls (parametric types) | P0 | ✅ Slice 5: `geometry.add_door/window_representation` + `feature.add_feature/add_filling`; moving/resizing placed doors: Slice 6 |
 | Columns and beams from profile types | P0 | Profile sets |
 | Roofs (flat; pitched later) | P1 | |
 | Spaces / rooms (auto from boundaries), area | P1 | |
