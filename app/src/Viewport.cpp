@@ -5,6 +5,7 @@
 #include <Graphic3d_ClipPlane.hxx>
 #include <OpenGl_GraphicDriver.hxx>
 #include <Prs3d_Drawer.hxx>
+#include <Standard_Failure.hxx>
 #include <SelectMgr_EntityOwner.hxx>
 #include <gp_Pnt.hxx>
 #ifdef _WIN32
@@ -14,6 +15,7 @@
 #endif
 
 #include <QElapsedTimer>
+#include <QGuiApplication>
 #include <QMouseEvent>
 #include <QWheelEvent>
 
@@ -106,7 +108,8 @@ AIS_SelectionScheme Viewport::selectionSchemeFor(Aspect_VKeyMouse button, Aspect
 
 int Viewport::selectInRectangle(int x0, int y0, int x1, int y1, AIS_SelectionScheme scheme)
 {
-    ensureWindow();
+    if (!ensureWindow())
+        return 0;
     m_context->SelectRectangle(NCollection_Vec2<int>(std::min(x0, x1), std::min(y0, y1)),
         NCollection_Vec2<int>(std::max(x0, x1), std::max(y0, y1)), m_view, scheme);
     m_context->UpdateCurrentViewer();
@@ -130,16 +133,26 @@ bool Viewport::ensureWindow()
 {
     if (!m_view->Window().IsNull())
         return true;
+    // Headless platforms have no native window for OpenGL: degrade instead of throwing.
+    const QString platform = QGuiApplication::platformName();
+    if (platform == QLatin1String("offscreen") || platform == QLatin1String("minimal"))
+        return false;
+    try {
 #ifdef _WIN32
-    Handle(WNT_Window) window = new WNT_Window(reinterpret_cast<Aspect_Handle>(winId()));
+        Handle(WNT_Window) window = new WNT_Window(reinterpret_cast<Aspect_Handle>(winId()));
 #else
-    Handle(Xw_Window) window = new Xw_Window(m_viewer->Driver()->GetDisplayConnection(), Aspect_Drawable(winId()));
+        Handle(Xw_Window) window = new Xw_Window(m_viewer->Driver()->GetDisplayConnection(), Aspect_Drawable(winId()));
 #endif
-    m_view->SetWindow(window);
-    if (!window->IsMapped())
-        window->Map();
-    m_view->MustBeResized();
-    return true;
+        m_view->SetWindow(window);
+        if (!window->IsMapped())
+            window->Map();
+        m_view->MustBeResized();
+        return true;
+    } catch (const Standard_Failure& e) {
+        // Never let an OCCT exception escape into a Qt event handler (it aborts the app).
+        qWarning("KIMCAD: cannot attach the 3D view to its window: %s", e.what());
+        return false;
+    }
 }
 
 void Viewport::paintEvent(QPaintEvent*)
@@ -213,7 +226,8 @@ void Viewport::clear()
 
 void Viewport::fitAll()
 {
-    ensureWindow();
+    if (!ensureWindow())
+        return;
     m_view->FitAll(0.05, false);
     m_view->ZFitAll();
     update();
@@ -380,7 +394,8 @@ Bnd_Box Viewport::boundsOf(const QStringList& guids) const
 
 double Viewport::measureFps(int frames)
 {
-    ensureWindow();
+    if (!ensureWindow())
+        return 0;
     Handle(Graphic3d_Camera) cam = m_view->Camera();
     const gp_Pnt center = cam->Center();
     const gp_Pnt eye = cam->Eye();
@@ -406,14 +421,16 @@ double Viewport::measureFps(int frames)
 
 bool Viewport::dumpImage(const QString& path)
 {
-    ensureWindow();
+    if (!ensureWindow())
+        return false;
     m_view->Redraw();
     return m_view->Dump(path.toUtf8().constData());
 }
 
 QString Viewport::pickAt(int x, int y)
 {
-    ensureWindow();
+    if (!ensureWindow())
+        return {};
     m_context->MoveTo(x, y, m_view, false);
     if (!m_context->HasDetected())
         return {};
@@ -424,7 +441,7 @@ QString Viewport::pickAt(int x, int y)
 bool Viewport::projectCenterOf(const QString& guid, int* x, int* y) const
 {
     auto it = m_locate.constFind(guid);
-    if (it == m_locate.constEnd())
+    if (it == m_locate.constEnd() || m_view->Window().IsNull())
         return false;
     const Bnd_Box box = m_batches[size_t(it->batch)]->elementBounds(it->index);
     if (box.IsVoid())

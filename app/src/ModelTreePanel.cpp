@@ -26,7 +26,9 @@ ModelTreePanel::ModelTreePanel(QWidget* parent)
     m_tree->header()->setStretchLastSection(false);
     m_tree->header()->setSectionResizeMode(0, QHeaderView::Stretch);
     m_tree->header()->setSectionResizeMode(1, QHeaderView::Interactive);
-    m_tree->setColumnWidth(1, 130);
+    m_tree->setColumnWidth(1, 110);
+    m_tree->setIndentation(12); // deep spatial trees must leave room for names
+    m_tree->setTextElideMode(Qt::ElideMiddle);
     m_tree->setContextMenuPolicy(Qt::CustomContextMenu);
     m_tree->setUniformRowHeights(true);
     m_tree->setSelectionMode(QAbstractItemView::ExtendedSelection); // Ctrl/Shift like the viewport
@@ -111,6 +113,16 @@ void ModelTreePanel::selectGuids(const QStringList& guids)
         m_tree->scrollToItem(first);
     }
     m_programmatic = false;
+}
+
+void ModelTreePanel::updateNames(const QJsonObject& node)
+{
+    if (QTreeWidgetItem* item = m_items.value(node.value("guid").toString())) {
+        const QString name = node.value("name").toString();
+        item->setText(0, name.isEmpty() ? node.value("type").toString() : name);
+    }
+    for (const auto& child : node.value("children").toArray())
+        updateNames(child.toObject());
 }
 
 QStringList ModelTreePanel::selectedGuids() const

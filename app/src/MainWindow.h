@@ -2,6 +2,9 @@
 #pragma once
 
 #include <QElapsedTimer>
+#include <QJsonObject>
+#include <QJsonValue>
+#include <QStringList>
 #include <QMainWindow>
 #include <QThread>
 
@@ -32,6 +35,16 @@ public:
     PropertiesPanel* propertiesPanel() const { return m_properties; }
     void setPlanCutHeight(double metres);
 
+    // Selection and editing (M2). Edits apply to every selected element as one undoable step.
+    void setSelection(const QStringList& guids);
+    QStringList selection() const { return m_selection; }
+    bool applyPropertyEdit(const QString& pset, const QString& prop, const QJsonValue& value);
+    bool applyName(const QString& name);
+    bool removeProperty(const QString& pset, const QString& prop);
+    bool isDirty() const;
+    bool save();                        // to the current file; asks for a path if there is none
+    bool saveAs(const QString& path);
+
 signals:
     void firstChunkShown();
     void loadFinished(int elements, bool stopped);
@@ -47,7 +60,13 @@ private:
     void openDialog();
     void stopLoading();
     void showError(const QString& title, const QString& message);
-    void showPropertiesOf(const QString& guid);
+    void refreshProperties();
+    void afterEdit();
+    bool maybeSave();
+    QJsonObject bridge(const char* fn, const QStringList& args = {});
+    void saveAsDialog();
+    void addPropertyDialog(const QString& pset);
+    void addPropertySetDialog();
     void buildCutsToolbar();
     void applyCuts();
 
@@ -66,6 +85,9 @@ private:
     PropertiesPanel* m_properties;
     QThread m_thread;
     ModelLoader* m_loader;
+    QStringList m_selection;
+    QAction* m_undo = nullptr;
+    QAction* m_redo = nullptr;
     QAction* m_planCut = nullptr;
     QAction* m_sectionBox = nullptr;
     QDoubleSpinBox* m_cutHeight = nullptr;

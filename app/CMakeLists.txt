@@ -44,6 +44,7 @@ kimcad_test(test_cuts)
 kimcad_test(test_model_loader)
 kimcad_test(test_navigation)
 kimcad_test(test_selection)
+kimcad_test(test_properties_panel)
 
 # GUI self-tests: need a real OpenGL window (GPU, or Mesa on the Linux CI runner). Label "gui".
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/broken.ifc "ISO-10303-21;
