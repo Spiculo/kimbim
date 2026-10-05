@@ -29,6 +29,7 @@ ModelTreePanel::ModelTreePanel(QWidget* parent)
     m_tree->setColumnWidth(1, 130);
     m_tree->setContextMenuPolicy(Qt::CustomContextMenu);
     m_tree->setUniformRowHeights(true);
+    m_tree->setSelectionMode(QAbstractItemView::ExtendedSelection); // Ctrl/Shift like the viewport
 
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -36,9 +37,9 @@ ModelTreePanel::ModelTreePanel(QWidget* parent)
     layout->addWidget(m_tree);
 
     connect(m_search, &QLineEdit::textChanged, this, &ModelTreePanel::setFilter);
-    connect(m_tree, &QTreeWidget::currentItemChanged, this, [this](QTreeWidgetItem* item) {
-        if (!m_programmatic && item)
-            emit guidsSelected({item->data(0, GuidRole).toString()});
+    connect(m_tree, &QTreeWidget::itemSelectionChanged, this, [this] {
+        if (!m_programmatic)
+            emit guidsSelected(selectedGuids());
     });
     connect(m_tree, &QTreeWidget::customContextMenuRequested, this, &ModelTreePanel::showContextMenu);
 }
@@ -91,6 +92,33 @@ bool ModelTreePanel::selectGuid(const QString& guid)
     m_tree->scrollToItem(item);
     m_programmatic = false;
     return true;
+}
+
+void ModelTreePanel::selectGuids(const QStringList& guids)
+{
+    m_programmatic = true;
+    m_tree->clearSelection();
+    QTreeWidgetItem* first = nullptr;
+    for (const QString& g : guids) {
+        if (QTreeWidgetItem* item = m_items.value(g)) {
+            item->setSelected(true);
+            if (!first)
+                first = item;
+        }
+    }
+    if (first) {
+        m_tree->setCurrentItem(first, 0, QItemSelectionModel::NoUpdate);
+        m_tree->scrollToItem(first);
+    }
+    m_programmatic = false;
+}
+
+QStringList ModelTreePanel::selectedGuids() const
+{
+    QStringList out;
+    for (QTreeWidgetItem* item : m_tree->selectedItems())
+        out << item->data(0, GuidRole).toString();
+    return out;
 }
 
 QString ModelTreePanel::currentGuid() const

@@ -142,6 +142,13 @@ int runSelfTest(const SelfTestOptions& options)
         QApplication::processEvents();
         result.insert(QStringLiteral("tree_follows_selection"), window.treePanel()->currentGuid() == picked);
     }
+    if (options.boxSelect) {
+        // Box selection takes elements fully inside the box: a box over the whole view selects all.
+        const int n = viewport->selectInRectangle(1, 1, w - 2, h - 2, AIS_SelectionScheme_Replace);
+        QApplication::processEvents();
+        result.insert(QStringLiteral("box_selected"), n);
+        result.insert(QStringLiteral("tree_selected"), int(window.treePanel()->selectedGuids().size()));
+    }
     if (options.planCut >= 0) {
         window.setPlanCutHeight(options.planCut);
         if (QAction* cut = window.findChild<QAction*>(QStringLiteral("actionPlanCut")))

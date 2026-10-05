@@ -21,6 +21,8 @@ public:
     void setTree(const QJsonObject& root);
     void clear();
     bool selectGuid(const QString& guid); // programmatic: does not emit guidsSelected
+    void selectGuids(const QStringList& guids); // programmatic multi-selection, no echo
+    QStringList selectedGuids() const;
     QString currentGuid() const;
     void setFilter(const QString& text);
     QStringList descendantGuids(const QString& guid) const; // the node and everything below it

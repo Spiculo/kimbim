@@ -8,100 +8,108 @@
       <source>Ready</source>
       <translation>Listo</translation>
     </message>
+    <message numerus="yes">
+      <location filename="../src/MainWindow.cpp" line="61" />
+      <source>%n element(s) selected</source>
+      <translation>
+        <numerusform>%n elemento seleccionado</numerusform>
+        <numerusform>%n elementos seleccionados</numerusform>
+      </translation>
+    </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="73" />
+      <location filename="../src/MainWindow.cpp" line="74" />
       <source>KIMCAD cannot start</source>
       <translation>KIMCAD no puede iniciarse</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="85" />
+      <location filename="../src/MainWindow.cpp" line="86" />
       <location filename="../tests/test_translations.cpp" line="12" />
       <source>&amp;File</source>
       <translation>&amp;Archivo</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="86" />
+      <location filename="../src/MainWindow.cpp" line="87" />
       <location filename="../tests/test_translations.cpp" line="13" />
       <source>&amp;Open IFC...</source>
       <translation>&amp;Abrir IFC...</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="90" />
+      <location filename="../src/MainWindow.cpp" line="91" />
       <source>&amp;Quit</source>
       <translation>&amp;Salir</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="94" />
+      <location filename="../src/MainWindow.cpp" line="95" />
       <source>&amp;View</source>
       <translation>&amp;Ver</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="95" />
+      <location filename="../src/MainWindow.cpp" line="96" />
       <source>&amp;Fit all</source>
       <translation>&amp;Encuadrar todo</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="99" />
+      <location filename="../src/MainWindow.cpp" line="100" />
       <source>&amp;Hide selected</source>
       <translation>&amp;Ocultar selección</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="103" />
+      <location filename="../src/MainWindow.cpp" line="104" />
       <source>&amp;Isolate selected</source>
       <translation>A&amp;islar selección</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="111" />
+      <location filename="../src/MainWindow.cpp" line="112" />
       <source>&amp;Show all</source>
       <translation>&amp;Mostrar todo</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="116" />
+      <location filename="../src/MainWindow.cpp" line="117" />
       <source>&amp;Plan cut</source>
       <translation>&amp;Corte en planta</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="121" />
+      <location filename="../src/MainWindow.cpp" line="122" />
       <source>Section &amp;box</source>
       <translation>Caja de &amp;sección</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="134" />
+      <location filename="../src/MainWindow.cpp" line="135" />
       <source>&amp;Help</source>
       <translation>A&amp;yuda</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="135" />
+      <location filename="../src/MainWindow.cpp" line="136" />
       <source>&amp;About KIMCAD</source>
       <translation>&amp;Acerca de KIMCAD</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="141" />
+      <location filename="../src/MainWindow.cpp" line="142" />
       <source>Model</source>
       <translation>Modelo</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="145" />
+      <location filename="../src/MainWindow.cpp" line="146" />
       <source>Properties</source>
       <translation>Propiedades</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="154" />
+      <location filename="../src/MainWindow.cpp" line="155" />
       <source>Cuts</source>
       <translation>Cortes</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="164" />
+      <location filename="../src/MainWindow.cpp" line="165" />
       <source>Plan cut height</source>
       <translation>Altura del corte en planta</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="192" />
+      <location filename="../src/MainWindow.cpp" line="193" />
       <source>About KIMCAD</source>
       <translation>Acerca de KIMCAD</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="193" />
+      <location filename="../src/MainWindow.cpp" line="194" />
       <source>KIMCAD %1
 Open-source native BIM for architects, with version control built in.
 License: GPL-3.0-or-later</source>
@@ -110,27 +118,27 @@ BIM nativo de código abierto para arquitectos, con control de versiones integra
 Licencia: GPL-3.0 o posterior</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="207" />
+      <location filename="../src/MainWindow.cpp" line="208" />
       <source>Open IFC</source>
       <translation>Abrir IFC</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="207" />
+      <location filename="../src/MainWindow.cpp" line="208" />
       <source>IFC files (*.ifc)</source>
       <translation>Archivos IFC (*.ifc)</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="222" />
+      <location filename="../src/MainWindow.cpp" line="223" />
       <source>Opening %1...</source>
       <translation>Abriendo %1...</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="255" />
+      <location filename="../src/MainWindow.cpp" line="257" />
       <source>Loading %1 (%2)...</source>
       <translation>Cargando %1 (%2)...</translation>
     </message>
     <message numerus="yes">
-      <location filename="../src/MainWindow.cpp" line="265" />
+      <location filename="../src/MainWindow.cpp" line="267" />
       <source>Loading... %n element(s)</source>
       <translation>
         <numerusform>Cargando... %n elemento</numerusform>
@@ -138,7 +146,7 @@ Licencia: GPL-3.0 o posterior</translation>
       </translation>
     </message>
     <message numerus="yes">
-      <location filename="../src/MainWindow.cpp" line="277" />
+      <location filename="../src/MainWindow.cpp" line="279" />
       <source>%n element(s) loaded in %1 s</source>
       <translation>
         <numerusform>%n elemento cargado en %1 s</numerusform>
@@ -146,7 +154,7 @@ Licencia: GPL-3.0 o posterior</translation>
       </translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="286" />
+      <location filename="../src/MainWindow.cpp" line="288" />
       <source>Could not open the model</source>
       <translation>No se pudo abrir el modelo</translation>
     </message>
@@ -169,17 +177,17 @@ Licencia: GPL-3.0 o posterior</translation>
       <translation>Tipo</translation>
     </message>
     <message>
-      <location filename="../src/ModelTreePanel.cpp" line="147" />
+      <location filename="../src/ModelTreePanel.cpp" line="175" />
       <source>Isolate</source>
       <translation>Aislar</translation>
     </message>
     <message>
-      <location filename="../src/ModelTreePanel.cpp" line="148" />
+      <location filename="../src/ModelTreePanel.cpp" line="176" />
       <source>Hide</source>
       <translation>Ocultar</translation>
     </message>
     <message>
-      <location filename="../src/ModelTreePanel.cpp" line="150" />
+      <location filename="../src/ModelTreePanel.cpp" line="178" />
       <source>Show all</source>
       <translation>Mostrar todo</translation>
     </message>

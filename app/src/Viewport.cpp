@@ -88,8 +88,30 @@ void Viewport::applyNavigationPreset()
     gestures.Bind(Aspect_VKeyMouse_LeftButton, AIS_MouseGesture_SelectRectangle);
     gestures.Bind(Aspect_VKeyMouse_LeftButton | Aspect_VKeyFlags_CTRL, AIS_MouseGesture_SelectRectangle);
     gestures.Bind(Aspect_VKeyMouse_LeftButton | Aspect_VKeyFlags_SHIFT, AIS_MouseGesture_SelectRectangle);
+    auto& schemes = ChangeMouseSelectionSchemes();
+    schemes.Clear();
+    schemes.Bind(Aspect_VKeyMouse_LeftButton, AIS_SelectionScheme_Replace);
+    schemes.Bind(Aspect_VKeyMouse_LeftButton | Aspect_VKeyFlags_CTRL, AIS_SelectionScheme_Add);
+    schemes.Bind(Aspect_VKeyMouse_LeftButton | Aspect_VKeyFlags_SHIFT, AIS_SelectionScheme_XOR);
     SetRotationMode(AIS_RotationMode_PickLast);
     SetStickToRayOnZoom(true); // wheel zoom goes toward the point under the cursor
+}
+
+AIS_SelectionScheme Viewport::selectionSchemeFor(Aspect_VKeyMouse button, Aspect_VKeyFlags flags) const
+{
+    AIS_SelectionScheme scheme = AIS_SelectionScheme_UNKNOWN;
+    MouseSelectionSchemes().Find(button | flags, scheme);
+    return scheme;
+}
+
+int Viewport::selectInRectangle(int x0, int y0, int x1, int y1, AIS_SelectionScheme scheme)
+{
+    ensureWindow();
+    m_context->SelectRectangle(NCollection_Vec2<int>(std::min(x0, x1), std::min(y0, y1)),
+        NCollection_Vec2<int>(std::max(x0, x1), std::max(y0, y1)), m_view, scheme);
+    m_context->UpdateCurrentViewer();
+    emit selectionChanged(selectedGuids());
+    return m_context->NbSelected();
 }
 
 AIS_MouseGesture Viewport::gestureFor(Aspect_VKeyMouse button, Aspect_VKeyFlags flags) const
@@ -270,13 +292,17 @@ void Viewport::redisplay(const std::vector<int>& batches)
 void Viewport::setHidden(const QStringList& guids, bool hidden)
 {
     std::vector<int> touched;
-    if (hidden)
-        m_context->ClearSelected(false);
     for (const QString& g : guids) {
         auto it = m_locate.constFind(g);
         if (it == m_locate.constEnd())
             continue;
-        m_batches[size_t(it->batch)]->setHidden(it->index, hidden);
+        const auto& batch = m_batches[size_t(it->batch)];
+        if (hidden) { // a hidden element can't stay selected; the rest of the selection stays
+            Handle(ElementOwner) owner = batch->owner(it->index);
+            if (owner->IsSelected())
+                m_context->AddOrRemoveSelected(owner, false);
+        }
+        batch->setHidden(it->index, hidden);
         touched.push_back(it->batch);
     }
     redisplay(touched);

@@ -56,8 +56,9 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
             m_properties->clear();
             return;
         }
-        m_tree->selectGuid(guids.first());
+        m_tree->selectGuids(guids);
         showPropertiesOf(guids.first());
+        statusBar()->showMessage(tr("%n element(s) selected", nullptr, int(guids.size())));
     });
     connect(m_tree, &ModelTreePanel::guidsSelected, this, [this](const QStringList& guids) {
         m_viewport->selectGuids(guids);
