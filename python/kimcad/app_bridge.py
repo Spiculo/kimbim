@@ -175,8 +175,13 @@ def _run(action) -> dict:
     _model.begin_transaction()
     try:
         changed = action()
-    finally:
+    except BaseException:
+        # Roll back a half-applied action so the model and the history stay as they were.
         _model.end_transaction()
+        _model.undo()
+        _model.future.pop()
+        raise
+    _model.end_transaction()
     _ids.append(_next_id)
     _next_id += 1
     _future_ids.clear()

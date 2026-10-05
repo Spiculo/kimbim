@@ -143,3 +143,26 @@ def test_editing_without_a_model_is_an_error():
     app_bridge._model = None
     assert call("set_property", "[]", "P", "x", '"1"')["ok"] is False
     assert call("undo")["ok"] is False
+
+
+def test_a_failure_midway_through_a_bulk_edit_rolls_back_everything(opened, monkeypatch):
+    real = ifcopenshell.api.pset.edit_pset
+    calls = {"n": 0}
+
+    def flaky(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise RuntimeError("boom")
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(ifcopenshell.api.pset, "edit_pset", flaky)
+    r = call("set_property", json.dumps(opened["walls"]), "Pset_WallCommon", "FireRating", '"EI90"')
+    assert not r["ok"] and "boom" in r["error"]
+    monkeypatch.setattr(ifcopenshell.api.pset, "edit_pset", real)
+
+    p = multi(opened["walls"])["psets"]["Pset_WallCommon"]["FireRating"]
+    assert p == {**p, "value": "EI30", "varies": False}  # the first wall was rolled back too
+    assert call("state") == {**call("state"), "dirty": False, "can_undo": False, "can_redo": False}
+    # The next edit and its undo still line up with ifcopenshell's history.
+    assert call("set_name", json.dumps(opened["walls"][:1]), "Nuevo")["ok"]
+    assert call("undo")["ok"] and not call("state")["dirty"]
