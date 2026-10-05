@@ -111,18 +111,17 @@ void MainWindow::buildMenus()
     m_undo->setObjectName(QStringLiteral("actionUndo"));
     m_undo->setShortcut(QKeySequence::Undo);
     m_undo->setEnabled(false);
-    connect(m_undo, &QAction::triggered, this, [this] {
-        bridge("undo");
-        afterEdit();
-    });
+    connect(m_undo, &QAction::triggered, this, [this] { afterEdit(bridge("undo")); });
     m_redo = editMenu->addAction(tr("&Redo"));
     m_redo->setObjectName(QStringLiteral("actionRedo"));
     m_redo->setShortcuts({QKeySequence(Qt::CTRL | Qt::Key_Y), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Z)});
     m_redo->setEnabled(false);
-    connect(m_redo, &QAction::triggered, this, [this] {
-        bridge("redo");
-        afterEdit();
-    });
+    connect(m_redo, &QAction::triggered, this, [this] { afterEdit(bridge("redo")); });
+    editMenu->addSeparator();
+    QAction* del = editMenu->addAction(tr("&Delete"));
+    del->setObjectName(QStringLiteral("actionDelete"));
+    del->setShortcut(QKeySequence::Delete);
+    connect(del, &QAction::triggered, this, &MainWindow::deleteSelection);
 
     QMenu* view = menuBar()->addMenu(tr("&View"));
     QAction* fit = view->addAction(tr("&Fit all"));
@@ -328,7 +327,7 @@ bool MainWindow::applyPropertyEdit(const QString& pset, const QString& prop, con
     const QJsonObject r = bridge("set_property", {jsonList(m_selection), pset, prop, jsonValue(value)});
     if (!r.value("ok").toBool())
         showError(tr("Could not change %1").arg(prop), r.value("error").toString());
-    afterEdit();
+    afterEdit(r);
     return r.value("ok").toBool();
 }
 
@@ -398,8 +397,54 @@ void MainWindow::typeEditDialog(const QString& pset, const QString& prop)
     applyTypeEdit(pset, prop, QJsonValue(value));
 }
 
-void MainWindow::afterEdit()
+bool MainWindow::deleteSelection()
 {
+    if (m_selection.isEmpty())
+        return false;
+    const QJsonObject r = bridge("delete_elements", {jsonList(m_selection)});
+    if (!r.value("ok").toBool())
+        showError(tr("Could not delete"), r.value("error").toString());
+    afterEdit(r);
+    return r.value("ok").toBool();
+}
+
+bool MainWindow::treeHasGuid(const QString& guid) const
+{
+    return m_tree->itemFor(guid) != nullptr;
+}
+
+void MainWindow::applyGeometry(const QJsonObject& geometry)
+{
+    QStringList changed, removed;
+    for (const auto& g : geometry.value("changed").toArray())
+        changed << g.toString();
+    for (const auto& g : geometry.value("removed").toArray())
+        removed << g.toString();
+    if (changed.isEmpty() && removed.isEmpty())
+        return;
+    m_viewport->removeElements(removed);
+    if (!changed.isEmpty()) {
+        MeshChunk chunk;
+        bool none = false;
+        QString error;
+        if (!fetchElementMeshes(PythonEngine::instance(), changed, &chunk, &none, &error))
+            showError(tr("Could not update the 3D view"), error);
+        else if (!none)
+            m_viewport->replaceElements(chunk);
+    }
+    m_tree->refreshTree(bridge("spatial_tree")); // elements can appear or disappear
+    QStringList kept;
+    for (const QString& g : std::as_const(m_selection))
+        if (!removed.contains(g))
+            kept << g;
+    m_tree->selectGuids(kept);
+    if (kept != m_selection)
+        setSelection(kept);
+}
+
+void MainWindow::afterEdit(const QJsonObject& result)
+{
+    applyGeometry(result.value("geometry").toObject());
     const QJsonObject s = bridge("state");
     m_undo->setEnabled(s.value("can_undo").toBool());
     m_redo->setEnabled(s.value("can_redo").toBool());

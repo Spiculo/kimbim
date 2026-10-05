@@ -52,6 +52,9 @@ public:
 
     void setHidden(int i, bool hidden);
     bool isHidden(int i) const { return m_hidden[size_t(i)] != 0; }
+    // A retired element was replaced or deleted by an edit: hidden for good (never shown again).
+    void retire(int i);
+    bool isRetired(int i) const { return m_retired[size_t(i)] != 0; }
     int visibleCount() const { return m_visible; }
 
     Bnd_Box elementBounds(int i) const;
@@ -72,6 +75,7 @@ private:
     MeshChunk m_chunk;
     QHash<QString, int> m_index;
     std::vector<char> m_hidden;
+    std::vector<char> m_retired;
     int m_visible = 0;
     std::vector<Handle(ElementOwner)> m_owners;
     Handle(Graphic3d_ArrayOfTriangles) m_pickArray; // indexed positions for Select3D_SensitivePrimitiveArray

@@ -45,6 +45,10 @@ public:
     bool applyTypeEdit(const QString& pset, const QString& prop, const QJsonValue& value);
     bool resetToType(const QString& pset, const QString& prop);
     bool isDirty() const;
+    bool deleteSelection();
+    bool treeHasGuid(const QString& guid) const;
+    // Re-mesh changed elements and drop removed ones after an edit/undo/redo ({changed, removed}).
+    void applyGeometry(const QJsonObject& geometry);
     bool save();                        // to the current file; asks for a path if there is none
     bool saveAs(const QString& path);
 
@@ -64,7 +68,7 @@ private:
     void stopLoading();
     void showError(const QString& title, const QString& message);
     void refreshProperties();
-    void afterEdit();
+    void afterEdit(const QJsonObject& result = {});
     bool maybeSave();
     QJsonObject bridge(const char* fn, const QStringList& args = {});
     void saveAsDialog();

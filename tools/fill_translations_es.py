@@ -82,6 +82,9 @@ ES = {
     "%1 changed on the type: %n element(s) updated": ("%1 cambiado en el tipo: %n elemento actualizado", "%1 cambiado en el tipo: %n elementos actualizados"),
     "This changes %1 for %n element(s) of this type, including elements that are not selected.": ("Esto cambia %1 en %n elemento de este tipo, incluidos los no seleccionados.", "Esto cambia %1 en %n elementos de este tipo, incluidos los no seleccionados."),
     "%n selected element(s) have no type and will not change.": ("%n elemento seleccionado no tiene tipo y no cambiará.", "%n elementos seleccionados no tienen tipo y no cambiarán."),
+    "&Delete": "&Eliminar",
+    "Could not delete": "No se pudo eliminar",
+    "Could not update the 3D view": "No se pudo actualizar la vista 3D",
     # plural forms: (singular, plural)
     "Loading... %n element(s)": ("Cargando... %n elemento", "Cargando... %n elementos"),
     "%n element(s) selected": ("%n elemento seleccionado", "%n elementos seleccionados"),

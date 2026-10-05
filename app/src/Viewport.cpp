@@ -238,8 +238,51 @@ QStringList Viewport::guids() const
     QStringList out;
     for (const auto& b : m_batches)
         for (int i = 0; i < b->elementCount(); ++i)
-            out << b->guid(i);
+            if (!b->isRetired(i))
+                out << b->guid(i);
     return out;
+}
+
+bool Viewport::retire(const QString& guid, std::vector<int>* touched)
+{
+    auto it = m_locate.find(guid);
+    if (it == m_locate.end())
+        return false;
+    const auto& batch = m_batches[size_t(it->batch)];
+    Handle(ElementOwner) owner = batch->owner(it->index);
+    const bool wasSelected = owner->IsSelected();
+    if (wasSelected)
+        m_context->AddOrRemoveSelected(owner, false);
+    batch->retire(it->index);
+    touched->push_back(it->batch);
+    m_locate.erase(it);
+    return wasSelected;
+}
+
+void Viewport::replaceElements(const MeshChunk& chunk)
+{
+    if (chunk.elementCount() == 0)
+        return;
+    std::vector<int> touched;
+    QStringList reselect;
+    for (const QString& g : chunk.guids)
+        if (retire(g, &touched))
+            reselect << g;
+    redisplay(touched);
+    addBatch(new ElementBatch(chunk));
+    for (const QString& g : reselect) {
+        const Loc loc = m_locate.value(g);
+        m_context->AddOrRemoveSelected(m_batches[size_t(loc.batch)]->owner(loc.index), false);
+    }
+    update();
+}
+
+void Viewport::removeElements(const QStringList& guids)
+{
+    std::vector<int> touched;
+    for (const QString& g : guids)
+        retire(g, &touched);
+    redisplay(touched);
 }
 
 int Viewport::visibleElementCount() const

@@ -35,6 +35,8 @@ struct MeshChunk {
 
 // Pulls the next chunk from Python. Returns false on error; sets *done when meshing is finished.
 bool fetchMeshChunk(PythonEngine& py, int maxElements, MeshChunk* out, bool* done, QString* error);
+// Meshes of specific elements after an edit (app_bridge.mesh_elements). *none: nothing to draw.
+bool fetchElementMeshes(PythonEngine& py, const QStringList& guids, MeshChunk* out, bool* none, QString* error);
 
 } // namespace kimcad
 

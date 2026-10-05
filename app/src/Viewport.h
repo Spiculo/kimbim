@@ -26,6 +26,10 @@ public:
     ~Viewport() override;
 
     void addBatch(const Handle(ElementBatch)& batch);
+    // Live edits (Slice 4): new geometry for these elements (old instances retired, selection kept),
+    // or elements gone from the model.
+    void replaceElements(const MeshChunk& chunk);
+    void removeElements(const QStringList& guids);
     void clear();
     void fitAll();
 
@@ -85,6 +89,7 @@ private:
     bool ensureWindow();
     void applyNavigationPreset();
     void redisplay(const std::vector<int>& batches);
+    bool retire(const QString& guid, std::vector<int>* touched); // true if it was selected
     NCollection_Vec2<int> toPixels(const QPointF& p) const;
 
     Handle(V3d_Viewer) m_viewer;

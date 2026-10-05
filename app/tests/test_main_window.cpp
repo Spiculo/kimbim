@@ -171,6 +171,37 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // Slice 4: Delete removes the selection from the model, the view and the tree; undo brings it back.
+    void deleteAndUndoUpdateViewAndTree()
+    {
+        QTemporaryDir tmp;
+        const QString path = tmp.filePath(QStringLiteral("borrar.ifc"));
+        auto& py = kimcad::PythonEngine::instance();
+        QString error;
+        QVERIFY(py.start(&error));
+        py.callJson("_write_test_model", {path});
+
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QSignalSpy done(&w, &kimcad::MainWindow::loadFinished);
+        w.openFile(path);
+        QVERIFY(done.wait(60000));
+        const QStringList walls = w.viewport()->guids();
+        QCOMPARE(walls.size(), 2);
+        w.viewport()->selectGuids({walls[0]});
+        w.setSelection({walls[0]});
+        action(w, "actionDelete")->trigger();
+        QCOMPARE(w.viewport()->elementCount(), 1);
+        QVERIFY(!w.viewport()->guids().contains(walls[0]));
+        QVERIFY(!w.treeHasGuid(walls[0]));
+        QVERIFY(w.selection().isEmpty());
+        QVERIFY(w.isDirty());
+        action(w, "actionUndo")->trigger();
+        QCOMPARE(w.viewport()->elementCount(), 2);
+        QVERIFY(w.viewport()->guids().contains(walls[0]));
+        QVERIFY(w.treeHasGuid(walls[0]));
+        QVERIFY(w.close());
+    }
+
     void shortcutsAreTheDocumentedOnes()
     {
         kimcad::MainWindow w(nullptr, true);
@@ -179,6 +210,7 @@ private slots:
         QCOMPARE(action(w, "actionShowAll")->shortcut(), QKeySequence(Qt::SHIFT | Qt::Key_H));
         QCOMPARE(action(w, "actionUndo")->shortcut(), QKeySequence(QKeySequence::Undo));
         QCOMPARE(action(w, "actionSave")->shortcut(), QKeySequence(QKeySequence::Save));
+        QCOMPARE(action(w, "actionDelete")->shortcut(), QKeySequence(QKeySequence::Delete));
     }
 };
 

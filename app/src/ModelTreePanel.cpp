@@ -96,6 +96,23 @@ bool ModelTreePanel::selectGuid(const QString& guid)
     return true;
 }
 
+void ModelTreePanel::refreshTree(const QJsonObject& root)
+{
+    QSet<QString> expanded;
+    for (auto it = m_items.constBegin(); it != m_items.constEnd(); ++it)
+        if (it.value()->isExpanded())
+            expanded.insert(it.key());
+    const QString filter = m_search->text();
+    setTree(root);
+    for (const QString& g : std::as_const(expanded))
+        if (QTreeWidgetItem* item = m_items.value(g))
+            item->setExpanded(true);
+    if (!filter.isEmpty()) { // re-apply the user's filter to the new items
+        m_search->clear();
+        m_search->setText(filter);
+    }
+}
+
 void ModelTreePanel::selectGuids(const QStringList& guids)
 {
     m_programmatic = true;
