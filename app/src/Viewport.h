@@ -82,6 +82,8 @@ public:
     // Navigation (D48, Revit/ArchiCAD preset): middle-drag pans, Shift+middle-drag orbits around the
     // picked point, wheel zooms at the cursor, left-drag box-selects, right button is for menus.
     AIS_MouseGesture gestureFor(Aspect_VKeyMouse button, Aspect_VKeyFlags flags) const;
+    Aspect_VKeyMouse pressedButtons() const { return PressedMouseButtons(); }
+    AIS_MouseGesture activeGesture() const { return myMouseActiveGesture; }
     AIS_RotationMode rotationMode() const { return RotationMode(); }
     // Click/box selection modifiers: plain = replace, Ctrl = add (Revit), Shift = toggle (ArchiCAD).
     AIS_SelectionScheme selectionSchemeFor(Aspect_VKeyMouse button, Aspect_VKeyFlags flags) const;

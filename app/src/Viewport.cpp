@@ -315,7 +315,8 @@ void Viewport::mousePressEvent(QMouseEvent* e)
             emit workPointClicked(p, tolerance, e->modifiers());
         return; // drawing clicks never reach selection
     }
-    if (PressMouseButton(toPixels(e->position()), toButtons(e->buttons()), toFlags(e->modifiers()), false))
+    // OCCT expects the button that changed (it keeps the set of held buttons itself).
+    if (PressMouseButton(toPixels(e->position()), toButtons(e->button()), toFlags(e->modifiers()), false))
         update();
 }
 
@@ -323,7 +324,9 @@ void Viewport::mouseReleaseEvent(QMouseEvent* e)
 {
     if (m_drawingMode && (e->button() == Qt::LeftButton || e->button() == Qt::RightButton))
         return;
-    if (ReleaseMouseButton(toPixels(e->position()), toButtons(e->buttons()), toFlags(e->modifiers()), false))
+    // The released button, not the ones still held: passing the held set kept pan/orbit running
+    // after release until a modifier key changed (owner bug report).
+    if (ReleaseMouseButton(toPixels(e->position()), toButtons(e->button()), toFlags(e->modifiers()), false))
         update();
 }
 
