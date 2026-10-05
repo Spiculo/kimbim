@@ -144,6 +144,12 @@ void MainWindow::buildMenus()
     view3D->setObjectName(QStringLiteral("action3DView"));
     view3D->setShortcut(Qt::Key_3);
     connect(view3D, &QAction::triggered, this, [this] { setPlanView(false); });
+    QAction* linesOnly = view->addAction(tr("&Lines only"));
+    linesOnly->setObjectName(QStringLiteral("actionLinesOnly"));
+    linesOnly->setShortcut(Qt::Key_L);
+    linesOnly->setCheckable(true);
+    linesOnly->setToolTip(tr("Show the model as a line drawing (hidden lines removed), e.g. for plans"));
+    connect(linesOnly, &QAction::toggled, m_viewport, &Viewport::setLinesOnly);
     view->addSeparator();
     QAction* fit = view->addAction(tr("&Fit all"));
     fit->setShortcut(Qt::Key_F);

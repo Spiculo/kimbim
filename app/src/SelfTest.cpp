@@ -154,6 +154,10 @@ int runSelfTest(const SelfTestOptions& options)
 
     Viewport* viewport = window.viewport();
     const double loadS = double(timer.elapsed()) / 1000.0;
+    if (options.linesOnly)
+        window.findChild<QAction*>(QStringLiteral("actionLinesOnly"))->setChecked(true);
+    if (options.planView)
+        window.findChild<QAction*>(QStringLiteral("actionPlanView"))->trigger();
     QApplication::processEvents();
     const double fps = viewport->measureFps(options.frames);
 

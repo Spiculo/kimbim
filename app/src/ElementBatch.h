@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <utility>
+#include <gp_Pnt.hxx>
+#include <Quantity_Color.hxx>
 #include <AIS_InteractiveObject.hxx>
 #include <Bnd_Box.hxx>
 #include <Graphic3d_ArrayOfTriangles.hxx>
@@ -42,7 +45,16 @@ private:
 class ElementBatch : public AIS_InteractiveObject {
     DEFINE_STANDARD_RTTI_INLINE(ElementBatch, AIS_InteractiveObject)
 public:
+    // Display modes: shaded faces with border lines; element ids as flat colours (visibility
+    // queries, never shown); lines only (hidden-line: faces in the background colour, black lines).
+    enum Mode { Shaded = 0, Ids = 1, LinesOnly = 2 };
+
     explicit ElementBatch(MeshChunk chunk);
+
+    // Border lines of one element: boundary edges and creases sharper than angleDeg. Triangulation
+    // diagonals and coplanar seams are skipped; unwelded meshes pair up by vertex position.
+    static std::vector<std::pair<gp_Pnt, gp_Pnt>> featureEdges(const MeshChunk& chunk, int element, double angleDeg = 30.0);
+    static void setBackground(const Quantity_Color& color) { s_background = color; }
 
     int elementCount() const { return m_chunk.elementCount(); }
     int triangleCount() const { return m_chunk.triangleCount(); }
@@ -64,7 +76,7 @@ public:
     // Flat-shaded triangles of one element (used for highlights).
     Handle(Graphic3d_ArrayOfTriangles) elementTriangles(int i) const;
 
-    bool AcceptDisplayMode(const int mode) const override { return mode == 0; }
+    bool AcceptDisplayMode(const int mode) const override { return mode >= Shaded && mode <= LinesOnly; }
     void Compute(const Handle(PrsMgr_PresentationManager)& pm, const Handle(Prs3d_Presentation)& prs,
         const int mode) override;
     void ComputeSelection(const Handle(SelectMgr_Selection)& selection, const int mode) override;
@@ -79,6 +91,12 @@ private:
     int m_visible = 0;
     std::vector<Handle(ElementOwner)> m_owners;
     Handle(Graphic3d_ArrayOfTriangles) m_pickArray; // indexed positions for Select3D_SensitivePrimitiveArray
+    void computeEdges();
+    void addTriangles(const Handle(Prs3d_Presentation)& prs, int mode);
+    void addLines(const Handle(Prs3d_Presentation)& prs, const Quantity_Color& color);
+    std::vector<gp_Pnt> m_edgePoints;    // segment end points of all elements' border lines
+    std::vector<uint32_t> m_edgeOffsets; // per element: first segment, one past the last (size n+1)
+    static Quantity_Color s_background;
 };
 
 } // namespace kimcad

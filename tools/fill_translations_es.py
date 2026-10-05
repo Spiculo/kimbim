@@ -117,6 +117,8 @@ ES = {
     "The model has no level. Add a level first.": "El modelo no tiene niveles. Añada un nivel primero.",
     "Wall: click the start point": "Muro: haga clic en el punto inicial",
     "Could not create the wall: %1": "No se pudo crear el muro: %1",
+    "&Lines only": "Solo &líneas",
+    "Show the model as a line drawing (hidden lines removed), e.g. for plans": "Mostrar el modelo como dibujo de líneas (sin líneas ocultas), p. ej. para plantas",
     # plural forms: (singular, plural)
     "Loading... %n element(s)": ("Cargando... %n elemento", "Cargando... %n elementos"),
     "%n element(s) selected": ("%n elemento seleccionado", "%n elementos seleccionados"),

@@ -39,6 +39,9 @@ public:
     void setPlanView(double elevation);
     void set3DView();
     bool isPlanView() const { return m_planView; }
+    // Lines only (hidden-line drawing, Slice 4b): every batch, including later ones.
+    void setLinesOnly(bool on);
+    bool linesOnly() const { return m_linesOnly; }
     double planElevation() const { return m_planElevation; }
     // Screen point -> point on the horizontal plane z (metres). False without a window or when the
     // view ray is parallel to the plane.
@@ -127,6 +130,7 @@ private:
     std::vector<Handle(ElementBatch)> m_batches;
     QHash<QString, Loc> m_locate;
     bool m_planView = false;
+    bool m_linesOnly = false;
     bool m_drawingMode = false;
     double m_workZ = 0.0;
     Handle(ElementBatch) m_preview;

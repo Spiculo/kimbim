@@ -237,6 +237,8 @@ private slots:
         QCOMPARE(action(w, "actionDelete")->shortcut(), QKeySequence(QKeySequence::Delete));
         QCOMPARE(action(w, "actionNewProject")->shortcut(), QKeySequence(QKeySequence::New));
         QCOMPARE(action(w, "actionPlanView")->shortcut(), QKeySequence(Qt::Key_P));
+        QCOMPARE(action(w, "actionLinesOnly")->shortcut(), QKeySequence(Qt::Key_L));
+        QVERIFY(action(w, "actionLinesOnly")->isCheckable());
     }
 };
 

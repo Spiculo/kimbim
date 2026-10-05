@@ -85,7 +85,9 @@ Viewport::Viewport(QWidget* parent)
     m_viewer->SetLightOn();
     m_context = new AIS_InteractiveContext(m_viewer);
     m_view = m_viewer->CreateView();
-    m_view->SetBackgroundColor(Quantity_Color(0.93, 0.94, 0.95, Quantity_TOC_RGB));
+    const Quantity_Color background(0.93, 0.94, 0.95, Quantity_TOC_RGB);
+    m_view->SetBackgroundColor(background);
+    ElementBatch::setBackground(background); // lines-only faces blend into it
     m_view->SetProj(V3d_XposYnegZpos);
     m_context->HighlightStyle(Prs3d_TypeOfHighlight_Dynamic)->SetColor(Quantity_Color(0.98, 0.75, 0.20, Quantity_TOC_RGB));
     m_context->HighlightStyle(Prs3d_TypeOfHighlight_Selected)->SetColor(Quantity_Color(0.15, 0.50, 0.95, Quantity_TOC_RGB));
@@ -363,7 +365,18 @@ void Viewport::addBatch(const Handle(ElementBatch)& batch)
         m_locate.insert(batch->guid(i), Loc{b, i});
     for (const auto& plane : m_clipPlanes)
         batch->AddClipPlane(plane);
-    m_context->Display(batch, 0, 0, false);
+    const int mode = m_linesOnly ? ElementBatch::LinesOnly : ElementBatch::Shaded;
+    batch->SetDisplayMode(mode); // the object's own mode, so later redisplays keep it
+    m_context->Display(batch, mode, 0, false);
+    update();
+}
+
+void Viewport::setLinesOnly(bool on)
+{
+    m_linesOnly = on;
+    const int mode = on ? ElementBatch::LinesOnly : ElementBatch::Shaded;
+    for (const auto& b : m_batches)
+        m_context->SetDisplayMode(b, mode, false);
     update();
 }
 

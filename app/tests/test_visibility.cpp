@@ -128,6 +128,24 @@ private slots:
         QVERIFY(v.guids().contains("a1"));
     }
 
+    // Slice 4b: lines-only (hidden-line) display for plans; new batches follow the current mode.
+    void linesOnlySwitchesEveryBatch()
+    {
+        kimcad::Viewport v;
+        Handle(kimcad::ElementBatch) a = batch("a", 2);
+        v.addBatch(a);
+        QVERIFY(!v.linesOnly());
+        v.setLinesOnly(true);
+        QVERIFY(v.linesOnly());
+        QCOMPARE(a->DisplayMode(), int(kimcad::ElementBatch::LinesOnly));
+        Handle(kimcad::ElementBatch) b = batch("b", 1);
+        v.addBatch(b);
+        QCOMPARE(b->DisplayMode(), int(kimcad::ElementBatch::LinesOnly));
+        v.setLinesOnly(false);
+        QCOMPARE(a->DisplayMode(), int(kimcad::ElementBatch::Shaded));
+        QCOMPARE(b->DisplayMode(), int(kimcad::ElementBatch::Shaded));
+    }
+
     void hidingClearsSelection()
     {
         kimcad::Viewport v;

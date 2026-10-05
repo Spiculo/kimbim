@@ -41,6 +41,10 @@ int main(int argc, char* argv[])
         QStringLiteral("Self-test: on a new project, draw walls through these points (\"x,y;x,y;...\", metres)."),
         QStringLiteral("points"));
     parser.addOption(drawWalls);
+    QCommandLineOption planView(QStringLiteral("plan-view"), QStringLiteral("Self-test: switch to the plan view."));
+    parser.addOption(planView);
+    QCommandLineOption linesOnly(QStringLiteral("lines-only"), QStringLiteral("Self-test: lines-only display."));
+    parser.addOption(linesOnly);
     QCommandLineOption screenshot(QStringLiteral("screenshot"), QStringLiteral("Self-test: save a PNG of the window."),
         QStringLiteral("png"));
     parser.addOption(screenshot);
@@ -62,6 +66,8 @@ int main(int argc, char* argv[])
         options.chunkSize = qMax(1, parser.value(chunk).toInt());
         options.boxSelect = parser.isSet(boxSelect);
         options.drawWalls = parser.value(drawWalls);
+        options.planView = parser.isSet(planView);
+        options.linesOnly = parser.isSet(linesOnly);
         options.screenshot = parser.value(screenshot);
         return kimcad::runSelfTest(options);
     }

@@ -13,6 +13,8 @@ struct SelfTestOptions {
     int chunkSize = 1000;         // elements per mesh chunk / batch
     bool boxSelect = false;       // box-select the whole view and report how many got selected
     QString screenshot;           // non-empty: save a PNG of the whole window at the end
+    bool planView = false;        // switch to the plan view of the lowest level before the screenshot
+    bool linesOnly = false;       // lines-only display before measuring/screenshot
     QString drawWalls;            // "x,y;x,y;...": new project, draw this wall polyline with the wall tool
 };
 
