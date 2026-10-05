@@ -306,6 +306,32 @@ def _own_property(e, pset: str, prop: str):
     return None
 
 
+def _type_of(e):
+    import ifcopenshell.util.element
+
+    return ifcopenshell.util.element.get_type(e)
+
+
+def _type_pset(t, pset: str):
+    """The type object's own property set entity with this name, or None."""
+    for d in getattr(t, "HasPropertySets", None) or ():
+        if d.is_a("IfcPropertySet") and d.Name == pset:
+            return d
+    return None
+
+
+def _type_property(t, pset: str, prop: str):
+    ps = _type_pset(t, pset) if t is not None else None
+    for p in (ps.HasProperties if ps else ()):
+        if p.Name == prop:
+            return p
+    return None
+
+
+def _value_type(p, fallback: str) -> str:
+    return p.NominalValue.is_a() if p is not None and getattr(p, "NominalValue", None) else fallback
+
+
 def set_property(guids_json: str, pset: str, prop: str, value_json: str) -> str:
     import ifcopenshell.api.pset
 
@@ -343,6 +369,90 @@ def remove_property(guids_json: str, pset: str, prop: str) -> str:
     if _model is None:
         return _dump({"ok": False, "error": "no model open"})
     targets = [e for e in _elements(guids_json) if _own_property(e, pset, prop) is not None]
+
+    def action():
+        for e in targets:
+            ifcopenshell.api.pset.edit_pset(_model, pset=_own_pset(e, pset), properties={prop: None}, should_purge=True)
+        return len(targets)
+
+    return _dump(_run(action))
+
+
+def _selected_types(elements) -> tuple[list, int]:
+    """Distinct types of the elements (first-seen order) and how many elements have no type."""
+    types, untyped = [], 0
+    for e in elements:
+        t = _type_of(e)
+        if t is None:
+            untyped += 1
+        elif t not in types:
+            types.append(t)
+    return types, untyped
+
+
+def _type_usage(types, pset: str, prop: str) -> dict:
+    import ifcopenshell.util.element
+
+    out, elements = [], 0
+    for t in types:
+        occurrences = ifcopenshell.util.element.get_types(t)
+        out.append({"guid": t.GlobalId, "name": t.Name or t.is_a(), "count": len(occurrences)})
+        # An element's own value overrides the type's, so overridden elements will not change.
+        elements += sum(1 for o in occurrences if _own_property(o, pset, prop) is None)
+    return {"types": out, "elements": elements}
+
+
+def type_usage(guids_json: str, pset: str, prop: str) -> str:
+    """Which types a type edit of pset/prop would change, and how many elements would show it."""
+    if _model is None:
+        return _dump({"error": "no model open"})
+    types, untyped = _selected_types(_elements(guids_json))
+    return _dump({**_type_usage(types, pset, prop), "untyped": untyped})
+
+
+def set_type_property(guids_json: str, pset: str, prop: str, value_json: str) -> str:
+    """Set pset/prop on the TYPES of the selected elements (every element of those types inherits it)."""
+    import ifcopenshell.api.pset
+
+    if _model is None:
+        return _dump({"ok": False, "error": "no model open"})
+    types, _ = _selected_types(_elements(guids_json))
+    if not types:
+        return _dump({"ok": False, "error": "the selected elements have no type"})
+    try:
+        value = json.loads(value_json)
+        fallback = _template_type(pset, prop) or _infer_type(value)
+        plan = []
+        for t in types:
+            ifc_type = _value_type(_type_property(t, pset, prop), fallback)
+            plan.append((t, ifc_type, _convert(value, ifc_type)))
+    except ValueError as ex:
+        return _dump({"ok": False, "error": str(ex)})
+    usage = _type_usage(types, pset, prop)
+
+    def action():
+        for t, ifc_type, converted in plan:
+            ps = _type_pset(t, pset) or ifcopenshell.api.pset.add_pset(_model, product=t, name=pset)
+            ifcopenshell.api.pset.edit_pset(_model, pset=ps, properties={prop: _model.create_entity(ifc_type, converted)})
+        return len(plan)
+
+    try:
+        r = _run(action)
+    except Exception as ex:
+        return _dump({"ok": False, "error": f"{type(ex).__name__}: {ex}"})
+    return _dump({**r, "types": len(plan), "elements": usage["elements"]})
+
+
+def reset_to_type(guids_json: str, pset: str, prop: str) -> str:
+    """Remove the elements' own value where their type defines pset/prop, so the type value shows again."""
+    import ifcopenshell.api.pset
+
+    if _model is None:
+        return _dump({"ok": False, "error": "no model open"})
+    targets = [
+        e for e in _elements(guids_json)
+        if _own_property(e, pset, prop) is not None and _type_property(_type_of(e), pset, prop) is not None
+    ]
 
     def action():
         for e in targets:
@@ -409,7 +519,8 @@ _MISSING = object()
 
 
 def _element_values(e) -> dict:
-    """{pset: {prop: (value, ifc_type, editable)}}: type-level values first, the element's own override them."""
+    """{pset: {prop: (value, ifc_type, editable, source, type_value)}}: type-level values first, the
+    element's own override them. source: "type", "element" or "override" (own value over a type value)."""
     out: dict = {}
     import ifcopenshell.util.element
 
@@ -421,18 +532,35 @@ def _element_values(e) -> dict:
             definitions.append((rel.RelatingPropertyDefinition, True))
     for d, own in definitions:
         props = out.setdefault(d.Name, {})
+
+        def put(name, value, ifc_type, editable):
+            if not own:
+                props[name] = (value, ifc_type, editable, "type", value)
+            elif name in props and props[name][3] == "type":
+                props[name] = (value, ifc_type, editable, "override", props[name][0])
+            else:
+                props[name] = (value, ifc_type, editable, "element", None)
+
         if d.is_a("IfcPropertySet"):
             for p in d.HasProperties:
                 if p.is_a("IfcPropertySingleValue"):
                     v = p.NominalValue
-                    props[p.Name] = (v.wrappedValue if v is not None else None, v.is_a() if v is not None else None, True)
+                    put(p.Name, v.wrappedValue if v is not None else None, v.is_a() if v is not None else None, True)
                 else:
-                    props[p.Name] = (p.is_a(), p.is_a(), False)  # lists/tables/enums: shown, not editable yet
+                    put(p.Name, p.is_a(), p.is_a(), False)  # lists/tables/enums: shown, not editable yet
         elif d.is_a("IfcElementQuantity"):
             for q in d.Quantities:
                 value = next((x for k, x in q.get_info(recursive=False).items() if k.endswith("Value")), None)
-                props[q.Name] = (value, q.is_a(), False)  # quantities are computed, not typed in
+                put(q.Name, value, q.is_a(), False)  # quantities are computed, not typed in
     return out
+
+
+def _shared_type_value(present: list, total: int):
+    """The type-level value when every selected element inherits the same one, else None."""
+    values = [x[4] for x in present]
+    if len(present) != total or any(x[3] == "element" for x in present) or any(v != values[0] for v in values):
+        return None
+    return values[0]
 
 
 def properties_multi(guids_json: str) -> str:
@@ -455,6 +583,8 @@ def properties_multi(guids_json: str) -> str:
                 "varies": varies,
                 "ifc_type": next((x[1] for x in present if x[1]), None),
                 "editable": all(x[2] for x in present),
+                "source": present[0][3] if all(x[3] == present[0][3] for x in present) else "mixed",
+                "type_value": _shared_type_value(present, len(entries)),
             }
         psets[pset] = props
     names = [e.Name or "" for e in elements]
@@ -469,8 +599,18 @@ def properties_multi(guids_json: str) -> str:
 
 
 def _write_test_model(path: str) -> str:
-    """Write a small model (2 walls on one storey) for the app's C++ tests and self-test."""
+    """Write a small model (2 walls of type "Basic Wall 200" on one storey) for the app's C++ tests and self-test."""
     from .testing import build_model
 
-    build_model(walls=2).write(path)
+    import ifcopenshell.api.pset
+    import ifcopenshell.api.root
+    import ifcopenshell.api.type
+
+    f = build_model(walls=2)
+    wall_type = ifcopenshell.api.root.create_entity(f, ifc_class="IfcWallType", name="Basic Wall 200")
+    ps = ifcopenshell.api.pset.add_pset(f, product=wall_type, name="Pset_WallCommon")
+    u = f.createIfcThermalTransmittanceMeasure(0.35)
+    ifcopenshell.api.pset.edit_pset(f, pset=ps, properties={"ThermalTransmittance": u})
+    ifcopenshell.api.type.assign_type(f, related_objects=f.by_type("IfcWall"), relating_type=wall_type)
+    f.write(path)
     return _dump({"ok": True, "path": path})
