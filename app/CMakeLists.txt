@@ -42,6 +42,9 @@ kimcad_test(test_visibility)
 kimcad_test(test_main_window)
 kimcad_test(test_cuts)
 kimcad_test(test_model_loader)
+kimcad_test(test_navigation)
+kimcad_test(test_selection)
+kimcad_test(test_properties_panel)
 
 # GUI self-tests: need a real OpenGL window (GPU, or Mesa on the Linux CI runner). Label "gui".
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/broken.ifc "ISO-10303-21;
@@ -59,3 +62,4 @@ kimcad_gui_test(app_selftest_fixture
 kimcad_gui_test(app_selftest_broken_file "\"ok\":false" ${CMAKE_CURRENT_BINARY_DIR}/broken.ifc)
 kimcad_gui_test(app_selftest_quit_during_load "\"ok\":true,\"quit_during_load\":true" :fixture: --quit-during-load --chunk 1)
 kimcad_gui_test(app_selftest_plan_cut "\"ok\":true.*\"planes\":1" :fixture: --frames 5 --plan-cut 1.5)
+kimcad_gui_test(app_selftest_box_select "\"box_selected\":2.*\"ok\":true.*\"tree_selected\":2" :fixture: --frames 5 --box-select)

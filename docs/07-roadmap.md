@@ -51,9 +51,18 @@ Measured (`kimcad-app --self-test`, integrated GPU): Duplex at 60 fps (vsync); a
 
 Not yet: colour by property, walk mode, measure, saved views, a "show spaces" toggle, section-box handles (the box is around the selection), and a fix for vsync double-waits in a bare top-level viewport.
 
-### M2 — Object data editor
+### M2 — Object data editor 🟡 (core done)
 Command/undo framework, property and pset editing, materials, types, classifications, bulk edit, schedules, save IFC (Plain mode).
 **Exit:** edit → save → reopen preserves everything; round-trip tests pass on the saved file.
+
+Done in Slice 3 ([plan](superpowers/plans/2026-10-05-slice3-navigation-and-data-editor.md)):
+- edit names and property values for one or many elements (bulk edit), with values keeping their IFC type;
+- add and remove properties and property sets (standard templates or custom);
+- undo/redo, one step per action;
+- Save / Save As with an unsaved-changes guard; the saved file round-trips;
+- Revit/ArchiCAD navigation; multi-select by Ctrl/Shift-click, box and tree.
+
+Not yet: materials, types (assign/edit), classifications, schedules, quantity take-off.
 
 ### M3 — Modeler
 Levels and grids, walls (layered, joins), slabs, openings, doors/windows, columns/beams, snapping, precise input, move/rotate/stretch.

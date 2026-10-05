@@ -73,6 +73,19 @@ private slots:
         QCOMPARE(v.selectedGuids(), QStringList({"a2"}));
     }
 
+    // OCCT exceptions must never escape into Qt event handlers (they abort the app). Without a
+    // native window (headless "offscreen" platform), view operations degrade instead of throwing.
+    void viewOperationsWithoutANativeWindowDoNotThrow()
+    {
+        kimcad::Viewport v;
+        v.addBatch(batch("a", 2));
+        v.fitAll();
+        QCOMPARE(v.pickAt(1, 1), QString());
+        QCOMPARE(v.selectInRectangle(0, 0, 10, 10, AIS_SelectionScheme_Replace), 0);
+        QCOMPARE(v.measureFps(2), 0.0);
+        QCOMPARE(v.dumpImage(QStringLiteral("unused.png")), false);
+    }
+
     void hidingClearsSelection()
     {
         kimcad::Viewport v;

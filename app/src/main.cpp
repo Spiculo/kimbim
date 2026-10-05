@@ -35,6 +35,8 @@ int main(int argc, char* argv[])
     QCommandLineOption chunk(QStringLiteral("chunk"), QStringLiteral("Self-test: elements per mesh chunk."),
         QStringLiteral("n"), QStringLiteral("1000"));
     parser.addOption(chunk);
+    QCommandLineOption boxSelect(QStringLiteral("box-select"), QStringLiteral("Self-test: box-select the whole view."));
+    parser.addOption(boxSelect);
     QCommandLineOption screenshot(QStringLiteral("screenshot"), QStringLiteral("Self-test: save a PNG of the window."),
         QStringLiteral("png"));
     parser.addOption(screenshot);
@@ -54,6 +56,7 @@ int main(int argc, char* argv[])
         options.quitDuringLoad = parser.isSet(quitDuringLoad);
         options.planCut = parser.isSet(planCut) ? parser.value(planCut).toDouble() : -1;
         options.chunkSize = qMax(1, parser.value(chunk).toInt());
+        options.boxSelect = parser.isSet(boxSelect);
         options.screenshot = parser.value(screenshot);
         return kimcad::runSelfTest(options);
     }

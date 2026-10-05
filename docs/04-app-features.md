@@ -21,6 +21,8 @@ Each feature notes **what we reuse**. Priorities: **P0** is needed for first usa
 
 ## 2. Viewport and navigation
 
+Navigation preset (D48, owner choice): middle-drag pans, Shift+middle-drag orbits around the point under the mouse, the wheel zooms toward the cursor. Selection: click replaces, Ctrl+click adds (Revit), Shift+click toggles (ArchiCAD), left-drag draws a box (elements fully inside are selected).
+
 | Feature | Pri | Notes / reuse |
 |---------|-----|---------------|
 | Orbit / pan / zoom, fit, standard views, perspective/ortho | P0 | |

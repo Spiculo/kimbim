@@ -55,6 +55,15 @@ public:
     const Handle(AIS_InteractiveContext)& context() const { return m_context; }
     const Handle(V3d_View)& view() const { return m_view; }
 
+    // Navigation (D48, Revit/ArchiCAD preset): middle-drag pans, Shift+middle-drag orbits around the
+    // picked point, wheel zooms at the cursor, left-drag box-selects, right button is for menus.
+    AIS_MouseGesture gestureFor(Aspect_VKeyMouse button, Aspect_VKeyFlags flags) const;
+    AIS_RotationMode rotationMode() const { return RotationMode(); }
+    // Click/box selection modifiers: plain = replace, Ctrl = add (Revit), Shift = toggle (ArchiCAD).
+    AIS_SelectionScheme selectionSchemeFor(Aspect_VKeyMouse button, Aspect_VKeyFlags flags) const;
+    // Box selection in window pixels (what left-drag does); returns how many elements are selected.
+    int selectInRectangle(int x0, int y0, int x1, int y1, AIS_SelectionScheme scheme);
+
 signals:
     void selectionChanged(const QStringList& guids);
 
@@ -74,6 +83,7 @@ private:
         int index;
     };
     bool ensureWindow();
+    void applyNavigationPreset();
     void redisplay(const std::vector<int>& batches);
     NCollection_Vec2<int> toPixels(const QPointF& p) const;
 

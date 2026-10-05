@@ -11,6 +11,7 @@ struct SelfTestOptions {
     bool quitDuringLoad = false;  // request quit after the first chunk (shutdown while loading)
     double planCut = -1;          // >= 0: apply a plan cut at this height before measuring
     int chunkSize = 1000;         // elements per mesh chunk / batch
+    bool boxSelect = false;       // box-select the whole view and report how many got selected
     QString screenshot;           // non-empty: save a PNG of the whole window at the end
 };
 
