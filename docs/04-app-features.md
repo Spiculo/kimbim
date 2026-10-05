@@ -21,7 +21,15 @@ Each feature notes **what we reuse**. Priorities: **P0** is needed for first usa
 
 ## 2. Viewport and navigation
 
-Navigation preset (D48, owner choice): middle-drag pans, Shift+middle-drag orbits around the point under the mouse, the wheel zooms toward the cursor. Selection: click replaces, Ctrl+click adds (Revit), Shift+click toggles (ArchiCAD), left-drag draws a box (elements fully inside are selected).
+Navigation preset (D48, owner choice): middle-drag pans, Shift+middle-drag orbits around the point under the mouse, the wheel zooms toward the cursor; a drag ends when its button is released. Selection: click replaces, Ctrl+click adds (Revit), Shift+click toggles (ArchiCAD), left-drag draws a box. The box takes the elements fully inside it **that you can see** (D52); hold **Alt** while dragging (or turn on View › Select hidden elements too) to also take elements hidden behind others.
+
+Display (Slice 4b): every element has border lines (outline and creases); View › **Lines only** (L) shows a line drawing with hidden lines removed, meant for plans. Plan view (P) and 3D view (3) exist; other preset views are in the backlog below.
+
+**Navigation backlog** (owner, 2026-10-05: "we need those, document them for now"):
+- **View cube** (clickable faces/edges/corners to jump to a view; drag to orbit), like Revit/ArchiCAD/most CAD.
+- **Preset views**: front, back, left, right, top, bottom, plus the isometric ones, from a menu and the view cube.
+- **Touchpad navigation**: two-finger drag pans, pinch zooms, and a way to orbit without a middle button (e.g. Shift+two-finger drag or a modifier with left-drag), so laptops work without a mouse.
+- **Perspective** toggle (all views are orthographic today).
 
 | Feature | Pri | Notes / reuse |
 |---------|-----|---------------|
