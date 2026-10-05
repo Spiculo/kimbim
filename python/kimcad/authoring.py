@@ -16,6 +16,7 @@ import ifcopenshell.api.aggregate
 import ifcopenshell.api.context
 import ifcopenshell.api.feature
 import ifcopenshell.api.geometry
+import ifcopenshell.api.grid
 import ifcopenshell.api.material
 import ifcopenshell.api.project
 import ifcopenshell.api.root
@@ -387,7 +388,7 @@ def snap_data(storey_guid: str) -> str:
                 d = d / np.linalg.norm(d)
                 along = float(np.dot(corner - np.array(axis[0]), d)) + width / 2
                 openings.append({"guid": fill.GlobalId, "wall": e.GlobalId, "along": round(along, 6), "width": round(width, 6)})
-    return B._dump({"walls": walls, "openings": openings})
+    return B._dump({"walls": walls, "openings": openings, "grid": _grid_lines(storey)})
 
 
 # ---------------------------------------------------------------- slabs (Slice 5)
@@ -660,3 +661,241 @@ def insert_opening(kind: str, wall_guid: str, type_guid: str, along, width, heig
     except Exception as ex:
         return _fail(f"{type(ex).__name__}: {ex}")
     return B._dump({**r, "guid": made["element"].GlobalId})
+
+
+# ---------------------------------------------------------------- columns and beams (Slice 6)
+
+# (name, profile class, width, depth) in metres; circles use width as the diameter.
+DEFAULT_COLUMN_TYPES = [("Column 300x300", "IfcRectangleProfileDef", 0.3, 0.3), ("Column D300", "IfcCircleProfileDef", 0.3, 0.3)]
+DEFAULT_BEAM_TYPES = [("Beam 200x400", "IfcRectangleProfileDef", 0.2, 0.4)]
+
+
+def _profile_set(element):
+    material = ifcopenshell.util.element.get_material(element, should_skip_usage=True)
+    return material if material is not None and material.is_a("IfcMaterialProfileSet") else None
+
+
+def _profile(element):
+    profile_set = _profile_set(element)
+    profiles = list(profile_set.MaterialProfiles or ()) if profile_set else []
+    return profiles[0].Profile if profiles else None
+
+
+def _profile_size(profile) -> tuple[float, float]:
+    s = _scale()
+    if profile.is_a("IfcCircleProfileDef"):
+        return 2 * float(profile.Radius) * s, 2 * float(profile.Radius) * s
+    if profile.is_a("IfcRectangleProfileDef"):
+        return float(profile.XDim) * s, float(profile.YDim) * s
+    return 0.0, 0.0
+
+
+def _profile_types(ifc_class: str, defaults) -> list:
+    f = B._model
+    if not [t for t in f.by_type(ifc_class) if _profile(t) is not None]:
+        s = _scale()
+        for name, profile_class, width, depth in defaults:
+            t = ifcopenshell.api.root.create_entity(f, ifc_class=ifc_class, name=name)
+            if profile_class == "IfcCircleProfileDef":
+                profile = f.create_entity(profile_class, ProfileType="AREA", ProfileName=name, Radius=width / 2 / s)
+            else:
+                profile = f.create_entity(profile_class, ProfileType="AREA", ProfileName=name, XDim=width / s, YDim=depth / s)
+            profile_set = ifcopenshell.api.material.add_material_set(f, name=name, set_type="IfcMaterialProfileSet")
+            material_name = "Concrete" if ifc_class == "IfcColumnType" else "Steel"
+            material = next((m for m in f.by_type("IfcMaterial") if m.Name == material_name), None) \
+                or ifcopenshell.api.material.add_material(f, name=material_name)
+            ifcopenshell.api.material.add_profile(f, profile_set=profile_set, material=material, profile=profile)
+            ifcopenshell.api.material.assign_material(f, products=[t], material=profile_set)
+    out = []
+    for t in f.by_type(ifc_class):
+        profile = _profile(t)
+        if profile is None:
+            continue
+        width, depth = _profile_size(profile)
+        out.append({"guid": t.GlobalId, "name": t.Name or "", "width": round(width, 6), "depth": round(depth, 6)})
+    return out
+
+
+def column_types() -> str:
+    return B._dump({"types": _profile_types("IfcColumnType", DEFAULT_COLUMN_TYPES) if B._model is not None else []})
+
+
+def beam_types() -> str:
+    return B._dump({"types": _profile_types("IfcBeamType", DEFAULT_BEAM_TYPES) if B._model is not None else []})
+
+
+def _profile_element(storey_guid, type_guid, type_class):
+    storey, element_type = _by_guid(storey_guid), _by_guid(type_guid)
+    if storey is None or not storey.is_a("IfcBuildingStorey"):
+        return None, None, "unknown level"
+    if element_type is None or not element_type.is_a(type_class) or _profile(element_type) is None:
+        return None, None, "unknown type or type without a profile"
+    return storey, element_type, ""
+
+
+def create_column(storey_guid: str, type_guid: str, x, y, height, rotation=0.0) -> str:
+    """A column standing on the level at (x, y), `height` m tall, turned `rotation` radians."""
+    if B._model is None:
+        return _fail("no model open")
+    storey, column_type, error = _profile_element(storey_guid, type_guid, "IfcColumnType")
+    if error:
+        return _fail(error)
+    try:
+        x, y, height, rotation = float(x), float(y), float(height), float(rotation or 0.0)
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    if height <= 0:
+        return _fail("the column height must be positive")
+    made = {}
+
+    def action():
+        f = B._model
+        column = ifcopenshell.api.root.create_entity(f, ifc_class="IfcColumn", name=column_type.Name)
+        ifcopenshell.api.type.assign_type(f, related_objects=[column], relating_type=column_type)
+        representation = ifcopenshell.api.geometry.add_profile_representation(
+            f, context=_body_context(), profile=_profile(column_type), depth=height)
+        ifcopenshell.api.geometry.assign_representation(f, product=column, representation=representation)
+        c, s = math.cos(rotation), math.sin(rotation)
+        matrix = np.array([[c, -s, 0, x], [s, c, 0, y], [0, 0, 1, _elevation(storey)], [0, 0, 0, 1]], dtype=float)
+        ifcopenshell.api.geometry.edit_object_placement(f, product=column, matrix=matrix, is_si=True)
+        ifcopenshell.api.spatial.assign_container(f, products=[column], relating_structure=storey)
+        made["element"] = column
+        return 1, [column.GlobalId], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "guid": made["element"].GlobalId})
+
+
+def create_beam(storey_guid: str, type_guid: str, x1, y1, x2, y2, top) -> str:
+    """A beam from (x1, y1) to (x2, y2) whose top is at `top` (absolute metres)."""
+    if B._model is None:
+        return _fail("no model open")
+    storey, beam_type, error = _profile_element(storey_guid, type_guid, "IfcBeamType")
+    if error:
+        return _fail(error)
+    try:
+        x1, y1, x2, y2, top = float(x1), float(y1), float(x2), float(y2), float(top)
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    length = math.hypot(x2 - x1, y2 - y1)
+    if length < MIN_WALL_LENGTH:
+        return _fail("the beam has no length")
+    made = {}
+
+    def action():
+        f = B._model
+        beam = ifcopenshell.api.root.create_entity(f, ifc_class="IfcBeam", name=beam_type.Name)
+        ifcopenshell.api.type.assign_type(f, related_objects=[beam], relating_type=beam_type)
+        # Profile Y up, extrusion (local Z) along the beam, top centre on the placement.
+        representation = ifcopenshell.api.geometry.add_profile_representation(
+            f, context=_body_context(), profile=_profile(beam_type), depth=length, cardinal_point=8)
+        ifcopenshell.api.geometry.assign_representation(f, product=beam, representation=representation)
+        dx, dy = (x2 - x1) / length, (y2 - y1) / length
+        matrix = np.array([[-dy, 0, dx, x1], [dx, 0, dy, y1], [0, 1, 0, top], [0, 0, 0, 1]], dtype=float)
+        ifcopenshell.api.geometry.edit_object_placement(f, product=beam, matrix=matrix, is_si=True)
+        ifcopenshell.api.spatial.assign_container(f, products=[beam], relating_structure=storey)
+        made["element"] = beam
+        return 1, [beam.GlobalId], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "guid": made["element"].GlobalId})
+
+
+# ---------------------------------------------------------------- grids (Slice 6)
+
+def _level_grid(storey):
+    for rel in getattr(storey, "ContainsElements", ()) or ():
+        for e in rel.RelatedElements:
+            if e.is_a("IfcGrid"):
+                return e
+    return None
+
+
+def _grid_axes(grid) -> list:
+    """All axes of a grid in creation order."""
+    axes = list(grid.UAxes or ()) + list(grid.VAxes or ()) + list(getattr(grid, "WAxes", None) or ())
+    return sorted(axes, key=lambda a: a.id())
+
+
+def _next_tag(existing: set, letters: bool) -> str:
+    n = 0
+    while True:
+        n += 1
+        if letters:
+            tag, k = "", n
+            while k > 0:
+                k, r = divmod(k - 1, 26)
+                tag = chr(ord("A") + r) + tag
+        else:
+            tag = str(n)
+        if tag not in existing:
+            return tag
+
+
+def add_grid_axis(storey_guid: str, x1, y1, x2, y2, tag: str = "") -> str:
+    """A grid line on a level (its IfcGrid is created on first use). Without a tag, axes closer to
+    vertical get letters (A, B, ...) and the others numbers (1, 2, ...)."""
+    if B._model is None:
+        return _fail("no model open")
+    storey = _by_guid(storey_guid)
+    if storey is None or not storey.is_a("IfcBuildingStorey"):
+        return _fail("unknown level")
+    try:
+        x1, y1, x2, y2 = float(x1), float(y1), float(x2), float(y2)
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    if math.hypot(x2 - x1, y2 - y1) < MIN_WALL_LENGTH:
+        return _fail("the grid line has no length")
+    vertical = abs(y2 - y1) >= abs(x2 - x1)
+    made = {}
+
+    def action():
+        f = B._model
+        grid = _level_grid(storey)
+        if grid is None:
+            grid = ifcopenshell.api.root.create_entity(f, ifc_class="IfcGrid", name="Grid")
+            matrix = np.eye(4)
+            matrix[2][3] = _elevation(storey)
+            ifcopenshell.api.geometry.edit_object_placement(f, product=grid, matrix=matrix, is_si=True)
+            ifcopenshell.api.spatial.assign_container(f, products=[grid], relating_structure=storey)
+        existing = {a.AxisTag for a in _grid_axes(grid)}
+        axis_tag = tag or _next_tag(existing, letters=vertical)
+        axis = ifcopenshell.api.grid.create_grid_axis(f, grid=grid, axis_tag=axis_tag, uvw_axes="UAxes" if vertical else "VAxes")
+        origin = ifcopenshell.util.placement.get_local_placement(grid.ObjectPlacement)[:3, 3] * _scale()
+        ifcopenshell.api.grid.create_axis_curve(f, p1=np.array([x1 - origin[0], y1 - origin[1], 0.0]),
+                                                p2=np.array([x2 - origin[0], y2 - origin[1], 0.0]), grid_axis=axis, is_si=True)
+        made["grid"], made["tag"] = grid, axis_tag
+        return 1, [], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "guid": made["grid"].GlobalId, "tag": made["tag"]})
+
+
+def _grid_lines(storey) -> list:
+    grid = _level_grid(storey)
+    if grid is None:
+        return []
+    m = ifcopenshell.util.placement.get_local_placement(grid.ObjectPlacement)
+    s = _scale()
+    out = []
+    for axis in _grid_axes(grid):
+        curve = axis.AxisCurve
+        points = list(curve.Points) if curve is not None and curve.is_a("IfcPolyline") else []
+        if len(points) < 2:
+            continue
+        ends = []
+        for p in (points[0], points[-1]):
+            c = list(p.Coordinates) + [0.0] * (3 - len(p.Coordinates))
+            ends.append((m @ np.array([c[0], c[1], c[2], 1.0]))[:2] * s)
+        out.append({"guid": grid.GlobalId, "tag": axis.AxisTag, "x1": round(float(ends[0][0]), 6), "y1": round(float(ends[0][1]), 6),
+                    "x2": round(float(ends[1][0]), 6), "y2": round(float(ends[1][1]), 6)})
+    return out
