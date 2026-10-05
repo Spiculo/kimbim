@@ -629,6 +629,12 @@ QStringList Viewport::guids() const
     return out;
 }
 
+QString Viewport::typeOf(const QString& guid) const
+{
+    const auto it = m_locate.constFind(guid);
+    return it == m_locate.constEnd() ? QString() : m_batches[size_t(it->batch)]->type(it->index);
+}
+
 bool Viewport::retire(const QString& guid, std::vector<int>* touched)
 {
     auto it = m_locate.find(guid);

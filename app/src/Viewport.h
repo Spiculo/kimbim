@@ -74,6 +74,7 @@ public:
     int batchCount() const { return int(m_batches.size()); }
     int elementCount() const { return m_locate.size(); }
     QStringList guids() const; // in batch order
+    QString typeOf(const QString& guid) const; // IFC class of a shown element ("" if unknown)
     int visibleElementCount() const;
     qint64 triangleCount() const;
 
