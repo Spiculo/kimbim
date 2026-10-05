@@ -9,6 +9,8 @@
 #include <QToolBar>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <algorithm>
+
 #include <QInputDialog>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -21,6 +23,7 @@
 
 #include "Cuts.h"
 #include "ElementBatch.h"
+#include "LevelsBar.h"
 #include "MeshChunk.h"
 #include "ModelLoader.h"
 #include "ModelTreePanel.h"
@@ -90,6 +93,10 @@ MainWindow::~MainWindow()
 void MainWindow::buildMenus()
 {
     QMenu* file = menuBar()->addMenu(tr("&File"));
+    QAction* newProjectAction = file->addAction(tr("&New project"));
+    newProjectAction->setObjectName(QStringLiteral("actionNewProject"));
+    newProjectAction->setShortcut(QKeySequence::New);
+    connect(newProjectAction, &QAction::triggered, this, [this] { newProject(); });
     QAction* open = file->addAction(tr("&Open IFC..."));
     open->setShortcut(QKeySequence::Open);
     connect(open, &QAction::triggered, this, &MainWindow::openDialog);
@@ -124,6 +131,15 @@ void MainWindow::buildMenus()
     connect(del, &QAction::triggered, this, &MainWindow::deleteSelection);
 
     QMenu* view = menuBar()->addMenu(tr("&View"));
+    QAction* planView = view->addAction(tr("&Plan view"));
+    planView->setObjectName(QStringLiteral("actionPlanView"));
+    planView->setShortcut(Qt::Key_P);
+    connect(planView, &QAction::triggered, this, [this] { setPlanView(true); });
+    QAction* view3D = view->addAction(tr("&3D view"));
+    view3D->setObjectName(QStringLiteral("action3DView"));
+    view3D->setShortcut(Qt::Key_3);
+    connect(view3D, &QAction::triggered, this, [this] { setPlanView(false); });
+    view->addSeparator();
     QAction* fit = view->addAction(tr("&Fit all"));
     fit->setShortcut(Qt::Key_F);
     connect(fit, &QAction::triggered, m_viewport, &Viewport::fitAll);
@@ -183,6 +199,16 @@ void MainWindow::buildDocks()
 
 void MainWindow::buildCutsToolbar()
 {
+    QToolBar* levels = addToolBar(tr("Levels"));
+    levels->setObjectName(QStringLiteral("levelsToolbar"));
+    m_levels = new LevelsBar(levels);
+    levels->addWidget(m_levels);
+    connect(m_levels, &LevelsBar::addLevelRequested, this, &MainWindow::addLevelDialog);
+    connect(m_levels, &LevelsBar::activeStoreyChanged, this, [this](const QString&, double elevation) {
+        if (m_viewport->isPlanView())
+            m_viewport->setPlanView(elevation);
+        applyCuts();
+    });
     QToolBar* bar = addToolBar(tr("Cuts"));
     bar->setObjectName(QStringLiteral("CutsToolbar"));
     bar->addAction(m_planCut);
@@ -212,7 +238,8 @@ void MainWindow::applyCuts()
 {
     CutState state;
     state.planCut = m_planCut->isChecked();
-    state.height = m_cutHeight->value();
+    // The cut height is measured from the active level (like a plan's view range).
+    state.height = (m_levels ? m_levels->activeElevation() : 0.0) + m_cutHeight->value();
     state.box = m_sectionBox->isChecked();
     state.bounds = m_boxBounds;
     m_viewport->clearClipPlanes();
@@ -397,6 +424,78 @@ void MainWindow::typeEditDialog(const QString& pset, const QString& prop)
     applyTypeEdit(pset, prop, QJsonValue(value));
 }
 
+bool MainWindow::newProject()
+{
+    if (!maybeSave())
+        return false;
+    stopLoading();
+    const QJsonObject r = bridge("new_project", {tr("Untitled")});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not create the project"), r.value("error").toString());
+        return false;
+    }
+    m_viewport->clear();
+    m_properties->clear();
+    m_selection.clear();
+    m_path.clear();
+    m_tree->setTree(bridge("spatial_tree"));
+    refreshLevels();
+    setWindowTitle(QStringLiteral("KIMCAD — %1[*]").arg(tr("Untitled")));
+    afterEdit();
+    statusBar()->showMessage(tr("New project"));
+    return true;
+}
+
+void MainWindow::refreshLevels()
+{
+    const int before = m_levels->count();
+    m_levels->setStoreys(bridge("storeys").value("storeys").toArray());
+    if (before != m_levels->count() && before > 0)
+        m_tree->refreshTree(bridge("spatial_tree")); // a level was added or undone
+}
+
+bool MainWindow::addLevel(const QString& name, double elevation)
+{
+    const QJsonObject r = bridge("add_storey", {name, QString::number(elevation, 'g', 17)});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not add the level"), r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
+    m_levels->setActive(r.value("guid").toString());
+    return true;
+}
+
+void MainWindow::addLevelDialog()
+{
+    double highest = 0.0;
+    bool any = false;
+    for (const auto& s : bridge("storeys").value("storeys").toArray()) {
+        highest = any ? std::max(highest, s.toObject().value("elevation").toDouble()) : s.toObject().value("elevation").toDouble();
+        any = true;
+    }
+    bool ok = false;
+    const QString name = QInputDialog::getText(this, tr("Add level"), tr("Name:"), QLineEdit::Normal,
+        tr("Level %1").arg(m_levels->count() + 1), &ok);
+    if (!ok || name.trimmed().isEmpty())
+        return;
+    const double elevation = QInputDialog::getDouble(this, tr("Add level"), tr("Elevation (m):"),
+        any ? highest + 3.0 : 0.0, -1000.0, 10000.0, 2, &ok);
+    if (ok)
+        addLevel(name.trimmed(), elevation);
+}
+
+void MainWindow::setPlanView(bool plan)
+{
+    if (plan) {
+        m_viewport->setPlanView(m_levels->activeElevation());
+        m_planCut->setChecked(true); // a plan is a horizontal cut
+    } else {
+        m_viewport->set3DView();
+    }
+    applyCuts();
+}
+
 bool MainWindow::deleteSelection()
 {
     if (m_selection.isEmpty())
@@ -445,6 +544,7 @@ void MainWindow::applyGeometry(const QJsonObject& geometry)
 void MainWindow::afterEdit(const QJsonObject& result)
 {
     applyGeometry(result.value("geometry").toObject());
+    refreshLevels();
     const QJsonObject s = bridge("state");
     m_undo->setEnabled(s.value("can_undo").toBool());
     m_redo->setEnabled(s.value("can_redo").toBool());
@@ -535,6 +635,7 @@ void MainWindow::onOpened(const QJsonObject& info)
 {
     setWindowTitle(QStringLiteral("KIMCAD — %1[*]").arg(QFileInfo(m_path).fileName()));
     setWindowModified(false);
+    refreshLevels();
     m_undo->setEnabled(false);
     m_redo->setEnabled(false);
     QString error;

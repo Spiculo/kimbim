@@ -15,6 +15,8 @@ class QDoubleSpinBox;
 
 namespace kimcad {
 
+class LevelsBar;
+
 class ModelLoader;
 class ModelTreePanel;
 class PropertiesPanel;
@@ -46,6 +48,10 @@ public:
     bool resetToType(const QString& pset, const QString& prop);
     bool isDirty() const;
     bool deleteSelection();
+    // Slice 4: new project, levels, plan view.
+    bool newProject();
+    bool addLevel(const QString& name, double elevation);
+    LevelsBar* levelsBar() const { return m_levels; }
     bool treeHasGuid(const QString& guid) const;
     // Re-mesh changed elements and drop removed ones after an edit/undo/redo ({changed, removed}).
     void applyGeometry(const QJsonObject& geometry);
@@ -75,6 +81,9 @@ private:
     void addPropertyDialog(const QString& pset);
     void addPropertySetDialog();
     void typeEditDialog(const QString& pset, const QString& prop);
+    void refreshLevels();
+    void addLevelDialog();
+    void setPlanView(bool plan);
     void buildCutsToolbar();
     void applyCuts();
 
@@ -94,6 +103,7 @@ private:
     QThread m_thread;
     ModelLoader* m_loader;
     QStringList m_selection;
+    LevelsBar* m_levels = nullptr;
     QAction* m_undo = nullptr;
     QAction* m_redo = nullptr;
     QAction* m_planCut = nullptr;

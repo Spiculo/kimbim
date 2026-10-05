@@ -6,6 +6,7 @@
 #include <OpenGl_GraphicDriver.hxx>
 #include <Prs3d_Drawer.hxx>
 #include <Standard_Failure.hxx>
+#include <Graphic3d_Camera.hxx>
 #include <SelectMgr_EntityOwner.hxx>
 #include <gp_Pnt.hxx>
 #ifdef _WIN32
@@ -80,12 +81,49 @@ Viewport::Viewport(QWidget* parent)
     applyNavigationPreset();
 }
 
+void Viewport::setPlanView(double elevation)
+{
+    m_planView = true;
+    m_planElevation = elevation;
+    m_view->Camera()->SetProjectionType(Graphic3d_Camera::Projection_Orthographic);
+    m_view->SetProj(V3d_Zpos); // looking down, north (+Y) up
+    applyNavigationPreset();
+    if (ensureWindow())
+        fitAll();
+    update();
+}
+
+void Viewport::set3DView()
+{
+    m_planView = false;
+    m_view->SetProj(V3d_XposYnegZpos);
+    applyNavigationPreset();
+    if (ensureWindow())
+        fitAll();
+    update();
+}
+
+bool Viewport::pointOnPlane(int x, int y, double z, gp_Pnt* out)
+{
+    if (!ensureWindow())
+        return false;
+    double px = 0, py = 0, pz = 0, vx = 0, vy = 0, vz = 0;
+    m_view->ConvertWithProj(x, y, px, py, pz, vx, vy, vz);
+    if (std::abs(vz) < 1e-9)
+        return false;
+    const double t = (z - pz) / vz;
+    *out = gp_Pnt(px + t * vx, py + t * vy, z);
+    return true;
+}
+
 void Viewport::applyNavigationPreset()
 {
     auto& gestures = ChangeMouseGestureMap();
     gestures.Clear();
     gestures.Bind(Aspect_VKeyMouse_MiddleButton, AIS_MouseGesture_Pan);
-    gestures.Bind(Aspect_VKeyMouse_MiddleButton | Aspect_VKeyFlags_SHIFT, AIS_MouseGesture_RotateOrbit);
+    // Plans are not orbited (Revit/ArchiCAD): Shift+middle pans there too.
+    gestures.Bind(Aspect_VKeyMouse_MiddleButton | Aspect_VKeyFlags_SHIFT,
+        m_planView ? AIS_MouseGesture_Pan : AIS_MouseGesture_RotateOrbit);
     // Left-drag draws a selection box; with Ctrl/Shift it adds/toggles like a click does.
     gestures.Bind(Aspect_VKeyMouse_LeftButton, AIS_MouseGesture_SelectRectangle);
     gestures.Bind(Aspect_VKeyMouse_LeftButton | Aspect_VKeyFlags_CTRL, AIS_MouseGesture_SelectRectangle);

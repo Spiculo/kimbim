@@ -10,6 +10,7 @@ qt_add_library(kimcad_core STATIC
     src/SelfTest.cpp src/SelfTest.h
     src/ModelTreePanel.cpp src/ModelTreePanel.h
     src/PropertiesPanel.cpp src/PropertiesPanel.h
+    src/LevelsBar.cpp src/LevelsBar.h
     src/ModelLoader.cpp src/ModelLoader.h
     src/Cuts.cpp src/Cuts.h
 )
@@ -45,6 +46,7 @@ kimcad_test(test_model_loader)
 kimcad_test(test_navigation)
 kimcad_test(test_selection)
 kimcad_test(test_properties_panel)
+kimcad_test(test_levels_bar)
 
 # GUI self-tests: need a real OpenGL window (GPU, or Mesa on the Linux CI runner). Label "gui".
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/broken.ifc "ISO-10303-21;

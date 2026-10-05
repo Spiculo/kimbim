@@ -3,6 +3,7 @@
 
 #include <AIS_InteractiveContext.hxx>
 #include <AIS_ViewController.hxx>
+#include <gp_Pnt.hxx>
 #include <V3d_View.hxx>
 #include <NCollection_Vec2.hxx>
 #include <V3d_Viewer.hxx>
@@ -30,6 +31,15 @@ public:
     // or elements gone from the model.
     void replaceElements(const MeshChunk& chunk);
     void removeElements(const QStringList& guids);
+
+    // Plan view (Slice 4): straight down on a level, no orbit. set3DView() returns to the 3D view.
+    void setPlanView(double elevation);
+    void set3DView();
+    bool isPlanView() const { return m_planView; }
+    double planElevation() const { return m_planElevation; }
+    // Screen point -> point on the horizontal plane z (metres). False without a window or when the
+    // view ray is parallel to the plane.
+    bool pointOnPlane(int x, int y, double z, gp_Pnt* out);
     void clear();
     void fitAll();
 
@@ -97,6 +107,8 @@ private:
     Handle(AIS_InteractiveContext) m_context;
     std::vector<Handle(ElementBatch)> m_batches;
     QHash<QString, Loc> m_locate;
+    bool m_planView = false;
+    double m_planElevation = 0.0;
     std::vector<Handle(Graphic3d_ClipPlane)> m_clipPlanes;
 };
 

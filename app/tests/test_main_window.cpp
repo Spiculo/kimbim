@@ -10,6 +10,7 @@
 #include <QtTest>
 
 #include "ElementBatch.h"
+#include "LevelsBar.h"
 #include "MainWindow.h"
 #include "PythonEngine.h"
 #include "Viewport.h"
@@ -202,6 +203,29 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // Slice 4: new project with one level; levels can be added and undone.
+    void newProjectAndLevels()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        QCOMPARE(w.viewport()->elementCount(), 0);
+        QCOMPARE(w.levelsBar()->count(), 1);
+        QVERIFY(!w.isDirty());
+        QVERIFY(w.windowTitle().contains(QObject::tr("Untitled")));
+        QVERIFY(w.addLevel(QStringLiteral("Level 2"), 3.0));
+        QCOMPARE(w.levelsBar()->count(), 2);
+        QCOMPARE(w.levelsBar()->activeElevation(), 3.0);
+        QVERIFY(w.isDirty());
+        action(w, "actionUndo")->trigger();
+        QCOMPARE(w.levelsBar()->count(), 1);
+        QCOMPARE(w.levelsBar()->activeElevation(), 0.0);
+        action(w, "actionPlanView")->trigger();
+        QVERIFY(w.viewport()->isPlanView());
+        action(w, "action3DView")->trigger();
+        QVERIFY(!w.viewport()->isPlanView());
+        QVERIFY(w.close());
+    }
+
     void shortcutsAreTheDocumentedOnes()
     {
         kimcad::MainWindow w(nullptr, true);
@@ -211,6 +235,8 @@ private slots:
         QCOMPARE(action(w, "actionUndo")->shortcut(), QKeySequence(QKeySequence::Undo));
         QCOMPARE(action(w, "actionSave")->shortcut(), QKeySequence(QKeySequence::Save));
         QCOMPARE(action(w, "actionDelete")->shortcut(), QKeySequence(QKeySequence::Delete));
+        QCOMPARE(action(w, "actionNewProject")->shortcut(), QKeySequence(QKeySequence::New));
+        QCOMPARE(action(w, "actionPlanView")->shortcut(), QKeySequence(Qt::Key_P));
     }
 };
 
