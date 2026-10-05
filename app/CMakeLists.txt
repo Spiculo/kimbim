@@ -15,6 +15,7 @@ qt_add_library(kimcad_core STATIC
     src/WallTool.cpp src/WallTool.h
     src/PolygonTool.cpp src/PolygonTool.h
     src/HostTool.cpp src/HostTool.h
+    src/TwoPointTool.cpp src/TwoPointTool.h
     src/ModelLoader.cpp src/ModelLoader.h
     src/Cuts.cpp src/Cuts.h
 )
@@ -55,6 +56,7 @@ kimcad_test(test_snapper)
 kimcad_test(test_wall_tool)
 kimcad_test(test_polygon_tool)
 kimcad_test(test_host_tool)
+kimcad_test(test_two_point_tool)
 
 # GUI self-tests: need a real OpenGL window (GPU, or Mesa on the Linux CI runner). Label "gui".
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/broken.ifc "ISO-10303-21;

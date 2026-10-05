@@ -6,6 +6,8 @@
 #include <QJsonObject>
 #include <QPointF>
 #include <QVector>
+
+#include <optional>
 #include <QJsonValue>
 #include <QStringList>
 #include <QMainWindow>
@@ -26,6 +28,7 @@ class LevelsBar;
 class WallTool;
 class PolygonTool;
 class HostTool;
+class TwoPointTool;
 struct WallSegment;
 struct Snap;
 struct Host;
@@ -67,12 +70,16 @@ public:
     LevelsBar* levelsBar() const { return m_levels; }
     // Modeling tools (M3): one active at a time. Exposed for tests and the self-test, which drive
     // them with work-plane points.
-    enum class Tool { None, Wall, Slab, Door, Window };
+    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid };
     void setTool(Tool tool);
     Tool tool() const { return m_tool; }
     WallTool* wallTool() const { return m_wallTool; }
     PolygonTool* polygonTool() const { return m_polygonTool; }
     HostTool* hostTool() const { return m_hostTool; }
+    TwoPointTool* twoPointTool() const { return m_twoPointTool; }
+    bool columnAt(QPointF p, bool turned = false);
+    bool createSegment(QPointF p1, QPointF p2); // beam or grid axis, per the active tool
+    int gridLineCount() const;
     void setWallToolActive(bool on) { setTool(on ? Tool::Wall : Tool::None); }
     bool createWall(const WallSegment& segment);
     bool createSlab(const QVector<QPointF>& outline);
@@ -139,6 +146,8 @@ private:
     WallTool* m_wallTool = nullptr;
     PolygonTool* m_polygonTool = nullptr;
     HostTool* m_hostTool = nullptr;
+    TwoPointTool* m_twoPointTool = nullptr;
+    std::optional<QPointF> m_columnHover;
     Tool m_tool = Tool::None;
     QHash<int, QAction*> m_toolActions;
     QComboBox* m_types = nullptr;

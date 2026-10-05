@@ -14,6 +14,7 @@
 #include "HostTool.h"
 #include "MainWindow.h"
 #include "PolygonTool.h"
+#include "TwoPointTool.h"
 #include "WallTool.h"
 #include "PythonEngine.h"
 #include "Viewport.h"
@@ -270,6 +271,31 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // Slice 6: columns, beams and grid lines through the tools; undo removes them.
+    void columnBeamGridWithTheTools()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        w.setTool(kimcad::MainWindow::Tool::Grid);
+        w.twoPointTool()->click({0, -1});
+        w.twoPointTool()->click({0, 7});
+        QCOMPARE(w.gridLineCount(), 1);
+        w.setTool(kimcad::MainWindow::Tool::Column);
+        w.columnAt(QPointF(0.03, 0.02)); // snaps onto the grid line
+        QCOMPARE(w.viewport()->elementCount(), 1);
+        w.setTool(kimcad::MainWindow::Tool::Beam);
+        w.twoPointTool()->click({0, 0});
+        w.twoPointTool()->click({0, 5});
+        QCOMPARE(w.viewport()->elementCount(), 2);
+        action(w, "actionUndo")->trigger();
+        QCOMPARE(w.viewport()->elementCount(), 1);
+        action(w, "actionUndo")->trigger();
+        action(w, "actionUndo")->trigger();
+        QCOMPARE(w.viewport()->elementCount(), 0);
+        QCOMPARE(w.gridLineCount(), 0);
+        QVERIFY(w.close());
+    }
+
     void shortcutsAreTheDocumentedOnes()
     {
         kimcad::MainWindow w(nullptr, true);
@@ -285,6 +311,9 @@ private slots:
         QCOMPARE(action(w, "actionSlabTool")->shortcut(), QKeySequence(Qt::Key_S));
         QCOMPARE(action(w, "actionDoorTool")->shortcut(), QKeySequence(Qt::Key_D));
         QCOMPARE(action(w, "actionWindowTool")->shortcut(), QKeySequence(Qt::Key_N));
+        QCOMPARE(action(w, "actionColumnTool")->shortcut(), QKeySequence(Qt::Key_K));
+        QCOMPARE(action(w, "actionBeamTool")->shortcut(), QKeySequence(Qt::Key_J));
+        QCOMPARE(action(w, "actionGridTool")->shortcut(), QKeySequence(Qt::Key_G));
         QVERIFY(action(w, "actionLinesOnly")->isCheckable());
     }
 };

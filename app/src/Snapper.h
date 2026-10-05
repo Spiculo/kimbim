@@ -15,20 +15,29 @@ struct SnapWall {
     double thickness = 0.0;
 };
 
+// A grid axis (from app_bridge.snap_data "grid"), in metres.
+struct SnapLine {
+    QString guid, tag;
+    QPointF a, b;
+};
+
 struct Snap {
-    enum Kind { None, Endpoint, Midpoint, Perpendicular, OnWall, Angle, Grid };
+    enum Kind { None, Endpoint, Midpoint, Perpendicular, OnWall, Angle, Grid, GridCross, GridLine };
     QPointF point;
     Kind kind = None;
     QString wallGuid; // the wall an object snap landed on
     bool onWall() const { return kind == Endpoint || kind == Midpoint || kind == Perpendicular || kind == OnWall; }
 };
 
-// Plan snapping for drawing tools (pure geometry, no view). Priority: wall endpoint > midpoint >
-// perpendicular from the previous point > anywhere on a wall > angle (15 degree steps from the
-// previous point; 0/90 with ortho) > grid.
+// Plan snapping for drawing tools (pure geometry, no view). Priority: wall endpoint > grid-axis
+// crossing > midpoint > perpendicular from the previous point > anywhere on a wall > anywhere on a
+// grid axis > angle (15 degree steps from the previous point; 0/90 with ortho) > grid.
 class Snapper {
 public:
     static QVector<SnapWall> parse(const QJsonObject& snapData);
+    static QVector<SnapLine> parseGrid(const QJsonObject& snapData);
+    void setGridLines(QVector<SnapLine> lines) { m_lines = std::move(lines); }
+    const QVector<SnapLine>& gridLines() const { return m_lines; }
     void setWalls(QVector<SnapWall> walls) { m_walls = std::move(walls); }
     const QVector<SnapWall>& walls() const { return m_walls; }
     void setGrid(double step) { m_grid = step; }
@@ -42,6 +51,7 @@ private:
     double gridLength(double length) const;
 
     QVector<SnapWall> m_walls;
+    QVector<SnapLine> m_lines;
     double m_grid = 0.01; // 10 mm
 };
 
