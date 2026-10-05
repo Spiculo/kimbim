@@ -746,6 +746,7 @@ from .authoring import (  # noqa: E402,F401
     rotate_elements,
     set_wall_axis,
     set_wall_height,
+    slide_openings,
     slab_outline_from_walls,
     slab_types,
     snap_data,

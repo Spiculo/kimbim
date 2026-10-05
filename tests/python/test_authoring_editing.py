@@ -63,15 +63,42 @@ def test_moving_a_wall_takes_its_door(room):
     assert b._model.by_guid(south) and b._model.by_guid(door)  # same GlobalIds
 
 
-def test_moving_one_wall_drops_joins_to_walls_that_stay(room):
+def test_moving_one_wall_drags_the_joined_walls_along(room):
+    """Owner decision (D54): like Revit, the walls joined to a moved wall follow at the joint."""
     south, east, north, west = room["walls"]
+    before = joins()
     r = call("move_elements", g(south), 0, -1.0, 0)
+    assert r["ok"], r
+    assert joins() == before  # every corner stays joined
+    assert {south, east, west} <= set(r["geometry"]["changed"])
+    for side in (east, west):
+        lo, hi = bbox(side)
+        assert lo[1] == pytest.approx(-1.15, abs=2e-3) and hi[1] == pytest.approx(6.15, abs=2e-3)
+        assert volume(side) == pytest.approx(0.3 * 3 * 7, abs=0.05)  # 1 m longer
+    assert b._model.by_guid(east).GlobalId == east
+    call("undo")
+    assert bbox(east)[0][1] == pytest.approx(-0.15, abs=2e-3)
+
+
+def test_detach_moves_the_wall_alone_and_drops_its_joins(room):
+    south, east, north, west = room["walls"]
+    r = call("move_elements", g(south), 0, -1.0, 0, True)
+    assert r["ok"], r
     assert frozenset((south, east)) not in joins() and frozenset((south, west)) not in joins()
     assert frozenset((east, north)) in joins()
     assert {east, west} <= set(r["geometry"]["changed"])  # the neighbours lost their mitre
     assert volume(east) == pytest.approx(0.3 * 3 * 6, abs=0.05)
     call("undo")
     assert frozenset((south, east)) in joins()
+
+
+def test_rotating_one_wall_drags_its_neighbours_too(room):
+    south, east, north, west = room["walls"]
+    r = call("rotate_elements", g(north), 0, 6, math.radians(10))  # pivot on the west corner
+    assert r["ok"], r
+    assert frozenset((north, east)) in joins() and frozenset((north, west)) in joins()
+    _, hi = bbox(east)
+    assert hi[1] > 6.15 + 1.0  # the east end of north rose by 8 * sin(10 degrees) = 1.39 m, east follows
 
 
 def test_moving_the_whole_room_keeps_its_joins(room):
@@ -137,3 +164,16 @@ def test_door_edits_that_dont_fit_change_nothing(room):
     for args in ((0.3, 0.9, 2.1, 0.0), (4.0, 0.9, 3.5, 0.0), (4.0, 9.0, 2.1, 0.0)):
         assert not call("edit_opening", door, *args)["ok"]
     assert b._model.by_guid(door).OverallWidth == pytest.approx(900.0)
+
+
+def test_sliding_a_door_along_its_wall(room):
+    door = room["door"]
+    r = call("slide_openings", g(door), 1.5, 0.7)  # only the along-wall part counts
+    assert r["ok"], r
+    lo, hi = bbox(door)
+    assert (lo[0] + hi[0]) / 2 == pytest.approx(5.5, abs=2e-3)
+    assert lo[1] == pytest.approx(-0.165, abs=2e-3)  # still in the wall
+    op = next(o for o in call("snap_data", room["level"])["openings"] if o["guid"] == door)
+    assert op["along"] == pytest.approx(5.5, abs=1e-6)
+    assert op["height"] == pytest.approx(2.1) and op["sill"] == pytest.approx(0.0, abs=1e-9)
+    assert not call("slide_openings", g(door), 10.0, 0)["ok"]  # past the wall's end
