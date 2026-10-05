@@ -75,6 +75,28 @@ Viewport::Viewport(QWidget* parent)
     m_view->SetProj(V3d_XposYnegZpos);
     m_context->HighlightStyle(Prs3d_TypeOfHighlight_Dynamic)->SetColor(Quantity_Color(0.98, 0.75, 0.20, Quantity_TOC_RGB));
     m_context->HighlightStyle(Prs3d_TypeOfHighlight_Selected)->SetColor(Quantity_Color(0.15, 0.50, 0.95, Quantity_TOC_RGB));
+    applyNavigationPreset();
+}
+
+void Viewport::applyNavigationPreset()
+{
+    auto& gestures = ChangeMouseGestureMap();
+    gestures.Clear();
+    gestures.Bind(Aspect_VKeyMouse_MiddleButton, AIS_MouseGesture_Pan);
+    gestures.Bind(Aspect_VKeyMouse_MiddleButton | Aspect_VKeyFlags_SHIFT, AIS_MouseGesture_RotateOrbit);
+    // Left-drag draws a selection box; with Ctrl/Shift it adds/toggles like a click does.
+    gestures.Bind(Aspect_VKeyMouse_LeftButton, AIS_MouseGesture_SelectRectangle);
+    gestures.Bind(Aspect_VKeyMouse_LeftButton | Aspect_VKeyFlags_CTRL, AIS_MouseGesture_SelectRectangle);
+    gestures.Bind(Aspect_VKeyMouse_LeftButton | Aspect_VKeyFlags_SHIFT, AIS_MouseGesture_SelectRectangle);
+    SetRotationMode(AIS_RotationMode_PickLast);
+    SetStickToRayOnZoom(true); // wheel zoom goes toward the point under the cursor
+}
+
+AIS_MouseGesture Viewport::gestureFor(Aspect_VKeyMouse button, Aspect_VKeyFlags flags) const
+{
+    AIS_MouseGesture gesture = AIS_MouseGesture_NONE;
+    MouseGestureMap().Find(button | flags, gesture);
+    return gesture;
 }
 
 Viewport::~Viewport()
