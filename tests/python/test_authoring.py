@@ -177,3 +177,22 @@ def test_mesh_elements_matches_the_chunk_format(project):
     assert m["guids"] == [a["guid"]] and m["types"] == ["IfcWall"]
     assert m["voff"][-1] * 12 == len(verts) and m["toff"][-1] * 12 == len(tris)
     assert b.mesh_elements(json.dumps(["not-a-guid"])) is None
+
+
+def test_files_without_a_body_context_get_one(tmp_path):
+    """Exports like Revit 2011's Duplex have no Model/Body/MODEL_VIEW context: drawing still works."""
+    from kimcad.testing import build_model
+
+    f = build_model(walls=0)
+    for c in f.by_type("IfcGeometricRepresentationSubContext"):
+        f.remove(c)
+    path = tmp_path / "sin-body.ifc"
+    f.write(str(path))
+    call("open_model", str(path))
+    level = call("storeys")["storeys"][0]["guid"]
+    gen = next(t for t in call("wall_types")["types"] if t["name"] == "Generic 200")
+    r = call("create_wall", level, gen["guid"], 0, 0, 3, 0, 2.5, "", "")
+    assert r["ok"], r
+    lo, hi = bbox(r["guid"])
+    assert hi - lo == pytest.approx([3.0, 0.2, 2.5], abs=1e-3)
+    assert call("undo")["ok"]  # the context is part of the same undoable step

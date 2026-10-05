@@ -169,7 +169,15 @@ def wall_types() -> str:
 # ---------------------------------------------------------------- walls
 
 def _body_context():
-    return ifcopenshell.util.representation.get_context(B._model, "Model", "Body", "MODEL_VIEW")
+    """The Model/Body/MODEL_VIEW context walls are drawn in; created when the file lacks it (some
+    exports, e.g. Revit 2011, only have other views). Call inside the action: it's part of the step."""
+    f = B._model
+    context = ifcopenshell.util.representation.get_context(f, "Model", "Body", "MODEL_VIEW")
+    if context is None:
+        model = ifcopenshell.util.representation.get_context(f, "Model") or             ifcopenshell.api.context.add_context(f, context_type="Model")
+        context = ifcopenshell.api.context.add_context(f, context_type="Model", context_identifier="Body",
+                                                       target_view="MODEL_VIEW", parent=model)
+    return context
 
 
 def _axis_world(wall):
