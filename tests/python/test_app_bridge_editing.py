@@ -46,7 +46,8 @@ def fire(guids):
 def test_merged_view_marks_differences(opened):
     w = opened["walls"]
     same = fire(w[:2])
-    assert same == {"value": "EI30", "varies": False, "ifc_type": "IfcLabel", "editable": True}
+    assert same == {"value": "EI30", "varies": False, "ifc_type": "IfcLabel", "editable": True,
+                    "source": "element", "type_value": None}
     mixed = fire([w[0], opened["slab"]])  # the slab has no Pset_WallCommon
     assert mixed["varies"] is True
     m = multi(w)
