@@ -333,7 +333,6 @@ def delete_elements(guids_json: str) -> str:
             gone.add(e.id())
             ifcopenshell.api.root.remove_product(f, product=e)
 
-        ids = {e.id(): e for e in elements}
         fillings = [e for e in elements if getattr(e, "FillsVoids", None)]
         # Doors/windows first, then the openings, then walls and the rest: removing a wall can
         # take its openings with it, so nothing is removed twice.
@@ -349,7 +348,6 @@ def delete_elements(guids_json: str) -> str:
                 if rel.is_a("IfcRelConnectsPathElements"):
                     f.remove(rel)  # the join goes with the wall
             remove(e)
-        del ids
         for w in neighbours:
             ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=w)
         return len(elements), [w.GlobalId for w in [*neighbours, *hosts]], removed
