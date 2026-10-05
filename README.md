@@ -15,7 +15,16 @@ pixi run app -- model.ifc --lang es
 pixi run app -- --self-test model.ifc --screenshot shot.png   # load, measure fps/picking, print JSON
 ```
 
-Open an IFC file. It appears progressively in the 3D view, with the spatial tree on the left and properties on the right. Click to select (the tree and properties follow). **H** hides, **I** isolates, **Shift+H** shows all, **C** toggles the plan cut (height in the Cuts toolbar), **B** puts a section box around the selection.
+Open an IFC file. It appears progressively in the 3D view, with the spatial tree on the left and properties on the right.
+
+| Action | How |
+|---|---|
+| Pan / orbit / zoom | Middle-drag / **Shift**+middle-drag (around the point under the mouse) / wheel (toward the cursor) |
+| Select / add / toggle | Click / **Ctrl**+click / **Shift**+click; left-drag draws a selection box |
+| Edit | Double-click a value in Properties (applies to every selected element); right-click to add or remove properties |
+| Undo / redo / save | **Ctrl+Z** / **Ctrl+Y** / **Ctrl+S** (**Ctrl+Shift+S** to save as) |
+| Hide / isolate / show all | **H** / **I** / **Shift+H** |
+| Plan cut / section box / fit | **C** (height in the Cuts toolbar) / **B** / **F** |
 
 ## Try it (command line)
 
