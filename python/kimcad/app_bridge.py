@@ -141,6 +141,48 @@ def next_mesh_chunk(max_elements: int = 1000):
     return meta, np.concatenate(verts).astype("<f4").tobytes(), np.concatenate(tris).astype("<u4").tobytes()
 
 
+def _mesh_settings():
+    import ifcopenshell.geom
+
+    s = ifcopenshell.geom.settings()
+    s.set("use-world-coords", True)
+    return s
+
+
+def mesh_elements(guids_json: str):
+    """Meshes of specific elements (after an edit), in the next_mesh_chunk format, or None."""
+    import ifcopenshell.geom
+    import numpy as np
+
+    if _model is None:
+        return None
+    elements = [e for e in _elements(guids_json) if e.is_a() not in NOT_DISPLAYED and getattr(e, "Representation", None)]
+    if not elements:
+        return None
+    it = ifcopenshell.geom.iterator(_mesh_settings(), _model, 1, include=elements,
+                                    geometry_library="hybrid-cgal-simple-opencascade")
+    if not it.initialize():
+        return None
+    guids, types, verts, tris, voff, toff = [], [], [], [], [0], [0]
+    while True:
+        shape = it.get()
+        t = np.asarray(shape.geometry.faces, dtype=np.uint32)
+        if len(t):
+            v = np.asarray(shape.geometry.verts, dtype=np.float32)
+            verts.append(v)
+            tris.append(t + voff[-1])
+            voff.append(voff[-1] + len(v) // 3)
+            toff.append(toff[-1] + len(t) // 3)
+            guids.append(shape.guid)
+            types.append(shape.type)
+        if not it.next():
+            break
+    if not guids:
+        return None
+    meta = _dump({"guids": guids, "types": types, "voff": voff, "toff": toff})
+    return meta, np.concatenate(verts).astype("<f4").tobytes(), np.concatenate(tris).astype("<u4").tobytes()
+
+
 # ---------------------------------------------------------------- editing (M2, D49)
 # Every user action is one ifcopenshell transaction (undo/redo for free). State ids mirror
 # ifcopenshell's history stack so "unsaved changes" is exact, even after undoing past a save.
@@ -150,11 +192,28 @@ _ids: list[int] = []      # one id per transaction in _model.history
 _future_ids: list[int] = []  # one id per transaction in _model.future
 _saved_id = 0
 _next_id = 1
+# Geometry touched by each transaction (guids whose shape changed or that were added/removed),
+# parallel to _ids/_future_ids, so undo/redo can tell the 3D view what to re-mesh (Slice 4).
+_deltas: list[list[str]] = []
+_future_deltas: list[list[str]] = []
 
 
 def _reset_history(path: str):
-    global _path, _base_id, _ids, _future_ids, _saved_id, _next_id
+    global _path, _base_id, _ids, _future_ids, _saved_id, _next_id, _deltas, _future_deltas
     _path, _base_id, _ids, _future_ids, _saved_id, _next_id = path, 0, [], [], 0, 1
+    _deltas, _future_deltas = [], []
+
+
+def _geometry_now(guids) -> dict:
+    """Split touched guids into those that exist now (re-mesh) and those that don't (remove)."""
+    changed, removed = [], []
+    for g in dict.fromkeys(guids):
+        try:
+            _model.by_guid(g)
+            changed.append(g)
+        except RuntimeError:
+            removed.append(g)
+    return {"changed": changed, "removed": removed}
 
 
 def _current_id() -> int:
@@ -170,7 +229,8 @@ def state() -> str:
 
 
 def _run(action) -> dict:
-    """Run `action()` (which returns the number of changed elements) as one undoable transaction."""
+    """Run `action()` as one undoable transaction. It returns the number of changed elements, or
+    (count, geometry_changed_guids, geometry_removed_guids) when it touched shapes."""
     global _next_id, _base_id
     _model.begin_transaction()
     try:
@@ -182,12 +242,17 @@ def _run(action) -> dict:
         _model.future.pop()
         raise
     _model.end_transaction()
+    count, geo_changed, geo_removed = changed if isinstance(changed, tuple) else (changed, [], [])
     _ids.append(_next_id)
+    _deltas.append(list(dict.fromkeys([*geo_changed, *geo_removed])))
     _next_id += 1
     _future_ids.clear()
+    _future_deltas.clear()
     while len(_ids) > len(_model.history):  # ifcopenshell dropped its oldest transaction
         _base_id = _ids.pop(0)
-    return {"ok": True, "changed": changed}
+        _deltas.pop(0)
+    geometry = {"changed": list(dict.fromkeys(geo_changed)), "removed": list(dict.fromkeys(geo_removed))}
+    return {"ok": True, "changed": count, "geometry": geometry}
 
 
 def _elements(guids_json: str) -> list:
@@ -482,7 +547,8 @@ def undo() -> str:
         return _dump({"ok": False, "error": "nothing to undo", **(_flags() if _model else {})})
     _model.undo()
     _future_ids.append(_ids.pop())
-    return _dump({"ok": True, **_flags()})
+    _future_deltas.append(_deltas.pop())
+    return _dump({"ok": True, **_flags(), "geometry": _geometry_now(_future_deltas[-1])})
 
 
 def redo() -> str:
@@ -490,7 +556,8 @@ def redo() -> str:
         return _dump({"ok": False, "error": "nothing to redo", **(_flags() if _model else {})})
     _model.redo()
     _ids.append(_future_ids.pop())
-    return _dump({"ok": True, **_flags()})
+    _deltas.append(_future_deltas.pop())
+    return _dump({"ok": True, **_flags(), "geometry": _geometry_now(_deltas[-1])})
 
 
 def save(path: str = "") -> str:
@@ -614,3 +681,15 @@ def _write_test_model(path: str) -> str:
     ifcopenshell.api.type.assign_type(f, related_objects=f.by_type("IfcWall"), relating_type=wall_type)
     f.write(path)
     return _dump({"ok": True, "path": path})
+
+
+# Modeling (M3) lives in its own module; re-exported here because the app calls this module.
+from .authoring import (  # noqa: E402,F401
+    add_storey,
+    create_wall,
+    delete_elements,
+    new_project,
+    snap_data,
+    storeys,
+    wall_types,
+)

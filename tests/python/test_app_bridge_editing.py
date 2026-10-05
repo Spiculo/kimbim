@@ -58,7 +58,7 @@ def test_merged_view_marks_differences(opened):
 def test_bulk_edit_is_one_undo_step(opened):
     w = opened["walls"][:2]
     r = call("set_property", json.dumps(w), "Pset_WallCommon", "FireRating", json.dumps("EI90"))
-    assert r == {"ok": True, "changed": 2}
+    assert r == {"ok": True, "changed": 2, "geometry": {"changed": [], "removed": []}}
     assert fire(w)["value"] == "EI90"
     s = call("undo")
     assert s["ok"] and not s["can_undo"] and s["can_redo"]
