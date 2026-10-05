@@ -58,15 +58,19 @@ Command/undo framework, property and pset editing, materials, types, classificat
 Done in Slice 3 ([plan](superpowers/plans/2026-10-05-slice3-navigation-and-data-editor.md)):
 - edit names and property values for one or many elements (bulk edit), with values keeping their IFC type;
 - add and remove properties and property sets (standard templates or custom);
+- see whether a value comes from the element's type; edit the type value deliberately or reset an override (Slice 3b, D50);
 - undo/redo, one step per action;
 - Save / Save As with an unsaved-changes guard; the saved file round-trips;
 - Revit/ArchiCAD navigation; multi-select by Ctrl/Shift-click, box and tree.
 
 Not yet: materials, types (assign/edit), classifications, schedules, quantity take-off.
 
-### M3 — Modeler
+### M3 — Modeler 🟡 (in progress)
 Levels and grids, walls (layered, joins), slabs, openings, doors/windows, columns/beams, snapping, precise input, move/rotate/stretch.
 **Exit:** an architect can model a small 2-storey house from scratch and export valid IFC that opens in at least two other tools (e.g. Bonsai, a commercial viewer).
+
+Slices: **4 ✅ new project, levels, walls** ([plan](superpowers/plans/2026-10-05-slice4-walls-and-levels.md)) → 5 slabs, openings, doors/windows → 6 columns/beams, grids, move/rotate/stretch → 7 the exit test.
+Done in Slice 4: new IFC4 project (mm), levels, plan view, layered wall types, wall tool (snapping, typed lengths, ortho), L/T joins, delete, live 3D updates with undo/redo.
 
 ### M4 — Libraries, cloning, drawings
 Library browser and bundled library, copy/paste/duplicate/array/mirror/copy-to-storeys, plan/section/elevation generation, annotations, sheets, PDF export.

@@ -46,7 +46,8 @@ def fire(guids):
 def test_merged_view_marks_differences(opened):
     w = opened["walls"]
     same = fire(w[:2])
-    assert same == {"value": "EI30", "varies": False, "ifc_type": "IfcLabel", "editable": True}
+    assert same == {"value": "EI30", "varies": False, "ifc_type": "IfcLabel", "editable": True,
+                    "source": "element", "type_value": None}
     mixed = fire([w[0], opened["slab"]])  # the slab has no Pset_WallCommon
     assert mixed["varies"] is True
     m = multi(w)
@@ -57,7 +58,7 @@ def test_merged_view_marks_differences(opened):
 def test_bulk_edit_is_one_undo_step(opened):
     w = opened["walls"][:2]
     r = call("set_property", json.dumps(w), "Pset_WallCommon", "FireRating", json.dumps("EI90"))
-    assert r == {"ok": True, "changed": 2}
+    assert r == {"ok": True, "changed": 2, "geometry": {"changed": [], "removed": []}}
     assert fire(w)["value"] == "EI90"
     s = call("undo")
     assert s["ok"] and not s["can_undo"] and s["can_redo"]

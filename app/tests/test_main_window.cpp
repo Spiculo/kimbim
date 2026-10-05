@@ -10,6 +10,7 @@
 #include <QtTest>
 
 #include "ElementBatch.h"
+#include "LevelsBar.h"
 #include "MainWindow.h"
 #include "PythonEngine.h"
 #include "Viewport.h"
@@ -133,6 +134,98 @@ private slots:
         QVERIFY(w.close()); // quiet mode: never a modal dialog
     }
 
+    // D50: a type edit reaches every element of the type (one undo step); reset brings the type value back.
+    void typeEditAndResetToType()
+    {
+        QTemporaryDir tmp;
+        const QString path = tmp.filePath(QStringLiteral("tipos.ifc"));
+        auto& py = kimcad::PythonEngine::instance();
+        QString error;
+        QVERIFY(py.start(&error));
+        py.callJson("_write_test_model", {path});
+
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QSignalSpy done(&w, &kimcad::MainWindow::loadFinished);
+        w.openFile(path);
+        QVERIFY(done.wait(60000));
+        const QStringList walls = w.viewport()->guids();
+        QCOMPARE(walls.size(), 2);
+
+        auto u = [&](const QString& guid) {
+            const QJsonObject m = py.callJson("properties_multi",
+                {QString::fromUtf8(QJsonDocument(QJsonArray{guid}).toJson(QJsonDocument::Compact))}).object();
+            return m["psets"].toObject()["Pset_WallCommon"].toObject()["ThermalTransmittance"].toObject();
+        };
+        w.setSelection({walls[0]});
+        QVERIFY(w.applyTypeEdit("Pset_WallCommon", "ThermalTransmittance", QJsonValue(0.5)));
+        QCOMPARE(u(walls[1])["value"].toDouble(), 0.5); // not selected, same type
+        QVERIFY(w.isDirty());
+        action(w, "actionUndo")->trigger();
+        QCOMPARE(u(walls[1])["value"].toDouble(), 0.35);
+        QVERIFY(!w.isDirty());
+
+        QVERIFY(w.applyPropertyEdit("Pset_WallCommon", "ThermalTransmittance", QJsonValue(0.9)));
+        QCOMPARE(u(walls[0])["source"].toString(), QString("override"));
+        QVERIFY(w.resetToType("Pset_WallCommon", "ThermalTransmittance"));
+        QCOMPARE(u(walls[0])["source"].toString(), QString("type"));
+        QCOMPARE(u(walls[0])["value"].toDouble(), 0.35);
+        QVERIFY(w.close());
+    }
+
+    // Slice 4: Delete removes the selection from the model, the view and the tree; undo brings it back.
+    void deleteAndUndoUpdateViewAndTree()
+    {
+        QTemporaryDir tmp;
+        const QString path = tmp.filePath(QStringLiteral("borrar.ifc"));
+        auto& py = kimcad::PythonEngine::instance();
+        QString error;
+        QVERIFY(py.start(&error));
+        py.callJson("_write_test_model", {path});
+
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QSignalSpy done(&w, &kimcad::MainWindow::loadFinished);
+        w.openFile(path);
+        QVERIFY(done.wait(60000));
+        const QStringList walls = w.viewport()->guids();
+        QCOMPARE(walls.size(), 2);
+        w.viewport()->selectGuids({walls[0]});
+        w.setSelection({walls[0]});
+        action(w, "actionDelete")->trigger();
+        QCOMPARE(w.viewport()->elementCount(), 1);
+        QVERIFY(!w.viewport()->guids().contains(walls[0]));
+        QVERIFY(!w.treeHasGuid(walls[0]));
+        QVERIFY(w.selection().isEmpty());
+        QVERIFY(w.isDirty());
+        action(w, "actionUndo")->trigger();
+        QCOMPARE(w.viewport()->elementCount(), 2);
+        QVERIFY(w.viewport()->guids().contains(walls[0]));
+        QVERIFY(w.treeHasGuid(walls[0]));
+        QVERIFY(w.close());
+    }
+
+    // Slice 4: new project with one level; levels can be added and undone.
+    void newProjectAndLevels()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        QCOMPARE(w.viewport()->elementCount(), 0);
+        QCOMPARE(w.levelsBar()->count(), 1);
+        QVERIFY(!w.isDirty());
+        QVERIFY(w.windowTitle().contains(QObject::tr("Untitled")));
+        QVERIFY(w.addLevel(QStringLiteral("Level 2"), 3.0));
+        QCOMPARE(w.levelsBar()->count(), 2);
+        QCOMPARE(w.levelsBar()->activeElevation(), 3.0);
+        QVERIFY(w.isDirty());
+        action(w, "actionUndo")->trigger();
+        QCOMPARE(w.levelsBar()->count(), 1);
+        QCOMPARE(w.levelsBar()->activeElevation(), 0.0);
+        action(w, "actionPlanView")->trigger();
+        QVERIFY(w.viewport()->isPlanView());
+        action(w, "action3DView")->trigger();
+        QVERIFY(!w.viewport()->isPlanView());
+        QVERIFY(w.close());
+    }
+
     void shortcutsAreTheDocumentedOnes()
     {
         kimcad::MainWindow w(nullptr, true);
@@ -141,6 +234,9 @@ private slots:
         QCOMPARE(action(w, "actionShowAll")->shortcut(), QKeySequence(Qt::SHIFT | Qt::Key_H));
         QCOMPARE(action(w, "actionUndo")->shortcut(), QKeySequence(QKeySequence::Undo));
         QCOMPARE(action(w, "actionSave")->shortcut(), QKeySequence(QKeySequence::Save));
+        QCOMPARE(action(w, "actionDelete")->shortcut(), QKeySequence(QKeySequence::Delete));
+        QCOMPARE(action(w, "actionNewProject")->shortcut(), QKeySequence(QKeySequence::New));
+        QCOMPARE(action(w, "actionPlanView")->shortcut(), QKeySequence(Qt::Key_P));
     }
 };
 

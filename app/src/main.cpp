@@ -37,6 +37,10 @@ int main(int argc, char* argv[])
     parser.addOption(chunk);
     QCommandLineOption boxSelect(QStringLiteral("box-select"), QStringLiteral("Self-test: box-select the whole view."));
     parser.addOption(boxSelect);
+    QCommandLineOption drawWalls(QStringLiteral("draw-walls"),
+        QStringLiteral("Self-test: on a new project, draw walls through these points (\"x,y;x,y;...\", metres)."),
+        QStringLiteral("points"));
+    parser.addOption(drawWalls);
     QCommandLineOption screenshot(QStringLiteral("screenshot"), QStringLiteral("Self-test: save a PNG of the window."),
         QStringLiteral("png"));
     parser.addOption(screenshot);
@@ -57,6 +61,7 @@ int main(int argc, char* argv[])
         options.planCut = parser.isSet(planCut) ? parser.value(planCut).toDouble() : -1;
         options.chunkSize = qMax(1, parser.value(chunk).toInt());
         options.boxSelect = parser.isSet(boxSelect);
+        options.drawWalls = parser.value(drawWalls);
         options.screenshot = parser.value(screenshot);
         return kimcad::runSelfTest(options);
     }

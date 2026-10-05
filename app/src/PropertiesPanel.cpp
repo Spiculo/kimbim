@@ -5,6 +5,7 @@
 #include <QJsonArray>
 #include <QLocale>
 #include <QMenu>
+#include <QPalette>
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
@@ -12,7 +13,7 @@ namespace kimcad {
 
 namespace {
 
-enum Role { PsetRole = Qt::UserRole, PropRole, KindRole };
+enum Role { PsetRole = Qt::UserRole, PropRole, KindRole, SourceRole };
 enum Kind { Text = 0, Number = 1, Bool = 2, ReadOnly = 3, NameKind = 4 };
 
 QString valueText(const QJsonValue& v)
@@ -149,6 +150,23 @@ void PropertiesPanel::showMulti(const QJsonObject& merged)
                 italic.setItalic(true);
                 item->setFont(1, italic);
             }
+            // D50: where the value comes from. Inherited values are dimmed; overrides name the type value.
+            const QString source = prop.value("source").toString();
+            item->setData(0, SourceRole, source);
+            const QString ifcType = prop.value("ifc_type").toString();
+            if (source == QLatin1String("type")) {
+                const QBrush dim = palette().brush(QPalette::Disabled, QPalette::Text);
+                item->setForeground(0, dim);
+                item->setForeground(1, dim);
+                item->setToolTip(1, QStringLiteral("%1\n%2").arg(fromTypeText(), ifcType));
+            } else if (source == QLatin1String("override")) {
+                item->setToolTip(1, QStringLiteral("%1\n%2")
+                                        .arg(tr("Overrides the type value: %1").arg(valueText(prop.value("type_value"))), ifcType));
+            } else if (source == QLatin1String("mixed")) {
+                item->setToolTip(1, QStringLiteral("%1\n%2").arg(tr("Some selected elements use their type's value"), ifcType));
+            } else {
+                item->setForeground(1, palette().brush(QPalette::Active, QPalette::Text));
+            }
         }
         group->setExpanded(true);
     }
@@ -202,21 +220,40 @@ void PropertiesPanel::onItemChanged(QTreeWidgetItem* item, int column)
     emit propertyEdited(pset, prop, QJsonValue(text)); // the bridge converts to the property's IFC type
 }
 
-void PropertiesPanel::showContextMenu(const QPoint& pos)
+QList<QAction*> PropertiesPanel::actionsFor(QTreeWidgetItem* item, QObject* parent)
 {
-    QTreeWidgetItem* item = m_tree->itemAt(pos);
-    QMenu menu(this);
+    if (!parent)
+        parent = this;
+    QList<QAction*> out;
+    auto add = [&](const char* name, const QString& text, auto slot) {
+        auto* a = new QAction(text, parent);
+        a->setObjectName(QLatin1String(name));
+        connect(a, &QAction::triggered, this, slot);
+        out << a;
+    };
     const QString pset = item ? item->data(0, PsetRole).toString() : QString();
     const QString prop = item ? item->data(0, PropRole).toString() : QString();
+    const QString source = item ? item->data(0, SourceRole).toString() : QString();
+    const bool editable = item && item->data(1, KindRole).toInt() != ReadOnly;
+    const bool fromType = source == QLatin1String("type") || source == QLatin1String("override")
+        || source == QLatin1String("mixed");
+    if (!prop.isEmpty() && editable && fromType)
+        add("editTypeValue", tr("Edit type value..."), [this, pset, prop] { emit typeEditRequested(pset, prop); });
+    if (!prop.isEmpty() && (source == QLatin1String("override") || source == QLatin1String("mixed")))
+        add("resetToType", tr("Reset to type value"), [this, pset, prop] { emit resetToTypeRequested(pset, prop); });
     if (!pset.isEmpty())
-        menu.addAction(tr("Add property to %1...").arg(pset), this, [this, pset] { emit addPropertyRequested(pset); });
-    if (!prop.isEmpty() && item->data(1, KindRole).toInt() != ReadOnly)
-        menu.addAction(tr("Remove property %1").arg(prop), this, [this, pset, prop] { emit propertyRemoved(pset, prop); });
-    if (m_name) {
-        if (!menu.isEmpty())
-            menu.addSeparator();
-        menu.addAction(tr("Add property set..."), this, [this] { emit addPropertySetRequested(); });
-    }
+        add("addProperty", tr("Add property to %1...").arg(pset), [this, pset] { emit addPropertyRequested(pset); });
+    if (!prop.isEmpty() && editable && source != QLatin1String("type")) // inherited values have nothing to remove
+        add("removeProperty", tr("Remove property %1").arg(prop), [this, pset, prop] { emit propertyRemoved(pset, prop); });
+    if (m_name)
+        add("addPropertySet", tr("Add property set..."), [this] { emit addPropertySetRequested(); });
+    return out;
+}
+
+void PropertiesPanel::showContextMenu(const QPoint& pos)
+{
+    QMenu menu(this);
+    menu.addActions(actionsFor(m_tree->itemAt(pos), &menu));
     if (!menu.isEmpty())
         menu.exec(m_tree->viewport()->mapToGlobal(pos));
 }

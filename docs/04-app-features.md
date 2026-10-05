@@ -55,6 +55,7 @@ Navigation preset (D48, owner choice): middle-drag pans, Shift+middle-drag orbit
 | Type / instance: assign type, edit type to update all instances | P0 | `ifcopenshell.api.type` |
 | Quantity take-off (auto-calculated quantities) | P1 | IfcOpenShell `ifc5d` / qto utilities |
 | **Bulk edit**: set a property on a selection | P0 | |
+| **Type vs. element values** (D50): values inherited from the element's type are dimmed; editing writes the element's own value (an override); *Edit type value…* changes the type for every element of it, after a confirmation with the count; *Reset to type value* drops the override | P0 | `ifcopenshell.util.element.get_type` |
 | **Schedules**: table views of objects × properties, editable, CSV/XLSX export | P1 | Bonsai/IfcOpenShell `ifccsv` |
 | Search and filter with a query language | P0 | `ifcopenshell.util.selector` syntax (e.g. `IfcWall, Pset_WallCommon.FireRating=EI60`) |
 | Object history panel (versioned projects) | P0 | [03](03-versioning.md#object-history-blame) |
@@ -65,8 +66,8 @@ All modeling goes through commands, with undo/redo ([01](01-architecture.md#engi
 
 | Feature | Pri | Notes / reuse |
 |---------|-----|---------------|
-| Levels (storeys) and grids | P0 | `ifcopenshell.api.spatial`, `grid` |
-| Walls: layered (by type), draw by axis, join at corners/T, flip | P0 | `ifcopenshell.api.geometry` + Bonsai wall-joining logic (port) |
+| Levels (storeys) and grids | P0 | `ifcopenshell.api.spatial`, `grid` — levels ✅ (Slice 4), grids: Slice 6 |
+| Walls: layered (by type), draw by axis, join at corners/T, flip | P0 | ✅ Slice 4 (flip: later). `geometry.create_2pt_wall`, `connect_wall`, `regenerate_wall_representation` — Bonsai's wall logic, already in ifcopenshell 0.9, no port needed |
 | Slabs / floors from outline or from walls | P0 | |
 | Openings + doors + windows hosted in walls (parametric types) | P0 | IfcOpenShell parametric door/window representations (used by Bonsai) |
 | Columns and beams from profile types | P0 | Profile sets |
@@ -75,8 +76,8 @@ All modeling goes through commands, with undo/redo ([01](01-architecture.md#engi
 | Stairs and railings (basic parametric) | P1 | Bonsai parametric stair/railing (port) |
 | Curtain walls | P2 | |
 | Generic object (extrusion, mesh import) | P1 | |
-| Snapping (endpoint, midpoint, perpendicular, grid, axis) and work planes | P0 | |
-| Precise input (typed distances/angles) | P0 | |
+| Snapping (endpoint, midpoint, perpendicular, grid, axis) and work planes | P0 | ✅ Slice 4 (on wall, 15° angles, ortho with Shift; work plane = active level) |
+| Precise input (typed distances/angles) | P0 | Typed lengths ✅ Slice 4; typed angles: later |
 | Edit geometry: move, rotate, stretch/extend wall, change height | P0 | |
 
 ## 6. Cloning

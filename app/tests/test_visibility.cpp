@@ -8,7 +8,7 @@
 namespace {
 
 // n elements, one triangle each, guids prefix+i.
-Handle(kimcad::ElementBatch) batch(const QString& prefix, int n)
+kimcad::MeshChunk chunk(const QString& prefix, int n)
 {
     kimcad::MeshChunk c;
     c.voff.push_back(0);
@@ -24,7 +24,12 @@ Handle(kimcad::ElementBatch) batch(const QString& prefix, int n)
         c.voff.push_back(uint32_t(c.verts.size() / 3));
         c.toff.push_back(uint32_t(c.tris.size() / 3));
     }
-    return new kimcad::ElementBatch(std::move(c));
+    return c;
+}
+
+Handle(kimcad::ElementBatch) batch(const QString& prefix, int n)
+{
+    return new kimcad::ElementBatch(chunk(prefix, n));
 }
 
 } // namespace
@@ -84,6 +89,43 @@ private slots:
         QCOMPARE(v.selectInRectangle(0, 0, 10, 10, AIS_SelectionScheme_Replace), 0);
         QCOMPARE(v.measureFps(2), 0.0);
         QCOMPARE(v.dumpImage(QStringLiteral("unused.png")), false);
+    }
+
+    // Slice 4: edits replace or remove elements live; old instances never come back.
+    void replacedElementsAreRetiredForGood()
+    {
+        kimcad::Viewport v;
+        v.addBatch(batch("a", 3));
+        v.replaceElements(chunk("a", 1)); // a0 has new geometry
+        QCOMPARE(v.elementCount(), 3);
+        QCOMPARE(v.guids().count("a0"), 1);
+        QCOMPARE(v.visibleElementCount(), 3);
+        v.showAll();
+        QCOMPARE(v.visibleElementCount(), 3); // the retired a0 stays hidden
+        v.isolate({"a0"});
+        QCOMPARE(v.visibleElementCount(), 1);
+        v.showAll();
+        v.selectGuids({"a0"});
+        QCOMPARE(v.selectedGuids(), QStringList{"a0"});
+        v.replaceElements(chunk("a", 1)); // replacing keeps it selected
+        QCOMPARE(v.selectedGuids(), QStringList{"a0"});
+    }
+
+    void removedElementsDisappear()
+    {
+        kimcad::Viewport v;
+        v.addBatch(batch("a", 3));
+        v.selectGuids({"a1", "a2"});
+        v.removeElements({"a1", "unknown"});
+        QCOMPARE(v.elementCount(), 2);
+        QCOMPARE(v.visibleElementCount(), 2);
+        QVERIFY(!v.guids().contains("a1"));
+        QCOMPARE(v.selectedGuids(), QStringList{"a2"});
+        v.showAll();
+        QCOMPARE(v.visibleElementCount(), 2);
+        v.replaceElements(chunk("a", 2)); // undo of a delete brings a1 back as new geometry
+        QCOMPARE(v.elementCount(), 3);
+        QVERIFY(v.guids().contains("a1"));
     }
 
     void hidingClearsSelection()

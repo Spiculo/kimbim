@@ -21,10 +21,14 @@ Open an IFC file. It appears progressively in the 3D view, with the spatial tree
 |---|---|
 | Pan / orbit / zoom | Middle-drag / **Shift**+middle-drag (around the point under the mouse) / wheel (toward the cursor) |
 | Select / add / toggle | Click / **Ctrl**+click / **Shift**+click; left-drag draws a selection box |
-| Edit | Double-click a value in Properties (applies to every selected element); right-click to add or remove properties |
+| Edit | Double-click a value in Properties (applies to every selected element); right-click to add or remove properties, edit a value on the type, or reset to the type value (dimmed values come from the type) |
 | Undo / redo / save | **Ctrl+Z** / **Ctrl+Y** / **Ctrl+S** (**Ctrl+Shift+S** to save as) |
 | Hide / isolate / show all | **H** / **I** / **Shift+H** |
-| Plan cut / section box / fit | **C** (height in the Cuts toolbar) / **B** / **F** |
+| Plan cut / section box / fit | **C** (height above the active level, in the Cuts toolbar) / **B** / **F** |
+| New project / add a level | **Ctrl+N** / *Add level…* in the Levels toolbar (the active level is where you draw) |
+| Plan view / 3D view | **P** / **3** |
+| Draw walls | **W**, then click points (snaps to wall ends, midpoints, perpendiculars, 15° angles; **Shift** for right angles), type a length + **Enter**, **Esc** to finish. Walls join at corners and T's |
+| Delete | **Del** |
 
 ## Try it (command line)
 

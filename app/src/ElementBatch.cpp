@@ -105,6 +105,7 @@ void ElementOwner::Clear(const Handle(PrsMgr_PresentationManager)& pm, const int
 ElementBatch::ElementBatch(MeshChunk chunk)
     : m_chunk(std::move(chunk))
     , m_hidden(size_t(m_chunk.elementCount()), 0)
+    , m_retired(size_t(m_chunk.elementCount()), 0)
     , m_visible(m_chunk.elementCount())
     , m_owners(size_t(m_chunk.elementCount()))
 {
@@ -117,8 +118,16 @@ ElementBatch::ElementBatch(MeshChunk chunk)
         m_pickArray->AddEdge(int(idx) + 1); // AddEdge is 1-based
 }
 
+void ElementBatch::retire(int i)
+{
+    setHidden(i, true);
+    m_retired[size_t(i)] = 1;
+}
+
 void ElementBatch::setHidden(int i, bool hidden)
 {
+    if (!hidden && isRetired(i))
+        return;
     char& h = m_hidden[size_t(i)];
     if (bool(h) == hidden)
         return;

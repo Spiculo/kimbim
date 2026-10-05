@@ -82,6 +82,23 @@ std::optional<MeshChunk> MeshChunk::parse(const QByteArray& metaJson, const QByt
     return c;
 }
 
+bool fetchElementMeshes(PythonEngine& py, const QStringList& guids, MeshChunk* out, bool* none, QString* error)
+{
+    QList<QByteArray> parts;
+    const QString list = QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(guids)).toJson(QJsonDocument::Compact));
+    if (!py.callParts("mesh_elements", {list}, &parts, none, error))
+        return false;
+    if (*none)
+        return true;
+    if (parts.size() != 3)
+        return fail(error, QStringLiteral("mesh_elements returned %1 parts, expected 3").arg(parts.size()));
+    auto chunk = MeshChunk::parse(parts[0], parts[1], parts[2], error);
+    if (!chunk)
+        return false;
+    *out = std::move(*chunk);
+    return true;
+}
+
 bool fetchMeshChunk(PythonEngine& py, int maxElements, MeshChunk* out, bool* done, QString* error)
 {
     *done = false;
