@@ -93,6 +93,20 @@ private slots:
         QCOMPARE(int(kimcad::ElementBatch::featureEdges(flipped, 0).size()), 6);
     }
 
+    // Slice 4b: element ids drawn as colours for "only what you can see" box selection.
+    // 6 bits per channel (value*4+2) survive +-1 of rounding; anything else decodes as "no element".
+    void idColoursRoundTripWithNoise()
+    {
+        for (int id : {1, 2, 63, 64, 4095, 4096, 100000, 262143}) {
+            const auto rgb = kimcad::ElementBatch::idRgb(id);
+            for (int d : {-1, 0, 1})
+                QCOMPARE(kimcad::ElementBatch::idFromRgb(rgb[0] + d, rgb[1] + d, rgb[2] - d), id);
+        }
+        QCOMPARE(kimcad::ElementBatch::idFromRgb(0, 0, 0), -1);       // black background
+        QCOMPARE(kimcad::ElementBatch::idFromRgb(240, 240, 244), -1); // anything off the grid
+        QCOMPARE(kimcad::ElementBatch::maxId(), 262143);
+    }
+
     void acceptsShadedIdAndLinesModes()
     {
         Handle(kimcad::ElementBatch) b = new kimcad::ElementBatch(unitCube());

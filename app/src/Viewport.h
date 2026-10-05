@@ -5,6 +5,7 @@
 #include <AIS_ViewController.hxx>
 #include <gp_Pnt.hxx>
 #include <QPointF>
+#include <QSet>
 #include <utility>
 #include <optional>
 #include <V3d_View.hxx>
@@ -91,7 +92,13 @@ public:
     // Click/box selection modifiers: plain = replace, Ctrl = add (Revit), Shift = toggle (ArchiCAD).
     AIS_SelectionScheme selectionSchemeFor(Aspect_VKeyMouse button, Aspect_VKeyFlags flags) const;
     // Box selection in window pixels (what left-drag does); returns how many elements are selected.
-    int selectInRectangle(int x0, int y0, int x1, int y1, AIS_SelectionScheme scheme);
+    // Box selection: by default only elements you can see (not hidden behind others); `through`
+    // also takes hidden ones (Alt while dragging, or the select-through setting).
+    int selectInRectangle(int x0, int y0, int x1, int y1, AIS_SelectionScheme scheme, bool through = false);
+    void setSelectThrough(bool on) { m_selectThrough = on; }
+    bool selectThrough() const { return m_selectThrough; }
+    // Guids with at least one visible pixel in the rectangle (nullopt: cannot tell, e.g. no window).
+    std::optional<QSet<QString>> visibleIn(int x0, int y0, int x1, int y1);
 
 signals:
     void selectionChanged(const QStringList& guids);
@@ -112,6 +119,7 @@ protected:
     void keyPressEvent(QKeyEvent*) override;
     void mouseDoubleClickEvent(QMouseEvent*) override;
     void OnSelectionChanged(const Handle(AIS_InteractiveContext)& ctx, const Handle(V3d_View)& view) override;
+    void handleSelectionPoly(const Handle(AIS_InteractiveContext)& ctx, const Handle(V3d_View)& view) override;
 
 private:
     struct Loc {
@@ -131,6 +139,12 @@ private:
     QHash<QString, Loc> m_locate;
     bool m_planView = false;
     bool m_linesOnly = false;
+    bool m_selectThrough = false;
+    bool m_quietSelection = false;
+    int m_nextIdBase = 0;
+    std::vector<int> m_idBases; // per batch, for decoding ids
+    void keepOnlyVisible(const QSet<QString>& before, AIS_SelectionScheme scheme, int x0, int y0, int x1, int y1);
+    QSet<QString> selectedSet() const;
     bool m_drawingMode = false;
     double m_workZ = 0.0;
     Handle(ElementBatch) m_preview;

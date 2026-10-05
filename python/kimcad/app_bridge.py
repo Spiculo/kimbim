@@ -665,6 +665,23 @@ def properties_multi(guids_json: str) -> str:
     })
 
 
+def _write_occlusion_model(path: str) -> str:
+    """A 4 m wall in front of a 1 m wall that it hides completely in the default view (Slice 4b
+    visible-only box selection self-test). Leaves no model open."""
+    global _model
+    from . import authoring
+
+    authoring.new_project("Occlusion")
+    level = json.loads(authoring.storeys())["storeys"][0]["guid"]
+    wall_type = json.loads(authoring.wall_types())["types"][0]["guid"]
+    authoring.create_wall(level, wall_type, -4, 0, 8, 0, 4.0)
+    authoring.create_wall(level, wall_type, 1, 2, 2, 2, 1.0)
+    _model.write(path)
+    _model = None
+    _reset_history("")
+    return _dump({"ok": True, "path": path})
+
+
 def count_entities(ifc_class: str) -> str:
     """Number of entities of a class (self-test reports)."""
     return _dump({"count": len(_model.by_type(ifc_class)) if _model is not None else 0})

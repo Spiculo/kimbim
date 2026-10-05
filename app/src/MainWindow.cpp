@@ -144,6 +144,11 @@ void MainWindow::buildMenus()
     view3D->setObjectName(QStringLiteral("action3DView"));
     view3D->setShortcut(Qt::Key_3);
     connect(view3D, &QAction::triggered, this, [this] { setPlanView(false); });
+    QAction* through = view->addAction(tr("Select &hidden elements too"));
+    through->setObjectName(QStringLiteral("actionSelectThrough"));
+    through->setCheckable(true);
+    through->setToolTip(tr("Box selection also takes elements hidden behind others (same as holding Alt while dragging)"));
+    connect(through, &QAction::toggled, m_viewport, &Viewport::setSelectThrough);
     QAction* linesOnly = view->addAction(tr("&Lines only"));
     linesOnly->setObjectName(QStringLiteral("actionLinesOnly"));
     linesOnly->setShortcut(Qt::Key_L);

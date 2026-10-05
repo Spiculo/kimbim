@@ -196,3 +196,10 @@ def test_files_without_a_body_context_get_one(tmp_path):
     lo, hi = bbox(r["guid"])
     assert hi - lo == pytest.approx([3.0, 0.2, 2.5], abs=1e-3)
     assert call("undo")["ok"]  # the context is part of the same undoable step
+
+
+def test_occlusion_model_hides_a_short_wall_behind_a_tall_one(tmp_path):
+    path = tmp_path / "occ.ifc"
+    assert call("_write_occlusion_model", str(path))["ok"]
+    f = ifcopenshell.open(str(path))
+    assert len(f.by_type("IfcWall")) == 2

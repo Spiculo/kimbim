@@ -3,6 +3,7 @@
 #include "ElementBatch.h"
 #include <unordered_map>
 #include <cmath>
+#include <cstdio>
 #include <Graphic3d_AspectLine3d.hxx>
 #include <Graphic3d_ArrayOfSegments.hxx>
 
@@ -165,9 +166,9 @@ Handle(ElementOwner) ElementBatch::owner(int i)
     return o;
 }
 
-void ElementBatch::addElement(Graphic3d_ArrayOfTriangles& out, int i, bool withColors) const
+void ElementBatch::addElement(Graphic3d_ArrayOfTriangles& out, int i, bool withColors, const Quantity_Color* fixed) const
 {
-    const Quantity_Color color = colorFor(m_chunk.types.at(i));
+    const Quantity_Color color = fixed ? *fixed : colorFor(m_chunk.types.at(i));
     for (uint32_t t = m_chunk.toff[size_t(i)]; t < m_chunk.toff[size_t(i) + 1]; ++t) {
         const gp_Pnt a = vertex(m_chunk, m_chunk.tris[3 * t]);
         const gp_Pnt b = vertex(m_chunk, m_chunk.tris[3 * t + 1]);
@@ -298,12 +299,21 @@ void ElementBatch::addTriangles(const Handle(Prs3d_Presentation)& prs, int mode)
             tris += int(m_chunk.toff[size_t(i) + 1] - m_chunk.toff[size_t(i)]);
     if (tris == 0)
         return;
-    const bool colours = mode == Shaded;
+    const bool colours = mode == Shaded || mode == Ids;
     Handle(Graphic3d_ArrayOfTriangles) arr = new Graphic3d_ArrayOfTriangles(
         tris * 3, 0, Graphic3d_ArrayFlags_VertexNormal | (colours ? Graphic3d_ArrayFlags_VertexColor : 0));
-    for (int i = 0; i < elementCount(); ++i)
-        if (!isHidden(i))
+    for (int i = 0; i < elementCount(); ++i) {
+        if (isHidden(i))
+            continue;
+        if (mode == Ids) {
+            const auto rgb = idRgb(m_idBase + i + 1);
+            // Linear RGB: the offscreen buffer stores these values as they are (no sRGB encoding).
+            const Quantity_Color id(rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0, Quantity_TOC_RGB);
+            addElement(*arr, i, true, &id);
+        } else {
             addElement(*arr, i, colours);
+        }
+    }
     Handle(Graphic3d_Group) group = prs->NewGroup();
     Handle(Graphic3d_AspectFillArea3d) aspect = new Graphic3d_AspectFillArea3d(*myDrawer->ShadingAspect()->Aspect());
     if (mode == Shaded) {
@@ -314,6 +324,8 @@ void ElementBatch::addTriangles(const Handle(Prs3d_Presentation)& prs, int mode)
         aspect->SetFrontMaterial(material);
         aspect->SetBackMaterial(material);
         aspect->SetInteriorColor(Quantity_NOC_WHITE);
+    } else if (mode == Ids) { // exact flat colours: no lighting
+        aspect->SetShadingModel(Graphic3d_TypeOfShadingModel_Unlit);
     } else { // lines only: faces just hide what is behind them
         aspect->SetShadingModel(Graphic3d_TypeOfShadingModel_Unlit);
         aspect->SetInteriorColor(s_background);
@@ -359,8 +371,11 @@ void ElementBatch::Compute(const Handle(PrsMgr_PresentationManager)&, const Hand
         addTriangles(prs, LinesOnly);
         addLines(prs, Quantity_Color(0.05, 0.05, 0.05, Quantity_TOC_RGB));
         break;
+    case Ids:
+        addTriangles(prs, Ids); // no lines: they would cover thin elements' ids
+        break;
     default:
-        break; // Ids: see the visibility query (Slice 4b Task 3)
+        break;
     }
 }
 

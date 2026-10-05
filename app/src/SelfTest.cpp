@@ -109,6 +109,11 @@ int runSelfTest(const SelfTestOptions& options)
 
     QTemporaryDir tmp;
     QString path = options.path;
+    if (path == QLatin1String(":occlusion:")) { // a short wall fully hidden behind a tall one
+        path = tmp.filePath(QStringLiteral("occlusion.ifc"));
+        if (!PythonEngine::instance().callJson("_write_occlusion_model", {path}, &error).object().value("ok").toBool())
+            return fail(error);
+    }
     if (path == QLatin1String(":fixture:")) {
         QDir().mkpath(tmp.filePath(QStringLiteral("Proyecto ñ")));
         path = tmp.filePath(QStringLiteral("Proyecto ñ/fixture.ifc"));
@@ -211,7 +216,7 @@ int runSelfTest(const SelfTestOptions& options)
     }
     if (options.boxSelect) {
         // Box selection takes elements fully inside the box: a box over the whole view selects all.
-        const int n = viewport->selectInRectangle(1, 1, w - 2, h - 2, AIS_SelectionScheme_Replace);
+        const int n = viewport->selectInRectangle(1, 1, w - 2, h - 2, AIS_SelectionScheme_Replace, options.selectThrough);
         QApplication::processEvents();
         result.insert(QStringLiteral("box_selected"), n);
         result.insert(QStringLiteral("tree_selected"), int(window.treePanel()->selectedGuids().size()));

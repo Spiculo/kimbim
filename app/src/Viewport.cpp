@@ -6,6 +6,8 @@
 #include <OpenGl_GraphicDriver.hxx>
 #include <Prs3d_Drawer.hxx>
 #include <Standard_Failure.hxx>
+#include <V3d_ImageDumpOptions.hxx>
+#include <Image_PixMap.hxx>
 #include <V3d_DirectionalLight.hxx>
 #include <V3d_AmbientLight.hxx>
 #include <Graphic3d_Camera.hxx>
@@ -141,11 +143,14 @@ void Viewport::applyNavigationPreset()
     gestures.Bind(Aspect_VKeyMouse_LeftButton, AIS_MouseGesture_SelectRectangle);
     gestures.Bind(Aspect_VKeyMouse_LeftButton | Aspect_VKeyFlags_CTRL, AIS_MouseGesture_SelectRectangle);
     gestures.Bind(Aspect_VKeyMouse_LeftButton | Aspect_VKeyFlags_SHIFT, AIS_MouseGesture_SelectRectangle);
+    // Alt+drag selects through: hidden elements inside the box too.
+    gestures.Bind(Aspect_VKeyMouse_LeftButton | Aspect_VKeyFlags_ALT, AIS_MouseGesture_SelectRectangle);
     auto& schemes = ChangeMouseSelectionSchemes();
     schemes.Clear();
     schemes.Bind(Aspect_VKeyMouse_LeftButton, AIS_SelectionScheme_Replace);
     schemes.Bind(Aspect_VKeyMouse_LeftButton | Aspect_VKeyFlags_CTRL, AIS_SelectionScheme_Add);
     schemes.Bind(Aspect_VKeyMouse_LeftButton | Aspect_VKeyFlags_SHIFT, AIS_SelectionScheme_XOR);
+    schemes.Bind(Aspect_VKeyMouse_LeftButton | Aspect_VKeyFlags_ALT, AIS_SelectionScheme_Replace);
     SetRotationMode(AIS_RotationMode_PickLast);
     SetStickToRayOnZoom(true); // wheel zoom goes toward the point under the cursor
 }
@@ -157,13 +162,146 @@ AIS_SelectionScheme Viewport::selectionSchemeFor(Aspect_VKeyMouse button, Aspect
     return scheme;
 }
 
-int Viewport::selectInRectangle(int x0, int y0, int x1, int y1, AIS_SelectionScheme scheme)
+QSet<QString> Viewport::selectedSet() const
+{
+    const QStringList list = selectedGuids();
+    return QSet<QString>(list.begin(), list.end());
+}
+
+std::optional<QSet<QString>> Viewport::visibleIn(int x0, int y0, int x1, int y1)
+{
+    if (!ensureWindow() || m_nextIdBase > ElementBatch::maxId())
+        return std::nullopt;
+    int w = 0, h = 0;
+    m_view->Window()->Size(w, h);
+    if (w <= 0 || h <= 0)
+        return std::nullopt;
+    // Draw every element in its id colour on black, without highlights or lines, into an
+    // offscreen image of the view; clip planes still apply, hidden elements are not drawn.
+    const Quantity_Color background = m_view->BackgroundColor();
+    // A mid grey that is never a valid id; how it comes back tells whether the buffer sRGB-encodes.
+    m_view->SetBackgroundColor(Quantity_Color(128 / 255.0, 128 / 255.0, 128 / 255.0, Quantity_TOC_RGB));
+    if (!m_preview.IsNull())
+        m_context->Erase(m_preview, false);
+    m_context->ClearDetected(false);
+    m_context->UnhilightSelected(false);
+    for (const auto& b : m_batches)
+        m_context->SetDisplayMode(b, ElementBatch::Ids, false);
+    Image_PixMap image;
+    V3d_ImageDumpOptions options;
+    options.Width = w;
+    options.Height = h;
+    options.BufferType = Graphic3d_BT_RGB;
+    const bool ok = m_view->ToPixMap(image, options);
+    const int mode = m_linesOnly ? ElementBatch::LinesOnly : ElementBatch::Shaded;
+    for (const auto& b : m_batches)
+        m_context->SetDisplayMode(b, mode, false);
+    m_view->SetBackgroundColor(background);
+    if (!m_preview.IsNull())
+        m_context->Display(m_preview, 0, -1, false);
+    m_context->HilightSelected(false);
+    update();
+    if (!ok)
+        return std::nullopt;
+
+    const bool bgr = image.Format() == Image_Format_BGR || image.Format() == Image_Format_BGR32;
+    // Calibrate: background pixels read ~128 (stored as is) or ~188 (sRGB-encoded on output).
+    auto pixel = [&](int x, int y) {
+        const uint8_t* p = image.RawValue(image.IsTopDown() ? size_t(y) : size_t(h - 1 - y), size_t(x));
+        return bgr ? std::array<int, 3>{p[2], p[1], p[0]} : std::array<int, 3>{p[0], p[1], p[2]};
+    };
+    int linearHits = 0, srgbHits = 0;
+    for (int y = 0; y < h; y += 7)
+        for (int x = 0; x < w; x += 7) {
+            const auto c = pixel(x, y);
+            if (std::abs(c[0] - 128) <= 2 && c[0] == c[1] && c[1] == c[2])
+                ++linearHits;
+            else if (std::abs(c[0] - 188) <= 2 && c[0] == c[1] && c[1] == c[2])
+                ++srgbHits;
+        }
+    std::array<int, 256> toLinear{};
+    for (int i = 0; i < 256; ++i) {
+        const double c = i / 255.0;
+        const double l = srgbHits > linearHits ? (c <= 0.04045 ? c / 12.92 : std::pow((c + 0.055) / 1.055, 2.4)) : c;
+        toLinear[size_t(i)] = int(std::lround(l * 255.0));
+    }
+    QSet<int> ids;
+    const int xa = std::clamp(std::min(x0, x1), 0, w - 1), xb = std::clamp(std::max(x0, x1), 0, w - 1);
+    const int ya = std::clamp(std::min(y0, y1), 0, h - 1), yb = std::clamp(std::max(y0, y1), 0, h - 1);
+    for (int y = ya; y <= yb; ++y) {
+        const size_t row = image.IsTopDown() ? size_t(y) : size_t(h - 1 - y);
+        for (int x = xa; x <= xb; ++x) {
+            const uint8_t* p = image.RawValue(row, size_t(x));
+            const int r = bgr ? p[2] : p[0], g = p[1], b = bgr ? p[0] : p[2];
+            const int id = ElementBatch::idFromRgb(toLinear[size_t(r)], toLinear[size_t(g)], toLinear[size_t(b)]);
+            if (id > 0)
+                ids.insert(id);
+        }
+    }
+    QSet<QString> out;
+    for (int id : std::as_const(ids)) {
+        const auto it = std::upper_bound(m_idBases.begin(), m_idBases.end(), id - 1);
+        if (it == m_idBases.begin())
+            continue;
+        const size_t b = size_t(std::distance(m_idBases.begin(), it) - 1);
+        const int index = id - 1 - m_idBases[b];
+        if (index < m_batches[b]->elementCount() && !m_batches[b]->isRetired(index))
+            out.insert(m_batches[b]->guid(index));
+    }
+    return out;
+}
+
+void Viewport::keepOnlyVisible(const QSet<QString>& before, AIS_SelectionScheme scheme, int x0, int y0, int x1, int y1)
+{
+    const auto visible = visibleIn(x0, y0, x1, y1);
+    if (!visible)
+        return; // cannot tell: keep the select-through result
+    const QSet<QString> after = selectedSet();
+    // Replace: the result is what the box took, minus what can't be seen. Add/toggle: undo the
+    // change for hidden elements (they keep the state they had before the drag).
+    const QSet<QString> touched = scheme == AIS_SelectionScheme_Replace ? after : (before - after) + (after - before);
+    for (const QString& g : touched) {
+        if (visible->contains(g))
+            continue;
+        const auto it = m_locate.constFind(g);
+        if (it != m_locate.constEnd())
+            m_context->AddOrRemoveSelected(m_batches[size_t(it->batch)]->owner(it->index), false);
+    }
+    m_context->UpdateCurrentViewer();
+}
+
+void Viewport::handleSelectionPoly(const Handle(AIS_InteractiveContext)& ctx, const Handle(V3d_View)& view)
+{
+    const auto& points = myUI.Selection.Points;
+    const bool rectangle = myUI.Selection.Tool == AIS_ViewSelectionTool_RubberBand && points.Size() == 2;
+    const bool through = m_selectThrough || (LastMouseFlags() & Aspect_VKeyFlags_ALT) != 0;
+    if (!rectangle || through) {
+        AIS_ViewController::handleSelectionPoly(ctx, view);
+        return;
+    }
+    const NCollection_Vec2<int> a = points.First(), b = points.Last();
+    const AIS_SelectionScheme scheme = myUI.Selection.Scheme;
+    const QSet<QString> before = selectedSet();
+    m_quietSelection = true; // one notification, after hidden elements were dropped
+    AIS_ViewController::handleSelectionPoly(ctx, view);
+    m_quietSelection = false;
+    // We are inside the paint pass: render the id image afterwards.
+    QMetaObject::invokeMethod(this, [this, before, scheme, a, b] {
+        keepOnlyVisible(before, scheme == AIS_SelectionScheme_UNKNOWN ? AIS_SelectionScheme_Replace : scheme, a.x(), a.y(), b.x(), b.y());
+        emit selectionChanged(selectedGuids());
+    }, Qt::QueuedConnection);
+}
+
+int Viewport::selectInRectangle(int x0, int y0, int x1, int y1, AIS_SelectionScheme scheme, bool through)
 {
     if (!ensureWindow())
         return 0;
+    const QSet<QString> before = selectedSet();
     m_context->SelectRectangle(NCollection_Vec2<int>(std::min(x0, x1), std::min(y0, y1)),
         NCollection_Vec2<int>(std::max(x0, x1), std::max(y0, y1)), m_view, scheme);
     m_context->UpdateCurrentViewer();
+    if (!through && !m_selectThrough)
+        keepOnlyVisible(before, scheme, x0, y0, x1, y1);
     emit selectionChanged(selectedGuids());
     return m_context->NbSelected();
 }
@@ -354,7 +492,8 @@ void Viewport::wheelEvent(QWheelEvent* e)
 
 void Viewport::OnSelectionChanged(const Handle(AIS_InteractiveContext)&, const Handle(V3d_View)&)
 {
-    emit selectionChanged(selectedGuids());
+    if (!m_quietSelection)
+        emit selectionChanged(selectedGuids());
 }
 
 void Viewport::addBatch(const Handle(ElementBatch)& batch)
@@ -365,6 +504,9 @@ void Viewport::addBatch(const Handle(ElementBatch)& batch)
         m_locate.insert(batch->guid(i), Loc{b, i});
     for (const auto& plane : m_clipPlanes)
         batch->AddClipPlane(plane);
+    batch->setIdBase(m_nextIdBase);
+    m_idBases.push_back(m_nextIdBase);
+    m_nextIdBase += batch->elementCount();
     const int mode = m_linesOnly ? ElementBatch::LinesOnly : ElementBatch::Shaded;
     batch->SetDisplayMode(mode); // the object's own mode, so later redisplays keep it
     m_context->Display(batch, mode, 0, false);
@@ -385,6 +527,8 @@ void Viewport::clear()
     m_context->RemoveAll(false);
     m_batches.clear();
     m_locate.clear();
+    m_idBases.clear();
+    m_nextIdBase = 0;
     update();
 }
 

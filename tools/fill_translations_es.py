@@ -119,6 +119,8 @@ ES = {
     "Could not create the wall: %1": "No se pudo crear el muro: %1",
     "&Lines only": "Solo &líneas",
     "Show the model as a line drawing (hidden lines removed), e.g. for plans": "Mostrar el modelo como dibujo de líneas (sin líneas ocultas), p. ej. para plantas",
+    "Select &hidden elements too": "Seleccionar también elementos &ocultos",
+    "Box selection also takes elements hidden behind others (same as holding Alt while dragging)": "La selección por ventana también toma elementos ocultos detrás de otros (igual que mantener Alt al arrastrar)",
     # plural forms: (singular, plural)
     "Loading... %n element(s)": ("Cargando... %n elemento", "Cargando... %n elementos"),
     "%n element(s) selected": ("%n elemento seleccionado", "%n elementos seleccionados"),
