@@ -198,10 +198,18 @@ _deltas: list[list[str]] = []
 _future_deltas: list[list[str]] = []
 
 
+# Set when a failed edit could not be rolled back: the model may be half-changed, so edits and
+# undo stop until the file is reopened (saving a copy still works).
+_inconsistent = False
+INCONSISTENT = ("The edit failed and could not be undone, so the model may be inconsistent. "
+                "Save a copy if you need it, then reopen the file.")
+
+
 def _reset_history(path: str):
-    global _path, _base_id, _ids, _future_ids, _saved_id, _next_id, _deltas, _future_deltas
+    global _path, _base_id, _ids, _future_ids, _saved_id, _next_id, _deltas, _future_deltas, _inconsistent
     _path, _base_id, _ids, _future_ids, _saved_id, _next_id = path, 0, [], [], 0, 1
     _deltas, _future_deltas = [], []
+    _inconsistent = False
 
 
 def _geometry_now(guids) -> dict:
@@ -225,21 +233,35 @@ def _flags() -> dict:
 
 
 def state() -> str:
-    return _dump({"dirty": _current_id() != _saved_id, "path": _path, **_flags()})
+    return _dump({"dirty": _current_id() != _saved_id, "path": _path, "inconsistent": _inconsistent, **_flags()})
 
 
 def _run(action) -> dict:
     """Run `action()` as one undoable transaction. It returns the number of changed elements, or
     (count, geometry_changed_guids, geometry_removed_guids) when it touched shapes."""
-    global _next_id, _base_id
+    global _next_id, _base_id, _inconsistent
+    if _inconsistent:
+        raise RuntimeError(INCONSISTENT)
     _model.begin_transaction()
     try:
         changed = action()
-    except BaseException:
+    except BaseException as failure:
         # Roll back a half-applied action so the model and the history stay as they were.
         _model.end_transaction()
-        _model.undo()
-        _model.future.pop()
+        try:
+            _model.undo()
+            _model.future.pop()
+        except Exception:
+            # ifcopenshell could not undo the partial transaction: say so, never carry on silently.
+            _inconsistent = True
+            _ids.clear()
+            _future_ids.clear()
+            _deltas.clear()
+            _future_deltas.clear()
+            _model.history.clear()
+            _model.future.clear()
+            _base_id = -1  # differs from any saved state: the model counts as changed
+            raise RuntimeError(INCONSISTENT) from failure
         raise
     _model.end_transaction()
     count, geo_changed, geo_removed = changed if isinstance(changed, tuple) else (changed, [], [])
@@ -708,9 +730,14 @@ def _write_test_model(path: str) -> str:
 # Modeling (M3) lives in its own module; re-exported here because the app calls this module.
 from .authoring import (  # noqa: E402,F401
     add_storey,
+    create_slab,
     create_wall,
     delete_elements,
+    insert_opening,
     new_project,
+    opening_types,
+    slab_outline_from_walls,
+    slab_types,
     snap_data,
     storeys,
     wall_types,

@@ -14,6 +14,7 @@ import math
 import ifcopenshell
 import ifcopenshell.api.aggregate
 import ifcopenshell.api.context
+import ifcopenshell.api.feature
 import ifcopenshell.api.geometry
 import ifcopenshell.api.material
 import ifcopenshell.api.project
@@ -34,6 +35,18 @@ DEFAULT_WALL_TYPES = [
     ("Generic 200", [("Generic", 0.2)]),
     ("Exterior 300", [("Brick", 0.1), ("Insulation", 0.08), ("Block", 0.12)]),
 ]
+DEFAULT_SLAB_TYPES = [
+    ("Floor 200", [("Concrete", 0.2)]),
+    ("Floor 300", [("Screed", 0.05), ("Insulation", 0.05), ("Concrete", 0.2)]),
+]
+# Doors and windows: (name, width, height, sill) in metres. IFC types have no size attributes, so
+# the defaults live in a custom pset on the type (D53); occurrences carry OverallWidth/Height.
+DEFAULT_OPENING_TYPES = {
+    "door": [("Door 900x2100", 0.9, 2.1, 0.0), ("Door 800x2100", 0.8, 2.1, 0.0)],
+    "window": [("Window 1200x1200", 1.2, 1.2, 0.9), ("Window 600x600", 0.6, 0.6, 1.5)],
+}
+OPENING_PSET = "KIMCAD_OpeningDefaults"
+OPENING_CLASSES = {"door": ("IfcDoor", "IfcDoorType"), "window": ("IfcWindow", "IfcWindowType")}
 MIN_WALL_LENGTH = 0.001  # metres; shorter clicks create nothing
 
 
@@ -139,15 +152,23 @@ def _thickness(layer_set) -> float:
     return sum(float(layer.LayerThickness or 0.0) for layer in layer_set.MaterialLayers) * _scale()
 
 
+def _layered_types(ifc_class: str) -> list:
+    return [t for t in B._model.by_type(ifc_class) if _layer_set(t) is not None]
+
+
 def _layered_wall_types() -> list:
-    return [t for t in B._model.by_type("IfcWallType") if _layer_set(t) is not None]
+    return _layered_types("IfcWallType")
 
 
 def _create_default_wall_types():
+    _create_layered_types("IfcWallType", DEFAULT_WALL_TYPES)
+
+
+def _create_layered_types(ifc_class: str, defaults):
     """Library defaults. Not a user action: created outside any transaction (never undone)."""
     f = B._model
-    for type_name, layers in DEFAULT_WALL_TYPES:
-        wall_type = ifcopenshell.api.root.create_entity(f, ifc_class="IfcWallType", name=type_name)
+    for type_name, layers in defaults:
+        wall_type = ifcopenshell.api.root.create_entity(f, ifc_class=ifc_class, name=type_name)
         layer_set = ifcopenshell.api.material.add_material_set(f, name=type_name, set_type="IfcMaterialLayerSet")
         for material_name, thickness in layers:
             material = next((m for m in f.by_type("IfcMaterial") if m.Name == material_name), None) \
@@ -278,23 +299,60 @@ def delete_elements(guids_json: str) -> str:
     if B._model is None:
         return _fail("no model open")
     elements = [e for e in B._elements(guids_json) if e.is_a("IfcProduct")]
+    # Cascade: a wall takes its openings and the doors/windows in them; a door/window takes its
+    # opening, and its host wall gets its hole closed (re-meshed).
+    openings, hosts = [], []
+    for e in list(elements):
+        for rel in getattr(e, "HasOpenings", ()) or ():
+            opening = rel.RelatedOpeningElement
+            openings.append(opening)
+            for fill in getattr(opening, "HasFillings", ()) or ():
+                if fill.RelatedBuildingElement not in elements:
+                    elements.append(fill.RelatedBuildingElement)
+        for fill in getattr(e, "FillsVoids", ()) or ():
+            opening = fill.RelatingOpeningElement
+            if opening not in openings:
+                openings.append(opening)
+            for void in getattr(opening, "VoidsElements", ()) or ():
+                hosts.append(void.RelatingBuildingElement)
     removed = [e.GlobalId for e in elements]
     neighbours = []
     for e in elements:
         for other in _connected_walls(e) if e.is_a("IfcWall") else ():
             if other.GlobalId not in removed and other not in neighbours:
                 neighbours.append(other)
+    hosts = [h for h in dict.fromkeys(hosts) if h.GlobalId not in removed and h not in neighbours]
 
     def action():
         f = B._model
+        gone = set()
+
+        def remove(e):
+            if e.id() in gone:
+                return
+            gone.add(e.id())
+            ifcopenshell.api.root.remove_product(f, product=e)
+
+        ids = {e.id(): e for e in elements}
+        fillings = [e for e in elements if getattr(e, "FillsVoids", None)]
+        # Doors/windows first, then the openings, then walls and the rest: removing a wall can
+        # take its openings with it, so nothing is removed twice.
+        for e in fillings:
+            remove(e)
+        for opening in openings:
+            if opening.id() not in gone:
+                remove(opening)
         for e in elements:
+            if e.id() in gone:
+                continue
             for rel in list(getattr(e, "ConnectedTo", ()) or ()) + list(getattr(e, "ConnectedFrom", ()) or ()):
                 if rel.is_a("IfcRelConnectsPathElements"):
                     f.remove(rel)  # the join goes with the wall
-            ifcopenshell.api.root.remove_product(f, product=e)
+            remove(e)
+        del ids
         for w in neighbours:
             ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=w)
-        return len(elements), [w.GlobalId for w in neighbours], removed
+        return len(elements), [w.GlobalId for w in [*neighbours, *hosts]], removed
 
     try:
         r = B._run(action)
@@ -308,7 +366,7 @@ def snap_data(storey_guid: str) -> str:
     storey = _by_guid(storey_guid) if B._model is not None else None
     if storey is None:
         return B._dump({"walls": []})
-    walls = []
+    walls, openings = [], []
     for rel in getattr(storey, "ContainsElements", ()) or ():
         for e in rel.RelatedElements:
             if not e.is_a("IfcWall"):
@@ -319,4 +377,288 @@ def snap_data(storey_guid: str) -> str:
                 continue
             walls.append({"guid": e.GlobalId, "x1": axis[0][0], "y1": axis[0][1], "x2": axis[1][0], "y2": axis[1][1],
                           "thickness": round(_thickness(layer_set), 6) if layer_set else 0.0})
-    return B._dump({"walls": walls})
+            for void in getattr(e, "HasOpenings", ()) or ():
+                opening = void.RelatedOpeningElement
+                fill = next((r.RelatedBuildingElement for r in getattr(opening, "HasFillings", ()) or ()), None)
+                if fill is None:
+                    continue
+                width = float(fill.OverallWidth or 0.0) * _scale()
+                m = ifcopenshell.util.placement.get_local_placement(opening.ObjectPlacement)
+                corner = np.array([m[0][3], m[1][3]]) * _scale()
+                d = np.array(axis[1]) - np.array(axis[0])
+                d = d / np.linalg.norm(d)
+                along = float(np.dot(corner - np.array(axis[0]), d)) + width / 2
+                openings.append({"guid": fill.GlobalId, "wall": e.GlobalId, "along": round(along, 6), "width": round(width, 6)})
+    return B._dump({"walls": walls, "openings": openings})
+
+
+# ---------------------------------------------------------------- slabs (Slice 5)
+
+def slab_types() -> str:
+    if B._model is None:
+        return B._dump({"types": []})
+    if not _layered_types("IfcSlabType"):
+        _create_layered_types("IfcSlabType", DEFAULT_SLAB_TYPES)
+    return B._dump({"types": [{"guid": t.GlobalId, "name": t.Name or "", "thickness": round(_thickness(_layer_set(t)), 6)}
+                              for t in _layered_types("IfcSlabType")]})
+
+
+def _segments_cross(a, b, c, d) -> bool:
+    """Proper intersection of segments ab and cd (shared end points don't count)."""
+    def orient(p, q, r):
+        v = (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+        return 0 if abs(v) < 1e-12 else (1 if v > 0 else -1)
+    o1, o2, o3, o4 = orient(a, b, c), orient(a, b, d), orient(c, d, a), orient(c, d, b)
+    return o1 * o2 < 0 and o3 * o4 < 0
+
+
+def _clean_polygon(points) -> list | None:
+    """Closed outline as [(x, y)...] without repeats, or None if it isn't a simple polygon."""
+    pts = []
+    for p in points:
+        q = (float(p[0]), float(p[1]))
+        if not pts or math.dist(q, pts[-1]) > 1e-6:
+            pts.append(q)
+    if len(pts) > 1 and math.dist(pts[0], pts[-1]) <= 1e-6:
+        pts.pop()
+    if len(pts) < 3:
+        return None
+    n = len(pts)
+    for i in range(n):
+        for j in range(i + 1, n):
+            if j == i + 1 or (i == 0 and j == n - 1):
+                continue  # neighbouring edges share a point
+            if _segments_cross(pts[i], pts[(i + 1) % n], pts[j], pts[(j + 1) % n]):
+                return None
+    area = sum(pts[i][0] * pts[(i + 1) % n][1] - pts[(i + 1) % n][0] * pts[i][1] for i in range(n)) / 2
+    return pts if abs(area) > 1e-9 else None
+
+
+def create_slab(storey_guid: str, type_guid: str, points_json: str, offset=0.0) -> str:
+    """A slab of a layered type with this outline (metres); its top is at the level + offset."""
+    if B._model is None:
+        return _fail("no model open")
+    storey, slab_type = _by_guid(storey_guid), _by_guid(type_guid)
+    if storey is None or not storey.is_a("IfcBuildingStorey"):
+        return _fail("unknown level")
+    if slab_type is None or not slab_type.is_a("IfcSlabType") or _layer_set(slab_type) is None:
+        return _fail("unknown or non-layered slab type")
+    try:
+        outline = _clean_polygon(json.loads(points_json))
+        offset = float(offset or 0.0)
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    if outline is None:
+        return _fail("the outline needs at least 3 points and must not cross itself")
+    made = {}
+
+    def action():
+        f = B._model
+        thickness = _thickness(_layer_set(slab_type))
+        slab = ifcopenshell.api.root.create_entity(f, ifc_class="IfcSlab", name=slab_type.Name, predefined_type="FLOOR")
+        ifcopenshell.api.type.assign_type(f, related_objects=[slab], relating_type=slab_type)
+        representation = ifcopenshell.api.geometry.add_slab_representation(
+            f, context=_body_context(), depth=thickness, polyline=outline)
+        ifcopenshell.api.geometry.assign_representation(f, product=slab, representation=representation)
+        matrix = np.eye(4)
+        matrix[2][3] = _elevation(storey) + offset - thickness  # top of slab at the level
+        ifcopenshell.api.geometry.edit_object_placement(f, product=slab, matrix=matrix, is_si=True)
+        ifcopenshell.api.spatial.assign_container(f, products=[slab], relating_structure=storey)
+        made["slab"] = slab
+        return 1, [slab.GlobalId], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "guid": made["slab"].GlobalId})
+
+
+def slab_outline_from_walls(walls_json: str) -> str:
+    """Outline at the outer faces of walls that form one closed loop (metres)."""
+    if B._model is None:
+        return _fail("no model open")
+    walls = [w for w in B._elements(walls_json) if w.is_a("IfcWall")]
+    segments = []
+    for w in walls:
+        axis = _axis_world(w)
+        layer_set = _layer_set(w)
+        if axis is None:
+            return _fail(f"wall {w.GlobalId} has no axis")
+        segments.append((np.array(axis[0]), np.array(axis[1]), _thickness(layer_set) if layer_set else 0.0))
+    if len(segments) < 3:
+        return _fail("select at least 3 walls that form a closed loop")
+    tolerance = max(max(s[2] for s in segments), 0.01)
+    # Chain the axes end to end.
+    remaining = list(range(1, len(segments)))
+    a, b, t = segments[0]
+    chain = [(a, b, t)]
+    current = b
+    while remaining:
+        nxt = None
+        for k in remaining:
+            p, q, th = segments[k]
+            if np.linalg.norm(p - current) <= tolerance:
+                nxt = (k, p, q, th)
+            elif np.linalg.norm(q - current) <= tolerance:
+                nxt = (k, q, p, th)
+            if nxt:
+                break
+        if nxt is None:
+            return _fail("the selected walls don't form one closed loop")
+        k, p, q, th = nxt
+        remaining.remove(k)
+        chain.append((p, q, th))
+        current = q
+    if np.linalg.norm(current - chain[0][0]) > tolerance:
+        return _fail("the selected walls don't form one closed loop")
+    n = len(chain)
+    corners = [(chain[i][0] + chain[i - 1][1]) / 2 for i in range(n)]  # corner i: start of edge i
+    area = sum(corners[i][0] * corners[(i + 1) % n][1] - corners[(i + 1) % n][0] * corners[i][1] for i in range(n)) / 2
+    sign = 1.0 if area > 0 else -1.0  # counter-clockwise: outward normal of (dx, dy) is (dy, -dx)
+    lines = []
+    for i in range(n):
+        p, q = corners[i], corners[(i + 1) % n]
+        d = (q - p) / np.linalg.norm(q - p)
+        normal = np.array([d[1], -d[0]]) * sign
+        lines.append((p + normal * chain[i][2] / 2, d))
+    points = []
+    for i in range(n):
+        (p1, d1), (p2, d2) = lines[i - 1], lines[i]
+        det = d1[0] * (-d2[1]) - d1[1] * (-d2[0])
+        if abs(det) < 1e-12:  # collinear walls: just the offset point
+            points.append(p2)
+            continue
+        rhs = p2 - p1
+        s1 = (rhs[0] * (-d2[1]) - rhs[1] * (-d2[0])) / det
+        points.append(p1 + d1 * s1)
+    return B._dump({"ok": True, "points": [[round(float(x), 6), round(float(y), 6)] for x, y in points]})
+
+
+# ---------------------------------------------------------------- doors and windows (Slice 5)
+
+def _opening_defaults(t) -> tuple[float, float, float]:
+    psets = ifcopenshell.util.element.get_psets(t)
+    d = psets.get(OPENING_PSET, {})
+    s = _scale()
+    return (float(d.get("Width", 0.9 / s)) * s, float(d.get("Height", 2.1 / s)) * s, float(d.get("SillHeight", 0.0)) * s)
+
+
+def opening_types(kind: str) -> str:
+    if B._model is None or kind not in OPENING_CLASSES:
+        return B._dump({"types": []})
+    _, type_class = OPENING_CLASSES[kind]
+    f = B._model
+    if not f.by_type(type_class):
+        import ifcopenshell.api.pset
+        for name, width, height, sill in DEFAULT_OPENING_TYPES[kind]:
+            t = ifcopenshell.api.root.create_entity(f, ifc_class=type_class, name=name,
+                                                    predefined_type="DOOR" if kind == "door" else "WINDOW")
+            if kind == "door":
+                t.OperationType = "SINGLE_SWING_LEFT"
+            else:
+                t.PartitioningType = "SINGLE_PANEL"
+            pset = ifcopenshell.api.pset.add_pset(f, product=t, name=OPENING_PSET)
+            ifcopenshell.api.pset.edit_pset(f, pset=pset, properties={
+                "Width": f.createIfcPositiveLengthMeasure(width / _scale()),
+                "Height": f.createIfcPositiveLengthMeasure(height / _scale()),
+                "SillHeight": f.createIfcLengthMeasure(sill / _scale())})
+    out = []
+    for t in f.by_type(type_class):
+        w, h, sill = _opening_defaults(t)
+        out.append({"guid": t.GlobalId, "name": t.Name or "", "width": round(w, 6), "height": round(h, 6), "sill": round(sill, 6)})
+    return B._dump({"types": out})
+
+
+def _wall_height(wall) -> float:
+    """Extrusion depth of the wall body in metres (0 if unknown)."""
+    representation = ifcopenshell.util.representation.get_representation(wall, "Model", "Body", "MODEL_VIEW")
+    depths = [float(e.Depth) for e in B._model.traverse(representation) if e.is_a("IfcExtrudedAreaSolid")] if representation else []
+    return max(depths, default=0.0) * _scale()
+
+
+def insert_opening(kind: str, wall_guid: str, type_guid: str, along, width, height, sill) -> str:
+    """A door or window in a wall: an opening through the wall filled by the door/window, centred
+    `along` metres from the wall axis start, with its bottom `sill` metres above the wall base."""
+    if B._model is None:
+        return _fail("no model open")
+    if kind not in OPENING_CLASSES:
+        return _fail(f"unknown kind {kind}")
+    element_class, type_class = OPENING_CLASSES[kind]
+    wall, opening_type = _by_guid(wall_guid), _by_guid(type_guid)
+    if wall is None or not wall.is_a("IfcWall"):
+        return _fail("not a wall")
+    if opening_type is None or not opening_type.is_a(type_class):
+        return _fail(f"not a {kind} type")
+    try:
+        along, width, height, sill = float(along), float(width), float(height), float(sill)
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    axis = _axis_world(wall)
+    layer_set = _layer_set(wall)
+    if axis is None or layer_set is None:
+        return _fail("the wall has no axis or layers")
+    length = math.dist(axis[0], axis[1])
+    if width <= 0 or height <= 0 or along - width / 2 < -1e-6 or along + width / 2 > length + 1e-6:
+        return _fail("the opening doesn't fit in the wall")
+    wall_height = _wall_height(wall)
+    if wall_height and sill + height > wall_height + 1e-6:
+        return _fail("the opening is taller than the wall")
+    thickness = _thickness(layer_set)
+    made = {}
+
+    def action():
+        f = B._model
+        s = _scale()
+        wm = ifcopenshell.util.placement.get_local_placement(wall.ObjectPlacement)
+        line = ifcopenshell.util.representation.get_reference_line(wall)
+        start = np.array([float(line[0][0]), float(line[0][1])])
+        direction = np.array([float(line[-1][0]), float(line[-1][1])]) - start
+        direction = direction / np.linalg.norm(direction)
+
+        def placed(along_m, across_m, up_m):
+            local = start + direction * (along_m / s)
+            matrix = wm.copy()
+            point = np.array([local[0], local[1], 0.0]) + np.array([-direction[1], direction[0], 0.0]) * (across_m / s)
+            point[2] = up_m / s
+            matrix[:3, 3] = wm[:3, 3] + wm[:3, :3] @ point
+            matrix[:3, 0] = wm[:3, :3] @ np.array([direction[0], direction[1], 0.0])
+            matrix[:3, 1] = wm[:3, :3] @ np.array([-direction[1], direction[0], 0.0])
+            return matrix
+
+        context = _body_context()
+        opening = ifcopenshell.api.root.create_entity(f, ifc_class="IfcOpeningElement", name=f"{kind} opening")
+        opening_rep = ifcopenshell.api.geometry.add_wall_representation(
+            f, context=context, length=width, height=height, thickness=thickness + 0.02)
+        ifcopenshell.api.geometry.assign_representation(f, product=opening, representation=opening_rep)
+        ifcopenshell.api.geometry.edit_object_placement(
+            f, product=opening, matrix=placed(along - width / 2, -(thickness / 2 + 0.01), sill), is_si=False)
+        ifcopenshell.api.feature.add_feature(f, feature=opening, element=wall)
+
+        element = ifcopenshell.api.root.create_entity(f, ifc_class=element_class, name=opening_type.Name,
+                                                      predefined_type="DOOR" if kind == "door" else "WINDOW")
+        element.OverallWidth, element.OverallHeight = width / s, height / s
+        ifcopenshell.api.type.assign_type(f, related_objects=[element], relating_type=opening_type)
+        if kind == "door":
+            representation = ifcopenshell.api.geometry.add_door_representation(
+                f, context=context, overall_height=height / s, overall_width=width / s,
+                operation_type=opening_type.OperationType or "SINGLE_SWING_LEFT")
+        else:
+            representation = ifcopenshell.api.geometry.add_window_representation(
+                f, context=context, overall_height=height / s, overall_width=width / s,
+                partition_type=opening_type.PartitioningType or "SINGLE_PANEL")
+        ifcopenshell.api.geometry.assign_representation(f, product=element, representation=representation)
+        ifcopenshell.api.geometry.edit_object_placement(
+            f, product=element, matrix=placed(along - width / 2, -thickness / 2, sill), is_si=False)
+        ifcopenshell.api.feature.add_filling(f, opening=opening, element=element)
+        container = ifcopenshell.util.element.get_container(wall)
+        if container is not None:
+            ifcopenshell.api.spatial.assign_container(f, products=[element], relating_structure=container)
+        made["element"] = element
+        return 1, [wall.GlobalId, element.GlobalId], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "guid": made["element"].GlobalId})

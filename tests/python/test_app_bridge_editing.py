@@ -167,3 +167,41 @@ def test_a_failure_midway_through_a_bulk_edit_rolls_back_everything(opened, monk
     # The next edit and its undo still line up with ifcopenshell's history.
     assert call("set_name", json.dumps(opened["walls"][:1]), "Nuevo")["ok"]
     assert call("undo")["ok"] and not call("state")["dirty"]
+
+
+def test_a_rollback_that_fails_is_reported_not_hidden():
+    """ifcopenshell can't always undo a half-applied transaction (e.g. a product removed twice).
+    The bridge must then say so clearly and stop offering undo, instead of carrying on silently."""
+    import ifcopenshell.api.root
+
+    assert call("new_project", "x")["ok"]
+    level = call("storeys")["storeys"][0]["guid"]
+    wall_type = call("wall_types")["types"][1]["guid"]
+    wall_guid = call("create_wall", level, wall_type, 0, 0, 8, 0, 3, "", "")["guid"]
+    door_type = call("opening_types", "door")["types"][0]["guid"]
+    assert call("insert_opening", "door", wall_guid, door_type, 2, 0.9, 2.1, 0)["ok"]
+    f = app_bridge._model
+    wall = f.by_guid(wall_guid)
+    opening = wall.HasOpenings[0].RelatedOpeningElement
+
+    def broken_action():
+        ifcopenshell.api.root.remove_product(f, product=wall)
+        ifcopenshell.api.root.remove_product(f, product=opening)  # already gone with the wall
+        return 1
+
+    with pytest.raises(RuntimeError, match="reopen"):
+        app_bridge._run(broken_action)
+    state = call("state")
+    assert state["inconsistent"] is True and state["dirty"] is True
+    assert state["can_undo"] is False and state["can_redo"] is False
+    with pytest.raises(RuntimeError, match="inconsistent"):
+        call("set_name", json.dumps([wall_guid]), "x")
+    assert call("open_model", str(_saved_copy(f)))["ok"]  # reopening clears the state
+    assert call("state")["inconsistent"] is False
+
+
+def _saved_copy(f):
+    import tempfile
+    path = tempfile.mktemp(suffix=".ifc")
+    f.write(path)
+    return path
