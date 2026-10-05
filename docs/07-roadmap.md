@@ -58,6 +58,7 @@ Command/undo framework, property and pset editing, materials, types, classificat
 Done in Slice 3 ([plan](superpowers/plans/2026-10-05-slice3-navigation-and-data-editor.md)):
 - edit names and property values for one or many elements (bulk edit), with values keeping their IFC type;
 - add and remove properties and property sets (standard templates or custom);
+- see whether a value comes from the element's type; edit the type value deliberately or reset an override (Slice 3b, D50);
 - undo/redo, one step per action;
 - Save / Save As with an unsaved-changes guard; the saved file round-trips;
 - Revit/ArchiCAD navigation; multi-select by Ctrl/Shift-click, box and tree.

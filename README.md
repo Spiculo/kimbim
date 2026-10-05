@@ -21,7 +21,7 @@ Open an IFC file. It appears progressively in the 3D view, with the spatial tree
 |---|---|
 | Pan / orbit / zoom | Middle-drag / **Shift**+middle-drag (around the point under the mouse) / wheel (toward the cursor) |
 | Select / add / toggle | Click / **Ctrl**+click / **Shift**+click; left-drag draws a selection box |
-| Edit | Double-click a value in Properties (applies to every selected element); right-click to add or remove properties |
+| Edit | Double-click a value in Properties (applies to every selected element); right-click to add or remove properties, edit a value on the type, or reset to the type value (dimmed values come from the type) |
 | Undo / redo / save | **Ctrl+Z** / **Ctrl+Y** / **Ctrl+S** (**Ctrl+Shift+S** to save as) |
 | Hide / isolate / show all | **H** / **I** / **Shift+H** |
 | Plan cut / section box / fit | **C** (height in the Cuts toolbar) / **B** / **F** |

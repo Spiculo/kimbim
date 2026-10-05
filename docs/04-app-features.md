@@ -55,6 +55,7 @@ Navigation preset (D48, owner choice): middle-drag pans, Shift+middle-drag orbit
 | Type / instance: assign type, edit type to update all instances | P0 | `ifcopenshell.api.type` |
 | Quantity take-off (auto-calculated quantities) | P1 | IfcOpenShell `ifc5d` / qto utilities |
 | **Bulk edit**: set a property on a selection | P0 | |
+| **Type vs. element values** (D50): values inherited from the element's type are dimmed; editing writes the element's own value (an override); *Edit type value…* changes the type for every element of it, after a confirmation with the count; *Reset to type value* drops the override | P0 | `ifcopenshell.util.element.get_type` |
 | **Schedules**: table views of objects × properties, editable, CSV/XLSX export | P1 | Bonsai/IfcOpenShell `ifccsv` |
 | Search and filter with a query language | P0 | `ifcopenshell.util.selector` syntax (e.g. `IfcWall, Pset_WallCommon.FireRating=EI60`) |
 | Object history panel (versioned projects) | P0 | [03](03-versioning.md#object-history-blame) |
