@@ -12,6 +12,9 @@
 #include <algorithm>
 
 #include <QInputDialog>
+#include <cmath>
+#include <QLocale>
+#include <QComboBox>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QLineEdit>
@@ -24,6 +27,7 @@
 #include "Cuts.h"
 #include "ElementBatch.h"
 #include "LevelsBar.h"
+#include "WallTool.h"
 #include "MeshChunk.h"
 #include "ModelLoader.h"
 #include "ModelTreePanel.h"
@@ -48,6 +52,7 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     buildMenus();
     buildDocks();
     buildCutsToolbar();
+    buildModelingToolbar();
     statusBar()->showMessage(tr("Ready"));
 
     m_loader->moveToThread(&m_thread);
@@ -207,6 +212,11 @@ void MainWindow::buildCutsToolbar()
     connect(m_levels, &LevelsBar::activeStoreyChanged, this, [this](const QString&, double elevation) {
         if (m_viewport->isPlanView())
             m_viewport->setPlanView(elevation);
+        if (m_viewport->isDrawingMode()) {
+            m_wallTool->finish();
+            m_viewport->setDrawingMode(true, elevation);
+            refreshSnapData();
+        }
         applyCuts();
     });
     QToolBar* bar = addToolBar(tr("Cuts"));
@@ -440,6 +450,7 @@ bool MainWindow::newProject()
     m_path.clear();
     m_tree->setTree(bridge("spatial_tree"));
     refreshLevels();
+    m_wallTypes->clear();
     setWindowTitle(QStringLiteral("KIMCAD — %1[*]").arg(tr("Untitled")));
     afterEdit();
     statusBar()->showMessage(tr("New project"));
@@ -496,6 +507,146 @@ void MainWindow::setPlanView(bool plan)
     applyCuts();
 }
 
+void MainWindow::buildModelingToolbar()
+{
+    QToolBar* bar = addToolBar(tr("Modeling"));
+    bar->setObjectName(QStringLiteral("modelingToolbar"));
+    m_wallTool = new WallTool(this);
+    m_wallAction = bar->addAction(tr("&Wall"));
+    m_wallAction->setObjectName(QStringLiteral("actionWallTool"));
+    m_wallAction->setShortcut(Qt::Key_W);
+    m_wallAction->setCheckable(true);
+    m_wallAction->setToolTip(tr("Draw walls: click points, type a length + Enter, Esc to finish. Shift: right angles."));
+    connect(m_wallAction, &QAction::toggled, this, &MainWindow::setWallToolActive);
+    m_wallTypes = new QComboBox(bar);
+    m_wallTypes->setObjectName(QStringLiteral("wallTypeCombo"));
+    m_wallTypes->setToolTip(tr("Wall type"));
+    m_wallTypes->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    m_wallTypes->setMinimumContentsLength(14);
+    bar->addWidget(m_wallTypes);
+    m_wallHeight = new QDoubleSpinBox(bar);
+    m_wallHeight->setObjectName(QStringLiteral("wallHeight"));
+    m_wallHeight->setRange(0.1, 100.0);
+    m_wallHeight->setDecimals(2);
+    m_wallHeight->setSingleStep(0.1);
+    m_wallHeight->setValue(3.0);
+    m_wallHeight->setSuffix(QStringLiteral(" m"));
+    m_wallHeight->setToolTip(tr("Wall height"));
+    bar->addWidget(m_wallHeight);
+    m_lengthInput = new QLineEdit(bar);
+    m_lengthInput->setObjectName(QStringLiteral("lengthInput"));
+    m_lengthInput->setPlaceholderText(tr("Length (m)"));
+    m_lengthInput->setMaximumWidth(110);
+    bar->addWidget(m_lengthInput);
+    connect(m_lengthInput, &QLineEdit::returnPressed, this, [this] {
+        bool ok = false;
+        double value = QLocale().toDouble(m_lengthInput->text(), &ok);
+        if (!ok)
+            value = QLocale::c().toDouble(QString(m_lengthInput->text()).replace(QLatin1Char(','), QLatin1Char('.')), &ok);
+        if (ok && m_wallTool->typeLength(value))
+            m_lengthInput->clear();
+        m_viewport->setFocus();
+    });
+
+    connect(m_viewport, &Viewport::workPointMoved, this, [this](QPointF p, double tolerance, Qt::KeyboardModifiers mods) {
+        m_wallTool->setTolerance(tolerance);
+        m_wallTool->setOrtho(mods & Qt::ShiftModifier);
+        showSnap(m_wallTool->move(p));
+    });
+    connect(m_viewport, &Viewport::workPointClicked, this, [this](QPointF p, double tolerance, Qt::KeyboardModifiers mods) {
+        m_wallTool->setTolerance(tolerance);
+        m_wallTool->setOrtho(mods & Qt::ShiftModifier);
+        m_wallTool->click(p);
+    });
+    connect(m_viewport, &Viewport::drawingEnded, this, [this] {
+        if (m_wallTool->isDrawing())
+            m_wallTool->finish();
+        else
+            m_wallAction->setChecked(false);
+    });
+    connect(m_viewport, &Viewport::lengthKeyTyped, this, [this](const QString& text) {
+        m_lengthInput->setFocus();
+        m_lengthInput->insert(text);
+    });
+    connect(m_wallTool, &WallTool::previewChanged, this, [this] {
+        const QJsonObject type = m_wallTypes->currentData().toJsonObject();
+        m_viewport->setWallPreview(m_wallTool->preview(), type.value("thickness").toDouble(), m_wallHeight->value());
+    });
+    connect(m_wallTool, &WallTool::wallRequested, this, &MainWindow::createWall);
+}
+
+void MainWindow::refreshWallTypes()
+{
+    const QString current = m_wallTypes->currentData().toJsonObject().value("guid").toString();
+    m_wallTypes->clear();
+    for (const auto& t : bridge("wall_types").value("types").toArray()) {
+        const QJsonObject o = t.toObject();
+        m_wallTypes->addItem(o.value("name").toString(), o);
+        if (o.value("guid").toString() == current)
+            m_wallTypes->setCurrentIndex(m_wallTypes->count() - 1);
+    }
+}
+
+void MainWindow::refreshSnapData()
+{
+    m_wallTool->snapper().setWalls(Snapper::parse(bridge("snap_data", {m_levels->activeStorey()})));
+}
+
+void MainWindow::showSnap(const Snap& snap)
+{
+    static const char* const names[] = {"", QT_TR_NOOP("endpoint"), QT_TR_NOOP("midpoint"), QT_TR_NOOP("perpendicular"),
+        QT_TR_NOOP("on wall"), QT_TR_NOOP("angle"), QT_TR_NOOP("grid")};
+    QString text = tr("Wall: click the next point, type a length, Esc to finish");
+    if (const auto preview = m_wallTool->preview()) {
+        const QPointF d = preview->second - preview->first;
+        text = tr("Length %1 m").arg(QLocale().toString(std::hypot(d.x(), d.y()), 'f', 3));
+    }
+    if (snap.kind != Snap::None)
+        text += QStringLiteral("  ·  ") + tr(names[snap.kind]);
+    statusBar()->showMessage(text);
+}
+
+void MainWindow::setWallToolActive(bool on)
+{
+    if (m_wallAction->isChecked() != on) {
+        m_wallAction->setChecked(on); // re-enters through toggled
+        return;
+    }
+    if (on) {
+        if (m_levels->activeStorey().isEmpty()) {
+            m_wallAction->setChecked(false);
+            showError(tr("Cannot draw walls"), tr("The model has no level. Add a level first."));
+            return;
+        }
+        if (m_wallTypes->count() == 0)
+            refreshWallTypes();
+        refreshSnapData();
+        m_viewport->setDrawingMode(true, m_levels->activeElevation());
+        m_viewport->setFocus();
+        statusBar()->showMessage(tr("Wall: click the start point"));
+    } else {
+        m_wallTool->finish();
+        m_viewport->setDrawingMode(false);
+        statusBar()->clearMessage();
+    }
+}
+
+bool MainWindow::createWall(const WallSegment& s)
+{
+    const QJsonObject type = m_wallTypes->currentData().toJsonObject();
+    auto num = [](double v) { return QString::number(v, 'g', 17); };
+    const QJsonObject r = bridge("create_wall", {m_levels->activeStorey(), type.value("guid").toString(),
+        num(s.p1.x()), num(s.p1.y()), num(s.p2.x()), num(s.p2.y()), num(m_wallHeight->value()), s.joinStart, s.joinEnd});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not create the wall: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    m_wallTool->setLastWall(r.value("guid").toString());
+    afterEdit(r);
+    refreshSnapData();
+    return true;
+}
+
 bool MainWindow::deleteSelection()
 {
     if (m_selection.isEmpty())
@@ -545,6 +696,8 @@ void MainWindow::afterEdit(const QJsonObject& result)
 {
     applyGeometry(result.value("geometry").toObject());
     refreshLevels();
+    if (m_viewport->isDrawingMode())
+        refreshSnapData(); // undo/redo can add or remove walls under the tool
     const QJsonObject s = bridge("state");
     m_undo->setEnabled(s.value("can_undo").toBool());
     m_redo->setEnabled(s.value("can_redo").toBool());
@@ -636,6 +789,7 @@ void MainWindow::onOpened(const QJsonObject& info)
     setWindowTitle(QStringLiteral("KIMCAD — %1[*]").arg(QFileInfo(m_path).fileName()));
     setWindowModified(false);
     refreshLevels();
+    m_wallTypes->clear();
     m_undo->setEnabled(false);
     m_redo->setEnabled(false);
     QString error;

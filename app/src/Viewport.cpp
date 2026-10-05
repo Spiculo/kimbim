@@ -6,6 +6,8 @@
 #include <OpenGl_GraphicDriver.hxx>
 #include <Prs3d_Drawer.hxx>
 #include <Standard_Failure.hxx>
+#include <V3d_DirectionalLight.hxx>
+#include <V3d_AmbientLight.hxx>
 #include <Graphic3d_Camera.hxx>
 #include <SelectMgr_EntityOwner.hxx>
 #include <gp_Pnt.hxx>
@@ -17,6 +19,7 @@
 
 #include <QElapsedTimer>
 #include <QGuiApplication>
+#include <QKeyEvent>
 #include <QMouseEvent>
 #include <QWheelEvent>
 
@@ -70,7 +73,15 @@ Viewport::Viewport(QWidget* parent)
     if (qEnvironmentVariableIntValue("KIMCAD_NO_VSYNC") == 1)
         driver->ChangeOptions().swapInterval = 0;
     m_viewer = new V3d_Viewer(driver);
-    m_viewer->SetDefaultLights();
+    // A fixed "sun" from the south-east above plus soft ambient and fill. A headlight along the
+    // isometric view direction lights the top and both visible sides equally, so boxes look flat.
+    Handle(V3d_AmbientLight) ambient = new V3d_AmbientLight(Quantity_Color(0.42, 0.42, 0.42, Quantity_TOC_RGB));
+    Handle(V3d_DirectionalLight) sun = new V3d_DirectionalLight(gp_Dir(-0.3, 0.5, -0.8), Quantity_NOC_WHITE);
+    sun->SetIntensity(0.75f);
+    Handle(V3d_DirectionalLight) fill = new V3d_DirectionalLight(gp_Dir(0.6, -0.25, -0.35), Quantity_NOC_WHITE);
+    fill->SetIntensity(0.25f);
+    for (const Handle(V3d_Light)& light : {Handle(V3d_Light)(ambient), Handle(V3d_Light)(sun), Handle(V3d_Light)(fill)})
+        m_viewer->AddLight(light);
     m_viewer->SetLightOn();
     m_context = new AIS_InteractiveContext(m_viewer);
     m_view = m_viewer->CreateView();
@@ -213,20 +224,119 @@ NCollection_Vec2<int> Viewport::toPixels(const QPointF& p) const
     return NCollection_Vec2<int>(int(std::lround(p.x() * r)), int(std::lround(p.y() * r)));
 }
 
+bool Viewport::workPoint(const QPointF& widgetPos, QPointF* point, double* tolerance)
+{
+    const NCollection_Vec2<int> px = toPixels(widgetPos);
+    gp_Pnt a, b;
+    if (!pointOnPlane(px.x(), px.y(), m_workZ, &a) || !pointOnPlane(px.x() + 10, px.y(), m_workZ, &b))
+        return false;
+    *point = QPointF(a.X(), a.Y());
+    *tolerance = a.Distance(b);
+    return true;
+}
+
+void Viewport::setDrawingMode(bool on, double workPlaneZ)
+{
+    m_drawingMode = on;
+    m_workZ = workPlaneZ;
+    if (on)
+        m_context->ClearDetected(false); // no hover highlight while drawing
+    else
+        setWallPreview(std::nullopt, 0, 0);
+    setCursor(on ? Qt::CrossCursor : Qt::ArrowCursor);
+}
+
+void Viewport::setWallPreview(const std::optional<std::pair<QPointF, QPointF>>& axis, double thickness, double height)
+{
+    if (!m_preview.IsNull()) {
+        m_context->Remove(m_preview, false);
+        m_preview.Nullify();
+    }
+    if (axis && thickness > 0 && height > 0) {
+        const QPointF a = axis->first, b = axis->second;
+        const double len = std::hypot(b.x() - a.x(), b.y() - a.y());
+        if (len > 1e-6) {
+            const QPointF n(-(b.y() - a.y()) / len * thickness / 2, (b.x() - a.x()) / len * thickness / 2);
+            const QPointF corners[4] = {a - n, b - n, b + n, a + n};
+            MeshChunk c;
+            c.guids << QStringLiteral("preview");
+            c.types << QStringLiteral("IfcWall");
+            for (double z : {m_workZ, m_workZ + height})
+                for (const QPointF& p : corners)
+                    c.verts.insert(c.verts.end(), {float(p.x()), float(p.y()), float(z)});
+            // 12 triangles: bottom, top, 4 sides (8 corners: 0-3 bottom, 4-7 top).
+            const uint32_t t[] = {0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4,
+                1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7};
+            c.tris.assign(std::begin(t), std::end(t));
+            c.voff = {0, 8};
+            c.toff = {0, 12};
+            m_preview = new ElementBatch(std::move(c));
+            m_context->Display(m_preview, 0, -1, false); // shown, never selectable
+        }
+    }
+    update();
+}
+
+void Viewport::keyPressEvent(QKeyEvent* e)
+{
+    if (m_drawingMode) {
+        if (e->key() == Qt::Key_Escape) {
+            emit drawingEnded();
+            return;
+        }
+        const QString text = e->text();
+        if (!text.isEmpty() && (text.at(0).isDigit() || text == QLatin1String(".") || text == QLatin1String(","))) {
+            emit lengthKeyTyped(text);
+            return;
+        }
+    }
+    QWidget::keyPressEvent(e);
+}
+
+void Viewport::mouseDoubleClickEvent(QMouseEvent* e)
+{
+    if (m_drawingMode && e->button() == Qt::LeftButton) {
+        emit drawingEnded();
+        return;
+    }
+    QWidget::mouseDoubleClickEvent(e);
+}
+
 void Viewport::mousePressEvent(QMouseEvent* e)
 {
+    if (m_drawingMode && (e->button() == Qt::LeftButton || e->button() == Qt::RightButton)) {
+        if (e->button() == Qt::RightButton) {
+            emit drawingEnded();
+            return;
+        }
+        QPointF p;
+        double tolerance = 0;
+        if (workPoint(e->position(), &p, &tolerance))
+            emit workPointClicked(p, tolerance, e->modifiers());
+        return; // drawing clicks never reach selection
+    }
     if (PressMouseButton(toPixels(e->position()), toButtons(e->buttons()), toFlags(e->modifiers()), false))
         update();
 }
 
 void Viewport::mouseReleaseEvent(QMouseEvent* e)
 {
+    if (m_drawingMode && (e->button() == Qt::LeftButton || e->button() == Qt::RightButton))
+        return;
     if (ReleaseMouseButton(toPixels(e->position()), toButtons(e->buttons()), toFlags(e->modifiers()), false))
         update();
 }
 
 void Viewport::mouseMoveEvent(QMouseEvent* e)
 {
+    if (m_drawingMode) {
+        QPointF p;
+        double tolerance = 0;
+        if (workPoint(e->position(), &p, &tolerance))
+            emit workPointMoved(p, tolerance, e->modifiers());
+        if (!(e->buttons() & Qt::MiddleButton))
+            return; // no hover highlighting while drawing; middle-button navigation still works
+    }
     if (UpdateMousePosition(toPixels(e->position()), toButtons(e->buttons()), toFlags(e->modifiers()), false))
         update();
 }

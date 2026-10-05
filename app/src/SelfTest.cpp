@@ -15,6 +15,10 @@
 #include <cstdio>
 
 #include "MainWindow.h"
+#include "WallTool.h"
+
+#include <QRegularExpression>
+
 #include "ModelTreePanel.h"
 #include "PythonEngine.h"
 #include "Viewport.h"
@@ -38,11 +42,70 @@ int fail(const QString& error)
 } // namespace
 
 // Drives the real MainWindow (background loader thread, progressive batches), then measures.
+static void takeScreenshots(MainWindow& window, const QString& path, QJsonObject* result)
+{
+    window.viewport()->fitAll();
+    for (int i = 0; i < 10; ++i)
+        QApplication::processEvents();
+    // grabWindow captures the composited screen, including the OpenGL viewport.
+    const QPixmap shot = window.screen()->grabWindow(window.winId());
+    result->insert(QStringLiteral("screenshot"), shot.save(path) ? path : QString());
+    // The window grab needs a composited screen (blank when the screen is locked or off);
+    // the OCCT dump renders the 3D view directly and always works.
+    QString viewportShot = path;
+    viewportShot.replace(QStringLiteral(".png"), QStringLiteral("-viewport.png"));
+    result->insert(QStringLiteral("viewport_screenshot"), window.viewport()->dumpImage(viewportShot) ? viewportShot : QString());
+}
+
+// Slice 4: draw a wall polyline on a new project through the real wall tool (plane points, no mouse).
+static int runDrawWalls(const SelfTestOptions& options)
+{
+    MainWindow window(nullptr, /*quiet=*/true, options.chunkSize);
+    window.show();
+    QApplication::processEvents();
+    if (!window.newProject())
+        return fail(QStringLiteral("new project failed"));
+    window.setWallToolActive(true);
+    QVector<QPointF> points;
+    for (const QString& pair : options.drawWalls.split(QRegularExpression(QStringLiteral("[; ]")), Qt::SkipEmptyParts)) {
+        const QStringList xy = pair.split(QLatin1Char(','));
+        if (xy.size() != 2)
+            return fail(QStringLiteral("bad point: ") + pair);
+        points << QPointF(xy[0].toDouble(), xy[1].toDouble());
+    }
+    window.wallTool()->setTolerance(0.05);
+    for (const QPointF& p : points) {
+        window.wallTool()->move(p);
+        window.wallTool()->click(p);
+        QApplication::processEvents();
+    }
+    window.wallTool()->finish();
+    window.setWallToolActive(false);
+    window.viewport()->fitAll();
+    QApplication::processEvents();
+    auto count = [](const char* cls) {
+        QString error;
+        return PythonEngine::instance().callJson("count_entities", {QString::fromLatin1(cls)}, &error)
+            .object().value("count").toInt();
+    };
+    const int walls = count("IfcWall");
+    const int joins = count("IfcRelConnectsPathElements");
+    const int elements = window.viewport()->elementCount();
+    QJsonObject result{{"ok", walls == int(points.size()) - 1 && elements == walls && window.isDirty()},
+        {"walls", walls}, {"joins", joins}, {"elements", elements}};
+    if (!options.screenshot.isEmpty())
+        takeScreenshots(window, options.screenshot, &result);
+    window.close();
+    return report(result);
+}
+
 int runSelfTest(const SelfTestOptions& options)
 {
     QString error;
     if (!PythonEngine::instance().start(&error))
         return fail(error);
+    if (!options.drawWalls.isEmpty())
+        return runDrawWalls(options);
 
     QTemporaryDir tmp;
     QString path = options.path;
@@ -158,19 +221,8 @@ int runSelfTest(const SelfTestOptions& options)
         result.insert(QStringLiteral("planes"), viewport->clipPlaneCount());
         result.insert(QStringLiteral("fps_with_cut"), viewport->measureFps(options.frames));
     }
-    if (!options.screenshot.isEmpty()) {
-        window.viewport()->fitAll();
-        for (int i = 0; i < 10; ++i)
-            QApplication::processEvents();
-        // grabWindow captures the composited screen, including the OpenGL viewport.
-        const QPixmap shot = window.screen()->grabWindow(window.winId());
-        result.insert(QStringLiteral("screenshot"), shot.save(options.screenshot) ? options.screenshot : QString());
-        // The window grab needs a composited screen (blank when the screen is locked or off);
-        // the OCCT dump renders the 3D view directly and always works.
-        QString viewportShot = options.screenshot;
-        viewportShot.replace(QStringLiteral(".png"), QStringLiteral("-viewport.png"));
-        result.insert(QStringLiteral("viewport_screenshot"), viewport->dumpImage(viewportShot) ? viewportShot : QString());
-    }
+    if (!options.screenshot.isEmpty())
+        takeScreenshots(window, options.screenshot, &result);
     return report(result);
 }
 

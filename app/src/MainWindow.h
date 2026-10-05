@@ -13,9 +13,16 @@
 class QAction;
 class QDoubleSpinBox;
 
+class QComboBox;
+class QDoubleSpinBox;
+class QLineEdit;
+
 namespace kimcad {
 
 class LevelsBar;
+class WallTool;
+struct WallSegment;
+struct Snap;
 
 class ModelLoader;
 class ModelTreePanel;
@@ -52,6 +59,10 @@ public:
     bool newProject();
     bool addLevel(const QString& name, double elevation);
     LevelsBar* levelsBar() const { return m_levels; }
+    // Wall tool (W). Exposed for the self-test, which drives it with plane points.
+    WallTool* wallTool() const { return m_wallTool; }
+    void setWallToolActive(bool on);
+    bool createWall(const WallSegment& segment);
     bool treeHasGuid(const QString& guid) const;
     // Re-mesh changed elements and drop removed ones after an edit/undo/redo ({changed, removed}).
     void applyGeometry(const QJsonObject& geometry);
@@ -84,6 +95,10 @@ private:
     void refreshLevels();
     void addLevelDialog();
     void setPlanView(bool plan);
+    void buildModelingToolbar();
+    void refreshWallTypes();
+    void refreshSnapData();
+    void showSnap(const Snap& snap);
     void buildCutsToolbar();
     void applyCuts();
 
@@ -104,6 +119,11 @@ private:
     ModelLoader* m_loader;
     QStringList m_selection;
     LevelsBar* m_levels = nullptr;
+    WallTool* m_wallTool = nullptr;
+    QAction* m_wallAction = nullptr;
+    QComboBox* m_wallTypes = nullptr;
+    QDoubleSpinBox* m_wallHeight = nullptr;
+    QLineEdit* m_lengthInput = nullptr;
     QAction* m_undo = nullptr;
     QAction* m_redo = nullptr;
     QAction* m_planCut = nullptr;

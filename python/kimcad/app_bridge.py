@@ -665,6 +665,11 @@ def properties_multi(guids_json: str) -> str:
     })
 
 
+def count_entities(ifc_class: str) -> str:
+    """Number of entities of a class (self-test reports)."""
+    return _dump({"count": len(_model.by_type(ifc_class)) if _model is not None else 0})
+
+
 def _write_test_model(path: str) -> str:
     """Write a small model (2 walls of type "Basic Wall 200" on one storey) for the app's C++ tests and self-test."""
     from .testing import build_model
