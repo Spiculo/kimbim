@@ -5,6 +5,8 @@
 #include <AIS_ViewController.hxx>
 #include <gp_Pnt.hxx>
 #include <QPointF>
+#include <QSet>
+#include <QVector>
 #include <utility>
 #include <optional>
 #include <V3d_View.hxx>
@@ -39,6 +41,9 @@ public:
     void setPlanView(double elevation);
     void set3DView();
     bool isPlanView() const { return m_planView; }
+    // Lines only (hidden-line drawing, Slice 4b): every batch, including later ones.
+    void setLinesOnly(bool on);
+    bool linesOnly() const { return m_linesOnly; }
     double planElevation() const { return m_planElevation; }
     // Screen point -> point on the horizontal plane z (metres). False without a window or when the
     // view ray is parallel to the plane.
@@ -50,6 +55,12 @@ public:
     bool isDrawingMode() const { return m_drawingMode; }
     // Rubber-band wall preview: a box along p1-p2 (plan metres); nullopt hides it.
     void setWallPreview(const std::optional<std::pair<QPointF, QPointF>>& axis, double thickness, double height);
+    // General tool preview: boxes along a-b, `width` across, from z0 to z1 (absolute metres).
+    struct PreviewBox {
+        QPointF a, b;
+        double width = 0, z0 = 0, z1 = 0;
+    };
+    void setPreviewBoxes(const QVector<PreviewBox>& boxes);
     void clear();
     void fitAll();
 
@@ -82,18 +93,27 @@ public:
     // Navigation (D48, Revit/ArchiCAD preset): middle-drag pans, Shift+middle-drag orbits around the
     // picked point, wheel zooms at the cursor, left-drag box-selects, right button is for menus.
     AIS_MouseGesture gestureFor(Aspect_VKeyMouse button, Aspect_VKeyFlags flags) const;
+    Aspect_VKeyMouse pressedButtons() const { return PressedMouseButtons(); }
+    AIS_MouseGesture activeGesture() const { return myMouseActiveGesture; }
     AIS_RotationMode rotationMode() const { return RotationMode(); }
     // Click/box selection modifiers: plain = replace, Ctrl = add (Revit), Shift = toggle (ArchiCAD).
     AIS_SelectionScheme selectionSchemeFor(Aspect_VKeyMouse button, Aspect_VKeyFlags flags) const;
     // Box selection in window pixels (what left-drag does); returns how many elements are selected.
-    int selectInRectangle(int x0, int y0, int x1, int y1, AIS_SelectionScheme scheme);
+    // Box selection: by default only elements you can see (not hidden behind others); `through`
+    // also takes hidden ones (Alt while dragging, or the select-through setting).
+    int selectInRectangle(int x0, int y0, int x1, int y1, AIS_SelectionScheme scheme, bool through = false);
+    void setSelectThrough(bool on) { m_selectThrough = on; }
+    bool selectThrough() const { return m_selectThrough; }
+    // Guids with at least one visible pixel in the rectangle (nullopt: cannot tell, e.g. no window).
+    std::optional<QSet<QString>> visibleIn(int x0, int y0, int x1, int y1);
 
 signals:
     void selectionChanged(const QStringList& guids);
     // Drawing mode. tolerance = ~10 screen pixels in metres at that point.
     void workPointMoved(QPointF point, double tolerance, Qt::KeyboardModifiers modifiers);
     void workPointClicked(QPointF point, double tolerance, Qt::KeyboardModifiers modifiers);
-    void drawingEnded();
+    void drawingEnded();      // Esc or right click: cancel / stop
+    void drawingConfirmed();  // Enter or double click: finish the current shape
     void lengthKeyTyped(const QString& text);
 
 protected:
@@ -107,6 +127,7 @@ protected:
     void keyPressEvent(QKeyEvent*) override;
     void mouseDoubleClickEvent(QMouseEvent*) override;
     void OnSelectionChanged(const Handle(AIS_InteractiveContext)& ctx, const Handle(V3d_View)& view) override;
+    void handleSelectionPoly(const Handle(AIS_InteractiveContext)& ctx, const Handle(V3d_View)& view) override;
 
 private:
     struct Loc {
@@ -125,6 +146,13 @@ private:
     std::vector<Handle(ElementBatch)> m_batches;
     QHash<QString, Loc> m_locate;
     bool m_planView = false;
+    bool m_linesOnly = false;
+    bool m_selectThrough = false;
+    bool m_quietSelection = false;
+    int m_nextIdBase = 0;
+    std::vector<int> m_idBases; // per batch, for decoding ids
+    void keepOnlyVisible(const QSet<QString>& before, AIS_SelectionScheme scheme, int x0, int y0, int x1, int y1);
+    QSet<QString> selectedSet() const;
     bool m_drawingMode = false;
     double m_workZ = 0.0;
     Handle(ElementBatch) m_preview;

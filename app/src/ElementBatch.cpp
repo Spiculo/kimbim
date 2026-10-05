@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#define _USE_MATH_DEFINES
 #include "ElementBatch.h"
+#include <unordered_map>
+#include <cmath>
+#include <cstdio>
+#include <Graphic3d_AspectLine3d.hxx>
+#include <Graphic3d_ArrayOfSegments.hxx>
 
 #include <Graphic3d_AspectFillArea3d.hxx>
 #include <Graphic3d_Group.hxx>
@@ -160,9 +166,9 @@ Handle(ElementOwner) ElementBatch::owner(int i)
     return o;
 }
 
-void ElementBatch::addElement(Graphic3d_ArrayOfTriangles& out, int i, bool withColors) const
+void ElementBatch::addElement(Graphic3d_ArrayOfTriangles& out, int i, bool withColors, const Quantity_Color* fixed) const
 {
-    const Quantity_Color color = colorFor(m_chunk.types.at(i));
+    const Quantity_Color color = fixed ? *fixed : colorFor(m_chunk.types.at(i));
     for (uint32_t t = m_chunk.toff[size_t(i)]; t < m_chunk.toff[size_t(i) + 1]; ++t) {
         const gp_Pnt a = vertex(m_chunk, m_chunk.tris[3 * t]);
         const gp_Pnt b = vertex(m_chunk, m_chunk.tris[3 * t + 1]);
@@ -186,33 +192,191 @@ Handle(Graphic3d_ArrayOfTriangles) ElementBatch::elementTriangles(int i) const
     return arr;
 }
 
-void ElementBatch::Compute(const Handle(PrsMgr_PresentationManager)&, const Handle(Prs3d_Presentation)& prs,
-    const int mode)
+Quantity_Color ElementBatch::s_background(0.97, 0.97, 0.98, Quantity_TOC_RGB);
+
+namespace {
+
+// Vertex position quantised to 10 micrometres, so unwelded copies of a vertex compare equal.
+struct Key {
+    long long x, y, z;
+    bool operator==(const Key& o) const { return x == o.x && y == o.y && z == o.z; }
+    bool operator<(const Key& o) const { return x != o.x ? x < o.x : (y != o.y ? y < o.y : z < o.z); }
+};
+
+Key keyOf(const gp_Pnt& p)
 {
-    if (mode != 0)
+    constexpr double q = 1e-5;
+    return Key{std::llround(p.X() / q), std::llround(p.Y() / q), std::llround(p.Z() / q)};
+}
+
+struct EdgeKey {
+    Key a, b;
+    bool operator==(const EdgeKey& o) const { return a == o.a && b == o.b; }
+};
+
+struct EdgeHash {
+    size_t operator()(const EdgeKey& e) const
+    {
+        size_t h = 1469598103934665603ull;
+        for (long long v : {e.a.x, e.a.y, e.a.z, e.b.x, e.b.y, e.b.z})
+            h = (h ^ size_t(v)) * 1099511628211ull;
+        return h;
+    }
+};
+
+struct EdgeInfo {
+    gp_Pnt a, b;
+    gp_Dir firstNormal;
+    int faces = 0;
+    bool crease = false;
+};
+
+} // namespace
+
+std::vector<std::pair<gp_Pnt, gp_Pnt>> ElementBatch::featureEdges(const MeshChunk& c, int element, double angleDeg)
+{
+    const double cosLimit = std::cos(angleDeg * M_PI / 180.0);
+    std::unordered_map<EdgeKey, EdgeInfo, EdgeHash> edges;
+    std::vector<EdgeKey> order; // deterministic output order
+    for (uint32_t t = c.toff[size_t(element)]; t < c.toff[size_t(element) + 1]; ++t) {
+        const gp_Pnt p[3] = {vertex(c, c.tris[3 * t]), vertex(c, c.tris[3 * t + 1]), vertex(c, c.tris[3 * t + 2])};
+        const gp_Vec n = gp_Vec(p[0], p[1]).Crossed(gp_Vec(p[0], p[2]));
+        if (n.Magnitude() < 1e-14)
+            continue; // degenerate triangle
+        const gp_Dir normal(n);
+        for (int k = 0; k < 3; ++k) {
+            gp_Pnt a = p[k], b = p[(k + 1) % 3];
+            Key ka = keyOf(a), kb = keyOf(b);
+            if (ka == kb)
+                continue;
+            if (kb < ka) {
+                std::swap(ka, kb);
+                std::swap(a, b);
+            }
+            const EdgeKey key{ka, kb};
+            auto [it, inserted] = edges.try_emplace(key);
+            EdgeInfo& e = it->second;
+            if (inserted) {
+                e.a = a;
+                e.b = b;
+                e.firstNormal = normal;
+                order.push_back(key);
+            } else if (std::abs(e.firstNormal.Dot(normal)) < cosLimit) {
+                e.crease = true; // |dot|: inconsistently wound neighbours are still coplanar
+            }
+            ++e.faces;
+        }
+    }
+    std::vector<std::pair<gp_Pnt, gp_Pnt>> out;
+    for (const EdgeKey& k : order) {
+        const EdgeInfo& e = edges.at(k);
+        if (e.faces == 1 || e.faces > 2 || e.crease)
+            out.emplace_back(e.a, e.b);
+    }
+    return out;
+}
+
+void ElementBatch::computeEdges()
+{
+    if (!m_edgeOffsets.empty())
         return;
+    m_edgeOffsets.reserve(size_t(elementCount()) + 1);
+    m_edgeOffsets.push_back(0);
+    for (int i = 0; i < elementCount(); ++i) {
+        for (const auto& [a, b] : featureEdges(m_chunk, i)) {
+            m_edgePoints.push_back(a);
+            m_edgePoints.push_back(b);
+        }
+        m_edgeOffsets.push_back(uint32_t(m_edgePoints.size() / 2));
+    }
+}
+
+void ElementBatch::addTriangles(const Handle(Prs3d_Presentation)& prs, int mode)
+{
     int tris = 0;
     for (int i = 0; i < elementCount(); ++i)
         if (!isHidden(i))
             tris += int(m_chunk.toff[size_t(i) + 1] - m_chunk.toff[size_t(i)]);
     if (tris == 0)
         return;
+    const bool colours = mode == Shaded || mode == Ids;
     Handle(Graphic3d_ArrayOfTriangles) arr = new Graphic3d_ArrayOfTriangles(
-        tris * 3, 0, Graphic3d_ArrayFlags_VertexNormal | Graphic3d_ArrayFlags_VertexColor);
-    for (int i = 0; i < elementCount(); ++i)
-        if (!isHidden(i))
-            addElement(*arr, i, true);
+        tris * 3, 0, Graphic3d_ArrayFlags_VertexNormal | (colours ? Graphic3d_ArrayFlags_VertexColor : 0));
+    for (int i = 0; i < elementCount(); ++i) {
+        if (isHidden(i))
+            continue;
+        if (mode == Ids) {
+            const auto rgb = idRgb(m_idBase + i + 1);
+            // Linear RGB: the offscreen buffer stores these values as they are (no sRGB encoding).
+            const Quantity_Color id(rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0, Quantity_TOC_RGB);
+            addElement(*arr, i, true, &id);
+        } else {
+            addElement(*arr, i, colours);
+        }
+    }
     Handle(Graphic3d_Group) group = prs->NewGroup();
-    // A colour-driven ("aspect") material, so per-vertex palette colours are used. The AIS default
-    // (brass) is a physical material that ignores vertex colours.
     Handle(Graphic3d_AspectFillArea3d) aspect = new Graphic3d_AspectFillArea3d(*myDrawer->ShadingAspect()->Aspect());
-    Graphic3d_MaterialAspect material(Graphic3d_NameOfMaterial_Plastified);
-    material.SetSpecularColor(Quantity_Color(0.08, 0.08, 0.08, Quantity_TOC_RGB));
-    aspect->SetFrontMaterial(material);
-    aspect->SetBackMaterial(material);
-    aspect->SetInteriorColor(Quantity_NOC_WHITE);
+    if (mode == Shaded) {
+        // A colour-driven ("aspect") material, so per-vertex palette colours are used. The AIS
+        // default (brass) is a physical material that ignores vertex colours.
+        Graphic3d_MaterialAspect material(Graphic3d_NameOfMaterial_Plastified);
+        material.SetSpecularColor(Quantity_Color(0.08, 0.08, 0.08, Quantity_TOC_RGB));
+        aspect->SetFrontMaterial(material);
+        aspect->SetBackMaterial(material);
+        aspect->SetInteriorColor(Quantity_NOC_WHITE);
+    } else if (mode == Ids) { // exact flat colours: no lighting
+        aspect->SetShadingModel(Graphic3d_TypeOfShadingModel_Unlit);
+    } else { // lines only: faces just hide what is behind them
+        aspect->SetShadingModel(Graphic3d_TypeOfShadingModel_Unlit);
+        aspect->SetInteriorColor(s_background);
+    }
+    // Push faces back a little so their border lines are drawn on top, not half hidden.
+    aspect->SetPolygonOffsets(Aspect_POM_Fill, 1.0f, 1.0f);
     group->SetGroupPrimitivesAspect(aspect);
     group->AddPrimitiveArray(arr);
+}
+
+void ElementBatch::addLines(const Handle(Prs3d_Presentation)& prs, const Quantity_Color& color)
+{
+    computeEdges();
+    int segments = 0;
+    for (int i = 0; i < elementCount(); ++i)
+        if (!isHidden(i))
+            segments += int(m_edgeOffsets[size_t(i) + 1] - m_edgeOffsets[size_t(i)]);
+    if (segments == 0)
+        return;
+    Handle(Graphic3d_ArrayOfSegments) arr = new Graphic3d_ArrayOfSegments(segments * 2);
+    for (int i = 0; i < elementCount(); ++i) {
+        if (isHidden(i))
+            continue;
+        for (uint32_t s = m_edgeOffsets[size_t(i)]; s < m_edgeOffsets[size_t(i) + 1]; ++s) {
+            arr->AddVertex(m_edgePoints[2 * s]);
+            arr->AddVertex(m_edgePoints[2 * s + 1]);
+        }
+    }
+    Handle(Graphic3d_Group) group = prs->NewGroup();
+    group->SetGroupPrimitivesAspect(new Graphic3d_AspectLine3d(color, Aspect_TOL_SOLID, 1.0));
+    group->AddPrimitiveArray(arr);
+}
+
+void ElementBatch::Compute(const Handle(PrsMgr_PresentationManager)&, const Handle(Prs3d_Presentation)& prs,
+    const int mode)
+{
+    switch (mode) {
+    case Shaded:
+        addTriangles(prs, Shaded);
+        addLines(prs, Quantity_Color(0.22, 0.22, 0.24, Quantity_TOC_RGB));
+        break;
+    case LinesOnly:
+        addTriangles(prs, LinesOnly);
+        addLines(prs, Quantity_Color(0.05, 0.05, 0.05, Quantity_TOC_RGB));
+        break;
+    case Ids:
+        addTriangles(prs, Ids); // no lines: they would cover thin elements' ids
+        break;
+    default:
+        break;
+    }
 }
 
 void ElementBatch::ComputeSelection(const Handle(SelectMgr_Selection)& selection, const int mode)

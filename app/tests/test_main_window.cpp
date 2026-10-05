@@ -11,7 +11,10 @@
 
 #include "ElementBatch.h"
 #include "LevelsBar.h"
+#include "HostTool.h"
 #include "MainWindow.h"
+#include "PolygonTool.h"
+#include "WallTool.h"
 #include "PythonEngine.h"
 #include "Viewport.h"
 
@@ -226,6 +229,47 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // Slice 5: the real tools end to end: walls, a door (undo removes it and closes the hole),
+    // a slab from the wall loop, and Esc leaving the tool.
+    void wallsDoorSlabWithTheTools()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->setTolerance(0.05);
+        for (const QPointF& p : {QPointF(0, 0), QPointF(8, 0), QPointF(8, 6), QPointF(0, 6), QPointF(0, 0)})
+            w.wallTool()->click(p);
+        QCOMPARE(w.viewport()->elementCount(), 4);
+        const QStringList walls = w.viewport()->guids();
+
+        w.setTool(kimcad::MainWindow::Tool::Door);
+        QVERIFY(action(w, "actionDoorTool")->isChecked());
+        QVERIFY(!action(w, "actionWallTool")->isChecked());
+        w.hostTool()->setTolerance(0.05);
+        w.hostTool()->click(QPointF(4.0, 0.02));
+        QCOMPARE(w.viewport()->elementCount(), 5);
+        action(w, "actionUndo")->trigger();
+        QCOMPARE(w.viewport()->elementCount(), 4);
+        action(w, "actionRedo")->trigger();
+        QCOMPARE(w.viewport()->elementCount(), 5);
+
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QVERIFY(w.slabFromWalls(walls));
+        QCOMPARE(w.viewport()->elementCount(), 6);
+        QVERIFY(!w.slabFromWalls(walls.mid(0, 2))); // not a closed loop: refused, nothing added
+        QCOMPARE(w.viewport()->elementCount(), 6);
+
+        w.setTool(kimcad::MainWindow::Tool::Slab);
+        w.polygonTool()->click({10, 0});
+        w.polygonTool()->click({12, 0});
+        w.polygonTool()->click({12, 2});
+        w.polygonTool()->finish(); // Enter
+        QCOMPARE(w.viewport()->elementCount(), 7);
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QVERIFY(!w.viewport()->isDrawingMode());
+        QVERIFY(w.close());
+    }
+
     void shortcutsAreTheDocumentedOnes()
     {
         kimcad::MainWindow w(nullptr, true);
@@ -237,6 +281,11 @@ private slots:
         QCOMPARE(action(w, "actionDelete")->shortcut(), QKeySequence(QKeySequence::Delete));
         QCOMPARE(action(w, "actionNewProject")->shortcut(), QKeySequence(QKeySequence::New));
         QCOMPARE(action(w, "actionPlanView")->shortcut(), QKeySequence(Qt::Key_P));
+        QCOMPARE(action(w, "actionLinesOnly")->shortcut(), QKeySequence(Qt::Key_L));
+        QCOMPARE(action(w, "actionSlabTool")->shortcut(), QKeySequence(Qt::Key_S));
+        QCOMPARE(action(w, "actionDoorTool")->shortcut(), QKeySequence(Qt::Key_D));
+        QCOMPARE(action(w, "actionWindowTool")->shortcut(), QKeySequence(Qt::Key_N));
+        QVERIFY(action(w, "actionLinesOnly")->isCheckable());
     }
 };
 

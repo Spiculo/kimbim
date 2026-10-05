@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <array>
+#include <utility>
+#include <gp_Pnt.hxx>
+#include <Quantity_Color.hxx>
 #include <AIS_InteractiveObject.hxx>
 #include <Bnd_Box.hxx>
 #include <Graphic3d_ArrayOfTriangles.hxx>
@@ -42,7 +46,36 @@ private:
 class ElementBatch : public AIS_InteractiveObject {
     DEFINE_STANDARD_RTTI_INLINE(ElementBatch, AIS_InteractiveObject)
 public:
+    // Display modes: shaded faces with border lines; element ids as flat colours (visibility
+    // queries, never shown); lines only (hidden-line: faces in the background colour, black lines).
+    enum Mode { Shaded = 0, Ids = 1, LinesOnly = 2 };
+
     explicit ElementBatch(MeshChunk chunk);
+
+    // Border lines of one element: boundary edges and creases sharper than angleDeg. Triangulation
+    // diagonals and coplanar seams are skipped; unwelded meshes pair up by vertex position.
+    static std::vector<std::pair<gp_Pnt, gp_Pnt>> featureEdges(const MeshChunk& chunk, int element, double angleDeg = 30.0);
+    static void setBackground(const Quantity_Color& color) { s_background = color; }
+
+    // Element ids as colours (Ids mode): 6 bits per channel stored as value*4+2, so +-1 of colour
+    // rounding still decodes; 0 and off-grid colours (background, lines) decode to -1.
+    static std::array<int, 3> idRgb(int id)
+    {
+        return {((id >> 12) & 63) * 4 + 2, ((id >> 6) & 63) * 4 + 2, (id & 63) * 4 + 2};
+    }
+    static int idFromRgb(int r, int g, int b)
+    {
+        auto channel = [](int c) { return c < 0 || c > 255 || c % 4 == 0 ? -1 : c >> 2; };
+        const int cr = channel(r), cg = channel(g), cb = channel(b);
+        if (cr < 0 || cg < 0 || cb < 0)
+            return -1;
+        const int id = (cr << 12) | (cg << 6) | cb;
+        return id == 0 ? -1 : id;
+    }
+    static constexpr int maxId() { return (1 << 18) - 1; }
+    // First id of this batch's elements minus one: element i draws as id idBase() + i + 1.
+    void setIdBase(int base) { m_idBase = base; }
+    int idBase() const { return m_idBase; }
 
     int elementCount() const { return m_chunk.elementCount(); }
     int triangleCount() const { return m_chunk.triangleCount(); }
@@ -64,13 +97,13 @@ public:
     // Flat-shaded triangles of one element (used for highlights).
     Handle(Graphic3d_ArrayOfTriangles) elementTriangles(int i) const;
 
-    bool AcceptDisplayMode(const int mode) const override { return mode == 0; }
+    bool AcceptDisplayMode(const int mode) const override { return mode >= Shaded && mode <= LinesOnly; }
     void Compute(const Handle(PrsMgr_PresentationManager)& pm, const Handle(Prs3d_Presentation)& prs,
         const int mode) override;
     void ComputeSelection(const Handle(SelectMgr_Selection)& selection, const int mode) override;
 
 private:
-    void addElement(Graphic3d_ArrayOfTriangles& out, int i, bool withColors) const;
+    void addElement(Graphic3d_ArrayOfTriangles& out, int i, bool withColors, const Quantity_Color* fixed = nullptr) const;
 
     MeshChunk m_chunk;
     QHash<QString, int> m_index;
@@ -79,6 +112,13 @@ private:
     int m_visible = 0;
     std::vector<Handle(ElementOwner)> m_owners;
     Handle(Graphic3d_ArrayOfTriangles) m_pickArray; // indexed positions for Select3D_SensitivePrimitiveArray
+    void computeEdges();
+    void addTriangles(const Handle(Prs3d_Presentation)& prs, int mode);
+    void addLines(const Handle(Prs3d_Presentation)& prs, const Quantity_Color& color);
+    std::vector<gp_Pnt> m_edgePoints;    // segment end points of all elements' border lines
+    std::vector<uint32_t> m_edgeOffsets; // per element: first segment, one past the last (size n+1)
+    static Quantity_Color s_background;
+    int m_idBase = 0;
 };
 
 } // namespace kimcad

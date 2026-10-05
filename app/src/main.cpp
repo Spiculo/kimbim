@@ -41,6 +41,14 @@ int main(int argc, char* argv[])
         QStringLiteral("Self-test: on a new project, draw walls through these points (\"x,y;x,y;...\", metres)."),
         QStringLiteral("points"));
     parser.addOption(drawWalls);
+    QCommandLineOption planView(QStringLiteral("plan-view"), QStringLiteral("Self-test: switch to the plan view."));
+    parser.addOption(planView);
+    QCommandLineOption linesOnly(QStringLiteral("lines-only"), QStringLiteral("Self-test: lines-only display."));
+    parser.addOption(linesOnly);
+    QCommandLineOption selectThrough(QStringLiteral("select-through"), QStringLiteral("Self-test: box selection includes hidden elements."));
+    parser.addOption(selectThrough);
+    QCommandLineOption house(QStringLiteral("house"), QStringLiteral("Self-test: model a small house with the tools."));
+    parser.addOption(house);
     QCommandLineOption screenshot(QStringLiteral("screenshot"), QStringLiteral("Self-test: save a PNG of the window."),
         QStringLiteral("png"));
     parser.addOption(screenshot);
@@ -62,6 +70,10 @@ int main(int argc, char* argv[])
         options.chunkSize = qMax(1, parser.value(chunk).toInt());
         options.boxSelect = parser.isSet(boxSelect);
         options.drawWalls = parser.value(drawWalls);
+        options.planView = parser.isSet(planView);
+        options.linesOnly = parser.isSet(linesOnly);
+        options.selectThrough = parser.isSet(selectThrough);
+        options.house = parser.isSet(house);
         options.screenshot = parser.value(screenshot);
         return kimcad::runSelfTest(options);
     }
