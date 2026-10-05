@@ -41,6 +41,9 @@ public:
     bool applyPropertyEdit(const QString& pset, const QString& prop, const QJsonValue& value);
     bool applyName(const QString& name);
     bool removeProperty(const QString& pset, const QString& prop);
+    // D50: change the value on the selected elements' types (every element of those types), no dialog.
+    bool applyTypeEdit(const QString& pset, const QString& prop, const QJsonValue& value);
+    bool resetToType(const QString& pset, const QString& prop);
     bool isDirty() const;
     bool save();                        // to the current file; asks for a path if there is none
     bool saveAs(const QString& path);
@@ -67,6 +70,7 @@ private:
     void saveAsDialog();
     void addPropertyDialog(const QString& pset);
     void addPropertySetDialog();
+    void typeEditDialog(const QString& pset, const QString& prop);
     void buildCutsToolbar();
     void applyCuts();
 

@@ -2,9 +2,11 @@
 #pragma once
 
 #include <QJsonObject>
+#include <QList>
 #include <QJsonValue>
 #include <QWidget>
 
+class QAction;
 class QTreeWidget;
 class QTreeWidgetItem;
 
@@ -26,6 +28,9 @@ public:
     QTreeWidgetItem* itemFor(const QString& pset, const QString& prop) const;
     QTreeWidgetItem* nameItem() const { return m_name; }
     QString variesText() const { return tr("(varies)"); }
+    QString fromTypeText() const { return tr("Inherited from the element's type"); }
+    // The context-menu actions for an item (parented to `parent`, or to the panel).
+    QList<QAction*> actionsFor(QTreeWidgetItem* item, QObject* parent = nullptr);
 
 signals:
     void propertyEdited(const QString& pset, const QString& prop, const QJsonValue& value);
@@ -33,6 +38,8 @@ signals:
     void nameEdited(const QString& name);
     void addPropertyRequested(const QString& pset); // empty pset: add a new property set
     void addPropertySetRequested();
+    void typeEditRequested(const QString& pset, const QString& prop);   // change the value on the type (D50)
+    void resetToTypeRequested(const QString& pset, const QString& prop); // drop the element's override
 
 private:
     void onItemChanged(QTreeWidgetItem* item, int column);

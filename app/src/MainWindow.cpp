@@ -13,6 +13,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QLineEdit>
+#include <QTreeWidgetItem>
 #include <QJsonObject>
 #include <QMenuBar>
 #include <QMessageBox>
@@ -68,6 +69,8 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     connect(m_properties, &PropertiesPanel::propertyRemoved, this, &MainWindow::removeProperty);
     connect(m_properties, &PropertiesPanel::addPropertyRequested, this, &MainWindow::addPropertyDialog);
     connect(m_properties, &PropertiesPanel::addPropertySetRequested, this, &MainWindow::addPropertySetDialog);
+    connect(m_properties, &PropertiesPanel::typeEditRequested, this, &MainWindow::typeEditDialog);
+    connect(m_properties, &PropertiesPanel::resetToTypeRequested, this, &MainWindow::resetToType);
     connect(m_tree, &ModelTreePanel::isolateRequested, m_viewport, &Viewport::isolate);
     connect(m_tree, &ModelTreePanel::hideRequested, this, [this](const QStringList& g) { m_viewport->setHidden(g, true); });
     connect(m_tree, &ModelTreePanel::showAllRequested, m_viewport, &Viewport::showAll);
@@ -345,6 +348,54 @@ bool MainWindow::removeProperty(const QString& pset, const QString& prop)
     const QJsonObject r = bridge("remove_property", {jsonList(m_selection), pset, prop});
     afterEdit();
     return r.value("ok").toBool();
+}
+
+bool MainWindow::applyTypeEdit(const QString& pset, const QString& prop, const QJsonValue& value)
+{
+    if (m_selection.isEmpty())
+        return false;
+    const QJsonObject r = bridge("set_type_property", {jsonList(m_selection), pset, prop, jsonValue(value)});
+    if (!r.value("ok").toBool())
+        showError(tr("Could not change %1").arg(prop), r.value("error").toString());
+    else
+        statusBar()->showMessage(tr("%1 changed on the type: %n element(s) updated", nullptr, r.value("elements").toInt()).arg(prop));
+    afterEdit();
+    return r.value("ok").toBool();
+}
+
+bool MainWindow::resetToType(const QString& pset, const QString& prop)
+{
+    if (m_selection.isEmpty())
+        return false;
+    const QJsonObject r = bridge("reset_to_type", {jsonList(m_selection), pset, prop});
+    afterEdit();
+    return r.value("ok").toBool();
+}
+
+void MainWindow::typeEditDialog(const QString& pset, const QString& prop)
+{
+    const QJsonObject usage = bridge("type_usage", {jsonList(m_selection), pset, prop});
+    QStringList typeNames;
+    for (const auto& t : usage.value("types").toArray())
+        typeNames << t.toObject().value("name").toString();
+    if (typeNames.isEmpty())
+        return;
+    QTreeWidgetItem* item = m_properties->itemFor(pset, prop);
+    const QString current = item && item->text(1) != m_properties->variesText() ? item->text(1) : QString();
+    bool ok = false;
+    const QString value = QInputDialog::getText(this, tr("Edit type value"),
+        tr("%1 on type %2:").arg(prop, typeNames.join(QStringLiteral(", "))), QLineEdit::Normal, current, &ok);
+    if (!ok)
+        return;
+    QString message = tr("This changes %1 for %n element(s) of this type, including elements that are not selected.",
+        nullptr, usage.value("elements").toInt()).arg(prop);
+    if (const int untyped = usage.value("untyped").toInt())
+        message += QStringLiteral("\n") + tr("%n selected element(s) have no type and will not change.", nullptr, untyped);
+    if (!m_quiet
+        && QMessageBox::question(this, tr("Edit type value"), message, QMessageBox::Ok | QMessageBox::Cancel)
+            != QMessageBox::Ok)
+        return;
+    applyTypeEdit(pset, prop, QJsonValue(value));
 }
 
 void MainWindow::afterEdit()
