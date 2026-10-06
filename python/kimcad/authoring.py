@@ -107,7 +107,7 @@ def _elevation(storey) -> float:
 def storeys() -> str:
     if B._model is None:
         return B._dump({"storeys": []})
-    out = [{"guid": s.GlobalId, "name": s.Name or "", "elevation": round(_elevation(s), 6)}
+    out = [{"guid": s.GlobalId, "name": s.Name or "", "elevation": round(_elevation(s), 6), "model": _is_model(s)}
            for s in B._model.by_type("IfcBuildingStorey")]
     return B._dump({"storeys": sorted(out, key=lambda s: s["elevation"])})
 
@@ -1308,14 +1308,73 @@ def _copy_shape(source, target):
             ifcopenshell.api.geometry.copy_representation(B._model, source=source, target=target, context_identifier=identifier)
 
 
-def _place_like(source, target, dz_units, parent=None):
-    """Give `target` the world placement of `source` raised by dz (project units), optionally
-    relative to `parent` (so hosted copies follow their copied host)."""
-    world = ifcopenshell.util.placement.get_local_placement(source.ObjectPlacement).copy()
-    world[2][3] += dz_units
+def _place_like(source, target, transform_units, parent=None):
+    """Give `target` the world placement of `source` moved by a 4x4 transform (project units),
+    optionally relative to `parent` (so hosted copies follow their copied host)."""
+    world = transform_units @ ifcopenshell.util.placement.get_local_placement(source.ObjectPlacement)
     if parent is not None and target.ObjectPlacement is not None:
         target.ObjectPlacement.PlacementRelTo = parent.ObjectPlacement
     ifcopenshell.api.geometry.edit_object_placement(B._model, product=target, matrix=world, is_si=False)
+
+
+def _copy_elements(elements, target, transform_units, *, tag=None) -> list:
+    """Inside an action: copy elements into a storey with a world transform (project units).
+    Walls bring their openings and the doors/windows in them; joins between copied walls are
+    copied. Returns [(source, copy)] for every copied product (fillings included). `tag(source,
+    copy)` is called for each pair (e.g. to link model instances)."""
+    f = B._model
+    copies = {}
+    pairs = []
+    for e in elements:
+        c = ifcopenshell.api.root.copy_class(f, product=e)
+        _copy_shape(e, c)
+        layers.copy_layer(e, c)
+        _place_like(e, c, transform_units)
+        ifcopenshell.api.spatial.assign_container(f, products=[c], relating_structure=target)
+        copies[e] = c
+        pairs.append((e, c))
+        # copy_class may duplicate the openings (same order); give them shapes and their fillings.
+        originals = [r.RelatedOpeningElement for r in getattr(e, "HasOpenings", ()) or ()]
+        duplicates = [r.RelatedOpeningElement for r in getattr(c, "HasOpenings", ()) or ()]
+        if len(duplicates) != len(originals):  # copy_class didn't duplicate them: do it here
+            for d in duplicates:
+                ifcopenshell.api.root.remove_product(f, product=d)
+            duplicates = []
+            for opening in originals:
+                opening_copy = ifcopenshell.api.root.copy_class(f, product=opening)
+                ifcopenshell.api.feature.add_feature(f, feature=opening_copy, element=c)
+                duplicates.append(opening_copy)
+        for opening, opening_copy in zip(originals, duplicates):
+            if not opening_copy.Representation:
+                _copy_shape(opening, opening_copy)
+            _place_like(opening, opening_copy, transform_units, parent=c)
+            for fill in getattr(opening, "HasFillings", ()) or ():
+                element = fill.RelatedBuildingElement
+                element_copy = ifcopenshell.api.root.copy_class(f, product=element)
+                _copy_shape(element, element_copy)
+                layers.copy_layer(element, element_copy)
+                ifcopenshell.api.feature.add_filling(f, opening=opening_copy, element=element_copy)
+                _place_like(element, element_copy, transform_units, parent=opening_copy)
+                ifcopenshell.api.spatial.assign_container(f, products=[element_copy], relating_structure=target)
+                pairs.append((element, element_copy))
+    for e in elements:  # joins between copied walls, as between the originals
+        for rel in getattr(e, "ConnectedTo", ()) or ():
+            if rel.is_a("IfcRelConnectsPathElements") and rel.RelatedElement in copies:
+                ifcopenshell.api.geometry.connect_path(
+                    f, relating_element=copies[e], related_element=copies[rel.RelatedElement],
+                    relating_connection=rel.RelatingConnectionType, related_connection=rel.RelatedConnectionType)
+    for c in copies.values():
+        if c.is_a("IfcWall") and _axis_world(c) is not None and _layer_set(c) is not None:
+            ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=c)
+    if tag is not None:
+        for source, copy in pairs:
+            tag(source, copy)
+    return pairs
+
+
+def _copyable(guids_json: str) -> list:
+    return [e for e in B._elements(guids_json) if e.is_a("IfcProduct") and not getattr(e, "FillsVoids", None)
+            and not e.is_a("IfcOpeningElement")]
 
 
 def copy_to_storey(guids_json: str, storey_guid: str) -> str:
@@ -1327,68 +1386,26 @@ def copy_to_storey(guids_json: str, storey_guid: str) -> str:
     target = _by_guid(storey_guid)
     if target is None or not target.is_a("IfcBuildingStorey"):
         return _fail("unknown level")
-    elements = [e for e in B._elements(guids_json) if e.is_a("IfcProduct") and not getattr(e, "FillsVoids", None)
-                and not e.is_a("IfcOpeningElement")]
+    elements = _copyable(guids_json)
     if not elements:
         return _fail("select the walls, slabs, columns or beams to copy (doors and windows come with their wall)")
-    sources = {}
     for e in elements:
         container = ifcopenshell.util.element.get_container(e)
         if container is None or not container.is_a("IfcBuildingStorey"):
             return _fail(f"{e.GlobalId} is not on a level")
-        sources[e] = container
     made = {}
 
     def action():
-        f = B._model
-        s = _scale()
-        copies = {}
-        changed = []
+        pairs = []
+        by_level = {}
         for e in elements:
-            dz = (_elevation(target) - _elevation(sources[e])) / s
-            c = ifcopenshell.api.root.copy_class(f, product=e)
-            _copy_shape(e, c)
-            layers.copy_layer(e, c)
-            _place_like(e, c, dz)
-            ifcopenshell.api.spatial.assign_container(f, products=[c], relating_structure=target)
-            copies[e] = c
-            changed.append(c.GlobalId)
-            # copy_class duplicates the openings (same order); give them shapes and their fillings.
-            originals = [r.RelatedOpeningElement for r in getattr(e, "HasOpenings", ()) or ()]
-            duplicates = [r.RelatedOpeningElement for r in getattr(c, "HasOpenings", ()) or ()]
-            if len(duplicates) != len(originals):  # copy_class didn't duplicate them: do it here
-                for d in duplicates:
-                    ifcopenshell.api.root.remove_product(f, product=d)
-                duplicates = []
-                for opening in originals:
-                    opening_copy = ifcopenshell.api.root.copy_class(f, product=opening)
-                    ifcopenshell.api.feature.add_feature(f, feature=opening_copy, element=c)
-                    duplicates.append(opening_copy)
-            for opening, opening_copy in zip(originals, duplicates):
-                if not opening_copy.Representation:
-                    _copy_shape(opening, opening_copy)
-                _place_like(opening, opening_copy, dz, parent=c)
-                for fill in getattr(opening, "HasFillings", ()) or ():
-                    element = fill.RelatedBuildingElement
-                    element_copy = ifcopenshell.api.root.copy_class(f, product=element)
-                    _copy_shape(element, element_copy)
-                    layers.copy_layer(element, element_copy)
-                    ifcopenshell.api.feature.add_filling(f, opening=opening_copy, element=element_copy)
-                    _place_like(element, element_copy, dz, parent=opening_copy)
-                    ifcopenshell.api.spatial.assign_container(f, products=[element_copy], relating_structure=target)
-                    changed.append(element_copy.GlobalId)
-        # Joins between copied walls, as between the originals.
-        for e in elements:
-            for rel in getattr(e, "ConnectedTo", ()) or ():
-                if rel.is_a("IfcRelConnectsPathElements") and rel.RelatedElement in copies:
-                    ifcopenshell.api.geometry.connect_path(
-                        f, relating_element=copies[e], related_element=copies[rel.RelatedElement],
-                        relating_connection=rel.RelatingConnectionType, related_connection=rel.RelatedConnectionType)
-        for e, c in copies.items():
-            if c.is_a("IfcWall") and _axis_world(c) is not None and _layer_set(c) is not None:
-                ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=c)
-        made["copies"] = [copies[e].GlobalId for e in elements]
-        return len(copies), changed, []
+            by_level.setdefault(ifcopenshell.util.element.get_container(e), []).append(e)
+        for level, group in by_level.items():
+            t = np.eye(4)
+            t[2][3] = (_elevation(target) - _elevation(level)) / _scale()
+            pairs += _copy_elements(group, target, t)
+        made["copies"] = [c.GlobalId for e, c in pairs if e in elements]
+        return len(made["copies"]), [c.GlobalId for _, c in pairs], []
 
     try:
         r = B._run(action)
@@ -1620,3 +1637,210 @@ def set_dimension(guids_json: str, name: str, value) -> str:
     except Exception as ex:
         return _fail(f"{type(ex).__name__}: {ex}")
     return B._dump(r)
+
+
+# ---------------------------------------------------------------- models (owner feedback, Slice 12)
+
+MODEL_PSET = "KIMCAD_Model"
+INSTANCE_PSET = "KIMCAD_ModelInstance"
+MODEL_DEPTH = 10.0  # metres below the lowest level where new model containers go
+
+
+def _is_model(storey) -> bool:
+    return bool(ifcopenshell.util.element.get_psets(storey).get(MODEL_PSET, {}).get("IsModel"))
+
+
+def _contained(storey) -> list:
+    return [e for rel in getattr(storey, "ContainsElements", ()) or () for e in rel.RelatedElements]
+
+
+def _instance_info(e) -> dict:
+    return ifcopenshell.util.element.get_psets(e).get(INSTANCE_PSET, {})
+
+
+def _instances() -> dict:
+    """instance id -> [elements]"""
+    out = {}
+    for e in B._model.by_type("IfcProduct"):
+        info = _instance_info(e)
+        if info.get("Instance"):
+            out.setdefault(info["Instance"], []).append(e)
+    return out
+
+
+def create_model(name: str) -> str:
+    """A model container ("Apartment A"): a level below the building, marked as a KIMCAD model,
+    where a unit is drawn once and then placed on many levels."""
+    if B._model is None:
+        return _fail("no model open")
+    name = (name or "").strip()
+    if not name:
+        return _fail("a model needs a name")
+    levels = B._model.by_type("IfcBuildingStorey")
+    if any((l.Name or "") == name for l in levels):
+        return _fail(f"there is already a level or model called {name}")
+    elevation = min([_elevation(l) for l in levels] + [0.0]) - MODEL_DEPTH
+    made = {}
+
+    def action():
+        storey = _make_storey(name, elevation)
+        pset = ifcopenshell.api.pset.add_pset(B._model, product=storey, name=MODEL_PSET)
+        ifcopenshell.api.pset.edit_pset(B._model, pset=pset, properties={"IsModel": True})
+        made["storey"] = storey
+        return 1
+
+    r = B._run(action)
+    return B._dump({**r, "guid": made["storey"].GlobalId, "elevation": elevation})
+
+
+def models() -> str:
+    if B._model is None:
+        return B._dump({"models": []})
+    instances = _instances()
+    out = []
+    for storey in B._model.by_type("IfcBuildingStorey"):
+        if not _is_model(storey):
+            continue
+        count = len({i for i, els in instances.items() if _instance_info(els[0]).get("Model") == storey.GlobalId})
+        out.append({"guid": storey.GlobalId, "name": storey.Name or "", "elevation": round(_elevation(storey), 6),
+                    "instances": count})
+    return B._dump({"models": out})
+
+
+def _instance_transform(model, target, x, y, angle):
+    """Model plan origin -> (x, y) on the target level, turned by angle (project units)."""
+    s = _scale()
+    c, sn = math.cos(angle), math.sin(angle)
+    t = np.array([[c, -sn, 0, x / s], [sn, c, 0, y / s], [0, 0, 1, _elevation(target) / s], [0, 0, 0, 1]], dtype=float)
+    down = np.eye(4)
+    down[2][3] = -_elevation(model) / s
+    return t @ down
+
+
+def _place_instance(model, target, x, y, angle, instance_id, keep_guids=None):
+    """Inside an action: copy the model's content as one linked instance; returns the pairs."""
+    elements = [e for e in _contained(model) if not getattr(e, "FillsVoids", None) and not e.is_a("IfcOpeningElement")
+                and not e.is_a("IfcGrid")]
+
+    def tag(source, copy):
+        if keep_guids and source.GlobalId in keep_guids:
+            copy.GlobalId = keep_guids[source.GlobalId]  # same element of the same instance: same identity
+        pset = ifcopenshell.api.pset.add_pset(B._model, product=copy, name=INSTANCE_PSET)
+        ifcopenshell.api.pset.edit_pset(B._model, pset=pset, properties={
+            "Model": model.GlobalId, "Instance": instance_id, "Source": source.GlobalId,
+            "X": float(x), "Y": float(y), "Angle": float(angle)})
+
+    return _copy_elements(elements, target, _instance_transform(model, target, x, y, angle), tag=tag)
+
+
+def place_model(model_guid: str, storey_guid: str, x, y, angle=0.0) -> str:
+    """Place a model on a level: its elements are copied there (real IFC elements other tools can
+    read), each linked to its model element and this instance."""
+    import uuid
+
+    if B._model is None:
+        return _fail("no model open")
+    model, target = _by_guid(model_guid), _by_guid(storey_guid)
+    if model is None or not _is_model(model):
+        return _fail("not a model")
+    if target is None or not target.is_a("IfcBuildingStorey") or _is_model(target):
+        return _fail("place models on a level of the building")
+    try:
+        x, y, angle = float(x), float(y), float(angle or 0.0)
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    if not _contained(model):
+        return _fail("the model is empty: draw the unit in it first")
+    instance_id = uuid.uuid4().hex
+    made = {}
+
+    def action():
+        pairs = _place_instance(model, target, x, y, angle, instance_id)
+        made["guids"] = [c.GlobalId for _, c in pairs]
+        return len(pairs), made["guids"], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "instance": instance_id, "guids": made["guids"]})
+
+
+def _remove_products(elements) -> None:
+    """Inside an action: remove products with their openings, fillings and wall joins."""
+    f = B._model
+    gone = set()
+    elements = list(elements)
+    openings = [r.RelatedOpeningElement for e in elements for r in getattr(e, "HasOpenings", ()) or ()]
+    ordered = [e for e in elements if getattr(e, "FillsVoids", None)] + openings + \
+        [e for e in elements if not getattr(e, "FillsVoids", None)]
+    for e in ordered:
+        if e.id() in gone:
+            continue
+        for rel in list(getattr(e, "ConnectedTo", ()) or ()) + list(getattr(e, "ConnectedFrom", ()) or ()):
+            if rel.is_a("IfcRelConnectsPathElements") and rel.id():
+                f.remove(rel)
+        gone.add(e.id())
+        ifcopenshell.api.root.remove_product(f, product=e)
+
+
+def update_model_instances(model_guid: str) -> str:
+    """Re-apply the model's current content to every instance; elements that still exist in the
+    model keep their GlobalIds in each instance (identity for versioning)."""
+    if B._model is None:
+        return _fail("no model open")
+    model = _by_guid(model_guid)
+    if model is None or not _is_model(model):
+        return _fail("not a model")
+    plans = []
+    for instance_id, elements in _instances().items():
+        info = _instance_info(elements[0])
+        if info.get("Model") != model.GlobalId:
+            continue
+        target = ifcopenshell.util.element.get_container(next(e for e in elements if not getattr(e, "FillsVoids", None)))
+        keep = {_instance_info(e)["Source"]: e.GlobalId for e in elements}
+        plans.append((instance_id, elements, target, info["X"], info["Y"], info["Angle"], keep))
+    if not plans:
+        return _fail("the model has no instances")
+
+    def action():
+        changed, removed = [], []
+        for instance_id, elements, target, x, y, angle, keep in plans:
+            old = [e.GlobalId for e in elements]
+            _remove_products(elements)
+            pairs = _place_instance(model, target, x, y, angle, instance_id, keep_guids=keep)
+            new = [c.GlobalId for _, c in pairs]
+            changed += new
+            removed += [g for g in old if g not in new]
+        return len(plans), changed, removed
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump(r)
+
+
+def explode_instance(instance_id: str) -> str:
+    """Unlink an instance: its elements become ordinary elements (no longer follow the model)."""
+    if B._model is None:
+        return _fail("no model open")
+    elements = _instances().get(instance_id, [])
+    if not elements:
+        return _fail("no such instance")
+
+    def action():
+        for e in elements:
+            for rel in list(getattr(e, "IsDefinedBy", ()) or ()):
+                d = rel.RelatingPropertyDefinition if rel.is_a("IfcRelDefinesByProperties") else None
+                if d is not None and d.Name == INSTANCE_PSET:
+                    ifcopenshell.api.pset.remove_pset(B._model, product=e, pset=d)
+        return len(elements)
+
+    return B._dump(B._run(action))
+
+
+def instance_members() -> str:
+    if B._model is None:
+        return B._dump({"instances": {}})
+    return B._dump({"instances": {i: [e.GlobalId for e in els] for i, els in _instances().items()}})
