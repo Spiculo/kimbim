@@ -65,11 +65,11 @@ Done in Slice 3 ([plan](superpowers/plans/2026-10-05-slice3-navigation-and-data-
 
 Not yet: materials, types (assign/edit), classifications, schedules, quantity take-off.
 
-### M3 — Modeler 🟡 (in progress)
+### M3 — Modeler ✅ (automatic exit checks pass; the owner's check in Bonsai + a commercial viewer is pending — [12](12-m3-exit.md))
 Levels and grids, walls (layered, joins), slabs, openings, doors/windows, columns/beams, snapping, precise input, move/rotate/stretch.
 **Exit:** an architect can model a small 2-storey house from scratch and export valid IFC that opens in at least two other tools (e.g. Bonsai, a commercial viewer).
 
-Slices: **4 ✅ new project, levels, walls** ([plan](superpowers/plans/2026-10-05-slice4-walls-and-levels.md)) → **4b ✅ view quality** ([plan](superpowers/plans/2026-10-05-slice4b-view-quality.md)) → **5 ✅ slabs, openings, doors/windows** ([plan](superpowers/plans/2026-10-05-slice5-slabs-doors-windows.md)) → **6 ✅ columns/beams, grids, move/rotate/stretch** ([plan](superpowers/plans/2026-10-05-slice6-structure-grids-editing.md)) → 7 the exit test.
+Slices: **4 ✅ new project, levels, walls** ([plan](superpowers/plans/2026-10-05-slice4-walls-and-levels.md)) → **4b ✅ view quality** ([plan](superpowers/plans/2026-10-05-slice4b-view-quality.md)) → **5 ✅ slabs, openings, doors/windows** ([plan](superpowers/plans/2026-10-05-slice5-slabs-doors-windows.md)) → **6 ✅ columns/beams, grids, move/rotate/stretch** ([plan](superpowers/plans/2026-10-05-slice6-structure-grids-editing.md)) → **7 ✅ the exit test** ([plan](superpowers/plans/2026-10-06-slice7-m3-exit-two-storey-house.md), [12](12-m3-exit.md)).
 Done in Slice 6: profile-based columns and beams, grid axes per level (auto tags, snapping), move/rotate with joined walls following (Ctrl detaches, D54), stretch wall ends, wall height, sliding and resizing doors/windows — all keeping GlobalIds.
 Done in Slice 5: layered slab types, slabs by outline (concave too) or from a closed wall loop (outer faces), parametric doors and windows in walls with real openings, cascading deletes; a saved test house (walls, slab, door, window) validates against the IFC4 schema with 0 issues.
 Done in Slice 4: new IFC4 project (mm), levels, plan view, layered wall types, wall tool (snapping, typed lengths, ortho), L/T joins, delete, live 3D updates with undo/redo.

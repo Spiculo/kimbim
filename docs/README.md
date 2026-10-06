@@ -20,6 +20,7 @@ These documents guide development. They come from the original spec (`../doc.md`
 | 09 | [Testing and Quality](09-testing-and-quality.md) | Test corpus, round-trip, determinism, benchmarks |
 | 10 | [Forge Feasibility](10-forge-feasibility.md) | An architect-oriented alternative to GitHub (future) |
 | 11 | [Spike Results](11-spike-results.md) | What spikes S1–S5 measured and what they changed in the design |
+| 12 | [M3 Exit](12-m3-exit.md) | The two-storey sample house, the automatic validity and interop checks, and the manual check in Bonsai + a commercial viewer |
 | — | [Decision Log](decisions.md) | Every architectural decision and its status |
 | — | [Open Questions](open-questions.md) | What is still undecided |
 | — | [Glossary](glossary.md) | BIM / IFC / VCS terms |
