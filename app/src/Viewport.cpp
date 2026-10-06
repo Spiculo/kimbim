@@ -745,6 +745,7 @@ void Viewport::addBatch(const Handle(ElementBatch)& batch)
     for (const auto& plane : m_clipPlanes)
         batch->AddClipPlane(plane);
     applyColors(batch);
+    applyLayerState(batch);
     batch->setIdBase(m_nextIdBase);
     m_idBases.push_back(m_nextIdBase);
     m_nextIdBase += batch->elementCount();
@@ -818,6 +819,39 @@ void Viewport::setElementColors(const QHash<QString, QColor>& colors)
         touched.push_back(int(b));
     }
     redisplay(touched);
+}
+
+void Viewport::applyLayerState(const Handle(ElementBatch)& batch) const
+{
+    for (int i = 0; i < batch->elementCount(); ++i) {
+        batch->setLayerHidden(i, m_layerHidden.contains(batch->guid(i)));
+        batch->setLocked(i, m_layerLocked.contains(batch->guid(i)));
+    }
+}
+
+void Viewport::setLayerState(const QSet<QString>& hiddenGuids, const QSet<QString>& lockedGuids)
+{
+    m_layerHidden = hiddenGuids;
+    m_layerLocked = lockedGuids;
+    // Hidden or locked elements can't stay selected.
+    for (const QString& g : selectedGuids())
+        if (hiddenGuids.contains(g) || lockedGuids.contains(g)) {
+            const auto it = m_locate.constFind(g);
+            if (it != m_locate.constEnd())
+                m_context->AddOrRemoveSelected(m_batches[size_t(it->batch)]->owner(it->index), false);
+        }
+    std::vector<int> touched;
+    for (size_t b = 0; b < m_batches.size(); ++b) {
+        applyLayerState(m_batches[b]);
+        touched.push_back(int(b));
+    }
+    redisplay(touched);
+}
+
+bool Viewport::isLocked(const QString& guid) const
+{
+    const auto it = m_locate.constFind(guid);
+    return it != m_locate.constEnd() && m_batches[size_t(it->batch)]->isLocked(it->index);
 }
 
 int Viewport::coloredCount() const

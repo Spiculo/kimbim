@@ -40,6 +40,7 @@
 #include "Cuts.h"
 #include "ElementBatch.h"
 #include "HistoryPanel.h"
+#include "LayersPanel.h"
 #include "LevelsBar.h"
 #include "HostTool.h"
 #include "PolygonTool.h"
@@ -294,6 +295,56 @@ void MainWindow::buildDocks()
         m_viewport->selectGuids({guid});
         m_tree->selectGuids({guid});
         setSelection({guid});
+    });
+    m_layersPanel = new LayersPanel(this);
+    auto* layersDock = new QDockWidget(tr("Layers"), this);
+    layersDock->setObjectName(QStringLiteral("LayersDock"));
+    layersDock->setWidget(m_layersPanel);
+    addDockWidget(Qt::LeftDockWidgetArea, layersDock);
+    tabifyDockWidget(treeDock, layersDock);
+    treeDock->raise();
+    connect(m_layersPanel, &LayersPanel::visibilityToggled, this, &MainWindow::setLayerVisible);
+    connect(m_layersPanel, &LayersPanel::lockToggled, this, &MainWindow::setLayerLocked);
+    connect(m_layersPanel, &LayersPanel::activeRequested, this, &MainWindow::setActiveLayer);
+    connect(m_layersPanel, &LayersPanel::assignRequested, this, &MainWindow::assignSelectionToLayer);
+    connect(m_layersPanel, &LayersPanel::createRequested, this, [this] {
+        bool ok = false;
+        const QString name = QInputDialog::getText(this, tr("New layer"), tr("Layer name:"), QLineEdit::Normal, QString(), &ok);
+        if (ok && !name.trimmed().isEmpty())
+            createLayer(name.trimmed());
+    });
+    connect(m_layersPanel, &LayersPanel::deleteRequested, this, [this](const QString& name) {
+        const QJsonObject r = bridge("delete_layer", {name});
+        if (!r.value("ok").toBool())
+            statusBar()->showMessage(r.value("error").toString());
+        m_hiddenLayers.remove(name);
+        m_lockedLayers.remove(name);
+        afterEdit(r);
+    });
+    connect(m_layersPanel, &LayersPanel::renameRequested, this, [this](const QString& from, const QString& to) {
+        const QJsonObject r = bridge("rename_layer", {from, to});
+        if (!r.value("ok").toBool())
+            statusBar()->showMessage(r.value("error").toString());
+        else {
+            if (m_hiddenLayers.remove(from))
+                m_hiddenLayers.insert(to);
+            if (m_lockedLayers.remove(from))
+                m_lockedLayers.insert(to);
+        }
+        afterEdit(r);
+    });
+    connect(m_layersPanel, &LayersPanel::viewRequested, this, &MainWindow::applyView);
+    connect(m_layersPanel, &LayersPanel::saveViewRequested, this, [this] {
+        bool ok = false;
+        const QString name = QInputDialog::getText(this, tr("Save view"), tr("View name:"), QLineEdit::Normal, m_currentView, &ok);
+        if (ok && !name.trimmed().isEmpty())
+            saveView(name.trimmed());
+    });
+    connect(m_layersPanel, &LayersPanel::deleteViewRequested, this, [this](const QString& name) {
+        const QJsonObject r = bridge("delete_view", {name});
+        if (m_currentView == name)
+            m_currentView.clear();
+        afterEdit(r);
     });
     resizeDocks({treeDock, propsDock}, {340, 360}, Qt::Horizontal);
 }
@@ -583,6 +634,10 @@ bool MainWindow::newProject()
     setWindowTitle(QStringLiteral("KIMCAD — %1[*]").arg(tr("Untitled")));
     afterEdit();
     refreshProject();
+    m_hiddenLayers.clear();
+    m_lockedLayers.clear();
+    m_currentView.clear();
+    refreshLayers();
     statusBar()->showMessage(tr("New project"));
     return true;
 }
@@ -1632,6 +1687,128 @@ bool MainWindow::dragFinished(QPointF start, QPointF current, double tolerance, 
     return moveSelection(delta, modifiers & Qt::ControlModifier);
 }
 
+void MainWindow::refreshLayers()
+{
+    const QJsonObject listing = bridge("layers");
+    const QJsonObject members = bridge("layer_members").value("layers").toObject();
+    QSet<QString> hidden, locked;
+    for (auto it = members.constBegin(); it != members.constEnd(); ++it)
+        for (const auto& g : it.value().toArray()) {
+            if (m_hiddenLayers.contains(it.key()))
+                hidden.insert(g.toString());
+            if (m_lockedLayers.contains(it.key()))
+                locked.insert(g.toString());
+        }
+    m_viewport->setLayerState(hidden, locked);
+    m_layersPanel->setLayers(listing.value("layers").toArray(), listing.value("active").toString(), m_hiddenLayers,
+        m_lockedLayers);
+    QStringList names;
+    for (const auto& v : bridge("views").value("views").toArray())
+        names << v.toObject().value("name").toString();
+    m_layersPanel->setViews(names, m_currentView);
+}
+
+bool MainWindow::createLayer(const QString& name)
+{
+    const QJsonObject r = bridge("create_layer", {name});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not create the layer: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    return true;
+}
+
+bool MainWindow::assignSelectionToLayer(const QString& layer)
+{
+    const QJsonObject r = bridge("assign_layer", {jsonList(m_selection), layer});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not change the layer: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    statusBar()->showMessage(tr("%n element(s) moved to %1", nullptr, int(m_selection.size())).arg(layer));
+    return true;
+}
+
+void MainWindow::setLayerVisible(const QString& layer, bool visible)
+{
+    if (visible)
+        m_hiddenLayers.remove(layer);
+    else
+        m_hiddenLayers.insert(layer);
+    refreshLayers();
+}
+
+void MainWindow::setLayerLocked(const QString& layer, bool locked)
+{
+    if (locked)
+        m_lockedLayers.insert(layer);
+    else
+        m_lockedLayers.remove(layer);
+    refreshLayers();
+}
+
+bool MainWindow::setActiveLayer(const QString& layer)
+{
+    const QJsonObject r = bridge("set_active_layer", {layer});
+    refreshLayers();
+    if (r.value("ok").toBool())
+        statusBar()->showMessage(tr("New elements go on layer %1").arg(layer));
+    return r.value("ok").toBool();
+}
+
+bool MainWindow::saveView(const QString& name)
+{
+    QJsonObject data{{"hidden", QJsonArray::fromStringList(QStringList(m_hiddenLayers.begin(), m_hiddenLayers.end()))},
+        {"locked", QJsonArray::fromStringList(QStringList(m_lockedLayers.begin(), m_lockedLayers.end()))},
+        {"level", m_levels->activeStorey()}, {"plan", m_viewport->isPlanView()},
+        {"cut", m_planCut->isChecked() ? QJsonValue(m_cutHeight->value()) : QJsonValue()},
+        {"linesOnly", m_viewport->linesOnly()}};
+    const QJsonObject r = bridge("save_view", {name, QString::fromUtf8(QJsonDocument(data).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not save the view: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    m_currentView = name;
+    afterEdit(r);
+    return true;
+}
+
+bool MainWindow::applyView(const QString& name)
+{
+    for (const auto& v : bridge("views").value("views").toArray()) {
+        const QJsonObject o = v.toObject();
+        if (o.value("name").toString() != name)
+            continue;
+        const QJsonObject data = o.value("data").toObject();
+        m_hiddenLayers.clear();
+        m_lockedLayers.clear();
+        for (const auto& l : data.value("hidden").toArray())
+            m_hiddenLayers.insert(l.toString());
+        for (const auto& l : data.value("locked").toArray())
+            m_lockedLayers.insert(l.toString());
+        if (!data.value("level").toString().isEmpty())
+            m_levels->setActive(data.value("level").toString());
+        if (data.contains("linesOnly"))
+            findChild<QAction*>(QStringLiteral("actionLinesOnly"))->setChecked(data.value("linesOnly").toBool());
+        if (data.value("cut").isDouble()) {
+            m_cutHeight->setValue(data.value("cut").toDouble());
+            m_planCut->setChecked(true);
+        } else if (data.contains("cut")) {
+            m_planCut->setChecked(false);
+        }
+        if (data.contains("plan"))
+            setPlanView(data.value("plan").toBool());
+        applyCuts();
+        m_currentView = name;
+        refreshLayers();
+        statusBar()->showMessage(tr("View %1").arg(name));
+        return true;
+    }
+    return false;
+}
+
 int MainWindow::gridLineCount() const
 {
     return m_viewport->gridLineCount();
@@ -1827,6 +2004,7 @@ void MainWindow::afterEdit(const QJsonObject& result)
             tr("An edit failed and could not be undone. Save a copy if you need it, then reopen the file."));
     }
     { StepTimer _(m_timings, "refreshSnapData"); refreshSnapData(); } // undo/redo can add or remove walls and grid lines
+    { StepTimer _(m_timings, "refreshLayers"); refreshLayers(); }
     StepTimer stateTimer(m_timings, "stateAndNames");
     const QJsonObject s = bridge("state");
     m_undo->setEnabled(s.value("can_undo").toBool());
@@ -1932,7 +2110,11 @@ void MainWindow::onOpened(const QJsonObject& info)
     QString error;
     const QJsonObject tree = PythonEngine::instance().callJson("spatial_tree", {}, &error).object();
     m_tree->setTree(tree);
+    m_hiddenLayers.clear();
+    m_lockedLayers.clear();
+    m_currentView.clear();
     refreshProject();
+    refreshLayers();
     statusBar()->showMessage(tr("Loading %1 (%2)...").arg(QFileInfo(m_path).fileName(), info.value("schema").toString()));
 }
 

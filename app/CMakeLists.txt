@@ -12,6 +12,7 @@ qt_add_library(kimcad_core STATIC
     src/PropertiesPanel.cpp src/PropertiesPanel.h
     src/LevelsBar.cpp src/LevelsBar.h
     src/HistoryPanel.cpp src/HistoryPanel.h
+    src/LayersPanel.cpp src/LayersPanel.h
     src/Icons.cpp src/Icons.h
     src/Snapper.cpp src/Snapper.h
     src/WallTool.cpp src/WallTool.h

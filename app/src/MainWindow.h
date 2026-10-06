@@ -3,6 +3,7 @@
 
 #include <QElapsedTimer>
 #include <QHash>
+#include <QSet>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QPointF>
@@ -30,6 +31,7 @@ namespace kimcad {
 
 class LevelsBar;
 class HistoryPanel;
+class LayersPanel;
 class WallTool;
 class PolygonTool;
 class HostTool;
@@ -110,6 +112,15 @@ public:
     bool switchOption(const QString& name);
     bool discardChanges();
     bool isVersioned() const { return m_versioned; }
+    // Layers and views (Slice 11, owner feedback).
+    bool createLayer(const QString& name);
+    bool assignSelectionToLayer(const QString& layer);
+    void setLayerVisible(const QString& layer, bool visible);
+    void setLayerLocked(const QString& layer, bool locked);
+    bool setActiveLayer(const QString& layer);
+    bool saveView(const QString& name);
+    bool applyView(const QString& name);
+    LayersPanel* layersPanel() const { return m_layersPanel; }
     // Drag to move (owner feedback): preview while dragging, move on release (Ctrl detaches).
     void dragMoveTo(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
     bool dragFinished(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
@@ -162,6 +173,7 @@ private:
     void copyToLevelDialog();
     void buildProjectToolbar();
     void refreshProject();
+    void refreshLayers();
     void saveVersionDialog();
     void enableVersioningDialog();
     void openProjectDialog();
@@ -212,6 +224,9 @@ private:
     QAction* m_lengthAction = nullptr;
     bool m_warnedInconsistent = false;
     HistoryPanel* m_history = nullptr;
+    LayersPanel* m_layersPanel = nullptr;
+    QSet<QString> m_hiddenLayers, m_lockedLayers;
+    QString m_currentView;
     QToolBar* m_projectBar = nullptr;
     QComboBox* m_options = nullptr;
     bool m_versioned = false;

@@ -113,6 +113,8 @@ void ElementOwner::Clear(const Handle(PrsMgr_PresentationManager)& pm, const int
 ElementBatch::ElementBatch(MeshChunk chunk)
     : m_chunk(std::move(chunk))
     , m_hidden(size_t(m_chunk.elementCount()), 0)
+    , m_layerHidden(size_t(m_chunk.elementCount()), 0)
+    , m_locked(size_t(m_chunk.elementCount()), 0)
     , m_retired(size_t(m_chunk.elementCount()), 0)
     , m_override(size_t(m_chunk.elementCount()))
     , m_visible(m_chunk.elementCount())
@@ -137,11 +139,22 @@ void ElementBatch::setHidden(int i, bool hidden)
 {
     if (!hidden && isRetired(i))
         return;
-    char& h = m_hidden[size_t(i)];
-    if (bool(h) == hidden)
-        return;
-    h = hidden ? 1 : 0;
-    m_visible += hidden ? -1 : 1;
+    const bool was = isHidden(i);
+    m_hidden[size_t(i)] = hidden ? 1 : 0;
+    updateVisible(i, was);
+}
+
+void ElementBatch::setLayerHidden(int i, bool hidden)
+{
+    const bool was = isHidden(i);
+    m_layerHidden[size_t(i)] = hidden ? 1 : 0;
+    updateVisible(i, was);
+}
+
+void ElementBatch::updateVisible(int i, bool wasHidden)
+{
+    if (wasHidden != isHidden(i))
+        m_visible += isHidden(i) ? -1 : 1;
 }
 
 Bnd_Box ElementBatch::elementBounds(int i) const
@@ -474,7 +487,7 @@ void ElementBatch::ComputeSelection(const Handle(SelectMgr_Selection)& selection
         return;
     for (int i = 0; i < elementCount(); ++i) {
         const int t0 = int(m_chunk.toff[size_t(i)]), t1 = int(m_chunk.toff[size_t(i) + 1]);
-        if (isHidden(i) || t1 == t0)
+        if (isHidden(i) || isLocked(i) || t1 == t0)
             continue;
         Handle(Select3D_SensitivePrimitiveArray) sensitive = new Select3D_SensitivePrimitiveArray(owner(i));
         sensitive->InitTriangulation(m_pickArray->Attributes(), m_pickArray->Indices(), TopLoc_Location(), t0 * 3,

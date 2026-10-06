@@ -89,6 +89,9 @@ public:
     void setElementColors(const QHash<QString, QColor>& colors);
     void clearElementColors() { setElementColors({}); }
     int coloredCount() const;
+    // Layers (Slice 11): elements hidden or locked by their layer's state in the current view.
+    void setLayerState(const QSet<QString>& hiddenGuids, const QSet<QString>& lockedGuids);
+    bool isLocked(const QString& guid) const;
     int visibleElementCount() const;
     qint64 triangleCount() const;
 
@@ -177,6 +180,8 @@ private:
     bool m_planView = false;
     bool m_linesOnly = false;
     QHash<QString, QColor> m_colors;
+    QSet<QString> m_layerHidden, m_layerLocked;
+    void applyLayerState(const Handle(ElementBatch)& batch) const;
     void applyColors(const Handle(ElementBatch)& batch) const;
     bool m_selectThrough = false;
     bool m_quietSelection = false;

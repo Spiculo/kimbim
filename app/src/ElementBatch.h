@@ -91,7 +91,12 @@ public:
     int indexOf(const QString& guid) const { return m_index.value(guid, -1); }
 
     void setHidden(int i, bool hidden);
-    bool isHidden(int i) const { return m_hidden[size_t(i)] != 0; }
+    // Hidden by the user (H / isolate) or by its layer (a view's layer state); either hides it.
+    bool isHidden(int i) const { return m_hidden[size_t(i)] != 0 || m_layerHidden[size_t(i)] != 0; }
+    void setLayerHidden(int i, bool hidden);
+    // Locked by its layer: shown, but not selectable.
+    void setLocked(int i, bool locked) { m_locked[size_t(i)] = locked ? 1 : 0; }
+    bool isLocked(int i) const { return m_locked[size_t(i)] != 0; }
     // A retired element was replaced or deleted by an edit: hidden for good (never shown again).
     void retire(int i);
     bool isRetired(int i) const { return m_retired[size_t(i)] != 0; }
@@ -118,6 +123,9 @@ private:
     MeshChunk m_chunk;
     QHash<QString, int> m_index;
     std::vector<char> m_hidden;
+    std::vector<char> m_layerHidden;
+    std::vector<char> m_locked;
+    void updateVisible(int i, bool wasHidden);
     std::vector<char> m_retired;
     std::vector<std::optional<Quantity_Color>> m_override;
     int m_visible = 0;

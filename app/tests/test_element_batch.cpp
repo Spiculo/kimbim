@@ -122,6 +122,24 @@ private slots:
         QCOMPARE(int(p.size()), 4); // collinear points from the triangulation are merged
     }
 
+    // Slice 11: layers can hide elements (separately from the user's H/I hiding) and lock them
+    // (locked elements can't be selected).
+    void layerHiddenAndLockedElements()
+    {
+        Handle(kimcad::ElementBatch) b = new kimcad::ElementBatch(threeElements());
+        b->setLayerHidden(0, true);
+        QVERIFY(b->isHidden(0));
+        QCOMPARE(b->visibleCount(), 2);
+        b->setHidden(0, false); // "show all" doesn't show what a layer hides
+        QVERIFY(b->isHidden(0));
+        b->setLayerHidden(0, false);
+        QVERIFY(!b->isHidden(0));
+        QCOMPARE(b->visibleCount(), 3);
+        b->setLocked(1, true);
+        QCOMPARE(selectionEntities(b), 2);
+        QVERIFY(b->isLocked(1));
+    }
+
     void acceptsShadedIdAndLinesModes()
     {
         Handle(kimcad::ElementBatch) b = new kimcad::ElementBatch(unitCube());

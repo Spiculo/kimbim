@@ -553,6 +553,38 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // Owner feedback: layers as boundaries, views as collections of layers.
+    void layersAndViews()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({5, 0});
+        w.wallTool()->finish();
+        w.wallTool()->click({0, 3});
+        w.wallTool()->click({5, 3});
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QStringList walls = w.viewport()->guids();
+        QVERIFY(w.columnAt(QPointF(8, 0)));
+        QCOMPARE(w.viewport()->visibleElementCount(), 3);
+
+        QVERIFY(w.createLayer(QStringLiteral("A-WALL")));
+        w.setSelection(walls);
+        QVERIFY(w.assignSelectionToLayer(QStringLiteral("A-WALL")));
+        w.setLayerVisible(QStringLiteral("A-WALL"), false);
+        QCOMPARE(w.viewport()->visibleElementCount(), 1);
+        QVERIFY(w.saveView(QStringLiteral("Structure")));
+        w.setLayerVisible(QStringLiteral("A-WALL"), true);
+        QCOMPARE(w.viewport()->visibleElementCount(), 3);
+        QVERIFY(w.applyView(QStringLiteral("Structure")));
+        QCOMPARE(w.viewport()->visibleElementCount(), 1);
+        w.setLayerVisible(QStringLiteral("A-WALL"), true);
+        w.setLayerLocked(QStringLiteral("A-WALL"), true);
+        QVERIFY(w.viewport()->isLocked(walls[0]));
+        QVERIFY(w.close());
+    }
+
     void shortcutsAreTheDocumentedOnes()
     {
         kimcad::MainWindow w(nullptr, true);
