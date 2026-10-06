@@ -730,12 +730,15 @@ def _write_test_model(path: str) -> str:
 # Modeling (M3) lives in its own module; re-exported here because the app calls this module.
 from .authoring import (  # noqa: E402,F401
     add_grid_axis,
+    add_slab_opening,
     add_storey,
     beam_types,
     column_types,
+    copy_to_storey,
     create_beam,
     create_column,
     create_slab,
+    create_stair,
     create_wall,
     delete_elements,
     edit_opening,
