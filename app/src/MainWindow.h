@@ -80,7 +80,7 @@ public:
     LevelsBar* levelsBar() const { return m_levels; }
     // Modeling tools (M3): one active at a time. Exposed for tests and the self-test, which drive
     // them with work-plane points.
-    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening };
+    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening, PlaceModel };
     void setTool(Tool tool);
     Tool tool() const { return m_tool; }
     WallTool* wallTool() const { return m_wallTool; }
@@ -121,6 +121,11 @@ public:
     bool saveView(const QString& name);
     bool applyView(const QString& name);
     LayersPanel* layersPanel() const { return m_layersPanel; }
+    // Models (Slice 12, owner feedback): a unit drawn once and placed on many levels.
+    bool createModel(const QString& name);
+    bool placeModelAt(QPointF p, bool turned);
+    bool updateModelInstances();
+    bool explodeSelectedInstance();
     // Drag to move (owner feedback): preview while dragging, move on release (Ctrl detaches).
     void dragMoveTo(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
     bool dragFinished(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
@@ -227,6 +232,8 @@ private:
     LayersPanel* m_layersPanel = nullptr;
     QSet<QString> m_hiddenLayers, m_lockedLayers;
     QString m_currentView;
+    QHash<QString, QString> m_instanceOf; // element -> model instance it belongs to
+    QHash<QString, QStringList> m_instanceMembers;
     QToolBar* m_projectBar = nullptr;
     QComboBox* m_options = nullptr;
     bool m_versioned = false;

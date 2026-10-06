@@ -356,6 +356,14 @@ void MainWindow::buildCutsToolbar()
     m_levels = new LevelsBar(levels);
     levels->addWidget(m_levels);
     connect(m_levels, &LevelsBar::addLevelRequested, this, &MainWindow::addLevelDialog);
+    connect(m_levels, &LevelsBar::newModelRequested, this, [this] {
+        bool ok = false;
+        const QString name = QInputDialog::getText(this, tr("New model"),
+            tr("Model name (e.g. Apartment A). Draw it, then place it on levels with Place model:"), QLineEdit::Normal,
+            QString(), &ok);
+        if (ok && !name.trimmed().isEmpty())
+            createModel(name.trimmed());
+    });
     connect(m_levels, &LevelsBar::activeStoreyChanged, this, [this](const QString&, double elevation) {
         updateCutSliderRange();
         m_viewport->setWorkPlaneZ(elevation);
@@ -368,6 +376,7 @@ void MainWindow::buildCutsToolbar()
             refreshSnapData();
         }
         applyCuts();
+        refreshLayers(); // models show only while one is active
     });
     QToolBar* bar = addToolBar(tr("Cuts"));
     bar->setObjectName(QStringLiteral("CutsToolbar"));
@@ -517,7 +526,17 @@ QString jsonValue(const QJsonValue& v)
 
 void MainWindow::setSelection(const QStringList& guids)
 {
-    m_selection = guids;
+    QStringList expanded = guids;
+    for (const QString& g : guids)
+        if (const auto it = m_instanceOf.constFind(g); it != m_instanceOf.constEnd())
+            for (const QString& m : m_instanceMembers.value(*it))
+                if (!expanded.contains(m))
+                    expanded << m;
+    if (expanded.size() != guids.size()) { // a click on an instance takes the whole instance
+        m_viewport->selectGuids(expanded);
+        m_tree->selectGuids(expanded);
+    }
+    m_selection = expanded;
     refreshProperties();
     if (!guids.isEmpty())
         statusBar()->showMessage(tr("%n element(s) selected", nullptr, int(guids.size())));
@@ -734,6 +753,8 @@ void MainWindow::buildModelingToolbar()
             tr("Draw a stair: click where it starts, then the direction it climbs; it goes up to the next level")},
         {Tool::SlabOpening, "actionSlabOpeningTool", tr("Slab &opening"), Qt::Key_O,
             tr("Cut a hole in the selected slab: draw its outline like a slab")},
+        {Tool::PlaceModel, "actionPlaceModelTool", tr("Place mo&del"), Qt::Key_U,
+            tr("Place a model (an apartment drawn once) on this level: click where its origin goes; Shift turns it 90 degrees")},
     };
     for (const Def& d : defs) {
         QAction* a = bar->addAction(d.text);
@@ -750,6 +771,14 @@ void MainWindow::buildModelingToolbar()
     QAction* copyAction = model->addAction(tr("Copy to &level..."));
     copyAction->setObjectName(QStringLiteral("actionCopyToLevel"));
     connect(copyAction, &QAction::triggered, this, &MainWindow::copyToLevelDialog);
+    QAction* updateModels = model->addAction(tr("&Update model instances"));
+    updateModels->setObjectName(QStringLiteral("actionUpdateModelInstances"));
+    updateModels->setToolTip(tr("Apply the model's changes to every place it is used"));
+    connect(updateModels, &QAction::triggered, this, &MainWindow::updateModelInstances);
+    QAction* explode = model->addAction(tr("E&xplode model instance"));
+    explode->setObjectName(QStringLiteral("actionExplodeInstance"));
+    explode->setToolTip(tr("Unlink the selected instance: its elements become ordinary elements you can edit one by one"));
+    connect(explode, &QAction::triggered, this, &MainWindow::explodeSelectedInstance);
     QAction* heightAction = model->addAction(tr("Wall &height..."));
     heightAction->setObjectName(QStringLiteral("actionWallHeight"));
     connect(heightAction, &QAction::triggered, this, &MainWindow::wallHeightDialog);
@@ -839,6 +868,9 @@ void MainWindow::buildModelingToolbar()
             m_columnHover = m_twoPointTool->snapper().snap(p, tolerance).point;
             updateToolPreview();
             break;
+        case Tool::PlaceModel:
+            m_twoPointTool->setTolerance(tolerance);
+            break;
         case Tool::Move:
             m_twoPointTool->setTolerance(tolerance);
             m_twoPointTool->setOrtho(ortho);
@@ -891,6 +923,10 @@ void MainWindow::buildModelingToolbar()
         case Tool::Column:
             m_twoPointTool->setTolerance(tolerance);
             columnAt(p, ortho);
+            break;
+        case Tool::PlaceModel:
+            m_twoPointTool->setTolerance(tolerance);
+            placeModelAt(m_twoPointTool->snapper().snap(p, tolerance).point, ortho);
             break;
         case Tool::Move:
             m_detach = mods & Qt::ControlModifier;
@@ -998,6 +1034,9 @@ void MainWindow::refreshTypes()
     case Tool::Beam:
         source = "beam_types";
         break;
+    case Tool::PlaceModel:
+        source = "models";
+        break;
     case Tool::Grid:
     case Tool::None:
         break;
@@ -1007,7 +1046,8 @@ void MainWindow::refreshTypes()
     m_types->clear();
     if (!source)
         return;
-    for (const auto& t : bridge(source, args).value("types").toArray()) {
+    const QJsonObject listing = bridge(source, args);
+    for (const auto& t : listing.value(listing.contains("models") ? "models" : "types").toArray()) {
         const QJsonObject o = t.toObject();
         m_types->addItem(o.value("name").toString(), o);
         if (o.value("guid").toString() == current)
@@ -1139,7 +1179,7 @@ void MainWindow::setTool(Tool tool)
         || tool == Tool::Rotate || tool == Tool::Stretch);
     m_lengthInput->setPlaceholderText(tool == Tool::Rotate ? tr("Angle (degrees)") : tr("Length (m)"));
     const bool typed = tool == Tool::Wall || tool == Tool::Slab || tool == Tool::Door || tool == Tool::Window
-        || tool == Tool::Column || tool == Tool::Beam;
+        || tool == Tool::Column || tool == Tool::Beam || tool == Tool::PlaceModel;
     m_types->setVisible(typed);
     const bool needsSlab = tool == Tool::SlabOpening
         && (m_selection.size() != 1 || m_viewport->typeOf(m_selection.first()) != QLatin1String("IfcSlab"));
@@ -1192,6 +1232,10 @@ void MainWindow::setTool(Tool tool)
         break;
     case Tool::SlabOpening:
         statusBar()->showMessage(tr("Slab opening: draw the hole's outline; click the first point or press Enter to close"));
+        break;
+    case Tool::PlaceModel:
+        statusBar()->showMessage(m_types->count() ? tr("Place model: click where its origin goes (Shift: turned 90 degrees)")
+                                                  : tr("There are no models yet: use New model... next to the levels"));
         break;
     default:
         statusBar()->showMessage(tr("Click on a wall to place it"));
@@ -1699,6 +1743,28 @@ void MainWindow::refreshLayers()
             if (m_lockedLayers.contains(it.key()))
                 locked.insert(g.toString());
         }
+    const QJsonObject inModels = bridge("model_elements");
+    const QString active = m_levels->activeStorey();
+    if (m_levels->activeIsModel()) { // drawing a model: only that model
+        const QJsonArray mine = inModels.value("models").toObject().value(active).toArray();
+        QSet<QString> keep;
+        for (const auto& g : mine)
+            keep.insert(g.toString());
+        for (const QString& g : m_viewport->guids())
+            if (!keep.contains(g))
+                hidden.insert(g);
+    } else {
+        for (const auto& g : inModels.value("guids").toArray())
+            hidden.insert(g.toString());
+    }
+    m_instanceOf.clear();
+    m_instanceMembers.clear();
+    const QJsonObject instances = bridge("instance_members").value("instances").toObject();
+    for (auto it = instances.constBegin(); it != instances.constEnd(); ++it)
+        for (const auto& g : it.value().toArray()) {
+            m_instanceOf.insert(g.toString(), it.key());
+            m_instanceMembers[it.key()] << g.toString();
+        }
     m_viewport->setLayerState(hidden, locked);
     m_layersPanel->setLayers(listing.value("layers").toArray(), listing.value("active").toString(), m_hiddenLayers,
         m_lockedLayers);
@@ -1706,6 +1772,88 @@ void MainWindow::refreshLayers()
     for (const auto& v : bridge("views").value("views").toArray())
         names << v.toObject().value("name").toString();
     m_layersPanel->setViews(names, m_currentView);
+}
+
+bool MainWindow::createModel(const QString& name)
+{
+    const QJsonObject r = bridge("create_model", {name});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not create the model"), r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
+    m_levels->setActive(r.value("guid").toString());
+    statusBar()->showMessage(tr("Draw the model here, then place it on levels with Place model (U)"));
+    return true;
+}
+
+bool MainWindow::placeModelAt(QPointF p, bool turned)
+{
+    if (m_levels->activeIsModel()) {
+        statusBar()->showMessage(tr("Choose a building level to place the model on"));
+        return false;
+    }
+    QJsonObject model = m_tool == Tool::PlaceModel ? currentType() : QJsonObject();
+    if (model.isEmpty())
+        model = bridge("models").value("models").toArray().first().toObject();
+    auto num = [](double v) { return QString::number(v, 'g', 17); };
+    const QJsonObject r = bridge("place_model", {model.value("guid").toString(), m_levels->activeStorey(), num(p.x()),
+        num(p.y()), num(turned ? M_PI / 2 : 0.0)});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not place it: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    return true;
+}
+
+bool MainWindow::updateModelInstances()
+{
+    const QJsonArray models = bridge("models").value("models").toArray();
+    QString guid;
+    if (m_levels->activeIsModel())
+        guid = m_levels->activeStorey();
+    else if (models.size() == 1)
+        guid = models.first().toObject().value("guid").toString();
+    else if (!models.isEmpty()) {
+        QStringList names;
+        for (const auto& m : models)
+            names << m.toObject().value("name").toString();
+        bool ok = false;
+        const QString choice = QInputDialog::getItem(this, tr("Update model instances"), tr("Model:"), names, 0, false, &ok);
+        if (!ok)
+            return false;
+        guid = models.at(names.indexOf(choice)).toObject().value("guid").toString();
+    }
+    if (guid.isEmpty()) {
+        statusBar()->showMessage(tr("There are no models yet"));
+        return false;
+    }
+    const QJsonObject r = bridge("update_model_instances", {guid});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not update: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    statusBar()->showMessage(tr("%n instance(s) updated", nullptr, r.value("count").toInt()));
+    return true;
+}
+
+bool MainWindow::explodeSelectedInstance()
+{
+    QString instance;
+    for (const QString& g : std::as_const(m_selection))
+        if (m_instanceOf.contains(g))
+            instance = m_instanceOf.value(g);
+    if (instance.isEmpty()) {
+        statusBar()->showMessage(tr("Select a placed model first"));
+        return false;
+    }
+    const QJsonObject r = bridge("explode_instance", {instance});
+    if (!r.value("ok").toBool())
+        return false;
+    afterEdit(r);
+    return true;
 }
 
 bool MainWindow::createLayer(const QString& name)

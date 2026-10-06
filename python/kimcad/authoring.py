@@ -1857,6 +1857,23 @@ def explode_instance(instance_id: str) -> str:
     return B._dump(B._run(action))
 
 
+def model_elements() -> str:
+    """Everything drawn inside model containers (with the doors/windows in it), per model."""
+    out = {}
+    if B._model is not None:
+        for storey in B._model.by_type("IfcBuildingStorey"):
+            if not _is_model(storey):
+                continue
+            guids = []
+            for e in _contained(storey):
+                guids.append(e.GlobalId)
+                for rel in getattr(e, "HasOpenings", ()) or ():
+                    for fill in getattr(rel.RelatedOpeningElement, "HasFillings", ()) or ():
+                        guids.append(fill.RelatedBuildingElement.GlobalId)
+            out[storey.GlobalId] = sorted(set(guids))
+    return B._dump({"models": out, "guids": sorted({g for v in out.values() for g in v})})
+
+
 def instance_members() -> str:
     if B._model is None:
         return B._dump({"instances": {}})

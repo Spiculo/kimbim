@@ -585,6 +585,56 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // Owner feedback: "models" — an apartment drawn once and placed on many levels.
+    void modelsPlacedOnLevels()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        const QString level = w.levelsBar()->activeStorey();
+        QVERIFY(w.createModel(QStringLiteral("Apartment A")));
+        const QString model = w.levelsBar()->activeStorey();
+        QVERIFY(model != level); // the new model is where we draw now
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({5, 0});
+        w.wallTool()->click({5, 3});
+        w.wallTool()->finish();
+        w.setTool(kimcad::MainWindow::Tool::None);
+        const QStringList inModel = w.viewport()->guids();
+        QCOMPARE(w.viewport()->visibleElementCount(), 2);
+        w.levelsBar()->setActive(level);
+        QCOMPARE(w.viewport()->visibleElementCount(), 0); // models aren't part of the building
+
+        w.setTool(kimcad::MainWindow::Tool::PlaceModel);
+        QVERIFY(w.placeModelAt(QPointF(10, 0), false));
+        QVERIFY(w.placeModelAt(QPointF(10, 10), true));
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QCOMPARE(w.viewport()->visibleElementCount(), 4);
+
+        QString part;
+        for (const QString& g : w.viewport()->guids())
+            if (!inModel.contains(g))
+                part = g;
+        w.setSelection({part});
+        QCOMPARE(w.selection().size(), 2); // a click on an instance takes the whole instance
+
+        w.levelsBar()->setActive(model);
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 3});
+        w.wallTool()->click({0, 0});
+        w.wallTool()->finish();
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QVERIFY(w.updateModelInstances());
+        w.levelsBar()->setActive(level);
+        QCOMPARE(w.viewport()->visibleElementCount(), 6);
+
+        w.setSelection({part});
+        QVERIFY(w.explodeSelectedInstance());
+        w.setSelection({part});
+        QCOMPARE(w.selection().size(), 1);
+        QVERIFY(w.close());
+    }
+
     void shortcutsAreTheDocumentedOnes()
     {
         kimcad::MainWindow w(nullptr, true);
@@ -607,6 +657,7 @@ private slots:
         QCOMPARE(action(w, "actionRotateTool")->shortcut(), QKeySequence(Qt::Key_R));
         QCOMPARE(action(w, "actionStretchTool")->shortcut(), QKeySequence(Qt::Key_E));
         QCOMPARE(action(w, "actionStairTool")->shortcut(), QKeySequence(Qt::Key_T));
+        QCOMPARE(action(w, "actionPlaceModelTool")->shortcut(), QKeySequence(Qt::Key_U));
         QCOMPARE(action(w, "actionSlabOpeningTool")->shortcut(), QKeySequence(Qt::Key_O));
         QCOMPARE(action(w, "actionSaveVersion")->shortcut(), QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_S));
         QVERIFY(action(w, "actionLinesOnly")->isCheckable());

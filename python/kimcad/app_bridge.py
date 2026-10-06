@@ -760,6 +760,7 @@ from .authoring import (  # noqa: E402,F401
     create_model,
     explode_instance,
     instance_members,
+    model_elements,
     models,
     place_model,
     update_model_instances,

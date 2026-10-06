@@ -118,3 +118,9 @@ def test_a_moved_instance_stays_where_it_was_moved(apartment):
                 ifcopenshell.util.element.get_psets(e)["KIMCAD_ModelInstance"]["Source"] == apartment["walls"][0])
     lo, hi = bbox(wall.GlobalId)
     assert lo[0] == pytest.approx(10.0, abs=0.2) and (lo[1] + hi[1]) / 2 == pytest.approx(5.0, abs=0.05)
+
+
+def test_model_elements_lists_what_is_drawn_in_models(apartment):
+    call("place_model", apartment["model"], apartment["l1"], 10, 0, 0)
+    inside = set(call("model_elements")["guids"])
+    assert inside == {*apartment["walls"], apartment["door"]}

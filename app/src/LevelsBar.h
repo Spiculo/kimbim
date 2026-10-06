@@ -16,7 +16,11 @@ class LevelsBar : public QWidget {
 public:
     explicit LevelsBar(QWidget* parent = nullptr);
 
-    void setStoreys(const QJsonArray& storeys); // [{guid, name, elevation (m)}] from app_bridge.storeys
+    // [{guid, name, elevation (m), model}] from app_bridge.storeys: building levels by elevation,
+    // then the models (owner feedback: a dedicated "model" section on the levels).
+    void setStoreys(const QJsonArray& storeys);
+    bool activeIsModel() const;
+    QToolButton* newModelButton() const { return m_newModel; }
     void setActive(const QString& guid);
     QString activeStorey() const;
     double activeElevation() const;
@@ -28,12 +32,14 @@ public:
 signals:
     void activeStoreyChanged(const QString& guid, double elevation);
     void addLevelRequested();
+    void newModelRequested();
 
 private:
     void onIndexChanged(int index);
 
     QComboBox* m_combo;
     QToolButton* m_add;
+    QToolButton* m_newModel;
     QString m_active;
     bool m_filling = false;
 };
