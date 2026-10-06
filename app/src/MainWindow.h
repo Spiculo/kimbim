@@ -21,6 +21,8 @@ class QDoubleSpinBox;
 
 class QComboBox;
 class QToolBar;
+class QSlider;
+class QLabel;
 class QDoubleSpinBox;
 class QLineEdit;
 
@@ -57,6 +59,7 @@ public:
     ModelTreePanel* treePanel() const { return m_tree; }
     PropertiesPanel* propertiesPanel() const { return m_properties; }
     void setPlanCutHeight(double metres);
+    double planCutHeight() const;
 
     // Selection and editing (M2). Edits apply to every selected element as one undoable step.
     void setSelection(const QStringList& guids);
@@ -186,6 +189,9 @@ private:
     QThread m_thread;
     ModelLoader* m_loader;
     QStringList m_selection;
+    QSlider* m_cutSlider = nullptr;
+    QLabel* m_cutLabel = nullptr;
+    void updateCutSliderRange();
     LevelsBar* m_levels = nullptr;
     WallTool* m_wallTool = nullptr;
     PolygonTool* m_polygonTool = nullptr;

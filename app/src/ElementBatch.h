@@ -5,6 +5,7 @@
 #include <optional>
 #include <utility>
 #include <gp_Pnt.hxx>
+#include <gp_Pnt2d.hxx>
 #include <Quantity_Color.hxx>
 #include <AIS_InteractiveObject.hxx>
 #include <Bnd_Box.hxx>
@@ -56,6 +57,9 @@ public:
     // Border lines of one element: boundary edges and creases sharper than angleDeg. Triangulation
     // diagonals and coplanar seams are skipped; unwelded meshes pair up by vertex position.
     static std::vector<std::pair<gp_Pnt, gp_Pnt>> featureEdges(const MeshChunk& chunk, int element, double angleDeg = 30.0);
+    // The element's section by the horizontal plane at z: closed outlines in plan (x, y).
+    static std::vector<std::vector<gp_Pnt2d>> sectionLoops(const MeshChunk& chunk, int element, double z);
+    std::vector<std::vector<gp_Pnt2d>> sectionLoops(int element, double z) const { return sectionLoops(m_chunk, element, z); }
     static void setBackground(const Quantity_Color& color) { s_background = color; }
     // Previews skip border lines (computing them on every mouse move made drawing lag).
     void setShowEdges(bool show) { m_showEdges = show; }

@@ -80,6 +80,8 @@ void ElementOwner::HilightWithColor(const Handle(PrsMgr_PresentationManager)& pm
     group->AddPrimitiveArray(b->elementTriangles(m_index));
     prs->SetZLayer(style->ZLayer() != Graphic3d_ZLayerId_UNKNOWN ? style->ZLayer()
                    : (hover ? Graphic3d_ZLayerId_Top : Graphic3d_ZLayerId_Default));
+    // The highlight is cut like the element (else the cut-away part shows as a floating overlay).
+    prs->SetClipPlanes(b->ClipPlanes());
     if (hover)
         pm->AddToImmediateList(prs);
     else
@@ -275,6 +277,90 @@ std::vector<std::pair<gp_Pnt, gp_Pnt>> ElementBatch::featureEdges(const MeshChun
             out.emplace_back(e.a, e.b);
     }
     return out;
+}
+
+std::vector<std::vector<gp_Pnt2d>> ElementBatch::sectionLoops(const MeshChunk& c, int element, double z)
+{
+    // 1. Every triangle crossing the plane gives one segment.
+    struct P {
+        long long x, y;
+        bool operator==(const P& o) const { return x == o.x && y == o.y; }
+    };
+    struct PH {
+        size_t operator()(const P& p) const { return size_t(p.x * 73856093LL ^ p.y * 19349663LL); }
+    };
+    constexpr double q = 1e-5;
+    auto key = [&](const gp_Pnt2d& p) { return P{std::llround(p.X() / q), std::llround(p.Y() / q)}; };
+    std::vector<std::pair<gp_Pnt2d, gp_Pnt2d>> segments;
+    for (uint32_t t = c.toff[size_t(element)]; t < c.toff[size_t(element) + 1]; ++t) {
+        const gp_Pnt v[3] = {vertex(c, c.tris[3 * t]), vertex(c, c.tris[3 * t + 1]), vertex(c, c.tris[3 * t + 2])};
+        std::vector<gp_Pnt2d> hits;
+        for (int k = 0; k < 3; ++k) {
+            const gp_Pnt& a = v[k];
+            const gp_Pnt& b = v[(k + 1) % 3];
+            const double da = a.Z() - z, db = b.Z() - z;
+            if ((da < 0 && db > 0) || (da > 0 && db < 0)) {
+                const double s = da / (da - db);
+                hits.emplace_back(a.X() + s * (b.X() - a.X()), a.Y() + s * (b.Y() - a.Y()));
+            } else if (da == 0 && db != 0) {
+                hits.emplace_back(a.X(), a.Y());
+            }
+        }
+        if (hits.size() == 2 && !(key(hits[0]) == key(hits[1])))
+            segments.emplace_back(hits[0], hits[1]);
+    }
+    // 2. Chain the segments into closed loops.
+    std::unordered_multimap<P, size_t, PH> byEnd;
+    for (size_t i = 0; i < segments.size(); ++i) {
+        byEnd.emplace(key(segments[i].first), i);
+        byEnd.emplace(key(segments[i].second), i);
+    }
+    std::vector<char> used(segments.size(), 0);
+    std::vector<std::vector<gp_Pnt2d>> loops;
+    for (size_t start = 0; start < segments.size(); ++start) {
+        if (used[start])
+            continue;
+        used[start] = 1;
+        std::vector<gp_Pnt2d> loop{segments[start].first, segments[start].second};
+        const P first = key(loop.front());
+        bool closed = false;
+        while (true) {
+            const P end = key(loop.back());
+            if (end == first) {
+                loop.pop_back();
+                closed = true;
+                break;
+            }
+            bool extended = false;
+            auto range = byEnd.equal_range(end);
+            for (auto it = range.first; it != range.second; ++it) {
+                if (used[it->second])
+                    continue;
+                used[it->second] = 1;
+                const auto& sg = segments[it->second];
+                loop.push_back(key(sg.first) == end ? sg.second : sg.first);
+                extended = true;
+                break;
+            }
+            if (!extended)
+                break;
+        }
+        if (!closed || loop.size() < 3)
+            continue;
+        // 3. Drop points on straight runs (the triangulation splits faces).
+        std::vector<gp_Pnt2d> clean;
+        for (size_t i = 0; i < loop.size(); ++i) {
+            const gp_Pnt2d& a = loop[(i + loop.size() - 1) % loop.size()];
+            const gp_Pnt2d& b = loop[i];
+            const gp_Pnt2d& d = loop[(i + 1) % loop.size()];
+            const double cross = (b.X() - a.X()) * (d.Y() - b.Y()) - (b.Y() - a.Y()) * (d.X() - b.X());
+            if (std::abs(cross) > 1e-10)
+                clean.push_back(b);
+        }
+        if (clean.size() >= 3)
+            loops.push_back(std::move(clean));
+    }
+    return loops;
 }
 
 void ElementBatch::computeEdges()

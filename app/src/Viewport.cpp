@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "Viewport.h"
+#include "PolygonTool.h"
 
 #include <Aspect_DisplayConnection.hxx>
 #include <Graphic3d_ClipPlane.hxx>
@@ -439,6 +440,100 @@ private:
 
 } // namespace
 
+namespace {
+
+// Cut sections: filled outlines (unlit, dark) plus bold borders, drawn just below the cut plane.
+class SectionPrs : public AIS_InteractiveObject {
+public:
+    SectionPrs(std::vector<std::vector<gp_Pnt2d>> loops, double z)
+        : m_loops(std::move(loops))
+        , m_z(z)
+    {
+    }
+    void Compute(const Handle(PrsMgr_PresentationManager)&, const Handle(Prs3d_Presentation)& prs, const int) override
+    {
+        int triangles = 0, segments = 0;
+        std::vector<std::vector<uint32_t>> tris;
+        for (const auto& loop : m_loops) {
+            QVector<QPointF> poly;
+            for (const auto& p : loop)
+                poly << QPointF(p.X(), p.Y());
+            tris.push_back(PolygonTool::triangulate(poly));
+            triangles += int(tris.back().size() / 3);
+            segments += int(loop.size());
+        }
+        const double z = m_z - 1e-4;
+        if (triangles > 0) {
+            Handle(Graphic3d_ArrayOfTriangles) fill = new Graphic3d_ArrayOfTriangles(triangles * 3);
+            for (size_t l = 0; l < m_loops.size(); ++l)
+                for (uint32_t i : tris[l])
+                    fill->AddVertex(gp_Pnt(m_loops[l][i].X(), m_loops[l][i].Y(), z));
+            Handle(Graphic3d_Group) g = prs->NewGroup();
+            Handle(Graphic3d_AspectFillArea3d) aspect = new Graphic3d_AspectFillArea3d();
+            aspect->SetInteriorStyle(Aspect_IS_SOLID);
+            aspect->SetInteriorColor(Quantity_Color(0.25, 0.25, 0.27, Quantity_TOC_RGB));
+            aspect->SetShadingModel(Graphic3d_TypeOfShadingModel_Unlit);
+            aspect->SetFaceCulling(Graphic3d_TypeOfBackfacingModel_DoubleSided);
+            g->SetGroupPrimitivesAspect(aspect);
+            g->AddPrimitiveArray(fill);
+        }
+        if (segments > 0) {
+            Handle(Graphic3d_ArrayOfSegments) lines = new Graphic3d_ArrayOfSegments(segments * 2);
+            for (const auto& loop : m_loops)
+                for (size_t i = 0; i < loop.size(); ++i) {
+                    lines->AddVertex(gp_Pnt(loop[i].X(), loop[i].Y(), z));
+                    lines->AddVertex(gp_Pnt(loop[(i + 1) % loop.size()].X(), loop[(i + 1) % loop.size()].Y(), z));
+                }
+            Handle(Graphic3d_Group) g = prs->NewGroup();
+            g->SetGroupPrimitivesAspect(new Graphic3d_AspectLine3d(Quantity_NOC_BLACK, Aspect_TOL_SOLID, 2.0));
+            g->AddPrimitiveArray(lines);
+        }
+    }
+    void ComputeSelection(const Handle(SelectMgr_Selection)&, const int) override {}
+
+private:
+    std::vector<std::vector<gp_Pnt2d>> m_loops;
+    double m_z;
+};
+
+} // namespace
+
+void Viewport::setSectionHeight(std::optional<double> z)
+{
+    m_sectionZ = z;
+    rebuildSection();
+}
+
+void Viewport::rebuildSection()
+{
+    if (!m_section.IsNull()) {
+        m_context->Remove(m_section, false);
+        m_section.Nullify();
+    }
+    m_sectionElements = 0;
+    if (!m_sectionZ) {
+        update();
+        return;
+    }
+    std::vector<std::vector<gp_Pnt2d>> loops;
+    for (const auto& b : m_batches)
+        for (int i = 0; i < b->elementCount(); ++i) {
+            if (b->isHidden(i))
+                continue;
+            auto element = b->sectionLoops(i, *m_sectionZ);
+            if (element.empty())
+                continue;
+            ++m_sectionElements;
+            for (auto& l : element)
+                loops.push_back(std::move(l));
+        }
+    if (!loops.empty()) {
+        m_section = new SectionPrs(std::move(loops), *m_sectionZ);
+        m_context->Display(m_section, 0, -1, false);
+    }
+    update();
+}
+
 void Viewport::setGridLines(const QVector<GridLine>& lines, double z)
 {
     if (!m_grid.IsNull()) {
@@ -589,6 +684,8 @@ void Viewport::addBatch(const Handle(ElementBatch)& batch)
     const int mode = m_linesOnly ? ElementBatch::LinesOnly : ElementBatch::Shaded;
     batch->SetDisplayMode(mode); // the object's own mode, so later redisplays keep it
     m_context->Display(batch, mode, 0, false);
+    if (m_sectionZ)
+        rebuildSection();
     update();
 }
 
@@ -609,6 +706,8 @@ void Viewport::clear()
     m_idBases.clear();
     m_grid.Nullify();
     m_gridLineCount = 0;
+    m_section.Nullify();
+    m_sectionElements = 0;
     m_preview.Nullify();
     m_nextIdBase = 0;
     update();
@@ -762,6 +861,8 @@ void Viewport::selectGuids(const QStringList& guids)
 
 void Viewport::redisplay(const std::vector<int>& batches)
 {
+    if (m_sectionZ && !batches.empty())
+        rebuildSection();
     std::set<int> unique(batches.begin(), batches.end());
     for (int b : unique) {
         m_context->Redisplay(m_batches[size_t(b)], false, true);

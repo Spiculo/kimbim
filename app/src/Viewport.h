@@ -69,6 +69,10 @@ public:
         QString tag;
     };
     void setGridLines(const QVector<GridLine>& lines, double z);
+    // The plan cut's sections (owner feedback): elements cut at height z get a dark fill and a bold
+    // outline (poché); nullopt removes them. Kept up to date as elements change.
+    void setSectionHeight(std::optional<double> z);
+    int sectionElementCount() const { return m_sectionElements; }
     int gridLineCount() const { return m_gridLineCount; }
     void clear();
     void fitAll();
@@ -173,6 +177,10 @@ private:
     double m_workZ = 0.0;
     Handle(ElementBatch) m_preview;
     Handle(AIS_InteractiveObject) m_grid;
+    Handle(AIS_InteractiveObject) m_section;
+    std::optional<double> m_sectionZ;
+    int m_sectionElements = 0;
+    void rebuildSection();
     int m_gridLineCount = 0;
     bool workPoint(const QPointF& widgetPos, QPointF* point, double* tolerance);
     double m_planElevation = 0.0;

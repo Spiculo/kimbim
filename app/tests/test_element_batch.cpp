@@ -107,6 +107,21 @@ private slots:
         QCOMPARE(kimcad::ElementBatch::maxId(), 262143);
     }
 
+    // Owner feedback: cut elements need their section drawn (OCCT capping doesn't show on these
+    // meshes). The section of an element at height z = its closed outline(s) in plan.
+    void sectionOfACubeIsItsSquare()
+    {
+        const auto loops = kimcad::ElementBatch::sectionLoops(unitCube(), 0, 0.5);
+        QCOMPARE(int(loops.size()), 1);
+        double area = 0;
+        const auto& p = loops.front();
+        for (size_t i = 0; i < p.size(); ++i)
+            area += p[i].X() * p[(i + 1) % p.size()].Y() - p[(i + 1) % p.size()].X() * p[i].Y();
+        QVERIFY(std::abs(std::abs(area) / 2 - 1.0) < 1e-9);
+        QVERIFY(kimcad::ElementBatch::sectionLoops(unitCube(), 0, 1.5).empty()); // above it
+        QCOMPARE(int(p.size()), 4); // collinear points from the triangulation are merged
+    }
+
     void acceptsShadedIdAndLinesModes()
     {
         Handle(kimcad::ElementBatch) b = new kimcad::ElementBatch(unitCube());

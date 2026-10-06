@@ -14,6 +14,8 @@
 
 #include <QElapsedTimer>
 #include <QInputDialog>
+#include <QHBoxLayout>
+#include <QSlider>
 #include <QVBoxLayout>
 #include <QListWidget>
 #include <QDir>
@@ -75,7 +77,27 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     qRegisterMetaType<kimcad::MeshChunk>();
     setWindowTitle(QStringLiteral("KIMCAD"));
     resize(1280, 800);
-    setCentralWidget(m_viewport);
+    // The 3D view with the plan-cut height slider at its right edge (owner feedback).
+    auto* central = new QWidget(this);
+    auto* row = new QHBoxLayout(central);
+    row->setContentsMargins(0, 0, 0, 0);
+    row->setSpacing(0);
+    row->addWidget(m_viewport, 1);
+    auto* cutColumn = new QVBoxLayout;
+    cutColumn->setContentsMargins(4, 6, 4, 6);
+    m_cutLabel = new QLabel(central);
+    m_cutLabel->setAlignment(Qt::AlignHCenter);
+    m_cutSlider = new QSlider(Qt::Vertical, central);
+    m_cutSlider->setObjectName(QStringLiteral("planCutSlider"));
+    m_cutSlider->setToolTip(tr("Plan cut height above the active level (drag to cut the model)"));
+    m_cutSlider->setRange(0, 300);
+    m_cutSlider->setValue(120);
+    m_cutSlider->setTickPosition(QSlider::TicksLeft);
+    m_cutSlider->setTickInterval(50);
+    cutColumn->addWidget(m_cutLabel);
+    cutColumn->addWidget(m_cutSlider, 1, Qt::AlignHCenter);
+    row->addLayout(cutColumn);
+    setCentralWidget(central);
     buildMenus();
     buildDocks();
     buildCutsToolbar();
@@ -274,6 +296,7 @@ void MainWindow::buildCutsToolbar()
     levels->addWidget(m_levels);
     connect(m_levels, &LevelsBar::addLevelRequested, this, &MainWindow::addLevelDialog);
     connect(m_levels, &LevelsBar::activeStoreyChanged, this, [this](const QString&, double elevation) {
+        updateCutSliderRange();
         if (m_viewport->isPlanView())
             m_viewport->setPlanView(elevation);
         if (m_viewport->isDrawingMode()) {
@@ -296,10 +319,21 @@ void MainWindow::buildCutsToolbar()
     m_cutHeight->setValue(1.2); // typical plan cut height above a floor
     m_cutHeight->setToolTip(tr("Plan cut height"));
     bar->addWidget(m_cutHeight);
-    connect(m_cutHeight, &QDoubleSpinBox::valueChanged, this, [this] {
+    connect(m_cutHeight, &QDoubleSpinBox::valueChanged, this, [this](double metres) {
+        {
+            const QSignalBlocker block(m_cutSlider);
+            m_cutSlider->setValue(int(std::lround(metres * 100)));
+        }
+        m_cutLabel->setText(QLocale().toString(metres, 'f', 2) + QStringLiteral(" m"));
         if (m_planCut->isChecked())
             applyCuts();
     });
+    connect(m_cutSlider, &QSlider::valueChanged, this, [this](int centimetres) {
+        m_cutHeight->setValue(centimetres / 100.0); // updates the label and the cut
+        if (!m_planCut->isChecked())
+            m_planCut->setChecked(true); // using the slider means cutting
+    });
+    m_cutLabel->setText(QLocale().toString(m_cutHeight->value(), 'f', 2) + QStringLiteral(" m"));
     bar->addSeparator();
     bar->addAction(m_sectionBox);
 }
@@ -307,6 +341,19 @@ void MainWindow::buildCutsToolbar()
 void MainWindow::setPlanCutHeight(double metres)
 {
     m_cutHeight->setValue(metres);
+}
+
+double MainWindow::planCutHeight() const
+{
+    return m_cutHeight->value();
+}
+
+void MainWindow::updateCutSliderRange()
+{
+    // From the level up to the next level (or 4 m), in centimetres.
+    const QSignalBlocker block(m_cutSlider);
+    m_cutSlider->setRange(0, int(std::lround(std::max(heightToNextLevel(), 1.0) * 100)));
+    m_cutSlider->setValue(int(std::lround(m_cutHeight->value() * 100)));
 }
 
 void MainWindow::applyCuts()
@@ -319,6 +366,7 @@ void MainWindow::applyCuts()
     state.bounds = m_boxBounds;
     m_viewport->clearClipPlanes();
     m_viewport->addClipPlanes(makePlanes(state));
+    m_viewport->setSectionHeight(state.planCut ? std::optional<double>(state.height) : std::nullopt);
 }
 
 void MainWindow::showAbout()

@@ -6,6 +6,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSignalSpy>
+#include <QSlider>
 #include <QTemporaryDir>
 #include <QtTest>
 
@@ -487,6 +488,24 @@ private slots:
         QCOMPARE(w.viewport()->elementCount(), 2); // main still has both walls
         QVERIFY(w.windowTitle().contains(QStringLiteral("main")));
         QVERIFY(!w.isDirty());
+        QVERIFY(w.close());
+    }
+
+    // Feedback: the plan cut height is a slider at the right of the 3D view; using it turns the cut on.
+    void planCutSliderBesideTheView()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        auto* slider = w.findChild<QSlider*>(QStringLiteral("planCutSlider"));
+        QVERIFY(slider);
+        QCOMPARE(slider->orientation(), Qt::Vertical);
+        QCOMPARE(w.viewport()->clipPlaneCount(), 0);
+        slider->setValue(150); // centimetres above the level
+        QVERIFY(action(w, "actionPlanCut")->isChecked());
+        QCOMPARE(w.viewport()->clipPlaneCount(), 1);
+        QCOMPARE(w.planCutHeight(), 1.5);
+        w.setPlanCutHeight(2.0); // the toolbar field drives the slider too
+        QCOMPARE(slider->value(), 200);
         QVERIFY(w.close());
     }
 
