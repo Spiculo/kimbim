@@ -169,4 +169,5 @@ def test_snap_data_lists_openings(house):
     d = types("door")["Door 900x2100"]
     door = call("insert_opening", "door", house["walls"][0], d["guid"], 3.0, 0.9, 2.1, 0.0)["guid"]
     ops = call("snap_data", house["level"])["openings"]
-    assert ops == [{"guid": door, "wall": house["walls"][0], "along": pytest.approx(3.0, abs=1e-6), "width": pytest.approx(0.9)}]
+    assert ops == [{"guid": door, "wall": house["walls"][0], "along": pytest.approx(3.0, abs=1e-6), "width": pytest.approx(0.9),
+                    "height": pytest.approx(2.1), "sill": pytest.approx(0.0, abs=1e-9)}]

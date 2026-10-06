@@ -93,6 +93,23 @@ private slots:
         QVERIFY(near(ortho.point, QPointF(2.0, 0.0), 1e-9));
     }
 
+    // Slice 6: grid axes snap like walls: their crossings first, then anywhere along a line.
+    void gridCrossingsAndLines()
+    {
+        Snapper s;
+        s.setGridLines(Snapper::parseGrid(QJsonDocument::fromJson(R"({"grid":[
+            {"guid":"G","tag":"A","x1":0,"y1":-1,"x2":0,"y2":7},
+            {"guid":"G","tag":"1","x1":-1,"y1":0,"x2":9,"y2":0}]})").object()));
+        const Snap cross = s.snap(QPointF(0.04, -0.03), 0.1);
+        QCOMPARE(cross.kind, Snap::GridCross);
+        QVERIFY(near(cross.point, QPointF(0, 0)));
+        const Snap line = s.snap(QPointF(3.0, 0.06), 0.1);
+        QCOMPARE(line.kind, Snap::GridLine);
+        QVERIFY(near(line.point, QPointF(3.0, 0.0)));
+        QVERIFY(line.wallGuid.isEmpty()); // grid lines are not walls to join
+        QCOMPARE(s.snap(QPointF(3.0, 3.0), 0.1).kind, Snap::Grid);
+    }
+
     void outsideToleranceNothingSticks()
     {
         const Snapper s = withWalls();

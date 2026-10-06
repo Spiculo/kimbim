@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#define _USE_MATH_DEFINES
 #include "MainWindow.h"
 
 #include <QApplication>
@@ -12,6 +13,9 @@
 #include <algorithm>
 
 #include <QInputDialog>
+#include <QFormLayout>
+#include <QDialogButtonBox>
+#include <QDialog>
 #include <QMenu>
 #include <QSignalBlocker>
 #include <cmath>
@@ -31,6 +35,9 @@
 #include "LevelsBar.h"
 #include "HostTool.h"
 #include "PolygonTool.h"
+#include "GripTool.h"
+#include "RotateTool.h"
+#include "TwoPointTool.h"
 #include "WallTool.h"
 #include "MeshChunk.h"
 #include "ModelLoader.h"
@@ -532,6 +539,9 @@ void MainWindow::buildModelingToolbar()
     m_wallTool = new WallTool(this);
     m_polygonTool = new PolygonTool(this);
     m_hostTool = new HostTool(this);
+    m_twoPointTool = new TwoPointTool(this);
+    m_rotateTool = new RotateTool(this);
+    m_gripTool = new GripTool(this);
 
     struct Def {
         Tool tool;
@@ -547,6 +557,18 @@ void MainWindow::buildModelingToolbar()
             tr("Draw a slab outline: click points, click the first point or press Enter to close, Esc to cancel")},
         {Tool::Door, "actionDoorTool", tr("&Door"), Qt::Key_D, tr("Place doors: click on a wall")},
         {Tool::Window, "actionWindowTool", tr("Wi&ndow"), Qt::Key_N, tr("Place windows: click on a wall")},
+        {Tool::Column, "actionColumnTool", tr("&Column"), Qt::Key_K,
+            tr("Place columns: click a point (snaps to grid crossings); Shift turns it 90 degrees")},
+        {Tool::Beam, "actionBeamTool", tr("&Beam"), Qt::Key_J,
+            tr("Draw a beam: click its two ends; its top is at the level plus the height field")},
+        {Tool::Grid, "actionGridTool", tr("&Grid line"), Qt::Key_G,
+            tr("Draw a grid line: click its two ends (tags A, B... and 1, 2... are automatic)")},
+        {Tool::Move, "actionMoveTool", tr("&Move"), Qt::Key_M,
+            tr("Move the selection: click a base point, then where it goes; joined walls follow (Ctrl: detach)")},
+        {Tool::Rotate, "actionRotateTool", tr("&Rotate"), Qt::Key_R,
+            tr("Rotate the selection: click the centre, a reference, then the new direction (or type degrees)")},
+        {Tool::Stretch, "actionStretchTool", tr("S&tretch wall"), Qt::Key_E,
+            tr("Stretch a wall: click near one of its ends, then click its new position (or type the length)")},
     };
     for (const Def& d : defs) {
         QAction* a = bar->addAction(d.text);
@@ -560,6 +582,12 @@ void MainWindow::buildModelingToolbar()
         m_toolActions.insert(int(d.tool), a);
     }
     model->addSeparator();
+    QAction* heightAction = model->addAction(tr("Wall &height..."));
+    heightAction->setObjectName(QStringLiteral("actionWallHeight"));
+    connect(heightAction, &QAction::triggered, this, &MainWindow::wallHeightDialog);
+    QAction* sizeAction = model->addAction(tr("Door/window si&ze..."));
+    sizeAction->setObjectName(QStringLiteral("actionOpeningSize"));
+    connect(sizeAction, &QAction::triggered, this, &MainWindow::openingSizeDialog);
     QAction* slabFromWallsAction = model->addAction(tr("Slab from selected &walls"));
     slabFromWallsAction->setObjectName(QStringLiteral("actionSlabFromWalls"));
     connect(slabFromWallsAction, &QAction::triggered, this, [this] { slabFromWalls(m_selection); });
@@ -593,7 +621,16 @@ void MainWindow::buildModelingToolbar()
         double value = QLocale().toDouble(m_lengthInput->text(), &ok);
         if (!ok)
             value = QLocale::c().toDouble(QString(m_lengthInput->text()).replace(QLatin1Char(','), QLatin1Char('.')), &ok);
-        if (ok && m_wallTool->typeLength(value))
+        bool typed = false;
+        if (m_tool == Tool::Wall)
+            typed = m_wallTool->typeLength(value);
+        else if (ok && m_tool == Tool::Rotate)
+            typed = m_rotateTool->typeAngle(value); // degrees
+        else if (ok && m_tool == Tool::Stretch)
+            typed = m_gripTool->typeLength(value);
+        else if (ok)
+            typed = m_twoPointTool->typeLength(value);
+        if (ok && typed)
             m_lengthInput->clear();
         m_viewport->setFocus();
     });
@@ -617,6 +654,32 @@ void MainWindow::buildModelingToolbar()
             m_hostTool->setTolerance(tolerance);
             m_hostTool->move(p);
             break;
+        case Tool::Beam:
+        case Tool::Grid:
+            m_twoPointTool->setTolerance(tolerance);
+            m_twoPointTool->setOrtho(ortho);
+            showSnap(m_twoPointTool->move(p));
+            break;
+        case Tool::Column:
+            m_twoPointTool->setTolerance(tolerance);
+            m_columnHover = m_twoPointTool->snapper().snap(p, tolerance).point;
+            updateToolPreview();
+            break;
+        case Tool::Move:
+            m_twoPointTool->setTolerance(tolerance);
+            m_twoPointTool->setOrtho(ortho);
+            m_twoPointTool->move(p);
+            break;
+        case Tool::Rotate:
+            m_rotateTool->setTolerance(tolerance);
+            m_rotateTool->setOrtho(ortho);
+            m_rotateTool->move(p);
+            break;
+        case Tool::Stretch:
+            m_gripTool->setTolerance(tolerance);
+            m_gripTool->setOrtho(ortho);
+            m_gripTool->move(p);
+            break;
         case Tool::None:
             break;
         }
@@ -639,6 +702,33 @@ void MainWindow::buildModelingToolbar()
             m_hostTool->setTolerance(tolerance);
             m_hostTool->click(p);
             break;
+        case Tool::Beam:
+        case Tool::Grid:
+            m_twoPointTool->setTolerance(tolerance);
+            m_twoPointTool->setOrtho(ortho);
+            m_twoPointTool->click(p);
+            break;
+        case Tool::Column:
+            m_twoPointTool->setTolerance(tolerance);
+            columnAt(p, ortho);
+            break;
+        case Tool::Move:
+            m_detach = mods & Qt::ControlModifier;
+            m_twoPointTool->setTolerance(tolerance);
+            m_twoPointTool->setOrtho(ortho);
+            m_twoPointTool->click(p);
+            break;
+        case Tool::Rotate:
+            m_detach = mods & Qt::ControlModifier;
+            m_rotateTool->setTolerance(tolerance);
+            m_rotateTool->setOrtho(ortho);
+            m_rotateTool->click(p);
+            break;
+        case Tool::Stretch:
+            m_gripTool->setTolerance(tolerance);
+            m_gripTool->setOrtho(ortho);
+            m_gripTool->click(p);
+            break;
         case Tool::None:
             break;
         }
@@ -649,6 +739,12 @@ void MainWindow::buildModelingToolbar()
             m_wallTool->finish();
         else if (m_tool == Tool::Slab && m_polygonTool->isDrawing())
             m_polygonTool->cancel();
+        else if ((m_tool == Tool::Beam || m_tool == Tool::Grid || m_tool == Tool::Move) && m_twoPointTool->isDrawing())
+            m_twoPointTool->cancel();
+        else if (m_tool == Tool::Rotate && m_rotateTool->stage() > 0)
+            m_rotateTool->cancel();
+        else if (m_tool == Tool::Stretch && m_gripTool->isDragging())
+            m_gripTool->cancel();
         else
             setTool(Tool::None);
     });
@@ -659,7 +755,7 @@ void MainWindow::buildModelingToolbar()
             m_polygonTool->finish();
     });
     connect(m_viewport, &Viewport::lengthKeyTyped, this, [this](const QString& text) {
-        if (m_tool != Tool::Wall)
+        if (!m_lengthAction->isVisible())
             return;
         m_lengthInput->setFocus();
         m_lengthInput->insert(text);
@@ -667,6 +763,17 @@ void MainWindow::buildModelingToolbar()
     connect(m_wallTool, &WallTool::previewChanged, this, &MainWindow::updateToolPreview);
     connect(m_polygonTool, &PolygonTool::previewChanged, this, &MainWindow::updateToolPreview);
     connect(m_hostTool, &HostTool::previewChanged, this, &MainWindow::updateToolPreview);
+    connect(m_twoPointTool, &TwoPointTool::previewChanged, this, &MainWindow::updateToolPreview);
+    connect(m_twoPointTool, &TwoPointTool::segmentFinished, this, [this](QPointF a, QPointF b) {
+        if (m_tool == Tool::Move)
+            moveSelection(b - a, m_detach);
+        else
+            createSegment(a, b);
+    });
+    connect(m_rotateTool, &RotateTool::previewChanged, this, &MainWindow::updateToolPreview);
+    connect(m_gripTool, &GripTool::previewChanged, this, &MainWindow::updateToolPreview);
+    connect(m_rotateTool, &RotateTool::rotationFinished, this, [this](QPointF c, double a) { rotateSelection(c, a, m_detach); });
+    connect(m_gripTool, &GripTool::stretchRequested, this, &MainWindow::stretchWall);
     connect(m_wallTool, &WallTool::wallRequested, this, &MainWindow::createWall);
     connect(m_polygonTool, &PolygonTool::polygonFinished, this, &MainWindow::createSlab);
     connect(m_polygonTool, &PolygonTool::rejected, this, [this](const QString& why) { statusBar()->showMessage(why); });
@@ -697,6 +804,13 @@ void MainWindow::refreshTypes()
         source = "opening_types";
         args << QStringLiteral("window");
         break;
+    case Tool::Column:
+        source = "column_types";
+        break;
+    case Tool::Beam:
+        source = "beam_types";
+        break;
+    case Tool::Grid:
     case Tool::None:
         break;
     }
@@ -718,9 +832,17 @@ void MainWindow::refreshSnapData()
 {
     const QJsonObject data = bridge("snap_data", {m_levels->activeStorey()});
     const QVector<SnapWall> walls = Snapper::parse(data);
-    m_wallTool->snapper().setWalls(walls);
-    m_polygonTool->snapper().setWalls(walls);
+    const QVector<SnapLine> lines = Snapper::parseGrid(data);
+    for (Snapper* s : {&m_wallTool->snapper(), &m_polygonTool->snapper(), &m_twoPointTool->snapper(),
+             &m_rotateTool->snapper(), &m_gripTool->snapper()}) {
+        s->setWalls(walls);
+        s->setGridLines(lines);
+    }
     m_hostTool->setWalls(walls);
+    QVector<Viewport::GridLine> shown;
+    for (const SnapLine& l : lines)
+        shown.push_back({l.a, l.b, l.tag});
+    m_viewport->setGridLines(shown, m_levels->activeElevation());
 }
 
 void MainWindow::updateToolPreview()
@@ -742,6 +864,35 @@ void MainWindow::updateToolPreview()
             boxes.push_back({pts[i], pts[i + 1], 0.05, z - depth, z});
         break;
     }
+    case Tool::Column:
+        if (m_columnHover) {
+            const double w = type.value("width").toDouble(0.3), d = type.value("depth").toDouble(0.3);
+            boxes.push_back({*m_columnHover - QPointF(w / 2, 0), *m_columnHover + QPointF(w / 2, 0), d, z, z + m_wallHeight->value()});
+        }
+        break;
+    case Tool::Beam:
+        if (const auto seg = m_twoPointTool->preview()) {
+            const double top = z + m_wallHeight->value();
+            boxes.push_back({seg->first, seg->second, type.value("width").toDouble(0.2), top - type.value("depth").toDouble(0.4), top});
+        }
+        break;
+    case Tool::Grid:
+    case Tool::Move:
+        if (const auto seg = m_twoPointTool->preview())
+            boxes.push_back({seg->first, seg->second, 0.03, z, z + 0.02});
+        break;
+    case Tool::Rotate:
+        if (const auto c = m_rotateTool->centre()) {
+            if (const auto r = m_rotateTool->reference())
+                boxes.push_back({*c, *r, 0.03, z, z + 0.02});
+            if (const auto h = m_rotateTool->hover())
+                boxes.push_back({*c, *h, 0.03, z, z + 0.02});
+        }
+        break;
+    case Tool::Stretch:
+        if (const auto axis = m_gripTool->preview())
+            boxes.push_back({axis->first, axis->second, std::max(m_gripTool->thickness(), 0.05), z, z + m_wallHeight->value()});
+        break;
     case Tool::Door:
     case Tool::Window:
         if (const auto host = m_hostTool->hover()) {
@@ -761,9 +912,10 @@ void MainWindow::updateToolPreview()
 void MainWindow::showSnap(const Snap& snap)
 {
     static const char* const names[] = {"", QT_TR_NOOP("endpoint"), QT_TR_NOOP("midpoint"), QT_TR_NOOP("perpendicular"),
-        QT_TR_NOOP("on wall"), QT_TR_NOOP("angle"), QT_TR_NOOP("grid")};
+        QT_TR_NOOP("on wall"), QT_TR_NOOP("angle"), QT_TR_NOOP("grid"), QT_TR_NOOP("grid crossing"), QT_TR_NOOP("on grid line")};
     QString text = tr("Wall: click the next point, type a length, Esc to finish");
-    if (const auto preview = m_wallTool->preview()) {
+    const auto preview = m_tool == Tool::Wall ? m_wallTool->preview() : m_twoPointTool->preview();
+    if (preview) {
         const QPointF d = preview->second - preview->first;
         text = tr("Length %1 m").arg(QLocale().toString(std::hypot(d.x(), d.y()), 'f', 3));
     }
@@ -780,14 +932,33 @@ void MainWindow::setTool(Tool tool)
     }
     m_wallTool->finish();
     m_polygonTool->cancel();
+    m_twoPointTool->cancel();
+    m_rotateTool->cancel();
+    m_gripTool->cancel();
+    m_columnHover.reset();
     m_tool = tool;
     for (auto it = m_toolActions.constBegin(); it != m_toolActions.constEnd(); ++it) {
         const QSignalBlocker block(it.value());
         it.value()->setChecked(it.key() == int(tool));
     }
-    m_wallHeightAction->setVisible(tool == Tool::Wall);
-    m_lengthAction->setVisible(tool == Tool::Wall);
-    m_types->setVisible(tool != Tool::None);
+    m_wallHeightAction->setVisible(tool == Tool::Wall || tool == Tool::Column || tool == Tool::Beam);
+    m_lengthAction->setVisible(tool == Tool::Wall || tool == Tool::Beam || tool == Tool::Grid || tool == Tool::Move
+        || tool == Tool::Rotate || tool == Tool::Stretch);
+    m_lengthInput->setPlaceholderText(tool == Tool::Rotate ? tr("Angle (degrees)") : tr("Length (m)"));
+    const bool typed = tool == Tool::Wall || tool == Tool::Slab || tool == Tool::Door || tool == Tool::Window
+        || tool == Tool::Column || tool == Tool::Beam;
+    m_types->setVisible(typed);
+    if ((tool == Tool::Move || tool == Tool::Rotate) && m_selection.isEmpty()) {
+        statusBar()->showMessage(tr("Select something first, then move or rotate it"));
+        tool = Tool::None;
+        m_tool = tool;
+        for (QAction* a : std::as_const(m_toolActions)) {
+            const QSignalBlocker block(a);
+            a->setChecked(false);
+        }
+        m_viewport->setDrawingMode(false);
+        return;
+    }
     refreshTypes();
     if (tool == Tool::None) {
         m_viewport->setDrawingMode(false);
@@ -804,10 +975,211 @@ void MainWindow::setTool(Tool tool)
     case Tool::Slab:
         statusBar()->showMessage(tr("Slab: click the outline's points; click the first point or press Enter to close"));
         break;
+    case Tool::Column:
+        statusBar()->showMessage(tr("Column: click to place it"));
+        break;
+    case Tool::Beam:
+    case Tool::Grid:
+        statusBar()->showMessage(tr("Click the first point"));
+        break;
+    case Tool::Move:
+        statusBar()->showMessage(tr("Move: click a base point, then where it goes (Ctrl: detach joined walls)"));
+        break;
+    case Tool::Rotate:
+        statusBar()->showMessage(tr("Rotate: click the centre, then a reference direction, then the new direction"));
+        break;
+    case Tool::Stretch:
+        statusBar()->showMessage(tr("Stretch: click near a wall end, then its new position"));
+        break;
     default:
         statusBar()->showMessage(tr("Click on a wall to place it"));
         break;
     }
+}
+
+bool MainWindow::moveSelection(QPointF delta, bool detach)
+{
+    if (m_selection.isEmpty())
+        return false;
+    auto num = [](double v) { return QString::number(v, 'g', 17); };
+    // Doors and windows on their own slide along their walls; anything else moves freely.
+    bool onlyOpenings = true;
+    for (const QString& g : std::as_const(m_selection)) {
+        const QString type = m_viewport->typeOf(g);
+        if (type != QLatin1String("IfcDoor") && type != QLatin1String("IfcWindow"))
+            onlyOpenings = false;
+    }
+    const QJsonObject r = onlyOpenings
+        ? bridge("slide_openings", {jsonList(m_selection), num(delta.x()), num(delta.y())})
+        : bridge("move_elements", {jsonList(m_selection), num(delta.x()), num(delta.y()), QStringLiteral("0"),
+              detach ? QStringLiteral("1") : QStringLiteral("0")});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not move: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    return true;
+}
+
+bool MainWindow::rotateSelection(QPointF centre, double radians, bool detach)
+{
+    if (m_selection.isEmpty())
+        return false;
+    auto num = [](double v) { return QString::number(v, 'g', 17); };
+    const QJsonObject r = bridge("rotate_elements", {jsonList(m_selection), num(centre.x()), num(centre.y()), num(radians),
+        detach ? QStringLiteral("1") : QStringLiteral("0")});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not rotate: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    return true;
+}
+
+bool MainWindow::stretchWall(const QString& wall, QPointF p1, QPointF p2)
+{
+    auto num = [](double v) { return QString::number(v, 'g', 17); };
+    const QJsonObject r = bridge("set_wall_axis", {wall, num(p1.x()), num(p1.y()), num(p2.x()), num(p2.y())});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not stretch: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    return true;
+}
+
+bool MainWindow::setWallHeight(const QStringList& walls, double height)
+{
+    const QJsonObject r = bridge("set_wall_height", {jsonList(walls), QString::number(height, 'g', 17)});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not change the height: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    return true;
+}
+
+QJsonObject MainWindow::openingInfo(const QString& guid)
+{
+    for (const auto& o : bridge("snap_data", {m_levels->activeStorey()}).value("openings").toArray())
+        if (o.toObject().value("guid").toString() == guid)
+            return o.toObject();
+    return {};
+}
+
+bool MainWindow::resizeOpening(const QString& guid, double width, double height, double sill)
+{
+    const QJsonObject info = openingInfo(guid);
+    if (info.isEmpty()) {
+        statusBar()->showMessage(tr("Select one door or window on the active level"));
+        return false;
+    }
+    auto num = [](double v) { return QString::number(v, 'g', 17); };
+    const QJsonObject r = bridge("edit_opening", {guid, num(info.value("along").toDouble()), num(width), num(height), num(sill)});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not resize: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    return true;
+}
+
+void MainWindow::wallHeightDialog()
+{
+    QStringList walls;
+    for (const QString& g : std::as_const(m_selection))
+        if (m_viewport->typeOf(g) == QLatin1String("IfcWall"))
+            walls << g;
+    if (walls.isEmpty()) {
+        statusBar()->showMessage(tr("Select one or more walls first"));
+        return;
+    }
+    bool ok = false;
+    const double height = QInputDialog::getDouble(this, tr("Wall height"), tr("Height (m):"), m_wallHeight->value(), 0.1, 100.0, 2, &ok);
+    if (ok)
+        setWallHeight(walls, height);
+}
+
+void MainWindow::openingSizeDialog()
+{
+    const QJsonObject info = m_selection.size() == 1 ? openingInfo(m_selection.first()) : QJsonObject();
+    if (info.isEmpty()) {
+        statusBar()->showMessage(tr("Select one door or window on the active level"));
+        return;
+    }
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Door/window size"));
+    auto* form = new QFormLayout(&dialog);
+    auto spin = [&](double value) {
+        auto* box = new QDoubleSpinBox(&dialog);
+        box->setRange(0.0, 20.0);
+        box->setDecimals(3);
+        box->setSingleStep(0.05);
+        box->setSuffix(QStringLiteral(" m"));
+        box->setValue(value);
+        return box;
+    };
+    QDoubleSpinBox* width = spin(info.value("width").toDouble());
+    QDoubleSpinBox* height = spin(info.value("height").toDouble());
+    QDoubleSpinBox* sill = spin(info.value("sill").toDouble());
+    form->addRow(tr("Width:"), width);
+    form->addRow(tr("Height:"), height);
+    form->addRow(tr("Sill height:"), sill);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    form->addRow(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    if (dialog.exec() == QDialog::Accepted)
+        resizeOpening(m_selection.first(), width->value(), height->value(), sill->value());
+}
+
+int MainWindow::gridLineCount() const
+{
+    return m_viewport->gridLineCount();
+}
+
+static QJsonObject firstType(const QJsonObject& listing)
+{
+    const QJsonArray types = listing.value("types").toArray();
+    return types.isEmpty() ? QJsonObject() : types.first().toObject();
+}
+
+bool MainWindow::columnAt(QPointF p, bool turned)
+{
+    const Snap s = m_twoPointTool->snapper().snap(p, m_twoPointTool->tolerance());
+    QJsonObject type = m_tool == Tool::Column ? currentType() : QJsonObject();
+    if (type.isEmpty())
+        type = firstType(bridge("column_types"));
+    auto num = [](double v) { return QString::number(v, 'g', 17); };
+    const QJsonObject r = bridge("create_column", {m_levels->activeStorey(), type.value("guid").toString(), num(s.point.x()),
+        num(s.point.y()), num(m_wallHeight->value()), num(turned ? M_PI / 2 : 0.0)});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not place it: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    return true;
+}
+
+bool MainWindow::createSegment(QPointF p1, QPointF p2)
+{
+    auto num = [](double v) { return QString::number(v, 'g', 17); };
+    QJsonObject r;
+    if (m_tool == Tool::Grid) {
+        r = bridge("add_grid_axis", {m_levels->activeStorey(), num(p1.x()), num(p1.y()), num(p2.x()), num(p2.y()), QString()});
+    } else {
+        QJsonObject type = m_tool == Tool::Beam ? currentType() : QJsonObject();
+        if (type.isEmpty())
+            type = firstType(bridge("beam_types"));
+        r = bridge("create_beam", {m_levels->activeStorey(), type.value("guid").toString(), num(p1.x()), num(p1.y()),
+            num(p2.x()), num(p2.y()), num(m_levels->activeElevation() + m_wallHeight->value())});
+    }
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not create it: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    return true;
 }
 
 bool MainWindow::createSlab(const QVector<QPointF>& outline)
@@ -943,8 +1315,7 @@ void MainWindow::afterEdit(const QJsonObject& result)
         showError(tr("The model may be inconsistent"),
             tr("An edit failed and could not be undone. Save a copy if you need it, then reopen the file."));
     }
-    if (m_viewport->isDrawingMode())
-        refreshSnapData(); // undo/redo can add or remove walls under the tool
+    refreshSnapData(); // undo/redo can add or remove walls and grid lines
     const QJsonObject s = bridge("state");
     m_undo->setEnabled(s.value("can_undo").toBool());
     m_redo->setEnabled(s.value("can_redo").toBool());

@@ -6,6 +6,11 @@
 #include <OpenGl_GraphicDriver.hxx>
 #include <Prs3d_Drawer.hxx>
 #include <Standard_Failure.hxx>
+#include <TCollection_ExtendedString.hxx>
+#include <Graphic3d_AspectLine3d.hxx>
+#include <Graphic3d_ArrayOfSegments.hxx>
+#include <Prs3d_TextAspect.hxx>
+#include <Prs3d_Text.hxx>
 #include <V3d_ImageDumpOptions.hxx>
 #include <Image_PixMap.hxx>
 #include <V3d_DirectionalLight.hxx>
@@ -394,6 +399,59 @@ void Viewport::setWallPreview(const std::optional<std::pair<QPointF, QPointF>>& 
     setPreviewBoxes(boxes);
 }
 
+namespace {
+
+// Grid axes as dashed lines with text tags; display only (no selection modes).
+class GridLinesPrs : public AIS_InteractiveObject {
+public:
+    GridLinesPrs(QVector<Viewport::GridLine> lines, double z)
+        : m_lines(std::move(lines))
+        , m_z(z)
+    {
+    }
+    void Compute(const Handle(PrsMgr_PresentationManager)&, const Handle(Prs3d_Presentation)& prs, const int) override
+    {
+        if (m_lines.isEmpty())
+            return;
+        Handle(Graphic3d_ArrayOfSegments) arr = new Graphic3d_ArrayOfSegments(int(m_lines.size()) * 2);
+        for (const auto& l : m_lines) {
+            arr->AddVertex(gp_Pnt(l.a.x(), l.a.y(), m_z));
+            arr->AddVertex(gp_Pnt(l.b.x(), l.b.y(), m_z));
+        }
+        Handle(Graphic3d_Group) lines = prs->NewGroup();
+        lines->SetGroupPrimitivesAspect(new Graphic3d_AspectLine3d(Quantity_Color(0.35, 0.45, 0.65, Quantity_TOC_RGB), Aspect_TOL_DASH, 1.0));
+        lines->AddPrimitiveArray(arr);
+        Handle(Prs3d_TextAspect) text = new Prs3d_TextAspect();
+        text->SetColor(Quantity_Color(0.15, 0.25, 0.55, Quantity_TOC_RGB));
+        text->SetHeight(14);
+        Handle(Graphic3d_Group) labels = prs->NewGroup();
+        for (const auto& l : m_lines)
+            for (const QPointF& p : {l.a, l.b})
+                Prs3d_Text::Draw(labels, text, TCollection_ExtendedString(l.tag.toUtf8().constData(), true), gp_Pnt(p.x(), p.y(), m_z));
+    }
+    void ComputeSelection(const Handle(SelectMgr_Selection)&, const int) override {}
+
+private:
+    QVector<Viewport::GridLine> m_lines;
+    double m_z;
+};
+
+} // namespace
+
+void Viewport::setGridLines(const QVector<GridLine>& lines, double z)
+{
+    if (!m_grid.IsNull()) {
+        m_context->Remove(m_grid, false);
+        m_grid.Nullify();
+    }
+    m_gridLineCount = int(lines.size());
+    if (!lines.isEmpty()) {
+        m_grid = new GridLinesPrs(lines, z);
+        m_context->Display(m_grid, 0, -1, false);
+    }
+    update();
+}
+
 void Viewport::setPreviewBoxes(const QVector<PreviewBox>& boxes)
 {
     if (!m_preview.IsNull()) {
@@ -545,6 +603,9 @@ void Viewport::clear()
     m_batches.clear();
     m_locate.clear();
     m_idBases.clear();
+    m_grid.Nullify();
+    m_gridLineCount = 0;
+    m_preview.Nullify();
     m_nextIdBase = 0;
     update();
 }
@@ -566,6 +627,12 @@ QStringList Viewport::guids() const
             if (!b->isRetired(i))
                 out << b->guid(i);
     return out;
+}
+
+QString Viewport::typeOf(const QString& guid) const
+{
+    const auto it = m_locate.constFind(guid);
+    return it == m_locate.constEnd() ? QString() : m_batches[size_t(it->batch)]->type(it->index);
 }
 
 bool Viewport::retire(const QString& guid, std::vector<int>* touched)

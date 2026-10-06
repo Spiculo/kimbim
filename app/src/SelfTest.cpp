@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#define _USE_MATH_DEFINES
 #include "SelfTest.h"
 
 #include <QAction>
@@ -16,9 +17,13 @@
 
 #include "MainWindow.h"
 #include "HostTool.h"
+#include "TwoPointTool.h"
 #include "WallTool.h"
 
 #include <QRegularExpression>
+
+#include <cmath>
+#include <utility>
 
 #include "ModelTreePanel.h"
 #include "PythonEngine.h"
@@ -125,7 +130,24 @@ static int runHouse(const SelfTestOptions& options)
     window.setTool(MainWindow::Tool::Window);
     window.hostTool()->setTolerance(0.05);
     window.hostTool()->click(QPointF(4.0, 6.0));
+    // Slice 6: grid lines on the wall axes, a column and a beam on the middle line, then move and
+    // rotate everything (joined walls stay joined, doors and windows go along).
+    window.setTool(MainWindow::Tool::Grid);
+    for (const auto& [a, b] : {std::pair{QPointF(0, -1), QPointF(0, 7)}, std::pair{QPointF(8, -1), QPointF(8, 7)},
+             std::pair{QPointF(-1, 0), QPointF(9, 0)}, std::pair{QPointF(-1, 6), QPointF(9, 6)}}) {
+        window.twoPointTool()->click(a);
+        window.twoPointTool()->click(b);
+    }
+    window.setTool(MainWindow::Tool::Column);
+    window.columnAt(QPointF(4.0, 3.0));
+    window.setTool(MainWindow::Tool::Beam);
+    window.twoPointTool()->click(QPointF(0.0, 3.0));
+    window.twoPointTool()->click(QPointF(8.0, 3.0));
     window.setTool(MainWindow::Tool::None);
+    const int gridLines = window.gridLineCount();
+    window.setSelection(window.viewport()->guids());
+    const bool moved = window.moveSelection(QPointF(1.0, 0.0));
+    const bool rotated = window.rotateSelection(QPointF(0.0, 0.0), M_PI / 2);
     window.viewport()->fitAll();
     QApplication::processEvents();
     auto count = [](const char* cls) {
@@ -134,10 +156,12 @@ static int runHouse(const SelfTestOptions& options)
             .object().value("count").toInt();
     };
     const int nWalls = count("IfcWall"), slabs = count("IfcSlab"), doors = count("IfcDoor"), windows = count("IfcWindow"),
-              openings = count("IfcOpeningElement"), elements = window.viewport()->elementCount();
-    QJsonObject result{{"ok", nWalls == 4 && slabs == 1 && doors == 1 && windows == 1 && openings == 2 && elements == 7},
+              openings = count("IfcOpeningElement"), columns = count("IfcColumn"), beams = count("IfcBeam"),
+              joins = count("IfcRelConnectsPathElements"), elements = window.viewport()->elementCount();
+    QJsonObject result{{"ok", nWalls == 4 && slabs == 1 && doors == 1 && windows == 1 && openings == 2 && columns == 1
+                                  && beams == 1 && gridLines == 4 && joins == 4 && moved && rotated && elements == 9},
         {"walls", nWalls}, {"slabs", slabs}, {"doors", doors}, {"windows", windows}, {"openings", openings},
-        {"elements", elements}};
+        {"columns", columns}, {"beams", beams}, {"grid", gridLines}, {"joins", joins}, {"elements", elements}};
     if (!options.screenshot.isEmpty())
         takeScreenshots(window, options.screenshot, &result);
     window.close();

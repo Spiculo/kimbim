@@ -30,6 +30,10 @@ Open an IFC file. It appears progressively in the 3D view, with the spatial tree
 | Draw walls | **W**, then click points (snaps to wall ends, midpoints, perpendiculars, 15° angles; **Shift** for right angles), type a length + **Enter**, **Esc** to finish. Walls join at corners and T's |
 | Draw slabs | **S**, click the outline's points, click the first point or **Enter** to close; or select a closed loop of walls and use *Model › Slab from selected walls* |
 | Place doors / windows | **D** / **N**, then click on a wall (the type sets the size and sill) |
+| Columns / beams / grid lines | **K** (click; **Shift** turns it 90°) / **J** (two clicks; top = level + height field) / **G** (two clicks; tags A, B… and 1, 2… are automatic; points snap to grid crossings) |
+| Move / rotate | Select, then **M** (base point, target) or **R** (centre, reference, new direction; or type degrees). Walls joined to what you move stretch along their own line to stay joined (they stay straight); hold **Ctrl** on the last click to detach them. Doors/windows alone slide along their wall |
+| Stretch a wall | **E**, click near a wall end, click its new position (or type the length) |
+| Wall height / door size | *Model › Wall height…* / *Model › Door/window size…* for the selection |
 | Delete | **Del** (deleting a wall also deletes its doors and windows) |
 
 ## Try it (command line)

@@ -47,6 +47,17 @@ QVector<SnapWall> Snapper::parse(const QJsonObject& snapData)
     return out;
 }
 
+QVector<SnapLine> Snapper::parseGrid(const QJsonObject& snapData)
+{
+    QVector<SnapLine> out;
+    for (const auto& v : snapData.value("grid").toArray()) {
+        const QJsonObject g = v.toObject();
+        out.push_back({g.value("guid").toString(), g.value("tag").toString(),
+            QPointF(g.value("x1").toDouble(), g.value("y1").toDouble()), QPointF(g.value("x2").toDouble(), g.value("y2").toDouble())});
+    }
+    return out;
+}
+
 QPointF Snapper::onGrid(QPointF p) const
 {
     if (m_grid <= 0)
@@ -81,6 +92,22 @@ Snap Snapper::snap(QPointF p, double tolerance, const QPointF* from, bool ortho)
         *q = dist(p, w.a) <= dist(p, w.b) ? w.a : w.b;
         return true;
     });
+    if (s.kind == Snap::None) { // grid-axis crossings
+        double bestDistance = tolerance;
+        for (int i = 0; i < m_lines.size(); ++i)
+            for (int j = i + 1; j < m_lines.size(); ++j) {
+                const QPointF a = m_lines[i].a, b = m_lines[i].b, c = m_lines[j].a, d = m_lines[j].b;
+                const double den = (b.x() - a.x()) * (d.y() - c.y()) - (b.y() - a.y()) * (d.x() - c.x());
+                if (std::abs(den) < 1e-12)
+                    continue;
+                const double t = ((c.x() - a.x()) * (d.y() - c.y()) - (c.y() - a.y()) * (d.x() - c.x())) / den;
+                const QPointF x = a + (b - a) * t;
+                if (dist(p, x) <= bestDistance) {
+                    bestDistance = dist(p, x);
+                    s = Snap{x, Snap::GridCross, {}};
+                }
+            }
+    }
     if (s.kind == Snap::None)
         s = best(Snap::Midpoint, [&](const SnapWall& w, QPointF* q) {
             *q = (w.a + w.b) / 2;
@@ -98,6 +125,17 @@ Snap Snapper::snap(QPointF p, double tolerance, const QPointF* from, bool ortho)
             *q = project(p, w.a, w.b, &inside);
             return inside;
         });
+    if (s.kind == Snap::None) { // anywhere along a grid axis
+        double bestDistance = tolerance;
+        for (const SnapLine& line : m_lines) {
+            bool inside = false;
+            const QPointF q = project(p, line.a, line.b, &inside);
+            if (inside && dist(p, q) <= bestDistance) {
+                bestDistance = dist(p, q);
+                s = Snap{q, Snap::GridLine, {}};
+            }
+        }
+    }
     if (s.kind != Snap::None)
         return s;
 

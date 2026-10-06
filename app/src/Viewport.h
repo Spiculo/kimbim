@@ -61,12 +61,20 @@ public:
         double width = 0, z0 = 0, z1 = 0;
     };
     void setPreviewBoxes(const QVector<PreviewBox>& boxes);
+    // Grid axes of the active level: dashed lines with their tags at both ends (not selectable).
+    struct GridLine {
+        QPointF a, b;
+        QString tag;
+    };
+    void setGridLines(const QVector<GridLine>& lines, double z);
+    int gridLineCount() const { return m_gridLineCount; }
     void clear();
     void fitAll();
 
     int batchCount() const { return int(m_batches.size()); }
     int elementCount() const { return m_locate.size(); }
     QStringList guids() const; // in batch order
+    QString typeOf(const QString& guid) const; // IFC class of a shown element ("" if unknown)
     int visibleElementCount() const;
     qint64 triangleCount() const;
 
@@ -156,6 +164,8 @@ private:
     bool m_drawingMode = false;
     double m_workZ = 0.0;
     Handle(ElementBatch) m_preview;
+    Handle(AIS_InteractiveObject) m_grid;
+    int m_gridLineCount = 0;
     bool workPoint(const QPointF& widgetPos, QPointF* point, double* tolerance);
     double m_planElevation = 0.0;
     std::vector<Handle(Graphic3d_ClipPlane)> m_clipPlanes;

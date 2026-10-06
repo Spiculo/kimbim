@@ -9,11 +9,16 @@
 #include <QTemporaryDir>
 #include <QtTest>
 
+#include <cmath>
+
 #include "ElementBatch.h"
 #include "LevelsBar.h"
 #include "HostTool.h"
 #include "MainWindow.h"
 #include "PolygonTool.h"
+#include "GripTool.h"
+#include "RotateTool.h"
+#include "TwoPointTool.h"
 #include "WallTool.h"
 #include "PythonEngine.h"
 #include "Viewport.h"
@@ -270,6 +275,116 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // Slice 6: columns, beams and grid lines through the tools; undo removes them.
+    void columnBeamGridWithTheTools()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        w.setTool(kimcad::MainWindow::Tool::Grid);
+        w.twoPointTool()->click({0, -1});
+        w.twoPointTool()->click({0, 7});
+        QCOMPARE(w.gridLineCount(), 1);
+        w.setTool(kimcad::MainWindow::Tool::Column);
+        w.columnAt(QPointF(0.03, 0.02)); // snaps onto the grid line
+        QCOMPARE(w.viewport()->elementCount(), 1);
+        w.setTool(kimcad::MainWindow::Tool::Beam);
+        w.twoPointTool()->click({0, 0});
+        w.twoPointTool()->click({0, 5});
+        QCOMPARE(w.viewport()->elementCount(), 2);
+        action(w, "actionUndo")->trigger();
+        QCOMPARE(w.viewport()->elementCount(), 1);
+        action(w, "actionUndo")->trigger();
+        action(w, "actionUndo")->trigger();
+        QCOMPARE(w.viewport()->elementCount(), 0);
+        QCOMPARE(w.gridLineCount(), 0);
+        QVERIFY(w.close());
+    }
+
+    // Slice 6: editing through the tools: move a wall (its door follows), slide a door, rotate a
+    // beam, stretch a wall, change a wall's height, resize a door; undo restores.
+    void moveRotateStretchWithTheTools()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->setTolerance(0.05);
+        for (const QPointF& p : {QPointF(0, 0), QPointF(8, 0), QPointF(8, 6), QPointF(0, 6), QPointF(0, 0)})
+            w.wallTool()->click(p);
+        const QStringList walls = w.viewport()->guids();
+        w.setTool(kimcad::MainWindow::Tool::Door);
+        w.hostTool()->setTolerance(0.05);
+        w.hostTool()->click({4.0, 0.0});
+        QString door;
+        for (const QString& g : w.viewport()->guids())
+            if (w.viewport()->typeOf(g) == QLatin1String("IfcDoor"))
+                door = g;
+        QVERIFY(!door.isEmpty());
+        auto centre = [&](const QString& g) {
+            double x0, y0, z0, x1, y1, z1;
+            w.viewport()->boundsOf({g}).Get(x0, y0, z0, x1, y1, z1);
+            return QVector<double>{(x0 + x1) / 2, (y0 + y1) / 2, z1, x1 - x0, y1 - y0};
+        };
+        const double doorY = centre(door)[1];
+        // Batches are re-made as walls get joined, so find the south wall by where it is.
+        QString south;
+        for (const QString& g : walls)
+            if (std::abs(centre(g)[1]) < 0.2 && centre(g)[3] > 7.0)
+                south = g;
+        QVERIFY(!south.isEmpty());
+
+        // Move the south wall 1 m south: the door goes with it, the side walls follow.
+        w.setSelection({south});
+        w.setTool(kimcad::MainWindow::Tool::Move);
+        w.twoPointTool()->click({4, 0});
+        w.twoPointTool()->click({4, -1});
+        QVERIFY(std::abs(centre(door)[1] - (doorY - 1.0)) < 0.01);
+        action(w, "actionUndo")->trigger();
+        QVERIFY(std::abs(centre(door)[1] - doorY) < 0.01);
+
+        // Moving only the door slides it along its wall.
+        w.setSelection({door});
+        w.setTool(kimcad::MainWindow::Tool::Move);
+        w.twoPointTool()->setOrtho(true); // Shift: straight along X
+        w.twoPointTool()->click({4, 0});
+        w.twoPointTool()->click({6, 0.5});
+        w.twoPointTool()->setOrtho(false);
+        QVERIFY(std::abs(centre(door)[0] - 6.0) < 0.01);
+        QVERIFY(std::abs(centre(door)[1] - doorY) < 0.01);
+
+        // Rotate a beam 90 degrees around its start.
+        w.setTool(kimcad::MainWindow::Tool::Beam);
+        w.twoPointTool()->click({10, 0});
+        w.twoPointTool()->click({14, 0});
+        const QString beam = w.viewport()->guids().last();
+        w.setSelection({beam});
+        w.setTool(kimcad::MainWindow::Tool::Rotate);
+        w.rotateTool()->click({10, 0});
+        w.rotateTool()->click({14, 0});
+        w.rotateTool()->click({10, 4});
+        QVERIFY(std::abs(centre(beam)[4] - 4.0) < 0.01); // now 4 m along Y
+        QVERIFY(w.viewport()->guids().contains(beam));   // same element
+
+        // Stretch a free wall's end from x = 24 to x = 26.
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->click({20, 0});
+        w.wallTool()->click({24, 0});
+        w.wallTool()->finish();
+        const QString free = w.viewport()->guids().last();
+        w.setTool(kimcad::MainWindow::Tool::Stretch);
+        w.gripTool()->setTolerance(0.1);
+        w.gripTool()->click({24, 0});
+        w.gripTool()->click({26, 0});
+        QVERIFY(std::abs(centre(free)[3] - 6.0) < 0.05);
+
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QVERIFY(w.setWallHeight({free}, 4.5));
+        QVERIFY(std::abs(centre(free)[2] - 4.5) < 0.01);
+        QVERIFY(w.resizeOpening(door, 1.2, 2.2, 0.0));
+        QVERIFY(std::abs(centre(door)[3] - 1.25) < 0.01);
+        QVERIFY(!w.resizeOpening(door, 9.0, 2.2, 0.0)); // too wide: refused
+        QVERIFY(w.close());
+    }
+
     void shortcutsAreTheDocumentedOnes()
     {
         kimcad::MainWindow w(nullptr, true);
@@ -285,6 +400,12 @@ private slots:
         QCOMPARE(action(w, "actionSlabTool")->shortcut(), QKeySequence(Qt::Key_S));
         QCOMPARE(action(w, "actionDoorTool")->shortcut(), QKeySequence(Qt::Key_D));
         QCOMPARE(action(w, "actionWindowTool")->shortcut(), QKeySequence(Qt::Key_N));
+        QCOMPARE(action(w, "actionColumnTool")->shortcut(), QKeySequence(Qt::Key_K));
+        QCOMPARE(action(w, "actionBeamTool")->shortcut(), QKeySequence(Qt::Key_J));
+        QCOMPARE(action(w, "actionGridTool")->shortcut(), QKeySequence(Qt::Key_G));
+        QCOMPARE(action(w, "actionMoveTool")->shortcut(), QKeySequence(Qt::Key_M));
+        QCOMPARE(action(w, "actionRotateTool")->shortcut(), QKeySequence(Qt::Key_R));
+        QCOMPARE(action(w, "actionStretchTool")->shortcut(), QKeySequence(Qt::Key_E));
         QVERIFY(action(w, "actionLinesOnly")->isCheckable());
     }
 };

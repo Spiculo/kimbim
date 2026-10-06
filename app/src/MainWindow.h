@@ -6,6 +6,8 @@
 #include <QJsonObject>
 #include <QPointF>
 #include <QVector>
+
+#include <optional>
 #include <QJsonValue>
 #include <QStringList>
 #include <QMainWindow>
@@ -26,6 +28,9 @@ class LevelsBar;
 class WallTool;
 class PolygonTool;
 class HostTool;
+class TwoPointTool;
+class RotateTool;
+class GripTool;
 struct WallSegment;
 struct Snap;
 struct Host;
@@ -67,12 +72,24 @@ public:
     LevelsBar* levelsBar() const { return m_levels; }
     // Modeling tools (M3): one active at a time. Exposed for tests and the self-test, which drive
     // them with work-plane points.
-    enum class Tool { None, Wall, Slab, Door, Window };
+    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch };
     void setTool(Tool tool);
     Tool tool() const { return m_tool; }
     WallTool* wallTool() const { return m_wallTool; }
     PolygonTool* polygonTool() const { return m_polygonTool; }
     HostTool* hostTool() const { return m_hostTool; }
+    TwoPointTool* twoPointTool() const { return m_twoPointTool; }
+    RotateTool* rotateTool() const { return m_rotateTool; }
+    GripTool* gripTool() const { return m_gripTool; }
+    // Editing (Slice 6). Walls joined to moved walls follow unless `detach` (Ctrl while clicking).
+    bool moveSelection(QPointF delta, bool detach = false);
+    bool rotateSelection(QPointF centre, double radians, bool detach = false);
+    bool stretchWall(const QString& wall, QPointF p1, QPointF p2);
+    bool setWallHeight(const QStringList& walls, double height);
+    bool resizeOpening(const QString& guid, double width, double height, double sill);
+    bool columnAt(QPointF p, bool turned = false);
+    bool createSegment(QPointF p1, QPointF p2); // beam or grid axis, per the active tool
+    int gridLineCount() const;
     void setWallToolActive(bool on) { setTool(on ? Tool::Wall : Tool::None); }
     bool createWall(const WallSegment& segment);
     bool createSlab(const QVector<QPointF>& outline);
@@ -112,6 +129,9 @@ private:
     void setPlanView(bool plan);
     void buildModelingToolbar();
     void refreshTypes();
+    void wallHeightDialog();
+    void openingSizeDialog();
+    QJsonObject openingInfo(const QString& guid);
     void updateToolPreview();
     QJsonObject currentType() const;
     void refreshSnapData();
@@ -139,6 +159,11 @@ private:
     WallTool* m_wallTool = nullptr;
     PolygonTool* m_polygonTool = nullptr;
     HostTool* m_hostTool = nullptr;
+    TwoPointTool* m_twoPointTool = nullptr;
+    RotateTool* m_rotateTool = nullptr;
+    GripTool* m_gripTool = nullptr;
+    bool m_detach = false; // Ctrl held on the click that finished a move/rotate
+    std::optional<QPointF> m_columnHover;
     Tool m_tool = Tool::None;
     QHash<int, QAction*> m_toolActions;
     QComboBox* m_types = nullptr;

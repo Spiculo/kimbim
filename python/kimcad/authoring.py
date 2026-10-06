@@ -16,6 +16,7 @@ import ifcopenshell.api.aggregate
 import ifcopenshell.api.context
 import ifcopenshell.api.feature
 import ifcopenshell.api.geometry
+import ifcopenshell.api.grid
 import ifcopenshell.api.material
 import ifcopenshell.api.project
 import ifcopenshell.api.root
@@ -378,16 +379,13 @@ def snap_data(storey_guid: str) -> str:
             for void in getattr(e, "HasOpenings", ()) or ():
                 opening = void.RelatedOpeningElement
                 fill = next((r.RelatedBuildingElement for r in getattr(opening, "HasFillings", ()) or ()), None)
-                if fill is None:
+                info = _opening_info(fill) if fill is not None else None
+                if info is None:
                     continue
-                width = float(fill.OverallWidth or 0.0) * _scale()
-                m = ifcopenshell.util.placement.get_local_placement(opening.ObjectPlacement)
-                corner = np.array([m[0][3], m[1][3]]) * _scale()
-                d = np.array(axis[1]) - np.array(axis[0])
-                d = d / np.linalg.norm(d)
-                along = float(np.dot(corner - np.array(axis[0]), d)) + width / 2
-                openings.append({"guid": fill.GlobalId, "wall": e.GlobalId, "along": round(along, 6), "width": round(width, 6)})
-    return B._dump({"walls": walls, "openings": openings})
+                _, _, along, width, height, sill = info
+                openings.append({"guid": fill.GlobalId, "wall": e.GlobalId, "along": round(along, 6), "width": round(width, 6),
+                                 "height": round(height, 6), "sill": round(sill, 6)})
+    return B._dump({"walls": walls, "openings": openings, "grid": _grid_lines(storey)})
 
 
 # ---------------------------------------------------------------- slabs (Slice 5)
@@ -568,6 +566,50 @@ def opening_types(kind: str) -> str:
     return B._dump({"types": out})
 
 
+def _wall_frame(wall):
+    """placed(along, across, up) -> placement matrix (project units) in the wall's frame: `along`
+    from the axis start, `across` to the left of the axis, `up` from the wall base (all metres)."""
+    s = _scale()
+    wm = ifcopenshell.util.placement.get_local_placement(wall.ObjectPlacement)
+    line = ifcopenshell.util.representation.get_reference_line(wall)
+    start = np.array([float(line[0][0]), float(line[0][1])])
+    direction = np.array([float(line[-1][0]), float(line[-1][1])]) - start
+    direction = direction / np.linalg.norm(direction)
+
+    def placed(along_m, across_m, up_m):
+        local = start + direction * (along_m / s)
+        matrix = wm.copy()
+        point = np.array([local[0], local[1], 0.0]) + np.array([-direction[1], direction[0], 0.0]) * (across_m / s)
+        point[2] = up_m / s
+        matrix[:3, 3] = wm[:3, 3] + wm[:3, :3] @ point
+        matrix[:3, 0] = wm[:3, :3] @ np.array([direction[0], direction[1], 0.0])
+        matrix[:3, 1] = wm[:3, :3] @ np.array([-direction[1], direction[0], 0.0])
+        return matrix
+
+    return placed
+
+
+def _filling_representation(kind, element_type, width, height):
+    f, s = B._model, _scale()
+    if kind == "door":
+        return ifcopenshell.api.geometry.add_door_representation(
+            f, context=_body_context(), overall_height=height / s, overall_width=width / s,
+            operation_type=getattr(element_type, "OperationType", None) or "SINGLE_SWING_LEFT")
+    return ifcopenshell.api.geometry.add_window_representation(
+        f, context=_body_context(), overall_height=height / s, overall_width=width / s,
+        partition_type=getattr(element_type, "PartitioningType", None) or "SINGLE_PANEL")
+
+
+def _replace_body(product, representation):
+    """Swap a product's body representation (keeps the product and its GlobalId)."""
+    f = B._model
+    old = ifcopenshell.util.representation.get_representation(product, "Model", "Body", "MODEL_VIEW")
+    if old is not None:
+        ifcopenshell.api.geometry.unassign_representation(f, product=product, representation=old)
+        ifcopenshell.api.geometry.remove_representation(f, representation=old)
+    ifcopenshell.api.geometry.assign_representation(f, product=product, representation=representation)
+
+
 def _wall_height(wall) -> float:
     """Extrusion depth of the wall body in metres (0 if unknown)."""
     representation = ifcopenshell.util.representation.get_representation(wall, "Model", "Body", "MODEL_VIEW")
@@ -608,22 +650,7 @@ def insert_opening(kind: str, wall_guid: str, type_guid: str, along, width, heig
     def action():
         f = B._model
         s = _scale()
-        wm = ifcopenshell.util.placement.get_local_placement(wall.ObjectPlacement)
-        line = ifcopenshell.util.representation.get_reference_line(wall)
-        start = np.array([float(line[0][0]), float(line[0][1])])
-        direction = np.array([float(line[-1][0]), float(line[-1][1])]) - start
-        direction = direction / np.linalg.norm(direction)
-
-        def placed(along_m, across_m, up_m):
-            local = start + direction * (along_m / s)
-            matrix = wm.copy()
-            point = np.array([local[0], local[1], 0.0]) + np.array([-direction[1], direction[0], 0.0]) * (across_m / s)
-            point[2] = up_m / s
-            matrix[:3, 3] = wm[:3, 3] + wm[:3, :3] @ point
-            matrix[:3, 0] = wm[:3, :3] @ np.array([direction[0], direction[1], 0.0])
-            matrix[:3, 1] = wm[:3, :3] @ np.array([-direction[1], direction[0], 0.0])
-            return matrix
-
+        placed = _wall_frame(wall)
         context = _body_context()
         opening = ifcopenshell.api.root.create_entity(f, ifc_class="IfcOpeningElement", name=f"{kind} opening")
         opening_rep = ifcopenshell.api.geometry.add_wall_representation(
@@ -637,14 +664,7 @@ def insert_opening(kind: str, wall_guid: str, type_guid: str, along, width, heig
                                                       predefined_type="DOOR" if kind == "door" else "WINDOW")
         element.OverallWidth, element.OverallHeight = width / s, height / s
         ifcopenshell.api.type.assign_type(f, related_objects=[element], relating_type=opening_type)
-        if kind == "door":
-            representation = ifcopenshell.api.geometry.add_door_representation(
-                f, context=context, overall_height=height / s, overall_width=width / s,
-                operation_type=opening_type.OperationType or "SINGLE_SWING_LEFT")
-        else:
-            representation = ifcopenshell.api.geometry.add_window_representation(
-                f, context=context, overall_height=height / s, overall_width=width / s,
-                partition_type=opening_type.PartitioningType or "SINGLE_PANEL")
+        representation = _filling_representation(kind, opening_type, width, height)
         ifcopenshell.api.geometry.assign_representation(f, product=element, representation=representation)
         ifcopenshell.api.geometry.edit_object_placement(
             f, product=element, matrix=placed(along - width / 2, -thickness / 2, sill), is_si=False)
@@ -660,3 +680,610 @@ def insert_opening(kind: str, wall_guid: str, type_guid: str, along, width, heig
     except Exception as ex:
         return _fail(f"{type(ex).__name__}: {ex}")
     return B._dump({**r, "guid": made["element"].GlobalId})
+
+
+# ---------------------------------------------------------------- columns and beams (Slice 6)
+
+# (name, profile class, width, depth) in metres; circles use width as the diameter.
+DEFAULT_COLUMN_TYPES = [("Column 300x300", "IfcRectangleProfileDef", 0.3, 0.3), ("Column D300", "IfcCircleProfileDef", 0.3, 0.3)]
+DEFAULT_BEAM_TYPES = [("Beam 200x400", "IfcRectangleProfileDef", 0.2, 0.4)]
+
+
+def _profile_set(element):
+    material = ifcopenshell.util.element.get_material(element, should_skip_usage=True)
+    return material if material is not None and material.is_a("IfcMaterialProfileSet") else None
+
+
+def _profile(element):
+    profile_set = _profile_set(element)
+    profiles = list(profile_set.MaterialProfiles or ()) if profile_set else []
+    return profiles[0].Profile if profiles else None
+
+
+def _profile_size(profile) -> tuple[float, float]:
+    s = _scale()
+    if profile.is_a("IfcCircleProfileDef"):
+        return 2 * float(profile.Radius) * s, 2 * float(profile.Radius) * s
+    if profile.is_a("IfcRectangleProfileDef"):
+        return float(profile.XDim) * s, float(profile.YDim) * s
+    return 0.0, 0.0
+
+
+def _profile_types(ifc_class: str, defaults) -> list:
+    f = B._model
+    if not [t for t in f.by_type(ifc_class) if _profile(t) is not None]:
+        s = _scale()
+        for name, profile_class, width, depth in defaults:
+            t = ifcopenshell.api.root.create_entity(f, ifc_class=ifc_class, name=name)
+            if profile_class == "IfcCircleProfileDef":
+                profile = f.create_entity(profile_class, ProfileType="AREA", ProfileName=name, Radius=width / 2 / s)
+            else:
+                profile = f.create_entity(profile_class, ProfileType="AREA", ProfileName=name, XDim=width / s, YDim=depth / s)
+            profile_set = ifcopenshell.api.material.add_material_set(f, name=name, set_type="IfcMaterialProfileSet")
+            material_name = "Concrete" if ifc_class == "IfcColumnType" else "Steel"
+            material = next((m for m in f.by_type("IfcMaterial") if m.Name == material_name), None) \
+                or ifcopenshell.api.material.add_material(f, name=material_name)
+            ifcopenshell.api.material.add_profile(f, profile_set=profile_set, material=material, profile=profile)
+            ifcopenshell.api.material.assign_material(f, products=[t], material=profile_set)
+    out = []
+    for t in f.by_type(ifc_class):
+        profile = _profile(t)
+        if profile is None:
+            continue
+        width, depth = _profile_size(profile)
+        out.append({"guid": t.GlobalId, "name": t.Name or "", "width": round(width, 6), "depth": round(depth, 6)})
+    return out
+
+
+def column_types() -> str:
+    return B._dump({"types": _profile_types("IfcColumnType", DEFAULT_COLUMN_TYPES) if B._model is not None else []})
+
+
+def beam_types() -> str:
+    return B._dump({"types": _profile_types("IfcBeamType", DEFAULT_BEAM_TYPES) if B._model is not None else []})
+
+
+def _profile_element(storey_guid, type_guid, type_class):
+    storey, element_type = _by_guid(storey_guid), _by_guid(type_guid)
+    if storey is None or not storey.is_a("IfcBuildingStorey"):
+        return None, None, "unknown level"
+    if element_type is None or not element_type.is_a(type_class) or _profile(element_type) is None:
+        return None, None, "unknown type or type without a profile"
+    return storey, element_type, ""
+
+
+def create_column(storey_guid: str, type_guid: str, x, y, height, rotation=0.0) -> str:
+    """A column standing on the level at (x, y), `height` m tall, turned `rotation` radians."""
+    if B._model is None:
+        return _fail("no model open")
+    storey, column_type, error = _profile_element(storey_guid, type_guid, "IfcColumnType")
+    if error:
+        return _fail(error)
+    try:
+        x, y, height, rotation = float(x), float(y), float(height), float(rotation or 0.0)
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    if height <= 0:
+        return _fail("the column height must be positive")
+    made = {}
+
+    def action():
+        f = B._model
+        column = ifcopenshell.api.root.create_entity(f, ifc_class="IfcColumn", name=column_type.Name)
+        ifcopenshell.api.type.assign_type(f, related_objects=[column], relating_type=column_type)
+        representation = ifcopenshell.api.geometry.add_profile_representation(
+            f, context=_body_context(), profile=_profile(column_type), depth=height)
+        ifcopenshell.api.geometry.assign_representation(f, product=column, representation=representation)
+        c, s = math.cos(rotation), math.sin(rotation)
+        matrix = np.array([[c, -s, 0, x], [s, c, 0, y], [0, 0, 1, _elevation(storey)], [0, 0, 0, 1]], dtype=float)
+        ifcopenshell.api.geometry.edit_object_placement(f, product=column, matrix=matrix, is_si=True)
+        ifcopenshell.api.spatial.assign_container(f, products=[column], relating_structure=storey)
+        made["element"] = column
+        return 1, [column.GlobalId], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "guid": made["element"].GlobalId})
+
+
+def create_beam(storey_guid: str, type_guid: str, x1, y1, x2, y2, top) -> str:
+    """A beam from (x1, y1) to (x2, y2) whose top is at `top` (absolute metres)."""
+    if B._model is None:
+        return _fail("no model open")
+    storey, beam_type, error = _profile_element(storey_guid, type_guid, "IfcBeamType")
+    if error:
+        return _fail(error)
+    try:
+        x1, y1, x2, y2, top = float(x1), float(y1), float(x2), float(y2), float(top)
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    length = math.hypot(x2 - x1, y2 - y1)
+    if length < MIN_WALL_LENGTH:
+        return _fail("the beam has no length")
+    made = {}
+
+    def action():
+        f = B._model
+        beam = ifcopenshell.api.root.create_entity(f, ifc_class="IfcBeam", name=beam_type.Name)
+        ifcopenshell.api.type.assign_type(f, related_objects=[beam], relating_type=beam_type)
+        # Profile Y up, extrusion (local Z) along the beam, top centre on the placement.
+        representation = ifcopenshell.api.geometry.add_profile_representation(
+            f, context=_body_context(), profile=_profile(beam_type), depth=length, cardinal_point=8)
+        ifcopenshell.api.geometry.assign_representation(f, product=beam, representation=representation)
+        dx, dy = (x2 - x1) / length, (y2 - y1) / length
+        matrix = np.array([[-dy, 0, dx, x1], [dx, 0, dy, y1], [0, 1, 0, top], [0, 0, 0, 1]], dtype=float)
+        ifcopenshell.api.geometry.edit_object_placement(f, product=beam, matrix=matrix, is_si=True)
+        ifcopenshell.api.spatial.assign_container(f, products=[beam], relating_structure=storey)
+        made["element"] = beam
+        return 1, [beam.GlobalId], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "guid": made["element"].GlobalId})
+
+
+# ---------------------------------------------------------------- grids (Slice 6)
+
+def _level_grid(storey):
+    for rel in getattr(storey, "ContainsElements", ()) or ():
+        for e in rel.RelatedElements:
+            if e.is_a("IfcGrid"):
+                return e
+    return None
+
+
+def _grid_axes(grid) -> list:
+    """All axes of a grid in creation order."""
+    axes = list(grid.UAxes or ()) + list(grid.VAxes or ()) + list(getattr(grid, "WAxes", None) or ())
+    return sorted(axes, key=lambda a: a.id())
+
+
+def _next_tag(existing: set, letters: bool) -> str:
+    n = 0
+    while True:
+        n += 1
+        if letters:
+            tag, k = "", n
+            while k > 0:
+                k, r = divmod(k - 1, 26)
+                tag = chr(ord("A") + r) + tag
+        else:
+            tag = str(n)
+        if tag not in existing:
+            return tag
+
+
+def add_grid_axis(storey_guid: str, x1, y1, x2, y2, tag: str = "") -> str:
+    """A grid line on a level (its IfcGrid is created on first use). Without a tag, axes closer to
+    vertical get letters (A, B, ...) and the others numbers (1, 2, ...)."""
+    if B._model is None:
+        return _fail("no model open")
+    storey = _by_guid(storey_guid)
+    if storey is None or not storey.is_a("IfcBuildingStorey"):
+        return _fail("unknown level")
+    try:
+        x1, y1, x2, y2 = float(x1), float(y1), float(x2), float(y2)
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    if math.hypot(x2 - x1, y2 - y1) < MIN_WALL_LENGTH:
+        return _fail("the grid line has no length")
+    vertical = abs(y2 - y1) >= abs(x2 - x1)
+    made = {}
+
+    def action():
+        f = B._model
+        grid = _level_grid(storey)
+        if grid is None:
+            grid = ifcopenshell.api.root.create_entity(f, ifc_class="IfcGrid", name="Grid")
+            matrix = np.eye(4)
+            matrix[2][3] = _elevation(storey)
+            ifcopenshell.api.geometry.edit_object_placement(f, product=grid, matrix=matrix, is_si=True)
+            ifcopenshell.api.spatial.assign_container(f, products=[grid], relating_structure=storey)
+        existing = {a.AxisTag for a in _grid_axes(grid)}
+        axis_tag = tag or _next_tag(existing, letters=vertical)
+        axis = ifcopenshell.api.grid.create_grid_axis(f, grid=grid, axis_tag=axis_tag, uvw_axes="UAxes" if vertical else "VAxes")
+        origin = ifcopenshell.util.placement.get_local_placement(grid.ObjectPlacement)[:3, 3] * _scale()
+        ifcopenshell.api.grid.create_axis_curve(f, p1=np.array([x1 - origin[0], y1 - origin[1], 0.0]),
+                                                p2=np.array([x2 - origin[0], y2 - origin[1], 0.0]), grid_axis=axis, is_si=True)
+        made["grid"], made["tag"] = grid, axis_tag
+        return 1, [], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "guid": made["grid"].GlobalId, "tag": made["tag"]})
+
+
+def _grid_lines(storey) -> list:
+    grid = _level_grid(storey)
+    if grid is None:
+        return []
+    m = ifcopenshell.util.placement.get_local_placement(grid.ObjectPlacement)
+    s = _scale()
+    out = []
+    for axis in _grid_axes(grid):
+        curve = axis.AxisCurve
+        points = list(curve.Points) if curve is not None and curve.is_a("IfcPolyline") else []
+        if len(points) < 2:
+            continue
+        ends = []
+        for p in (points[0], points[-1]):
+            c = list(p.Coordinates) + [0.0] * (3 - len(p.Coordinates))
+            ends.append((m @ np.array([c[0], c[1], c[2], 1.0]))[:2] * s)
+        out.append({"guid": grid.GlobalId, "tag": axis.AxisTag, "x1": round(float(ends[0][0]), 6), "y1": round(float(ends[0][1]), 6),
+                    "x2": round(float(ends[1][0]), 6), "y2": round(float(ends[1][1]), 6)})
+    return out
+
+
+# ---------------------------------------------------------------- editing geometry (Slice 6)
+
+def _path_joins(wall) -> list:
+    return [r for r in list(getattr(wall, "ConnectedTo", ()) or ()) + list(getattr(wall, "ConnectedFrom", ()) or ())
+            if r.is_a("IfcRelConnectsPathElements")]
+
+
+def _hosted(element) -> list:
+    """Openings in an element and the doors/windows filling them (they move with it)."""
+    out = []
+    for rel in getattr(element, "HasOpenings", ()) or ():
+        opening = rel.RelatedOpeningElement
+        out.append(opening)
+        out += [r.RelatedBuildingElement for r in getattr(opening, "HasFillings", ()) or ()]
+    return out
+
+
+def _placement_parent(element):
+    placement = getattr(element, "ObjectPlacement", None)
+    rel_to = getattr(placement, "PlacementRelTo", None) if placement is not None else None
+    places = getattr(rel_to, "PlacesObject", None) if rel_to is not None else None
+    return places[0] if places else None
+
+
+def _transform(guids_json: str, transform_si, detach=False) -> str:
+    """Apply a rigid world transform (4x4, metres) to the elements and what they host.
+
+    Walls joined at an end to a moved wall are dragged along: their joined end slides along their
+    own line to meet the moved wall (D54), so corners stay closed and the walls stay straight. With `detach`, those joins are dropped instead and
+    the moved walls go alone."""
+    if B._model is None:
+        return _fail("no model open")
+    elements = [e for e in B._elements(guids_json) if e.is_a("IfcProduct") and getattr(e, "ObjectPlacement", None)]
+    if not elements:
+        return _fail("nothing to move")
+    moved = set(elements)
+    for e in list(elements):
+        moved.update(_hosted(e))
+
+    def has_moving_ancestor(e):
+        parent = _placement_parent(e)
+        while parent is not None:
+            if parent in moved:
+                return True
+            parent = _placement_parent(parent)
+        return False
+
+    t = np.array(transform_si, dtype=float)
+    roots = [e for e in elements if not has_moving_ancestor(e)]
+    walls = [e for e in elements if e.is_a("IfcWall")]
+    broken, neighbours = [], []
+    dragged = {}  # neighbour -> [new start, new end] (metres), ends joined to moved walls follow
+    for w in walls:
+        for rel in _path_joins(w):
+            other = rel.RelatedElement if rel.RelatingElement == w else rel.RelatingElement
+            if other in moved:
+                continue
+            if other not in neighbours:
+                neighbours.append(other)
+            if detach:
+                broken.append(rel)
+                continue
+            theirs = rel.RelatedConnectionType if rel.RelatingElement == w else rel.RelatingConnectionType
+            axis = _axis_world(other)
+            if theirs not in ("ATSTART", "ATEND") or axis is None:
+                continue  # the moved wall ends on the other's path: the join just regenerates
+            ends = dragged.setdefault(other, [np.array(axis[0], dtype=float), np.array(axis[1], dtype=float)])
+            k = 0 if theirs == "ATSTART" else 1
+            ends[k] = _follow_end(np.array(axis[k], dtype=float), np.array(axis[1 - k], dtype=float), w, t)
+    for n, (p1, p2) in dragged.items():
+        if float(np.linalg.norm(p2 - p1)) < MIN_WALL_LENGTH:
+            return _fail(f"moving this would shrink wall {n.GlobalId} to nothing")
+
+    def action():
+        f = B._model
+        s = _scale()
+        t_units = t.copy()
+        t_units[:3, 3] = t[:3, 3] / s
+        for rel in dict.fromkeys(broken):
+            f.remove(rel)  # detached: joins to walls that stay put no longer hold
+        for e in roots:
+            world = ifcopenshell.util.placement.get_local_placement(e.ObjectPlacement)
+            ifcopenshell.api.geometry.edit_object_placement(
+                f, product=e, matrix=t_units @ world, is_si=False, should_transform_children=True)
+        for n, (p1, p2) in dragged.items():
+            _reaxis(n, p1, p2)
+        for w in [*walls, *neighbours]:
+            if _axis_world(w) is not None and _layer_set(w) is not None:
+                ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=w)
+        changed = [e.GlobalId for e in moved if not e.is_a("IfcOpeningElement")] + [n.GlobalId for n in neighbours]
+        return len(roots), changed, []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump(r)
+
+
+def _follow_end(end, other_end, moved_wall, t):
+    """Where a joined wall's end goes when the wall it joins moves by `t` (metres): it slides along
+    its own line to meet the moved wall's new axis line, so it stays straight (D54). Only when the
+    two are parallel does it follow the full movement."""
+    axis = _axis_world(moved_wall)
+    q1 = (t @ np.array([axis[0][0], axis[0][1], 0.0, 1.0]))[:2]
+    q2 = (t @ np.array([axis[1][0], axis[1][1], 0.0, 1.0]))[:2]
+    d_own, d_moved = end - other_end, q2 - q1
+
+    def cross(a, b):
+        return a[0] * b[1] - a[1] * b[0]
+
+    denom = cross(d_own, d_moved)
+    if abs(denom) < 1e-9 * max(np.linalg.norm(d_own) * np.linalg.norm(d_moved), 1e-12):
+        return (t @ np.array([end[0], end[1], 0.0, 1.0]))[:2]
+    return other_end + d_own * (cross(q1 - other_end, d_moved) / denom)
+
+
+def _truthy(value) -> bool:
+    return str(value).strip().lower() in ("1", "true", "yes")
+
+
+def move_elements(guids_json: str, dx, dy, dz=0.0, detach=False) -> str:
+    """Move elements (and the doors/windows they host) by (dx, dy, dz) metres; joined walls follow
+    unless `detach`."""
+    try:
+        t = np.eye(4)
+        t[:3, 3] = [float(dx), float(dy), float(dz or 0.0)]
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    return _transform(guids_json, t, _truthy(detach))
+
+
+def rotate_elements(guids_json: str, cx, cy, angle, detach=False) -> str:
+    """Rotate elements by `angle` radians around the vertical line through (cx, cy); joined walls
+    follow unless `detach`."""
+    try:
+        cx, cy, angle = float(cx), float(cy), float(angle)
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    c, s = math.cos(angle), math.sin(angle)
+    rotation = np.array([[c, -s, 0, 0], [s, c, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]], dtype=float)
+    to_origin, back = np.eye(4), np.eye(4)
+    to_origin[:2, 3] = [-cx, -cy]
+    back[:2, 3] = [cx, cy]
+    return _transform(guids_json, back @ rotation @ to_origin, _truthy(detach))
+
+
+def set_wall_axis(wall_guid: str, x1, y1, x2, y2) -> str:
+    """Stretch/extend a wall to a new axis (metres). Joins at an end that moved are dropped; its
+    doors and windows keep their place; the wall keeps its GlobalId."""
+    if B._model is None:
+        return _fail("no model open")
+    wall = _by_guid(wall_guid)
+    if wall is None or not wall.is_a("IfcWall") or _axis_world(wall) is None:
+        return _fail("not a wall with an axis")
+    try:
+        p1, p2 = np.array([float(x1), float(y1)]), np.array([float(x2), float(y2)])
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    length = float(np.linalg.norm(p2 - p1))
+    if length < MIN_WALL_LENGTH:
+        return _fail("the wall has no length")
+    a0, a1 = (np.array(p) for p in _axis_world(wall))
+    start_moved, end_moved = np.linalg.norm(p1 - a0) > 1e-6, np.linalg.norm(p2 - a1) > 1e-6
+    height = _wall_height(wall) or 3.0
+    dropped, neighbours = [], []
+    for rel in _path_joins(wall):
+        mine = rel.RelatingConnectionType if rel.RelatingElement == wall else rel.RelatedConnectionType
+        other = rel.RelatedElement if rel.RelatingElement == wall else rel.RelatingElement
+        if (mine == "ATSTART" and start_moved) or (mine == "ATEND" and end_moved):
+            dropped.append(rel)
+        neighbours.append(other)
+
+    def action():
+        f = B._model
+        for rel in dropped:
+            f.remove(rel)
+        _reaxis(wall, p1, p2)
+        ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=wall, length=length, height=height)
+        for n in neighbours:
+            ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=n)
+        return 1, [wall.GlobalId, *(n.GlobalId for n in neighbours), *(e.GlobalId for e in _hosted(wall) if not e.is_a("IfcOpeningElement"))], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump(r)
+
+
+def _reaxis(wall, p1, p2):
+    """Give a wall a new axis from p1 to p2 (world metres) inside an action: placement at p1 along
+    the axis (its doors/windows keep their place) and a new Plan/Axis line of the new length.
+    The caller regenerates the body."""
+    f = B._model
+    s = _scale()
+    p1, p2 = np.asarray(p1, dtype=float), np.asarray(p2, dtype=float)
+    length = float(np.linalg.norm(p2 - p1))
+    z = float(ifcopenshell.util.placement.get_local_placement(wall.ObjectPlacement)[2][3])
+    d = (p2 - p1) / length
+    matrix = np.array([[d[0], -d[1], 0, p1[0] / s], [d[1], d[0], 0, p1[1] / s], [0, 0, 1, z], [0, 0, 0, 1]], dtype=float)
+    ifcopenshell.api.geometry.edit_object_placement(f, product=wall, matrix=matrix, is_si=False)
+    # A new axis of the new length (in the wall's own frame): the wall's
+    # geometry is rebuilt from it; without one it would be rebuilt from the old body.
+    context = ifcopenshell.util.representation.get_context(f, "Plan", "Axis", "GRAPH_VIEW")
+    if context is None:
+        plan = ifcopenshell.util.representation.get_context(f, "Plan") or ifcopenshell.api.context.add_context(
+            f, context_type="Plan")
+        context = ifcopenshell.api.context.add_context(f, context_type="Plan", context_identifier="Axis",
+                                                       target_view="GRAPH_VIEW", parent=plan)
+    new_axis = ifcopenshell.api.geometry.add_axis_representation(f, context=context, axis=((0.0, 0.0), (length, 0.0)))  # metres
+    old_axis = ifcopenshell.util.representation.get_representation(wall, "Plan", "Axis", "GRAPH_VIEW")
+    if old_axis is not None:
+        ifcopenshell.api.geometry.unassign_representation(f, product=wall, representation=old_axis)
+        ifcopenshell.api.geometry.remove_representation(f, representation=old_axis)
+    ifcopenshell.api.geometry.assign_representation(f, product=wall, representation=new_axis)
+
+
+def set_wall_height(guids_json: str, height) -> str:
+    """Change the height of walls (metres)."""
+    if B._model is None:
+        return _fail("no model open")
+    try:
+        height = float(height)
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    if height <= 0:
+        return _fail("the wall height must be positive")
+    walls = [w for w in B._elements(guids_json) if w.is_a("IfcWall")]
+    if not walls:
+        return _fail("no walls selected")
+
+    def action():
+        f = B._model
+        for w in walls:
+            body = ifcopenshell.util.representation.get_representation(w, "Model", "Body", "MODEL_VIEW")
+            for solid in (f.traverse(body) if body is not None else ()):
+                if solid.is_a("IfcExtrudedAreaSolid"):
+                    solid.Depth = height / _scale()
+            if _axis_world(w) is not None and _layer_set(w) is not None:
+                ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=w, height=height)
+        return len(walls), [w.GlobalId for w in walls], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump(r)
+
+
+def _opening_info(element):
+    """(opening, wall, along, width, height, sill) of a door/window in a wall (metres), or None."""
+    fills = list(getattr(element, "FillsVoids", ()) or ()) if element is not None else []
+    if not fills:
+        return None
+    opening = fills[0].RelatingOpeningElement
+    voids = list(getattr(opening, "VoidsElements", ()) or ())
+    wall = voids[0].RelatingBuildingElement if voids else None
+    axis = _axis_world(wall) if wall is not None else None
+    if axis is None:
+        return None
+    s = _scale()
+    width = float(element.OverallWidth or 0.0) * s
+    height = float(element.OverallHeight or 0.0) * s
+    m = ifcopenshell.util.placement.get_local_placement(opening.ObjectPlacement)
+    wm = ifcopenshell.util.placement.get_local_placement(wall.ObjectPlacement)
+    corner = np.array([m[0][3], m[1][3]]) * s
+    u = np.array(axis[1]) - np.array(axis[0])
+    u = u / np.linalg.norm(u)
+    along = float(np.dot(corner - np.array(axis[0]), u)) + width / 2
+    sill = float(m[2][3] - wm[2][3]) * s
+    return opening, wall, along, width, height, sill
+
+
+def _opening_fit_error(wall, along, width, height, sill) -> str:
+    axis = _axis_world(wall)
+    if axis is None or _layer_set(wall) is None:
+        return "the host wall has no axis or layers"
+    length = math.dist(axis[0], axis[1])
+    if width <= 0 or height <= 0 or along - width / 2 < -1e-6 or along + width / 2 > length + 1e-6:
+        return "the opening doesn't fit in the wall"
+    wall_height = _wall_height(wall)
+    if wall_height and sill + height > wall_height + 1e-6:
+        return "the opening is taller than the wall"
+    return ""
+
+
+def _apply_opening_edit(element, opening, wall, along, width, height, sill):
+    """Inside an action: re-place and resize a door/window and its opening."""
+    f = B._model
+    s = _scale()
+    thickness = _thickness(_layer_set(wall))
+    kind = "door" if element.is_a("IfcDoor") else "window"
+    placed = _wall_frame(wall)
+    _replace_body(opening, ifcopenshell.api.geometry.add_wall_representation(
+        f, context=_body_context(), length=width, height=height, thickness=thickness + 0.02))
+    ifcopenshell.api.geometry.edit_object_placement(
+        f, product=opening, matrix=placed(along - width / 2, -(thickness / 2 + 0.01), sill), is_si=False)
+    _replace_body(element, _filling_representation(kind, ifcopenshell.util.element.get_type(element), width, height))
+    ifcopenshell.api.geometry.edit_object_placement(
+        f, product=element, matrix=placed(along - width / 2, -thickness / 2, sill), is_si=False)
+    element.OverallWidth, element.OverallHeight = width / s, height / s
+
+
+def edit_opening(guid: str, along, width, height, sill) -> str:
+    """Move a door/window along its wall and/or resize it (metres); keeps its GlobalId."""
+    if B._model is None:
+        return _fail("no model open")
+    element = _by_guid(guid)
+    info = _opening_info(element)
+    if info is None:
+        return _fail("not a door or window in a wall")
+    opening, wall = info[0], info[1]
+    try:
+        along, width, height, sill = float(along), float(width), float(height), float(sill)
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    error = _opening_fit_error(wall, along, width, height, sill)
+    if error:
+        return _fail(error)
+
+    def action():
+        _apply_opening_edit(element, opening, wall, along, width, height, sill)
+        return 1, [wall.GlobalId, element.GlobalId], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump(r)
+
+
+def slide_openings(guids_json: str, dx, dy) -> str:
+    """Slide doors/windows along their walls by the along-wall part of (dx, dy); one undo step."""
+    if B._model is None:
+        return _fail("no model open")
+    try:
+        d = np.array([float(dx), float(dy)])
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    plan = []
+    for element in B._elements(guids_json):
+        info = _opening_info(element)
+        if info is None:
+            return _fail("only doors and windows in walls can slide")
+        opening, wall, along, width, height, sill = info
+        axis = _axis_world(wall)
+        u = np.array(axis[1]) - np.array(axis[0])
+        u = u / np.linalg.norm(u)
+        new_along = along + float(np.dot(d, u))
+        error = _opening_fit_error(wall, new_along, width, height, sill)
+        if error:
+            return _fail(error)
+        plan.append((element, opening, wall, new_along, width, height, sill))
+    if not plan:
+        return _fail("nothing to slide")
+
+    def action():
+        for element, opening, wall, along, width, height, sill in plan:
+            _apply_opening_edit(element, opening, wall, along, width, height, sill)
+        return len(plan), [x for e, _, w, *_ in plan for x in (w.GlobalId, e.GlobalId)], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump(r)
