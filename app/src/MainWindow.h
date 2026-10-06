@@ -110,6 +110,9 @@ public:
     bool switchOption(const QString& name);
     bool discardChanges();
     bool isVersioned() const { return m_versioned; }
+    // Drag to move (owner feedback): preview while dragging, move on release (Ctrl detaches).
+    void dragMoveTo(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
+    bool dragFinished(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
     // Milliseconds spent per step of editing (accumulated; for the tool benchmark).
     const QHash<QString, double>& timings() const { return m_timings; }
     void resetTimings() { m_timings.clear(); }

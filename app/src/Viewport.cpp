@@ -652,12 +652,40 @@ void Viewport::mousePressEvent(QMouseEvent* e)
         return; // drawing clicks never reach selection
     }
     // OCCT expects the button that changed (it keeps the set of held buttons itself).
+    if (e->button() == Qt::LeftButton && !(e->modifiers() & (Qt::ShiftModifier | Qt::AltModifier))) {
+        // Pressing on an element that is already selected may start a drag-move.
+        const NCollection_Vec2<int> px = toPixels(e->position());
+        const QString guid = pickAt(px.x(), px.y());
+        QPointF start;
+        double tolerance = 0;
+        if (!guid.isEmpty() && selectedGuids().contains(guid) && workPoint(e->position(), &start, &tolerance)) {
+            m_dragCandidate = true;
+            m_dragging = false;
+            m_dragPressPos = e->position();
+            m_dragStart = start;
+            return;
+        }
+    }
     if (PressMouseButton(toPixels(e->position()), toButtons(e->button()), toFlags(e->modifiers()), false))
         update();
 }
 
 void Viewport::mouseReleaseEvent(QMouseEvent* e)
 {
+    if (m_dragCandidate && e->button() == Qt::LeftButton) {
+        QPointF p;
+        double tolerance = 0;
+        const bool moved = m_dragging && workPoint(e->position(), &p, &tolerance);
+        m_dragCandidate = m_dragging = false;
+        if (moved) {
+            emit dragReleased(m_dragStart, p, tolerance, e->modifiers());
+        } else { // a plain click on a selected element: select just it, like any click
+            const NCollection_Vec2<int> px = toPixels(e->position());
+            selectGuids({pickAt(px.x(), px.y())});
+            emit selectionChanged(selectedGuids());
+        }
+        return;
+    }
     if (m_drawingMode && (e->button() == Qt::LeftButton || e->button() == Qt::RightButton))
         return;
     // The released button, not the ones still held: passing the held set kept pan/orbit running
@@ -668,6 +696,16 @@ void Viewport::mouseReleaseEvent(QMouseEvent* e)
 
 void Viewport::mouseMoveEvent(QMouseEvent* e)
 {
+    if (m_dragCandidate) {
+        if (!m_dragging && (e->position() - m_dragPressPos).manhattanLength() < 5)
+            return; // not a drag yet
+        m_dragging = true;
+        QPointF p;
+        double tolerance = 0;
+        if (workPoint(e->position(), &p, &tolerance))
+            emit dragMoved(m_dragStart, p, tolerance, e->modifiers());
+        return;
+    }
     if (!m_drawingMode && e->buttons() == Qt::NoButton) { // rest the mouse on an element for a hint
         m_hoverPos = e->position();
         m_hoverTimer->start();

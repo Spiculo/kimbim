@@ -131,6 +131,8 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     connect(m_properties, &PropertiesPanel::typeEditRequested, this, &MainWindow::typeEditDialog);
     connect(m_properties, &PropertiesPanel::resetToTypeRequested, this, &MainWindow::resetToType);
     connect(m_tree, &ModelTreePanel::isolateRequested, m_viewport, &Viewport::isolate);
+    connect(m_viewport, &Viewport::dragMoved, this, &MainWindow::dragMoveTo);
+    connect(m_viewport, &Viewport::dragReleased, this, &MainWindow::dragFinished);
     connect(m_viewport, &Viewport::hovered, this, [this](const QString& guid, const QPoint& at) {
         const QString hint = guid.isEmpty() ? QString() : m_tree->hintFor(guid);
         if (hint.isEmpty())
@@ -305,6 +307,7 @@ void MainWindow::buildCutsToolbar()
     connect(m_levels, &LevelsBar::addLevelRequested, this, &MainWindow::addLevelDialog);
     connect(m_levels, &LevelsBar::activeStoreyChanged, this, [this](const QString&, double elevation) {
         updateCutSliderRange();
+        m_viewport->setWorkPlaneZ(elevation);
         if (m_viewport->isPlanView())
             m_viewport->setPlanView(elevation);
         if (m_viewport->isDrawingMode()) {
@@ -1591,6 +1594,42 @@ bool MainWindow::discardChanges()
     endCompare();
     openFile(r.value("path").toString());
     return true;
+}
+
+static QPointF dragTarget(Snapper& snapper, QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers m)
+{
+    return snapper.snap(current, tolerance, &start, m & Qt::ShiftModifier).point;
+}
+
+void MainWindow::dragMoveTo(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers)
+{
+    if (m_selection.isEmpty())
+        return;
+    const QPointF delta = dragTarget(m_twoPointTool->snapper(), start, current, tolerance, modifiers) - start;
+    // Preview: the selection's footprint where it would go, plus the drag line.
+    double x0, y0, z0, x1, y1, z1;
+    const Bnd_Box box = m_viewport->boundsOf(m_selection);
+    QVector<Viewport::PreviewBox> boxes;
+    if (!box.IsVoid()) {
+        box.Get(x0, y0, z0, x1, y1, z1);
+        const QPointF a(x0 + delta.x(), y0 + delta.y()), b(x1 + delta.x(), y0 + delta.y()),
+            c(x1 + delta.x(), y1 + delta.y()), d(x0 + delta.x(), y1 + delta.y());
+        for (const auto& [p, q] : {std::pair{a, b}, std::pair{b, c}, std::pair{c, d}, std::pair{d, a}})
+            boxes.push_back({p, q, 0.04, z0, z1});
+    }
+    boxes.push_back({start, start + delta, 0.03, m_levels->activeElevation(), m_levels->activeElevation() + 0.02});
+    m_viewport->setPreviewBoxes(boxes);
+    statusBar()->showMessage(tr("Move %1 m (Ctrl: detach joined walls, Shift: straight)")
+                                 .arg(QLocale().toString(std::hypot(delta.x(), delta.y()), 'f', 3)));
+}
+
+bool MainWindow::dragFinished(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers)
+{
+    m_viewport->setPreviewBoxes({});
+    const QPointF delta = dragTarget(m_twoPointTool->snapper(), start, current, tolerance, modifiers) - start;
+    if (std::hypot(delta.x(), delta.y()) < 1e-4)
+        return false;
+    return moveSelection(delta, modifiers & Qt::ControlModifier);
 }
 
 int MainWindow::gridLineCount() const

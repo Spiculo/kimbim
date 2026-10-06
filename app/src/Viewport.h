@@ -57,6 +57,7 @@ public:
     // Drawing mode (wall tool): left clicks and moves become points on the work plane (z, metres)
     // instead of selection; middle-button navigation keeps working. Esc/right click end drawing.
     void setDrawingMode(bool on, double workPlaneZ = 0.0);
+    void setWorkPlaneZ(double z) { m_workZ = z; }
     bool isDrawingMode() const { return m_drawingMode; }
     // Rubber-band wall preview: a box along p1-p2 (plan metres); nullopt hides it.
     void setWallPreview(const std::optional<std::pair<QPointF, QPointF>>& axis, double thickness, double height);
@@ -138,6 +139,10 @@ signals:
     void lengthKeyTyped(const QString& text);
     // The mouse rested on an element ("" when it left it): the app shows a hint.
     void hovered(const QString& guid, const QPoint& globalPos);
+    // Drag to move (owner feedback): left-drag that starts on a selected element; points on the work
+    // plane, tolerance = ~10 px in metres.
+    void dragMoved(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
+    void dragReleased(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
 
 protected:
     QPaintEngine* paintEngine() const override { return nullptr; }
@@ -181,6 +186,10 @@ private:
     QSet<QString> selectedSet() const;
     bool m_drawingMode = false;
     QTimer* m_hoverTimer = nullptr;
+    bool m_dragCandidate = false;
+    bool m_dragging = false;
+    QPointF m_dragPressPos;
+    QPointF m_dragStart;
     QPointF m_hoverPos;
     double m_workZ = 0.0;
     Handle(ElementBatch) m_preview;

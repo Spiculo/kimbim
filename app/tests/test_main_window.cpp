@@ -531,6 +531,28 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // Owner feedback: drag to move — pressing on a selected element and dragging moves the selection
+    // (snapped: here 0.97 m becomes 1 m on the grid... the angle snap keeps it straight).
+    void draggingASelectedElementMovesIt()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({5, 0});
+        w.setTool(kimcad::MainWindow::Tool::None);
+        const QString wall = w.viewport()->guids().first();
+        w.setSelection({wall});
+        w.dragMoveTo(QPointF(2.5, 0.0), QPointF(2.52, -1.004), 0.05, Qt::NoModifier); // preview only
+        QVERIFY(w.dragFinished(QPointF(2.5, 0.0), QPointF(2.52, -1.004), 0.05, Qt::NoModifier));
+        double x0, y0, z0, x1, y1, z1;
+        w.viewport()->boundsOf({wall}).Get(x0, y0, z0, x1, y1, z1);
+        QVERIFY(std::abs((y0 + y1) / 2 - (-1.0)) < 0.01); // moved straight down 1 m (90 degree snap)
+        QVERIFY(std::abs(x0 - (-0.15)) < 0.02 || std::abs(x0) < 0.02);
+        QVERIFY(!w.dragFinished(QPointF(1, 1), QPointF(1, 1), 0.05, Qt::NoModifier)); // no movement
+        QVERIFY(w.close());
+    }
+
     void shortcutsAreTheDocumentedOnes()
     {
         kimcad::MainWindow w(nullptr, true);
