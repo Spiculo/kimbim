@@ -105,7 +105,9 @@ Tree diff, per-category classification, property-level changes, JSON and human o
 Three-way merge with conflict model, integrity pass, conflict serialization for the UI; GlobalId/Tag/heuristic reconciliation with report.
 **Exit:** merge test suite (including ported `ifcmerge` cases) passes; re-importing a Revit-exported file with regenerated GlobalIds keeps more than 95% of identities on the corpus pair.
 
-## M5 — Versioned projects in the app
+## M5 — Versioned projects in the app 🟡 (Slice 8 done: [plan](superpowers/plans/2026-10-06-slice8-versioned-projects.md))
+Slices: **8 ✅ enable/open, Save version, History, Compare (colours + list), design options** → 9 milestones (tags), object history, before/after, delete option → 10 Combine options (three-way merge, conflict UI) = M5 exit.
+
 Enable/disable versioning, Save version, history timeline, Compare (viewport coloring and before/after), design options, milestones, Combine options with conflict UI, object history panel, re-import with reconciliation review.
 **Exit:** two design options of the house are created, edited separately, compared and combined with one conflict resolved in the UI.
 
