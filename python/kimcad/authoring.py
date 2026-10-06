@@ -947,8 +947,8 @@ def _placement_parent(element):
 def _transform(guids_json: str, transform_si, detach=False) -> str:
     """Apply a rigid world transform (4x4, metres) to the elements and what they host.
 
-    Walls joined at an end to a moved wall are dragged along: their joined end follows the joint
-    (D54, like Revit), so corners stay closed. With `detach`, those joins are dropped instead and
+    Walls joined at an end to a moved wall are dragged along: their joined end slides along their
+    own line to meet the moved wall (D54), so corners stay closed and the walls stay straight. With `detach`, those joins are dropped instead and
     the moved walls go alone."""
     if B._model is None:
         return _fail("no model open")
@@ -988,8 +988,7 @@ def _transform(guids_json: str, transform_si, detach=False) -> str:
                 continue  # the moved wall ends on the other's path: the join just regenerates
             ends = dragged.setdefault(other, [np.array(axis[0], dtype=float), np.array(axis[1], dtype=float)])
             k = 0 if theirs == "ATSTART" else 1
-            point = t @ np.array([axis[k][0], axis[k][1], 0.0, 1.0])
-            ends[k] = point[:2]
+            ends[k] = _follow_end(np.array(axis[k], dtype=float), np.array(axis[1 - k], dtype=float), w, t)
     for n, (p1, p2) in dragged.items():
         if float(np.linalg.norm(p2 - p1)) < MIN_WALL_LENGTH:
             return _fail(f"moving this would shrink wall {n.GlobalId} to nothing")
@@ -1018,6 +1017,24 @@ def _transform(guids_json: str, transform_si, detach=False) -> str:
     except Exception as ex:
         return _fail(f"{type(ex).__name__}: {ex}")
     return B._dump(r)
+
+
+def _follow_end(end, other_end, moved_wall, t):
+    """Where a joined wall's end goes when the wall it joins moves by `t` (metres): it slides along
+    its own line to meet the moved wall's new axis line, so it stays straight (D54). Only when the
+    two are parallel does it follow the full movement."""
+    axis = _axis_world(moved_wall)
+    q1 = (t @ np.array([axis[0][0], axis[0][1], 0.0, 1.0]))[:2]
+    q2 = (t @ np.array([axis[1][0], axis[1][1], 0.0, 1.0]))[:2]
+    d_own, d_moved = end - other_end, q2 - q1
+
+    def cross(a, b):
+        return a[0] * b[1] - a[1] * b[0]
+
+    denom = cross(d_own, d_moved)
+    if abs(denom) < 1e-9 * max(np.linalg.norm(d_own) * np.linalg.norm(d_moved), 1e-12):
+        return (t @ np.array([end[0], end[1], 0.0, 1.0]))[:2]
+    return other_end + d_own * (cross(q1 - other_end, d_moved) / denom)
 
 
 def _truthy(value) -> bool:

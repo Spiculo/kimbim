@@ -92,13 +92,27 @@ def test_detach_moves_the_wall_alone_and_drops_its_joins(room):
     assert frozenset((south, east)) in joins()
 
 
-def test_rotating_one_wall_drags_its_neighbours_too(room):
+def test_sliding_a_wall_sideways_leaves_its_neighbours_square(room):
+    """Joined walls keep their own line: their end slides along it to meet the moved wall's new
+    line (owner, D54 refinement). A sideways slide of the south wall changes no side wall."""
+    south, east, north, west = room["walls"]
+    before = {w: bbox(w) for w in (east, west)}
+    r = call("move_elements", g(south), 1.0, 0, 0)
+    assert r["ok"], r
+    for w in (east, west):
+        lo, hi = bbox(w)
+        assert lo == pytest.approx(before[w][0], abs=2e-3) and hi == pytest.approx(before[w][1], abs=2e-3)
+    assert frozenset((south, east)) in joins() and frozenset((south, west)) in joins()
+
+
+def test_rotating_one_wall_keeps_its_neighbours_square(room):
     south, east, north, west = room["walls"]
     r = call("rotate_elements", g(north), 0, 6, math.radians(10))  # pivot on the west corner
     assert r["ok"], r
     assert frozenset((north, east)) in joins() and frozenset((north, west)) in joins()
-    _, hi = bbox(east)
-    assert hi[1] > 6.15 + 1.0  # the east end of north rose by 8 * sin(10 degrees) = 1.39 m, east follows
+    lo, hi = bbox(east)
+    assert lo[0] == pytest.approx(7.85, abs=2e-3) and hi[0] == pytest.approx(8.15, abs=2e-3)  # still vertical
+    assert hi[1] > 6.15 + 1.2  # longer: it meets the rotated north wall at y = 6 + 8 tan(10 degrees) = 7.41
 
 
 def test_moving_the_whole_room_keeps_its_joins(room):
