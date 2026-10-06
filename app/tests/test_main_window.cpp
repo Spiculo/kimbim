@@ -385,6 +385,60 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // Slice 7: a second floor: copy the walls (with their door) up, a stair to the next level, and a
+    // stair hole in the upper floor slab.
+    void secondFloorWithTheTools()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        const QString l1 = w.levelsBar()->activeStorey();
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->setTolerance(0.05);
+        for (const QPointF& p : {QPointF(0, 0), QPointF(8, 0), QPointF(8, 6), QPointF(0, 6), QPointF(0, 0)})
+            w.wallTool()->click(p);
+        w.setTool(kimcad::MainWindow::Tool::Door);
+        w.hostTool()->setTolerance(0.05);
+        w.hostTool()->click({4.0, 0.0});
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QStringList walls;
+        for (const QString& g : w.viewport()->guids())
+            if (w.viewport()->typeOf(g) == QLatin1String("IfcWall"))
+                walls << g;
+        QCOMPARE(walls.size(), 4);
+        QVERIFY(w.addLevel(QStringLiteral("Level 2"), 3.0));
+        const QString l2 = w.levelsBar()->activeStorey();
+        QVERIFY(l2 != l1);
+        QVERIFY(w.copyToLevel(walls, l2));
+        QCOMPARE(w.viewport()->elementCount(), 10); // 4 walls + door, twice
+
+        w.levelsBar()->setActive(l1);
+        w.setTool(kimcad::MainWindow::Tool::Stair);
+        w.twoPointTool()->click({1, 1});
+        w.twoPointTool()->click({5, 1});
+        QCOMPARE(w.viewport()->elementCount(), 11);
+        double x0, y0, z0, x1, y1, z1;
+        w.viewport()->boundsOf({w.viewport()->guids().last()}).Get(x0, y0, z0, x1, y1, z1);
+        QVERIFY(std::abs(z1 - 3.0) < 0.01); // up to Level 2
+
+        w.levelsBar()->setActive(l2);
+        w.setTool(kimcad::MainWindow::Tool::Slab);
+        for (const QPointF& p : {QPointF(0, 0), QPointF(8, 0), QPointF(8, 6), QPointF(0, 6)})
+            w.polygonTool()->click(p);
+        w.polygonTool()->finish();
+        const QString slab = w.viewport()->guids().last();
+        QCOMPARE(w.viewport()->typeOf(slab), QString("IfcSlab"));
+        w.setSelection({slab});
+        w.setTool(kimcad::MainWindow::Tool::SlabOpening);
+        QVERIFY(action(w, "actionSlabOpeningTool")->isChecked());
+        for (const QPointF& p : {QPointF(1, 0.5), QPointF(5.8, 0.5), QPointF(5.8, 1.6), QPointF(1, 1.6)})
+            w.polygonTool()->click(p);
+        w.polygonTool()->finish();
+        w.viewport()->boundsOf({slab}).Get(x0, y0, z0, x1, y1, z1);
+        QVERIFY(std::abs(z1 - 3.0) < 0.01);
+        QVERIFY(w.isDirty());
+        QVERIFY(w.close());
+    }
+
     void shortcutsAreTheDocumentedOnes()
     {
         kimcad::MainWindow w(nullptr, true);
@@ -406,6 +460,8 @@ private slots:
         QCOMPARE(action(w, "actionMoveTool")->shortcut(), QKeySequence(Qt::Key_M));
         QCOMPARE(action(w, "actionRotateTool")->shortcut(), QKeySequence(Qt::Key_R));
         QCOMPARE(action(w, "actionStretchTool")->shortcut(), QKeySequence(Qt::Key_E));
+        QCOMPARE(action(w, "actionStairTool")->shortcut(), QKeySequence(Qt::Key_T));
+        QCOMPARE(action(w, "actionSlabOpeningTool")->shortcut(), QKeySequence(Qt::Key_O));
         QVERIFY(action(w, "actionLinesOnly")->isCheckable());
     }
 };

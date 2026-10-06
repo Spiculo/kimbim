@@ -72,7 +72,7 @@ public:
     LevelsBar* levelsBar() const { return m_levels; }
     // Modeling tools (M3): one active at a time. Exposed for tests and the self-test, which drive
     // them with work-plane points.
-    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch };
+    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening };
     void setTool(Tool tool);
     Tool tool() const { return m_tool; }
     WallTool* wallTool() const { return m_wallTool; }
@@ -87,6 +87,11 @@ public:
     bool stretchWall(const QString& wall, QPointF p1, QPointF p2);
     bool setWallHeight(const QStringList& walls, double height);
     bool resizeOpening(const QString& guid, double width, double height, double sill);
+    // Two-storey houses (Slice 7).
+    bool copyToLevel(const QStringList& guids, const QString& storey);
+    bool createStair(QPointF start, QPointF towards);
+    bool addSlabOpening(const QVector<QPointF>& outline);
+    double heightToNextLevel();
     bool columnAt(QPointF p, bool turned = false);
     bool createSegment(QPointF p1, QPointF p2); // beam or grid axis, per the active tool
     int gridLineCount() const;
@@ -130,6 +135,7 @@ private:
     void buildModelingToolbar();
     void refreshTypes();
     void wallHeightDialog();
+    void copyToLevelDialog();
     void openingSizeDialog();
     QJsonObject openingInfo(const QString& guid);
     void updateToolPreview();
