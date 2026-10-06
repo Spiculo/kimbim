@@ -1659,12 +1659,19 @@ def _instance_info(e) -> dict:
 
 
 def _instances() -> dict:
-    """instance id -> [elements]"""
+    """instance id -> [elements]; reads only KIMCAD's instance property sets (reading every
+    product's psets takes seconds on real files)."""
     out = {}
-    for e in B._model.by_type("IfcProduct"):
-        info = _instance_info(e)
-        if info.get("Instance"):
-            out.setdefault(info["Instance"], []).append(e)
+    if not any(_is_model(s) for s in B._model.by_type("IfcBuildingStorey")):
+        return out  # no models, no instances (most files): skip the scan
+    for rel in B._model.by_type("IfcRelDefinesByProperties"):
+        pset = rel.RelatingPropertyDefinition
+        if not hasattr(pset, "is_a") or not pset.is_a("IfcPropertySet") or pset.Name != INSTANCE_PSET:
+            continue
+        instance = next((p.NominalValue.wrappedValue for p in pset.HasProperties
+                         if p.Name == "Instance" and p.is_a("IfcPropertySingleValue") and p.NominalValue), None)
+        if instance:
+            out.setdefault(instance, []).extend(e for e in rel.RelatedObjects if e.is_a("IfcProduct"))
     return out
 
 

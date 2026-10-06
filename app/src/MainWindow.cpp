@@ -1771,8 +1771,11 @@ bool MainWindow::dragFinished(QPointF start, QPointF current, double tolerance, 
 
 void MainWindow::refreshLayers()
 {
-    const QJsonObject listing = bridge("layers");
-    const QJsonObject members = bridge("layer_members").value("layers").toObject();
+    const QJsonObject state = bridge("layer_members"); // one pass over the model per edit
+    const QJsonObject members = state.value("layers").toObject();
+    QJsonArray listing;
+    for (auto it = members.constBegin(); it != members.constEnd(); ++it) // QJsonObject keys are sorted
+        listing.append(QJsonObject{{"name", it.key()}, {"count", it.value().toArray().size()}});
     QSet<QString> hidden, locked;
     for (auto it = members.constBegin(); it != members.constEnd(); ++it)
         for (const auto& g : it.value().toArray()) {
@@ -1804,8 +1807,7 @@ void MainWindow::refreshLayers()
             m_instanceMembers[it.key()] << g.toString();
         }
     m_viewport->setLayerState(hidden, locked);
-    m_layersPanel->setLayers(listing.value("layers").toArray(), listing.value("active").toString(), m_hiddenLayers,
-        m_lockedLayers);
+    m_layersPanel->setLayers(listing, state.value("active").toString(), m_hiddenLayers, m_lockedLayers);
     QStringList names;
     for (const auto& v : bridge("views").value("views").toArray())
         names << v.toObject().value("name").toString();

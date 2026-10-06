@@ -43,31 +43,41 @@ def _representations(element) -> list:
     return list(rep.Representations) if rep is not None else []
 
 
-def _owner(item):
-    """The product a representation belongs to (or None)."""
-    if item.is_a("IfcShapeRepresentation"):
-        for pd in getattr(item, "OfProductRepresentation", ()) or ():
-            for product in getattr(pd, "ShapeOfProduct", ()) or ():
-                return product
-    return None
+def _owners() -> dict:
+    """representation id -> product, in one pass (inverse lookups per item are far too slow on
+    real files: thousands of layered items in Revit exports)."""
+    out = {}
+    for product in B._model.by_type("IfcProduct"):
+        shape = product.Representation
+        if shape is not None:
+            for rep in shape.Representations:
+                out[rep.id()] = product
+    return out
 
 
-def _members(layer) -> list:
-    out = []
+def _members(layer, owners) -> list:
+    out, seen = [], set()
     for item in layer.AssignedItems or ():
-        product = _owner(item)
-        if product is not None and product not in out:
+        product = owners.get(item.id())
+        if product is not None and product.id() not in seen:
+            seen.add(product.id())
             out.append(product)
     return out
 
 
 def layers() -> str:
-    listing = sorted(({"name": l.Name or "", "count": len(_members(l))} for l in _all()), key=lambda x: x["name"].lower())
+    found = _all()
+    owners = _owners() if found else {}
+    listing = sorted(({"name": l.Name or "", "count": len(_members(l, owners))} for l in found),
+                     key=lambda x: x["name"].lower())
     return B._dump({"layers": listing, "active": _active})
 
 
 def layer_members() -> str:
-    return B._dump({"layers": {l.Name or "": [p.GlobalId for p in _members(l)] for l in _all()}})
+    found = _all()
+    owners = _owners() if found else {}
+    return B._dump({"layers": {l.Name or "": [p.GlobalId for p in _members(l, owners)] for l in found},
+                    "active": _active})
 
 
 def _unassign(element) -> None:

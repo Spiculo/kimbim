@@ -163,20 +163,19 @@ def annotations(storey_guid: str) -> str:
     out = []
     if storey is not None:
         s = A._scale()
-        for rel in getattr(storey, "ContainsElements", ()) or ():
-            for a in rel.RelatedElements:
-                if not a.is_a("IfcAnnotation") or a.ObjectPlacement is None:
-                    continue
-                data = _read(a)
-                if data is None:
-                    continue
-                kind, text, local = data
-                m = ifcopenshell.util.placement.get_local_placement(a.ObjectPlacement)
-                points = []
-                for x, y in local:
-                    w = m @ np.array([x / s, y / s, 0.0, 1.0])
-                    points.append([round(float(w[0] * s), 6), round(float(w[1] * s), 6)])
-                out.append({"guid": a.GlobalId, "kind": kind, "text": text, "points": points})
+        for a in B._model.by_type("IfcAnnotation"):  # few; a level can hold 100k elements
+            if a.ObjectPlacement is None or ifcopenshell.util.element.get_container(a) != storey:
+                continue
+            data = _read(a)
+            if data is None:
+                continue
+            kind, text, local = data
+            m = ifcopenshell.util.placement.get_local_placement(a.ObjectPlacement)
+            points = []
+            for x, y in local:
+                w = m @ np.array([x / s, y / s, 0.0, 1.0])
+                points.append([round(float(w[0] * s), 6), round(float(w[1] * s), 6)])
+            out.append({"guid": a.GlobalId, "kind": kind, "text": text, "points": points})
     return B._dump({"annotations": out})
 
 
