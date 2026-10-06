@@ -716,10 +716,13 @@ def _profile_types(ifc_class: str, defaults) -> list:
         s = _scale()
         for name, profile_class, width, depth in defaults:
             t = ifcopenshell.api.root.create_entity(f, ifc_class=ifc_class, name=name)
+            # Position is optional in IFC4, but some readers (web-ifc) need it: write the origin.
+            origin = f.createIfcAxis2Placement2D(f.createIfcCartesianPoint((0.0, 0.0)))
             if profile_class == "IfcCircleProfileDef":
-                profile = f.create_entity(profile_class, ProfileType="AREA", ProfileName=name, Radius=width / 2 / s)
+                profile = f.create_entity(profile_class, ProfileType="AREA", ProfileName=name, Position=origin, Radius=width / 2 / s)
             else:
-                profile = f.create_entity(profile_class, ProfileType="AREA", ProfileName=name, XDim=width / s, YDim=depth / s)
+                profile = f.create_entity(profile_class, ProfileType="AREA", ProfileName=name, Position=origin,
+                                          XDim=width / s, YDim=depth / s)
             profile_set = ifcopenshell.api.material.add_material_set(f, name=name, set_type="IfcMaterialProfileSet")
             material_name = "Concrete" if ifc_class == "IfcColumnType" else "Steel"
             material = next((m for m in f.by_type("IfcMaterial") if m.Name == material_name), None) \

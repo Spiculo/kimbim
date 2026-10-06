@@ -101,3 +101,11 @@ def test_grids_are_per_level(project):
     r = call("add_grid_axis", project["level2"], 0, 0, 0, 5, "")
     assert r["tag"] == "A"
     assert len(b._model.by_type("IfcGrid")) == 2
+
+
+def test_profiles_carry_an_explicit_position(project):
+    """Position is optional in IFC4, but web-ifc (and other viewers) expect it: always write one."""
+    call("column_types")
+    call("beam_types")
+    for profile in b._model.by_type("IfcParameterizedProfileDef"):
+        assert profile.Position is not None, profile

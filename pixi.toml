@@ -20,8 +20,15 @@ qt6-main = ">=6.11.2,<7"
 cmake = ">=4.4.4,<5"
 ninja = ">=1.13.2,<2"
 cxx-compiler = ">=2.0.0,<3"
+# M3 exit check: web-ifc (independent IFC engine) runs on Node
+nodejs = ">=22"
 
 [tasks]
+# M3 exit test: build the two-storey sample house through the modeling commands, then check that
+# it validates (schema + EXPRESS rules) and that web-ifc opens and meshes every element.
+house = "python tools/make_house.py build/house.ifc"
+interop-install = { cmd = "npm ci --no-audit --no-fund", cwd = "tools/interop" }
+interop = { cmd = "python tools/check_interop.py build/house.ifc", depends-on = ["interop-install", "house"] }
 build = "maturin develop --release --skip-install"
 check-spdx = "python tools/check_spdx.py"
 test-rust = "cargo test --workspace"

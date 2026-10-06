@@ -52,3 +52,6 @@ desktop.ini
 /python/kimcad/_core*.so
 /target/
 /python/kimcad/_core*.pdb
+
+# interop check (npm)
+node_modules/

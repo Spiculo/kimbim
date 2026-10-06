@@ -29,6 +29,8 @@ jobs:
         run: pixi run golden
       - name: Desktop app - translations complete (English + Spanish)
         run: pixi run check-translations
+      - name: M3 exit test - two-storey house validates (schema + EXPRESS rules) and opens in web-ifc
+        run: pixi run interop
       # On Linux, OCCT connects to an X display as soon as a viewer exists (even without drawing),
       # so the non-GPU app tests also need a virtual display there.
       - name: Desktop app - build and tests that need no GPU (Windows)
