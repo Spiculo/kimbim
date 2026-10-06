@@ -210,6 +210,9 @@ def _reset_history(path: str):
     _path, _base_id, _ids, _future_ids, _saved_id, _next_id = path, 0, [], [], 0, 1
     _deltas, _future_deltas = [], []
     _inconsistent = False
+    from . import versioning  # a different model leaves versioned mode (not the project's own working copy)
+
+    versioning.forget(path)
 
 
 def _geometry_now(guids) -> dict:
@@ -755,4 +758,17 @@ from .authoring import (  # noqa: E402,F401
     snap_data,
     storeys,
     wall_types,
+)
+from .versioning import (  # noqa: E402,F401
+    compare,
+    create_option,
+    discard_changes,
+    enable_versioning,
+    history,
+    open_project,
+    options,
+    project_state,
+    save_version,
+    switch_option,
+    version_changes,
 )
