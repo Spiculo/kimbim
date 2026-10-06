@@ -57,6 +57,8 @@ public:
     // diagonals and coplanar seams are skipped; unwelded meshes pair up by vertex position.
     static std::vector<std::pair<gp_Pnt, gp_Pnt>> featureEdges(const MeshChunk& chunk, int element, double angleDeg = 30.0);
     static void setBackground(const Quantity_Color& color) { s_background = color; }
+    // Previews skip border lines (computing them on every mouse move made drawing lag).
+    void setShowEdges(bool show) { m_showEdges = show; }
 
     // Element ids as colours (Ids mode): 6 bits per channel stored as value*4+2, so +-1 of colour
     // rounding still decodes; 0 and off-grid colours (background, lines) decode to -1.
@@ -124,6 +126,7 @@ private:
     std::vector<uint32_t> m_edgeOffsets; // per element: first segment, one past the last (size n+1)
     static Quantity_Color s_background;
     int m_idBase = 0;
+    bool m_showEdges = true;
 };
 
 } // namespace kimcad

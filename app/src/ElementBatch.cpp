@@ -339,6 +339,8 @@ void ElementBatch::addTriangles(const Handle(Prs3d_Presentation)& prs, int mode)
 
 void ElementBatch::addLines(const Handle(Prs3d_Presentation)& prs, const Quantity_Color& color)
 {
+    if (!m_showEdges)
+        return;
     computeEdges();
     int segments = 0;
     for (int i = 0; i < elementCount(); ++i)

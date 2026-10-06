@@ -49,6 +49,8 @@ int main(int argc, char* argv[])
     parser.addOption(selectThrough);
     QCommandLineOption house(QStringLiteral("house"), QStringLiteral("Self-test: model a small house with the tools."));
     parser.addOption(house);
+    QCommandLineOption benchTools(QStringLiteral("bench-tools"), QStringLiteral("Self-test: time tool previews and wall placement."));
+    parser.addOption(benchTools);
     QCommandLineOption screenshot(QStringLiteral("screenshot"), QStringLiteral("Self-test: save a PNG of the window."),
         QStringLiteral("png"));
     parser.addOption(screenshot);
@@ -74,6 +76,7 @@ int main(int argc, char* argv[])
         options.linesOnly = parser.isSet(linesOnly);
         options.selectThrough = parser.isSet(selectThrough);
         options.house = parser.isSet(house);
+        options.benchTools = parser.isSet(benchTools);
         options.screenshot = parser.value(screenshot);
         return kimcad::runSelfTest(options);
     }

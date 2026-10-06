@@ -107,6 +107,9 @@ public:
     bool switchOption(const QString& name);
     bool discardChanges();
     bool isVersioned() const { return m_versioned; }
+    // Milliseconds spent per step of editing (accumulated; for the tool benchmark).
+    const QHash<QString, double>& timings() const { return m_timings; }
+    void resetTimings() { m_timings.clear(); }
     bool columnAt(QPointF p, bool turned = false);
     bool createSegment(QPointF p1, QPointF p2); // beam or grid axis, per the active tool
     int gridLineCount() const;
@@ -203,6 +206,7 @@ private:
     QToolBar* m_projectBar = nullptr;
     QComboBox* m_options = nullptr;
     bool m_versioned = false;
+    QHash<QString, double> m_timings;
     QString m_projectFolder;
     QLineEdit* m_lengthInput = nullptr;
     QAction* m_undo = nullptr;

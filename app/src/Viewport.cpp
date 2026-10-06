@@ -353,7 +353,8 @@ void Viewport::paintEvent(QPaintEvent*)
 {
     if (!ensureWindow())
         return;
-    m_view->InvalidateImmediate();
+    // One redraw per paint: forcing an extra immediate-layer redraw here swapped buffers twice per
+    // frame, so every paint waited two vsyncs and tool previews lagged behind the mouse.
     FlushViewEvents(m_context, m_view, true);
 }
 
@@ -483,6 +484,8 @@ void Viewport::setPreviewBoxes(const QVector<PreviewBox>& boxes)
         c.voff.push_back(uint32_t(c.verts.size() / 3));
         c.toff.push_back(uint32_t(c.tris.size() / 3));
         m_preview = new ElementBatch(std::move(c));
+        m_preview->setShowEdges(false);
+        m_preview->SetZLayer(Graphic3d_ZLayerId_Top);
         m_context->Display(m_preview, 0, -1, false); // shown, never selectable
     }
     update();

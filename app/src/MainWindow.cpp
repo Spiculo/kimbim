@@ -12,6 +12,7 @@
 #include <QFileInfo>
 #include <algorithm>
 
+#include <QElapsedTimer>
 #include <QInputDialog>
 #include <QVBoxLayout>
 #include <QListWidget>
@@ -51,6 +52,17 @@
 #include "Viewport.h"
 
 namespace kimcad {
+
+namespace {
+// Adds the time spent in a scope to a named counter.
+struct StepTimer {
+    QHash<QString, double>& into;
+    const char* name;
+    QElapsedTimer t;
+    StepTimer(QHash<QString, double>& h, const char* n) : into(h), name(n) { t.start(); }
+    ~StepTimer() { into[QLatin1String(name)] += double(t.nsecsElapsed()) / 1e6; }
+};
+} // namespace
 
 MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     : QMainWindow(parent)
@@ -1637,6 +1649,7 @@ bool MainWindow::createWall(const WallSegment& s)
         type = types.first().toObject();
     }
     auto num = [](double v) { return QString::number(v, 'g', 17); };
+    StepTimer createTimer(m_timings, "bridgeCreateWall");
     const QJsonObject r = bridge("create_wall", {m_levels->activeStorey(), type.value("guid").toString(),
         num(s.p1.x()), num(s.p1.y()), num(s.p2.x()), num(s.p2.y()), num(m_wallHeight->value()), s.joinStart, s.joinEnd});
     if (!r.value("ok").toBool()) {
@@ -1679,12 +1692,22 @@ void MainWindow::applyGeometry(const QJsonObject& geometry)
         MeshChunk chunk;
         bool none = false;
         QString error;
-        if (!fetchElementMeshes(PythonEngine::instance(), changed, &chunk, &none, &error))
+        bool fetched = false;
+        {
+            StepTimer _(m_timings, "fetchMeshes");
+            fetched = fetchElementMeshes(PythonEngine::instance(), changed, &chunk, &none, &error);
+        }
+        if (!fetched)
             showError(tr("Could not update the 3D view"), error);
-        else if (!none)
+        else if (!none) {
+            StepTimer _(m_timings, "replaceElements");
             m_viewport->replaceElements(chunk);
+        }
     }
-    m_tree->refreshTree(bridge("spatial_tree")); // elements can appear or disappear
+    {
+        StepTimer _(m_timings, "refreshTree");
+        m_tree->refreshTree(bridge("spatial_tree")); // elements can appear or disappear
+    }
     QStringList kept;
     for (const QString& g : std::as_const(m_selection))
         if (!removed.contains(g))
@@ -1694,16 +1717,18 @@ void MainWindow::applyGeometry(const QJsonObject& geometry)
         setSelection(kept);
 }
 
+
 void MainWindow::afterEdit(const QJsonObject& result)
 {
-    applyGeometry(result.value("geometry").toObject());
-    refreshLevels();
+    { StepTimer _(m_timings, "applyGeometry"); applyGeometry(result.value("geometry").toObject()); }
+    { StepTimer _(m_timings, "refreshLevels"); refreshLevels(); }
     if (!m_warnedInconsistent && bridge("state").value("inconsistent").toBool()) {
         m_warnedInconsistent = true;
         showError(tr("The model may be inconsistent"),
             tr("An edit failed and could not be undone. Save a copy if you need it, then reopen the file."));
     }
-    refreshSnapData(); // undo/redo can add or remove walls and grid lines
+    { StepTimer _(m_timings, "refreshSnapData"); refreshSnapData(); } // undo/redo can add or remove walls and grid lines
+    StepTimer stateTimer(m_timings, "stateAndNames");
     const QJsonObject s = bridge("state");
     m_undo->setEnabled(s.value("can_undo").toBool());
     m_redo->setEnabled(s.value("can_redo").toBool());
