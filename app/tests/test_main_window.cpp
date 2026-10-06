@@ -635,6 +635,36 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // Owner feedback: architects put labels, dimensions and marks on the plan.
+    void planAnnotations()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        QVERIFY(w.addAnnotation(QStringLiteral("text"), {QPointF(1, 2)}, QStringLiteral("Living room")));
+        QVERIFY(w.addAnnotation(QStringLiteral("mark"), {QPointF(3, 3)}, QStringLiteral("A")));
+        QCOMPARE(w.viewport()->annotationCount(), 2);
+
+        // The dimension tool: click both ends, then where the dimension line goes.
+        w.setTool(kimcad::MainWindow::Tool::Dimension);
+        for (const QPointF p : {QPointF(0, 0), QPointF(4.5, 0), QPointF(2, -1)})
+            emit w.viewport()->workPointClicked(p, 0.01, Qt::NoModifier);
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QCOMPARE(w.viewport()->annotationCount(), 3);
+        QVERIFY(w.viewport()->annotationTexts().contains(QStringLiteral("4.50")));
+
+        // Annotations are selectable, deletable, and live on a level.
+        const QString label = w.viewport()->annotationGuids().first();
+        w.viewport()->selectGuids({label});
+        QCOMPARE(w.viewport()->selectedGuids(), QStringList{label});
+        w.setSelection({label});
+        QCOMPARE(w.viewport()->typeOf(label), QStringLiteral("IfcAnnotation"));
+        QVERIFY(w.deleteSelection());
+        QCOMPARE(w.viewport()->annotationCount(), 2);
+        QVERIFY(w.addLevel(QStringLiteral("Level 2"), 3.0));
+        QCOMPARE(w.viewport()->annotationCount(), 0); // each level has its own
+        QVERIFY(w.close());
+    }
+
     void shortcutsAreTheDocumentedOnes()
     {
         kimcad::MainWindow w(nullptr, true);
@@ -658,6 +688,9 @@ private slots:
         QCOMPARE(action(w, "actionStretchTool")->shortcut(), QKeySequence(Qt::Key_E));
         QCOMPARE(action(w, "actionStairTool")->shortcut(), QKeySequence(Qt::Key_T));
         QCOMPARE(action(w, "actionPlaceModelTool")->shortcut(), QKeySequence(Qt::Key_U));
+        QCOMPARE(action(w, "actionTextTool")->shortcut(), QKeySequence(Qt::Key_A));
+        QCOMPARE(action(w, "actionDimensionTool")->shortcut(), QKeySequence(Qt::Key_Q));
+        QCOMPARE(action(w, "actionMarkTool")->shortcut(), QKeySequence(Qt::Key_X));
         QCOMPARE(action(w, "actionSlabOpeningTool")->shortcut(), QKeySequence(Qt::Key_O));
         QCOMPARE(action(w, "actionSaveVersion")->shortcut(), QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_S));
         QVERIFY(action(w, "actionLinesOnly")->isCheckable());

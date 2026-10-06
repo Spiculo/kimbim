@@ -18,7 +18,11 @@
 #include <V3d_AmbientLight.hxx>
 #include <Graphic3d_Camera.hxx>
 #include <SelectMgr_EntityOwner.hxx>
+#include <SelectMgr_Selection.hxx>
+#include <Select3D_SensitivePoint.hxx>
+#include <Select3D_SensitiveSegment.hxx>
 #include <gp_Pnt.hxx>
+#include <gp_Vec.hxx>
 #ifdef _WIN32
 #include <WNT_Window.hxx>
 #else
@@ -550,6 +554,175 @@ void Viewport::rebuildSection()
     update();
 }
 
+namespace {
+
+// The owner of an annotation's sensitive entities: carries its guid for selection.
+class AnnotationOwner : public SelectMgr_EntityOwner {
+public:
+    AnnotationOwner(const Handle(SelectMgr_SelectableObject)& prs, const QString& guid)
+        : SelectMgr_EntityOwner(prs, 5)
+        , m_guid(guid)
+    {
+    }
+    const QString& guid() const { return m_guid; }
+
+private:
+    QString m_guid;
+};
+
+// One plan annotation: lines (dimension, mark circle) and its text, on top of the model.
+class AnnotationPrs : public AIS_InteractiveObject {
+public:
+    AnnotationPrs(Viewport::Annotation a, double z)
+        : m_a(std::move(a))
+        , m_z(z)
+    {
+        SetZLayer(Graphic3d_ZLayerId_Topmost);
+    }
+    const QString& guid() const { return m_a.guid; }
+    // Null until the annotation is selectable (not on a locked layer).
+    const Handle(SelectMgr_EntityOwner)& owner() const { return m_owner; }
+
+    void Compute(const Handle(PrsMgr_PresentationManager)&, const Handle(Prs3d_Presentation)& prs, const int) override
+    {
+        const Quantity_Color ink = m_a.kind == QLatin1String("mark") ? Quantity_Color(0.75, 0.15, 0.1, Quantity_TOC_RGB)
+                                                                      : Quantity_Color(0.1, 0.1, 0.12, Quantity_TOC_RGB);
+        const std::vector<std::pair<gp_Pnt, gp_Pnt>> segs = segments();
+        if (!segs.empty()) {
+            Handle(Graphic3d_ArrayOfSegments) arr = new Graphic3d_ArrayOfSegments(int(segs.size()) * 2);
+            for (const auto& s : segs) {
+                arr->AddVertex(s.first);
+                arr->AddVertex(s.second);
+            }
+            Handle(Graphic3d_Group) lines = prs->NewGroup();
+            lines->SetGroupPrimitivesAspect(new Graphic3d_AspectLine3d(ink, Aspect_TOL_SOLID, 1.5));
+            lines->AddPrimitiveArray(arr);
+        }
+        Handle(Prs3d_TextAspect) text = new Prs3d_TextAspect();
+        text->SetColor(ink);
+        text->SetHeight(m_a.kind == QLatin1String("text") ? 16 : 14);
+        if (m_a.kind == QLatin1String("dimension")) { // centred, sitting on the dimension line
+            text->SetHorizontalJustification(Graphic3d_HTA_CENTER);
+            text->SetVerticalJustification(Graphic3d_VTA_CENTER);
+        } else if (m_a.kind == QLatin1String("mark")) { // the tag in the circle
+            text->SetHorizontalJustification(Graphic3d_HTA_CENTER);
+            text->SetVerticalJustification(Graphic3d_VTA_CENTER);
+        }
+        Handle(Graphic3d_Group) labels = prs->NewGroup();
+        Prs3d_Text::Draw(labels, text, TCollection_ExtendedString(m_a.text.toUtf8().constData(), true), anchor());
+    }
+
+    void ComputeSelection(const Handle(SelectMgr_Selection)& selection, const int mode) override
+    {
+        if (mode != 0)
+            return;
+        if (m_owner.IsNull())
+            m_owner = new AnnotationOwner(this, m_a.guid);
+        const Handle(SelectMgr_EntityOwner)& owner = m_owner;
+        for (const auto& s : segments())
+            selection->Add(new Select3D_SensitiveSegment(owner, s.first, s.second));
+        Handle(Select3D_SensitivePoint) point = new Select3D_SensitivePoint(owner, anchor());
+        point->SetSensitivityFactor(12);
+        selection->Add(point);
+    }
+
+private:
+    gp_Pnt at(QPointF p) const { return gp_Pnt(p.x(), p.y(), m_z); }
+
+    gp_Pnt anchor() const
+    {
+        if (m_a.kind == QLatin1String("dimension") && m_a.points.size() == 3) {
+            const auto segs = segments();
+            const gp_Pnt a = segs[2].first, b = segs[2].second;
+            // Just off the dimension line, on the side away from what it measures.
+            gp_Vec away(segs[0].first, segs[0].second);
+            if (away.Magnitude() < 1e-9) {
+                const gp_Vec along(a, b);
+                away = gp_Vec(-along.Y(), along.X(), 0);
+            }
+            away.Normalize();
+            return gp_Pnt((a.X() + b.X()) / 2, (a.Y() + b.Y()) / 2, m_z).Translated(away * 0.12);
+        }
+        return m_a.points.isEmpty() ? gp_Pnt(0, 0, m_z) : at(m_a.points.first());
+    }
+
+    std::vector<std::pair<gp_Pnt, gp_Pnt>> segments() const
+    {
+        std::vector<std::pair<gp_Pnt, gp_Pnt>> out;
+        if (m_a.kind == QLatin1String("dimension") && m_a.points.size() == 3) {
+            const QPointF a = m_a.points[0], b = m_a.points[1], o = m_a.points[2];
+            const QPointF d = b - a;
+            const double len = std::hypot(d.x(), d.y());
+            if (len < 1e-9)
+                return out;
+            const QPointF n(-d.y() / len, d.x() / len);
+            const double off = QPointF::dotProduct(o - a, n);
+            const QPointF a2 = a + n * off, b2 = b + n * off, u = d / len;
+            out.push_back({at(a), at(a2)});
+            out.push_back({at(b), at(b2)});
+            out.push_back({at(a2), at(b2)});
+            const double t = 0.12; // architectural ticks at both ends
+            for (const QPointF& p : {a2, b2})
+                out.push_back({at(p - (u + n) * t), at(p + (u + n) * t)});
+        } else if (m_a.kind == QLatin1String("mark") && !m_a.points.isEmpty()) {
+            const QPointF c = m_a.points.first();
+            const int n = 32;
+            const double r = 0.4;
+            for (int i = 0; i < n; ++i) {
+                const double t0 = 2 * M_PI * i / n, t1 = 2 * M_PI * (i + 1) / n;
+                out.push_back({at(c + QPointF(std::cos(t0), std::sin(t0)) * r), at(c + QPointF(std::cos(t1), std::sin(t1)) * r)});
+            }
+        }
+        return out;
+    }
+
+    Viewport::Annotation m_a;
+    double m_z;
+    Handle(SelectMgr_EntityOwner) m_owner;
+};
+
+} // namespace
+
+void Viewport::setAnnotations(const QVector<Annotation>& annotations, double z)
+{
+    m_annotationData = annotations;
+    m_annotationZ = z;
+    displayAnnotations();
+}
+
+void Viewport::displayAnnotations()
+{
+    for (const auto& prs : std::as_const(m_annotations))
+        m_context->Remove(prs, false);
+    m_annotations.clear();
+    for (const Annotation& a : std::as_const(m_annotationData)) {
+        if (m_layerHidden.contains(a.guid))
+            continue;
+        Handle(AnnotationPrs) prs = new AnnotationPrs(a, m_annotationZ + 0.02);
+        m_context->Display(prs, 0, m_layerLocked.contains(a.guid) ? -1 : 0, false);
+        m_annotations.insert(a.guid, prs);
+    }
+    update();
+}
+
+QStringList Viewport::annotationGuids() const
+{
+    QStringList out;
+    for (const Annotation& a : m_annotationData)
+        if (m_annotations.contains(a.guid))
+            out << a.guid;
+    return out;
+}
+
+QStringList Viewport::annotationTexts() const
+{
+    QStringList out;
+    for (const Annotation& a : m_annotationData)
+        if (m_annotations.contains(a.guid))
+            out << a.text;
+    return out;
+}
+
 void Viewport::setGridLines(const QVector<GridLine>& lines, double z)
 {
     if (!m_grid.IsNull()) {
@@ -768,6 +941,10 @@ void Viewport::setLinesOnly(bool on)
 
 void Viewport::clear()
 {
+    for (const auto& prs : std::as_const(m_annotations))
+        m_context->Remove(prs, false);
+    m_annotations.clear();
+    m_annotationData.clear();
     m_context->RemoveAll(false);
     m_batches.clear();
     m_locate.clear();
@@ -846,6 +1023,7 @@ void Viewport::setLayerState(const QSet<QString>& hiddenGuids, const QSet<QStrin
         touched.push_back(int(b));
     }
     redisplay(touched);
+    displayAnnotations();
 }
 
 bool Viewport::isLocked(const QString& guid) const
@@ -865,7 +1043,9 @@ int Viewport::coloredCount() const
 QString Viewport::typeOf(const QString& guid) const
 {
     const auto it = m_locate.constFind(guid);
-    return it == m_locate.constEnd() ? QString() : m_batches[size_t(it->batch)]->type(it->index);
+    if (it == m_locate.constEnd())
+        return m_annotations.contains(guid) ? QStringLiteral("IfcAnnotation") : QString();
+    return m_batches[size_t(it->batch)]->type(it->index);
 }
 
 bool Viewport::retire(const QString& guid, std::vector<int>* touched)
@@ -933,6 +1113,8 @@ QStringList Viewport::selectedGuids() const
         Handle(ElementOwner) owner = Handle(ElementOwner)::DownCast(m_context->SelectedOwner());
         if (!owner.IsNull())
             out << owner->batch()->guid(owner->index());
+        else if (Handle(AnnotationOwner) note = Handle(AnnotationOwner)::DownCast(m_context->SelectedOwner()); !note.IsNull())
+            out << note->guid();
     }
     return out;
 }
@@ -955,6 +1137,11 @@ void Viewport::selectGuids(const QStringList& guids)
         auto it = m_locate.constFind(g);
         if (it != m_locate.constEnd())
             m_context->AddOrRemoveSelected(m_batches[size_t(it->batch)]->owner(it->index), false);
+        else if (const auto note = m_annotations.constFind(g); note != m_annotations.constEnd()) {
+            const Handle(SelectMgr_EntityOwner)& owner = Handle(AnnotationPrs)::DownCast(*note)->owner();
+            if (!owner.IsNull())
+                m_context->AddOrRemoveSelected(owner, false);
+        }
     }
     m_context->UpdateCurrentViewer();
     update();

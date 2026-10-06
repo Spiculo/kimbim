@@ -73,6 +73,16 @@ public:
         QString tag;
     };
     void setGridLines(const QVector<GridLine>& lines, double z);
+    // Plan annotations of the active level (Slice 13): text labels, dimensions, marks; drawn on
+    // top, selectable (their guids join selectedGuids), hidden/locked with their layer.
+    struct Annotation {
+        QString guid, kind, text;
+        QVector<QPointF> points; // world metres: text/mark anchor; dimension a, b, line point
+    };
+    void setAnnotations(const QVector<Annotation>& annotations, double z);
+    int annotationCount() const { return int(m_annotations.size()); }
+    QStringList annotationGuids() const;
+    QStringList annotationTexts() const;
     // The plan cut's sections (owner feedback): elements cut at height z get a dark fill and a bold
     // outline (poché); nullopt removes them. Kept up to date as elements change.
     void setSectionHeight(std::optional<double> z);
@@ -199,6 +209,10 @@ private:
     double m_workZ = 0.0;
     Handle(ElementBatch) m_preview;
     Handle(AIS_InteractiveObject) m_grid;
+    QVector<Annotation> m_annotationData;
+    double m_annotationZ = 0.0;
+    QHash<QString, Handle(AIS_InteractiveObject)> m_annotations;
+    void displayAnnotations();
     Handle(AIS_InteractiveObject) m_section;
     std::optional<double> m_sectionZ;
     int m_sectionElements = 0;

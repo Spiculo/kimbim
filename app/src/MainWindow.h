@@ -80,7 +80,7 @@ public:
     LevelsBar* levelsBar() const { return m_levels; }
     // Modeling tools (M3): one active at a time. Exposed for tests and the self-test, which drive
     // them with work-plane points.
-    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening, PlaceModel };
+    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening, PlaceModel, Text, Dimension, Mark };
     void setTool(Tool tool);
     Tool tool() const { return m_tool; }
     WallTool* wallTool() const { return m_wallTool; }
@@ -126,6 +126,8 @@ public:
     bool placeModelAt(QPointF p, bool turned);
     bool updateModelInstances();
     bool explodeSelectedInstance();
+    // Plan annotations (Slice 13): kind "text" (1 point), "dimension" (a, b, line point), "mark".
+    bool addAnnotation(const QString& kind, const QVector<QPointF>& points, const QString& text);
     // Drag to move (owner feedback): preview while dragging, move on release (Ctrl detaches).
     void dragMoveTo(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
     bool dragFinished(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
@@ -179,6 +181,8 @@ private:
     void buildProjectToolbar();
     void refreshProject();
     void refreshLayers();
+    void refreshAnnotations();
+    void annotationClick(QPointF p);
     void saveVersionDialog();
     void enableVersioningDialog();
     void openProjectDialog();
@@ -234,6 +238,7 @@ private:
     QString m_currentView;
     QHash<QString, QString> m_instanceOf; // element -> model instance it belongs to
     QHash<QString, QStringList> m_instanceMembers;
+    QVector<QPointF> m_annotationPoints; // the dimension tool's clicks so far
     QToolBar* m_projectBar = nullptr;
     QComboBox* m_options = nullptr;
     bool m_versioned = false;

@@ -377,6 +377,7 @@ void MainWindow::buildCutsToolbar()
         }
         applyCuts();
         refreshLayers(); // models show only while one is active
+        refreshAnnotations(); // each level has its own
     });
     QToolBar* bar = addToolBar(tr("Cuts"));
     bar->setObjectName(QStringLiteral("CutsToolbar"));
@@ -556,6 +557,15 @@ bool MainWindow::applyPropertyEdit(const QString& pset, const QString& prop, con
     if (m_selection.isEmpty())
         return false;
     // The Dimensions group is live geometry, not a property set: it edits the elements' shape.
+    if (pset == QLatin1String("KIMCAD_Annotation") && prop == QLatin1String("Text")) {
+        bool all = true;
+        for (const QString& g : std::as_const(m_selection)) {
+            const QJsonObject r = bridge("set_annotation_text", {g, value.toString()});
+            all = all && r.value("ok").toBool();
+            afterEdit(r);
+        }
+        return all;
+    }
     const QJsonObject r = pset == QLatin1String("Dimensions")
         ? bridge("set_dimension", {jsonList(m_selection), prop,
               value.isDouble() ? QString::number(value.toDouble(), 'g', 17) : value.toString()})
@@ -657,6 +667,7 @@ bool MainWindow::newProject()
     m_lockedLayers.clear();
     m_currentView.clear();
     refreshLayers();
+    refreshAnnotations();
     statusBar()->showMessage(tr("New project"));
     return true;
 }
@@ -755,6 +766,10 @@ void MainWindow::buildModelingToolbar()
             tr("Cut a hole in the selected slab: draw its outline like a slab")},
         {Tool::PlaceModel, "actionPlaceModelTool", tr("Place mo&del"), Qt::Key_U,
             tr("Place a model (an apartment drawn once) on this level: click where its origin goes; Shift turns it 90 degrees")},
+        {Tool::Text, "actionTextTool", tr("Te&xt label"), Qt::Key_A, tr("Put a text label on the plan: click where it goes")},
+        {Tool::Dimension, "actionDimensionTool", tr("Dimensi&on"), Qt::Key_Q,
+            tr("Dimension: click the two points to measure, then where the dimension line goes")},
+        {Tool::Mark, "actionMarkTool", tr("Mar&k"), Qt::Key_X, tr("Mark something on the plan: a circle with a tag")},
     };
     for (const Def& d : defs) {
         QAction* a = bar->addAction(d.text);
@@ -869,6 +884,9 @@ void MainWindow::buildModelingToolbar()
             updateToolPreview();
             break;
         case Tool::PlaceModel:
+        case Tool::Text:
+        case Tool::Dimension:
+        case Tool::Mark:
             m_twoPointTool->setTolerance(tolerance);
             break;
         case Tool::Move:
@@ -927,6 +945,12 @@ void MainWindow::buildModelingToolbar()
         case Tool::PlaceModel:
             m_twoPointTool->setTolerance(tolerance);
             placeModelAt(m_twoPointTool->snapper().snap(p, tolerance).point, ortho);
+            break;
+        case Tool::Text:
+        case Tool::Dimension:
+        case Tool::Mark:
+            m_twoPointTool->setTolerance(tolerance);
+            annotationClick(m_twoPointTool->snapper().snap(p, tolerance).point);
             break;
         case Tool::Move:
             m_detach = mods & Qt::ControlModifier;
@@ -1036,6 +1060,10 @@ void MainWindow::refreshTypes()
         break;
     case Tool::PlaceModel:
         source = "models";
+        break;
+    case Tool::Text:
+    case Tool::Dimension:
+    case Tool::Mark:
         break;
     case Tool::Grid:
     case Tool::None:
@@ -1169,6 +1197,7 @@ void MainWindow::setTool(Tool tool)
     m_rotateTool->cancel();
     m_gripTool->cancel();
     m_columnHover.reset();
+    m_annotationPoints.clear();
     m_tool = tool;
     for (auto it = m_toolActions.constBegin(); it != m_toolActions.constEnd(); ++it) {
         const QSignalBlocker block(it.value());
@@ -1232,6 +1261,15 @@ void MainWindow::setTool(Tool tool)
         break;
     case Tool::SlabOpening:
         statusBar()->showMessage(tr("Slab opening: draw the hole's outline; click the first point or press Enter to close"));
+        break;
+    case Tool::Text:
+        statusBar()->showMessage(tr("Text: click where the label goes"));
+        break;
+    case Tool::Dimension:
+        statusBar()->showMessage(tr("Dimension: click the first point to measure"));
+        break;
+    case Tool::Mark:
+        statusBar()->showMessage(tr("Mark: click what to mark"));
         break;
     case Tool::PlaceModel:
         statusBar()->showMessage(m_types->count() ? tr("Place model: click where its origin goes (Shift: turned 90 degrees)")
@@ -1774,6 +1812,60 @@ void MainWindow::refreshLayers()
     m_layersPanel->setViews(names, m_currentView);
 }
 
+void MainWindow::refreshAnnotations()
+{
+    QVector<Viewport::Annotation> list;
+    for (const auto& v : bridge("annotations", {m_levels->activeStorey()}).value("annotations").toArray()) {
+        const QJsonObject o = v.toObject();
+        Viewport::Annotation a{o.value("guid").toString(), o.value("kind").toString(), o.value("text").toString(), {}};
+        for (const auto& p : o.value("points").toArray())
+            a.points << QPointF(p.toArray().at(0).toDouble(), p.toArray().at(1).toDouble());
+        list << a;
+    }
+    m_viewport->setAnnotations(list, m_levels->activeElevation());
+    if (!m_selection.isEmpty())
+        m_viewport->selectGuids(m_selection);
+}
+
+bool MainWindow::addAnnotation(const QString& kind, const QVector<QPointF>& points, const QString& text)
+{
+    QJsonArray pts;
+    for (const QPointF& p : points)
+        pts.append(QJsonArray{p.x(), p.y()});
+    const QJsonObject r = bridge("add_annotation", {m_levels->activeStorey(), kind,
+        QString::fromUtf8(QJsonDocument(pts).toJson(QJsonDocument::Compact)), text});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not add it: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    return true;
+}
+
+void MainWindow::annotationClick(QPointF p)
+{
+    if (m_tool == Tool::Dimension) {
+        m_annotationPoints << p;
+        if (m_annotationPoints.size() == 1)
+            statusBar()->showMessage(tr("Dimension: click the second point"));
+        else if (m_annotationPoints.size() == 2)
+            statusBar()->showMessage(tr("Dimension: click where the dimension line goes"));
+        else {
+            const QVector<QPointF> pts = m_annotationPoints;
+            m_annotationPoints.clear();
+            addAnnotation(QStringLiteral("dimension"), pts, QString());
+            statusBar()->showMessage(tr("Dimension: click the first point to measure"));
+        }
+        return;
+    }
+    const bool mark = m_tool == Tool::Mark;
+    bool ok = false;
+    const QString text = QInputDialog::getText(this, mark ? tr("Mark") : tr("Text label"),
+        mark ? tr("Tag (e.g. A, 1, R2):") : tr("Text:"), QLineEdit::Normal, QString(), &ok);
+    if (ok && !text.trimmed().isEmpty())
+        addAnnotation(mark ? QStringLiteral("mark") : QStringLiteral("text"), {p}, text.trimmed());
+}
+
 bool MainWindow::createModel(const QString& name)
 {
     const QJsonObject r = bridge("create_model", {name});
@@ -2153,6 +2245,7 @@ void MainWindow::afterEdit(const QJsonObject& result)
     }
     { StepTimer _(m_timings, "refreshSnapData"); refreshSnapData(); } // undo/redo can add or remove walls and grid lines
     { StepTimer _(m_timings, "refreshLayers"); refreshLayers(); }
+    { StepTimer _(m_timings, "refreshAnnotations"); refreshAnnotations(); }
     StepTimer stateTimer(m_timings, "stateAndNames");
     const QJsonObject s = bridge("state");
     m_undo->setEnabled(s.value("can_undo").toBool());
@@ -2263,6 +2356,7 @@ void MainWindow::onOpened(const QJsonObject& info)
     m_currentView.clear();
     refreshProject();
     refreshLayers();
+    refreshAnnotations();
     statusBar()->showMessage(tr("Loading %1 (%2)...").arg(QFileInfo(m_path).fileName(), info.value("schema").toString()));
 }
 
