@@ -509,6 +509,28 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // Owner feedback: editing a length in the Properties panel changes the element.
+    void editingDimensionsInThePanelChangesGeometry()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({5, 0});
+        w.setTool(kimcad::MainWindow::Tool::None);
+        const QString wall = w.viewport()->guids().first();
+        w.setSelection({wall});
+        QVERIFY(w.applyPropertyEdit(QStringLiteral("Dimensions"), QStringLiteral("Length"), QJsonValue(6.5)));
+        double x0, y0, z0, x1, y1, z1;
+        w.viewport()->boundsOf({wall}).Get(x0, y0, z0, x1, y1, z1);
+        QVERIFY(std::abs((x1 - x0) - 6.5) < 0.01);
+        QVERIFY(w.applyPropertyEdit(QStringLiteral("Dimensions"), QStringLiteral("Height"), QJsonValue(4.0)));
+        w.viewport()->boundsOf({wall}).Get(x0, y0, z0, x1, y1, z1);
+        QVERIFY(std::abs(z1 - 4.0) < 0.01);
+        QVERIFY(!w.applyPropertyEdit(QStringLiteral("Dimensions"), QStringLiteral("Thickness"), QJsonValue(0.5)));
+        QVERIFY(w.close());
+    }
+
     void shortcutsAreTheDocumentedOnes()
     {
         kimcad::MainWindow w(nullptr, true);

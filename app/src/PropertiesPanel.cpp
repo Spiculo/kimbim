@@ -132,7 +132,9 @@ void PropertiesPanel::showMulti(const QJsonObject& merged)
             item->setData(0, PsetRole, p.key());
             item->setData(0, PropRole, v.key());
             item->setData(1, KindRole, kind);
-            item->setToolTip(1, prop.value("ifc_type").toString());
+            item->setToolTip(1, prop.value("source").toString() == QLatin1String("dimension")
+                    ? tr("Metres, measured from the model; editing it changes the element")
+                    : prop.value("ifc_type").toString());
             const bool varies = prop.value("varies").toBool();
             if (kind == Bool) {
                 item->setFlags((item->flags() | Qt::ItemIsUserCheckable) & ~Qt::ItemIsEditable);
@@ -241,9 +243,10 @@ QList<QAction*> PropertiesPanel::actionsFor(QTreeWidgetItem* item, QObject* pare
         add("editTypeValue", tr("Edit type value..."), [this, pset, prop] { emit typeEditRequested(pset, prop); });
     if (!prop.isEmpty() && (source == QLatin1String("override") || source == QLatin1String("mixed")))
         add("resetToType", tr("Reset to type value"), [this, pset, prop] { emit resetToTypeRequested(pset, prop); });
-    if (!pset.isEmpty())
+    const bool dimension = source == QLatin1String("dimension") || pset == QLatin1String("Dimensions");
+    if (!pset.isEmpty() && !dimension)
         add("addProperty", tr("Add property to %1...").arg(pset), [this, pset] { emit addPropertyRequested(pset); });
-    if (!prop.isEmpty() && editable && source != QLatin1String("type")) // inherited values have nothing to remove
+    if (!prop.isEmpty() && editable && !dimension && source != QLatin1String("type")) // inherited values have nothing to remove
         add("removeProperty", tr("Remove property %1").arg(prop), [this, pset, prop] { emit propertyRemoved(pset, prop); });
     if (m_name)
         add("addPropertySet", tr("Add property set..."), [this] { emit addPropertySetRequested(); });

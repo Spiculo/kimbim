@@ -679,6 +679,22 @@ def properties_multi(guids_json: str) -> str:
                 "type_value": _shared_type_value(present, len(entries)),
             }
         psets[pset] = props
+    # Dimensions (owner feedback): live from the model, editable through set_dimension.
+    from . import authoring
+
+    per_dims = [{name: (value, editable) for name, value, editable in authoring.element_dimensions(e)} for e in elements]
+    dim_names = [name for name, _, _ in authoring.element_dimensions(elements[0])]
+    for d in per_dims[1:]:
+        dim_names += [k for k in d if k not in dim_names]
+    if dim_names:
+        group = {}
+        for name in dim_names:
+            present = [d[name] for d in per_dims if name in d]
+            values = [round(v, 6) for v, _ in present]
+            varies = len(present) != len(per_dims) or any(v != values[0] for v in values)
+            group[name] = {"value": None if varies else values[0], "varies": varies, "ifc_type": "IfcLengthMeasure",
+                           "editable": all(ed for _, ed in present), "source": "dimension", "type_value": None}
+        psets = {authoring.DIMENSIONS: group, **psets}
     names = [e.Name or "" for e in elements]
     same_name = all(n == names[0] for n in names)
     return _dump({
@@ -751,6 +767,7 @@ from .authoring import (  # noqa: E402,F401
     opening_types,
     rotate_elements,
     set_wall_axis,
+    set_dimension,
     set_wall_height,
     slide_openings,
     slab_outline_from_walls,

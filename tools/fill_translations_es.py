@@ -233,6 +233,7 @@ ES = {
     "Save a version of your changes before switching options?": "¿Guardar una versión de sus cambios antes de cambiar de opción?",
     "Could not switch options": "No se pudo cambiar de opción",
     "Plan cut height above the active level (drag to cut the model)": "Altura del corte en planta sobre el nivel activo (arrastre para cortar el modelo)",
+    "Metres, measured from the model; editing it changes the element": "Metros, medidos del modelo; editarlo cambia el elemento",
     # plural forms: (singular, plural)
     "Loading... %n element(s)": ("Cargando... %n elemento", "Cargando... %n elementos"),
     "%n element(s) selected": ("%n elemento seleccionado", "%n elementos seleccionados"),

@@ -482,7 +482,11 @@ bool MainWindow::applyPropertyEdit(const QString& pset, const QString& prop, con
 {
     if (m_selection.isEmpty())
         return false;
-    const QJsonObject r = bridge("set_property", {jsonList(m_selection), pset, prop, jsonValue(value)});
+    // The Dimensions group is live geometry, not a property set: it edits the elements' shape.
+    const QJsonObject r = pset == QLatin1String("Dimensions")
+        ? bridge("set_dimension", {jsonList(m_selection), prop,
+              value.isDouble() ? QString::number(value.toDouble(), 'g', 17) : value.toString()})
+        : bridge("set_property", {jsonList(m_selection), pset, prop, jsonValue(value)});
     if (!r.value("ok").toBool())
         showError(tr("Could not change %1").arg(prop), r.value("error").toString());
     afterEdit(r);

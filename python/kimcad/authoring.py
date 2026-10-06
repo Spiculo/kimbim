@@ -1480,3 +1480,133 @@ def add_slab_opening(slab_guid: str, points_json: str) -> str:
     except Exception as ex:
         return _fail(f"{type(ex).__name__}: {ex}")
     return B._dump(r)
+
+
+# ---------------------------------------------------------------- dimensions in the Properties panel
+
+DIMENSIONS = "Dimensions"
+
+
+def _extrusion_depth(element) -> float:
+    representation = ifcopenshell.util.representation.get_representation(element, "Model", "Body", "MODEL_VIEW")
+    depths = [float(e.Depth) for e in B._model.traverse(representation) if e.is_a("IfcExtrudedAreaSolid")] if representation else []
+    return max(depths, default=0.0) * _scale()
+
+
+def element_dimensions(e) -> list[tuple[str, float, bool]]:
+    """(name, metres, editable) shown in the Properties panel's Dimensions group."""
+    if e.is_a("IfcWall") and _axis_world(e) is not None:
+        a, b = _axis_world(e)
+        layer_set = _layer_set(e)
+        return [("Length", math.dist(a, b), True), ("Height", _wall_height(e), True),
+                ("Thickness", _thickness(layer_set) if layer_set else 0.0, False)]
+    if e.is_a("IfcDoor") or e.is_a("IfcWindow"):
+        info = _opening_info(e)
+        if info is not None:
+            _, _, _, width, height, sill = info
+            return [("Width", width, True), ("Height", height, True), ("Sill height", sill, True)]
+    if e.is_a("IfcColumn"):
+        return [("Height", _extrusion_depth(e), True)]
+    if e.is_a("IfcBeam"):
+        return [("Length", _extrusion_depth(e), True)]
+    if e.is_a("IfcSlab"):
+        t = ifcopenshell.util.element.get_type(e)
+        layer_set = _layer_set(t) if t is not None else None
+        return [("Thickness", _thickness(layer_set) if layer_set else _extrusion_depth(e), False)]
+    return []
+
+
+def _stretch_plan(wall, p1, p2):
+    """Joins dropped and neighbours to regenerate when a wall gets the axis p1-p2 (metres)."""
+    a0, a1 = (np.array(p) for p in _axis_world(wall))
+    start_moved, end_moved = np.linalg.norm(p1 - a0) > 1e-6, np.linalg.norm(p2 - a1) > 1e-6
+    dropped, neighbours = [], []
+    for rel in _path_joins(wall):
+        mine = rel.RelatingConnectionType if rel.RelatingElement == wall else rel.RelatedConnectionType
+        other = rel.RelatedElement if rel.RelatingElement == wall else rel.RelatingElement
+        if (mine == "ATSTART" and start_moved) or (mine == "ATEND" and end_moved):
+            dropped.append(rel)
+        neighbours.append(other)
+    return dropped, neighbours
+
+
+def set_dimension(guids_json: str, name: str, value) -> str:
+    """Change a dimension of the selected elements (metres): wall Length (from its start) or Height,
+    door/window Width, Height or Sill height, column Height, beam Length (from its start)."""
+    if B._model is None:
+        return _fail("no model open")
+    try:
+        metres = float(str(value).strip().replace(",", "."))
+    except ValueError:
+        return _fail(f"not a number: {value}")
+    if name != "Sill height" and metres <= 0:
+        return _fail(f"{name} must be more than 0")
+    plan = []
+    for e in B._elements(guids_json):
+        current = {n: (v, editable) for n, v, editable in element_dimensions(e)}
+        if name not in current:
+            continue
+        if not current[name][1]:
+            return _fail(f"{name} can't be changed here (it comes from the type)")
+        if e.is_a("IfcDoor") or e.is_a("IfcWindow"):
+            opening, wall, along, width, height, sill = _opening_info(e)
+            width, height, sill = (metres if name == "Width" else width, metres if name == "Height" else height,
+                                   metres if name == "Sill height" else sill)
+            error = _opening_fit_error(wall, along, width, height, sill)
+            if error:
+                return _fail(error)
+            plan.append(("opening", e, (opening, wall, along, width, height, sill)))
+        elif e.is_a("IfcWall") and name == "Length":
+            a, b = (np.array(p, dtype=float) for p in _axis_world(e))
+            p2 = a + (b - a) / np.linalg.norm(b - a) * metres
+            plan.append(("wall-length", e, (a, p2, _stretch_plan(e, a, p2))))
+        elif e.is_a("IfcWall"):
+            plan.append(("wall-height", e, metres))
+        elif e.is_a("IfcColumn") or e.is_a("IfcBeam"):
+            element_type = ifcopenshell.util.element.get_type(e)
+            if element_type is None or _profile(element_type) is None:
+                return _fail(f"{e.Name or e.GlobalId} has no profile type")
+            plan.append(("profile", e, (_profile(element_type), metres, e.is_a("IfcBeam"))))
+    if not plan:
+        return _fail(f"no selected element has a {name}")
+
+    def action():
+        f = B._model
+        changed = []
+        for kind, e, data in plan:
+            if kind == "opening":
+                opening, wall, along, width, height, sill = data
+                _apply_opening_edit(e, opening, wall, along, width, height, sill)
+                changed += [wall.GlobalId, e.GlobalId]
+            elif kind == "wall-length":
+                p1, p2, (dropped, neighbours) = data
+                for rel in dropped:
+                    if rel.id():
+                        f.remove(rel)
+                height = _wall_height(e) or 3.0
+                _reaxis(e, p1, p2)
+                ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=e, length=float(np.linalg.norm(p2 - p1)), height=height)
+                for n in neighbours:
+                    ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=n)
+                changed += [e.GlobalId, *(n.GlobalId for n in neighbours),
+                            *(x.GlobalId for x in _hosted(e) if not x.is_a("IfcOpeningElement"))]
+            elif kind == "wall-height":
+                body = ifcopenshell.util.representation.get_representation(e, "Model", "Body", "MODEL_VIEW")
+                for solid in (f.traverse(body) if body is not None else ()):
+                    if solid.is_a("IfcExtrudedAreaSolid"):
+                        solid.Depth = data / _scale()
+                ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=e, height=data)
+                changed.append(e.GlobalId)
+            else:  # column height / beam length: a new extrusion of the type's profile
+                profile, metres_, beam = data
+                representation = ifcopenshell.api.geometry.add_profile_representation(
+                    f, context=_body_context(), profile=profile, depth=metres_, cardinal_point=8 if beam else 5)
+                _replace_body(e, representation)
+                changed.append(e.GlobalId)
+        return len(plan), changed, []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump(r)
