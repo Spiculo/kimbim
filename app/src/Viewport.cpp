@@ -28,6 +28,7 @@
 #include <QElapsedTimer>
 #include <QGuiApplication>
 #include <QKeyEvent>
+#include <QTimer>
 #include <QMouseEvent>
 #include <QWheelEvent>
 
@@ -72,13 +73,26 @@ Viewport::Viewport(QWidget* parent)
     setAttribute(Qt::WA_NoSystemBackground);
     setAttribute(Qt::WA_NativeWindow);
     setMouseTracking(true);
+    m_hoverTimer = new QTimer(this);
+    m_hoverTimer->setSingleShot(true);
+    m_hoverTimer->setInterval(450);
+    connect(m_hoverTimer, &QTimer::timeout, this, [this] {
+        if (m_drawingMode)
+            return;
+        Handle(ElementOwner) owner = Handle(ElementOwner)::DownCast(m_context->DetectedOwner());
+        const QString guid = owner.IsNull() || !owner->batch() ? QString() : owner->batch()->guid(owner->index());
+        emit hovered(guid, mapToGlobal(m_hoverPos.toPoint()));
+    });
     setFocusPolicy(Qt::StrongFocus);
     setMinimumSize(200, 200);
 
     Handle(Aspect_DisplayConnection) display = new Aspect_DisplayConnection();
     Handle(OpenGl_GraphicDriver) driver = new OpenGl_GraphicDriver(display, false);
-    // KIMCAD_NO_VSYNC=1: measure true frame cost in benchmarks (normal use keeps vsync: no tearing).
-    if (qEnvironmentVariableIntValue("KIMCAD_NO_VSYNC") == 1)
+    // No vsync by default: the view only redraws when something changes, so this never spins, and a
+    // frame takes ~1 ms. With vsync each redraw blocked the UI until the next screen refresh (33 ms
+    // on 30 Hz laptop panels), so drawing tools lagged behind the mouse (owner feedback).
+    // KIMCAD_VSYNC=1 turns it back on (e.g. if orbiting tears on some screen).
+    if (qEnvironmentVariableIntValue("KIMCAD_VSYNC") != 1)
         driver->ChangeOptions().swapInterval = 0;
     m_viewer = new V3d_Viewer(driver);
     // A fixed "sun" from the south-east above plus soft ambient and fill. A headlight along the
@@ -354,8 +368,10 @@ void Viewport::paintEvent(QPaintEvent*)
 {
     if (!ensureWindow())
         return;
-    // One redraw per paint: forcing an extra immediate-layer redraw here swapped buffers twice per
-    // frame, so every paint waited two vsyncs and tool previews lagged behind the mouse.
+    // One full redraw per paint (one buffer swap). Invalidating the immediate layer here as well
+    // made every paint swap twice, waiting two vsyncs, so tool previews lagged behind the mouse;
+    // not invalidating at all left the window blank after it was shown or uncovered.
+    m_view->Invalidate();
     FlushViewEvents(m_context, m_view, true);
 }
 
@@ -606,6 +622,13 @@ void Viewport::keyPressEvent(QKeyEvent* e)
     QWidget::keyPressEvent(e);
 }
 
+void Viewport::leaveEvent(QEvent* e)
+{
+    m_hoverTimer->stop();
+    emit hovered(QString(), QPoint());
+    QWidget::leaveEvent(e);
+}
+
 void Viewport::mouseDoubleClickEvent(QMouseEvent* e)
 {
     if (m_drawingMode && e->button() == Qt::LeftButton) {
@@ -645,6 +668,12 @@ void Viewport::mouseReleaseEvent(QMouseEvent* e)
 
 void Viewport::mouseMoveEvent(QMouseEvent* e)
 {
+    if (!m_drawingMode && e->buttons() == Qt::NoButton) { // rest the mouse on an element for a hint
+        m_hoverPos = e->position();
+        m_hoverTimer->start();
+    } else {
+        m_hoverTimer->stop();
+    }
     if (m_drawingMode) {
         QPointF p;
         double tolerance = 0;

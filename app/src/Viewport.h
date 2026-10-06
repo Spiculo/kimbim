@@ -6,6 +6,7 @@
 #include <gp_Pnt.hxx>
 #include <QColor>
 #include <QHash>
+#include <QPoint>
 #include <QPointF>
 #include <QSet>
 #include <QVector>
@@ -22,6 +23,8 @@
 #include <vector>
 
 #include "ElementBatch.h"
+
+class QTimer;
 
 namespace kimcad {
 
@@ -133,6 +136,8 @@ signals:
     void drawingEnded();      // Esc or right click: cancel / stop
     void drawingConfirmed();  // Enter or double click: finish the current shape
     void lengthKeyTyped(const QString& text);
+    // The mouse rested on an element ("" when it left it): the app shows a hint.
+    void hovered(const QString& guid, const QPoint& globalPos);
 
 protected:
     QPaintEngine* paintEngine() const override { return nullptr; }
@@ -144,6 +149,7 @@ protected:
     void wheelEvent(QWheelEvent*) override;
     void keyPressEvent(QKeyEvent*) override;
     void mouseDoubleClickEvent(QMouseEvent*) override;
+    void leaveEvent(QEvent*) override;
     void OnSelectionChanged(const Handle(AIS_InteractiveContext)& ctx, const Handle(V3d_View)& view) override;
     void handleSelectionPoly(const Handle(AIS_InteractiveContext)& ctx, const Handle(V3d_View)& view) override;
 
@@ -174,6 +180,8 @@ private:
     void keepOnlyVisible(const QSet<QString>& before, AIS_SelectionScheme scheme, int x0, int y0, int x1, int y1);
     QSet<QString> selectedSet() const;
     bool m_drawingMode = false;
+    QTimer* m_hoverTimer = nullptr;
+    QPointF m_hoverPos;
     double m_workZ = 0.0;
     Handle(ElementBatch) m_preview;
     Handle(AIS_InteractiveObject) m_grid;

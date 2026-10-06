@@ -30,6 +30,8 @@ public:
 
     int itemCount() const { return m_items.size(); }
     QTreeWidgetItem* itemFor(const QString& guid) const { return m_items.value(guid); }
+    // "Name · IfcClass · Level" for hover hints ("" for unknown elements).
+    QString hintFor(const QString& guid) const;
     // Rebuild after elements were added/removed, keeping what the user had expanded.
     void refreshTree(const QJsonObject& root);
     QString displayName(const QString& guid) const;

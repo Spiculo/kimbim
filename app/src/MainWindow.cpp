@@ -14,6 +14,7 @@
 
 #include <QElapsedTimer>
 #include <QInputDialog>
+#include <QToolTip>
 #include <QHBoxLayout>
 #include <QSlider>
 #include <QVBoxLayout>
@@ -130,6 +131,13 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     connect(m_properties, &PropertiesPanel::typeEditRequested, this, &MainWindow::typeEditDialog);
     connect(m_properties, &PropertiesPanel::resetToTypeRequested, this, &MainWindow::resetToType);
     connect(m_tree, &ModelTreePanel::isolateRequested, m_viewport, &Viewport::isolate);
+    connect(m_viewport, &Viewport::hovered, this, [this](const QString& guid, const QPoint& at) {
+        const QString hint = guid.isEmpty() ? QString() : m_tree->hintFor(guid);
+        if (hint.isEmpty())
+            QToolTip::hideText();
+        else
+            QToolTip::showText(at, hint, m_viewport);
+    });
     connect(m_tree, &ModelTreePanel::hideRequested, this, [this](const QStringList& g) { m_viewport->setHidden(g, true); });
     connect(m_tree, &ModelTreePanel::showAllRequested, m_viewport, &Viewport::showAll);
 
