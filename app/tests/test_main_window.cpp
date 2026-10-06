@@ -439,6 +439,57 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // Slice 8: versioned projects: enable, save versions, history, compare colours, options.
+    void versionedProjectFlow()
+    {
+        QTemporaryDir tmp;
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({5, 0});
+        w.wallTool()->finish();
+        w.wallTool()->click({0, 3});
+        w.wallTool()->click({5, 3});
+        w.setTool(kimcad::MainWindow::Tool::None);
+        const QStringList walls = w.viewport()->guids();
+        QCOMPARE(walls.size(), 2);
+
+        QVERIFY(w.enableVersioning(tmp.filePath(QStringLiteral("proyecto ñ"))));
+        QCOMPARE(w.history().size(), 1);
+        QVERIFY(!w.isDirty());
+        QVERIFY(w.windowTitle().contains(QStringLiteral("proyecto ñ")));
+        const QString first = w.history().first().toObject().value("id").toString();
+
+        w.setSelection({walls[0]});
+        QVERIFY(w.applyName(QStringLiteral("Muro sur")));
+        QVERIFY(w.isDirty());
+        QVERIFY(w.saveVersion(QStringLiteral("Rename the south wall")));
+        QCOMPARE(w.history().size(), 2);
+        QVERIFY(!w.isDirty());
+
+        QVERIFY(w.compareWith(first));
+        QCOMPARE(w.viewport()->coloredCount(), 1);
+        QCOMPARE(w.compareChangeCount(), 1);
+        w.endCompare();
+        QCOMPARE(w.viewport()->coloredCount(), 0);
+
+        QVERIFY(w.createOption(QStringLiteral("Option B")));
+        QVERIFY(w.windowTitle().contains(QStringLiteral("Option B")));
+        w.setSelection({walls[1]});
+        QVERIFY(w.deleteSelection());
+        QVERIFY(w.saveVersion(QStringLiteral("B without the north wall")));
+        QCOMPARE(w.viewport()->elementCount(), 1);
+
+        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        QVERIFY(w.switchOption(QStringLiteral("main")));
+        QVERIFY(loaded.wait(60000));
+        QCOMPARE(w.viewport()->elementCount(), 2); // main still has both walls
+        QVERIFY(w.windowTitle().contains(QStringLiteral("main")));
+        QVERIFY(!w.isDirty());
+        QVERIFY(w.close());
+    }
+
     void shortcutsAreTheDocumentedOnes()
     {
         kimcad::MainWindow w(nullptr, true);
@@ -462,6 +513,7 @@ private slots:
         QCOMPARE(action(w, "actionStretchTool")->shortcut(), QKeySequence(Qt::Key_E));
         QCOMPARE(action(w, "actionStairTool")->shortcut(), QKeySequence(Qt::Key_T));
         QCOMPARE(action(w, "actionSlabOpeningTool")->shortcut(), QKeySequence(Qt::Key_O));
+        QCOMPARE(action(w, "actionSaveVersion")->shortcut(), QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_S));
         QVERIFY(action(w, "actionLinesOnly")->isCheckable());
     }
 };

@@ -3,6 +3,7 @@
 
 #include <QElapsedTimer>
 #include <QHash>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QPointF>
 #include <QVector>
@@ -19,12 +20,14 @@ class QAction;
 class QDoubleSpinBox;
 
 class QComboBox;
+class QToolBar;
 class QDoubleSpinBox;
 class QLineEdit;
 
 namespace kimcad {
 
 class LevelsBar;
+class HistoryPanel;
 class WallTool;
 class PolygonTool;
 class HostTool;
@@ -92,6 +95,18 @@ public:
     bool createStair(QPointF start, QPointF towards);
     bool addSlabOpening(const QVector<QPointF>& outline);
     double heightToNextLevel();
+    // Versioned projects (Slice 8, docs/03).
+    bool enableVersioning(const QString& folder, const QString& message = QString());
+    bool openProject(const QString& folder);
+    bool saveVersion(const QString& message);
+    QJsonArray history();
+    bool compareWith(const QString& revA, const QString& revB = QStringLiteral("WORKING"));
+    void endCompare();
+    int compareChangeCount() const;
+    bool createOption(const QString& name);
+    bool switchOption(const QString& name);
+    bool discardChanges();
+    bool isVersioned() const { return m_versioned; }
     bool columnAt(QPointF p, bool turned = false);
     bool createSegment(QPointF p1, QPointF p2); // beam or grid axis, per the active tool
     int gridLineCount() const;
@@ -136,6 +151,13 @@ private:
     void refreshTypes();
     void wallHeightDialog();
     void copyToLevelDialog();
+    void buildProjectToolbar();
+    void refreshProject();
+    void saveVersionDialog();
+    void enableVersioningDialog();
+    void openProjectDialog();
+    void newOptionDialog();
+    bool resolveUnsavedForSwitch();
     void openingSizeDialog();
     QJsonObject openingInfo(const QString& guid);
     void updateToolPreview();
@@ -177,6 +199,11 @@ private:
     QAction* m_wallHeightAction = nullptr;
     QAction* m_lengthAction = nullptr;
     bool m_warnedInconsistent = false;
+    HistoryPanel* m_history = nullptr;
+    QToolBar* m_projectBar = nullptr;
+    QComboBox* m_options = nullptr;
+    bool m_versioned = false;
+    QString m_projectFolder;
     QLineEdit* m_lengthInput = nullptr;
     QAction* m_undo = nullptr;
     QAction* m_redo = nullptr;
