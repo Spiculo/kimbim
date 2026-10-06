@@ -1,0 +1,10 @@
+{
+  "name": "kimcad-interop-check",
+  "private": true,
+  "description": "Opens exported IFC files with web-ifc (That Open / IFC.js engine) as an independent check (M3 exit).",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "dependencies": {
+    "web-ifc": "0.0.78"
+  }
+}

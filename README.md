@@ -34,6 +34,7 @@ Open an IFC file. It appears progressively in the 3D view, with the spatial tree
 | Move / rotate | Select, then **M** (base point, target) or **R** (centre, reference, new direction; or type degrees). Walls joined to what you move stretch along their own line to stay joined (they stay straight); hold **Ctrl** on the last click to detach them. Doors/windows alone slide along their wall |
 | Stretch a wall | **E**, click near a wall end, click its new position (or type the length) |
 | Wall height / door size | *Model › Wall height…* / *Model › Door/window size…* for the selection |
+| Upper floors | *Model › Copy to level…* (walls bring their doors, windows and corner joins), **T** stair to the next level (two clicks), **O** hole in the selected slab |
 | Delete | **Del** (deleting a wall also deletes its doors and windows) |
 
 ## Try it (command line)
@@ -64,3 +65,5 @@ Development: see [CONTRIBUTING.md](CONTRIBUTING.md).
 - Languages: English and Spanish.
 
 The original specification (v0.1) is kept in [doc.md](doc.md). The `docs/` folder supersedes it.
+
+**Sample two-storey house:** `pixi run house` writes `build/house.ifc`; `pixi run interop` validates it (IFC4 schema + EXPRESS rules) and opens it with web-ifc. See [docs/12-m3-exit.md](docs/12-m3-exit.md).

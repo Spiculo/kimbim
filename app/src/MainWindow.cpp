@@ -569,6 +569,10 @@ void MainWindow::buildModelingToolbar()
             tr("Rotate the selection: click the centre, a reference, then the new direction (or type degrees)")},
         {Tool::Stretch, "actionStretchTool", tr("S&tretch wall"), Qt::Key_E,
             tr("Stretch a wall: click near one of its ends, then click its new position (or type the length)")},
+        {Tool::Stair, "actionStairTool", tr("S&tair"), Qt::Key_T,
+            tr("Draw a stair: click where it starts, then the direction it climbs; it goes up to the next level")},
+        {Tool::SlabOpening, "actionSlabOpeningTool", tr("Slab &opening"), Qt::Key_O,
+            tr("Cut a hole in the selected slab: draw its outline like a slab")},
     };
     for (const Def& d : defs) {
         QAction* a = bar->addAction(d.text);
@@ -582,6 +586,9 @@ void MainWindow::buildModelingToolbar()
         m_toolActions.insert(int(d.tool), a);
     }
     model->addSeparator();
+    QAction* copyAction = model->addAction(tr("Copy to &level..."));
+    copyAction->setObjectName(QStringLiteral("actionCopyToLevel"));
+    connect(copyAction, &QAction::triggered, this, &MainWindow::copyToLevelDialog);
     QAction* heightAction = model->addAction(tr("Wall &height..."));
     heightAction->setObjectName(QStringLiteral("actionWallHeight"));
     connect(heightAction, &QAction::triggered, this, &MainWindow::wallHeightDialog);
@@ -656,9 +663,15 @@ void MainWindow::buildModelingToolbar()
             break;
         case Tool::Beam:
         case Tool::Grid:
+        case Tool::Stair:
             m_twoPointTool->setTolerance(tolerance);
             m_twoPointTool->setOrtho(ortho);
             showSnap(m_twoPointTool->move(p));
+            break;
+        case Tool::SlabOpening:
+            m_polygonTool->setTolerance(tolerance);
+            m_polygonTool->setOrtho(ortho);
+            m_polygonTool->move(p);
             break;
         case Tool::Column:
             m_twoPointTool->setTolerance(tolerance);
@@ -704,9 +717,15 @@ void MainWindow::buildModelingToolbar()
             break;
         case Tool::Beam:
         case Tool::Grid:
+        case Tool::Stair:
             m_twoPointTool->setTolerance(tolerance);
             m_twoPointTool->setOrtho(ortho);
             m_twoPointTool->click(p);
+            break;
+        case Tool::SlabOpening:
+            m_polygonTool->setTolerance(tolerance);
+            m_polygonTool->setOrtho(ortho);
+            m_polygonTool->click(p);
             break;
         case Tool::Column:
             m_twoPointTool->setTolerance(tolerance);
@@ -737,9 +756,10 @@ void MainWindow::buildModelingToolbar()
         // Esc / right click: stop the current shape, or leave the tool when nothing is in progress.
         if (m_tool == Tool::Wall && m_wallTool->isDrawing())
             m_wallTool->finish();
-        else if (m_tool == Tool::Slab && m_polygonTool->isDrawing())
+        else if ((m_tool == Tool::Slab || m_tool == Tool::SlabOpening) && m_polygonTool->isDrawing())
             m_polygonTool->cancel();
-        else if ((m_tool == Tool::Beam || m_tool == Tool::Grid || m_tool == Tool::Move) && m_twoPointTool->isDrawing())
+        else if ((m_tool == Tool::Beam || m_tool == Tool::Grid || m_tool == Tool::Move || m_tool == Tool::Stair)
+            && m_twoPointTool->isDrawing())
             m_twoPointTool->cancel();
         else if (m_tool == Tool::Rotate && m_rotateTool->stage() > 0)
             m_rotateTool->cancel();
@@ -751,7 +771,7 @@ void MainWindow::buildModelingToolbar()
     connect(m_viewport, &Viewport::drawingConfirmed, this, [this] {
         if (m_tool == Tool::Wall)
             m_wallTool->finish();
-        else if (m_tool == Tool::Slab)
+        else if (m_tool == Tool::Slab || m_tool == Tool::SlabOpening)
             m_polygonTool->finish();
     });
     connect(m_viewport, &Viewport::lengthKeyTyped, this, [this](const QString& text) {
@@ -767,6 +787,8 @@ void MainWindow::buildModelingToolbar()
     connect(m_twoPointTool, &TwoPointTool::segmentFinished, this, [this](QPointF a, QPointF b) {
         if (m_tool == Tool::Move)
             moveSelection(b - a, m_detach);
+        else if (m_tool == Tool::Stair)
+            createStair(a, b);
         else
             createSegment(a, b);
     });
@@ -775,7 +797,12 @@ void MainWindow::buildModelingToolbar()
     connect(m_rotateTool, &RotateTool::rotationFinished, this, [this](QPointF c, double a) { rotateSelection(c, a, m_detach); });
     connect(m_gripTool, &GripTool::stretchRequested, this, &MainWindow::stretchWall);
     connect(m_wallTool, &WallTool::wallRequested, this, &MainWindow::createWall);
-    connect(m_polygonTool, &PolygonTool::polygonFinished, this, &MainWindow::createSlab);
+    connect(m_polygonTool, &PolygonTool::polygonFinished, this, [this](const QVector<QPointF>& outline) {
+        if (m_tool == Tool::SlabOpening)
+            addSlabOpening(outline);
+        else
+            createSlab(outline);
+    });
     connect(m_polygonTool, &PolygonTool::rejected, this, [this](const QString& why) { statusBar()->showMessage(why); });
     connect(m_hostTool, &HostTool::openingRequested, this, &MainWindow::insertOpening);
 }
@@ -854,6 +881,11 @@ void MainWindow::updateToolPreview()
     case Tool::Wall:
         m_viewport->setWallPreview(m_wallTool->preview(), type.value("thickness").toDouble(), m_wallHeight->value());
         return;
+    case Tool::Stair:
+        if (const auto seg = m_twoPointTool->preview())
+            boxes.push_back({seg->first, seg->second, 1.0, z, z + heightToNextLevel()});
+        break;
+    case Tool::SlabOpening:
     case Tool::Slab: {
         // The outline as thin walls of the slab's depth, its top at the level.
         QVector<QPointF> pts = m_polygonTool->points();
@@ -948,8 +980,11 @@ void MainWindow::setTool(Tool tool)
     const bool typed = tool == Tool::Wall || tool == Tool::Slab || tool == Tool::Door || tool == Tool::Window
         || tool == Tool::Column || tool == Tool::Beam;
     m_types->setVisible(typed);
-    if ((tool == Tool::Move || tool == Tool::Rotate) && m_selection.isEmpty()) {
-        statusBar()->showMessage(tr("Select something first, then move or rotate it"));
+    const bool needsSlab = tool == Tool::SlabOpening
+        && (m_selection.size() != 1 || m_viewport->typeOf(m_selection.first()) != QLatin1String("IfcSlab"));
+    if (((tool == Tool::Move || tool == Tool::Rotate) && m_selection.isEmpty()) || needsSlab) {
+        statusBar()->showMessage(needsSlab ? tr("Select one slab first, then draw the opening")
+                                           : tr("Select something first, then move or rotate it"));
         tool = Tool::None;
         m_tool = tool;
         for (QAction* a : std::as_const(m_toolActions)) {
@@ -990,6 +1025,12 @@ void MainWindow::setTool(Tool tool)
         break;
     case Tool::Stretch:
         statusBar()->showMessage(tr("Stretch: click near a wall end, then its new position"));
+        break;
+    case Tool::Stair:
+        statusBar()->showMessage(tr("Stair: click where it starts, then the direction it climbs"));
+        break;
+    case Tool::SlabOpening:
+        statusBar()->showMessage(tr("Slab opening: draw the hole's outline; click the first point or press Enter to close"));
         break;
     default:
         statusBar()->showMessage(tr("Click on a wall to place it"));
@@ -1131,6 +1172,86 @@ void MainWindow::openingSizeDialog()
     connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
     if (dialog.exec() == QDialog::Accepted)
         resizeOpening(m_selection.first(), width->value(), height->value(), sill->value());
+}
+
+double MainWindow::heightToNextLevel()
+{
+    const double here = m_levels->activeElevation();
+    double next = 0;
+    bool found = false;
+    for (const auto& s : bridge("storeys").value("storeys").toArray()) {
+        const double e = s.toObject().value("elevation").toDouble();
+        if (e > here + 1e-6 && (!found || e < next)) {
+            next = e;
+            found = true;
+        }
+    }
+    return found ? next - here : m_wallHeight->value();
+}
+
+bool MainWindow::createStair(QPointF start, QPointF towards)
+{
+    const QPointF d = towards - start;
+    if (std::hypot(d.x(), d.y()) < 1e-6)
+        return false;
+    auto num = [](double v) { return QString::number(v, 'g', 17); };
+    const QJsonObject r = bridge("create_stair", {m_levels->activeStorey(), num(start.x()), num(start.y()),
+        num(std::atan2(d.y(), d.x())), num(1.0), num(heightToNextLevel())});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not create the stair: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    statusBar()->showMessage(tr("Stair: %1 risers of %2 m").arg(r.value("risers").toInt())
+                                 .arg(QLocale().toString(r.value("riser").toDouble(), 'f', 3)));
+    return true;
+}
+
+bool MainWindow::addSlabOpening(const QVector<QPointF>& outline)
+{
+    if (m_selection.size() != 1)
+        return false;
+    QJsonArray pts;
+    for (const QPointF& p : outline)
+        pts.append(QJsonArray{p.x(), p.y()});
+    const QJsonObject r = bridge("add_slab_opening", {m_selection.first(),
+        QString::fromUtf8(QJsonDocument(pts).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not cut the opening: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    return true;
+}
+
+bool MainWindow::copyToLevel(const QStringList& guids, const QString& storey)
+{
+    const QJsonObject r = bridge("copy_to_storey", {jsonList(guids), storey});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not copy"), r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
+    statusBar()->showMessage(tr("%n element(s) copied", nullptr, int(r.value("guids").toArray().size())));
+    return true;
+}
+
+void MainWindow::copyToLevelDialog()
+{
+    if (m_selection.isEmpty()) {
+        statusBar()->showMessage(tr("Select what to copy first"));
+        return;
+    }
+    QStringList names, guids;
+    for (const auto& s : bridge("storeys").value("storeys").toArray()) {
+        const QJsonObject o = s.toObject();
+        names << QStringLiteral("%1 (%2 m)").arg(o.value("name").toString(), QLocale().toString(o.value("elevation").toDouble(), 'f', 2));
+        guids << o.value("guid").toString();
+    }
+    bool ok = false;
+    const QString choice = QInputDialog::getItem(this, tr("Copy to level"), tr("Copy the selection to:"), names, 0, false, &ok);
+    if (ok)
+        copyToLevel(m_selection, guids.value(names.indexOf(choice)));
 }
 
 int MainWindow::gridLineCount() const

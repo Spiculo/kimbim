@@ -19,6 +19,7 @@ import ifcopenshell.api.geometry
 import ifcopenshell.api.grid
 import ifcopenshell.api.material
 import ifcopenshell.api.project
+import ifcopenshell.api.pset
 import ifcopenshell.api.root
 import ifcopenshell.api.spatial
 import ifcopenshell.api.type
@@ -715,10 +716,13 @@ def _profile_types(ifc_class: str, defaults) -> list:
         s = _scale()
         for name, profile_class, width, depth in defaults:
             t = ifcopenshell.api.root.create_entity(f, ifc_class=ifc_class, name=name)
+            # Position is optional in IFC4, but some readers (web-ifc) need it: write the origin.
+            origin = f.createIfcAxis2Placement2D(f.createIfcCartesianPoint((0.0, 0.0)))
             if profile_class == "IfcCircleProfileDef":
-                profile = f.create_entity(profile_class, ProfileType="AREA", ProfileName=name, Radius=width / 2 / s)
+                profile = f.create_entity(profile_class, ProfileType="AREA", ProfileName=name, Position=origin, Radius=width / 2 / s)
             else:
-                profile = f.create_entity(profile_class, ProfileType="AREA", ProfileName=name, XDim=width / s, YDim=depth / s)
+                profile = f.create_entity(profile_class, ProfileType="AREA", ProfileName=name, Position=origin,
+                                          XDim=width / s, YDim=depth / s)
             profile_set = ifcopenshell.api.material.add_material_set(f, name=name, set_type="IfcMaterialProfileSet")
             material_name = "Concrete" if ifc_class == "IfcColumnType" else "Steel"
             material = next((m for m in f.by_type("IfcMaterial") if m.Name == material_name), None) \
@@ -1281,6 +1285,195 @@ def slide_openings(guids_json: str, dx, dy) -> str:
         for element, opening, wall, along, width, height, sill in plan:
             _apply_opening_edit(element, opening, wall, along, width, height, sill)
         return len(plan), [x for e, _, w, *_ in plan for x in (w.GlobalId, e.GlobalId)], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump(r)
+
+
+# ---------------------------------------------------------------- two-storey houses (Slice 7)
+
+def _copy_shape(source, target):
+    for identifier in ("Body", "Axis"):
+        if ifcopenshell.util.representation.get_representation(source, "Model" if identifier == "Body" else "Plan", identifier):
+            ifcopenshell.api.geometry.copy_representation(B._model, source=source, target=target, context_identifier=identifier)
+
+
+def _place_like(source, target, dz_units, parent=None):
+    """Give `target` the world placement of `source` raised by dz (project units), optionally
+    relative to `parent` (so hosted copies follow their copied host)."""
+    world = ifcopenshell.util.placement.get_local_placement(source.ObjectPlacement).copy()
+    world[2][3] += dz_units
+    if parent is not None and target.ObjectPlacement is not None:
+        target.ObjectPlacement.PlacementRelTo = parent.ObjectPlacement
+    ifcopenshell.api.geometry.edit_object_placement(B._model, product=target, matrix=world, is_si=False)
+
+
+def copy_to_storey(guids_json: str, storey_guid: str) -> str:
+    """Copy elements to another level, at the same plan position and the same height above their
+    level. Walls bring their openings and the doors/windows in them; joins between copied walls are
+    copied too. Doors/windows on their own are copied only with their wall."""
+    if B._model is None:
+        return _fail("no model open")
+    target = _by_guid(storey_guid)
+    if target is None or not target.is_a("IfcBuildingStorey"):
+        return _fail("unknown level")
+    elements = [e for e in B._elements(guids_json) if e.is_a("IfcProduct") and not getattr(e, "FillsVoids", None)
+                and not e.is_a("IfcOpeningElement")]
+    if not elements:
+        return _fail("select the walls, slabs, columns or beams to copy (doors and windows come with their wall)")
+    sources = {}
+    for e in elements:
+        container = ifcopenshell.util.element.get_container(e)
+        if container is None or not container.is_a("IfcBuildingStorey"):
+            return _fail(f"{e.GlobalId} is not on a level")
+        sources[e] = container
+    made = {}
+
+    def action():
+        f = B._model
+        s = _scale()
+        copies = {}
+        changed = []
+        for e in elements:
+            dz = (_elevation(target) - _elevation(sources[e])) / s
+            c = ifcopenshell.api.root.copy_class(f, product=e)
+            _copy_shape(e, c)
+            _place_like(e, c, dz)
+            ifcopenshell.api.spatial.assign_container(f, products=[c], relating_structure=target)
+            copies[e] = c
+            changed.append(c.GlobalId)
+            # copy_class duplicates the openings (same order); give them shapes and their fillings.
+            originals = [r.RelatedOpeningElement for r in getattr(e, "HasOpenings", ()) or ()]
+            duplicates = [r.RelatedOpeningElement for r in getattr(c, "HasOpenings", ()) or ()]
+            if len(duplicates) != len(originals):  # copy_class didn't duplicate them: do it here
+                for d in duplicates:
+                    ifcopenshell.api.root.remove_product(f, product=d)
+                duplicates = []
+                for opening in originals:
+                    opening_copy = ifcopenshell.api.root.copy_class(f, product=opening)
+                    ifcopenshell.api.feature.add_feature(f, feature=opening_copy, element=c)
+                    duplicates.append(opening_copy)
+            for opening, opening_copy in zip(originals, duplicates):
+                if not opening_copy.Representation:
+                    _copy_shape(opening, opening_copy)
+                _place_like(opening, opening_copy, dz, parent=c)
+                for fill in getattr(opening, "HasFillings", ()) or ():
+                    element = fill.RelatedBuildingElement
+                    element_copy = ifcopenshell.api.root.copy_class(f, product=element)
+                    _copy_shape(element, element_copy)
+                    ifcopenshell.api.feature.add_filling(f, opening=opening_copy, element=element_copy)
+                    _place_like(element, element_copy, dz, parent=opening_copy)
+                    ifcopenshell.api.spatial.assign_container(f, products=[element_copy], relating_structure=target)
+                    changed.append(element_copy.GlobalId)
+        # Joins between copied walls, as between the originals.
+        for e in elements:
+            for rel in getattr(e, "ConnectedTo", ()) or ():
+                if rel.is_a("IfcRelConnectsPathElements") and rel.RelatedElement in copies:
+                    ifcopenshell.api.geometry.connect_path(
+                        f, relating_element=copies[e], related_element=copies[rel.RelatedElement],
+                        relating_connection=rel.RelatingConnectionType, related_connection=rel.RelatedConnectionType)
+        for e, c in copies.items():
+            if c.is_a("IfcWall") and _axis_world(c) is not None and _layer_set(c) is not None:
+                ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=c)
+        made["copies"] = [copies[e].GlobalId for e in elements]
+        return len(copies), changed, []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "guids": made["copies"]})
+
+
+MAX_RISER = 0.175  # metres
+TREAD = 0.28       # metres (going)
+STAIR_WAIST = 0.2  # metres, vertical thickness under the top step
+
+
+def create_stair(storey_guid: str, x, y, angle, width, height) -> str:
+    """A straight-flight stair going up `height` metres from the level, starting at (x, y) and
+    climbing in direction `angle` (radians); risers <= 175 mm, goings 280 mm."""
+    if B._model is None:
+        return _fail("no model open")
+    storey = _by_guid(storey_guid)
+    if storey is None or not storey.is_a("IfcBuildingStorey"):
+        return _fail("unknown level")
+    try:
+        x, y, angle, width, height = float(x), float(y), float(angle), float(width), float(height)
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    if width <= 0 or height <= 0:
+        return _fail("the stair needs a width and a height")
+    risers = math.ceil(height / MAX_RISER - 1e-9)
+    riser = height / risers
+    run = (risers - 1) * TREAD
+    made = {}
+
+    def action():
+        f = B._model
+        s = _scale()
+        # Side profile (x along the run, y up), saw-tooth on top, straight underside.
+        pts = [(0.0, 0.0)]
+        for i in range(1, risers):
+            pts += [((i - 1) * TREAD, i * riser), (i * TREAD, i * riser)]
+        pts += [(run, height), (run, max(height - STAIR_WAIST, 0.0)), (min(TREAD, run), 0.0)]
+        curve = f.createIfcPolyline([f.createIfcCartesianPoint((px / s, py / s)) for px, py in pts + [pts[0]]])
+        profile = f.createIfcArbitraryClosedProfileDef("AREA", None, curve)
+        position = f.createIfcAxis2Placement3D(f.createIfcCartesianPoint((0.0, width / 2 / s, 0.0)),
+                                               f.createIfcDirection((0.0, -1.0, 0.0)), f.createIfcDirection((1.0, 0.0, 0.0)))
+        solid = f.createIfcExtrudedAreaSolid(profile, position, f.createIfcDirection((0.0, 0.0, 1.0)), width / s)
+        representation = f.createIfcShapeRepresentation(_body_context(), "Body", "SweptSolid", [solid])
+        stair = ifcopenshell.api.root.create_entity(f, ifc_class="IfcStair", name="Stair", predefined_type="STRAIGHT_RUN_STAIR")
+        ifcopenshell.api.geometry.assign_representation(f, product=stair, representation=representation)
+        c, sn = math.cos(angle), math.sin(angle)
+        matrix = np.array([[c, -sn, 0, x], [sn, c, 0, y], [0, 0, 1, _elevation(storey)], [0, 0, 0, 1]], dtype=float)
+        ifcopenshell.api.geometry.edit_object_placement(f, product=stair, matrix=matrix, is_si=True)
+        ifcopenshell.api.spatial.assign_container(f, products=[stair], relating_structure=storey)
+        pset = ifcopenshell.api.pset.add_pset(f, product=stair, name="Pset_StairCommon")
+        ifcopenshell.api.pset.edit_pset(f, pset=pset, properties={
+            "NumberOfRiser": risers, "NumberOfTreads": risers - 1,
+            "RiserHeight": riser / s, "TreadLength": TREAD / s})
+        made["stair"] = stair
+        return 1, [stair.GlobalId], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "guid": made["stair"].GlobalId, "risers": risers, "riser": round(riser, 6), "run": round(run, 6)})
+
+
+def add_slab_opening(slab_guid: str, points_json: str) -> str:
+    """A hole through a slab with this outline (plan metres), e.g. for a stair."""
+    if B._model is None:
+        return _fail("no model open")
+    slab = _by_guid(slab_guid)
+    if slab is None or not slab.is_a("IfcSlab"):
+        return _fail("not a slab")
+    try:
+        outline = _clean_polygon(json.loads(points_json))
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    if outline is None:
+        return _fail("the outline needs at least 3 points and must not cross itself")
+    layer_set = _layer_set(ifcopenshell.util.element.get_type(slab)) if ifcopenshell.util.element.get_type(slab) else None
+    thickness = _thickness(layer_set) if layer_set else 0.3
+    bottom = float(ifcopenshell.util.placement.get_local_placement(slab.ObjectPlacement)[2][3]) * _scale()
+
+    def action():
+        f = B._model
+        opening = ifcopenshell.api.root.create_entity(f, ifc_class="IfcOpeningElement", name="Slab opening")
+        representation = ifcopenshell.api.geometry.add_slab_representation(
+            f, context=_body_context(), depth=thickness + 0.02, polyline=outline)
+        ifcopenshell.api.geometry.assign_representation(f, product=opening, representation=representation)
+        matrix = np.eye(4)
+        matrix[2][3] = bottom - 0.01
+        ifcopenshell.api.geometry.edit_object_placement(f, product=opening, matrix=matrix, is_si=True)
+        ifcopenshell.api.feature.add_feature(f, feature=opening, element=slab)
+        return 1, [slab.GlobalId], []
 
     try:
         r = B._run(action)

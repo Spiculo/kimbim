@@ -76,12 +76,13 @@ All modeling goes through commands, with undo/redo ([01](01-architecture.md#engi
 |---------|-----|---------------|
 | Levels (storeys) and grids | P0 | `ifcopenshell.api.spatial`, `grid` — levels ✅ (Slice 4), grids ✅ (Slice 6) |
 | Walls: layered (by type), draw by axis, join at corners/T, flip | P0 | ✅ Slice 4 (flip: later). `geometry.create_2pt_wall`, `connect_wall`, `regenerate_wall_representation` — Bonsai's wall logic, already in ifcopenshell 0.9, no port needed |
-| Slabs / floors from outline or from walls | P0 | ✅ Slice 5 (top of slab at the level; from walls = outer faces of a closed loop) |
+| Slabs / floors from outline or from walls | P0 | ✅ Slice 5 (top of slab at the level; from walls = outer faces of a closed loop); slab openings ✅ Slice 7 |
+| Copy to another level | P0 | ✅ Slice 7 (walls with their openings, doors/windows and joins; slabs, columns, beams) |
 | Openings + doors + windows hosted in walls (parametric types) | P0 | ✅ Slice 5: `geometry.add_door/window_representation` + `feature.add_feature/add_filling`; moving/resizing placed doors: Slice 6 |
 | Columns and beams from profile types | P0 | ✅ Slice 6 (`geometry.add_profile_representation`, material profile sets) |
 | Roofs (flat; pitched later) | P1 | |
 | Spaces / rooms (auto from boundaries), area | P1 | |
-| Stairs and railings (basic parametric) | P1 | Bonsai parametric stair/railing (port) |
+| Stairs and railings (basic parametric) | P1 | Straight-flight stair ✅ Slice 7 (own generator: ifcopenshell has none outside Bonsai); landings, other shapes and railings: later |
 | Curtain walls | P2 | |
 | Generic object (extrusion, mesh import) | P1 | |
 | Snapping (endpoint, midpoint, perpendicular, grid, axis) and work planes | P0 | ✅ Slice 4 (on wall, 15° angles, ortho with Shift; work plane = active level) |
