@@ -4,6 +4,8 @@
 #include <AIS_InteractiveContext.hxx>
 #include <AIS_ViewController.hxx>
 #include <gp_Pnt.hxx>
+#include <QColor>
+#include <QHash>
 #include <QPointF>
 #include <QSet>
 #include <QVector>
@@ -75,6 +77,10 @@ public:
     int elementCount() const { return m_locate.size(); }
     QStringList guids() const; // in batch order
     QString typeOf(const QString& guid) const; // IFC class of a shown element ("" if unknown)
+    // Compare (Slice 8): colour these elements (others keep their class colour) until cleared.
+    void setElementColors(const QHash<QString, QColor>& colors);
+    void clearElementColors() { setElementColors({}); }
+    int coloredCount() const;
     int visibleElementCount() const;
     qint64 triangleCount() const;
 
@@ -155,6 +161,8 @@ private:
     QHash<QString, Loc> m_locate;
     bool m_planView = false;
     bool m_linesOnly = false;
+    QHash<QString, QColor> m_colors;
+    void applyColors(const Handle(ElementBatch)& batch) const;
     bool m_selectThrough = false;
     bool m_quietSelection = false;
     int m_nextIdBase = 0;
