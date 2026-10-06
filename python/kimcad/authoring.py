@@ -1717,8 +1717,13 @@ def _instance_transform(model, target, x, y, angle):
     return t @ down
 
 
-def _place_instance(model, target, x, y, angle, instance_id, keep_guids=None):
-    """Inside an action: copy the model's content as one linked instance; returns the pairs."""
+def _place_instance(model, target, transform, instance_id, keep_guids=None):
+    """Inside an action: copy the model's content as one linked instance (4x4 transform from the
+    model to the level, project units); returns the pairs."""
+    s = _scale()
+    placed = transform @ np.linalg.inv(_instance_transform(model, target, 0.0, 0.0, 0.0))
+    x, y = placed[0][3] * s, placed[1][3] * s
+    angle = math.atan2(placed[1][0], placed[0][0])
     elements = [e for e in _contained(model) if not getattr(e, "FillsVoids", None) and not e.is_a("IfcOpeningElement")
                 and not e.is_a("IfcGrid")]
 
@@ -1730,7 +1735,7 @@ def _place_instance(model, target, x, y, angle, instance_id, keep_guids=None):
             "Model": model.GlobalId, "Instance": instance_id, "Source": source.GlobalId,
             "X": float(x), "Y": float(y), "Angle": float(angle)})
 
-    return _copy_elements(elements, target, _instance_transform(model, target, x, y, angle), tag=tag)
+    return _copy_elements(elements, target, transform, tag=tag)
 
 
 def place_model(model_guid: str, storey_guid: str, x, y, angle=0.0) -> str:
@@ -1755,7 +1760,7 @@ def place_model(model_guid: str, storey_guid: str, x, y, angle=0.0) -> str:
     made = {}
 
     def action():
-        pairs = _place_instance(model, target, x, y, angle, instance_id)
+        pairs = _place_instance(model, target, _instance_transform(model, target, x, y, angle), instance_id)
         made["guids"] = [c.GlobalId for _, c in pairs]
         return len(pairs), made["guids"], []
 
@@ -1784,6 +1789,18 @@ def _remove_products(elements) -> None:
         ifcopenshell.api.root.remove_product(f, product=e)
 
 
+def _current_transform(model, target, elements, info):
+    """Where an instance is now (it may have been moved or rotated as a whole): the transform
+    from a model element to its copy; the stored placement if no model element is left."""
+    for e in elements:
+        source = _by_guid(_instance_info(e).get("Source", ""))
+        if source is None or getattr(e, "FillsVoids", None) or e.ObjectPlacement is None:
+            continue
+        world = ifcopenshell.util.placement.get_local_placement
+        return world(e.ObjectPlacement) @ np.linalg.inv(world(source.ObjectPlacement))
+    return _instance_transform(model, target, info["X"], info["Y"], info["Angle"])
+
+
 def update_model_instances(model_guid: str) -> str:
     """Re-apply the model's current content to every instance; elements that still exist in the
     model keep their GlobalIds in each instance (identity for versioning)."""
@@ -1799,16 +1816,16 @@ def update_model_instances(model_guid: str) -> str:
             continue
         target = ifcopenshell.util.element.get_container(next(e for e in elements if not getattr(e, "FillsVoids", None)))
         keep = {_instance_info(e)["Source"]: e.GlobalId for e in elements}
-        plans.append((instance_id, elements, target, info["X"], info["Y"], info["Angle"], keep))
+        plans.append((instance_id, elements, target, _current_transform(model, target, elements, info), keep))
     if not plans:
         return _fail("the model has no instances")
 
     def action():
         changed, removed = [], []
-        for instance_id, elements, target, x, y, angle, keep in plans:
+        for instance_id, elements, target, transform, keep in plans:
             old = [e.GlobalId for e in elements]
             _remove_products(elements)
-            pairs = _place_instance(model, target, x, y, angle, instance_id, keep_guids=keep)
+            pairs = _place_instance(model, target, transform, instance_id, keep_guids=keep)
             new = [c.GlobalId for _, c in pairs]
             changed += new
             removed += [g for g in old if g not in new]

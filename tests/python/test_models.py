@@ -108,3 +108,13 @@ def test_instance_members_for_locking(apartment):
     assert set(members) == {r["instance"]} and len(members[r["instance"]]) == 3
     call("undo")
     assert call("instance_members")["instances"] == {}
+
+
+def test_a_moved_instance_stays_where_it_was_moved(apartment):
+    r = call("place_model", apartment["model"], apartment["l1"], 10, 0, 0)
+    assert call("move_elements", g(*r["guids"]), 0, 5, 0)["ok"]
+    call("update_model_instances", apartment["model"])
+    wall = next(e for e in contained(apartment["l1"]) if e.is_a("IfcWall") and
+                ifcopenshell.util.element.get_psets(e)["KIMCAD_ModelInstance"]["Source"] == apartment["walls"][0])
+    lo, hi = bbox(wall.GlobalId)
+    assert lo[0] == pytest.approx(10.0, abs=0.2) and (lo[1] + hi[1]) / 2 == pytest.approx(5.0, abs=0.05)
