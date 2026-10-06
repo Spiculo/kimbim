@@ -213,6 +213,9 @@ def _reset_history(path: str):
     from . import versioning  # a different model leaves versioned mode (not the project's own working copy)
 
     versioning.forget(path)
+    from . import layers
+
+    layers.forget()
 
 
 def _geometry_now(guids) -> dict:
@@ -788,4 +791,16 @@ from .versioning import (  # noqa: E402,F401
     save_version,
     switch_option,
     version_changes,
+)
+from .layers import (  # noqa: E402,F401
+    assign_layer,
+    create_layer,
+    delete_layer,
+    delete_view,
+    layer_members,
+    layers,
+    rename_layer,
+    save_view,
+    set_active_layer,
+    views,
 )

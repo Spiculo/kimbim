@@ -31,6 +31,7 @@ import ifcopenshell.util.unit
 import numpy as np
 
 from . import app_bridge as B
+from . import layers
 
 # Default wall types created the first time a model without layered wall types needs one.
 DEFAULT_WALL_TYPES = [
@@ -286,6 +287,7 @@ def create_wall(storey_guid: str, type_guid: str, x1, y1, x2, y2, height, join_s
             neighbours.append(other)
         for w in [wall, *neighbours]:
             ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=w, length=length, height=height)
+        layers.assign_active(wall)
         made["wall"] = wall
         return 1, [wall.GlobalId, *(n.GlobalId for n in neighbours)], []
 
@@ -461,6 +463,7 @@ def create_slab(storey_guid: str, type_guid: str, points_json: str, offset=0.0) 
         matrix[2][3] = _elevation(storey) + offset - thickness  # top of slab at the level
         ifcopenshell.api.geometry.edit_object_placement(f, product=slab, matrix=matrix, is_si=True)
         ifcopenshell.api.spatial.assign_container(f, products=[slab], relating_structure=storey)
+        layers.assign_active(slab)
         made["slab"] = slab
         return 1, [slab.GlobalId], []
 
@@ -606,6 +609,7 @@ def _replace_body(product, representation):
     f = B._model
     old = ifcopenshell.util.representation.get_representation(product, "Model", "Body", "MODEL_VIEW")
     if old is not None:
+        layers.carry_layers(old, representation)  # the element stays on its layer
         ifcopenshell.api.geometry.unassign_representation(f, product=product, representation=old)
         ifcopenshell.api.geometry.remove_representation(f, representation=old)
     ifcopenshell.api.geometry.assign_representation(f, product=product, representation=representation)
@@ -673,6 +677,7 @@ def insert_opening(kind: str, wall_guid: str, type_guid: str, along, width, heig
         container = ifcopenshell.util.element.get_container(wall)
         if container is not None:
             ifcopenshell.api.spatial.assign_container(f, products=[element], relating_structure=container)
+        layers.assign_active(element)
         made["element"] = element
         return 1, [wall.GlobalId, element.GlobalId], []
 
@@ -782,6 +787,7 @@ def create_column(storey_guid: str, type_guid: str, x, y, height, rotation=0.0) 
         matrix = np.array([[c, -s, 0, x], [s, c, 0, y], [0, 0, 1, _elevation(storey)], [0, 0, 0, 1]], dtype=float)
         ifcopenshell.api.geometry.edit_object_placement(f, product=column, matrix=matrix, is_si=True)
         ifcopenshell.api.spatial.assign_container(f, products=[column], relating_structure=storey)
+        layers.assign_active(column)
         made["element"] = column
         return 1, [column.GlobalId], []
 
@@ -820,6 +826,7 @@ def create_beam(storey_guid: str, type_guid: str, x1, y1, x2, y2, top) -> str:
         matrix = np.array([[-dy, 0, dx, x1], [dx, 0, dy, y1], [0, 1, 0, top], [0, 0, 0, 1]], dtype=float)
         ifcopenshell.api.geometry.edit_object_placement(f, product=beam, matrix=matrix, is_si=True)
         ifcopenshell.api.spatial.assign_container(f, products=[beam], relating_structure=storey)
+        layers.assign_active(beam)
         made["element"] = beam
         return 1, [beam.GlobalId], []
 
@@ -1341,6 +1348,7 @@ def copy_to_storey(guids_json: str, storey_guid: str) -> str:
             dz = (_elevation(target) - _elevation(sources[e])) / s
             c = ifcopenshell.api.root.copy_class(f, product=e)
             _copy_shape(e, c)
+            layers.copy_layer(e, c)
             _place_like(e, c, dz)
             ifcopenshell.api.spatial.assign_container(f, products=[c], relating_structure=target)
             copies[e] = c
@@ -1364,6 +1372,7 @@ def copy_to_storey(guids_json: str, storey_guid: str) -> str:
                     element = fill.RelatedBuildingElement
                     element_copy = ifcopenshell.api.root.copy_class(f, product=element)
                     _copy_shape(element, element_copy)
+                    layers.copy_layer(element, element_copy)
                     ifcopenshell.api.feature.add_filling(f, opening=opening_copy, element=element_copy)
                     _place_like(element, element_copy, dz, parent=opening_copy)
                     ifcopenshell.api.spatial.assign_container(f, products=[element_copy], relating_structure=target)
@@ -1436,6 +1445,7 @@ def create_stair(storey_guid: str, x, y, angle, width, height) -> str:
         ifcopenshell.api.pset.edit_pset(f, pset=pset, properties={
             "NumberOfRiser": risers, "NumberOfTreads": risers - 1,
             "RiserHeight": riser / s, "TreadLength": TREAD / s})
+        layers.assign_active(stair)
         made["stair"] = stair
         return 1, [stair.GlobalId], []
 
