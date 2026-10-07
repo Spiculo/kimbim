@@ -31,6 +31,7 @@ signals:
     void compareRequested(const QString& revA, const QString& revB); // revB "WORKING" = the open model
     void endCompareRequested();
     void elementActivated(const QString& guid);
+    void beforeAfterRequested(const QString& guid); // the selected change, between the compared versions
 
 private:
     void updateButtons();
@@ -40,6 +41,7 @@ private:
     QPushButton* m_compareCurrent;
     QPushButton* m_compareTwo;
     QPushButton* m_end;
+    QPushButton* m_beforeAfter;
     QLabel* m_legend;
     int m_changeCount = 0;
 };

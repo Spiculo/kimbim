@@ -104,3 +104,37 @@ fn rejects_signatures_that_would_corrupt_the_commit() {
     }
     assert_eq!(repo.head().unwrap(), None);
 }
+
+#[test]
+fn milestones_are_annotated_tags() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = Repo::init(dir.path()).unwrap();
+    let c1 = repo.commit(&changes(&[("a.json", Some("1"))]), "first", &sig(1_790_000_000)).unwrap();
+    repo.create_tag("Concept", "HEAD", "Concept design\nfor the client", &sig(1_790_000_050)).unwrap();
+    let c2 = repo.commit(&changes(&[("a.json", Some("2"))]), "second", &sig(1_790_000_100)).unwrap();
+    repo.create_tag("Schematic%20design", &c2, "SD", &sig(1_790_000_200)).unwrap();
+    let tags = repo.tags().unwrap();
+    assert_eq!(tags.iter().map(|t| t.name.as_str()).collect::<Vec<_>>(), vec!["Concept", "Schematic%20design"]);
+    assert_eq!(tags[0].target, c1);
+    assert_eq!(tags[0].message.trim(), "Concept design\nfor the client");
+    assert_eq!(tags[0].time, 1_790_000_050);
+    assert_eq!(tags[1].target, c2);
+    assert_eq!(repo.resolve("Concept").unwrap(), c1);
+    assert!(repo.create_tag("Concept", "HEAD", "again", &sig(1)).is_err()); // names are unique
+    assert!(repo.create_tag("-x", "HEAD", "bad", &sig(1)).is_err());
+    repo.delete_tag("Concept").unwrap();
+    assert_eq!(repo.tags().unwrap().len(), 1);
+    assert!(repo.delete_tag("Concept").is_err());
+}
+
+#[test]
+fn delete_branch_but_not_the_current_one() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = Repo::init(dir.path()).unwrap();
+    repo.commit(&changes(&[("a.json", Some("1"))]), "base", &sig(1)).unwrap();
+    repo.create_branch("option-b", "HEAD").unwrap();
+    assert!(repo.delete_branch("main").is_err()); // current
+    repo.delete_branch("option-b").unwrap();
+    assert_eq!(repo.branches().unwrap(), vec!["main"]);
+    assert!(matches!(repo.delete_branch("option-b"), Err(Error::UnknownBranch(_))));
+}

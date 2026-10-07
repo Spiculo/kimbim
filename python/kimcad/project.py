@@ -275,3 +275,60 @@ class Project:
             self.repo.switch(name)
         except _core.RepoError as e:
             raise KimcadError(str(e)) from None
+
+    def delete_branch(self, name: str):
+        try:
+            self.repo.delete_branch(name)
+        except _core.RepoError as e:
+            raise KimcadError(str(e)) from None
+
+    # ---- milestones (annotated tags) ----
+    def tag(self, name: str, message: str, rev: str = "HEAD", *, author: tuple[str, str] | None = None,
+            time: int | None = None):
+        target = self._rev(rev)
+        tagger, email = author or _author()
+        try:
+            self.repo.create_tag(name, target, message or name, tagger, email, int(time if time is not None else _time.time()))
+        except _core.RepoError as e:
+            raise KimcadError(str(e)) from None
+
+    def tags(self):
+        return self.repo.tags()
+
+    def delete_tag(self, name: str):
+        try:
+            self.repo.delete_tag(name)
+        except _core.RepoError as e:
+            raise KimcadError(str(e)) from None
+
+    # ---- object history ("blame", docs/03) ----
+    def history_of(self, main: str, related: set[str] = frozenset(), rev: str = "HEAD", limit: int = 100):
+        """[(commit, "added" | "modified" | "removed")] for the commits (first-parent chain, newest
+        first) that changed the record at path `main` or any `related` one (e.g. its property sets);
+        added/removed refer to `main`."""
+        paths = {main, *related}
+        if self.repo.head() is None:
+            return []
+        commits = self.repo.log(self._rev(rev), limit)
+        out = []
+        cache: dict[str, dict[str, str]] = {}
+
+        def entries(cid):
+            if cid not in cache:
+                cache[cid] = {p: o for p, o in self.repo.tree_entries(cid).items() if p in paths}
+            return cache[cid]
+
+        for c in commits:
+            now = entries(c.id)
+            before = entries(c.parents[0]) if c.parents else {}
+            if now == before:
+                continue
+            if main in now and main not in before:
+                kind = "added"
+            elif main in before and main not in now:
+                kind = "removed"
+            else:
+                kind = "modified"
+            out.append((c, kind))
+        return out
+

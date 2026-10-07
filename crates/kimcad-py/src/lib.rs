@@ -23,6 +23,15 @@ struct Commit {
     message: String,
 }
 
+#[pyclass(get_all, frozen)]
+struct Tag {
+    name: String,
+    target: String,
+    message: String,
+    tagger_name: String,
+    time: i64,
+}
+
 #[pyclass(frozen)]
 struct Repo {
     inner: kimcad_repo::Repo,
@@ -103,6 +112,29 @@ impl Repo {
         self.inner.switch(name).map_err(err)
     }
 
+    fn delete_branch(&self, name: &str) -> PyResult<()> {
+        self.inner.delete_branch(name).map_err(err)
+    }
+
+    fn create_tag(&self, name: &str, rev: &str, message: &str, tagger_name: String, tagger_email: String, time: i64) -> PyResult<()> {
+        let sig = kimcad_repo::Signature { name: tagger_name, email: tagger_email, time };
+        self.inner.create_tag(name, rev, message, &sig).map_err(err)
+    }
+
+    fn tags(&self) -> PyResult<Vec<Tag>> {
+        Ok(self
+            .inner
+            .tags()
+            .map_err(err)?
+            .into_iter()
+            .map(|t| Tag { name: t.name, target: t.target, message: t.message, tagger_name: t.tagger_name, time: t.time })
+            .collect())
+    }
+
+    fn delete_tag(&self, name: &str) -> PyResult<()> {
+        self.inner.delete_tag(name).map_err(err)
+    }
+
     fn repack_no_delta(&self, py: Python<'_>) -> PyResult<()> {
         py.detach(|| self.inner.repack_no_delta()).map_err(err)
     }
@@ -112,6 +144,7 @@ impl Repo {
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Repo>()?;
     m.add_class::<Commit>()?;
+    m.add_class::<Tag>()?;
     m.add("RepoError", m.py().get_type::<RepoError>())?;
     Ok(())
 }

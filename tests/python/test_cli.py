@@ -86,3 +86,26 @@ def test_engine_errors_are_messages_not_tracebacks(tmp_path, capsys, monkeypatch
     monkeypatch.setenv("KIMCAD_AUTHOR_NAME", "Evil <x>")
     code, _, err = run(capsys, "-C", str(proj), "commit", str(a), "-m", "x")
     assert code == 1 and "invalid author" in err and "Traceback" not in err
+
+
+def test_tags_and_blame(tmp_path, capsys):
+    proj = tmp_path / "p"
+    f = build_model()
+    wall = f.by_type("IfcWall")[0]
+    a = tmp_path / "a.ifc"
+    f.write(str(a))
+    run(capsys, "init", str(proj))
+    run(capsys, "-C", str(proj), "commit", str(a), "-m", "first")
+    assert run(capsys, "-C", str(proj), "tag", "Concept", "-m", "for the client")[0] == 0
+    wall.Name = "Renamed"
+    f.write(str(a))
+    run(capsys, "-C", str(proj), "commit", str(a), "-m", "rename")
+    code, out, _ = run(capsys, "-C", str(proj), "tag")
+    assert code == 0 and "Concept" in out and "for the client" in out
+    code, out, _ = run(capsys, "-C", str(proj), "diff", "Concept", "HEAD")
+    assert code == 0 and "1 modified" in out
+    code, out, _ = run(capsys, "-C", str(proj), "blame", wall.GlobalId)
+    assert code == 0 and out.index("rename") < out.index("first") and "~ modified" in out and "+ added" in out
+    assert run(capsys, "-C", str(proj), "tag", "--delete", "Concept")[0] == 0
+    code, out, _ = run(capsys, "-C", str(proj), "tag")
+    assert "Concept" not in out

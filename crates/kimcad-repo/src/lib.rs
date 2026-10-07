@@ -53,6 +53,18 @@ pub struct CommitInfo {
     pub message: String,
 }
 
+/// A milestone: an annotated tag on a version.
+#[derive(Debug, Clone)]
+pub struct TagInfo {
+    pub name: String,
+    /// The tagged commit.
+    pub target: String,
+    pub message: String,
+    pub tagger_name: String,
+    /// Seconds since the Unix epoch, UTC.
+    pub time: i64,
+}
+
 pub struct Repo {
     git_dir: PathBuf,
 }
@@ -238,6 +250,78 @@ impl Repo {
             return Err(Error::UnknownBranch(name.to_string()));
         }
         std::fs::write(self.git_dir.join("HEAD"), format!("ref: refs/heads/{name}\n"))?;
+        Ok(())
+    }
+
+    pub fn delete_branch(&self, name: &str) -> Result<()> {
+        if !self.branches()?.iter().any(|b| b == name) {
+            return Err(Error::UnknownBranch(name.to_string()));
+        }
+        if self.current_branch()? == name {
+            return Err(Error::Git(format!("{name} is the current branch")));
+        }
+        self.run(self.git().args(["branch", "-D", "--", name]))
+    }
+
+    /// An annotated tag (a milestone) on `rev`, signed by `tagger` at its time.
+    pub fn create_tag(&self, name: &str, rev: &str, message: &str, tagger: &Signature) -> Result<()> {
+        validate_signature(tagger)?;
+        if name.starts_with('-') || name.trim().is_empty() {
+            return Err(Error::Git(format!("invalid tag name {name:?}")));
+        }
+        let target = self.resolve(rev)?;
+        let mut c = self.git();
+        c.env("GIT_COMMITTER_NAME", &tagger.name)
+            .env("GIT_COMMITTER_EMAIL", &tagger.email)
+            .env("GIT_COMMITTER_DATE", format!("{} +0000", tagger.time))
+            .args(["tag", "-a", "-m", message, name, &target]);
+        self.run(&mut c)
+    }
+
+    /// Annotated and lightweight tags, sorted by name.
+    pub fn tags(&self) -> Result<Vec<TagInfo>> {
+        let out = self
+            .git()
+            .args([
+                "for-each-ref",
+                "refs/tags",
+                "--format=%(refname:strip=2)%1f%(*objectname)%1f%(objectname)%1f%(taggername)%1f%(taggerdate:unix)%1f%(contents)%1e",
+            ])
+            .output()?;
+        if !out.status.success() {
+            return Err(Error::Git(String::from_utf8_lossy(&out.stderr).into_owned()));
+        }
+        let text = String::from_utf8_lossy(&out.stdout);
+        let mut tags = Vec::new();
+        for record in text.split('\x1e') {
+            let f: Vec<&str> = record.trim_start_matches('\n').split('\x1f').collect();
+            if f.len() < 6 {
+                continue;
+            }
+            tags.push(TagInfo {
+                name: f[0].to_string(),
+                target: if f[1].is_empty() { f[2] } else { f[1] }.to_string(),
+                tagger_name: f[3].to_string(),
+                time: f[4].trim().parse().unwrap_or(0),
+                message: f[5].to_string(),
+            });
+        }
+        tags.sort_by(|a, b| a.name.cmp(&b.name));
+        Ok(tags)
+    }
+
+    pub fn delete_tag(&self, name: &str) -> Result<()> {
+        if !self.tags()?.iter().any(|t| t.name == name) {
+            return Err(Error::UnknownRev(name.to_string()));
+        }
+        self.run(self.git().args(["tag", "-d", "--", name]))
+    }
+
+    fn run(&self, c: &mut Command) -> Result<()> {
+        let st = c.output()?;
+        if !st.status.success() {
+            return Err(Error::Git(String::from_utf8_lossy(&st.stderr).into_owned()));
+        }
         Ok(())
     }
 

@@ -43,6 +43,8 @@
 #include <QTimer>
 #include <QHeaderView>
 #include <QTableWidget>
+#include <QCheckBox>
+#include <QDateTime>
 #include <QPushButton>
 
 #include "Cuts.h"
@@ -361,6 +363,10 @@ void MainWindow::buildDocks()
     propsDock->raise();
     connect(m_history, &HistoryPanel::compareRequested, this, [this](const QString& a, const QString& b) { compareWith(a, b); });
     connect(m_history, &HistoryPanel::endCompareRequested, this, &MainWindow::endCompare);
+    connect(m_history, &HistoryPanel::beforeAfterRequested, this, [this](const QString& guid) {
+        if (!m_compareA.isEmpty())
+            beforeAfterDialog(guid, m_compareA, m_compareB);
+    });
     connect(m_history, &HistoryPanel::elementActivated, this, [this](const QString& guid) {
         m_viewport->selectGuids({guid});
         m_tree->selectGuids({guid});
@@ -1732,6 +1738,18 @@ void MainWindow::buildProjectToolbar()
     QAction* newOption = m_projectBar->addAction(tr("New option..."));
     newOption->setObjectName(QStringLiteral("actionNewOption"));
     connect(newOption, &QAction::triggered, this, &MainWindow::newOptionDialog);
+    QAction* deleteOptionAction = m_projectBar->addAction(tr("Delete option..."));
+    deleteOptionAction->setObjectName(QStringLiteral("actionDeleteOption"));
+    connect(deleteOptionAction, &QAction::triggered, this, &MainWindow::deleteOptionDialog);
+    m_projectBar->addSeparator();
+    QAction* milestoneAction = m_projectBar->addAction(tr("Milestone..."));
+    milestoneAction->setObjectName(QStringLiteral("actionAddMilestone"));
+    milestoneAction->setToolTip(tr("Name the latest saved version (Concept, Schematic design, Tender...)"));
+    connect(milestoneAction, &QAction::triggered, this, &MainWindow::milestoneDialog);
+    QAction* objectHistoryAction = m_projectBar->addAction(tr("Object history..."));
+    objectHistoryAction->setObjectName(QStringLiteral("actionObjectHistory"));
+    objectHistoryAction->setToolTip(tr("The versions that changed the selected element"));
+    connect(objectHistoryAction, &QAction::triggered, this, &MainWindow::objectHistoryDialog);
     connect(m_options, &QComboBox::activated, this, [this](int index) {
         const QString wanted = m_options->itemText(index);
         if (!switchOption(wanted))
@@ -1875,6 +1893,8 @@ bool MainWindow::compareWith(const QString& revA, const QString& revB)
     for (const auto& v : r.value("modified").toArray())
         colors.insert(v.toObject().value("guid").toString(), HistoryPanel::modifiedColor());
     m_viewport->setElementColors(colors);
+    m_compareA = revA;
+    m_compareB = revB;
     m_history->setChanges(r);
     statusBar()->showMessage(tr("Compare: %1 added, %2 modified, %3 removed")
                                  .arg(r.value("added").toArray().size()).arg(r.value("modified").toArray().size())
@@ -1885,6 +1905,8 @@ bool MainWindow::compareWith(const QString& revA, const QString& revB)
 void MainWindow::endCompare()
 {
     m_viewport->clearElementColors();
+    m_compareA.clear();
+    m_compareB.clear();
     m_history->setChanges({});
 }
 
@@ -1903,6 +1925,212 @@ bool MainWindow::createOption(const QString& name)
     refreshProject();
     statusBar()->showMessage(tr("Now working on option %1").arg(name));
     return true;
+}
+
+bool MainWindow::addMilestone(const QString& name, const QString& message)
+{
+    const QJsonObject r = bridge("create_milestone", {name, message});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not add the milestone"), r.value("error").toString());
+        return false;
+    }
+    refreshProject();
+    statusBar()->showMessage(tr("Milestone %1 marks the latest version").arg(name));
+    return true;
+}
+
+void MainWindow::milestoneDialog()
+{
+    if (isDirty() && !m_quiet) {
+        const auto answer = QMessageBox::question(this, tr("Milestone"),
+            tr("A milestone names a saved version. Save a version of your changes first?"),
+            QMessageBox::Save | QMessageBox::Cancel, QMessageBox::Save);
+        if (answer != QMessageBox::Save)
+            return;
+        saveVersionDialog();
+        if (isDirty())
+            return;
+    }
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Milestone"));
+    auto* form = new QFormLayout(&dialog);
+    auto* name = new QComboBox(&dialog);
+    name->setEditable(true);
+    name->addItems({tr("Concept"), tr("Schematic design"), tr("Design development"), tr("Permit"), tr("Tender"),
+        tr("Construction")});
+    name->setMinimumWidth(260);
+    auto* note = new QLineEdit(&dialog);
+    form->addRow(tr("Name:"), name);
+    form->addRow(tr("Note:"), note);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    form->addRow(buttons);
+    if (dialog.exec() == QDialog::Accepted && !name->currentText().trimmed().isEmpty())
+        addMilestone(name->currentText().trimmed(), note->text().trimmed());
+}
+
+bool MainWindow::deleteOption(const QString& name)
+{
+    const QJsonObject r = bridge("delete_option", {name});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not delete the option"), r.value("error").toString());
+        return false;
+    }
+    refreshProject();
+    statusBar()->showMessage(tr("Option %1 deleted").arg(name));
+    return true;
+}
+
+void MainWindow::deleteOptionDialog()
+{
+    QStringList others;
+    for (const auto& o : bridge("options").value("options").toArray())
+        if (o.toString() != m_options->currentText() && o.toString() != QLatin1String("main"))
+            others << o.toString();
+    if (others.isEmpty()) {
+        statusBar()->showMessage(tr("No other option to delete (the current one and main can't be deleted)"));
+        return;
+    }
+    bool ok = false;
+    const QString name = QInputDialog::getItem(this, tr("Delete option"), tr("Option to delete:"), others, 0, false, &ok);
+    if (!ok)
+        return;
+    if (QMessageBox::warning(this, tr("Delete option"),
+            tr("Delete the design option %1 and its versions? Milestones on it are kept.").arg(name),
+            QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel)
+        == QMessageBox::Yes)
+        deleteOption(name);
+}
+
+QJsonObject MainWindow::objectHistory(const QString& guid)
+{
+    return bridge("element_history", {guid});
+}
+
+QJsonObject MainWindow::beforeAfter(const QString& guid, const QString& revA, const QString& revB)
+{
+    return bridge("before_after", {guid, revA, revB});
+}
+
+void MainWindow::objectHistoryDialog()
+{
+    if (m_selection.size() != 1) {
+        statusBar()->showMessage(tr("Select one element to see its history"));
+        return;
+    }
+    const QString guid = m_selection.first();
+    const QJsonObject r = objectHistory(guid);
+    if (!r.value("ok").toBool()) {
+        showError(tr("Object history"), r.value("error").toString());
+        return;
+    }
+    QDialog dialog(this);
+    dialog.setObjectName(QStringLiteral("objectHistoryDialog"));
+    dialog.setWindowTitle(tr("Object history"));
+    auto* layout = new QVBoxLayout(&dialog);
+    auto* table = new QTableWidget(&dialog);
+    const QStringList headers = {tr("Version"), tr("Change"), tr("Author"), tr("Date")};
+    table->setColumnCount(int(headers.size()));
+    table->setHorizontalHeaderLabels(headers);
+    table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    table->setSelectionBehavior(QAbstractItemView::SelectRows);
+    table->setSelectionMode(QAbstractItemView::SingleSelection);
+    const QJsonArray versions = r.value("versions").toArray();
+    table->setRowCount(int(versions.size()));
+    const QHash<QString, QString> changes = {{QStringLiteral("added"), tr("added")}, {QStringLiteral("modified"), tr("modified")},
+        {QStringLiteral("removed"), tr("removed")}, {QStringLiteral("unsaved"), tr("unsaved changes")}};
+    for (int i = 0; i < versions.size(); ++i) {
+        const QJsonObject v = versions[i].toObject();
+        QStringList marks;
+        for (const auto& m : v.value("milestones").toArray())
+            marks << m.toString();
+        QString title = v.value("message").toString();
+        if (!marks.isEmpty())
+            title = QStringLiteral("◆ %1 — %2").arg(marks.join(QStringLiteral(", ")), title);
+        auto* first = new QTableWidgetItem(v.value("change").toString() == QLatin1String("unsaved") ? tr("(not saved yet)") : title);
+        first->setData(Qt::UserRole, v.value("id").toString());
+        table->setItem(i, 0, first);
+        table->setItem(i, 1, new QTableWidgetItem(changes.value(v.value("change").toString())));
+        table->setItem(i, 2, new QTableWidgetItem(v.value("author").toString()));
+        const qint64 t = v.value("time").toInteger();
+        table->setItem(i, 3, new QTableWidgetItem(t ? QLocale().toString(QDateTime::fromSecsSinceEpoch(t), QLocale::ShortFormat) : QString()));
+    }
+    table->horizontalHeader()->setStretchLastSection(true);
+    table->resizeColumnsToContents();
+    table->setMinimumSize(560, 260);
+    layout->addWidget(new QLabel(tr("Versions that changed this element (or its properties), newest first:"), &dialog));
+    layout->addWidget(table);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dialog);
+    QPushButton* compareButton = buttons->addButton(tr("Before/after with current..."), QDialogButtonBox::ActionRole);
+    compareButton->setEnabled(false);
+    connect(table, &QTableWidget::itemSelectionChanged, &dialog, [table, compareButton] {
+        const auto items = table->selectedItems();
+        compareButton->setEnabled(!items.isEmpty() && table->item(items.first()->row(), 0)->data(Qt::UserRole).toString() != QLatin1String("WORKING"));
+    });
+    connect(compareButton, &QPushButton::clicked, &dialog, [this, table, guid] {
+        const auto items = table->selectedItems();
+        if (!items.isEmpty())
+            beforeAfterDialog(guid, table->item(items.first()->row(), 0)->data(Qt::UserRole).toString(), QStringLiteral("WORKING"));
+    });
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    layout->addWidget(buttons);
+    dialog.exec();
+}
+
+void MainWindow::beforeAfterDialog(const QString& guid, const QString& revA, const QString& revB)
+{
+    const QJsonObject r = beforeAfter(guid, revA, revB);
+    if (!r.value("ok").toBool()) {
+        showError(tr("Before/after"), r.value("error").toString());
+        return;
+    }
+    QDialog dialog(this);
+    dialog.setObjectName(QStringLiteral("beforeAfterDialog"));
+    dialog.setWindowTitle(tr("Before/after"));
+    auto* layout = new QVBoxLayout(&dialog);
+    auto* only = new QCheckBox(tr("Only what changed"), &dialog);
+    only->setChecked(true);
+    auto* table = new QTableWidget(&dialog);
+    const auto label = [](const QString& rev) {
+        return rev == QLatin1String("WORKING") ? tr("Current") : rev.left(8);
+    };
+    table->setColumnCount(3);
+    table->setHorizontalHeaderLabels({tr("Field"), tr("Before (%1)").arg(label(revA)), tr("After (%1)").arg(label(revB))});
+    table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    const QJsonArray rows = r.value("rows").toArray();
+    table->setRowCount(int(rows.size()));
+    for (int i = 0; i < rows.size(); ++i) {
+        const QJsonObject row = rows[i].toObject();
+        const bool changed = row.value("changed").toBool();
+        const QStringList cells = {row.value("field").toString(), row.value("before").toString(), row.value("after").toString()};
+        for (int c = 0; c < 3; ++c) {
+            auto* item = new QTableWidgetItem(cells[c]);
+            if (changed && c > 0)
+                item->setBackground(HistoryPanel::modifiedColor().lighter(160));
+            table->setItem(i, c, item);
+        }
+        table->item(i, 0)->setData(Qt::UserRole, changed);
+    }
+    const auto filter = [table, only] {
+        for (int i = 0; i < table->rowCount(); ++i)
+            table->setRowHidden(i, only->isChecked() && !table->item(i, 0)->data(Qt::UserRole).toBool());
+    };
+    connect(only, &QCheckBox::toggled, &dialog, filter);
+    filter();
+    table->horizontalHeader()->setStretchLastSection(true);
+    table->resizeColumnsToContents();
+    table->setMinimumSize(640, 320);
+    if (!r.value("before_exists").toBool())
+        layout->addWidget(new QLabel(tr("The element did not exist in the earlier version."), &dialog));
+    if (!r.value("after_exists").toBool())
+        layout->addWidget(new QLabel(tr("The element was deleted in the later version."), &dialog));
+    layout->addWidget(only);
+    layout->addWidget(table);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dialog);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    layout->addWidget(buttons);
+    dialog.exec();
 }
 
 void MainWindow::newOptionDialog()

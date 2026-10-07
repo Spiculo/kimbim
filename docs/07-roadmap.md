@@ -96,8 +96,8 @@ Done in Slice 1 in Python (`kimcad.records`), byte-identical to the spike golden
 Record decomposition, canonical JSON, BLAKE3 references, records → IFC export with deterministic step IDs.
 **Exit:** corpus round-trip is a fixed point; golden hashes match on Windows and Linux.
 
-### R2 — Store and history ✅ (except tags)
-Done in Slice 1: `init / commit / status / log / show / export / branch / switch` through the Rust store. Tags come next.
+### R2 — Store and history ✅
+Done in Slice 1: `init / commit / status / log / show / export / branch / switch` through the Rust store; Slice 20 added `tag` (annotated tags = milestones) and `blame` (object history).
 
 `kimcad init / import / commit / log / show / export / branch / switch / tag` on the gitoxide-backed store; local cache.
 **Exit:** import 100k-object model, change one property, commit; the new commit adds only a handful of objects.
@@ -113,7 +113,7 @@ Three-way merge with conflict model, integrity pass, conflict serialization for 
 **Exit:** merge test suite (including ported `ifcmerge` cases) passes; re-importing a Revit-exported file with regenerated GlobalIds keeps more than 95% of identities on the corpus pair.
 
 ## M5 — Versioned projects in the app 🟡 (Slice 8 done: [plan](superpowers/plans/2026-10-06-slice8-versioned-projects.md))
-Slices: **8 ✅ enable/open, Save version, History, Compare (colours + list), design options** → 20 milestones (tags), object history, before/after, delete option → 21 R4 merge engine (repository side, not in the app yet) → 22 Combine options (conflict UI: mine or theirs per element and property, 3D preview, commit) = M5 exit. (These were called 9 and 10 before the architect-feedback track took Slices 9–13.)
+Slices: **8 ✅ enable/open, Save version, History, Compare (colours + list), design options** → **20 ✅ milestones (tags), object history, before/after, delete option** ([plan](superpowers/plans/2026-10-07-slice20-milestones-history.md)) → 21 R4 merge engine (repository side, not in the app yet) → 22 Combine options (conflict UI: mine or theirs per element and property, 3D preview, commit) = M5 exit. (These were called 9 and 10 before the architect-feedback track took Slices 9–13.)
 
 Enable/disable versioning, Save version, history timeline, Compare (viewport coloring and before/after), design options, milestones, Combine options with conflict UI, object history panel, re-import with reconciliation review.
 **Exit:** two design options of the house are created, edited separately, compared and combined with one conflict resolved in the UI.

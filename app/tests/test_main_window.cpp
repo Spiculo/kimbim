@@ -494,6 +494,47 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // Slice 20: milestones, object history, before/after, deleting an option.
+    void milestonesHistoryAndDeleteOption()
+    {
+        QTemporaryDir tmp;
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({5, 0});
+        w.setTool(kimcad::MainWindow::Tool::None);
+        const QString wall = w.viewport()->guids().first();
+        QVERIFY(w.enableVersioning(tmp.filePath(QStringLiteral("hitos"))));
+        const QString first = w.history().first().toObject().value("id").toString();
+        QVERIFY(w.addMilestone(QStringLiteral("Concept")));
+        QCOMPARE(w.history().first().toObject().value("milestones").toArray().first().toString(), QStringLiteral("Concept"));
+        w.setSelection({wall});
+        QVERIFY(w.applyName(QStringLiteral("Muro sur")));
+        QVERIFY(!w.addMilestone(QStringLiteral("Schematic design"))); // unsaved changes: save first
+        QVERIFY(w.saveVersion(QStringLiteral("Rename")));
+        const QJsonArray steps = w.objectHistory(wall).value("versions").toArray();
+        QCOMPARE(steps.size(), 2);
+        QCOMPARE(steps.first().toObject().value("change").toString(), QStringLiteral("modified"));
+        const QJsonObject ba = w.beforeAfter(wall, first);
+        QVERIFY(ba.value("ok").toBool());
+        bool nameChanged = false;
+        for (const auto& row : ba.value("rows").toArray())
+            nameChanged |= row.toObject().value("field").toString() == QLatin1String("Name") && row.toObject().value("changed").toBool();
+        QVERIFY(nameChanged);
+        QVERIFY(w.compareWith(QStringLiteral("Concept"))); // milestones compare by name
+        QCOMPARE(w.compareChangeCount(), 1);
+        w.endCompare();
+        QVERIFY(w.createOption(QStringLiteral("Scheme B")));
+        QVERIFY(!w.deleteOption(QStringLiteral("Scheme B"))); // the current option
+        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        QVERIFY(w.switchOption(QStringLiteral("main")));
+        QVERIFY(loaded.wait(60000));
+        QVERIFY(w.deleteOption(QStringLiteral("Scheme B")));
+        QVERIFY(action(w, "actionAddMilestone") && action(w, "actionObjectHistory") && action(w, "actionDeleteOption"));
+        QVERIFY(w.close());
+    }
+
     // Feedback: the plan cut height is a slider at the right of the 3D view; using it turns the cut on.
     void planCutSliderBesideTheView()
     {

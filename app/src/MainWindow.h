@@ -114,6 +114,11 @@ public:
     int compareChangeCount() const;
     bool createOption(const QString& name);
     bool switchOption(const QString& name);
+    // Slice 20: milestones (named versions), deleting an option, object history, before/after.
+    bool addMilestone(const QString& name, const QString& message = QString());
+    bool deleteOption(const QString& name);
+    QJsonObject objectHistory(const QString& guid);
+    QJsonObject beforeAfter(const QString& guid, const QString& revA, const QString& revB = QStringLiteral("WORKING"));
     bool discardChanges();
     bool isVersioned() const { return m_versioned; }
     // Layers and views (Slice 11, owner feedback).
@@ -237,6 +242,10 @@ private:
     void enableVersioningDialog();
     void openProjectDialog();
     void newOptionDialog();
+    void milestoneDialog();
+    void deleteOptionDialog();
+    void objectHistoryDialog();
+    void beforeAfterDialog(const QString& guid, const QString& revA, const QString& revB);
     bool resolveUnsavedForSwitch();
     void openingSizeDialog();
     QJsonObject openingInfo(const QString& guid);
@@ -302,6 +311,7 @@ private:
     int m_lastDrawingVisible = -1;
     QToolBar* m_projectBar = nullptr;
     QComboBox* m_options = nullptr;
+    QString m_compareA, m_compareB; // the versions being compared (empty when not comparing)
     bool m_versioned = false;
     QHash<QString, double> m_timings;
     QString m_projectFolder;

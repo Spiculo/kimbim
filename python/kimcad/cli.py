@@ -9,6 +9,7 @@ import pathlib
 import sys
 
 from . import _core
+from .layout import key_to_path
 from .project import Changes, KimcadError, Project
 
 SYMBOL = {"added": "+", "modified": "~", "removed": "-"}
@@ -58,6 +59,15 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--rev", default="HEAD")
     s = sub.add_parser("switch", help="switch to a design option (branch)")
     s.add_argument("name")
+    s = sub.add_parser("tag", help="list, set or delete milestones (annotated tags)")
+    s.add_argument("name", nargs="?")
+    s.add_argument("-m", "--message", default="")
+    s.add_argument("--rev", default="HEAD")
+    s.add_argument("--delete", action="store_true")
+    s = sub.add_parser("blame", help="object history: the versions that changed an object (by GlobalId)")
+    s.add_argument("guid")
+    s.add_argument("--rev", default="HEAD")
+    s.add_argument("-n", type=int, default=100)
     return p
 
 
@@ -104,6 +114,25 @@ def run(args) -> int:
     elif args.cmd == "switch":
         proj.switch(args.name)
         print(f"switched to {args.name}")
+    elif args.cmd == "tag":
+        if args.name and args.delete:
+            proj.delete_tag(args.name)
+            print(f"deleted milestone {args.name}")
+        elif args.name:
+            proj.tag(args.name, args.message, args.rev)
+            print(f"milestone {args.name} on {proj.repo.resolve(args.rev)[:10]}")
+        else:
+            for t in proj.tags():
+                first_line = (t.message.strip().splitlines() or [""])[0]
+                print(f"{t.name}  {t.target[:10]}  {first_line}")
+    elif args.cmd == "blame":
+        steps = proj.history_of(key_to_path("o/" + args.guid), rev=args.rev, limit=args.n)
+        if not steps:
+            print(f"no version changed {args.guid}")
+        for c, kind in steps:
+            when = dt.datetime.fromtimestamp(c.time, dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+            first_line = (c.message.strip().splitlines() or [""])[0]
+            print(f"{SYMBOL[kind]} {kind:<8}  {c.id[:10]}  {when}  {c.author_name}  {first_line}")
     return 0
 
 

@@ -798,9 +798,15 @@ from .authoring import (  # noqa: E402,F401
     wall_types,
 )
 from .versioning import (  # noqa: E402,F401
+    before_after,
     compare,
+    create_milestone,
     create_option,
+    delete_milestone,
+    delete_option,
     discard_changes,
+    element_history,
+    milestones,
     enable_versioning,
     history,
     open_project,
