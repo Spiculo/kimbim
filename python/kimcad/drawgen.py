@@ -475,11 +475,12 @@ def room_stamps(storey, to_paper, size=TEXT_SIZE):
 
 def segment_labels(text: str, segments: int) -> list:
     """One label per dimension segment. A single segment shows its whole text ("2.50 m"); a chain's labels
-    are separated by "|" ("to grid A | 3.50"), or by spaces as measured ("4.00 3.50", older files)."""
-    if "|" in text:
-        labels = [t.strip() for t in text.split("|")]
-    elif segments <= 1:
+    are separated by ";" ("a eje A; 3,50": the comma is a decimal separator in Spanish), or by spaces as
+    measured ("4.00 3.50", older files)."""
+    if segments <= 1:
         labels = [text.strip()]
+    elif ";" in text:
+        labels = [t.strip() for t in text.split(";")]
     else:
         labels = text.split()
     return (labels + [""] * segments)[:segments]

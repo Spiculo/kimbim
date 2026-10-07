@@ -116,8 +116,9 @@ def test_typed_dimension_text_with_spaces_is_kept_whole(plan):
     one = call("add_annotation", plan["l1"], "dimension", json.dumps([[0, 0], [2.5, 0], [0, -1]]), "2.50 m")["guid"]
     assert _literals(one) == ["2.50 m"]
     chain = call("add_annotation", plan["l1"], "dimension", json.dumps([[0, 0], [4, 0], [7.5, 0], [0, -1]]),
-                 "to grid A | 3.50")["guid"]
-    assert _literals(chain) == ["to grid A", "3.50"]
+                 "a eje A; 3,50")["guid"]
+    assert _literals(chain) == ["a eje A", "3,50"]
     assert drawgen.segment_labels("4.00 3.50", 2) == ["4.00", "3.50"]  # measured chains, older files
+    assert drawgen.segment_labels("ver nota; detalle 3", 1) == ["ver nota; detalle 3"]
     svg = "".join(drawgen.plan_annotations(b._model.by_guid(plan["l1"]), lambda x, y, z: (x * 10, y * 10)))
-    assert ">2.50 m<" in svg and ">to grid A<" in svg
+    assert ">2.50 m<" in svg and ">a eje A<" in svg
