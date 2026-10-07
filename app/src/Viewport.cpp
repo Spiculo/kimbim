@@ -108,6 +108,7 @@ Viewport::Viewport(Scene* scene, QWidget* parent)
     m_view->SetProj(V3d_XposYnegZpos);
     applyNavigationPreset();
     connect(m_scene, &Scene::redrawRequested, this, qOverload<>(&QWidget::update));
+    connect(m_scene, &Scene::viewsChanged, this, &Viewport::keepOverlaysHere); // views opened later
     connect(m_scene, &Scene::elementsAltered, this, [this] {
         if (m_sectionZ)
             rebuildSection();
@@ -228,6 +229,7 @@ std::optional<QSet<QString>> Viewport::idsInImage(int w, int h, int x0, int y0, 
     m_view->SetBackgroundColor(background);
     if (!m_preview.IsNull())
         m_context->Display(m_preview, 0, -1, false);
+        keepHere(m_preview);
     m_context->HilightSelected(false);
     update();
     if (!ok)
@@ -301,12 +303,11 @@ std::optional<QSet<QString>> Viewport::visibleFrom(QPointF p1, QPointF p2, QPoin
     keep(p2, -u);
     if (depth >= 0)
         keep(p1 + n * depth, -n);
-    for (const auto& b : m_scene->batches) {
-        for (const auto& plane : m_clipPlanes)
-            b->RemoveClipPlane(plane);
+    for (const auto& plane : m_clipPlanes)
+        m_view->RemoveClipPlane(plane);
+    for (const auto& b : m_scene->batches)
         for (const auto& plane : planes)
             b->AddClipPlane(plane);
-    }
     Handle(Graphic3d_Camera) saved = new Graphic3d_Camera();
     saved->Copy(m_view->Camera());
     const Handle(Graphic3d_Camera)& camera = m_view->Camera();
@@ -323,12 +324,11 @@ std::optional<QSet<QString>> Viewport::visibleFrom(QPointF p1, QPointF p2, QPoin
     camera->SetAspect(double(w) / h);
     m_view->ZFitAll();
     const auto ids = idsInImage(w, h, 0, 0, w - 1, h - 1);
-    for (const auto& b : m_scene->batches) {
+    for (const auto& b : m_scene->batches)
         for (const auto& plane : planes)
             b->RemoveClipPlane(plane);
-        for (const auto& plane : m_clipPlanes)
-            b->AddClipPlane(plane);
-    }
+    for (const auto& plane : m_clipPlanes)
+        m_view->AddClipPlane(plane);
     m_view->Camera()->Copy(saved);
     m_view->Invalidate();
     update();
@@ -615,8 +615,10 @@ void Viewport::rebuildSection()
                 loops.push_back(std::move(l));
         }
     if (!loops.empty()) {
-        m_section = new SectionPrs(std::move(loops), *m_sectionZ);
+        // 1 mm below the cut height: the view's own cut plane keeps what is below it.
+        m_section = new SectionPrs(std::move(loops), *m_sectionZ - 0.001);
         m_context->Display(m_section, 0, -1, false);
+        keepHere(m_section);
     }
     update();
 }
@@ -863,6 +865,7 @@ void Viewport::displayAnnotations()
                 continue;
             Handle(AnnotationPrs) prs = new AnnotationPrs(a, m_annotationZ + 0.02);
             m_context->Display(prs, 0, m_scene->layerLocked.contains(a.guid) ? -1 : 0, false);
+            keepHere(prs);
             m_annotations.insert(a.guid, prs);
         }
     }
@@ -920,6 +923,7 @@ void Viewport::setGridLines(const QVector<GridLine>& lines, double z)
     if (!lines.isEmpty()) {
         m_grid = new GridLinesPrs(lines, z);
         m_context->Display(m_grid, 0, -1, false);
+        keepHere(m_grid);
     }
     update();
 }
@@ -958,6 +962,7 @@ void Viewport::setPreviewBoxes(const QVector<PreviewBox>& boxes)
         m_preview->setShowEdges(false);
         m_preview->SetZLayer(Graphic3d_ZLayerId_Top);
         m_context->Display(m_preview, 0, -1, false); // shown, never selectable
+        keepHere(m_preview);
     }
     update();
 }
@@ -1102,8 +1107,6 @@ void Viewport::addBatch(const Handle(ElementBatch)& batch)
     m_scene->batches.push_back(batch);
     for (int i = 0; i < batch->elementCount(); ++i)
         m_scene->locate.insert(batch->guid(i), Scene::Loc{b, i});
-    for (const auto& plane : m_clipPlanes)
-        batch->AddClipPlane(plane);
     applyColors(batch);
     applyLayerState(batch);
     batch->setIdBase(m_scene->nextIdBase);
@@ -1398,12 +1401,12 @@ void Viewport::showAll()
     redisplay(touched);
 }
 
+// Cuts belong to this view (D71): a plan tab's cut doesn't cut the 3D tab.
 void Viewport::addClipPlanes(const std::vector<Handle(Graphic3d_ClipPlane)>& planes)
 {
     for (const auto& plane : planes) {
         m_clipPlanes.push_back(plane);
-        for (const auto& b : m_scene->batches)
-            b->AddClipPlane(plane);
+        m_view->AddClipPlane(plane);
     }
     update();
 }
@@ -1411,10 +1414,37 @@ void Viewport::addClipPlanes(const std::vector<Handle(Graphic3d_ClipPlane)>& pla
 void Viewport::clearClipPlanes()
 {
     for (const auto& plane : m_clipPlanes)
-        for (const auto& b : m_scene->batches)
-            b->RemoveClipPlane(plane);
+        m_view->RemoveClipPlane(plane);
     m_clipPlanes.clear();
     update();
+}
+
+int Viewport::viewClipPlaneCount() const
+{
+    return m_view->ClipPlanes().IsNull() ? 0 : m_view->ClipPlanes()->Size();
+}
+
+// Overlays (grid, annotations, markers, poché, previews) belong to this view only.
+void Viewport::keepHere(const Handle(AIS_InteractiveObject)& obj)
+{
+    if (obj.IsNull())
+        return;
+    for (auto it = m_scene->viewer()->DefinedViewIterator(); it.More(); it.Next())
+        m_context->SetViewAffinity(obj, it.Value(), it.Value() == m_view);
+}
+
+void Viewport::keepOverlaysHere()
+{
+    keepHere(m_preview);
+    keepHere(m_grid);
+    keepHere(m_section);
+    for (const auto& a : std::as_const(m_annotations))
+        keepHere(a);
+}
+
+bool Viewport::showsOverlay(const Handle(AIS_InteractiveObject)& obj, const Handle(V3d_View)& view) const
+{
+    return !obj.IsNull() && !view.IsNull() && obj->ViewAffinity()->IsVisible(view->View()->Identification());
 }
 
 Bnd_Box Viewport::boundsOf(const QStringList& guids) const

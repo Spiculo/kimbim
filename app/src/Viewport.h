@@ -123,6 +123,10 @@ public:
     void addClipPlanes(const std::vector<Handle(Graphic3d_ClipPlane)>& planes);
     void clearClipPlanes();
     int clipPlaneCount() const { return int(m_clipPlanes.size()); }
+    int viewClipPlaneCount() const; // the cut planes on this view's V3d_View
+    // Overlays belong to their view (D71); for tests.
+    bool showsOverlay(const Handle(AIS_InteractiveObject)& obj, const Handle(V3d_View)& view) const;
+    Handle(AIS_InteractiveObject) gridObject() const { return m_grid; }
     Bnd_Box boundsOf(const QStringList& guids) const; // all visible elements when empty
 
     // Measurement helpers used by --self-test.
@@ -222,6 +226,8 @@ private:
     std::optional<double> m_sectionZ;
     int m_sectionElements = 0;
     void rebuildSection();
+    void keepHere(const Handle(AIS_InteractiveObject)& obj);
+    void keepOverlaysHere();
     int m_gridLineCount = 0;
     bool workPoint(const QPointF& widgetPos, QPointF* point, double* tolerance);
     double m_planElevation = 0.0;

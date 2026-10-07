@@ -3,6 +3,9 @@
 #include <QSignalSpy>
 #include <QtTest>
 
+#include <Graphic3d_ClipPlane.hxx>
+#include <gp_Pln.hxx>
+
 #include "ElementBatch.h"
 #include "Scene.h"
 #include "Viewport.h"
@@ -56,6 +59,26 @@ private slots:
         QVERIFY(alone.scene());
         alone.addBatch(batch(2));
         QCOMPARE(alone.elementCount(), 2);
+    }
+
+    void overlaysAndCutsStayInTheirView()
+    {
+        kimcad::Scene scene;
+        kimcad::Viewport model(&scene), plan(&scene);
+        model.addBatch(batch(2));
+        plan.setPlanView(0.0);
+        plan.setGridLines({{QPointF(0, 0), QPointF(10, 0), "A"}}, 0.0);
+        QCOMPARE(plan.gridLineCount(), 1);
+        QVERIFY(plan.showsOverlay(plan.gridObject(), plan.view()));
+        QVERIFY(!plan.showsOverlay(plan.gridObject(), model.view())); // not in the 3D tab
+        Handle(Graphic3d_ClipPlane) cut = new Graphic3d_ClipPlane(gp_Pln(gp_Pnt(0, 0, 1.2), gp_Dir(0, 0, -1)));
+        plan.addClipPlanes({cut});
+        QCOMPARE(plan.viewClipPlaneCount(), 1);
+        QCOMPARE(model.viewClipPlaneCount(), 0); // the 3D tab is not cut by the plan's cut
+        kimcad::Viewport later(&scene);          // a view opened afterwards doesn't show it either
+        QVERIFY(!plan.showsOverlay(plan.gridObject(), later.view()));
+        plan.clearClipPlanes();
+        QCOMPARE(plan.viewClipPlaneCount(), 0);
     }
 
     void viewsAreCountedAndRemoved()
