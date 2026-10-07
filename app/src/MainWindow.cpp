@@ -668,14 +668,15 @@ void MainWindow::setSelection(const QStringList& guids)
         m_tree->selectGuids(expanded);
     }
     m_selection = expanded;
-    // The bottom bar's summary: "2 IfcWall", or "5 element(s)" for several kinds.
+    // The bottom bar's summary: "1 Wall", "2 Walls", or "5 element(s)" for several kinds.
     QSet<QString> kinds;
     for (const QString& g : expanded)
         kinds.insert(m_viewport->typeOf(g));
     if (expanded.isEmpty())
         m_status->setSelection(QString());
     else if (kinds.size() == 1)
-        m_status->setSelection(QStringLiteral("%1 %2").arg(expanded.size()).arg(*kinds.constBegin()));
+        m_status->setSelection(QStringLiteral("%1 %2").arg(expanded.size()).arg(expanded.size() == 1
+            ? ModelTreePanel::plainName(*kinds.constBegin()) : ModelTreePanel::plainPlural(*kinds.constBegin())));
     else
         m_status->setSelection(tr("%n element(s)", nullptr, int(expanded.size())));
     refreshProperties();

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSignalSpy>
@@ -36,7 +37,77 @@ private slots:
         QVERIFY(panel.selectGuid("W1"));
         QCOMPARE(panel.currentGuid(), QString("W1"));
         QVERIFY(!panel.selectGuid("unknown"));
-        QCOMPARE(panel.displayName("W2"), QString("IfcWall")); // unnamed elements show their type
+        QCOMPARE(panel.displayName("W2"), QString("Wall")); // unnamed elements show a plain name
+    }
+
+    // D71: less noise. Project › Site › Building in one row, no Type column, elements grouped by
+    // category under their level.
+    void singleChildSpatialRowsAreMerged()
+    {
+        kimcad::ModelTreePanel panel;
+        panel.setTree(sampleTree());
+        QCOMPARE(panel.tree()->topLevelItemCount(), 1);
+        QTreeWidgetItem* top = panel.tree()->topLevelItem(0);
+        QCOMPARE(top->text(0), QString("Edificio"));
+        QCOMPARE(panel.itemFor("P"), top);
+        QCOMPARE(panel.itemFor("S"), top);
+        QVERIFY(top->toolTip(0).contains("Casa") && top->toolTip(0).contains("Sitio"));
+        QCOMPARE(panel.itemFor("L1")->parent(), top);
+        QCOMPARE(panel.tree()->columnCount(), 1);
+    }
+
+    void elementsAreGroupedByCategoryUnderALevel()
+    {
+        kimcad::ModelTreePanel panel;
+        panel.setTree(sampleTree());
+        QTreeWidgetItem* level = panel.itemFor("L1");
+        QCOMPARE(level->childCount(), 2);
+        QCOMPARE(level->child(0)->text(0), QString("Doors (1)"));
+        QCOMPARE(level->child(1)->text(0), QString("Walls (2)"));
+        QCOMPARE(panel.itemFor("W1")->parent(), level->child(1));
+        panel.tree()->clearSelection();
+        level->child(1)->setSelected(true); // a group row selects nothing itself
+        QVERIFY(panel.selectedGuids().isEmpty());
+        QStringList g = panel.descendantGuids("L1");
+        g.sort();
+        QCOMPARE(g, QStringList({"D1", "L1", "W1", "W2"}));
+    }
+
+    void twoBuildingsAreNotMerged()
+    {
+        QJsonObject root = sampleTree();
+        QJsonArray sites = root["children"].toArray();
+        QJsonObject site = sites[0].toObject();
+        QJsonArray buildings = site["children"].toArray();
+        buildings.append(QJsonObject{{"guid", "B2"}, {"type", "IfcBuilding"}, {"name", "Anexo"}, {"children", QJsonArray()}});
+        site["children"] = buildings;
+        sites[0] = site;
+        root["children"] = sites;
+        kimcad::ModelTreePanel panel;
+        panel.setTree(root);
+        QTreeWidgetItem* top = panel.tree()->topLevelItem(0);
+        QCOMPARE(top->text(0), QString("Sitio")); // Casa › Sitio merged, then two buildings
+        QCOMPARE(top->childCount(), 2);
+    }
+
+    void typeStillSearchableAndInTheHint()
+    {
+        kimcad::ModelTreePanel panel;
+        panel.setTree(sampleTree());
+        QVERIFY(panel.hintFor("W1").contains("IfcWall"));
+        QCOMPARE(panel.ifcTypeOf("W2"), QString("IfcWall"));
+        QCOMPARE(kimcad::ModelTreePanel::plainName("IfcWallStandardCase"), QString("Wall"));
+        QCOMPARE(kimcad::ModelTreePanel::plainPlural("IfcSpace"), QString("Rooms"));
+    }
+
+    void expandedGroupsSurviveARefresh()
+    {
+        kimcad::ModelTreePanel panel;
+        panel.setTree(sampleTree());
+        QTreeWidgetItem* walls = panel.itemFor("L1")->child(1);
+        walls->setExpanded(true);
+        panel.refreshTree(sampleTree());
+        QVERIFY(panel.itemFor("L1")->child(1)->isExpanded());
     }
 
     void userSelectionEmitsGuids()

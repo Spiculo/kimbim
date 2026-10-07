@@ -14,6 +14,7 @@
 
 #include "CombineDialog.h"
 #include "DockLayout.h"
+#include "ModelTreePanel.h"
 #include "StatusStrip.h"
 #include "ToolOptionsBar.h"
 #include "ToolPalette.h"
@@ -261,7 +262,7 @@ private slots:
         w.setTool(kimcad::MainWindow::Tool::None);
         QVERIFY(w.statusStrip()->selectionText().isEmpty());
         w.setSelection(w.viewport()->guids().mid(0, 1));
-        QVERIFY(w.statusStrip()->selectionText().startsWith(QLatin1String("1 ")));
+        QCOMPARE(w.statusStrip()->selectionText(), QStringLiteral("1 ") + kimcad::ModelTreePanel::plainName(QStringLiteral("IfcWall")));
         QVERIFY(!w.statusStrip()->layersText().isEmpty());
         QVERIFY(w.statusBar()->isHidden());
     }
