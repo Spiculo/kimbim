@@ -210,14 +210,14 @@ release notes, so check before relying on a single cell.
 
 | Tool | Has | KIMCAD | Pri | Notes |
 |------|-----|--------|-----|-------|
-| Section views (marker in plan, linked view) | all | ⬜ | P1 | IfcOpenShell SVG serializer, as in Bonsai |
-| Elevations (building, interior) | all | ⬜ | P1 | |
+| Section views (marker in plan, linked view) | all | 🟡 | P1 | Slice 14: Section tool (V), Archicad's three clicks; SVG from IfcOpenShell's serializer, in a tab (D60, D61). Not yet: scale setting, detail level, cropping by hand |
+| Elevations (building, interior) | all | 🟡 | P1 | Slice 14: template N/S/E/W elevations in new projects, *Create elevations*, Elevation tool (Shift+V). Interior elevations: an elevation with a limited depth |
 | Detail views (enlarged, cropped, with extra 2D) | all | ⬜ | P1 | Archicad details and worksheets, Revit callouts |
 | Drafting views (2D only) | all | ⬜ | new | |
 | 3D documents / axonometric drawings | AC RV VW | ⬜ | new | |
-| Crop regions, view range, depth | AC RV VW | ⬜ | new | |
+| Crop regions, view range, depth | AC RV VW | 🟡 | new | Depth: infinite / limited / zero (D61), in the bridge; no UI yet |
 | Model view options (detail level by scale) | AC RV VW | ⬜ | new | |
-| Drawings update when the model changes | all | ⬜ | P1 | |
+| Drawings update when the model changes | all | 🟡 | P1 | Out-of-date bar + Regenerate; regenerated when brought to the front |
 
 ## 12. 2D drafting
 
@@ -243,7 +243,7 @@ release notes, so check before relying on a single cell.
 | Associative labels and tags (show a property, follow the element) | all | ⬜ | P1 | Door/window/room/wall tags |
 | Leaders and arrows | all | ⬜ | P1 | Open in doc 13 |
 | Revision clouds | AC RV VW | ⬜ | new | Open in doc 13 |
-| Section, elevation and detail markers | all | ⬜ | P1 | Come with drawings (§11) |
+| Section, elevation and detail markers | all | 🟡 | P1 | Section and elevation markers in plan (Slice 14); detail markers later |
 | North arrow, scale bar | all | ⬜ | new | |
 | Keynotes | RV VW AC | ⬜ | new | |
 | Room / zone stamps (name, number, area) | all | ⬜ | P1 | Need rooms (§6) |

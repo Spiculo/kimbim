@@ -75,11 +75,11 @@ Done in Slice 6: profile-based columns and beams, grid axes per level (auto tags
 Done in Slice 5: layered slab types, slabs by outline (concave too) or from a closed wall loop (outer faces), parametric doors and windows in walls with real openings, cascading deletes; a saved test house (walls, slab, door, window) validates against the IFC4 schema with 0 issues.
 Done in Slice 4: new IFC4 project (mm), levels, plan view, layered wall types, wall tool (snapping, typed lengths, ortho), L/T joins, delete, live 3D updates with undo/redo.
 
-### M4 — Libraries, cloning, drawings
+### M4 — Libraries, cloning, drawings 🟡 (Slice 14 done: [plan](superpowers/plans/2026-10-07-slice14-sections-elevations.md))
 Library browser and bundled library, copy/paste/duplicate/array/mirror/copy-to-storeys, plan/section/elevation generation, annotations, sheets, PDF export.
 **Exit:** the M3 house produces a plan, a section and an elevation on a sheet with a title block, exported to PDF. CI checks this automatically, as it checks M3.
 
-Slices (numbering continues after the architect-feedback track, Slices 9–13): 14 sections and elevations → 15 plan drawings and annotation on drawings → 16 sheets and PDF export (= M4 exit) → 17 everyday editing (copy/paste, duplicate, Ctrl+drag copy, mirror, arrays, offset).
+Slices (numbering continues after the architect-feedback track, Slices 9–13): **14 ✅ sections and elevations** → 15 plan drawings and annotation on drawings → 16 sheets and PDF export (= M4 exit) → 17 everyday editing (copy/paste, duplicate, Ctrl+drag copy, mirror, arrays, offset).
 M4 comes before the end of M5 (owner plan, 2026-10-07): drawings are what an architect hands to a client, and Combine options (Slice 22) needs the R4 merge engine, which is easier to judge once real projects with drawings exist.
 
 ### After M4: modeling gaps

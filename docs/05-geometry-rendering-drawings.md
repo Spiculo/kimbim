@@ -83,6 +83,13 @@ sheet composition (title block, viewports at scale)  ──►  PDF / SVG export
 - **Porting source:** Bonsai's drawing and sheet subsystem (Python, GPL-3) is the most complete open implementation of this flow. KIMCAD is GPL-3 ([06](06-reuse-and-licensing.md)), so we can port its logic with attribution.
 - PDF export uses SVG → PDF through Qt (`QPdfWriter`/`QSvgRenderer`) at first. Revisit if output quality is insufficient.
 
+**As built (Slice 14, spike S6, D60/D61):**
+- A drawing is an `IfcAnnotation` DRAWING (Bonsai's definition): placement = camera, `Body` = `IfcBlock` for the extent, `EPset_Drawing`; KIMCAD's settings in `KIMCAD_Drawing`. The marker line in plan is the camera's X axis over the block width, so moving the annotation moves the drawing. Infinite ranges (Archicad's default) are re-fitted to the model when generating.
+- IfcOpenShell 0.9 has no `addDrawing()` from Python; drawings go through `elevation-ref-guid`, and the annotation itself must be among the elements given to the serializer. Openings, spaces and annotations are left out.
+- Generation (`kimcad/drawgen.py`) runs in a **child process** from a snapshot of the model, because the serializer holds the GIL for its whole hidden-line pass. Polygon HLR (`svg-poly`) is used.
+- Hidden-line removal grows with everything behind the cut, so the 3D view first renders element ids from the drawing's camera (the D52 pass) and only the visible elements are sent: an elevation of a 2,880-element model went from 52 s to about 4 s.
+- The SVG is cropped to its content and cached per drawing and model state (the last four states, so undo returns to a cached drawing). It is never written into the model.
+
 ## Geometry editing
 
 - Authoring operations change **parametric definitions** (wall axis and height, profile, extrusion depth) through `ifcopenshell.api`. They do not edit meshes.

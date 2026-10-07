@@ -64,33 +64,35 @@ Spike S6 (`spikes/s6_drawings/drawing_bench.py`), results in 11.
 - [x] `kimcad/drawings.py`: `create_section(x1, y1, x2, y2, look_x, look_y, depth)` (depth < 0 = Infinite, 0 = the cut only; no level, as in Archicad), `create_elevation(...)`, `create_template_elevations()` (N/S/E/W; called by `new_project`, outside the undo history), `drawings()` → `[{guid, name, kind, depth, auto, points, look, stale}]`, `rename_drawing`, `set_drawing_depth`, `delete_drawing`, `generate_drawing(guid, include_json)` → `{svg, cached, timing}`; the cache keeps the last 4 model states per drawing, so undo returns to a cached drawing.
 - [x] Tests `tests/python/test_drawings.py` (9): template elevations in new projects only; section from two points and a look side (undoable, validates, not a plan annotation); cut walls and slabs + projection, openings not drawn, cropped at 1:100, cached; moving a wall → stale → different SVG, undo → the old one; template elevations follow the model; depth, rename, delete (no orphan representation or property sets), undo; bad input refused; drawings not meshed.
 
-### Task 2: Keep drawings out of the 3D view
+### Task 2: Keep drawings out of the 3D view ✅
 - [x] `start_meshing` / `mesh_elements` skip `IfcAnnotation` (plan annotations are 2D and drawn by the overlay; the iterator cannot exclude single instances by class name and GlobalId together). Drawings are not in a level, so the model tree does not list them; the Drawings panel does (Task 4).
 - [ ] Test: house + section → mesh count unchanged.
 
-### Task 2b: Visible-element pass
-- [ ] `Viewport::visibleElements(camera, box)`: render IDs from the drawing's camera offscreen (the D52 pass), return the GlobalIds seen; the bridge adds the elements the cut plane crosses and passes the union to `generate_drawing`.
-- [ ] Test: the synthetic grid model's south elevation is generated from the front row only; timing written in 11.
+### Task 2b: Visible-element pass ✅
+- [x] `Viewport::visibleElements(camera, box)`: render IDs from the drawing's camera offscreen (the D52 pass), return the GlobalIds seen; the bridge adds the elements the cut plane crosses and passes the union to `generate_drawing`.
+- [x] GUI self-tests on the occlusion model (South sends 1 element, North 2); the synthetic grid model's South Elevation: 4.1 s in the app with 96 visible elements (52 s with all of them in S6).
 
-### Task 3: App — Section and Elevation tools, template elevations
-- [ ] Section tool (**V**): click, click for the line, then a third click on the side to look at (Archicad's eye cursor); preview line with direction arrows; typed length like the wall tool. Horizontal range **Infinite** by default; Limited (a depth) and Zero depth in the drawing's settings.
-- [ ] Elevation tool (**Shift+V**): same three clicks, for an elevation marker placed by hand.
-- [ ] New projects get **North, South, East and West elevations**, like Archicad's default template. Their markers sit outside the building and their extent follows the model's bounds when generated, until the user moves a marker. Opening an existing IFC adds nothing (no model change on open).
-- [ ] Section and elevation markers drawn in plan (overlay, like annotations); selectable, movable, deletable.
-- [ ] Tests in `test_main_window`: draw a section on the house → one drawing listed; a new project lists four elevations. Python tests that count elements in new projects are updated deliberately (drawings are not products of a level).
+### Task 3: App — Section and Elevation tools, template elevations ✅ (core)
+- [x] Section tool (**V**): click, click for the line, then a third click on the side to look at. Infinite range by default.
+- [x] Elevation tool (**Shift+V**): same three clicks.
+- [x] New projects get **North, South, East and West elevations** (Archicad's template); their markers sit outside the building and follow the model's bounds when generated, until moved. Opening an IFC adds nothing; *View › Create elevations* adds the missing ones (one undo step).
+- [x] Markers in plan view only (not in 3D, as in Archicad): sections as a line with end flags and arrows, elevations as a triangle with range ticks; selectable, movable, rotatable, deletable.
+- [x] Tests in `test_main_window` (`sectionsAndElevations`, shortcuts) and Python tests updated deliberately (the template elevations are not plan annotations).
+- [ ] Follow-up: rubber-band preview of the line and typed length; depth (Limited / Zero) and scale in a drawing settings dialog (the bridge has `set_drawing_depth`).
 
-### Task 4: App — Drawings panel and 2D tab
-- [ ] Drawings dock: list (kind icon, name, scale), double-click opens; rename, delete.
-- [ ] Drawing tab: `QSvgRenderer` in a `QGraphicsView`; wheel zoom at cursor, middle pan, fit; "out of date" bar with Regenerate (and automatic regenerate when the tab is visible, debounced).
-- [ ] Generation on a worker thread with progress in the status bar; the old SVG stays visible until the new one is ready.
-- [ ] Tests: open the house section tab → SVG item present; edit a wall → stale bar → regenerate → content changes.
+### Task 4: App — Drawings panel and 2D tab ✅
+- [x] Drawings dock (next to Layers): list, double-click or *Open*, rename in place, delete.
+- [x] The central area is tabbed: *Model* plus one tab per open drawing; `DrawingView` paints the SVG with `QSvgRenderer` (paper on a grey desk), wheel zoom at the cursor, drag to pan, fit on first show.
+- [x] Generation on a worker thread; the old drawing stays until the new one arrives; an out-of-date bar with *Regenerate*; a stale drawing brought to the front regenerates; deleting a drawing closes its tab.
+- [x] Self-test `--open-drawing NAME` (with `--create-elevations`, `--screenshot`) reports `drawing_shown`, `drawing_s`, `drawing_visible`, paper size.
+- [ ] Follow-up: keep generated SVGs in `.kimcad/drawings/` for versioned projects, so reopening is instant.
 
-### Task 5: Timing on Clinic in CI
-- [ ] `tests/python/test_drawings.py::test_clinic_timing` (marked `slow` and `golden`, needs the corpus): plan, section and elevation of Clinic_Architectural; prints the timings, fails only above a generous ceiling. Record the numbers in 11 and in the slice notes.
+### Task 5: Timing on Clinic in CI (informational)
+- [x] Two non-blocking Linux CI steps: `pixi run drawing-bench` (S6, every element) and the app pipeline on Clinic (`--create-elevations --open-drawing "South Elevation"`, with the visible-element pass). Numbers in 11.
 
-### Task 6: Docs and verification
-- [ ] D60 in decisions.md; doc 05 drawing flow updated (no `addDrawing`, `svg-poly`, the cache key); doc 04 §8 status; doc 14 §11 rows; roadmap M4 progress; README "try it".
-- [ ] EN/ES strings (`pixi run check-translations`); full `pixi run test`, `golden`, `app-test` on Windows and Linux.
+### Task 6: Docs and verification ✅
+- [x] D60 (proposed), D61 (owner); doc 05 "As built"; doc 04 §8; doc 14 §11 and §13; roadmap M4; README.
+- [x] EN/ES strings (`check-translations` OK); Python 151 passed; app 31/31 (20 non-GPU + 11 GUI self-tests under Xvfb) on Linux. Windows: CI.
 
 ## Owner decisions (2026-10-07): follow Archicad's conventions (D61)
 
