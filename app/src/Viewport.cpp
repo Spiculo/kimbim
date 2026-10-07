@@ -444,6 +444,11 @@ void Viewport::paintEvent(QPaintEvent*)
     // not invalidating at all left the window blank after it was shown or uncovered.
     m_view->Invalidate();
     FlushViewEvents(m_context, m_view, true);
+    // Wheel zoom is applied while flushing the view events: report it after.
+    if (const double zoom = zoomPercent(); std::abs(zoom - m_lastZoom) > 0.5) {
+        m_lastZoom = zoom;
+        emit zoomChanged(zoom);
+    }
 }
 
 void Viewport::resizeEvent(QResizeEvent*)
@@ -1153,7 +1158,13 @@ void Viewport::fitAll()
         return;
     m_view->FitAll(0.05, false);
     m_view->ZFitAll();
+    m_fitScale = m_view->Scale();
     update();
+}
+
+double Viewport::zoomPercent() const
+{
+    return m_fitScale > 0 ? 100.0 * m_view->Scale() / m_fitScale : 100.0;
 }
 
 QStringList Viewport::guids() const

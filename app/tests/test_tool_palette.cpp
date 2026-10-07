@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // D71: the left tool palette, the tool options strip and the bottom bar.
 #include <QAction>
+#include <QComboBox>
 #include <QLineEdit>
+#include <QMenu>
+#include <QSignalSpy>
 #include <QToolButton>
 #include <QtTest>
 
+#include "StatusStrip.h"
 #include "ToolOptionsBar.h"
 #include "ToolPalette.h"
 
@@ -43,6 +47,35 @@ private slots:
         height->hide();
         bar.setActive(true);
         QVERIFY(bar.isHidden()); // nothing to show
+    }
+
+    void statusStripShowsLayersZoomSelectionAndMessages()
+    {
+        kimcad::StatusStrip s;
+        QSignalSpy active(&s, &kimcad::StatusStrip::activeLayerRequested);
+        QSignalSpy visible(&s, &kimcad::StatusStrip::layerVisibilityToggled);
+        s.setLayers({"A-WALL", "A-DOOR", "A-ANNO"}, "A-WALL", {"A-ANNO"});
+        QCOMPARE(s.layersText(), QString("2/3"));
+        auto* combo = s.findChild<QComboBox*>(QStringLiteral("activeLayer"));
+        QCOMPARE(combo->currentText(), QString("A-WALL"));
+        emit combo->activated(combo->findText("A-DOOR"));
+        QCOMPARE(active.count(), 1);
+        QCOMPARE(active.first().first().toString(), QString("A-DOOR"));
+        QAction* anno = s.findChild<QToolButton*>(QStringLiteral("visibleLayers"))->menu()->actions().at(2);
+        QVERIFY(!anno->isChecked());
+        anno->setChecked(true);
+        QCOMPARE(visible.count(), 1);
+        s.setZoom(150.0);
+        QCOMPARE(s.zoomText(), QString("150%"));
+        s.setZoom(-1);
+        QCOMPARE(s.zoomText(), QString());
+        s.setSelection("2 walls");
+        QCOMPARE(s.selectionText(), QString("2 walls"));
+        s.showMessage("Wall: click the start point");
+        QCOMPARE(s.message(), QString("Wall: click the start point"));
+        s.clearMessage();
+        QVERIFY(s.message().isEmpty());
+        QVERIFY(!s.findChild<QToolButton*>(QStringLiteral("penButton"))->isEnabled()); // pen sets: step 3
     }
 };
 

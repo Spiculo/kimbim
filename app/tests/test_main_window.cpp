@@ -14,10 +14,12 @@
 
 #include "CombineDialog.h"
 #include "DockLayout.h"
+#include "StatusStrip.h"
 #include "ToolOptionsBar.h"
 #include "ToolPalette.h"
 #include <QComboBox>
 #include <QDoubleSpinBox>
+#include <QStatusBar>
 #include <QToolBar>
 #include <DockManager.h>
 #include <DockWidget.h>
@@ -244,6 +246,24 @@ private slots:
         QVERIFY(w.openPlanTab(w.levelsBar()->activeStorey()));
         QVERIFY(w.dockLayout()->view(w.currentViewKey())->isAncestorOf(bar)); // it moves with the active view
         QVERIFY(!w.findChild<QToolBar*>(QStringLiteral("toolFieldsToolbar")));
+    }
+
+    // D71: the bottom bar: pen, layers, zoom, selection, messages.
+    void bottomBarFollowsTheWindow()
+    {
+        kimcad::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        QCOMPARE(w.statusStrip()->message(), QCoreApplication::translate("kimcad::MainWindow", "Wall: click the start point"));
+        w.wallTool()->setTolerance(0.05);
+        for (const QPointF& p : {QPointF(0, 0), QPointF(4, 0)})
+            w.wallTool()->click(p);
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QVERIFY(w.statusStrip()->selectionText().isEmpty());
+        w.setSelection(w.viewport()->guids().mid(0, 1));
+        QVERIFY(w.statusStrip()->selectionText().startsWith(QLatin1String("1 ")));
+        QVERIFY(!w.statusStrip()->layersText().isEmpty());
+        QVERIFY(w.statusBar()->isHidden());
     }
 
     void visibilityActionsUseTheSelection()

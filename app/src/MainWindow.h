@@ -32,6 +32,7 @@ namespace kimcad {
 
 class LevelsBar;
 class ToolPalette;
+class StatusStrip;
 class ToolOptionsBar;
 class DockLayout;
 class Scene;
@@ -164,6 +165,7 @@ public:
     Viewport* modelView() const;                  // the 3D tab's view
     ToolPalette* toolPalette() const { return m_palette; } // D71: the tools on the left
     ToolOptionsBar* toolOptions() const { return m_toolOptions; } // the active tool's fields
+    StatusStrip* statusStrip() const { return m_status; }          // the bottom bar
     // Sheets and project info (Slice 16, M4 exit).
     SheetsPanel* sheetsPanel() const { return m_sheetsPanel; }
     QString addSheet(const QString& paper, const QString& title); // its number, "" on failure
@@ -331,6 +333,7 @@ private:
     QVector<std::function<void(Viewport*)>> m_viewConnectors;
     ToolPalette* m_palette = nullptr;
     ToolOptionsBar* m_toolOptions = nullptr;
+    StatusStrip* m_status = nullptr;
     // Each view has its own cuts (a plan tab is cut at its level; the 3D tab need not be).
     struct CutSettings {
         bool planCut = false;

@@ -4,6 +4,7 @@
 #include "DockLayout.h"
 #include "Scene.h"
 #include "Icons.h"
+#include "StatusStrip.h"
 #include "ToolOptionsBar.h"
 #include "ToolPalette.h"
 #include "ViewHost.h"
@@ -100,6 +101,17 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     , m_loader(new ModelLoader(chunkSize))
 {
     qRegisterMetaType<kimcad::MeshChunk>();
+    // D71: the bottom bar (pen, layers, zoom, selection, messages) replaces the status bar.
+    m_status = new StatusStrip(this);
+    auto* bottom = new QToolBar(tr("Status"), this);
+    bottom->setObjectName(QStringLiteral("statusToolbar"));
+    bottom->setMovable(false);
+    bottom->setFloatable(false);
+    bottom->addWidget(m_status);
+    addToolBar(Qt::BottomToolBarArea, bottom);
+    statusBar()->hide();
+    connect(m_status, &StatusStrip::activeLayerRequested, this, &MainWindow::setActiveLayer);
+    connect(m_status, &StatusStrip::layerVisibilityToggled, this, &MainWindow::setLayerVisible);
     setWindowTitle(QStringLiteral("KIMCAD"));
     resize(1280, 800);
     // The plan-cut height slider at the right edge of the active model view (owner feedback).
@@ -132,7 +144,7 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     buildModelingToolbar();
     buildPalette();
     buildProjectToolbar();
-    statusBar()->showMessage(tr("Ready"));
+    m_status->showMessage(tr("Ready"));
 
     m_loader->moveToThread(&m_thread);
     connect(&m_thread, &QThread::finished, m_loader, &QObject::deleteLater);
@@ -160,6 +172,10 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     connect(m_properties, &PropertiesPanel::resetToTypeRequested, this, &MainWindow::resetToType);
     connect(m_tree, &ModelTreePanel::isolateRequested, m_viewport, &Viewport::isolate);
     onEachView([this](Viewport* v) { connect(v, &Viewport::dragMoved, this, &MainWindow::dragMoveTo); });
+    onEachView([this](Viewport* v) { connect(v, &Viewport::zoomChanged, this, [this, v](double z) {
+        if (v == m_viewport)
+            m_status->setZoom(z);
+    }); });
     onEachView([this](Viewport* v) { connect(v, &Viewport::dragReleased, this, &MainWindow::dragFinished); });
     onEachView([this](Viewport* v) { connect(v, &Viewport::hovered, this, [this](const QString& guid, const QPoint& at) {
         const QString hint = guid.isEmpty() ? QString() : m_tree->hintFor(guid);
@@ -285,11 +301,11 @@ void MainWindow::buildMenus()
     connect(elevations, &QAction::triggered, this, [this] {
         const QJsonObject r = bridge("create_drawings");
         if (!r.value("ok").toBool()) {
-            statusBar()->showMessage(tr("Could not add them: %1").arg(r.value("error").toString()));
+            m_status->showMessage(tr("Could not add them: %1").arg(r.value("error").toString()));
             return;
         }
         afterEdit(r);
-        statusBar()->showMessage(tr("%n drawing(s) added", nullptr, r.value("created").toInt()));
+        m_status->showMessage(tr("%n drawing(s) added", nullptr, r.value("created").toInt()));
     });
     QAction* through = view->addAction(tr("Select &hidden elements too"));
     through->setObjectName(QStringLiteral("actionSelectThrough"));
@@ -380,7 +396,7 @@ void MainWindow::buildDocks()
     connect(m_sheetsPanel, &SheetsPanel::placeRequested, this, [this](const QString& n) {
         const QString drawing = m_drawingsPanel->selectedDrawing();
         if (drawing.isEmpty()) {
-            statusBar()->showMessage(tr("Select a drawing in the Drawings panel first"));
+            m_status->showMessage(tr("Select a drawing in the Drawings panel first"));
             return;
         }
         placeOnSheet(n, drawing);
@@ -388,19 +404,19 @@ void MainWindow::buildDocks()
     connect(m_sheetsPanel, &SheetsPanel::deleteRequested, this, [this](const QString& n) {
         const QJsonObject r = bridge("delete_sheet", {n});
         if (!r.value("ok").toBool())
-            statusBar()->showMessage(tr("Could not delete it: %1").arg(r.value("error").toString()));
+            m_status->showMessage(tr("Could not delete it: %1").arg(r.value("error").toString()));
         afterEdit(r);
     });
     connect(m_drawingsPanel, &DrawingsPanel::renameRequested, this, [this](const QString& g, const QString& name) {
         const QJsonObject r = bridge("rename_drawing", {g, name});
         if (!r.value("ok").toBool())
-            statusBar()->showMessage(tr("Could not rename it: %1").arg(r.value("error").toString()));
+            m_status->showMessage(tr("Could not rename it: %1").arg(r.value("error").toString()));
         afterEdit(r);
     });
     connect(m_drawingsPanel, &DrawingsPanel::deleteRequested, this, [this](const QString& g) {
         const QJsonObject r = bridge("delete_drawing", {g});
         if (!r.value("ok").toBool())
-            statusBar()->showMessage(tr("Could not delete it: %1").arg(r.value("error").toString()));
+            m_status->showMessage(tr("Could not delete it: %1").arg(r.value("error").toString()));
         afterEdit(r);
     });
     m_dock->raisePanel(QStringLiteral("tree"));
@@ -417,7 +433,7 @@ void MainWindow::buildDocks()
     connect(m_layersPanel, &LayersPanel::deleteRequested, this, [this](const QString& name) {
         const QJsonObject r = bridge("delete_layer", {name});
         if (!r.value("ok").toBool())
-            statusBar()->showMessage(r.value("error").toString());
+            m_status->showMessage(r.value("error").toString());
         m_hiddenLayers.remove(name);
         m_lockedLayers.remove(name);
         afterEdit(r);
@@ -425,7 +441,7 @@ void MainWindow::buildDocks()
     connect(m_layersPanel, &LayersPanel::renameRequested, this, [this](const QString& from, const QString& to) {
         const QJsonObject r = bridge("rename_layer", {from, to});
         if (!r.value("ok").toBool())
-            statusBar()->showMessage(r.value("error").toString());
+            m_status->showMessage(r.value("error").toString());
         else {
             if (m_hiddenLayers.remove(from))
                 m_hiddenLayers.insert(to);
@@ -560,7 +576,7 @@ void MainWindow::showAbout()
 
 void MainWindow::showError(const QString& title, const QString& message)
 {
-    statusBar()->showMessage(message);
+    m_status->showMessage(message);
     if (!m_quiet)
         QMessageBox::critical(this, title, message);
 }
@@ -586,7 +602,7 @@ void MainWindow::openFile(const QString& path)
     m_loading = true;
     m_loadedElements = 0;
     m_loadTimer.start();
-    statusBar()->showMessage(tr("Opening %1...").arg(QFileInfo(path).fileName()));
+    m_status->showMessage(tr("Opening %1...").arg(QFileInfo(path).fileName()));
     m_loader->reset();
     QMetaObject::invokeMethod(m_loader, "load", Qt::QueuedConnection, Q_ARG(QString, path));
 }
@@ -650,9 +666,19 @@ void MainWindow::setSelection(const QStringList& guids)
         m_tree->selectGuids(expanded);
     }
     m_selection = expanded;
+    // The bottom bar's summary: "2 IfcWall", or "5 element(s)" for several kinds.
+    QSet<QString> kinds;
+    for (const QString& g : expanded)
+        kinds.insert(m_viewport->typeOf(g));
+    if (expanded.isEmpty())
+        m_status->setSelection(QString());
+    else if (kinds.size() == 1)
+        m_status->setSelection(QStringLiteral("%1 %2").arg(expanded.size()).arg(*kinds.constBegin()));
+    else
+        m_status->setSelection(tr("%n element(s)", nullptr, int(expanded.size())));
     refreshProperties();
     if (!guids.isEmpty())
-        statusBar()->showMessage(tr("%n element(s) selected", nullptr, int(guids.size())));
+        m_status->showMessage(tr("%n element(s) selected", nullptr, int(guids.size())));
 }
 
 void MainWindow::refreshProperties()
@@ -675,7 +701,7 @@ bool MainWindow::applyPropertyEdit(const QString& pset, const QString& prop, con
             const QString v = value.isDouble() ? QString::number(value.toDouble(), 'g', 17) : value.toString();
             const QJsonObject r = bridge(prop == QLatin1String("Size") ? "set_annotation_size" : "set_annotation_text", {g, v});
             if (!r.value("ok").toBool())
-                statusBar()->showMessage(tr("Could not change %1").arg(prop) + QStringLiteral(": ") + r.value("error").toString());
+                m_status->showMessage(tr("Could not change %1").arg(prop) + QStringLiteral(": ") + r.value("error").toString());
             all = all && r.value("ok").toBool();
             afterEdit(r);
         }
@@ -717,7 +743,7 @@ bool MainWindow::applyTypeEdit(const QString& pset, const QString& prop, const Q
     if (!r.value("ok").toBool())
         showError(tr("Could not change %1").arg(prop), r.value("error").toString());
     else
-        statusBar()->showMessage(tr("%1 changed on the type: %n element(s) updated", nullptr, r.value("elements").toInt()).arg(prop));
+        m_status->showMessage(tr("%1 changed on the type: %n element(s) updated", nullptr, r.value("elements").toInt()).arg(prop));
     afterEdit();
     return r.value("ok").toBool();
 }
@@ -786,7 +812,7 @@ bool MainWindow::newProject()
     refreshAnnotations();
     refreshDrawings();
     refreshSheets();
-    statusBar()->showMessage(tr("New project"));
+    m_status->showMessage(tr("New project"));
     return true;
 }
 
@@ -1141,7 +1167,7 @@ void MainWindow::buildModelingToolbar()
             m_twoPointTool->setTolerance(tolerance);
             m_annotationPoints << m_twoPointTool->snapper().snap(p, tolerance).point;
             if (m_annotationPoints.size() == 1) {
-                statusBar()->showMessage(tr("Mirror: click the second point of the mirror line (Ctrl: mirror a copy)"));
+                m_status->showMessage(tr("Mirror: click the second point of the mirror line (Ctrl: mirror a copy)"));
             } else {
                 const QVector<QPointF> pts = m_annotationPoints;
                 m_annotationPoints.clear();
@@ -1224,7 +1250,7 @@ void MainWindow::buildModelingToolbar()
         else
             createSlab(outline);
     });
-    connect(m_polygonTool, &PolygonTool::rejected, this, [this](const QString& why) { statusBar()->showMessage(why); });
+    connect(m_polygonTool, &PolygonTool::rejected, this, [this](const QString& why) { m_status->showMessage(why); });
     connect(m_hostTool, &HostTool::openingRequested, this, &MainWindow::insertOpening);
 }
 
@@ -1388,7 +1414,7 @@ void MainWindow::showSnap(const Snap& snap)
     }
     if (snap.kind != Snap::None)
         text += QStringLiteral("  ·  ") + tr(names[snap.kind]);
-    statusBar()->showMessage(text);
+    m_status->showMessage(text);
 }
 
 void MainWindow::setTool(Tool tool)
@@ -1427,7 +1453,7 @@ void MainWindow::setTool(Tool tool)
     const bool needsSlab = tool == Tool::SlabOpening
         && (m_selection.size() != 1 || m_viewport->typeOf(m_selection.first()) != QLatin1String("IfcSlab"));
     if (((tool == Tool::Move || tool == Tool::Rotate) && m_selection.isEmpty()) || needsSlab) {
-        statusBar()->showMessage(needsSlab ? tr("Select one slab first, then draw the opening")
+        m_status->showMessage(needsSlab ? tr("Select one slab first, then draw the opening")
                                            : tr("Select something first, then move or rotate it"));
         tool = Tool::None;
         m_tool = tool;
@@ -1441,7 +1467,7 @@ void MainWindow::setTool(Tool tool)
     refreshTypes();
     if (tool == Tool::None) {
         m_viewport->setDrawingMode(false);
-        statusBar()->clearMessage();
+        m_status->clearMessage();
         return;
     }
     refreshSnapData();
@@ -1449,67 +1475,67 @@ void MainWindow::setTool(Tool tool)
     m_viewport->setFocus();
     switch (tool) {
     case Tool::Wall:
-        statusBar()->showMessage(tr("Wall: click the start point"));
+        m_status->showMessage(tr("Wall: click the start point"));
         break;
     case Tool::Slab:
-        statusBar()->showMessage(tr("Slab: click the outline's points; click the first point or press Enter to close"));
+        m_status->showMessage(tr("Slab: click the outline's points; click the first point or press Enter to close"));
         break;
     case Tool::Column:
-        statusBar()->showMessage(tr("Column: click to place it"));
+        m_status->showMessage(tr("Column: click to place it"));
         break;
     case Tool::Beam:
     case Tool::Grid:
-        statusBar()->showMessage(tr("Click the first point"));
+        m_status->showMessage(tr("Click the first point"));
         break;
     case Tool::Move:
-        statusBar()->showMessage(tr("Move: click a base point, then where it goes (Ctrl: detach joined walls)"));
+        m_status->showMessage(tr("Move: click a base point, then where it goes (Ctrl: detach joined walls)"));
         break;
     case Tool::Rotate:
-        statusBar()->showMessage(tr("Rotate: click the centre, then a reference direction, then the new direction"));
+        m_status->showMessage(tr("Rotate: click the centre, then a reference direction, then the new direction"));
         break;
     case Tool::Stretch:
-        statusBar()->showMessage(tr("Stretch: click near a wall end, then its new position"));
+        m_status->showMessage(tr("Stretch: click near a wall end, then its new position"));
         break;
     case Tool::Stair:
-        statusBar()->showMessage(tr("Stair: click where it starts, then the direction it climbs"));
+        m_status->showMessage(tr("Stair: click where it starts, then the direction it climbs"));
         break;
     case Tool::SlabOpening:
-        statusBar()->showMessage(tr("Slab opening: draw the hole's outline; click the first point or press Enter to close"));
+        m_status->showMessage(tr("Slab opening: draw the hole's outline; click the first point or press Enter to close"));
         break;
     case Tool::Text:
-        statusBar()->showMessage(tr("Text: click where the label goes"));
+        m_status->showMessage(tr("Text: click where the label goes"));
         break;
     case Tool::Dimension:
-        statusBar()->showMessage(tr("Dimension: click the first point to measure"));
+        m_status->showMessage(tr("Dimension: click the first point to measure"));
         break;
     case Tool::Mark:
-        statusBar()->showMessage(tr("Mark: click what to mark"));
+        m_status->showMessage(tr("Mark: click what to mark"));
         break;
     case Tool::Leader:
-        statusBar()->showMessage(tr("Leader: click what it points at"));
+        m_status->showMessage(tr("Leader: click what it points at"));
         break;
     case Tool::Room:
-        statusBar()->showMessage(tr("Room: click inside the walls that enclose it"));
+        m_status->showMessage(tr("Room: click inside the walls that enclose it"));
         break;
     case Tool::Roof:
-        statusBar()->showMessage(tr("Roof: click the eaves outline's points; click the first point or press Enter to close"));
+        m_status->showMessage(tr("Roof: click the eaves outline's points; click the first point or press Enter to close"));
         break;
     case Tool::Mirror:
-        statusBar()->showMessage(m_selection.isEmpty() ? tr("Mirror: select what to mirror first")
+        m_status->showMessage(m_selection.isEmpty() ? tr("Mirror: select what to mirror first")
                                                        : tr("Mirror: click the first point of the mirror line"));
         break;
     case Tool::Section:
-        statusBar()->showMessage(tr("Section: click where the section line starts"));
+        m_status->showMessage(tr("Section: click where the section line starts"));
         break;
     case Tool::Elevation:
-        statusBar()->showMessage(tr("Elevation: click where the elevation line starts"));
+        m_status->showMessage(tr("Elevation: click where the elevation line starts"));
         break;
     case Tool::PlaceModel:
-        statusBar()->showMessage(m_types->count() ? tr("Place model: click where its origin goes (Shift: turned 90 degrees)")
+        m_status->showMessage(m_types->count() ? tr("Place model: click where its origin goes (Shift: turned 90 degrees)")
                                                   : tr("There are no models yet: use New model... next to the levels"));
         break;
     default:
-        statusBar()->showMessage(tr("Click on a wall to place it"));
+        m_status->showMessage(tr("Click on a wall to place it"));
         break;
     }
 }
@@ -1531,7 +1557,7 @@ bool MainWindow::moveSelection(QPointF delta, bool detach)
         : bridge("move_elements", {jsonList(m_selection), num(delta.x()), num(delta.y()), QStringLiteral("0"),
               detach ? QStringLiteral("1") : QStringLiteral("0")});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not move: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not move: %1").arg(r.value("error").toString()));
         return false;
     }
     afterEdit(r);
@@ -1546,7 +1572,7 @@ bool MainWindow::rotateSelection(QPointF centre, double radians, bool detach)
     const QJsonObject r = bridge("rotate_elements", {jsonList(m_selection), num(centre.x()), num(centre.y()), num(radians),
         detach ? QStringLiteral("1") : QStringLiteral("0")});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not rotate: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not rotate: %1").arg(r.value("error").toString()));
         return false;
     }
     afterEdit(r);
@@ -1558,7 +1584,7 @@ bool MainWindow::stretchWall(const QString& wall, QPointF p1, QPointF p2)
     auto num = [](double v) { return QString::number(v, 'g', 17); };
     const QJsonObject r = bridge("set_wall_axis", {wall, num(p1.x()), num(p1.y()), num(p2.x()), num(p2.y())});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not stretch: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not stretch: %1").arg(r.value("error").toString()));
         return false;
     }
     afterEdit(r);
@@ -1569,7 +1595,7 @@ bool MainWindow::setWallHeight(const QStringList& walls, double height)
 {
     const QJsonObject r = bridge("set_wall_height", {jsonList(walls), QString::number(height, 'g', 17)});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not change the height: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not change the height: %1").arg(r.value("error").toString()));
         return false;
     }
     afterEdit(r);
@@ -1588,13 +1614,13 @@ bool MainWindow::resizeOpening(const QString& guid, double width, double height,
 {
     const QJsonObject info = openingInfo(guid);
     if (info.isEmpty()) {
-        statusBar()->showMessage(tr("Select one door or window on the active level"));
+        m_status->showMessage(tr("Select one door or window on the active level"));
         return false;
     }
     auto num = [](double v) { return QString::number(v, 'g', 17); };
     const QJsonObject r = bridge("edit_opening", {guid, num(info.value("along").toDouble()), num(width), num(height), num(sill)});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not resize: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not resize: %1").arg(r.value("error").toString()));
         return false;
     }
     afterEdit(r);
@@ -1608,7 +1634,7 @@ void MainWindow::wallHeightDialog()
         if (m_viewport->typeOf(g) == QLatin1String("IfcWall"))
             walls << g;
     if (walls.isEmpty()) {
-        statusBar()->showMessage(tr("Select one or more walls first"));
+        m_status->showMessage(tr("Select one or more walls first"));
         return;
     }
     bool ok = false;
@@ -1621,7 +1647,7 @@ void MainWindow::openingSizeDialog()
 {
     const QJsonObject info = m_selection.size() == 1 ? openingInfo(m_selection.first()) : QJsonObject();
     if (info.isEmpty()) {
-        statusBar()->showMessage(tr("Select one door or window on the active level"));
+        m_status->showMessage(tr("Select one door or window on the active level"));
         return;
     }
     QDialog dialog(this);
@@ -1674,11 +1700,11 @@ bool MainWindow::createStair(QPointF start, QPointF towards)
     const QJsonObject r = bridge("create_stair", {m_levels->activeStorey(), num(start.x()), num(start.y()),
         num(std::atan2(d.y(), d.x())), num(1.0), num(heightToNextLevel())});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not create the stair: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not create the stair: %1").arg(r.value("error").toString()));
         return false;
     }
     afterEdit(r);
-    statusBar()->showMessage(tr("Stair: %1 risers of %2 m").arg(r.value("risers").toInt())
+    m_status->showMessage(tr("Stair: %1 risers of %2 m").arg(r.value("risers").toInt())
                                  .arg(QLocale().toString(r.value("riser").toDouble(), 'f', 3)));
     return true;
 }
@@ -1693,7 +1719,7 @@ bool MainWindow::addSlabOpening(const QVector<QPointF>& outline)
     const QJsonObject r = bridge("add_slab_opening", {m_selection.first(),
         QString::fromUtf8(QJsonDocument(pts).toJson(QJsonDocument::Compact))});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not cut the opening: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not cut the opening: %1").arg(r.value("error").toString()));
         return false;
     }
     afterEdit(r);
@@ -1708,14 +1734,14 @@ bool MainWindow::copyToLevel(const QStringList& guids, const QString& storey)
         return false;
     }
     afterEdit(r);
-    statusBar()->showMessage(tr("%n element(s) copied", nullptr, int(r.value("guids").toArray().size())));
+    m_status->showMessage(tr("%n element(s) copied", nullptr, int(r.value("guids").toArray().size())));
     return true;
 }
 
 void MainWindow::copyToLevelDialog()
 {
     if (m_selection.isEmpty()) {
-        statusBar()->showMessage(tr("Select what to copy first"));
+        m_status->showMessage(tr("Select what to copy first"));
         return;
     }
     QStringList names, guids;
@@ -1844,14 +1870,14 @@ bool MainWindow::enableVersioning(const QString& folder, const QString& message)
     m_path = QDir(folder).filePath(QStringLiteral(".kimcad/working.ifc"));
     afterEdit();
     refreshProject();
-    statusBar()->showMessage(tr("Versioning enabled: first version saved"));
+    m_status->showMessage(tr("Versioning enabled: first version saved"));
     return true;
 }
 
 void MainWindow::enableVersioningDialog()
 {
     if (m_versioned) {
-        statusBar()->showMessage(tr("This model is already versioned"));
+        m_status->showMessage(tr("This model is already versioned"));
         return;
     }
     const QString folder = QFileDialog::getExistingDirectory(this, tr("Choose an empty folder for the project"));
@@ -1884,13 +1910,13 @@ bool MainWindow::saveVersion(const QString& message)
 {
     const QJsonObject r = bridge("save_version", {message});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("No version saved: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("No version saved: %1").arg(r.value("error").toString()));
         refreshProject();
         return false;
     }
     afterEdit();
     refreshProject();
-    statusBar()->showMessage(tr("Version saved: %1 added, %2 modified, %3 removed")
+    m_status->showMessage(tr("Version saved: %1 added, %2 modified, %3 removed")
                                  .arg(r.value("added").toInt()).arg(r.value("modified").toInt()).arg(r.value("removed").toInt()));
     return true;
 }
@@ -1898,7 +1924,7 @@ bool MainWindow::saveVersion(const QString& message)
 void MainWindow::saveVersionDialog()
 {
     if (!m_versioned) {
-        statusBar()->showMessage(tr("Enable versioning first (File menu)"));
+        m_status->showMessage(tr("Enable versioning first (File menu)"));
         return;
     }
     const QJsonObject changes = bridge("version_changes");
@@ -1935,7 +1961,7 @@ bool MainWindow::compareWith(const QString& revA, const QString& revB)
 {
     const QJsonObject r = bridge("compare", {revA, revB});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not compare: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not compare: %1").arg(r.value("error").toString()));
         return false;
     }
     QHash<QString, QColor> colors;
@@ -1947,7 +1973,7 @@ bool MainWindow::compareWith(const QString& revA, const QString& revB)
     m_compareA = revA;
     m_compareB = revB;
     m_history->setChanges(r);
-    statusBar()->showMessage(tr("Compare: %1 added, %2 modified, %3 removed")
+    m_status->showMessage(tr("Compare: %1 added, %2 modified, %3 removed")
                                  .arg(r.value("added").toArray().size()).arg(r.value("modified").toArray().size())
                                  .arg(r.value("removed").toArray().size()));
     return true;
@@ -1974,7 +2000,7 @@ bool MainWindow::createOption(const QString& name)
         return false;
     }
     refreshProject();
-    statusBar()->showMessage(tr("Now working on option %1").arg(name));
+    m_status->showMessage(tr("Now working on option %1").arg(name));
     return true;
 }
 
@@ -1986,7 +2012,7 @@ bool MainWindow::addMilestone(const QString& name, const QString& message)
         return false;
     }
     refreshProject();
-    statusBar()->showMessage(tr("Milestone %1 marks the latest version").arg(name));
+    m_status->showMessage(tr("Milestone %1 marks the latest version").arg(name));
     return true;
 }
 
@@ -2031,7 +2057,7 @@ bool MainWindow::combineOptions(const QString& option, const QJsonObject& choice
     }
     const QString status = r.value("status").toString();
     if (status == QLatin1String("up_to_date")) {
-        statusBar()->showMessage(tr("This option already contains everything in %1").arg(option));
+        m_status->showMessage(tr("This option already contains everything in %1").arg(option));
         return true;
     }
     endCompare();
@@ -2050,7 +2076,7 @@ bool MainWindow::combineOptions(const QString& option, const QJsonObject& choice
             return;
         m_viewport->setElementColors(colors);
         refreshProject();
-        statusBar()->showMessage(status == QLatin1String("fast_forward")
+        m_status->showMessage(status == QLatin1String("fast_forward")
                 ? tr("This option now has %1's latest version").arg(option)
                 : tr("Combined with %1: review it (changes from %1 in green, your choices in orange), then Save version or Discard").arg(option));
     });
@@ -2060,7 +2086,7 @@ bool MainWindow::combineOptions(const QString& option, const QJsonObject& choice
 void MainWindow::combineDialog()
 {
     if (!m_versioned) {
-        statusBar()->showMessage(tr("Combining needs a versioned project with design options"));
+        m_status->showMessage(tr("Combining needs a versioned project with design options"));
         return;
     }
     if (isDirty() && !resolveUnsavedForSwitch())
@@ -2070,7 +2096,7 @@ void MainWindow::combineDialog()
         if (o.toString() != m_options->currentText())
             others << o.toString();
     if (others.isEmpty()) {
-        statusBar()->showMessage(tr("There is no other option to combine with"));
+        m_status->showMessage(tr("There is no other option to combine with"));
         return;
     }
     CombineDialog dialog([this](const char* fn, const QStringList& args) { return bridge(fn, args); }, others, this);
@@ -2090,7 +2116,7 @@ bool MainWindow::deleteOption(const QString& name)
         return false;
     }
     refreshProject();
-    statusBar()->showMessage(tr("Option %1 deleted").arg(name));
+    m_status->showMessage(tr("Option %1 deleted").arg(name));
     return true;
 }
 
@@ -2101,7 +2127,7 @@ void MainWindow::deleteOptionDialog()
         if (o.toString() != m_options->currentText() && o.toString() != QLatin1String("main"))
             others << o.toString();
     if (others.isEmpty()) {
-        statusBar()->showMessage(tr("No other option to delete (the current one and main can't be deleted)"));
+        m_status->showMessage(tr("No other option to delete (the current one and main can't be deleted)"));
         return;
     }
     bool ok = false;
@@ -2128,7 +2154,7 @@ QJsonObject MainWindow::beforeAfter(const QString& guid, const QString& revA, co
 void MainWindow::objectHistoryDialog()
 {
     if (m_selection.size() != 1) {
-        statusBar()->showMessage(tr("Select one element to see its history"));
+        m_status->showMessage(tr("Select one element to see its history"));
         return;
     }
     const QString guid = m_selection.first();
@@ -2319,7 +2345,7 @@ void MainWindow::dragMoveTo(QPointF start, QPointF current, double tolerance, Qt
     }
     boxes.push_back({start, start + delta, 0.03, m_levels->activeElevation(), m_levels->activeElevation() + 0.02});
     m_viewport->setPreviewBoxes(boxes);
-    statusBar()->showMessage(tr("Move %1 m (Ctrl: copy, Alt: detach joined walls, Shift: straight)")
+    m_status->showMessage(tr("Move %1 m (Ctrl: copy, Alt: detach joined walls, Shift: straight)")
                                  .arg(QLocale().toString(std::hypot(delta.x(), delta.y()), 'f', 3)));
 }
 
@@ -2373,6 +2399,7 @@ void MainWindow::refreshLayers()
         }
     m_viewport->setLayerState(hidden, locked);
     m_layersPanel->setLayers(listing, state.value("active").toString(), m_hiddenLayers, m_lockedLayers);
+    m_status->setLayers(members.keys(), state.value("active").toString(), m_hiddenLayers);
     QStringList names;
     for (const auto& v : bridge("views").value("views").toArray())
         names << v.toObject().value("name").toString();
@@ -2415,7 +2442,7 @@ bool MainWindow::addAnnotation(const QString& kind, const QVector<QPointF>& poin
     const QJsonObject r = bridge("add_annotation", {m_levels->activeStorey(), kind,
         QString::fromUtf8(QJsonDocument(pts).toJson(QJsonDocument::Compact)), text});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not add it: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not add it: %1").arg(r.value("error").toString()));
         return false;
     }
     afterEdit(r);
@@ -2427,7 +2454,7 @@ void MainWindow::annotationClick(QPointF p, Qt::KeyboardModifiers modifiers)
     if (m_tool == Tool::Leader) {
         m_annotationPoints << p;
         if (m_annotationPoints.size() == 1) {
-            statusBar()->showMessage(tr("Leader: click where its text goes"));
+            m_status->showMessage(tr("Leader: click where its text goes"));
             return;
         }
         const QVector<QPointF> pts = m_annotationPoints;
@@ -2437,7 +2464,7 @@ void MainWindow::annotationClick(QPointF p, Qt::KeyboardModifiers modifiers)
             : QInputDialog::getText(this, tr("Leader"), tr("Text:"), QLineEdit::Normal, QString(), &ok);
         if ((ok || m_quiet) && !text.trimmed().isEmpty())
             addAnnotation(QStringLiteral("leader"), pts, text.trimmed());
-        statusBar()->showMessage(tr("Leader: click what it points at"));
+        m_status->showMessage(tr("Leader: click what it points at"));
         return;
     }
     if (m_tool == Tool::Dimension) {
@@ -2446,14 +2473,14 @@ void MainWindow::annotationClick(QPointF p, Qt::KeyboardModifiers modifiers)
         const bool chainMore = m_annotationPoints.size() >= 2 && (modifiers & Qt::ShiftModifier);
         m_annotationPoints << p;
         if (m_annotationPoints.size() == 1)
-            statusBar()->showMessage(tr("Dimension: click the second point"));
+            m_status->showMessage(tr("Dimension: click the second point"));
         else if (m_annotationPoints.size() == 2 || chainMore)
-            statusBar()->showMessage(tr("Dimension: Shift+click to add a point, or click where the dimension line goes"));
+            m_status->showMessage(tr("Dimension: Shift+click to add a point, or click where the dimension line goes"));
         else {
             const QVector<QPointF> pts = m_annotationPoints;
             m_annotationPoints.clear();
             addAnnotation(QStringLiteral("dimension"), pts, QString());
-            statusBar()->showMessage(tr("Dimension: click the first point to measure"));
+            m_status->showMessage(tr("Dimension: click the first point to measure"));
         }
         return;
     }
@@ -2472,15 +2499,15 @@ void MainWindow::drawingClick(QPointF p)
     const bool section = m_tool == Tool::Section;
     m_annotationPoints << p;
     if (m_annotationPoints.size() == 1) {
-        statusBar()->showMessage(section ? tr("Section: click where the section line ends")
+        m_status->showMessage(section ? tr("Section: click where the section line ends")
                                          : tr("Elevation: click where the elevation line ends"));
     } else if (m_annotationPoints.size() == 2) {
-        statusBar()->showMessage(tr("Click the side the drawing looks at"));
+        m_status->showMessage(tr("Click the side the drawing looks at"));
     } else {
         const QVector<QPointF> pts = m_annotationPoints;
         m_annotationPoints.clear();
         createDrawing(section ? QStringLiteral("section") : QStringLiteral("elevation"), pts[0], pts[1], pts[2]);
-        statusBar()->showMessage(section ? tr("Section: click where the section line starts")
+        m_status->showMessage(section ? tr("Section: click where the section line starts")
                                          : tr("Elevation: click where the elevation line starts"));
     }
 }
@@ -2491,7 +2518,7 @@ bool MainWindow::createDrawing(const QString& kind, QPointF p1, QPointF p2, QPoi
     const QJsonObject r = bridge(kind == QLatin1String("section") ? "create_section" : "create_elevation",
         {num(p1.x()), num(p1.y()), num(p2.x()), num(p2.y()), num(look.x()), num(look.y()), QStringLiteral("-1")});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not add it: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not add it: %1").arg(r.value("error").toString()));
         return false;
     }
     afterEdit(r);
@@ -2575,6 +2602,7 @@ QString MainWindow::currentViewKey() const
 void MainWindow::activateView(const QString& key)
 {
     if (auto* view = qobject_cast<DrawingView*>(m_dock->view(key))) {
+        m_status->setZoom(-1); // drawings show their own zoom
         setTool(Tool::None); // the tools draw in model views
         if (view->isStale() || !view->hasDrawing())
             regenerateDrawing(view->guid()); // a drawing brought to the front is brought up to date
@@ -2595,6 +2623,7 @@ void MainWindow::activateView(const QString& key)
         m_boxBounds = cut.bounds;
     }
     host->adoptChrome(m_toolOptions, m_cutColumn);
+    m_status->setZoom(m_viewport->zoomPercent());
     if (!host->storey().isEmpty() && host->storey() != m_levels->activeStorey())
         m_levels->setActive(host->storey()); // a plan tab's level is the active level
     if (switched) {
@@ -2746,7 +2775,7 @@ void MainWindow::onDrawingGenerated(const QString& guid, const QJsonObject& resu
         return; // its tab was closed meanwhile
     view->setBusy(false);
     if (!error.isEmpty() || !result.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not generate the drawing: %1").arg(error.isEmpty() ? result.value("error").toString() : error));
+        m_status->showMessage(tr("Could not generate the drawing: %1").arg(error.isEmpty() ? result.value("error").toString() : error));
         return;
     }
     view->setSvg(result.value("svg").toString().toUtf8());
@@ -2768,7 +2797,7 @@ QString MainWindow::addSheet(const QString& paper, const QString& title)
 {
     const QJsonObject r = bridge("add_sheet", {paper, title});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not add it: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not add it: %1").arg(r.value("error").toString()));
         return QString();
     }
     afterEdit(r);
@@ -2777,10 +2806,10 @@ QString MainWindow::addSheet(const QString& paper, const QString& title)
 
 bool MainWindow::placeOnSheet(const QString& number, const QString& drawingGuid)
 {
-    statusBar()->showMessage(tr("Placing the drawing..."));
+    m_status->showMessage(tr("Placing the drawing..."));
     const QJsonObject r = bridge("place_drawing", {number, drawingGuid, QStringLiteral("-1"), QStringLiteral("-1"), QStringLiteral("100")});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not place it: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not place it: %1").arg(r.value("error").toString()));
         return false;
     }
     afterEdit(r);
@@ -2806,7 +2835,7 @@ bool MainWindow::openSheet(const QString& number)
         const QJsonObject r = bridge("move_placed", {number, drawing, QString::number(topLeft.x(), 'f', 1),
             QString::number(topLeft.y(), 'f', 1)});
         if (!r.value("ok").toBool())
-            statusBar()->showMessage(tr("Could not move it: %1").arg(r.value("error").toString()));
+            m_status->showMessage(tr("Could not move it: %1").arg(r.value("error").toString()));
         afterEdit(r);
     });
     m_drawingViews.insert(key, view);
@@ -2866,7 +2895,7 @@ bool MainWindow::exportSheet(const QString& number, const QString& path)
         showError(tr("Could not export the sheet"), error.isEmpty() ? sheet.value("error").toString() : error);
         return false;
     }
-    statusBar()->showMessage(tr("Sheet %1 exported to %2").arg(number, path));
+    m_status->showMessage(tr("Sheet %1 exported to %2").arg(number, path));
     return true;
 }
 
@@ -2910,7 +2939,7 @@ bool MainWindow::createRoof(const QVector<QPointF>& outline)
         QString::fromUtf8(QJsonDocument(pts).toJson(QJsonDocument::Compact)), m_roofKind->currentData().toString(),
         num(m_roofPitch->value()), QStringLiteral("0.25"), num(m_wallHeight->value()), QString()});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not create the roof: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not create the roof: %1").arg(r.value("error").toString()));
         return false;
     }
     afterEdit(r);
@@ -2929,17 +2958,17 @@ bool MainWindow::trimWallsToRoof(const QStringList& selection)
             walls << g;
     }
     if (roof.isEmpty() || walls.isEmpty()) {
-        statusBar()->showMessage(tr("Select a roof and the walls to trim to it"));
+        m_status->showMessage(tr("Select a roof and the walls to trim to it"));
         return false;
     }
     const QJsonObject r = bridge("attach_walls_to_roof", {roof,
         QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(walls)).toJson(QJsonDocument::Compact))});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not trim the walls: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not trim the walls: %1").arg(r.value("error").toString()));
         return false;
     }
     afterEdit(r);
-    statusBar()->showMessage(tr("%n wall(s) trimmed to the roof", nullptr, int(walls.size())));
+    m_status->showMessage(tr("%n wall(s) trimmed to the roof", nullptr, int(walls.size())));
     return true;
 }
 
@@ -2948,7 +2977,7 @@ bool MainWindow::releaseWallsFromRoof(const QStringList& selection)
     const QJsonObject r = bridge("detach_walls_from_roof",
         {QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(selection)).toJson(QJsonDocument::Compact))});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(r.value("error").toString());
+        m_status->showMessage(r.value("error").toString());
         return false;
     }
     afterEdit(r);
@@ -2967,11 +2996,11 @@ bool MainWindow::roomAt(QPointF p, const QString& name)
     }
     const QJsonObject r = bridge("create_room", {m_levels->activeStorey(), num(p.x()), num(p.y()), text});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("No room here: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("No room here: %1").arg(r.value("error").toString()));
         return false;
     }
     afterEdit(r);
-    statusBar()->showMessage(tr("Room: click inside the walls that enclose it"));
+    m_status->showMessage(tr("Room: click inside the walls that enclose it"));
     return true;
 }
 
@@ -3014,7 +3043,7 @@ void MainWindow::roomScheduleDialog()
         if (path.isEmpty())
             return;
         const QJsonObject r = bridge("export_room_schedule", {path});
-        statusBar()->showMessage(r.value("ok").toBool() ? tr("Room schedule saved to %1").arg(path)
+        m_status->showMessage(r.value("ok").toBool() ? tr("Room schedule saved to %1").arg(path)
                                                         : tr("Could not export it: %1").arg(r.value("error").toString()));
     });
     layout->addWidget(buttons);
@@ -3068,7 +3097,7 @@ bool MainWindow::copySelection(QPointF delta)
     auto num = [](double v) { return QString::number(v, 'g', 17); };
     const QJsonObject r = bridge("copy_elements", {jsonList(m_selection), num(delta.x()), num(delta.y()), QStringLiteral("0"), QString()});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not copy: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not copy: %1").arg(r.value("error").toString()));
         return false;
     }
     afterCopy(r);
@@ -3078,7 +3107,7 @@ bool MainWindow::copySelection(QPointF delta)
 void MainWindow::copyToClipboard()
 {
     m_clipboard = m_selection;
-    statusBar()->showMessage(tr("%n element(s) copied", nullptr, int(m_clipboard.size())));
+    m_status->showMessage(tr("%n element(s) copied", nullptr, int(m_clipboard.size())));
 }
 
 bool MainWindow::paste()
@@ -3088,11 +3117,11 @@ bool MainWindow::paste()
     const QJsonObject r = bridge("copy_elements", {jsonList(m_clipboard), QStringLiteral("0"), QStringLiteral("0"),
         QStringLiteral("0"), m_levels->activeStorey()});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not paste: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not paste: %1").arg(r.value("error").toString()));
         return false;
     }
     afterCopy(r);
-    statusBar()->showMessage(tr("Pasted; drag the copies where they go"));
+    m_status->showMessage(tr("Pasted; drag the copies where they go"));
     return true;
 }
 
@@ -3102,7 +3131,7 @@ bool MainWindow::duplicateSelection()
         return false;
     const QJsonObject r = bridge("duplicate_elements", {jsonList(m_selection)});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not duplicate: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not duplicate: %1").arg(r.value("error").toString()));
         return false;
     }
     afterCopy(r);
@@ -3117,7 +3146,7 @@ bool MainWindow::mirrorSelection(QPointF a, QPointF b, bool copy)
     const QJsonObject r = bridge("mirror_elements", {jsonList(m_selection), num(a.x()), num(a.y()), num(b.x()), num(b.y()),
         copy ? QStringLiteral("1") : QStringLiteral("0")});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not mirror: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not mirror: %1").arg(r.value("error").toString()));
         return false;
     }
     if (copy)
@@ -3134,7 +3163,7 @@ bool MainWindow::multiplySelection(const QString& kind, const QJsonObject& param
     const QJsonObject r = bridge("array_elements", {jsonList(m_selection), kind,
         QString::fromUtf8(QJsonDocument(params).toJson(QJsonDocument::Compact))});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not multiply: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not multiply: %1").arg(r.value("error").toString()));
         return false;
     }
     afterCopy(r);
@@ -3147,7 +3176,7 @@ bool MainWindow::offsetSelection(double distance)
         return false;
     const QJsonObject r = bridge("offset_elements", {jsonList(m_selection), QString::number(distance, 'g', 17)});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not offset: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not offset: %1").arg(r.value("error").toString()));
         return false;
     }
     if (r.value("guids").toArray().isEmpty())
@@ -3160,7 +3189,7 @@ bool MainWindow::offsetSelection(double distance)
 void MainWindow::multiplyDialog()
 {
     if (m_selection.isEmpty()) {
-        statusBar()->showMessage(tr("Select what to multiply first"));
+        m_status->showMessage(tr("Select what to multiply first"));
         return;
     }
     QDialog dialog(this);
@@ -3204,7 +3233,7 @@ void MainWindow::multiplyDialog()
 void MainWindow::offsetDialog()
 {
     if (m_selection.isEmpty()) {
-        statusBar()->showMessage(tr("Select walls or slabs to offset first"));
+        m_status->showMessage(tr("Select walls or slabs to offset first"));
         return;
     }
     bool ok = false;
@@ -3224,14 +3253,14 @@ bool MainWindow::createModel(const QString& name)
     }
     afterEdit(r);
     m_levels->setActive(r.value("guid").toString());
-    statusBar()->showMessage(tr("Draw the model here, then place it on levels with Place model (U)"));
+    m_status->showMessage(tr("Draw the model here, then place it on levels with Place model (U)"));
     return true;
 }
 
 bool MainWindow::placeModelAt(QPointF p, bool turned)
 {
     if (m_levels->activeIsModel()) {
-        statusBar()->showMessage(tr("Choose a building level to place the model on"));
+        m_status->showMessage(tr("Choose a building level to place the model on"));
         return false;
     }
     QJsonObject model = m_tool == Tool::PlaceModel ? currentType() : QJsonObject();
@@ -3241,7 +3270,7 @@ bool MainWindow::placeModelAt(QPointF p, bool turned)
     const QJsonObject r = bridge("place_model", {model.value("guid").toString(), m_levels->activeStorey(), num(p.x()),
         num(p.y()), num(turned ? M_PI / 2 : 0.0)});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not place it: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not place it: %1").arg(r.value("error").toString()));
         return false;
     }
     afterEdit(r);
@@ -3267,16 +3296,16 @@ bool MainWindow::updateModelInstances()
         guid = models.at(names.indexOf(choice)).toObject().value("guid").toString();
     }
     if (guid.isEmpty()) {
-        statusBar()->showMessage(tr("There are no models yet"));
+        m_status->showMessage(tr("There are no models yet"));
         return false;
     }
     const QJsonObject r = bridge("update_model_instances", {guid});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not update: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not update: %1").arg(r.value("error").toString()));
         return false;
     }
     afterEdit(r);
-    statusBar()->showMessage(tr("%n instance(s) updated", nullptr, r.value("count").toInt()));
+    m_status->showMessage(tr("%n instance(s) updated", nullptr, r.value("count").toInt()));
     return true;
 }
 
@@ -3287,7 +3316,7 @@ bool MainWindow::explodeSelectedInstance()
         if (m_instanceOf.contains(g))
             instance = m_instanceOf.value(g);
     if (instance.isEmpty()) {
-        statusBar()->showMessage(tr("Select a placed model first"));
+        m_status->showMessage(tr("Select a placed model first"));
         return false;
     }
     const QJsonObject r = bridge("explode_instance", {instance});
@@ -3301,7 +3330,7 @@ bool MainWindow::createLayer(const QString& name)
 {
     const QJsonObject r = bridge("create_layer", {name});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not create the layer: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not create the layer: %1").arg(r.value("error").toString()));
         return false;
     }
     afterEdit(r);
@@ -3312,11 +3341,11 @@ bool MainWindow::assignSelectionToLayer(const QString& layer)
 {
     const QJsonObject r = bridge("assign_layer", {jsonList(m_selection), layer});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not change the layer: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not change the layer: %1").arg(r.value("error").toString()));
         return false;
     }
     afterEdit(r);
-    statusBar()->showMessage(tr("%n element(s) moved to %1", nullptr, int(m_selection.size())).arg(layer));
+    m_status->showMessage(tr("%n element(s) moved to %1", nullptr, int(m_selection.size())).arg(layer));
     return true;
 }
 
@@ -3343,7 +3372,7 @@ bool MainWindow::setActiveLayer(const QString& layer)
     const QJsonObject r = bridge("set_active_layer", {layer});
     refreshLayers();
     if (r.value("ok").toBool())
-        statusBar()->showMessage(tr("New elements go on layer %1").arg(layer));
+        m_status->showMessage(tr("New elements go on layer %1").arg(layer));
     return r.value("ok").toBool();
 }
 
@@ -3356,7 +3385,7 @@ bool MainWindow::saveView(const QString& name)
         {"linesOnly", m_viewport->linesOnly()}};
     const QJsonObject r = bridge("save_view", {name, QString::fromUtf8(QJsonDocument(data).toJson(QJsonDocument::Compact))});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not save the view: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not save the view: %1").arg(r.value("error").toString()));
         return false;
     }
     m_currentView = name;
@@ -3392,7 +3421,7 @@ bool MainWindow::applyView(const QString& name)
         applyCuts();
         m_currentView = name;
         refreshLayers();
-        statusBar()->showMessage(tr("View %1").arg(name));
+        m_status->showMessage(tr("View %1").arg(name));
         return true;
     }
     return false;
@@ -3419,7 +3448,7 @@ bool MainWindow::columnAt(QPointF p, bool turned)
     const QJsonObject r = bridge("create_column", {m_levels->activeStorey(), type.value("guid").toString(), num(s.point.x()),
         num(s.point.y()), num(m_wallHeight->value()), num(turned ? M_PI / 2 : 0.0)});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not place it: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not place it: %1").arg(r.value("error").toString()));
         return false;
     }
     afterEdit(r);
@@ -3440,7 +3469,7 @@ bool MainWindow::createSegment(QPointF p1, QPointF p2)
             num(p2.x()), num(p2.y()), num(m_levels->activeElevation() + m_wallHeight->value())});
     }
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not create it: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not create it: %1").arg(r.value("error").toString()));
         return false;
     }
     afterEdit(r);
@@ -3462,7 +3491,7 @@ bool MainWindow::createSlab(const QVector<QPointF>& outline)
     const QJsonObject r = bridge("create_slab", {m_levels->activeStorey(), type.value("guid").toString(),
         QString::fromUtf8(QJsonDocument(pts).toJson(QJsonDocument::Compact)), QStringLiteral("0")});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not create the slab: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not create the slab: %1").arg(r.value("error").toString()));
         return false;
     }
     afterEdit(r);
@@ -3496,7 +3525,7 @@ bool MainWindow::insertOpening(const Host& host)
     const QJsonObject r = bridge("insert_opening", {kind, host.wallGuid, type.value("guid").toString(), num(host.along),
         num(type.value("width").toDouble()), num(type.value("height").toDouble()), num(type.value("sill").toDouble())});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not place it: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not place it: %1").arg(r.value("error").toString()));
         return false;
     }
     afterEdit(r);
@@ -3518,7 +3547,7 @@ bool MainWindow::createWall(const WallSegment& s)
     const QJsonObject r = bridge("create_wall", {m_levels->activeStorey(), type.value("guid").toString(),
         num(s.p1.x()), num(s.p1.y()), num(s.p2.x()), num(s.p2.y()), num(m_wallHeight->value()), s.joinStart, s.joinEnd});
     if (!r.value("ok").toBool()) {
-        statusBar()->showMessage(tr("Could not create the wall: %1").arg(r.value("error").toString()));
+        m_status->showMessage(tr("Could not create the wall: %1").arg(r.value("error").toString()));
         return false;
     }
     m_wallTool->setLastWall(r.value("guid").toString());
@@ -3638,7 +3667,7 @@ bool MainWindow::saveAs(const QString& path)
     m_path = path;
     setWindowTitle(QStringLiteral("KIMCAD — %1[*]").arg(QFileInfo(path).fileName()));
     afterEdit();
-    statusBar()->showMessage(tr("Saved %1").arg(QFileInfo(path).fileName()));
+    m_status->showMessage(tr("Saved %1").arg(QFileInfo(path).fileName()));
     return true;
 }
 
@@ -3710,7 +3739,7 @@ void MainWindow::onOpened(const QJsonObject& info)
     refreshAnnotations();
     refreshDrawings();
     refreshSheets();
-    statusBar()->showMessage(tr("Loading %1 (%2)...").arg(QFileInfo(m_path).fileName(), info.value("schema").toString()));
+    m_status->showMessage(tr("Loading %1 (%2)...").arg(QFileInfo(m_path).fileName(), info.value("schema").toString()));
 }
 
 void MainWindow::onChunk(const MeshChunk& chunk)
@@ -3720,7 +3749,7 @@ void MainWindow::onChunk(const MeshChunk& chunk)
     const bool first = m_viewport->batchCount() == 0;
     m_viewport->addBatch(new ElementBatch(chunk));
     m_loadedElements += chunk.elementCount();
-    statusBar()->showMessage(tr("Loading... %n element(s)", nullptr, m_loadedElements));
+    m_status->showMessage(tr("Loading... %n element(s)", nullptr, m_loadedElements));
     if (first) {
         m_viewport->fitAll();
         emit firstChunkShown();
@@ -3732,7 +3761,7 @@ void MainWindow::onFinished(int elements, bool stopped)
     m_loading = false;
     if (!stopped) {
         m_viewport->fitAll();
-        statusBar()->showMessage(tr("%n element(s) loaded in %1 s", nullptr, elements)
+        m_status->showMessage(tr("%n element(s) loaded in %1 s", nullptr, elements)
                                      .arg(double(m_loadTimer.elapsed()) / 1000.0, 0, 'f', 1));
     }
     emit loadFinished(elements, stopped);

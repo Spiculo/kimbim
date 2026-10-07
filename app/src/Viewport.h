@@ -100,6 +100,7 @@ public:
     int gridLineCount() const { return m_gridLineCount; }
     void clear();
     void fitAll();
+    double zoomPercent() const; // 100 = the fitted view (D71: the bottom bar)
 
     int batchCount() const { return int(m_scene->batches.size()); }
     int elementCount() const { return m_scene->locate.size(); }
@@ -170,6 +171,7 @@ signals:
     void lengthKeyTyped(const QString& text);
     // The mouse rested on an element ("" when it left it): the app shows a hint.
     void hovered(const QString& guid, const QPoint& globalPos);
+    void zoomChanged(double percent);
     // Drag to move (owner feedback): left-drag that starts on a selected element; points on the work
     // plane, tolerance = ~10 px in metres.
     void dragMoved(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
@@ -231,6 +233,8 @@ private:
     int m_gridLineCount = 0;
     bool workPoint(const QPointF& widgetPos, QPointF* point, double* tolerance);
     double m_planElevation = 0.0;
+    double m_fitScale = 0.0; // the view's scale when fitted (100%)
+    double m_lastZoom = -1.0;
     std::vector<Handle(Graphic3d_ClipPlane)> m_clipPlanes;
 };
 

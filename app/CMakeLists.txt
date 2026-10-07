@@ -33,6 +33,7 @@ qt_add_library(kimcad_core STATIC
     src/ViewHost.cpp src/ViewHost.h
     src/ToolPalette.cpp src/ToolPalette.h
     src/ToolOptionsBar.cpp src/ToolOptionsBar.h
+    src/StatusStrip.cpp src/StatusStrip.h
 )
 target_include_directories(kimcad_core PUBLIC src)
 # Element icons (owner feedback: objects need an icon and a hint on hover).
