@@ -80,7 +80,12 @@ public:
         QVector<QPointF> points; // world metres: text/mark anchor; dimension a, b, line point
     };
     void setAnnotations(const QVector<Annotation>& annotations, double z);
-    int annotationCount() const { return int(m_annotations.size()); }
+    int annotationCount() const;
+    // Section and elevation markers (Slice 14): kind "section"/"elevation", text = the drawing's
+    // name, points = the line's two ends and a point on the side it looks at. Shown in plan view on
+    // every level (not in 3D, as in Archicad), selectable like annotations (Move, Rotate, Delete).
+    void setDrawingMarkers(const QVector<Annotation>& markers, double z);
+    int markerCount() const;
     QStringList annotationGuids() const;
     QStringList annotationTexts() const;
     // The plan cut's sections (owner feedback): elements cut at height z get a dark fill and a bold
@@ -210,6 +215,7 @@ private:
     Handle(ElementBatch) m_preview;
     Handle(AIS_InteractiveObject) m_grid;
     QVector<Annotation> m_annotationData;
+    QVector<Annotation> m_markerData;
     double m_annotationZ = 0.0;
     QHash<QString, Handle(AIS_InteractiveObject)> m_annotations;
     void displayAnnotations();

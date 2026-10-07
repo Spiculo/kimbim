@@ -36,8 +36,14 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QStatusBar>
+#include <QPointer>
+#include <QTabBar>
+#include <QTabWidget>
+#include <QTimer>
 
 #include "Cuts.h"
+#include "DrawingView.h"
+#include "DrawingsPanel.h"
 #include "ElementBatch.h"
 #include "HistoryPanel.h"
 #include "LayersPanel.h"
@@ -99,7 +105,21 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     cutColumn->addWidget(m_cutLabel);
     cutColumn->addWidget(m_cutSlider, 1, Qt::AlignHCenter);
     row->addLayout(cutColumn);
-    setCentralWidget(central);
+    // The model is the first tab; drawings open next to it (Slice 14).
+    m_tabs = new QTabWidget(this);
+    m_tabs->setObjectName(QStringLiteral("mainTabs"));
+    m_tabs->setDocumentMode(true);
+    m_tabs->addTab(central, tr("Model"));
+    m_tabs->setTabsClosable(true);
+    m_tabs->tabBar()->setTabButton(0, QTabBar::RightSide, nullptr); // the model tab stays
+    m_tabs->tabBar()->setTabButton(0, QTabBar::LeftSide, nullptr);
+    connect(m_tabs, &QTabWidget::tabCloseRequested, this, &MainWindow::closeDrawingTab);
+    connect(m_tabs, &QTabWidget::currentChanged, this, [this](int index) {
+        auto* view = qobject_cast<DrawingView*>(m_tabs->widget(index));
+        if (view && (view->isStale() || !view->hasDrawing()))
+            regenerateDrawing(view->guid()); // a drawing brought to the front is brought up to date
+    });
+    setCentralWidget(m_tabs);
     buildMenus();
     buildDocks();
     buildCutsToolbar();
@@ -151,6 +171,8 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
 
 MainWindow::~MainWindow()
 {
+    for (QThread* t : std::as_const(m_drawingThreads))
+        t->wait(); // a drawing being generated: its result is dropped
     stopLoading();
     m_thread.quit();
     m_thread.wait();
@@ -302,6 +324,25 @@ void MainWindow::buildDocks()
     layersDock->setWidget(m_layersPanel);
     addDockWidget(Qt::LeftDockWidgetArea, layersDock);
     tabifyDockWidget(treeDock, layersDock);
+    m_drawingsPanel = new DrawingsPanel(this);
+    auto* drawingsDock = new QDockWidget(tr("Drawings"), this);
+    drawingsDock->setObjectName(QStringLiteral("DrawingsDock"));
+    drawingsDock->setWidget(m_drawingsPanel);
+    addDockWidget(Qt::LeftDockWidgetArea, drawingsDock);
+    tabifyDockWidget(layersDock, drawingsDock);
+    connect(m_drawingsPanel, &DrawingsPanel::openRequested, this, [this](const QString& g) { openDrawing(g); });
+    connect(m_drawingsPanel, &DrawingsPanel::renameRequested, this, [this](const QString& g, const QString& name) {
+        const QJsonObject r = bridge("rename_drawing", {g, name});
+        if (!r.value("ok").toBool())
+            statusBar()->showMessage(tr("Could not rename it: %1").arg(r.value("error").toString()));
+        afterEdit(r);
+    });
+    connect(m_drawingsPanel, &DrawingsPanel::deleteRequested, this, [this](const QString& g) {
+        const QJsonObject r = bridge("delete_drawing", {g});
+        if (!r.value("ok").toBool())
+            statusBar()->showMessage(tr("Could not delete it: %1").arg(r.value("error").toString()));
+        afterEdit(r);
+    });
     treeDock->raise();
     connect(m_layersPanel, &LayersPanel::visibilityToggled, this, &MainWindow::setLayerVisible);
     connect(m_layersPanel, &LayersPanel::lockToggled, this, &MainWindow::setLayerLocked);
@@ -668,6 +709,7 @@ bool MainWindow::newProject()
     m_currentView.clear();
     refreshLayers();
     refreshAnnotations();
+    refreshDrawings();
     statusBar()->showMessage(tr("New project"));
     return true;
 }
@@ -738,7 +780,7 @@ void MainWindow::buildModelingToolbar()
         Tool tool;
         const char* name;
         QString text;
-        Qt::Key key;
+        QKeyCombination key;
         QString tip;
     };
     const Def defs[] = {
@@ -770,6 +812,10 @@ void MainWindow::buildModelingToolbar()
         {Tool::Dimension, "actionDimensionTool", tr("Dimensi&on"), Qt::Key_Q,
             tr("Dimension: click the two points to measure, then where the dimension line goes")},
         {Tool::Mark, "actionMarkTool", tr("Mar&k"), Qt::Key_X, tr("Mark something on the plan: a circle with a tag")},
+        {Tool::Section, "actionSectionTool", tr("Sect&ion"), Qt::Key_V,
+            tr("Section: click the two ends of the section line, then the side it looks at")},
+        {Tool::Elevation, "actionElevationTool", tr("&Elevation"), QKeyCombination(Qt::SHIFT, Qt::Key_V),
+            tr("Elevation: click the two ends of the elevation line, then the side it looks at")},
     };
     for (const Def& d : defs) {
         QAction* a = bar->addAction(d.text);
@@ -887,6 +933,8 @@ void MainWindow::buildModelingToolbar()
         case Tool::Text:
         case Tool::Dimension:
         case Tool::Mark:
+        case Tool::Section:
+        case Tool::Elevation:
             m_twoPointTool->setTolerance(tolerance);
             break;
         case Tool::Move:
@@ -951,6 +999,11 @@ void MainWindow::buildModelingToolbar()
         case Tool::Mark:
             m_twoPointTool->setTolerance(tolerance);
             annotationClick(m_twoPointTool->snapper().snap(p, tolerance).point);
+            break;
+        case Tool::Section:
+        case Tool::Elevation:
+            m_twoPointTool->setTolerance(tolerance);
+            drawingClick(m_twoPointTool->snapper().snap(p, tolerance).point);
             break;
         case Tool::Move:
             m_detach = mods & Qt::ControlModifier;
@@ -1064,6 +1117,8 @@ void MainWindow::refreshTypes()
     case Tool::Text:
     case Tool::Dimension:
     case Tool::Mark:
+    case Tool::Section:
+    case Tool::Elevation:
         break;
     case Tool::Grid:
     case Tool::None:
@@ -1270,6 +1325,12 @@ void MainWindow::setTool(Tool tool)
         break;
     case Tool::Mark:
         statusBar()->showMessage(tr("Mark: click what to mark"));
+        break;
+    case Tool::Section:
+        statusBar()->showMessage(tr("Section: click where the section line starts"));
+        break;
+    case Tool::Elevation:
+        statusBar()->showMessage(tr("Elevation: click where the elevation line starts"));
         break;
     case Tool::PlaceModel:
         statusBar()->showMessage(m_types->count() ? tr("Place model: click where its origin goes (Shift: turned 90 degrees)")
@@ -1868,6 +1929,164 @@ void MainWindow::annotationClick(QPointF p)
         addAnnotation(mark ? QStringLiteral("mark") : QStringLiteral("text"), {p}, text.trimmed());
 }
 
+// ---------------------------------------------------------------- drawings (Slice 14)
+
+void MainWindow::drawingClick(QPointF p)
+{
+    const bool section = m_tool == Tool::Section;
+    m_annotationPoints << p;
+    if (m_annotationPoints.size() == 1) {
+        statusBar()->showMessage(section ? tr("Section: click where the section line ends")
+                                         : tr("Elevation: click where the elevation line ends"));
+    } else if (m_annotationPoints.size() == 2) {
+        statusBar()->showMessage(tr("Click the side the drawing looks at"));
+    } else {
+        const QVector<QPointF> pts = m_annotationPoints;
+        m_annotationPoints.clear();
+        createDrawing(section ? QStringLiteral("section") : QStringLiteral("elevation"), pts[0], pts[1], pts[2]);
+        statusBar()->showMessage(section ? tr("Section: click where the section line starts")
+                                         : tr("Elevation: click where the elevation line starts"));
+    }
+}
+
+bool MainWindow::createDrawing(const QString& kind, QPointF p1, QPointF p2, QPointF look)
+{
+    auto num = [](double v) { return QString::number(v, 'g', 17); };
+    const QJsonObject r = bridge(kind == QLatin1String("section") ? "create_section" : "create_elevation",
+        {num(p1.x()), num(p1.y()), num(p2.x()), num(p2.y()), num(look.x()), num(look.y()), QStringLiteral("-1")});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not add it: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    return true;
+}
+
+QString MainWindow::drawingGuid(const QString& name)
+{
+    for (const auto& v : bridge("drawings").value("drawings").toArray())
+        if (v.toObject().value("name").toString() == name)
+            return v.toObject().value("guid").toString();
+    return QString();
+}
+
+void MainWindow::refreshDrawings()
+{
+    const QJsonArray list = bridge("drawings").value("drawings").toArray();
+    m_drawingsPanel->setDrawings(list);
+    QVector<Viewport::Annotation> markers;
+    QHash<QString, QJsonObject> byGuid;
+    for (const auto& v : list) {
+        const QJsonObject d = v.toObject();
+        byGuid.insert(d.value("guid").toString(), d);
+        Viewport::Annotation m{d.value("guid").toString(), d.value("kind").toString(), d.value("name").toString(), {}};
+        for (const auto& p : d.value("points").toArray())
+            m.points << QPointF(p.toArray().at(0).toDouble(), p.toArray().at(1).toDouble());
+        const QJsonArray look = d.value("look").toArray();
+        m.points << QPointF(look.at(0).toDouble(), look.at(1).toDouble());
+        markers << m;
+    }
+    m_viewport->setDrawingMarkers(markers, m_levels->activeElevation());
+    for (int i = m_tabs->count() - 1; i > 0; --i) {
+        auto* view = qobject_cast<DrawingView*>(m_tabs->widget(i));
+        if (!view)
+            continue;
+        const auto it = byGuid.constFind(view->guid());
+        if (it == byGuid.constEnd()) { // deleted (or undone): its tab goes too
+            closeDrawingTab(i);
+            continue;
+        }
+        m_tabs->setTabText(i, it->value("name").toString());
+        view->setStale(it->value("stale").toBool());
+    }
+}
+
+bool MainWindow::openDrawing(const QString& guid)
+{
+    if (DrawingView* view = m_drawingViews.value(guid)) {
+        m_tabs->setCurrentWidget(view);
+        return true;
+    }
+    QString name;
+    for (const auto& v : bridge("drawings").value("drawings").toArray())
+        if (v.toObject().value("guid").toString() == guid)
+            name = v.toObject().value("name").toString();
+    if (name.isEmpty())
+        return false;
+    auto* view = new DrawingView(guid, m_tabs);
+    connect(view, &DrawingView::regenerateRequested, this, &MainWindow::regenerateDrawing);
+    m_drawingViews.insert(guid, view);
+    view->setStale(true);
+    m_tabs->addTab(view, name);
+    m_tabs->setCurrentWidget(view); // brings it up to date (currentChanged)
+    if (!m_generating.contains(guid) && !view->hasDrawing())
+        regenerateDrawing(guid);
+    return true;
+}
+
+void MainWindow::showModelTab()
+{
+    m_tabs->setCurrentIndex(0);
+}
+
+void MainWindow::closeDrawingTab(int index)
+{
+    auto* view = qobject_cast<DrawingView*>(m_tabs->widget(index));
+    if (!view)
+        return; // the model tab stays
+    m_drawingViews.remove(view->guid());
+    m_tabs->removeTab(index);
+    view->deleteLater();
+}
+
+void MainWindow::regenerateDrawing(const QString& guid)
+{
+    DrawingView* view = m_drawingViews.value(guid);
+    if (!view)
+        return;
+    if (m_generating.contains(guid)) {
+        m_generateAgain.insert(guid); // the model changed while generating: once more when done
+        return;
+    }
+    m_generating.insert(guid);
+    view->setBusy(true);
+    // The bridge snapshots the model and runs IfcOpenShell's serializer in a child process, which
+    // can take seconds on real files (spike S6); waiting for it here would freeze the window.
+    QPointer<MainWindow> self(this);
+    QThread* worker = QThread::create([self, guid] {
+        QString error;
+        const QJsonObject result = PythonEngine::instance().callJson("generate_drawing", {guid, QString()}, &error).object();
+        if (self)
+            QMetaObject::invokeMethod(self, [self, guid, result, error] {
+                if (self)
+                    self->onDrawingGenerated(guid, result, error);
+            }, Qt::QueuedConnection);
+    });
+    m_drawingThreads << worker;
+    connect(worker, &QThread::finished, this, [this, worker] {
+        m_drawingThreads.removeAll(worker);
+        worker->deleteLater();
+    });
+    worker->start();
+}
+
+void MainWindow::onDrawingGenerated(const QString& guid, const QJsonObject& result, const QString& error)
+{
+    m_generating.remove(guid);
+    DrawingView* view = m_drawingViews.value(guid);
+    if (!view)
+        return; // its tab was closed meanwhile
+    view->setBusy(false);
+    if (!error.isEmpty() || !result.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not generate the drawing: %1").arg(error.isEmpty() ? result.value("error").toString() : error));
+        return;
+    }
+    view->setSvg(result.value("svg").toString().toUtf8());
+    refreshDrawings(); // stale again if the model changed while it was generated
+    if (m_generateAgain.remove(guid) && view->isStale() && m_tabs->currentWidget() == view)
+        regenerateDrawing(guid);
+}
+
 bool MainWindow::createModel(const QString& name)
 {
     const QJsonObject r = bridge("create_model", {name});
@@ -2248,6 +2467,7 @@ void MainWindow::afterEdit(const QJsonObject& result)
     { StepTimer _(m_timings, "refreshSnapData"); refreshSnapData(); } // undo/redo can add or remove walls and grid lines
     { StepTimer _(m_timings, "refreshLayers"); refreshLayers(); }
     { StepTimer _(m_timings, "refreshAnnotations"); refreshAnnotations(); }
+    { StepTimer _(m_timings, "refreshDrawings"); refreshDrawings(); }
     StepTimer stateTimer(m_timings, "stateAndNames");
     const QJsonObject s = bridge("state");
     m_undo->setEnabled(s.value("can_undo").toBool());
@@ -2359,6 +2579,7 @@ void MainWindow::onOpened(const QJsonObject& info)
     refreshProject();
     refreshLayers();
     refreshAnnotations();
+    refreshDrawings();
     statusBar()->showMessage(tr("Loading %1 (%2)...").arg(QFileInfo(m_path).fileName(), info.value("schema").toString()));
 }
 

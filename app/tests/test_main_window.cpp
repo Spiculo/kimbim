@@ -12,6 +12,8 @@
 
 #include <cmath>
 
+#include "DrawingView.h"
+#include "DrawingsPanel.h"
 #include "ElementBatch.h"
 #include "LevelsBar.h"
 #include "HostTool.h"
@@ -665,9 +667,67 @@ private slots:
         QVERIFY(w.close());
     }
 
+    void sectionsAndElevations()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        // D61: a new project has Archicad's four template elevations, listed and marked in plan.
+        QCOMPARE(w.drawingsPanel()->count(), 4);
+        w.viewport()->set3DView();
+        QCOMPARE(w.viewport()->markerCount(), 0); // plan symbols, not shown in 3D (Archicad)
+        action(w, "actionPlanView")->trigger();
+        QCOMPARE(w.viewport()->markerCount(), 4);
+        QCOMPARE(w.viewport()->annotationCount(), 0); // markers are not plan annotations
+
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->setTolerance(0.05);
+        for (const QPointF& p : {QPointF(0, 0), QPointF(8, 0)})
+            w.wallTool()->click(p);
+        w.setTool(kimcad::MainWindow::Tool::None);
+
+        // The Section tool (D61): two clicks for the line, a third for the side it looks at.
+        w.setTool(kimcad::MainWindow::Tool::Section);
+        for (const QPointF p : {QPointF(4, -2), QPointF(4, 6), QPointF(6, 0)})
+            emit w.viewport()->workPointClicked(p, 0.01, Qt::NoModifier);
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QCOMPARE(w.drawingsPanel()->count(), 5);
+        QCOMPARE(w.viewport()->markerCount(), 5);
+        const QString section = w.drawingGuid(QStringLiteral("Section 1"));
+        QVERIFY(!section.isEmpty());
+
+        // Open it in a tab: generated in the background, shown when ready.
+        QVERIFY(w.openDrawing(section));
+        kimcad::DrawingView* view = w.drawingView(section);
+        QVERIFY(view);
+        QTRY_VERIFY_WITH_TIMEOUT(view->hasDrawing(), 60000);
+        QVERIFY(!view->isStale());
+        QVERIFY(view->paperSize().width() > 5); // the wall's 300 mm cut at 1:100 plus margins
+
+        // An edit makes it out of date; regenerating brings it back.
+        w.showModelTab();
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->setTolerance(0.05);
+        for (const QPointF& p : {QPointF(0, 3), QPointF(8, 3)})
+            w.wallTool()->click(p);
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QVERIFY(view->isStale());
+        w.regenerateDrawing(section);
+        QTRY_VERIFY_WITH_TIMEOUT(!view->isStale(), 60000);
+
+        // Markers are selectable and deletable like other elements.
+        w.viewport()->selectGuids({section});
+        w.setSelection({section});
+        QVERIFY(w.deleteSelection());
+        QCOMPARE(w.drawingsPanel()->count(), 4);
+        QVERIFY(!w.drawingView(section)); // its tab closed
+        QVERIFY(w.close());
+    }
+
     void shortcutsAreTheDocumentedOnes()
     {
         kimcad::MainWindow w(nullptr, true);
+        QCOMPARE(action(w, "actionSectionTool")->shortcut(), QKeySequence(Qt::Key_V));
+        QCOMPARE(action(w, "actionElevationTool")->shortcut(), QKeySequence(Qt::SHIFT | Qt::Key_V));
         QCOMPARE(action(w, "actionHideSelected")->shortcut(), QKeySequence(Qt::Key_H));
         QCOMPARE(action(w, "actionIsolateSelected")->shortcut(), QKeySequence(Qt::Key_I));
         QCOMPARE(action(w, "actionShowAll")->shortcut(), QKeySequence(Qt::SHIFT | Qt::Key_H));

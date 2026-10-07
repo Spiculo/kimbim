@@ -21,6 +21,7 @@ class QAction;
 class QDoubleSpinBox;
 
 class QComboBox;
+class QTabWidget;
 class QToolBar;
 class QSlider;
 class QLabel;
@@ -30,6 +31,8 @@ class QLineEdit;
 namespace kimcad {
 
 class LevelsBar;
+class DrawingsPanel;
+class DrawingView;
 class HistoryPanel;
 class LayersPanel;
 class WallTool;
@@ -80,7 +83,7 @@ public:
     LevelsBar* levelsBar() const { return m_levels; }
     // Modeling tools (M3): one active at a time. Exposed for tests and the self-test, which drive
     // them with work-plane points.
-    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening, PlaceModel, Text, Dimension, Mark };
+    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening, PlaceModel, Text, Dimension, Mark, Section, Elevation };
     void setTool(Tool tool);
     Tool tool() const { return m_tool; }
     WallTool* wallTool() const { return m_wallTool; }
@@ -128,6 +131,16 @@ public:
     bool explodeSelectedInstance();
     // Plan annotations (Slice 13): kind "text" (1 point), "dimension" (a, b, line point), "mark".
     bool addAnnotation(const QString& kind, const QVector<QPointF>& points, const QString& text);
+    // Sections and elevations (Slice 14, D60/D61). kind "section" or "elevation": the marker line
+    // p1-p2 looking towards `look` (Archicad's third click), infinite depth.
+    bool createDrawing(const QString& kind, QPointF p1, QPointF p2, QPointF look);
+    DrawingsPanel* drawingsPanel() const { return m_drawingsPanel; }
+    QString drawingGuid(const QString& name); // "" if there is none
+    // Open (or show) a drawing's tab and generate it in the background if it is out of date.
+    bool openDrawing(const QString& guid);
+    DrawingView* drawingView(const QString& guid) const { return m_drawingViews.value(guid); }
+    void regenerateDrawing(const QString& guid);
+    void showModelTab();
     // Drag to move (owner feedback): preview while dragging, move on release (Ctrl detaches).
     void dragMoveTo(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
     bool dragFinished(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
@@ -183,6 +196,10 @@ private:
     void refreshLayers();
     void refreshAnnotations();
     void annotationClick(QPointF p);
+    void refreshDrawings();
+    void drawingClick(QPointF p);
+    void onDrawingGenerated(const QString& guid, const QJsonObject& result, const QString& error);
+    void closeDrawingTab(int index);
     void saveVersionDialog();
     void enableVersioningDialog();
     void openProjectDialog();
@@ -238,7 +255,12 @@ private:
     QString m_currentView;
     QHash<QString, QString> m_instanceOf; // element -> model instance it belongs to
     QHash<QString, QStringList> m_instanceMembers;
-    QVector<QPointF> m_annotationPoints; // the dimension tool's clicks so far
+    QVector<QPointF> m_annotationPoints; // the dimension/section tool's clicks so far
+    QTabWidget* m_tabs = nullptr; // the model (3D/plan) and the open drawings
+    DrawingsPanel* m_drawingsPanel = nullptr;
+    QHash<QString, DrawingView*> m_drawingViews;
+    QSet<QString> m_generating, m_generateAgain;
+    QList<QThread*> m_drawingThreads;
     QToolBar* m_projectBar = nullptr;
     QComboBox* m_options = nullptr;
     bool m_versioned = false;

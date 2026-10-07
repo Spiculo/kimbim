@@ -122,11 +122,14 @@ Viewport::Viewport(QWidget* parent)
 
 void Viewport::setPlanView(double elevation)
 {
+    const bool wasPlan = m_planView;
     m_planView = true;
     m_planElevation = elevation;
     m_view->Camera()->SetProjectionType(Graphic3d_Camera::Projection_Orthographic);
     m_view->SetProj(V3d_Zpos); // looking down, north (+Y) up
     applyNavigationPreset();
+    if (!wasPlan && !m_markerData.isEmpty())
+        displayAnnotations(); // section/elevation markers belong to the plan
     if (ensureWindow())
         fitAll();
     update();
@@ -134,9 +137,12 @@ void Viewport::setPlanView(double elevation)
 
 void Viewport::set3DView()
 {
+    const bool wasPlan = m_planView;
     m_planView = false;
     m_view->SetProj(V3d_XposYnegZpos);
     applyNavigationPreset();
+    if (wasPlan && !m_markerData.isEmpty())
+        displayAnnotations();
     if (ensureWindow())
         fitAll();
     update();
@@ -585,8 +591,10 @@ public:
 
     void Compute(const Handle(PrsMgr_PresentationManager)&, const Handle(Prs3d_Presentation)& prs, const int) override
     {
+        const bool marker = isMarker();
         const Quantity_Color ink = m_a.kind == QLatin1String("mark") ? Quantity_Color(0.75, 0.15, 0.1, Quantity_TOC_RGB)
-                                                                      : Quantity_Color(0.1, 0.1, 0.12, Quantity_TOC_RGB);
+            : marker ? Quantity_Color(0.1, 0.3, 0.75, Quantity_TOC_RGB)
+                     : Quantity_Color(0.1, 0.1, 0.12, Quantity_TOC_RGB);
         const std::vector<std::pair<gp_Pnt, gp_Pnt>> segs = segments();
         if (!segs.empty()) {
             Handle(Graphic3d_ArrayOfSegments) arr = new Graphic3d_ArrayOfSegments(int(segs.size()) * 2);
@@ -601,7 +609,7 @@ public:
         Handle(Prs3d_TextAspect) text = new Prs3d_TextAspect();
         text->SetColor(ink);
         text->SetHeight(m_a.kind == QLatin1String("text") ? 16 : 14);
-        if (m_a.kind == QLatin1String("dimension")) { // centred, sitting on the dimension line
+        if (marker || m_a.kind == QLatin1String("dimension")) { // centred, sitting on the dimension line
             text->SetHorizontalJustification(Graphic3d_HTA_CENTER);
             text->SetVerticalJustification(Graphic3d_VTA_CENTER);
         } else if (m_a.kind == QLatin1String("mark")) { // the tag in the circle
@@ -628,6 +636,23 @@ public:
 
 private:
     gp_Pnt at(QPointF p) const { return gp_Pnt(p.x(), p.y(), m_z); }
+    bool isMarker() const
+    {
+        return (m_a.kind == QLatin1String("section") || m_a.kind == QLatin1String("elevation")) && m_a.points.size() == 3;
+    }
+    // A marker's line direction u and the unit normal n towards the side it looks at.
+    bool markerFrame(QPointF* u, QPointF* n) const
+    {
+        const QPointF a = m_a.points[0], b = m_a.points[1], d = b - a;
+        const double len = std::hypot(d.x(), d.y());
+        if (len < 1e-9)
+            return false;
+        *u = d / len;
+        *n = QPointF(-u->y(), u->x());
+        if (QPointF::dotProduct(m_a.points[2] - a, *n) < 0)
+            *n = -*n;
+        return true;
+    }
 
     gp_Pnt anchor() const
     {
@@ -642,6 +667,11 @@ private:
             }
             away.Normalize();
             return gp_Pnt((a.X() + b.X()) / 2, (a.Y() + b.Y()) / 2, m_z).Translated(away * 0.12);
+        }
+        QPointF u, n;
+        if (isMarker() && markerFrame(&u, &n)) { // the name beside the start of the line, behind it
+            return m_a.kind == QLatin1String("section") ? at(m_a.points[0] - u * 0.6)
+                                                        : at((m_a.points[0] + m_a.points[1]) / 2 - n * 0.6);
         }
         return m_a.points.isEmpty() ? gp_Pnt(0, 0, m_z) : at(m_a.points.first());
     }
@@ -664,6 +694,26 @@ private:
             const double t = 0.12; // architectural ticks at both ends
             for (const QPointF& p : {a2, b2})
                 out.push_back({at(p - (u + n) * t), at(p + (u + n) * t)});
+        } else if (QPointF u, n; isMarker() && markerFrame(&u, &n)) {
+            const QPointF a = m_a.points[0], b = m_a.points[1];
+            if (m_a.kind == QLatin1String("section")) {
+                out.push_back({at(a), at(b)});
+                // Archicad-style: a flag at each end with an arrow towards the side looked at.
+                for (const QPointF& e : {a, b}) {
+                    const QPointF tip = e + n * 0.8;
+                    out.push_back({at(e), at(tip)});
+                    out.push_back({at(tip), at(tip - n * 0.25 + u * 0.15)});
+                    out.push_back({at(tip), at(tip - n * 0.25 - u * 0.15)});
+                }
+            } else { // elevation (Archicad): the marker, a triangle pointing where it looks, and the
+                     // ends of its range as short ticks, without the full line
+                for (const QPointF& e : {a, b})
+                    out.push_back({at(e), at(e + n * 0.4)});
+                const QPointF m = (a + b) / 2, tip = m + n * 0.6, l = m - u * 0.4, r = m + u * 0.4;
+                out.push_back({at(l), at(r)});
+                out.push_back({at(l), at(tip)});
+                out.push_back({at(tip), at(r)});
+            }
         } else if (m_a.kind == QLatin1String("mark") && !m_a.points.isEmpty()) {
             const QPointF c = m_a.points.first();
             const int n = 32;
@@ -695,14 +745,42 @@ void Viewport::displayAnnotations()
     for (const auto& prs : std::as_const(m_annotations))
         m_context->Remove(prs, false);
     m_annotations.clear();
-    for (const Annotation& a : std::as_const(m_annotationData)) {
-        if (m_layerHidden.contains(a.guid))
+    // Section and elevation markers are plan symbols, as in Archicad: not in the 3D view.
+    for (const QVector<Annotation>* list : {&m_annotationData, &m_markerData}) {
+        if (list == &m_markerData && !m_planView)
             continue;
-        Handle(AnnotationPrs) prs = new AnnotationPrs(a, m_annotationZ + 0.02);
-        m_context->Display(prs, 0, m_layerLocked.contains(a.guid) ? -1 : 0, false);
-        m_annotations.insert(a.guid, prs);
+        for (const Annotation& a : *list) {
+            if (m_layerHidden.contains(a.guid))
+                continue;
+            Handle(AnnotationPrs) prs = new AnnotationPrs(a, m_annotationZ + 0.02);
+            m_context->Display(prs, 0, m_layerLocked.contains(a.guid) ? -1 : 0, false);
+            m_annotations.insert(a.guid, prs);
+        }
     }
     update();
+}
+
+void Viewport::setDrawingMarkers(const QVector<Annotation>& markers, double z)
+{
+    m_markerData = markers;
+    m_annotationZ = z;
+    displayAnnotations();
+}
+
+int Viewport::annotationCount() const
+{
+    int n = 0;
+    for (const Annotation& a : m_annotationData)
+        n += m_annotations.contains(a.guid);
+    return n;
+}
+
+int Viewport::markerCount() const
+{
+    int n = 0;
+    for (const Annotation& a : m_markerData)
+        n += m_annotations.contains(a.guid);
+    return n;
 }
 
 QStringList Viewport::annotationGuids() const
@@ -945,6 +1023,7 @@ void Viewport::clear()
         m_context->Remove(prs, false);
     m_annotations.clear();
     m_annotationData.clear();
+    m_markerData.clear();
     m_context->RemoveAll(false);
     m_batches.clear();
     m_locate.clear();

@@ -308,6 +308,31 @@ ES = {
     "Loading... %n element(s)": ("Cargando... %n elemento", "Cargando... %n elementos"),
     "%n element(s) selected": ("%n elemento seleccionado", "%n elementos seleccionados"),
     "%n element(s) loaded in %1 s": ("%n elemento cargado en %1 s", "%n elementos cargados en %1 s"),
+    # Slice 14: sections and elevations (Archicad's Spanish terms: Sección, Alzado)
+    "Regenerate": "Regenerar",
+    "Generating the drawing...": "Generando el dibujo...",
+    "The model has changed since this drawing was generated.": "El modelo ha cambiado desde que se generó este dibujo.",
+    "No drawing yet": "Todavía no hay dibujo",
+    "Open": "Abrir",
+    "Rename": "Renombrar",
+    "Double-click a drawing to open it": "Haga doble clic en un dibujo para abrirlo",
+    "Section": "Sección",
+    "Elevation": "Alzado",
+    "Drawings": "Dibujos",
+    "Could not rename it: %1": "No se pudo renombrar: %1",
+    "Could not delete it: %1": "No se pudo eliminar: %1",
+    "Sect&ion": "Secc&ión",
+    "Section: click the two ends of the section line, then the side it looks at":
+        "Sección: haga clic en los dos extremos de la línea de sección y luego en el lado hacia el que mira",
+    "&Elevation": "Al&zado",
+    "Elevation: click the two ends of the elevation line, then the side it looks at":
+        "Alzado: haga clic en los dos extremos de la línea de alzado y luego en el lado hacia el que mira",
+    "Section: click where the section line starts": "Sección: haga clic donde empieza la línea de sección",
+    "Elevation: click where the elevation line starts": "Alzado: haga clic donde empieza la línea de alzado",
+    "Section: click where the section line ends": "Sección: haga clic donde termina la línea de sección",
+    "Elevation: click where the elevation line ends": "Alzado: haga clic donde termina la línea de alzado",
+    "Click the side the drawing looks at": "Haga clic en el lado hacia el que mira el dibujo",
+    "Could not generate the drawing: %1": "No se pudo generar el dibujo: %1",
 }
 
 

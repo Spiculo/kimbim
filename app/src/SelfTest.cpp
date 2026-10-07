@@ -4,6 +4,7 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QJsonArray>
 #include <QScreen>
 #include <QDir>
 #include <QElapsedTimer>
@@ -15,6 +16,7 @@
 
 #include <cstdio>
 
+#include "DrawingView.h"
 #include "MainWindow.h"
 #include "HostTool.h"
 #include "TwoPointTool.h"
@@ -340,6 +342,24 @@ int runSelfTest(const SelfTestOptions& options)
         result.insert(QStringLiteral("plan_cut"), options.planCut);
         result.insert(QStringLiteral("planes"), viewport->clipPlaneCount());
         result.insert(QStringLiteral("fps_with_cut"), viewport->measureFps(options.frames));
+    }
+    if (!options.openDrawing.isEmpty()) { // Slice 14: a section or elevation, generated in the background
+        const QString guid = window.drawingGuid(options.openDrawing);
+        QElapsedTimer drawingTimer;
+        drawingTimer.start();
+        bool shown = !guid.isEmpty() && window.openDrawing(guid);
+        DrawingView* view = shown ? window.drawingView(guid) : nullptr;
+        while (view && !view->hasDrawing() && drawingTimer.elapsed() < 10 * 60 * 1000)
+            QApplication::processEvents(QEventLoop::AllEvents, 50);
+        shown = view && view->hasDrawing();
+        result.insert(QStringLiteral("drawing_shown"), shown);
+        result.insert(QStringLiteral("drawing_s"), double(drawingTimer.elapsed()) / 1000.0);
+        if (shown) {
+            result.insert(QStringLiteral("drawing_paper_mm"), QJsonArray{view->paperSize().width(), view->paperSize().height()});
+            view->fit();
+        }
+        result.insert(QStringLiteral("ok"), result.value("ok").toBool() && shown);
+        QApplication::processEvents();
     }
     if (!options.screenshot.isEmpty())
         takeScreenshots(window, options.screenshot, &result);
