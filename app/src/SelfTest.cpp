@@ -4,6 +4,7 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QJsonArray>
 #include <QScreen>
 #include <QDir>
 #include <QElapsedTimer>
@@ -12,9 +13,15 @@
 #include <QJsonObject>
 #include <QTemporaryDir>
 #include <QTimer>
+#include <QImage>
+#include <QSet>
 
 #include <cstdio>
 
+#include "DockLayout.h"
+#include "DrawingView.h"
+#include <DockManager.h>
+#include <DockWidget.h>
 #include "MainWindow.h"
 #include "HostTool.h"
 #include "TwoPointTool.h"
@@ -25,6 +32,7 @@
 #include <cmath>
 #include <utility>
 
+#include "LevelsBar.h"
 #include "ModelTreePanel.h"
 #include "PythonEngine.h"
 #include "Viewport.h"
@@ -332,6 +340,37 @@ int runSelfTest(const SelfTestOptions& options)
         result.insert(QStringLiteral("box_selected"), n);
         result.insert(QStringLiteral("tree_selected"), int(window.treePanel()->selectedGuids().size()));
     }
+    if (options.popOut) {
+        // D71: a tab dragged out moves its view to a new top-level window (a new native window).
+        // The view must keep drawing there and after it is docked back.
+        auto drawsSomething = [&](Viewport* v) {
+            const QString file = QDir::temp().filePath(QStringLiteral("kimcad-popout.png"));
+            if (!v->dumpImage(file))
+                return false;
+            const QImage image(file);
+            QSet<QRgb> colours;
+            for (int y = 0; y < image.height() && colours.size() < 3; y += 7)
+                for (int x = 0; x < image.width() && colours.size() < 3; x += 7)
+                    colours.insert(image.pixel(x, y));
+            return colours.size() >= 2 && !v->pickAt(v->width() / 2, v->height() / 2).isNull();
+        };
+        DockLayout* dock = window.dockLayout();
+        const QByteArray docked = dock->saveLayout();
+        ads::CDockWidget* tab = dock->manager()->findDockWidget(QStringLiteral("3d"));
+        tab->setFloating(); // what dragging the tab out does
+        QApplication::processEvents();
+        result.insert(QStringLiteral("pop_out_floating"), tab->isFloating());
+        viewport->fitAll();
+        QApplication::processEvents();
+        const bool outside = tab->isFloating() && drawsSomething(viewport);
+        dock->restoreLayout(docked); // docked back
+        QApplication::processEvents();
+        viewport->fitAll();
+        QApplication::processEvents();
+        const bool back = drawsSomething(viewport);
+        result.insert(QStringLiteral("pop_out_outside"), outside);
+        result.insert(QStringLiteral("pop_out"), outside && back);
+    }
     if (options.planCut >= 0) {
         window.setPlanCutHeight(options.planCut);
         if (QAction* cut = window.findChild<QAction*>(QStringLiteral("actionPlanCut")))
@@ -340,6 +379,61 @@ int runSelfTest(const SelfTestOptions& options)
         result.insert(QStringLiteral("plan_cut"), options.planCut);
         result.insert(QStringLiteral("planes"), viewport->clipPlaneCount());
         result.insert(QStringLiteral("fps_with_cut"), viewport->measureFps(options.frames));
+    }
+    if (options.benchEdit) {
+        // D71: an edit's refresh with one view (3D) or with a plan tab open and active (its cut on).
+        if (options.planTab)
+            window.openPlanTab(window.levelsBar()->activeStorey());
+        QApplication::processEvents();
+        QString wall;
+        for (const QString& g : window.viewport()->guids())
+            if (window.viewport()->typeOf(g).startsWith(QLatin1String("IfcWall"))) {
+                wall = g;
+                break;
+            }
+        const int edits = 6;
+        double total = 0;
+        bool moved = !wall.isEmpty();
+        window.resetTimings();
+        for (int i = 0; moved && i < edits; ++i) {
+            window.setSelection({wall});
+            QElapsedTimer t;
+            t.start();
+            moved = window.moveSelection(QPointF(i % 2 ? -0.1 : 0.1, 0.0), /*detach=*/true);
+            QApplication::processEvents();
+            total += double(t.nsecsElapsed()) / 1e6;
+        }
+        QJsonObject steps;
+        for (auto it = window.timings().constBegin(); it != window.timings().constEnd(); ++it)
+            steps.insert(it.key(), it.value() / edits);
+        result.insert(QStringLiteral("edit_ms"), total / edits);
+        result.insert(QStringLiteral("edit_steps_ms"), steps);
+        result.insert(QStringLiteral("edit_views"), options.planTab ? 2 : 1);
+        result.insert(QStringLiteral("ok"), result.value("ok").toBool() && moved);
+    }
+    if (options.createDrawings) {
+        window.findChild<QAction*>(QStringLiteral("actionCreateDrawings"))->trigger();
+        window.findChild<QAction*>(QStringLiteral("actionPlanView"))->trigger();
+        QApplication::processEvents();
+    }
+    if (!options.openDrawing.isEmpty()) { // Slice 14: a section or elevation, generated in the background
+        const QString guid = window.drawingGuid(options.openDrawing);
+        QElapsedTimer drawingTimer;
+        drawingTimer.start();
+        bool shown = !guid.isEmpty() && window.openDrawing(guid);
+        DrawingView* view = shown ? window.drawingView(guid) : nullptr;
+        while (view && !view->hasDrawing() && drawingTimer.elapsed() < 10 * 60 * 1000)
+            QApplication::processEvents(QEventLoop::AllEvents, 50);
+        shown = view && view->hasDrawing();
+        result.insert(QStringLiteral("drawing_shown"), shown);
+        result.insert(QStringLiteral("drawing_visible"), window.lastDrawingVisibleCount());
+        result.insert(QStringLiteral("drawing_s"), double(drawingTimer.elapsed()) / 1000.0);
+        if (shown) {
+            result.insert(QStringLiteral("drawing_paper_mm"), QJsonArray{view->paperSize().width(), view->paperSize().height()});
+            view->fit();
+        }
+        result.insert(QStringLiteral("ok"), result.value("ok").toBool() && shown);
+        QApplication::processEvents();
     }
     if (!options.screenshot.isEmpty())
         takeScreenshots(window, options.screenshot, &result);

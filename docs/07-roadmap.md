@@ -28,6 +28,7 @@ M4 Libraries + cloning + drawings          R4 Merge + reconciliation
 | S3 | Does the record decomposition round-trip the test corpus losslessly? | ✅ Yes: 77/77 valid files lossless, fixed point, deterministic export (D34–D36) |
 | S4 | Do Windows and Linux produce identical record hashes? | ✅ Yes: 77/77 identical state hashes and IFC exports |
 | S5 | How do `gix` writes perform at 1M blobs: commit time, repo size, checkout-to-model time? | ✅ Viable with packs only and no deltas (D39) |
+| S6 | Is IfcOpenShell's SVG serializer good and fast enough for KIMCAD's drawings (Slice 14 risk check)? | ✅ Quality yes; speed needs visible elements only, polygon HLR and a child process (D60, proposed) |
 
 The spike code lives in [`spikes/`](../spikes/README.md).
 
@@ -74,9 +75,15 @@ Done in Slice 6: profile-based columns and beams, grid axes per level (auto tags
 Done in Slice 5: layered slab types, slabs by outline (concave too) or from a closed wall loop (outer faces), parametric doors and windows in walls with real openings, cascading deletes; a saved test house (walls, slab, door, window) validates against the IFC4 schema with 0 issues.
 Done in Slice 4: new IFC4 project (mm), levels, plan view, layered wall types, wall tool (snapping, typed lengths, ortho), L/T joins, delete, live 3D updates with undo/redo.
 
-### M4 — Libraries, cloning, drawings
+### M4 — Libraries, cloning, drawings 🟡 (drawings done: Slices 14–16; the exit test passes in CI, `pixi run m4`)
 Library browser and bundled library, copy/paste/duplicate/array/mirror/copy-to-storeys, plan/section/elevation generation, annotations, sheets, PDF export.
-**Exit:** the M3 house produces a plan, a section and an elevation on a sheet, exported to PDF.
+**Exit:** the M3 house produces a plan, a section and an elevation on a sheet with a title block, exported to PDF. CI checks this automatically, as it checks M3.
+
+Slices (numbering continues after the architect-feedback track, Slices 9–13): **14 ✅ sections and elevations** → **15 ✅ plan drawings and annotation on drawings** ([plan](superpowers/plans/2026-10-07-slice15-plan-drawings-annotation.md)) → **16 ✅ sheets and PDF export (= M4 exit)** ([plan](superpowers/plans/2026-10-07-slice16-sheets-pdf.md)) → **17 ✅ everyday editing** (copy/paste, duplicate, Ctrl+drag copy, mirror, arrays, offset; [plan](superpowers/plans/2026-10-07-slice17-everyday-editing.md)).
+M4 comes before the end of M5 (owner plan, 2026-10-07): drawings are what an architect hands to a client, and Combine options (Slice 22) needs the R4 merge engine, which is easier to judge once real projects with drawings exist.
+
+### After M4: modeling gaps
+Slices **18 ✅ rooms and areas** (`IfcSpace` from the surrounding walls, room stamps, room schedule with CSV; [plan](superpowers/plans/2026-10-07-slice18-rooms.md)) → **19 ✅ roofs** (flat, shed, gable, hip and per-edge slopes from a footprint; walls trimmed to the roof; [plan](superpowers/plans/2026-10-07-slice19-roofs.md)). Then M5 resumes.
 
 ## Repo track
 
@@ -89,8 +96,8 @@ Done in Slice 1 in Python (`kimcad.records`), byte-identical to the spike golden
 Record decomposition, canonical JSON, BLAKE3 references, records → IFC export with deterministic step IDs.
 **Exit:** corpus round-trip is a fixed point; golden hashes match on Windows and Linux.
 
-### R2 — Store and history ✅ (except tags)
-Done in Slice 1: `init / commit / status / log / show / export / branch / switch` through the Rust store. Tags come next.
+### R2 — Store and history ✅
+Done in Slice 1: `init / commit / status / log / show / export / branch / switch` through the Rust store; Slice 20 added `tag` (annotated tags = milestones) and `blame` (object history).
 
 `kimcad init / import / commit / log / show / export / branch / switch / tag` on the gitoxide-backed store; local cache.
 **Exit:** import 100k-object model, change one property, commit; the new commit adds only a handful of objects.
@@ -101,12 +108,14 @@ Record-level diff (added/modified/removed per object) done in Slice 1. Property-
 Tree diff, per-category classification, property-level changes, JSON and human output.
 **Exit:** diff time depends on the size of the change, not the size of the model (benchmark).
 
-### R4 — Merge and reconciliation
+### R4 — Merge and reconciliation 🟡 (merge ✅ Slice 21; reconciliation to do)
+Slice 21 ([plan](superpowers/plans/2026-10-07-slice21-merge-engine.md)): three-way record merge with the conflict model, integrity pass and IFC validation, `kimcad merge`, and ifcmerge's cases ported (fixtures in `tests/fixtures/ifcmerge`).
+
 Three-way merge with conflict model, integrity pass, conflict serialization for the UI; GlobalId/Tag/heuristic reconciliation with report.
 **Exit:** merge test suite (including ported `ifcmerge` cases) passes; re-importing a Revit-exported file with regenerated GlobalIds keeps more than 95% of identities on the corpus pair.
 
-## M5 — Versioned projects in the app 🟡 (Slice 8 done: [plan](superpowers/plans/2026-10-06-slice8-versioned-projects.md))
-Slices: **8 ✅ enable/open, Save version, History, Compare (colours + list), design options** → 9 milestones (tags), object history, before/after, delete option → 10 Combine options (three-way merge, conflict UI) = M5 exit.
+## M5 — Versioned projects in the app ✅ (exit test automated: `pixi run m5` + app test `m5ExitCombineOptions`)
+Slices: **8 ✅ enable/open, Save version, History, Compare (colours + list), design options** → **20 ✅ milestones (tags), object history, before/after, delete option** ([plan](superpowers/plans/2026-10-07-slice20-milestones-history.md)) → **21 ✅ R4 merge engine** (repository side; [plan](superpowers/plans/2026-10-07-slice21-merge-engine.md)) → **22 ✅ Combine options** (conflict UI: this option or the other per element and property, the combined model as a 3D preview, commit with two parents; [plan](superpowers/plans/2026-10-07-slice22-combine-options.md)) = M5 exit. (These were called 9 and 10 before the architect-feedback track took Slices 9–13.)
 
 Enable/disable versioning, Save version, history timeline, Compare (viewport coloring and before/after), design options, milestones, Combine options with conflict UI, object history panel, re-import with reconciliation review.
 **Exit:** two design options of the house are created, edited separately, compared and combined with one conflict resolved in the UI.

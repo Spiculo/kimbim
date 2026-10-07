@@ -9,7 +9,8 @@ import pathlib
 import sys
 
 from . import _core
-from .project import Changes, KimcadError, Project
+from .layout import key_to_path
+from .project import Changes, KimcadError, MergeConflicts, Project
 
 SYMBOL = {"added": "+", "modified": "~", "removed": "-"}
 MAX_LINES = 200
@@ -58,6 +59,21 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--rev", default="HEAD")
     s = sub.add_parser("switch", help="switch to a design option (branch)")
     s.add_argument("name")
+    s = sub.add_parser("tag", help="list, set or delete milestones (annotated tags)")
+    s.add_argument("name", nargs="?")
+    s.add_argument("-m", "--message", default="")
+    s.add_argument("--rev", default="HEAD")
+    s.add_argument("--delete", action="store_true")
+    s = sub.add_parser("merge", help="combine another design option into the current one")
+    s.add_argument("option")
+    s.add_argument("-m", "--message", default="")
+    s.add_argument("--resolve", action="append", default=[], metavar="CONFLICT=CHOICE",
+                   help="a conflict's choice (ours, theirs, or one of its options); repeatable")
+    s.add_argument("--json", action="store_true", help="print the conflicts as JSON")
+    s = sub.add_parser("blame", help="object history: the versions that changed an object (by GlobalId)")
+    s.add_argument("guid")
+    s.add_argument("--rev", default="HEAD")
+    s.add_argument("-n", type=int, default=100)
     return p
 
 
@@ -89,7 +105,7 @@ def run(args) -> int:
     elif args.cmd == "diff":
         _print_changes(proj.diff(args.rev_a, args.rev_b), as_json=args.json)
     elif args.cmd == "export":
-        out = proj.export(args.out, args.rev, overwrite=args.force)
+        out = proj.export(args.out, args.rev, overwrite=args.force, one_owner=True)
         print(f"wrote {out}")
     elif args.cmd == "show":
         print(json.dumps(proj.show(args.key, args.rev), ensure_ascii=False, indent=1, sort_keys=True))
@@ -104,6 +120,46 @@ def run(args) -> int:
     elif args.cmd == "switch":
         proj.switch(args.name)
         print(f"switched to {args.name}")
+    elif args.cmd == "tag":
+        if args.name and args.delete:
+            proj.delete_tag(args.name)
+            print(f"deleted milestone {args.name}")
+        elif args.name:
+            proj.tag(args.name, args.message, args.rev)
+            print(f"milestone {args.name} on {proj.repo.resolve(args.rev)[:10]}")
+        else:
+            for t in proj.tags():
+                first_line = (t.message.strip().splitlines() or [""])[0]
+                print(f"{t.name}  {t.target[:10]}  {first_line}")
+    elif args.cmd == "merge":
+        resolutions = dict(r.rsplit("=", 1) for r in args.resolve if "=" in r)
+        message = args.message or f"Combine {args.option} into {proj.current_branch()}"
+        try:
+            cid = proj.merge(args.option, message, resolutions)
+        except MergeConflicts as e:
+            conflicts = [c.to_dict() for c in e.result.conflicts if c.id in e.result.unresolved]
+            if args.json:
+                print(json.dumps(conflicts, ensure_ascii=False, indent=1, default=str))
+            else:
+                print(f"{len(conflicts)} conflict(s); choose with --resolve ID=CHOICE:")
+                for c in conflicts:
+                    what = c["attribute"] or ""
+                    if c["property"]:
+                        what += f"[{c['property']}]"
+                    print(f"  {c['id']}  {c['kind']}  {c['ifc_type']} {c['name']!r} {what}  options: {', '.join(c['options'])}")
+                    if c["kind"] in ("attribute", "property", "class"):
+                        print(f"      base {json.dumps(c['base'], default=str)[:80]}  ours {json.dumps(c['ours'], default=str)[:80]}"
+                              f"  theirs {json.dumps(c['theirs'], default=str)[:80]}")
+            return 1
+        print(f"[{proj.current_branch()} {cid[:10]}] {message}")
+    elif args.cmd == "blame":
+        steps = proj.history_of(key_to_path("o/" + args.guid), rev=args.rev, limit=args.n)
+        if not steps:
+            print(f"no version changed {args.guid}")
+        for c, kind in steps:
+            when = dt.datetime.fromtimestamp(c.time, dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+            first_line = (c.message.strip().splitlines() or [""])[0]
+            print(f"{SYMBOL[kind]} {kind:<8}  {c.id[:10]}  {when}  {c.author_name}  {first_line}")
     return 0
 
 

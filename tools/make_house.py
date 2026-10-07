@@ -3,7 +3,8 @@
 
 Two storeys (Level 1 at 0, Level 2 at 3 m, Roof at 6 m): a 10 x 8 m loop of exterior walls per
 floor, a front door and windows, floor slabs, a roof slab, a stair from Level 1 to Level 2 with its
-hole in the Level 2 floor, columns and a beam. This is the same modeling path the GUI uses
+hole in the Level 2 floor, columns and a beam. Plus the M4 exit: floor plans, a section, elevations
+and sheet A01 holding the ground floor plan, the section and the south elevation. This is the same modeling path the GUI uses
 (app_bridge), without the GUI, so CI can produce the file on any machine.
 
 Usage: python tools/make_house.py OUT.ifc   (prints a JSON summary)
@@ -63,8 +64,25 @@ def build(out: str) -> dict:
     call("add_annotation", l1, "text", json.dumps([[3.0, 2.0]]), "Living room")
     call("add_annotation", l1, "dimension", json.dumps([[0.0, 0.0], [10.0, 0.0], [0.0, -1.0]]), "")
     call("add_annotation", l1, "mark", json.dumps([[8.0, 6.0]]), "A")
+    # Rooms (Slice 18): one per level, from the walls around a point.
+    call("create_room", l1, 2.0, 6.0, "Living room")
+    call("create_room", l2, 5.0, 6.0, "Bedroom")
     roof = call("add_storey", "Roof", 6.0)["guid"]
     call("copy_to_storey", json.dumps([slab1]), roof)
+    # Roof (Slice 19): a 30-degree gable roof with 0.5 m eaves; the upper walls are trimmed to it.
+    pitched = call("create_roof", roof, json.dumps([[-0.5, -0.5], [10.5, -0.5], [10.5, 8.5], [-0.5, 8.5]]), "gable",
+                   30, 0.25, 0.0, "")["guid"]
+    call("attach_walls_to_roof", pitched, json.dumps(upper[:4]))
+
+    # M4 exit (Slices 14-16): a section across the house and sheet A01 with the ground floor plan, the
+    # section and the south elevation, under a title block filled from the project info.
+    call("set_project_info", json.dumps({"number": "M4-01", "name": "KIMCAD two-storey house",
+                                         "client": "KIMCAD test client", "address": "1 Sample Street"}))
+    section = call("create_section", -1.0, 4.5, 11.0, 4.5, 5.0, 8.0, -1)["guid"]
+    drawing = {d["name"]: d["guid"] for d in call("drawings")["drawings"]}
+    sheet = call("add_sheet", "A3", "Plan, section and elevation")["number"]
+    for guid in (drawing["Level 1 Floor Plan"], section, drawing["South Elevation"]):
+        call("place_drawing", sheet, guid, -1, -1, 100)
 
     saved = json.loads(b.save(out))
     if not saved.get("ok"):
@@ -72,7 +90,8 @@ def build(out: str) -> dict:
     count = lambda cls: len(b._model.by_type(cls))  # noqa: E731
     return {"file": out, "storeys": count("IfcBuildingStorey"), "walls": count("IfcWall"), "slabs": count("IfcSlab"),
             "doors": count("IfcDoor"), "windows": count("IfcWindow"), "stairs": count("IfcStair"),
-            "columns": count("IfcColumn"), "beams": count("IfcBeam"), "openings": count("IfcOpeningElement")}
+            "columns": count("IfcColumn"), "rooms": count("IfcSpace"), "roofs": count("IfcRoof"), "beams": count("IfcBeam"), "openings": count("IfcOpeningElement"),
+            "drawings": len(call("drawings")["drawings"]), "sheets": len(call("sheets")["sheets"])}
 
 
 if __name__ == "__main__":

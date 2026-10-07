@@ -12,6 +12,7 @@ qt_add_library(kimcad_core STATIC
     src/PropertiesPanel.cpp src/PropertiesPanel.h
     src/LevelsBar.cpp src/LevelsBar.h
     src/HistoryPanel.cpp src/HistoryPanel.h
+    src/CombineDialog.cpp src/CombineDialog.h
     src/LayersPanel.cpp src/LayersPanel.h
     src/Icons.cpp src/Icons.h
     src/Snapper.cpp src/Snapper.h
@@ -23,13 +24,23 @@ qt_add_library(kimcad_core STATIC
     src/GripTool.cpp src/GripTool.h
     src/ModelLoader.cpp src/ModelLoader.h
     src/Cuts.cpp src/Cuts.h
+    src/DrawingsPanel.cpp src/DrawingsPanel.h
+    src/DrawingView.cpp src/DrawingView.h
+    src/SheetExport.cpp src/SheetExport.h
+    src/SheetsPanel.cpp src/SheetsPanel.h
+    src/DockLayout.cpp src/DockLayout.h
+    src/Scene.cpp src/Scene.h
+    src/ViewHost.cpp src/ViewHost.h
+    src/ToolPalette.cpp src/ToolPalette.h
+    src/ToolOptionsBar.cpp src/ToolOptionsBar.h
+    src/StatusStrip.cpp src/StatusStrip.h
 )
 target_include_directories(kimcad_core PUBLIC src)
 # Element icons (owner feedback: objects need an icon and a hint on hover).
 file(GLOB KIMCAD_ICONS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} resources/icons/*.svg)
 qt_add_resources(kimcad_core "kimcad_icons" PREFIX "/icons" BASE resources/icons FILES ${KIMCAD_ICONS})
-target_link_libraries(kimcad_core PUBLIC Qt6::Widgets Python3::Python
-    TKernel TKMath TKService TKV3d TKOpenGl TKBRep TKG3d)
+target_link_libraries(kimcad_core PUBLIC Qt6::Widgets Qt6::Svg Python3::Python
+    TKernel TKMath TKService TKV3d TKOpenGl TKBRep TKG3d ads::qtadvanceddocking-qt6)
 target_include_directories(kimcad_core PUBLIC ${OpenCASCADE_INCLUDE_DIR})
 target_compile_definitions(kimcad_core PUBLIC KIMCAD_VERSION="${PROJECT_VERSION}" _USE_MATH_DEFINES)
 qt_add_translations(kimcad_core
@@ -67,6 +78,9 @@ kimcad_test(test_host_tool)
 kimcad_test(test_two_point_tool)
 kimcad_test(test_rotate_tool)
 kimcad_test(test_grip_tool)
+kimcad_test(test_dock_layout)
+kimcad_test(test_scene)
+kimcad_test(test_tool_palette)
 
 # GUI self-tests: need a real OpenGL window (GPU, or Mesa on the Linux CI runner). Label "gui".
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/broken.ifc "ISO-10303-21;
@@ -83,9 +97,17 @@ kimcad_gui_test(app_selftest_fixture
     "\"ok\":true.*\"pick_matched\":2.*\"pick_missed\":0.*\"tree_follows_selection\":true" :fixture: --frames 5)
 kimcad_gui_test(app_selftest_broken_file "\"ok\":false" ${CMAKE_CURRENT_BINARY_DIR}/broken.ifc)
 kimcad_gui_test(app_selftest_quit_during_load "\"ok\":true,\"quit_during_load\":true" :fixture: --quit-during-load --chunk 1)
+kimcad_gui_test(app_selftest_pop_out "\"ok\":true.*\"pop_out\":true" :fixture: --frames 2 --pop-out)
+# D71: a plan tab open while the window closes: no OpenGL errors from views torn down after their window.
+kimcad_gui_test(app_selftest_plan_tab_exit "\"ok\":true" :fixture: --frames 2 --bench-edit --plan-tab)
+set_tests_properties(app_selftest_plan_tab_exit PROPERTIES FAIL_REGULAR_EXPRESSION "MakeCurrent\(\) has failed|Type: Error")
 kimcad_gui_test(app_selftest_plan_cut "\"ok\":true.*\"planes\":1" :fixture: --frames 5 --plan-cut 1.5)
 kimcad_gui_test(app_selftest_draw_walls "\"elements\":4,\"joins\":4,\"ok\":true,\"walls\":4" :new: --draw-walls "0,0 5,0 5,4 0,4 0,0")
 kimcad_gui_test(app_selftest_house "\"beams\":1,\"columns\":1,\"doors\":1,\"elements\":9,\"grid\":4,\"joins\":4,\"ok\":true,\"openings\":2,\"slabs\":1,\"walls\":4,\"windows\":1" :new: --house)
 kimcad_gui_test(app_selftest_box_select_visible "\"box_selected\":1,.*\"ok\":true" :occlusion: --frames 5 --box-select)
 kimcad_gui_test(app_selftest_box_select_through "\"box_selected\":2,.*\"ok\":true" :occlusion: --frames 5 --box-select --select-through)
 kimcad_gui_test(app_selftest_box_select "\"box_selected\":2.*\"ok\":true.*\"tree_selected\":2" :fixture: --frames 5 --box-select)
+# Slice 14: an elevation sends only the elements it can see to the serializer (the short wall is hidden
+# behind the tall one from the south, in front of it from the north).
+kimcad_gui_test(app_selftest_drawing_visible_south "\"drawing_shown\":true,\"drawing_visible\":1," :occlusion: --frames 1 --open-drawing "South Elevation")
+kimcad_gui_test(app_selftest_drawing_visible_north "\"drawing_shown\":true,\"drawing_visible\":2," :occlusion: --frames 1 --open-drawing "North Elevation")

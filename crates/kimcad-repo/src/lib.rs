@@ -53,6 +53,18 @@ pub struct CommitInfo {
     pub message: String,
 }
 
+/// A milestone: an annotated tag on a version.
+#[derive(Debug, Clone)]
+pub struct TagInfo {
+    pub name: String,
+    /// The tagged commit.
+    pub target: String,
+    pub message: String,
+    pub tagger_name: String,
+    /// Seconds since the Unix epoch, UTC.
+    pub time: i64,
+}
+
 pub struct Repo {
     git_dir: PathBuf,
 }
@@ -146,6 +158,18 @@ impl Repo {
     }
 
     pub fn commit(&self, changes: &BTreeMap<String, Option<Vec<u8>>>, message: &str, author: &Signature) -> Result<String> {
+        self.commit_merge(changes, message, author, &[])
+    }
+
+    /// A commit on the current branch whose extra parents are `merged` (a merge commit when non-empty).
+    pub fn commit_merge(
+        &self,
+        changes: &BTreeMap<String, Option<Vec<u8>>>,
+        message: &str,
+        author: &Signature,
+        merged: &[String],
+    ) -> Result<String> {
+        let merged = merged.iter().map(|r| self.resolve(r)).collect::<Result<Vec<_>>>()?;
         for path in changes.keys() {
             validate_path(path)?;
         }
@@ -167,6 +191,9 @@ impl Repo {
             w.write_all(b"\n")?;
             if let Some(p) = &parent {
                 writeln!(w, "from {p}")?;
+            }
+            for m in &merged {
+                writeln!(w, "merge {m}")?;
             }
             for (path, data) in changes {
                 match data {
@@ -238,6 +265,100 @@ impl Repo {
             return Err(Error::UnknownBranch(name.to_string()));
         }
         std::fs::write(self.git_dir.join("HEAD"), format!("ref: refs/heads/{name}\n"))?;
+        Ok(())
+    }
+
+    /// The best common ancestor of two versions, if any.
+    pub fn merge_base(&self, a: &str, b: &str) -> Result<Option<String>> {
+        let (a, b) = (self.resolve(a)?, self.resolve(b)?);
+        let out = self.git().args(["merge-base", &a, &b]).output()?;
+        if !out.status.success() {
+            return Ok(None); // no common history
+        }
+        Ok(Some(String::from_utf8_lossy(&out.stdout).trim().to_string()))
+    }
+
+    /// Move the current branch forward to `rev` (which must contain its head).
+    pub fn fast_forward(&self, rev: &str) -> Result<String> {
+        let target = self.resolve(rev)?;
+        let branch = self.current_branch()?;
+        let head = self.head()?.ok_or_else(|| Error::Git("nothing to fast-forward".into()))?;
+        if self.merge_base(&head, &target)?.as_deref() != Some(head.as_str()) {
+            return Err(Error::Git(format!("{rev} does not contain the current version")));
+        }
+        self.run(self.git().args(["update-ref", &format!("refs/heads/{branch}"), &target, &head]))?;
+        Ok(target)
+    }
+
+    pub fn delete_branch(&self, name: &str) -> Result<()> {
+        if !self.branches()?.iter().any(|b| b == name) {
+            return Err(Error::UnknownBranch(name.to_string()));
+        }
+        if self.current_branch()? == name {
+            return Err(Error::Git(format!("{name} is the current branch")));
+        }
+        self.run(self.git().args(["branch", "-D", "--", name]))
+    }
+
+    /// An annotated tag (a milestone) on `rev`, signed by `tagger` at its time.
+    pub fn create_tag(&self, name: &str, rev: &str, message: &str, tagger: &Signature) -> Result<()> {
+        validate_signature(tagger)?;
+        if name.starts_with('-') || name.trim().is_empty() {
+            return Err(Error::Git(format!("invalid tag name {name:?}")));
+        }
+        let target = self.resolve(rev)?;
+        let mut c = self.git();
+        c.env("GIT_COMMITTER_NAME", &tagger.name)
+            .env("GIT_COMMITTER_EMAIL", &tagger.email)
+            .env("GIT_COMMITTER_DATE", format!("{} +0000", tagger.time))
+            .args(["tag", "-a", "-m", message, name, &target]);
+        self.run(&mut c)
+    }
+
+    /// Annotated and lightweight tags, sorted by name.
+    pub fn tags(&self) -> Result<Vec<TagInfo>> {
+        let out = self
+            .git()
+            .args([
+                "for-each-ref",
+                "refs/tags",
+                "--format=%(refname:strip=2)%1f%(*objectname)%1f%(objectname)%1f%(taggername)%1f%(taggerdate:unix)%1f%(contents)%1e",
+            ])
+            .output()?;
+        if !out.status.success() {
+            return Err(Error::Git(String::from_utf8_lossy(&out.stderr).into_owned()));
+        }
+        let text = String::from_utf8_lossy(&out.stdout);
+        let mut tags = Vec::new();
+        for record in text.split('\x1e') {
+            let f: Vec<&str> = record.trim_start_matches('\n').split('\x1f').collect();
+            if f.len() < 6 {
+                continue;
+            }
+            tags.push(TagInfo {
+                name: f[0].to_string(),
+                target: if f[1].is_empty() { f[2] } else { f[1] }.to_string(),
+                tagger_name: f[3].to_string(),
+                time: f[4].trim().parse().unwrap_or(0),
+                message: f[5].to_string(),
+            });
+        }
+        tags.sort_by(|a, b| a.name.cmp(&b.name));
+        Ok(tags)
+    }
+
+    pub fn delete_tag(&self, name: &str) -> Result<()> {
+        if !self.tags()?.iter().any(|t| t.name == name) {
+            return Err(Error::UnknownRev(name.to_string()));
+        }
+        self.run(self.git().args(["tag", "-d", "--", name]))
+    }
+
+    fn run(&self, c: &mut Command) -> Result<()> {
+        let st = c.output()?;
+        if !st.status.success() {
+            return Err(Error::Git(String::from_utf8_lossy(&st.stderr).into_owned()));
+        }
         Ok(())
     }
 

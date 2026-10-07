@@ -18,3 +18,4 @@ KIMCAD is GPL-3.0-or-later. These are the components it uses, how each is linked
 | pytest | MIT | Tests | Development only |
 | tempfile | MIT OR Apache-2.0 | Rust tests | Development only |
 | pixi | BSD-3-Clause | Environment manager | Development only |
+| Qt Advanced Docking System 4.5.0 (commit 87cffe5) | LGPL-2.1-or-later | Dockable, floating and auto-hide panels and tabs in the app (D71) | Static (C++), built from source with CMake FetchContent |

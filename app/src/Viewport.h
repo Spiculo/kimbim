@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <QPointer>
+
 #include <AIS_InteractiveContext.hxx>
 #include <AIS_ViewController.hxx>
 #include <gp_Pnt.hxx>
@@ -23,18 +25,22 @@
 #include <vector>
 
 #include "ElementBatch.h"
+#include "Scene.h"
 
 class QTimer;
 
 namespace kimcad {
 
 // OCCT 3D view in a native Qt widget (D45). Navigation and click-selection come from
-// AIS_ViewController; the model is a set of ElementBatch objects (D42).
+// AIS_ViewController; the model is a set of ElementBatch objects (D42) held by a Scene that several
+// views can share (D71: the 3D tab and plan tabs).
 class Viewport : public QWidget, protected AIS_ViewController {
     Q_OBJECT
 public:
-    explicit Viewport(QWidget* parent = nullptr);
+    explicit Viewport(QWidget* parent = nullptr);               // owns a new Scene (tests, self-test)
+    explicit Viewport(Scene* scene, QWidget* parent = nullptr); // one view of `scene`
     ~Viewport() override;
+    Scene* scene() const { return m_scene; }
 
     void addBatch(const Handle(ElementBatch)& batch);
     // Live edits (Slice 4): new geometry for these elements (old instances retired, selection kept),
@@ -48,7 +54,7 @@ public:
     bool isPlanView() const { return m_planView; }
     // Lines only (hidden-line drawing, Slice 4b): every batch, including later ones.
     void setLinesOnly(bool on);
-    bool linesOnly() const { return m_linesOnly; }
+    bool linesOnly() const { return m_scene->linesOnly; }
     double planElevation() const { return m_planElevation; }
     // Screen point -> point on the horizontal plane z (metres). False without a window or when the
     // view ray is parallel to the plane.
@@ -77,10 +83,16 @@ public:
     // top, selectable (their guids join selectedGuids), hidden/locked with their layer.
     struct Annotation {
         QString guid, kind, text;
-        QVector<QPointF> points; // world metres: text/mark anchor; dimension a, b, line point
+        QVector<QPointF> points; // world metres: text/mark anchor; dimension chain points + line point; leader tip..text
+        double size = 2.5;       // text size in millimetres on paper (printed at 1:100)
     };
     void setAnnotations(const QVector<Annotation>& annotations, double z);
-    int annotationCount() const { return int(m_annotations.size()); }
+    int annotationCount() const;
+    // Section and elevation markers (Slice 14): kind "section"/"elevation", text = the drawing's
+    // name, points = the line's two ends and a point on the side it looks at. Shown in plan view on
+    // every level (not in 3D, as in Archicad), selectable like annotations (Move, Rotate, Delete).
+    void setDrawingMarkers(const QVector<Annotation>& markers, double z);
+    int markerCount() const;
     QStringList annotationGuids() const;
     QStringList annotationTexts() const;
     // The plan cut's sections (owner feedback): elements cut at height z get a dark fill and a bold
@@ -90,9 +102,10 @@ public:
     int gridLineCount() const { return m_gridLineCount; }
     void clear();
     void fitAll();
+    double zoomPercent() const; // 100 = the fitted view (D71: the bottom bar)
 
-    int batchCount() const { return int(m_batches.size()); }
-    int elementCount() const { return m_locate.size(); }
+    int batchCount() const { return int(m_scene->batches.size()); }
+    int elementCount() const { return m_scene->locate.size(); }
     QStringList guids() const; // in batch order
     QString typeOf(const QString& guid) const; // IFC class of a shown element ("" if unknown)
     // Compare (Slice 8): colour these elements (others keep their class colour) until cleared.
@@ -113,6 +126,10 @@ public:
     void addClipPlanes(const std::vector<Handle(Graphic3d_ClipPlane)>& planes);
     void clearClipPlanes();
     int clipPlaneCount() const { return int(m_clipPlanes.size()); }
+    int viewClipPlaneCount() const; // the cut planes on this view's V3d_View
+    // Overlays belong to their view (D71); for tests.
+    bool showsOverlay(const Handle(AIS_InteractiveObject)& obj, const Handle(V3d_View)& view) const;
+    Handle(AIS_InteractiveObject) gridObject() const { return m_grid; }
     Bnd_Box boundsOf(const QStringList& guids) const; // all visible elements when empty
 
     // Measurement helpers used by --self-test.
@@ -141,6 +158,10 @@ public:
     bool selectThrough() const { return m_selectThrough; }
     // Guids with at least one visible pixel in the rectangle (nullopt: cannot tell, e.g. no window).
     std::optional<QSet<QString>> visibleIn(int x0, int y0, int x1, int y1);
+    // Elements a section/elevation can see (Slice 14 visible-element pass, spike S6): an
+    // orthographic camera on the line p1-p2 looking towards `look`, between heights z0 and z1,
+    // up to `depth` metres beyond the line (< 0: no limit). Rendered offscreen in id colours.
+    std::optional<QSet<QString>> visibleFrom(QPointF p1, QPointF p2, QPointF look, double z0, double z1, double depth);
 
 signals:
     void selectionChanged(const QStringList& guids);
@@ -152,6 +173,9 @@ signals:
     void lengthKeyTyped(const QString& text);
     // The mouse rested on an element ("" when it left it): the app shows a hint.
     void hovered(const QString& guid, const QPoint& globalPos);
+    void zoomChanged(double percent);
+    // Double-click on an element or a plan note (not while drawing): its properties (D71).
+    void elementDoubleClicked(const QString& guid);
     // Drag to move (owner feedback): left-drag that starts on a selected element; points on the work
     // plane, tolerance = ~10 px in metres.
     void dragMoved(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
@@ -172,32 +196,23 @@ protected:
     void handleSelectionPoly(const Handle(AIS_InteractiveContext)& ctx, const Handle(V3d_View)& view) override;
 
 private:
-    struct Loc {
-        int batch;
-        int index;
-    };
     bool ensureWindow();
     void applyNavigationPreset();
     void redisplay(const std::vector<int>& batches);
     bool retire(const QString& guid, std::vector<int>* touched); // true if it was selected
     NCollection_Vec2<int> toPixels(const QPointF& p) const;
 
-    Handle(V3d_Viewer) m_viewer;
+    QPointer<Scene> m_scene;                  // shared with the other views of the model (a closed tab's view
+                                              // can be deleted late: never touch a scene that is gone)
+    Handle(AIS_InteractiveContext) m_context; // == m_scene->context()
     Handle(V3d_View) m_view;
-    Handle(AIS_InteractiveContext) m_context;
-    std::vector<Handle(ElementBatch)> m_batches;
-    QHash<QString, Loc> m_locate;
     bool m_planView = false;
-    bool m_linesOnly = false;
-    QHash<QString, QColor> m_colors;
-    QSet<QString> m_layerHidden, m_layerLocked;
     void applyLayerState(const Handle(ElementBatch)& batch) const;
     void applyColors(const Handle(ElementBatch)& batch) const;
     bool m_selectThrough = false;
-    bool m_quietSelection = false;
-    int m_nextIdBase = 0;
-    std::vector<int> m_idBases; // per batch, for decoding ids
     void keepOnlyVisible(const QSet<QString>& before, AIS_SelectionScheme scheme, int x0, int y0, int x1, int y1);
+    // Renders the view's camera into a w x h offscreen image in id colours; guids seen in the rectangle.
+    std::optional<QSet<QString>> idsInImage(int w, int h, int x0, int y0, int x1, int y1);
     QSet<QString> selectedSet() const;
     bool m_drawingMode = false;
     QTimer* m_hoverTimer = nullptr;
@@ -210,6 +225,7 @@ private:
     Handle(ElementBatch) m_preview;
     Handle(AIS_InteractiveObject) m_grid;
     QVector<Annotation> m_annotationData;
+    QVector<Annotation> m_markerData;
     double m_annotationZ = 0.0;
     QHash<QString, Handle(AIS_InteractiveObject)> m_annotations;
     void displayAnnotations();
@@ -217,9 +233,13 @@ private:
     std::optional<double> m_sectionZ;
     int m_sectionElements = 0;
     void rebuildSection();
+    void keepHere(const Handle(AIS_InteractiveObject)& obj);
+    void keepOverlaysHere();
     int m_gridLineCount = 0;
     bool workPoint(const QPointF& widgetPos, QPointF* point, double* tolerance);
     double m_planElevation = 0.0;
+    double m_fitScale = 0.0; // the view's scale when fitted (100%)
+    double m_lastZoom = -1.0;
     std::vector<Handle(Graphic3d_ClipPlane)> m_clipPlanes;
 };
 

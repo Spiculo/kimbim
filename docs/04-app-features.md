@@ -25,6 +25,16 @@ Navigation preset (D48, owner choice): middle-drag pans, Shift+middle-drag orbit
 
 Display (Slice 4b): every element has border lines (outline and creases); View › **Lines only** (L) shows a line drawing with hidden lines removed, meant for plans. Plan view (P) and 3D view (3) exist; other preset views are in the backlog below.
 
+**Window layout (D71).** The center holds tabs: **3D**, a **plan tab per level** (P opens the active level's, or double-click a level in the tree; View › New plan tab), sections, elevations and sheets. Any tab can be dragged out to its own window (a second monitor) and docked back, or placed beside another. The 3D and plan tabs show one loaded model: selecting in one selects in all; each has its own camera and cut (a plan tab is cut at its level). Switching tabs ends a tool in progress, like Esc.
+- **Left:** the tools, in collapsible groups **3D** (wall, slab, column, beam, door, window, stair, roof, room, slab opening, place model), **Plane** (text, dimension, leader, mark, grid line), **View** (section, elevation, new plan tab, new sheet) and **Edit** (move, rotate, stretch, mirror, copy to level). Shortcuts and the Model menu are unchanged.
+- **Above the active view:** the active tool's fields (type, height, roof shape and pitch, typed length), only while a tool is active.
+- **Right:** the model tree, Properties, Layers, History, Drawings and Sheets as tabs; the area can auto-hide or float. **Double-click** an element (in a view or the tree) to bring Properties forward.
+- **Bottom:** the current pen (pen sets come later), the active layer, the visible layers, the zoom, the selection ("2 Walls") and messages.
+- **Top:** one bar with the design option (versioned projects), the active level and the cut controls.
+- The layout is remembered between sessions; a window left on a missing monitor comes back to the default layout.
+
+**Model tree:** one row for Project › Site › Building when there is only one of each; plain names ("Wall"); a level's elements grouped by category with a count ("Walls (12)"); the IFC class shows on hover and the search still matches it.
+
 **Navigation backlog** (owner, 2026-10-05: "we need those, document them for now"):
 - **View cube** (clickable faces/edges/corners to jump to a view; drag to orbit), like Revit/ArchiCAD/most CAD.
 - **Preset views**: front, back, left, right, top, bottom, plus the isometric ones, from a menu and the view cube.
@@ -66,7 +76,7 @@ Display (Slice 4b): every element has border lines (outline and creases); View �
 | **Type vs. element values** (D50): values inherited from the element's type are dimmed; editing writes the element's own value (an override); *Edit type value…* changes the type for every element of it, after a confirmation with the count; *Reset to type value* drops the override | P0 | `ifcopenshell.util.element.get_type` |
 | **Schedules**: table views of objects × properties, editable, CSV/XLSX export | P1 | Bonsai/IfcOpenShell `ifccsv` |
 | Search and filter with a query language | P0 | `ifcopenshell.util.selector` syntax (e.g. `IfcWall, Pset_WallCommon.FireRating=EI60`) |
-| Object history panel (versioned projects) | P0 | [03](03-versioning.md#object-history-blame) |
+| Object history panel (versioned projects) | P0 | ✅ Slice 20: *Object history…* dialog ([03](03-versioning.md#object-history-blame)) |
 
 ## 5. Modeling
 
@@ -118,11 +128,11 @@ Clones get **new KIMCAD IDs and GlobalIds**. They never share identity with the 
 
 | Feature | Pri | Notes / reuse |
 |---------|-----|---------------|
-| Generate plans, sections, elevations from the model | P1 | IfcOpenShell **SVG serializer** (hidden-line removal, cut fills), as used by Bonsai |
+| Generate plans, sections, elevations from the model | P1 | IfcOpenShell **SVG serializer** (hidden-line removal, cut fills), as used by Bonsai. ✅ Sections and elevations (Slice 14, D60/D61); plans: Slice 15 |
 | Annotations: dimensions, text, tags (door/window/room tags), level marks | P1 | IFC annotation entities (`IfcAnnotation`), stored in the model |
 | Sheets with title blocks; place drawings at scale | P1 | Bonsai's drawing/sheet approach (SVG-based) |
 | Export PDF / SVG; DXF later | P1 | |
-| Drawings update automatically when the model changes | P1 | |
+| Drawings update automatically when the model changes | P1 | 🟡 Slice 14: marked out of date, regenerated in the background when shown or on Regenerate |
 | Show version/milestone on the title block (from repo) | P2 | Bonsai already does this with `git describe` |
 
 ## 9. Versioning UI (versioned projects)
@@ -130,11 +140,11 @@ Clones get **new KIMCAD IDs and GlobalIds**. They never share identity with the 
 | Feature | Pri | Notes |
 |---------|-----|-------|
 | "Save version" dialog: message, changed-objects summary | P0 | ✅ Slice 8 (Ctrl+Alt+S; Ctrl+S in a versioned project) |
-| History timeline (versions, milestones, design options) | P0 | ✅ Slice 8: History dock per option; milestones: Slice 9 |
-| Compare any two versions: viewport coloring + change list + before/after | P0 | ✅ Slice 8: version vs current or two versions, added green / modified orange, change list (click selects); before/after: Slice 9 |
-| Design options: create, switch, delete | P0 | Branches. ✅ Slice 8: create, switch (with an unsaved-changes guard); delete: Slice 9 |
-| Combine options with conflict resolution UI | P1 | [03](03-versioning.md#merge-combine-options) |
-| Milestones | P0 | Tags |
+| History timeline (versions, milestones, design options) | P0 | ✅ Slice 8: History dock per option; ✅ Slice 20: milestones shown in bold with ◆ |
+| Compare any two versions: viewport coloring + change list + before/after | P0 | ✅ Slice 8: version vs current or two versions, added green / modified orange, change list (click selects); ✅ Slice 20: before/after per element (field by field) |
+| Design options: create, switch, delete | P0 | Branches. ✅ Slice 8: create, switch (with an unsaved-changes guard); delete: Slice 20 |
+| Combine options with conflict resolution UI | P1 | ✅ Slice 22 (M5 exit): dialog, combined model as preview, two-parent version ([03](03-versioning.md#merge-combine-options)) |
+| Milestones | P0 | ✅ Slice 20: annotated tags (D67) |
 | Re-import from external tool with reconciliation report | P1 | [03](03-versioning.md#import-reconciliation) |
 | Remotes: push/pull to a Git host | P2 | [08](08-future.md) |
 
@@ -178,6 +188,7 @@ Rules:
 ## UX principles
 
 - **Architect vocabulary in the UI** ([00](00-vision-and-scope.md#audience)). Show IFC class names as secondary information, not as the primary label.
-- **Familiar patterns** from mainstream BIM tools: ribbon or toolbar with tools by discipline, properties on the right, project browser on the left, status bar with snapping.
+- **Familiar patterns** from mainstream BIM tools: tools grouped by category on the left, the model tree and properties on the right (D71), a bottom bar with layers, zoom and selection.
+- **Room for the model.** Panels are tabbed and can auto-hide; views are tabs that can move to another window.
 - **Nothing blocks.** Long operations show progress and can be cancelled.
 - **Every action can be undone.** Versioned projects add a second safety net: any saved version can be restored.

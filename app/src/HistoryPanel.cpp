@@ -24,6 +24,7 @@ HistoryPanel::HistoryPanel(QWidget* parent)
     , m_compareCurrent(new QPushButton(tr("Compare with current"), this))
     , m_compareTwo(new QPushButton(tr("Compare the two selected"), this))
     , m_end(new QPushButton(tr("End compare"), this))
+    , m_beforeAfter(new QPushButton(tr("Before/after..."), this))
     , m_legend(new QLabel(this))
 {
     m_versions->setObjectName(QStringLiteral("versionList"));
@@ -44,6 +45,18 @@ HistoryPanel::HistoryPanel(QWidget* parent)
     layout->addLayout(buttons);
     layout->addWidget(m_legend);
     layout->addWidget(m_changes, 3);
+    m_beforeAfter->setObjectName(QStringLiteral("beforeAfterButton"));
+    m_beforeAfter->setToolTip(tr("The selected element in the two compared versions, field by field"));
+    layout->addWidget(m_beforeAfter);
+    connect(m_changes, &QTreeWidget::itemSelectionChanged, this, [this] {
+        const auto items = m_changes->selectedItems();
+        m_beforeAfter->setEnabled(items.size() == 1 && !items.first()->data(0, GuidRole).toString().isEmpty());
+    });
+    connect(m_beforeAfter, &QPushButton::clicked, this, [this] {
+        const auto items = m_changes->selectedItems();
+        if (items.size() == 1 && !items.first()->data(0, GuidRole).toString().isEmpty())
+            emit beforeAfterRequested(items.first()->data(0, GuidRole).toString());
+    });
 
     connect(m_versions, &QListWidget::itemSelectionChanged, this, &HistoryPanel::updateButtons);
     connect(m_compareCurrent, &QPushButton::clicked, this, [this] {
@@ -75,10 +88,21 @@ void HistoryPanel::setVersions(const QJsonArray& versions)
     for (const auto& v : versions) {
         const QJsonObject o = v.toObject();
         const QString when = QLocale().toString(QDateTime::fromSecsSinceEpoch(o.value("time").toInteger()), QLocale::ShortFormat);
+        QStringList marks;
+        for (const auto& m : o.value("milestones").toArray())
+            marks << m.toString();
+        // Milestones (Slice 20) are named versions: shown first, in bold.
+        const QString title = marks.isEmpty() ? o.value("message").toString().section(QLatin1Char('\n'), 0, 0)
+                                              : QStringLiteral("◆ %1 — %2").arg(marks.join(QStringLiteral(", ")),
+                                                    o.value("message").toString().section(QLatin1Char('\n'), 0, 0));
         auto* item = new QListWidgetItem(QStringLiteral("%1\n%2 · %3 · %4")
-                                             .arg(o.value("message").toString().section(QLatin1Char('\n'), 0, 0),
-                                                 o.value("author").toString(), when, o.value("short").toString()),
+                                             .arg(title, o.value("author").toString(), when, o.value("short").toString()),
             m_versions);
+        if (!marks.isEmpty()) {
+            QFont bold = item->font();
+            bold.setBold(true);
+            item->setFont(bold);
+        }
         item->setData(IdRole, o.value("id").toString());
         item->setToolTip(o.value("message").toString());
     }
@@ -92,6 +116,8 @@ void HistoryPanel::setChanges(const QJsonObject& compare)
     const bool comparing = !compare.isEmpty();
     m_legend->setVisible(comparing);
     m_end->setEnabled(comparing);
+    m_beforeAfter->setVisible(comparing);
+    m_beforeAfter->setEnabled(false);
     if (!comparing)
         return;
     const struct {

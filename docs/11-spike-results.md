@@ -1,4 +1,4 @@
-# 11 — Spike Results (S1–S5)
+# 11 — Spike Results (S1–S6)
 
 Run 2026-10-03/04 on Windows 11 (16 threads, 32 GB) and WSL Ubuntu, ifcopenshell 0.9.0, gix 0.88.
 Code and instructions: [`spikes/`](../spikes/README.md). Test corpus: 80 buildingSMART sample files (IFC2X3, IFC4, IFC4X3), including real Revit/ArchiCAD exports (Duplex, Clinic, Schependomlaan, Esplanades).
@@ -12,6 +12,7 @@ Code and instructions: [`spikes/`](../spikes/README.md). Test corpus: 80 buildin
 | S3 | Lossless, deterministic IFC ↔ records round-trip? Local edits? | **Yes**, after three design rules found by the spike (below). |
 | S4 | Identical hashes on Windows and Linux? | **Yes: 77/77 identical state hashes and byte-identical IFC exports.** |
 | S5 | Git object DB for a 1M-record model? | **Yes, if records are written as packs (never loose objects) and packs avoid deltas.** |
+| S6 | Can IfcOpenShell's SVG serializer make KIMCAD's drawings, fast enough? | **Yes for quality; speed needs**: sending only visible elements (the big win), polygon HLR (a smaller one), and generating in a child process (the serializer holds the GIL). |
 
 ---
 
@@ -190,6 +191,54 @@ Synthetic ~700-byte canonical records, sharded `objects/<aa>/<bb>/<id>.json`, on
 
 ---
 
+## S6 — Drawings: SVG serializer (Slice 14 risk check)
+
+Run 2026-10-07 on Linux (4 threads), ifcopenshell 0.9.0 (PyPI wheel; same version as the conda-forge build), with
+[`spikes/s6_drawings/drawing_bench.py`](../spikes/s6_drawings/drawing_bench.py).
+
+**API.** In 0.9.0 the serializer has no `addDrawing()` from Python. Custom drawings work the way `ifcopenshell.draw` and
+Bonsai do it: an `IfcAnnotation` with `ObjectType = "DRAWING"` whose placement is the camera (it looks along −Z) and
+whose `Body` is an `IfcBlock` (width × height × depth), passed with the `elevation-ref-guid` setting. The annotation
+itself must be among the iterator's elements, otherwise the output is empty. `IfcOpeningElement` must be left out,
+otherwise openings are drawn as cut fill across doors and windows. Output is in paper millimetres (`bounds`, `scale`).
+
+**Quality (the M4 house).** Plan, section and elevation are correct: walls and slabs cut with a solid fill (poché),
+windows and doors in projection, storeys and slabs in the right places. Missing: door swings in plan (the doors have no
+swing in their representation; Slice 15). Polygon HLR (`svg-poly`) gives the same drawings as exact HLR.
+
+**Speed.**
+
+| Model | Drawing | Elements given | Geometry | HLR | Total |
+|-------|---------|----------------|----------|-----|-------|
+| House (24 products) | plan / section / elevation | 18 / 33 / 33 | 0.07–0.14 s | 0.15–0.17 s | **0.25–0.33 s** |
+| Synthetic, 2,880 products (12 × 12 rooms × 4 levels) | plan, level 1, exact HLR | 1,297 | 2.1 s | 7.3 s | 10.6 s |
+| same | plan, level 1, `svg-poly` | 1,297 | 1.9 s | 4.6 s | **6.8 s** |
+| same | section through the middle, exact / `svg-poly` | all | 9.9 / 8.0 s | 18.2 / 16.2 s | 32.5 / **25.6 s** |
+| same | south elevation, exact / `svg-poly` | all | 8.4 / 8.8 s | 58.9 / 42.1 s | 72.1 / **52.1 s** |
+| same | south elevation, only the visible front row | 240 products | 1.3 s | 1.9 s | **3.4 s** |
+| Clinic_Architectural (2,586 products drawn), CI Linux runner, two runs | plan of First Floor (the fullest storey), `svg-poly` | 2,075 | 2.8 s | 3.3 s | **6.4 s** |
+| same | section through the middle, `svg-poly` | all | 7.2–11.1 s | 8.9–13.4 s | **17.0–25.9 s** |
+| same | south elevation, `svg-poly` | all | 7.3–11.5 s | 13.9–21.4 s | **22.2–34.4 s** |
+| same, **in the app (Slice 14)** | South Elevation from *Create elevations*, visible-element pass + child process | 120 visible of 2,586 | — | — | **5.1 s** (CI Linux runner, end to end) |
+
+- Clinic confirms the synthetic results on a real Revit export: a plan of its fullest floor takes 6.4 s, a section or
+  elevation of the whole building 17–34 s (runners vary), and geometry (7–11 s) matters too, not only HLR. The visible-element pass cuts both.
+- Hidden-line removal dominates, and it grows with everything behind the cut, not with what is visible. Sending only
+  the elements the camera can see cut the elevation from 52 s to 3.4 s. KIMCAD already renders element IDs into an
+  offscreen image for box selection (D52); the same pass from the drawing's camera gives the visible set.
+- `svg-poly` (with `svg-prefilter` on and `svg-unify-inputs` off) makes HLR 1.1–1.6× faster with the same drawings,
+  and `write` 3–4× faster. Worth having, but it is not the fix. (Earlier runs that showed a 4× gain were taken while
+  other benchmarks shared the 4 cores; the table uses sequential runs only.)
+- **The serializer holds the GIL** during `write` and `finalize`: a Python thread ticking every 10 ms stalled for
+  4.7 s while a plan generated. Generating in-process would freeze the app, because the GUI calls Python. A snapshot
+  for a child process is cheap: `to_string` 0.25 s and `from_string` 0.31 s for the 5 MB synthetic model.
+
+**Decisions** (D60, proposed in the [Slice 14 plan](superpowers/plans/2026-10-07-slice14-sections-elevations.md)):
+drawings are DRAWING annotations; generation runs in a child process from a snapshot; `svg-poly`; plans pre-filtered
+to their level; sections and elevations get a visible-element pass first.
+
+---
+
 ## Changes made to the design docs
 
 - [02](02-data-model-and-format.md): content-class classification; stable IDs for shared mutable entities; loose-entity multiplicity; no NFC normalization; INTEGER/REAL distinction; invalid-input and duplicate-GlobalId policy.
@@ -197,3 +246,20 @@ Synthetic ~700-byte canonical records, sharded `objects/<aa>/<bb>/<id>.json`, on
 - [05](05-geometry-rendering-drawings.md): hybrid CGAL/OCCT kernel for display tessellation.
 - [07](07-roadmap.md): spike status.
 - [decisions.md](decisions.md): D34–D39.
+
+## Slices 18–22 on Clinic (owner process rule: time on Clinic)
+
+`python spikes/m5_bench/clinic_bench.py Clinic_Architectural.ifc WORK_DIR` (`pixi run m5-bench`), Linux container, 2026-10-07. Clinic: 3,298 products, 1,080 walls, 269 (Revit) spaces, 14,432 property sets, IFC2X3.
+
+| Step | Time | Note |
+|---|---|---|
+| After-edit hooks (rooms re-fit, walls re-trimmed to roofs), per edit | 10 ms for a wall edit, < 1 ms otherwise | was 58 ms before rooms were found through their property sets and skipped when no wall changed |
+| Enable versioning / Save version | 100 s each | **pre-existing (Slice 8)**: Python decomposition of the whole model on every save. The Rust record layer (R1 port) or incremental decomposition is needed before large real projects |
+| Switch option | 13 s | export + reopen |
+| Milestone | 0.02 s | |
+| Object history (3 versions) | 0.4 s | tree entries per version |
+| Before/after | 19 s first, 0.02 s cached | composes the whole older version; reading only the element's records is a follow-up |
+| Combine preview | 4.5 s | reads the three record sets, merges |
+| Combine (write + open the combined model) | 18 s | |
+
+The bench also found two problems, both fixed: moving a Revit wall failed (ifcopenshell's wall regenerator needs a Body/MODEL_VIEW context; imported walls now keep their own geometry), and both options editing one IFC2X3 element raised a second conflict on its `OwnerHistory` (bookkeeping: this option's is kept, never asked).

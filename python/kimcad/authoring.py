@@ -31,6 +31,7 @@ import ifcopenshell.util.unit
 import numpy as np
 
 from . import app_bridge as B
+from . import drawgen
 from . import layers
 
 # Default wall types created the first time a model without layered wall types needs one.
@@ -91,6 +92,10 @@ def new_project(name: str = "") -> str:
             ifcopenshell.api.geometry.edit_object_placement(f, product=product)
         B._model = f
         _make_storey("Level 1", 0.0)
+        from . import drawings
+
+        drawings.create_plan(B._model.by_type("IfcBuildingStorey")[0].GlobalId, undoable=False)  # every story has one
+        drawings.create_template_elevations()  # D61: like Archicad's default template
     except Exception as ex:
         return _fail(f"{type(ex).__name__}: {ex}")
     B._reset_history("")
@@ -136,7 +141,10 @@ def add_storey(name: str, elevation) -> str:
     made = {}
 
     def action():
+        from . import drawings
+
         made["storey"] = _make_storey(name or "Level", elevation)
+        drawings.create_plan(made["storey"].GlobalId, undoable=False)  # Archicad: every story has a floor plan
         return 1
 
     r = B._run(action)
@@ -279,14 +287,14 @@ def create_wall(storey_guid: str, type_guid: str, x1, y1, x2, y2, height, join_s
             elevation=_elevation(storey), height=height, thickness=thickness, is_si=True)
         ifcopenshell.api.geometry.assign_representation(f, product=wall, representation=representation)
         ifcopenshell.api.spatial.assign_container(f, products=[wall], relating_structure=storey)
-        ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=wall, length=length, height=height)
+        _regenerate(f, wall, length=length, height=height)
         neighbours = []
         for guid, point in joins:
             other = B._model.by_guid(guid)
             ifcopenshell.api.geometry.connect_wall(f, wall1=wall, wall2=other, is_atpath=not _is_at_end(point, other))
             neighbours.append(other)
         for w in [wall, *neighbours]:
-            ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=w, length=length, height=height)
+            _regenerate(f, w, length=length, height=height)
         layers.assign_active(wall)
         made["wall"] = wall
         return 1, [wall.GlobalId, *(n.GlobalId for n in neighbours)], []
@@ -353,7 +361,7 @@ def delete_elements(guids_json: str) -> str:
                     f.remove(rel)  # the join goes with the wall
             remove(e)
         for w in neighbours:
-            ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=w)
+            _regenerate(f, w)
         return len(elements), [w.GlobalId for w in [*neighbours, *hosts]], removed
 
     try:
@@ -602,6 +610,19 @@ def _filling_representation(kind, element_type, width, height):
     return ifcopenshell.api.geometry.add_window_representation(
         f, context=_body_context(), overall_height=height / s, overall_width=width / s,
         partition_type=getattr(element_type, "PartitioningType", None) or "SINGLE_PANEL")
+
+
+def _regenerate(f, wall, **kwargs):
+    """Rebuild a layered wall's body and axis (ifcopenshell's wall regenerator). Imported walls whose
+    body is not on the Model/Body/MODEL_VIEW context (e.g. Revit IFC2X3 puts it on the Model context)
+    keep their own geometry: moving them moves their placement only. A wall with no body yet gets one."""
+    ours = ifcopenshell.util.representation.get_representation(wall, "Model", "Body", "MODEL_VIEW")
+    bodies = [r for r in (wall.Representation.Representations if wall.Representation else ())
+              if r.RepresentationIdentifier == "Body"]
+    if ours is None and bodies:
+        return None
+    _body_context()  # the regenerator needs the Body/MODEL_VIEW context
+    return ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=wall, **kwargs)
 
 
 def _replace_body(product, representation):
@@ -1015,11 +1036,13 @@ def _transform(guids_json: str, transform_si, detach=False) -> str:
             world = ifcopenshell.util.placement.get_local_placement(e.ObjectPlacement)
             ifcopenshell.api.geometry.edit_object_placement(
                 f, product=e, matrix=t_units @ world, is_si=False, should_transform_children=True)
+            if drawgen.is_drawing(e):
+                drawgen.release(f, e)  # a moved template elevation stays where it was put (D61)
         for n, (p1, p2) in dragged.items():
             _reaxis(n, p1, p2)
         for w in [*walls, *neighbours]:
             if _axis_world(w) is not None and _layer_set(w) is not None:
-                ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=w)
+                _regenerate(f, w)
         changed = [e.GlobalId for e in moved if not e.is_a("IfcOpeningElement")] + [n.GlobalId for n in neighbours]
         return len(roots), changed, []
 
@@ -1046,6 +1069,12 @@ def _follow_end(end, other_end, moved_wall, t):
     if abs(denom) < 1e-9 * max(np.linalg.norm(d_own) * np.linalg.norm(d_moved), 1e-12):
         return (t @ np.array([end[0], end[1], 0.0, 1.0]))[:2]
     return other_end + d_own * (cross(q1 - other_end, d_moved) / denom)
+
+
+def _world(element):
+    """An element's placement origin in world metres (x, y, z)."""
+    m = ifcopenshell.util.placement.get_local_placement(element.ObjectPlacement)
+    return tuple(float(v) for v in m[:3, 3] * _scale())
 
 
 def _truthy(value) -> bool:
@@ -1109,9 +1138,9 @@ def set_wall_axis(wall_guid: str, x1, y1, x2, y2) -> str:
         for rel in dropped:
             f.remove(rel)
         _reaxis(wall, p1, p2)
-        ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=wall, length=length, height=height)
+        _regenerate(f, wall, length=length, height=height)
         for n in neighbours:
-            ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=n)
+            _regenerate(f, n)
         return 1, [wall.GlobalId, *(n.GlobalId for n in neighbours), *(e.GlobalId for e in _hosted(wall) if not e.is_a("IfcOpeningElement"))], []
 
     try:
@@ -1171,7 +1200,7 @@ def set_wall_height(guids_json: str, height) -> str:
                 if solid.is_a("IfcExtrudedAreaSolid"):
                     solid.Depth = height / _scale()
             if _axis_world(w) is not None and _layer_set(w) is not None:
-                ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=w, height=height)
+                _regenerate(f, w, height=height)
         return len(walls), [w.GlobalId for w in walls], []
 
     try:
@@ -1365,7 +1394,7 @@ def _copy_elements(elements, target, transform_units, *, tag=None) -> list:
                     relating_connection=rel.RelatingConnectionType, related_connection=rel.RelatedConnectionType)
     for c in copies.values():
         if c.is_a("IfcWall") and _axis_world(c) is not None and _layer_set(c) is not None:
-            ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=c)
+            _regenerate(f, c)
     if tag is not None:
         for source, copy in pairs:
             tag(source, copy)
@@ -1612,9 +1641,9 @@ def set_dimension(guids_json: str, name: str, value) -> str:
                         f.remove(rel)
                 height = _wall_height(e) or 3.0
                 _reaxis(e, p1, p2)
-                ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=e, length=float(np.linalg.norm(p2 - p1)), height=height)
+                _regenerate(f, e, length=float(np.linalg.norm(p2 - p1)), height=height)
                 for n in neighbours:
-                    ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=n)
+                    _regenerate(f, n)
                 changed += [e.GlobalId, *(n.GlobalId for n in neighbours),
                             *(x.GlobalId for x in _hosted(e) if not x.is_a("IfcOpeningElement"))]
             elif kind == "wall-height":
@@ -1622,7 +1651,7 @@ def set_dimension(guids_json: str, name: str, value) -> str:
                 for solid in (f.traverse(body) if body is not None else ()):
                     if solid.is_a("IfcExtrudedAreaSolid"):
                         solid.Depth = data / _scale()
-                ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=e, height=data)
+                _regenerate(f, e, height=data)
                 changed.append(e.GlobalId)
             else:  # column height / beam length: a new extrusion of the type's profile
                 profile, metres_, beam = data

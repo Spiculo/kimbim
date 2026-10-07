@@ -27,6 +27,12 @@ nodejs = ">=22"
 # M3 exit test: build the two-storey sample house through the modeling commands, then check that
 # it validates (schema + EXPRESS rules) and that web-ifc opens and meshes every element.
 house = "python tools/make_house.py build/house.ifc"
+# M4 exit test: the house's sheet A01 (plan, section, elevation, title block) exported to PDF by the app
+# (no window) and checked: one A3 page, vector content, fonts; the sheet holds the three drawings.
+m4 = { cmd = "python tools/check_m4.py build/house.ifc build/m4", depends-on = ["house", "app-build", "build"] }
+# M5 exit test: two design options of the house are created, edited separately, compared and combined
+# with one conflict resolved (the UI path is test_main_window's m5ExitCombineOptions).
+m5 = { cmd = "python tools/check_m5.py build/m5", depends-on = ["build"] }
 interop-install = { cmd = "npm ci --no-audit --no-fund", cwd = "tools/interop" }
 interop = { cmd = "python tools/check_interop.py build/house.ifc", depends-on = ["interop-install", "house"] }
 build = "maturin develop --release --skip-install"
@@ -42,6 +48,10 @@ app-build = { cmd = "cmake --build build/app", depends-on = ["app-configure"] }
 app-test = { cmd = "ctest --test-dir build/app --output-on-failure", depends-on = ["app-build", "build"], env = { KIMCAD_PYTHON_PATH = "$PIXI_PROJECT_ROOT/python" } }
 app-test-nogui = { cmd = "ctest --test-dir build/app --output-on-failure -LE gui", depends-on = ["app-build", "build"], env = { KIMCAD_PYTHON_PATH = "$PIXI_PROJECT_ROOT/python" } }
 app = { cmd = "build/app/kimcad-app", depends-on = ["app-build", "build"], env = { KIMCAD_PYTHON_PATH = "$PIXI_PROJECT_ROOT/python" } }
+# Spike S6: SVG drawing generation (plan, section, elevation) timed on the large Clinic model
+drawing-bench = "python spikes/s6_drawings/drawing_bench.py Clinic_Architectural.ifc build/s6-clinic"
+# Slices 18-22 timed on Clinic: after-edit hooks, versioning, history, before/after, combining options
+m5-bench = "python spikes/m5_bench/clinic_bench.py Clinic_Architectural.ifc build/m5-clinic"
 check-translations = "python tools/check_translations.py"
 kimcad = { cmd = "python -m kimcad", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/python" } }
 

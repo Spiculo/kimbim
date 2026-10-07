@@ -9,6 +9,7 @@
 #include <QPointF>
 #include <QVector>
 
+#include <functional>
 #include <optional>
 #include <QJsonValue>
 #include <QStringList>
@@ -18,6 +19,7 @@
 #include <Bnd_Box.hxx>
 
 class QAction;
+class QMenu;
 class QDoubleSpinBox;
 
 class QComboBox;
@@ -30,6 +32,15 @@ class QLineEdit;
 namespace kimcad {
 
 class LevelsBar;
+class ToolPalette;
+class StatusStrip;
+class ToolOptionsBar;
+class DockLayout;
+class Scene;
+class ViewHost;
+class DrawingsPanel;
+class SheetsPanel;
+class DrawingView;
 class HistoryPanel;
 class LayersPanel;
 class WallTool;
@@ -80,7 +91,7 @@ public:
     LevelsBar* levelsBar() const { return m_levels; }
     // Modeling tools (M3): one active at a time. Exposed for tests and the self-test, which drive
     // them with work-plane points.
-    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening, PlaceModel, Text, Dimension, Mark };
+    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening, PlaceModel, Text, Dimension, Mark, Section, Elevation, Leader, Mirror, Room, Roof };
     void setTool(Tool tool);
     Tool tool() const { return m_tool; }
     WallTool* wallTool() const { return m_wallTool; }
@@ -110,6 +121,14 @@ public:
     int compareChangeCount() const;
     bool createOption(const QString& name);
     bool switchOption(const QString& name);
+    // Slice 20: milestones (named versions), deleting an option, object history, before/after.
+    bool addMilestone(const QString& name, const QString& message = QString());
+    bool deleteOption(const QString& name);
+    // Slice 22: combine another option into the current one (choices: conflict id -> choice); the
+    // combined model opens as unsaved work, coloured by what the other option brought.
+    bool combineOptions(const QString& option, const QJsonObject& choices = QJsonObject());
+    QJsonObject objectHistory(const QString& guid);
+    QJsonObject beforeAfter(const QString& guid, const QString& revA, const QString& revB = QStringLiteral("WORKING"));
     bool discardChanges();
     bool isVersioned() const { return m_versioned; }
     // Layers and views (Slice 11, owner feedback).
@@ -128,6 +147,44 @@ public:
     bool explodeSelectedInstance();
     // Plan annotations (Slice 13): kind "text" (1 point), "dimension" (a, b, line point), "mark".
     bool addAnnotation(const QString& kind, const QVector<QPointF>& points, const QString& text);
+    // Sections and elevations (Slice 14, D60/D61). kind "section" or "elevation": the marker line
+    // p1-p2 looking towards `look` (Archicad's third click), infinite depth.
+    bool createDrawing(const QString& kind, QPointF p1, QPointF p2, QPointF look);
+    DrawingsPanel* drawingsPanel() const { return m_drawingsPanel; }
+    QString drawingGuid(const QString& name); // "" if there is none
+    // Open (or show) a drawing's tab and generate it in the background if it is out of date.
+    bool openDrawing(const QString& guid);
+    DrawingView* drawingView(const QString& guid) const { return m_drawingViews.value(guid); }
+    void regenerateDrawing(const QString& guid);
+    void showModelTab();
+    // D71: the docking layout; the key of the current center view ("3d", "plan:<guid>", a drawing
+    // guid or "sheet:<number>").
+    DockLayout* dockLayout() const { return m_dock; }
+    QString currentViewKey() const;
+    // A level's plan tab (D71): opened once, raised after; a view of the same model as the 3D tab.
+    Viewport* openPlanTab(const QString& storey); // nullptr if it isn't a level of this model
+    Viewport* modelView() const;                  // the 3D tab's view
+    ToolPalette* toolPalette() const { return m_palette; } // D71: the tools on the left
+    ToolOptionsBar* toolOptions() const { return m_toolOptions; } // the active tool's fields
+    StatusStrip* statusStrip() const { return m_status; }          // the bottom bar
+    // Sheets and project info (Slice 16, M4 exit).
+    SheetsPanel* sheetsPanel() const { return m_sheetsPanel; }
+    QString addSheet(const QString& paper, const QString& title); // its number, "" on failure
+    bool placeOnSheet(const QString& number, const QString& drawingGuid);
+    bool openSheet(const QString& number);
+    DrawingView* sheetView(const QString& number) const { return m_drawingViews.value(QStringLiteral("sheet:") + number); }
+    bool exportSheet(const QString& number, const QString& path); // .pdf or .svg
+    bool setProjectInfo(const QJsonObject& info);
+    // How many elements the last generation sent to the serializer (-1: all, no visible pass).
+    int lastDrawingVisibleCount() const { return m_lastDrawingVisible; }
+    // Everyday editing (Slice 17, Archicad's Edit menu). Copies are selected afterwards.
+    bool copySelection(QPointF delta);          // a moved copy (Ctrl+drag)
+    void copyToClipboard();                     // Ctrl+C
+    bool paste();                               // Ctrl+V: onto the active level, same plan position
+    bool duplicateSelection();                  // Ctrl+D
+    bool mirrorSelection(QPointF a, QPointF b, bool copy); // Ctrl+M tool: two clicks; Ctrl copies
+    bool multiplySelection(const QString& kind, const QJsonObject& params); // Ctrl+U: linear / polar
+    bool offsetSelection(double distance);
     // Drag to move (owner feedback): preview while dragging, move on release (Ctrl detaches).
     void dragMoveTo(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
     bool dragFinished(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
@@ -135,6 +192,13 @@ public:
     const QHash<QString, double>& timings() const { return m_timings; }
     void resetTimings() { m_timings.clear(); }
     bool columnAt(QPointF p, bool turned = false);
+    // Slice 18: a room (Archicad zone) filling the walls around p; name asked unless quiet.
+    bool roomAt(QPointF p, const QString& name = QString());
+    // Slice 19: a roof over an outline (the roof kind and pitch from the toolbar); walls trimmed to it.
+    bool createRoof(const QVector<QPointF>& outline);
+    bool trimWallsToRoof(const QStringList& selection);
+    bool releaseWallsFromRoof(const QStringList& selection);
+    void setRoofKind(const QString& kind, double pitch);
     bool createSegment(QPointF p1, QPointF p2); // beam or grid axis, per the active tool
     int gridLineCount() const;
     void setWallToolActive(bool on) { setTool(on ? Tool::Wall : Tool::None); }
@@ -175,6 +239,8 @@ private:
     void addLevelDialog();
     void setPlanView(bool plan);
     void buildModelingToolbar();
+    void buildPalette();
+    void newSheetDialog(const QString& paper);
     void refreshTypes();
     void wallHeightDialog();
     void copyToLevelDialog();
@@ -182,11 +248,33 @@ private:
     void refreshProject();
     void refreshLayers();
     void refreshAnnotations();
-    void annotationClick(QPointF p);
+    void annotationClick(QPointF p, Qt::KeyboardModifiers modifiers = {});
+    void afterCopy(const QJsonObject& result);
+    void multiplyDialog();
+    void offsetDialog();
+    void refreshDrawings();
+    void refreshSheets(bool changed = true); // changed: the model changed, sheets need composing again
+    void projectInfoDialog();
+    void roomScheduleDialog();
+    void exportSheetDialog(bool pdf);
+    void drawingClick(QPointF p);
+    void onDrawingGenerated(const QString& guid, const QJsonObject& result, const QString& error);
+    void activateView(const QString& key);
+    void activateElement(const QString& guid); // double-click: properties, or a level's plan
+    // Every model view gets the same signal handlers: `connect` runs for the views open now and
+    // for every plan tab opened later.
+    void onEachView(const std::function<void(Viewport*)>& connect);
+    void closePlanTabs(const QStringList& keep = {});
+    void closeView(const QString& key);
     void saveVersionDialog();
     void enableVersioningDialog();
     void openProjectDialog();
     void newOptionDialog();
+    void milestoneDialog();
+    void deleteOptionDialog();
+    void combineDialog();
+    void objectHistoryDialog();
+    void beforeAfterDialog(const QString& guid, const QString& revA, const QString& revB);
     bool resolveUnsavedForSwitch();
     void openingSizeDialog();
     QJsonObject openingInfo(const QString& guid);
@@ -207,7 +295,8 @@ private:
     int m_loadedElements = 0;
     QString m_path;
     QElapsedTimer m_loadTimer;
-    Viewport* m_viewport;
+    Scene* m_scene;
+    Viewport* m_viewport; // the active model view (3D or a plan tab)
     ModelTreePanel* m_tree;
     PropertiesPanel* m_properties;
     QThread m_thread;
@@ -229,8 +318,8 @@ private:
     QHash<int, QAction*> m_toolActions;
     QComboBox* m_types = nullptr;
     QDoubleSpinBox* m_wallHeight = nullptr;
-    QAction* m_wallHeightAction = nullptr;
-    QAction* m_lengthAction = nullptr;
+    QComboBox* m_roofKind = nullptr;
+    QDoubleSpinBox* m_roofPitch = nullptr;
     bool m_warnedInconsistent = false;
     HistoryPanel* m_history = nullptr;
     LayersPanel* m_layersPanel = nullptr;
@@ -238,9 +327,34 @@ private:
     QString m_currentView;
     QHash<QString, QString> m_instanceOf; // element -> model instance it belongs to
     QHash<QString, QStringList> m_instanceMembers;
-    QVector<QPointF> m_annotationPoints; // the dimension tool's clicks so far
-    QToolBar* m_projectBar = nullptr;
+    QVector<QPointF> m_annotationPoints; // the dimension/section tool's clicks so far
+    QStringList m_clipboard;            // Ctrl+C
+    DockLayout* m_dock = nullptr;     // center views and side panels (D71)
+    QHash<QString, ViewHost*> m_hosts; // model views by key: "3d", "plan:<guid>"
+    QWidget* m_cutColumn = nullptr;    // the plan-cut slider, in the active model view
+    QVector<std::function<void(Viewport*)>> m_viewConnectors;
+    ToolPalette* m_palette = nullptr;
+    QMenu* m_viewMenu = nullptr;
+    ToolOptionsBar* m_toolOptions = nullptr;
+    StatusStrip* m_status = nullptr;
+    // Each view has its own cuts (a plan tab is cut at its level; the 3D tab need not be).
+    struct CutSettings {
+        bool planCut = false;
+        bool box = false;
+        double height = 1.2;
+        Bnd_Box bounds;
+    };
+    QHash<Viewport*, CutSettings> m_cuts;
+    DrawingsPanel* m_drawingsPanel = nullptr;
+    SheetsPanel* m_sheetsPanel = nullptr;
+    QHash<QString, DrawingView*> m_drawingViews;
+    QSet<QString> m_generating, m_generateAgain;
+    QList<QThread*> m_drawingThreads;
+    int m_lastDrawingVisible = -1;
+    QToolBar* m_topBar = nullptr;       // D71: design option, level and cuts in one bar
+    QList<QAction*> m_projectActions;  // the design-option part, shown in versioned projects
     QComboBox* m_options = nullptr;
+    QString m_compareA, m_compareB; // the versions being compared (empty when not comparing)
     bool m_versioned = false;
     QHash<QString, double> m_timings;
     QString m_projectFolder;

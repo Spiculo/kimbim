@@ -12,7 +12,9 @@ class QTreeWidgetItem;
 
 namespace kimcad {
 
-// Spatial tree (project > site > building > storey > elements) with a search filter.
+// The model tree (D71: less noise): the spatial structure with single-child Project/Site/Building rows
+// merged into one, plain names ("Wall", not IfcWallStandardCase; the IFC class on hover and in the
+// search), and each level's elements grouped by category ("Walls (12)"). A search filter on top.
 class ModelTreePanel : public QWidget {
     Q_OBJECT
 public:
@@ -36,15 +38,20 @@ public:
     void refreshTree(const QJsonObject& root);
     QString displayName(const QString& guid) const;
     QTreeWidget* tree() const { return m_tree; }
+    QString ifcTypeOf(const QString& guid) const; // "" if unknown
+    static QString plainName(const QString& ifcType);   // "IfcWallStandardCase" -> "Wall" (translated)
+    static QString plainPlural(const QString& ifcType); // -> "Walls" (translated)
 
 signals:
     void guidsSelected(const QStringList& guids);
     void isolateRequested(const QStringList& guids);
     void hideRequested(const QStringList& guids);
     void showAllRequested();
+    void guidActivated(const QString& guid); // double-click on an element or a level (not a category row)
 
 private:
-    QTreeWidgetItem* addNode(const QJsonObject& node, QTreeWidgetItem* parent);
+    // `merged`: the names of single-child spatial rows above this one, shown as one row with it.
+    QTreeWidgetItem* addNode(const QJsonObject& node, QTreeWidgetItem* parent, QStringList merged);
     bool applyFilter(QTreeWidgetItem* item, const QString& text);
     void showContextMenu(const QPoint& pos);
 
@@ -52,6 +59,7 @@ private:
     QTreeWidget* m_tree;
     QHash<QString, QTreeWidgetItem*> m_items;
     bool m_programmatic = false;
+    QStringList m_mergedGuids; // guids of the rows merged into the next one being added
 };
 
 } // namespace kimcad

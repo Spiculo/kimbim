@@ -15,9 +15,12 @@ import pathlib
 import urllib.parse
 
 from . import app_bridge as B
+from .layout import blob_oid, key_to_path
 from .project import KimcadError, NothingToCommit, NotAProject, Project
+from .records import compose, unshare
 
 _project: Project | None = None
+_combining: dict | None = None  # a combined model is open, not saved yet: {"option", "theirs"}
 
 MAIN = "main"
 
@@ -34,8 +37,11 @@ def forget(path: str = "") -> None:
     """Called when a model is opened or created: leave versioned mode unless it's our working copy."""
     global _project
     if _project is not None and path and pathlib.Path(path).resolve() == _working().resolve():
+        if _combining:
+            B._saved_id = -1  # re-opening a combined model (the app's loader): still unsaved work
         return
     _project = None
+    _end_combining()
 
 
 def _encode(option: str) -> str:
@@ -55,7 +61,8 @@ def project_state() -> str:
         return B._dump({"versioned": False, "dirty": _dirty() if B._model is not None else False})
     head = _project.repo.head()
     return B._dump({"versioned": True, "folder": str(_project.path), "option": _decode(_project.current_branch()),
-                    "options": sorted(_decode(b) for b in _project.branches()), "head": head, "dirty": _dirty()})
+                    "options": sorted(_decode(b) for b in _project.branches()), "head": head, "dirty": _dirty(),
+                    "combining": _combining["option"] if _combining else ""})
 
 
 def _write_working() -> pathlib.Path:
@@ -69,12 +76,18 @@ def _mark_saved(working: pathlib.Path) -> None:
     B._saved_id, B._path = B._current_id(), str(working)
 
 
+def _end_combining() -> None:
+    global _combining
+    _combining = None
+
+
 def _open_head(project: Project) -> str:
     """Export the current option's latest version to the working copy and open it."""
     global _project
+    _end_combining()
     working = _working(project)
     working.parent.mkdir(parents=True, exist_ok=True)
-    project.export(working, overwrite=True)
+    project.export(working, overwrite=True, one_owner=True)
     _project = project
     info = json.loads(B.open_model(str(working)))  # keeps _project: it's our working copy
     _project = project
@@ -159,8 +172,7 @@ def _summary(changes) -> dict:
         if B._model is not None:
             try:
                 pset = B._model.by_guid(guid)
-                for rel in getattr(pset, "DefinesOccurrence", ()) or ():
-                    users += list(rel.RelatedObjects)
+                users += B._pset_users(pset)
             except RuntimeError:
                 pass
         if not users:
@@ -191,7 +203,9 @@ def save_version(message: str) -> str:
         return _fail("a version needs a message")
     working = _write_working()
     try:
-        cid, changes = _project.commit(working, message.strip())
+        merged = [_combining["theirs"]] if _combining else None
+        cid, changes = _project.commit(working, message.strip(), merged=merged)
+        _end_combining()
     except NothingToCommit:
         _mark_saved(working)
         return _fail("nothing changed since the last version")
@@ -206,8 +220,12 @@ def save_version(message: str) -> str:
 def history(limit=100) -> str:
     if _project is None:
         return B._dump({"versions": []})
+    marks = {}
+    for t in _project.tags():
+        marks.setdefault(t.target, []).append(_decode(t.name))
     return B._dump({"versions": [{"id": c.id, "short": c.id[:8], "message": c.message, "author": c.author_name,
-                                  "time": c.time, "parents": list(c.parents)} for c in _project.log("HEAD", int(limit))]})
+                                  "time": c.time, "parents": list(c.parents), "milestones": sorted(marks.get(c.id, []))}
+                                 for c in _project.log("HEAD", int(limit))]})
 
 
 def compare(rev_a: str, rev_b: str = "WORKING") -> str:
@@ -215,10 +233,11 @@ def compare(rev_a: str, rev_b: str = "WORKING") -> str:
     if _project is None:
         return _fail("this model isn't versioned")
     try:
+        rev_a = _revision(rev_a)
         if rev_b == "WORKING":
             changes, _ = _project._changes(_project._entries(rev_a), _project._decompose_file(_write_working()))
         else:
-            changes = _project.diff(rev_a, rev_b)
+            changes = _project.diff(rev_a, _revision(rev_b))
     except KimcadError as ex:
         return _fail(str(ex))
     return B._dump({"ok": True, **_summary(changes)})
@@ -268,3 +287,330 @@ def discard_changes() -> str:
         return _open_head(_project)
     except KimcadError as ex:
         return _fail(str(ex))
+
+
+def delete_option(name: str) -> str:
+    """Delete a design option (Git branch); not the current one, never main."""
+    if _project is None:
+        return _fail("this model isn't versioned")
+    if name == MAIN:
+        return _fail("the main option can't be deleted")
+    if name not in json.loads(options())["options"]:
+        return _fail(f"there is no option called {name}")
+    if _encode(name) == _project.current_branch():
+        return _fail("switch to another option before deleting this one")
+    try:
+        _project.delete_branch(_encode(name))
+    except KimcadError as ex:
+        return _fail(str(ex))
+    return B._dump({"ok": True, **json.loads(project_state())})
+
+
+# ---------------------------------------------------------------- milestones (Slice 20)
+
+def _revision(rev: str) -> str:
+    """A version id, a milestone or option name (as shown) or anything Git resolves."""
+    if _project is not None and rev and rev != "WORKING":
+        for t in _project.tags():
+            if _decode(t.name) == rev:
+                return t.target
+        if rev in (_decode(b) for b in _project.branches()):  # an option: its latest version
+            return _project.repo.resolve(_encode(rev))
+    return rev
+
+
+def milestones() -> str:
+    """[{name, id, short, message, author, time}] sorted by the time they were set."""
+    if _project is None:
+        return B._dump({"milestones": []})
+    out = [{"name": _decode(t.name), "id": t.target, "short": t.target[:8], "message": t.message.strip(),
+            "author": t.tagger_name, "time": t.time} for t in _project.tags()]
+    out.sort(key=lambda m: (m["time"], m["name"]))
+    return B._dump({"milestones": out})
+
+
+def create_milestone(name: str, message: str = "") -> str:
+    """Mark the latest saved version of the current option as a milestone (Concept, Schematic design...)."""
+    if _project is None:
+        return _fail("this model isn't versioned")
+    name = (name or "").strip()
+    if not name:
+        return _fail("a milestone needs a name")
+    if _dirty():
+        return _fail("there are unsaved changes: save a version first, then mark it as a milestone")
+    if any(m["name"] == name for m in json.loads(milestones())["milestones"]):
+        return _fail(f"there is already a milestone called {name}")
+    try:
+        _project.tag(_encode(name), message or name)
+    except KimcadError as ex:
+        return _fail(str(ex))
+    return B._dump({"ok": True, "milestones": json.loads(milestones())["milestones"]})
+
+
+def delete_milestone(name: str) -> str:
+    if _project is None:
+        return _fail("this model isn't versioned")
+    try:
+        _project.delete_tag(_encode(name))
+    except KimcadError as ex:
+        return _fail(f"no milestone called {name}" if "unknown" in str(ex) else str(ex))
+    return B._dump({"ok": True, "milestones": json.loads(milestones())["milestones"]})
+
+
+# ---------------------------------------------------------------- object history and before/after
+
+def _related_paths(guid: str) -> set[str]:
+    """Record paths whose changes count as changes to the element: its property sets."""
+    out = set()
+    if B._model is not None:
+        try:
+            e = B._model.by_guid(guid)
+        except RuntimeError:
+            return out
+        for rel in getattr(e, "IsDefinedBy", ()) or ():
+            if rel.is_a("IfcRelDefinesByProperties"):
+                definition = rel.RelatingPropertyDefinition
+                if getattr(definition, "GlobalId", None):
+                    out.add(key_to_path("o/" + definition.GlobalId))
+    return out
+
+
+def element_history(guid: str, limit=100) -> str:
+    """The saved versions that changed an element (or its properties), newest first; unsaved changes
+    to it come first as "unsaved"."""
+    if _project is None:
+        return _fail("this model isn't versioned")
+    main = key_to_path("o/" + guid)
+    related = _related_paths(guid)
+    try:
+        steps = _project.history_of(main, related, "HEAD", int(limit))
+    except KimcadError as ex:
+        return _fail(str(ex))
+    marks = {}
+    for t in _project.tags():
+        marks.setdefault(t.target, []).append(_decode(t.name))
+    out = [{"id": c.id, "short": c.id[:8], "message": c.message.strip(), "author": c.author_name, "time": c.time,
+            "change": kind, "milestones": sorted(marks.get(c.id, []))} for c, kind in steps]
+    if _dirty():
+        try:
+            records = _project._decompose_file(_write_working())
+            head = _project._head_entries()
+            paths = {main, *related}
+            now = {key_to_path(k): blob_oid(v) for k, v in records.items() if key_to_path(k) in paths}
+            if now != {p: o for p, o in head.items() if p in paths}:
+                out.insert(0, {"id": "WORKING", "short": "", "message": "", "author": "", "time": 0,
+                               "change": "unsaved", "milestones": []})
+        except KimcadError:
+            pass
+    return B._dump({"ok": True, "guid": guid, "versions": out})
+
+
+_models: dict[str, object] = {}
+
+
+def _model_at(rev: str):
+    """The model at a version (ifcopenshell file), or the open one for "WORKING"; the last few cached."""
+    if rev == "WORKING":
+        return B._model
+    cid = _project._rev(_revision(rev))
+    if cid not in _models:
+        if len(_models) >= 3:
+            _models.pop(next(iter(_models)))
+        _models[cid] = compose(_project._records(cid))
+    return _models[cid]
+
+
+def _fmt(v) -> str:
+    if v is None:
+        return ""
+    if isinstance(v, float):
+        return f"{v:.6g}"
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    return str(v)
+
+
+def _element_rows(f, guid: str) -> dict | None:
+    """What a person compares: identity, level, type, position and every property, as text."""
+    import ifcopenshell.util.element
+    import ifcopenshell.util.placement
+    import ifcopenshell.util.unit
+
+    try:
+        e = f.by_guid(guid)
+    except RuntimeError:
+        return None
+    rows = {"Class": e.is_a(), "Name": _fmt(getattr(e, "Name", None)),
+            "Description": _fmt(getattr(e, "Description", None)), "Tag": _fmt(getattr(e, "Tag", None)),
+            "Predefined type": _fmt(getattr(e, "PredefinedType", None))}
+    container = ifcopenshell.util.element.get_container(e)
+    rows["Level"] = _fmt(container.Name if container is not None else "")
+    t = ifcopenshell.util.element.get_type(e)
+    rows["Type"] = _fmt(t.Name if t is not None else "")
+    if getattr(e, "ObjectPlacement", None) is not None:
+        s = ifcopenshell.util.unit.calculate_unit_scale(f)
+        m = ifcopenshell.util.placement.get_local_placement(e.ObjectPlacement)
+        import math
+
+        angle = math.degrees(math.atan2(m[1][0], m[0][0]))
+        rows["Position"] = ", ".join(f"{m[i][3] * s:.3f}" for i in range(3)) + f" ({angle:.1f}°)"
+    for pset, props in sorted(ifcopenshell.util.element.get_psets(e, psets_only=False).items()):
+        for k, v in sorted(props.items()):
+            if k != "id":
+                rows[f"{pset}.{k}"] = _fmt(v)
+    return rows
+
+
+def before_after(guid: str, rev_a: str, rev_b: str = "WORKING") -> str:
+    """One element at two versions, field by field: [{field, before, after, changed}]."""
+    if _project is None:
+        return _fail("this model isn't versioned")
+    try:
+        before = _element_rows(_model_at(rev_a), guid)
+        after = _element_rows(_model_at(rev_b), guid)
+    except (KimcadError, RuntimeError) as ex:
+        return _fail(str(ex))
+    if before is None and after is None:
+        return _fail("the element is in neither version")
+    fields = list((after or {}).keys()) + [k for k in (before or {}) if k not in (after or {})]
+    rows = [{"field": k, "before": (before or {}).get(k, ""), "after": (after or {}).get(k, ""),
+             "changed": (before or {}).get(k) != (after or {}).get(k)} for k in fields]
+    return B._dump({"ok": True, "guid": guid, "before_exists": before is not None, "after_exists": after is not None,
+                    "rows": rows})
+
+
+# ---------------------------------------------------------------- combine options (Slice 22, M5)
+
+def _text(value, side_records=None) -> str:
+    """A conflict value as an architect reads it: plain values as they are, references by name,
+    placements by their position."""
+    if value is None:
+        return "(deleted)"
+    if isinstance(value, (str, int, float, bool)):
+        return str(value)
+    if isinstance(value, list):
+        return ", ".join(_text(v, side_records) for v in value[:6]) + (" ..." if len(value) > 6 else "")
+    if isinstance(value, dict):
+        if "@t" in value:
+            return _text(value.get("v"), side_records)
+        if "@o" in value:
+            try:
+                e = B._model.by_guid(value["@o"])
+                return getattr(e, "Name", None) or e.is_a()
+            except (RuntimeError, AttributeError):
+                return value["@o"]
+        if "@n" in value or "@a" in value:
+            return "(shared value)"
+        t, a = value.get("t", ""), value.get("a", {})
+        if t == "IfcLocalPlacement":
+            loc = ((a.get("RelativePlacement") or {}).get("a") or {}).get("Location")
+            coords = (loc or {}).get("a", {}).get("Coordinates") if isinstance(loc, dict) else None
+            return f"at {', '.join(f'{c:.3f}' for c in coords)}" if coords else "placement"
+        if t.startswith("IfcProperty") and "NominalValue" in a:
+            return _text(a["NominalValue"], side_records)
+        name = a.get("Name")
+        return f"{t} {_text(name)}".strip() if name is not None else t
+    return str(value)
+
+
+def _conflict_json(c, resolutions) -> dict:
+    d = c.to_dict()
+    guid = c.key[2:].split("~", 1)[0] if c.key.startswith("o/") else ""
+    out = {k: d[k] for k in ("id", "kind", "key", "ifc_type", "name", "attribute", "property", "options", "message")}
+    out.update(guid=guid, choice=resolutions.get(c.id) if resolutions.get(c.id) in c.options else None,
+               base_text=_text(c.base), ours_text=_text(c.ours), theirs_text=_text(c.theirs))
+    if c.kind == "containment":
+        out["option_labels"] = [m for m in c.message.split(": ", 1)[-1].split(", ")]
+    return out
+
+
+def _other(option: str):
+    if _project is None:
+        raise KimcadError("this model isn't versioned")
+    if option not in json.loads(options())["options"]:
+        raise KimcadError(f"there is no option called {option}")
+    if _encode(option) == _project.current_branch():
+        raise KimcadError("choose another option to combine with this one")
+    return _encode(option)
+
+
+def combine_preview(option: str, resolutions_json: str = "{}") -> str:
+    """What combining `option` into the current one would do: status (up_to_date / fast_forward /
+    merge), the conflicts with their choices, the elements the other option brings."""
+    try:
+        branch = _other(option)
+        resolutions = json.loads(resolutions_json or "{}")
+        preview = _project.merge_preview(branch, resolutions)
+    except (KimcadError, ValueError) as ex:
+        return _fail(str(ex))
+    out = {"ok": True, "status": preview.status, "option": option, "conflicts": [], "unresolved": [], "from_theirs": [],
+           "warnings": []}
+    if preview.status == "fast_forward":
+        out["from_theirs"] = _fast_forward_changes(preview)
+    if preview.status == "merge":
+        r = preview.result
+        out["conflicts"] = [_conflict_json(c, resolutions) for c in r.conflicts]
+        out["unresolved"] = list(r.unresolved)
+        out["from_theirs"] = _from_theirs(preview)
+        out["warnings"] = r.warnings
+        out["stats"] = r.stats
+    return B._dump(out)
+
+
+def _fast_forward_changes(preview) -> list:
+    """Elements (GlobalIds) a fast-forward brings: the two versions are compared once."""
+    s = _summary(_project.diff(preview.ours, preview.theirs))
+    return [x["guid"] for x in s["modified"] + s["added"]]
+
+
+def _from_theirs(preview) -> list:
+    """Elements (GlobalIds) the other option changed since the common version."""
+    base_entries = _project._entries(preview.base) if preview.base else {}
+    changes, _ = _project._changes(base_entries, _project._records(preview.theirs))
+    s = _summary(changes)
+    return sorted({x["guid"] for x in s["added"] + s["modified"]})
+
+
+def combine_options(option: str, resolutions_json: str = "{}") -> str:
+    """Combine `option` into the current one. Fast-forward: the current option takes the other's latest
+    version. Otherwise (every conflict chosen) the combined model opens as unsaved work: review it,
+    then Save version (a version with two parents) or Discard."""
+    global _combining
+    if _project is not None and _dirty():
+        return _fail("there are unsaved changes: save a version or discard them before combining options")
+    try:
+        branch = _other(option)
+        resolutions = json.loads(resolutions_json or "{}")
+        preview = _project.merge_preview(branch, resolutions)
+    except (KimcadError, ValueError) as ex:
+        return _fail(str(ex))
+    if preview.status == "up_to_date":
+        return B._dump({"ok": True, "status": "up_to_date", "from_theirs": []})
+    if preview.status == "fast_forward":
+        changed = _fast_forward_changes(preview)
+        try:
+            _project.repo.fast_forward(preview.theirs)
+            info = json.loads(_open_head(_project))
+        except Exception as ex:  # noqa: BLE001 (RepoError or KimcadError: report, change nothing more)
+            return _fail(str(ex))
+        return B._dump({**info, "ok": True, "status": "fast_forward", "from_theirs": changed})
+    result = preview.result
+    if not result.clean:
+        return B._dump({"ok": False, "error": f"{len(result.unresolved)} conflict(s) need a choice before combining",
+                        "unresolved": result.unresolved})
+    working = _working()
+    try:
+        combined = compose(result.records)
+        unshare(combined)  # one owner where IFC requires it
+        combined.write(str(working))
+    except Exception as ex:  # noqa: BLE001
+        return _fail(f"the combined model could not be written: {ex}")
+    info = json.loads(B.open_model(str(working)))
+    if not info.get("ok", True):
+        return B._dump(info)
+    _combining = {"option": option, "theirs": preview.theirs}
+    B._saved_id = -1  # the combined model is unsaved work until Save version
+    resolved = sorted({c.key[2:].split("~", 1)[0] for c in result.conflicts if c.key.startswith("o/")})
+    return B._dump({**info, "ok": True, "status": "merge", "path": str(working), "from_theirs": _from_theirs(preview), "resolved": resolved,
+                    "conflicts": len(result.conflicts), "warnings": result.warnings})
+

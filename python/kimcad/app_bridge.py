@@ -86,8 +86,9 @@ def properties(guid: str) -> str:
 _iterator = None
 _iterator_done = True
 # Voids are subtracted from their hosts; spaces are room volumes that would hide walls and windows.
-# Both stay in the tree and properties; spaces get a "show spaces" toggle later.
-NOT_DISPLAYED = ["IfcOpeningElement", "IfcSpace"]
+# Both stay in the tree and properties; spaces get a "show spaces" toggle later. Annotations are 2D
+# (drawn by the plan overlay) or drawing cameras, whose box would hide the model (D60).
+NOT_DISPLAYED = ["IfcOpeningElement", "IfcSpace", "IfcAnnotation"]
 
 
 def start_meshing(threads: int = 0) -> str:
@@ -242,6 +243,11 @@ def state() -> str:
     return _dump({"dirty": _current_id() != _saved_id, "path": _path, "inconsistent": _inconsistent, **_flags()})
 
 
+# Called inside every edit's transaction with (geometry_changed, geometry_removed) GlobalIds; returns
+# more changed GlobalIds. Modules register follow-ups that must be part of the same undo step.
+AFTER_ACTION: list = []
+
+
 def _run(action) -> dict:
     """Run `action()` as one undoable transaction. It returns the number of changed elements, or
     (count, geometry_changed_guids, geometry_removed_guids) when it touched shapes."""
@@ -251,6 +257,11 @@ def _run(action) -> dict:
     _model.begin_transaction()
     try:
         changed = action()
+        count, geo_changed, geo_removed = changed if isinstance(changed, tuple) else (changed, [], [])
+        # Follow-ups inside the same undo step (e.g. rooms re-fitted to walls that moved, Slice 18).
+        for hook in AFTER_ACTION:
+            geo_changed = list(geo_changed) + list(hook(list(geo_changed), list(geo_removed)) or ())
+        changed = (count, geo_changed, geo_removed)
     except BaseException as failure:
         # Roll back a half-applied action so the model and the history stay as they were.
         _model.end_transaction()
@@ -379,6 +390,13 @@ def _template_type(pset: str, prop: str) -> str | None:
 def _template_schema() -> str:
     s = _model.schema_identifier
     return "IFC4X3" if s.startswith("IFC4X3") else ("IFC2X3" if s == "IFC2X3" else "IFC4")
+
+
+def _pset_users(pset) -> list:
+    """The objects a property set is attached to. The inverse is DefinesOccurrence in IFC4 and
+    PropertyDefinitionOf in IFC2X3 (imported Revit files)."""
+    rels = pset.DefinesOccurrence if hasattr(pset, "DefinesOccurrence") else getattr(pset, "PropertyDefinitionOf", ())
+    return [o for rel in rels or () for o in rel.RelatedObjects]
 
 
 def _own_pset(e, pset: str):
@@ -787,9 +805,17 @@ from .authoring import (  # noqa: E402,F401
     wall_types,
 )
 from .versioning import (  # noqa: E402,F401
+    before_after,
+    combine_options,
+    combine_preview,
     compare,
+    create_milestone,
     create_option,
+    delete_milestone,
+    delete_option,
     discard_changes,
+    element_history,
+    milestones,
     enable_versioning,
     history,
     open_project,
@@ -811,4 +837,40 @@ from .layers import (  # noqa: E402,F401
     set_active_layer,
     views,
 )
-from .annotations import add_annotation, annotations, set_annotation_text  # noqa: E402,F401
+from .annotations import add_annotation, annotations, set_annotation_size, set_annotation_text  # noqa: E402,F401
+from .drawings import (  # noqa: E402,F401
+    create_drawings,
+    create_elevation,
+    create_elevations,
+    create_plan,
+    create_section,
+    delete_drawing,
+    drawings,
+    generate_drawing,
+    rename_drawing,
+    set_drawing_depth,
+)
+from .sheets import (  # noqa: E402,F401
+    add_sheet,
+    delete_sheet,
+    edit_sheet,
+    export_sheet_svg,
+    move_placed,
+    place_drawing,
+    project_info,
+    remove_placed,
+    set_placed_scale,
+    set_project_info,
+    sheet_svg,
+    sheets,
+)
+from .editing import (  # noqa: E402,F401
+    array_elements,
+    copy_elements,
+    duplicate_elements,
+    mirror_elements,
+    offset_elements,
+    slab_outline,
+)
+from .rooms import create_room, edit_room, export_room_schedule, room_schedule, rooms  # noqa: E402,F401
+from .roofs import attach_walls_to_roof, create_roof, detach_walls_from_roof, roof_info  # noqa: E402,F401

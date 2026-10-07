@@ -16,7 +16,7 @@ import ifcopenshell.validate
 from . import _core
 from .layout import META_PATH, blob_oid, key_to_path, path_to_key
 from .nodeids import decompose_against_head
-from .records import compose
+from .records import compose, unshare
 
 REPACK_THRESHOLD = 10_000  # changed records; D39
 GLOBALID = re.compile(r"[0-9A-Za-z_$]{22}")  # IFC GlobalId: 22 chars of the IFC base-64 alphabet
@@ -50,10 +50,25 @@ class TargetExists(KimcadError):
     pass
 
 
+class MergeConflicts(KimcadError):
+    def __init__(self, result):
+        super().__init__(f"{len(result.unresolved)} conflict(s) to resolve before combining")
+        self.result = result
+
+
 class InvalidInput(KimcadError):
     def __init__(self, message: str, messages: list[str]):
         super().__init__(message)
         self.messages = messages
+
+
+@dataclass
+class MergePreview:
+    status: str  # "up_to_date" | "fast_forward" | "merge"
+    base: str | None
+    ours: str
+    theirs: str
+    result: object = None  # kimcad.merge.MergeResult for "merge"
 
 
 @dataclass
@@ -216,13 +231,23 @@ class Project:
         changes, _ = self._changes(self._head_entries(), self._decompose_file(ifc_path))
         return changes
 
-    def commit(self, ifc_path, message: str, *, author: tuple[str, str] | None = None, time: int | None = None):
+    def commit(self, ifc_path, message: str, *, author: tuple[str, str] | None = None, time: int | None = None,
+               merged: list[str] | None = None):
+        """A new version from an IFC file; `merged`: other versions it combines (a merge commit, which
+        is recorded even when the result equals the current version)."""
         records = self._decompose_file(ifc_path)
         changes, writes = self._changes(self._head_entries(), records)
-        if not changes:
+        if not changes and not merged:
             raise NothingToCommit("nothing to commit: the file matches the current version")
         name, email = author or _author()
-        cid = self.repo.commit(writes, message, name, email, int(time if time is not None else _time.time()))
+        when = int(time if time is not None else _time.time())
+        if merged:
+            try:
+                cid = self.repo.commit_merge(writes, message, name, email, when, list(merged))
+            except _core.RepoError as e:
+                raise KimcadError(str(e)) from None
+        else:
+            cid = self.repo.commit(writes, message, name, email, when)
         if len(writes) > REPACK_THRESHOLD:
             self.repo.repack_no_delta()
         return cid, changes
@@ -242,12 +267,18 @@ class Project:
         changes, _ = self._changes(old, self._records(b))
         return changes
 
-    def export(self, out_path, rev: str = "HEAD", overwrite: bool = False) -> pathlib.Path:
+    def export(self, out_path, rev: str = "HEAD", overwrite: bool = False, one_owner: bool = False) -> pathlib.Path:
+        """Write a version as IFC. `one_owner`: give each owner its own copy of values IFC wants owned
+        once (D70; the app and the CLI use it). Off by default: the bytes are then exactly compose()'s,
+        which the golden reference hashes pin."""
         out = pathlib.Path(out_path)
         records = self._records(rev)
         if out.exists() and not overwrite:
             raise TargetExists(f"{out} already exists (use --force to overwrite)")
-        compose(records).write(str(out))
+        f = compose(records)
+        if one_owner:
+            unshare(f)  # one owner where IFC requires it (records hash-cons identical values)
+        f.write(str(out))
         return out
 
     def show(self, key: str, rev: str = "HEAD") -> dict:
@@ -275,3 +306,99 @@ class Project:
             self.repo.switch(name)
         except _core.RepoError as e:
             raise KimcadError(str(e)) from None
+
+    def delete_branch(self, name: str):
+        try:
+            self.repo.delete_branch(name)
+        except _core.RepoError as e:
+            raise KimcadError(str(e)) from None
+
+    # ---- milestones (annotated tags) ----
+    def tag(self, name: str, message: str, rev: str = "HEAD", *, author: tuple[str, str] | None = None,
+            time: int | None = None):
+        target = self._rev(rev)
+        tagger, email = author or _author()
+        try:
+            self.repo.create_tag(name, target, message or name, tagger, email, int(time if time is not None else _time.time()))
+        except _core.RepoError as e:
+            raise KimcadError(str(e)) from None
+
+    def tags(self):
+        return self.repo.tags()
+
+    def delete_tag(self, name: str):
+        try:
+            self.repo.delete_tag(name)
+        except _core.RepoError as e:
+            raise KimcadError(str(e)) from None
+
+    # ---- object history ("blame", docs/03) ----
+    def history_of(self, main: str, related: set[str] = frozenset(), rev: str = "HEAD", limit: int = 100):
+        """[(commit, "added" | "modified" | "removed")] for the commits (first-parent chain, newest
+        first) that changed the record at path `main` or any `related` one (e.g. its property sets);
+        added/removed refer to `main`."""
+        paths = {main, *related}
+        if self.repo.head() is None:
+            return []
+        commits = self.repo.log(self._rev(rev), limit)
+        out = []
+        cache: dict[str, dict[str, str]] = {}
+
+        def entries(cid):
+            if cid not in cache:
+                cache[cid] = {p: o for p, o in self.repo.tree_entries(cid).items() if p in paths}
+            return cache[cid]
+
+        for c in commits:
+            now = entries(c.id)
+            before = entries(c.parents[0]) if c.parents else {}
+            if now == before:
+                continue
+            if main in now and main not in before:
+                kind = "added"
+            elif main in before and main not in now:
+                kind = "removed"
+            else:
+                kind = "modified"
+            out.append((c, kind))
+        return out
+
+    # ---- combining options (R4 merge) ----
+    def merge_preview(self, other: str, resolutions: dict | None = None) -> MergePreview:
+        """What combining `other` into the current option would do; for a real merge, the merged records
+        and the conflicts (with `resolutions` applied)."""
+        from .merge import merge_records
+
+        ours, theirs = self._rev("HEAD"), self._rev(other)
+        base = self.repo.merge_base(ours, theirs)
+        if base == theirs:
+            return MergePreview("up_to_date", base, ours, theirs)
+        if base == ours:
+            return MergePreview("fast_forward", base, ours, theirs)
+        base_records = self._records(base) if base else {}
+        result = merge_records(base_records, self._records(ours), self._records(theirs), resolutions)
+        return MergePreview("merge", base, ours, theirs, result)
+
+    def merge(self, other: str, message: str, resolutions: dict | None = None, *,
+              author: tuple[str, str] | None = None, time: int | None = None) -> str:
+        """Combine `other` into the current option: fast-forward, or a merge commit with two parents.
+        Raises MergeConflicts while conflicts remain unresolved."""
+        preview = self.merge_preview(other, resolutions)
+        if preview.status == "up_to_date":
+            return preview.ours
+        if preview.status == "fast_forward":
+            try:
+                return self.repo.fast_forward(preview.theirs)
+            except _core.RepoError as e:
+                raise KimcadError(str(e)) from None
+        if not preview.result.clean:
+            raise MergeConflicts(preview.result)
+        compose(preview.result.records)  # the result must be writable as IFC (lossless guarantee)
+        _changes, writes = self._changes(self._head_entries(), preview.result.records)
+        name, email = author or _author()
+        try:
+            return self.repo.commit_merge(writes, message, name, email,
+                                          int(time if time is not None else _time.time()), [preview.theirs])
+        except _core.RepoError as e:
+            raise KimcadError(str(e)) from None
+

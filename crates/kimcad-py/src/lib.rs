@@ -23,6 +23,15 @@ struct Commit {
     message: String,
 }
 
+#[pyclass(get_all, frozen)]
+struct Tag {
+    name: String,
+    target: String,
+    message: String,
+    tagger_name: String,
+    time: i64,
+}
+
 #[pyclass(frozen)]
 struct Repo {
     inner: kimcad_repo::Repo,
@@ -74,6 +83,30 @@ impl Repo {
         py.detach(|| self.inner.commit(&changes, message, &sig)).map_err(err)
     }
 
+    #[pyo3(signature = (changes, message, author_name, author_email, time, merged))]
+    #[allow(clippy::too_many_arguments)]
+    fn commit_merge(
+        &self,
+        py: Python<'_>,
+        changes: BTreeMap<String, Option<Vec<u8>>>,
+        message: &str,
+        author_name: String,
+        author_email: String,
+        time: i64,
+        merged: Vec<String>,
+    ) -> PyResult<String> {
+        let sig = kimcad_repo::Signature { name: author_name, email: author_email, time };
+        py.detach(|| self.inner.commit_merge(&changes, message, &sig, &merged)).map_err(err)
+    }
+
+    fn merge_base(&self, a: &str, b: &str) -> PyResult<Option<String>> {
+        self.inner.merge_base(a, b).map_err(err)
+    }
+
+    fn fast_forward(&self, rev: &str) -> PyResult<String> {
+        self.inner.fast_forward(rev).map_err(err)
+    }
+
     fn log(&self, rev: &str, limit: usize) -> PyResult<Vec<Commit>> {
         Ok(self
             .inner
@@ -103,6 +136,29 @@ impl Repo {
         self.inner.switch(name).map_err(err)
     }
 
+    fn delete_branch(&self, name: &str) -> PyResult<()> {
+        self.inner.delete_branch(name).map_err(err)
+    }
+
+    fn create_tag(&self, name: &str, rev: &str, message: &str, tagger_name: String, tagger_email: String, time: i64) -> PyResult<()> {
+        let sig = kimcad_repo::Signature { name: tagger_name, email: tagger_email, time };
+        self.inner.create_tag(name, rev, message, &sig).map_err(err)
+    }
+
+    fn tags(&self) -> PyResult<Vec<Tag>> {
+        Ok(self
+            .inner
+            .tags()
+            .map_err(err)?
+            .into_iter()
+            .map(|t| Tag { name: t.name, target: t.target, message: t.message, tagger_name: t.tagger_name, time: t.time })
+            .collect())
+    }
+
+    fn delete_tag(&self, name: &str) -> PyResult<()> {
+        self.inner.delete_tag(name).map_err(err)
+    }
+
     fn repack_no_delta(&self, py: Python<'_>) -> PyResult<()> {
         py.detach(|| self.inner.repack_no_delta()).map_err(err)
     }
@@ -112,6 +168,7 @@ impl Repo {
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Repo>()?;
     m.add_class::<Commit>()?;
+    m.add_class::<Tag>()?;
     m.add("RepoError", m.py().get_type::<RepoError>())?;
     Ok(())
 }

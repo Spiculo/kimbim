@@ -17,6 +17,20 @@ The owner's ten notes from the first hands-on session, and where each one landed
 | 9 | Selection flashes the background | Redraws now repaint the whole view in one pass; please confirm on your screen | Click around |
 | 10 | Icons and hints | Element icons in the model tree; hovering an element in the 3D view shows its name, type and level | Hover |
 
+## 2026-10-07: main window rework (step 1 of 3)
+
+The owner's UI notes after Slices 14–22 ([spec](superpowers/specs/2026-10-07-main-window-rework-design.md), D71):
+
+| Note | What KIMCAD does now | Try it |
+|------|----------------------|--------|
+| Tools on the left, by category | Left column with **3D / Plane / View / Edit** groups (collapsible); the tool's fields appear above the view only while it's active | Pick Wall in the 3D group |
+| Properties on double-click | Double-click an element (view or tree): Properties comes forward in the right panels; a level opens its plan | Double-click a wall |
+| Less noise in the object tree, on the right | Tree on the right; one row for Project/Site/Building; plain names; elements grouped by category under each level | Model tab on the right |
+| A bottom bar with ink set, zoom, layers | Bottom bar: pen (placeholder until pen sets, step 3), active and visible layers, zoom, selection, messages | Look at the bottom |
+| 3D and plan views as tabs that pop out | 3D tab plus a plan tab per level, drawings and sheets; drag a tab out to its own window and back | P, then drag the plan tab out |
+
+Next: **step 2**, the `.kim` file (one file, or open as a folder) with project and user preferences and office templates; **step 3**, pen sets. Several models open together is future research ([08](08-future.md#federation-and-linked-models)).
+
 ## Shortcuts added
 
 Place model **U** · Text label **A** · Dimension **Q** · Mark **X** (with the earlier W, S, D, N, K, J, G, M, R, E, T, O).
@@ -24,6 +38,6 @@ Place model **U** · Text label **A** · Dimension **Q** · Mark **X** (with the
 ## Still open for the next session
 
 - Confirm 9 (flash) and the feel of 1 and 8 on your screen; tests can't see either.
-- Annotations: revision clouds, leaders/arrows, text size in paper units (they're screen-sized now), dimension chains and snapping to wall faces.
+- Annotations: revision clouds. (Leaders, text size in paper units, dimension chains and snapping to wall faces: done in Slice 15.)
 - Models: editing an instance in place (today: edit the model, then Update), nested models, a model library across projects.
 - Views: per-view graphic overrides (colours/line weights per layer), sheets.

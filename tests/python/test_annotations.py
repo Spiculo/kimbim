@@ -34,12 +34,14 @@ def test_text_dimension_and_mark_are_ifc_annotations_on_the_level(plan):
     m = call("add_annotation", plan["l1"], "mark", json.dumps([[3, 3]]), "A")
     assert t["ok"] and d["ok"] and m["ok"], (t, d, m)
     shown = listed(plan["l1"])
-    assert shown[t["guid"]] == {"guid": t["guid"], "kind": "text", "text": "Living room", "points": [[1.0, 2.0]]}
+    assert shown[t["guid"]] == {"guid": t["guid"], "kind": "text", "text": "Living room", "points": [[1.0, 2.0]], "size": 2.5}
     assert shown[d["guid"]]["text"] == "4.50"  # dimensions measure themselves
     assert shown[d["guid"]]["points"] == [[0.0, 0.0], [4.5, 0.0], [0.0, -1.0]]
     assert shown[m["guid"]]["kind"] == "mark"
     assert listed(plan["l2"]) == {}
     for a in b._model.by_type("IfcAnnotation"):
+        if a.ObjectType == "DRAWING":
+            continue  # the new project's template elevations (D61)
         rep = a.Representation.Representations[0]
         assert rep.ContextOfItems.ContextType == "Plan" and rep.RepresentationIdentifier == "Annotation"
     meshed = b.mesh_elements(g(t["guid"]))
@@ -70,3 +72,53 @@ def test_bad_annotations_are_refused(plan):
     assert not call("add_annotation", plan["l1"], "dimension", json.dumps([[0, 0], [0, 0], [0, 1]]), "")["ok"]
     assert not call("add_annotation", plan["l1"], "text", json.dumps([[0, 0]]), "  ")["ok"]
     assert not call("add_annotation", plan["l1"], "arrow", json.dumps([[0, 0]]), "x")["ok"]
+
+
+# ---------------------------------------------------------------- Slice 15 (doc 13 open items)
+
+def test_dimension_chain_measures_each_segment(plan):
+    d = call("add_annotation", plan["l1"], "dimension", json.dumps([[0, 0], [4, 0], [7.5, 0], [0, -1]]), "")
+    assert d["ok"], d
+    shown = listed(plan["l1"])[d["guid"]]
+    assert shown["text"] == "4.00 3.50" and len(shown["points"]) == 4
+    logger = ifcopenshell.validate.json_logger()
+    ifcopenshell.validate.validate(b._model, logger, express_rules=True)
+    assert logger.statements == []
+
+
+def test_leader_points_at_something_with_its_text(plan):
+    r = call("add_annotation", plan["l1"], "leader", json.dumps([[1, 1], [2, 2], [3, 2]]), "Concrete")
+    assert r["ok"], r
+    shown = listed(plan["l1"])[r["guid"]]
+    assert shown["kind"] == "leader" and shown["text"] == "Concrete" and len(shown["points"]) == 3
+    assert not call("add_annotation", plan["l1"], "leader", json.dumps([[1, 1]]), "x")["ok"]  # needs a line
+
+
+def test_text_size_is_in_paper_millimetres(plan):
+    t = call("add_annotation", plan["l1"], "text", json.dumps([[1, 2]]), "Hall")["guid"]
+    assert listed(plan["l1"])[t]["size"] == 2.5  # the default, as on a printed plan
+    assert call("set_annotation_size", t, 5.0)["ok"]
+    assert listed(plan["l1"])[t]["size"] == 5.0
+    literal = next(i for i in b._model.by_guid(t).Representation.Representations[0].Items if i.is_a("IfcTextLiteralWithExtent"))
+    assert abs(literal.Extent.SizeInY - 500.0) < 1e-6  # 5 mm at 1:100 = 0.5 m, in millimetres
+    assert not call("set_annotation_size", t, 0)["ok"]
+
+
+def _literals(guid):
+    rep = b._model.by_guid(guid).Representation.Representations[0]
+    return [i.Literal for i in rep.Items if i.is_a("IfcTextLiteral")]
+
+
+def test_typed_dimension_text_with_spaces_is_kept_whole(plan):
+    """Labels were split on whitespace (one word per segment): "2.50 m" printed as "2.50"."""
+    from kimcad import drawgen
+
+    one = call("add_annotation", plan["l1"], "dimension", json.dumps([[0, 0], [2.5, 0], [0, -1]]), "2.50 m")["guid"]
+    assert _literals(one) == ["2.50 m"]
+    chain = call("add_annotation", plan["l1"], "dimension", json.dumps([[0, 0], [4, 0], [7.5, 0], [0, -1]]),
+                 "a eje A; 3,50")["guid"]
+    assert _literals(chain) == ["a eje A", "3,50"]
+    assert drawgen.segment_labels("4.00 3.50", 2) == ["4.00", "3.50"]  # measured chains, older files
+    assert drawgen.segment_labels("ver nota; detalle 3", 1) == ["ver nota; detalle 3"]
+    svg = "".join(drawgen.plan_annotations(b._model.by_guid(plan["l1"]), lambda x, y, z: (x * 10, y * 10)))
+    assert ">2.50 m<" in svg and ">a eje A<" in svg

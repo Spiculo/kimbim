@@ -38,7 +38,7 @@ release notes, so check before relying on a single cell.
 | Autosave, crash recovery | AC RV VW | ⬜ | P0 | oplog ([03](03-versioning.md)) |
 | Recent projects | all | ⬜ | P0 | |
 | Imperial units, unit preferences | all | ⬜ | P0 | Metric only today |
-| Project info (address, client, number) used in title blocks | AC RV VW | ⬜ | new | `IfcProject` / `IfcBuilding` attributes |
+| Project info (address, client, number) used in title blocks | AC RV VW | ✅ | new | Slice 16: *File › Project info…*, in IFC fields (D63) |
 | Survey point, project base point, georeferencing | AC RV VW BB | ⬜ | P2 | `ifcopenshell.api.georeference` |
 | Story settings (levels table: edit heights, insert/delete) | AC RV | 🟡 | P0 | Add level exists; no levels table |
 | Purge unused types/materials | RV VW BB | ⬜ | new | |
@@ -92,12 +92,12 @@ release notes, so check before relying on a single cell.
 | Move, drag to move | all | ✅ | P0 | Joined walls follow; Ctrl detaches (D54) |
 | Rotate | all | ✅ | P0 | |
 | Stretch / extend a wall end | all | ✅ | P0 | |
-| Copy / paste in the project | all | ⬜ | P0 | |
-| Duplicate, drag a copy (Ctrl+drag) | all | ⬜ | P0 | |
+| Copy / paste in the project | all | ✅ | P0 | Slice 17 (Ctrl+C / Ctrl+V onto the active level) |
+| Duplicate, drag a copy (Ctrl+drag) | all | ✅ | P0 | Slice 17 (Ctrl+D, Ctrl+drag) |
 | Copy to another level | AC RV | ✅ | P0 | |
-| Mirror | all | ⬜ | P1 | |
-| Array: linear, rectangular, polar | all | ⬜ | P1 | |
-| Offset (parallel copy) | all | ⬜ | new | |
+| Mirror | all | ✅ | P1 | Slice 17 (Ctrl+M; Ctrl mirrors a copy) |
+| Array: linear, rectangular, polar | all | 🟡 | P1 | Slice 17: linear and polar (Ctrl+U); rectangular = two linear |
+| Offset (parallel copy) | all | ✅ | new | Slice 17: walls (parallel copy), slabs (grow/shrink) |
 | Trim, extend to boundary, split, join | all | ⬜ | new | Walls, beams, 2D lines |
 | Align (to an edge or face) | RV VW | ⬜ | new | |
 | Elevate (change vertical position) | AC RV | 🟡 | new | Wall height; no general elevate |
@@ -210,14 +210,15 @@ release notes, so check before relying on a single cell.
 
 | Tool | Has | KIMCAD | Pri | Notes |
 |------|-----|--------|-----|-------|
-| Section views (marker in plan, linked view) | all | ⬜ | P1 | IfcOpenShell SVG serializer, as in Bonsai |
-| Elevations (building, interior) | all | ⬜ | P1 | |
+| Floor plan drawings (one per story, cut plane, symbols) | all | ✅ | P1 | Slice 15: cut at 1.10 m (Archicad), door swings, window glass, annotations and markers drawn on |
+| Section views (marker in plan, linked view) | all | 🟡 | P1 | Slice 14: Section tool (V), Archicad's three clicks; SVG from IfcOpenShell's serializer, in a tab (D60, D61). Not yet: scale setting, detail level, cropping by hand |
+| Elevations (building, interior) | all | 🟡 | P1 | Slice 14: template N/S/E/W elevations in new projects, *Create elevations*, Elevation tool (Shift+V). Interior elevations: an elevation with a limited depth |
 | Detail views (enlarged, cropped, with extra 2D) | all | ⬜ | P1 | Archicad details and worksheets, Revit callouts |
 | Drafting views (2D only) | all | ⬜ | new | |
 | 3D documents / axonometric drawings | AC RV VW | ⬜ | new | |
-| Crop regions, view range, depth | AC RV VW | ⬜ | new | |
+| Crop regions, view range, depth | AC RV VW | 🟡 | new | Depth: infinite / limited / zero (D61), in the bridge; no UI yet |
 | Model view options (detail level by scale) | AC RV VW | ⬜ | new | |
-| Drawings update when the model changes | all | ⬜ | P1 | |
+| Drawings update when the model changes | all | 🟡 | P1 | Out-of-date bar + Regenerate; regenerated when brought to the front |
 
 ## 12. 2D drafting
 
@@ -236,14 +237,14 @@ release notes, so check before relying on a single cell.
 | Text labels | all | ✅ | P1 | Screen-sized; paper-unit size is open (doc 13) |
 | Linear dimension (two points) | all | ✅ | P1 | |
 | Marks (circle with a tag) | AC | ✅ | P1 | |
-| Dimension chains, overall dimensions | all | ⬜ | P1 | Open in doc 13 |
-| Snap dimensions to wall faces, openings and layers | all | ⬜ | P1 | |
+| Dimension chains, overall dimensions | all | 🟡 | P1 | Slice 15: chains (Shift+click); no overall dimension yet |
+| Snap dimensions to wall faces, openings and layers | all | 🟡 | P1 | Slice 15: wall faces; openings and layer lines later |
 | Automatic dimensioning of walls and openings | AC RV VW | ⬜ | new | |
 | Angle, radius, arc-length, level and spot-elevation dimensions | all | ⬜ | P1 | |
 | Associative labels and tags (show a property, follow the element) | all | ⬜ | P1 | Door/window/room/wall tags |
-| Leaders and arrows | all | ⬜ | P1 | Open in doc 13 |
+| Leaders and arrows | all | ✅ | P1 | Slice 15: Leader tool (Shift+A) |
 | Revision clouds | AC RV VW | ⬜ | new | Open in doc 13 |
-| Section, elevation and detail markers | all | ⬜ | P1 | Come with drawings (§11) |
+| Section, elevation and detail markers | all | 🟡 | P1 | Section and elevation markers in plan (Slice 14); detail markers later |
 | North arrow, scale bar | all | ⬜ | new | |
 | Keynotes | RV VW AC | ⬜ | new | |
 | Room / zone stamps (name, number, area) | all | ⬜ | P1 | Need rooms (§6) |
@@ -252,11 +253,11 @@ release notes, so check before relying on a single cell.
 
 | Tool | Has | KIMCAD | Pri | Notes |
 |------|-----|--------|-----|-------|
-| Sheets / layouts with drawings placed at scale | all | ⬜ | P1 | M4 exit |
-| Title blocks filled from project data | all | ⬜ | P1 | |
+| Sheets / layouts with drawings placed at scale | all | ✅ | P1 | Slice 16 (M4 exit): A1/A3, numbered, drag to place (D62) |
+| Title blocks filled from project data | all | 🟡 | P1 | Slice 16: one built-in title block; custom templates later |
 | Drawing and sheet lists (auto-numbered) | AC RV VW | ⬜ | new | |
 | Revisions / issue management | AC RV VW | ⬜ | new | Could use versions and milestones (P2 item in 04) |
-| Print, PDF export | all | ⬜ | P1 | |
+| Print, PDF export | all | ✅ | P1 | Slice 16: PDF and SVG per sheet (Qt, vector) |
 | Batch publishing (sets of sheets to PDF/DWG) | AC RV VW | ⬜ | new | Archicad Publisher |
 | DWG/DXF export | AC RV VW BB | ⬜ | P1 | |
 
@@ -287,7 +288,7 @@ release notes, so check before relying on a single cell.
 | Tool | Has | KIMCAD | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Save version, History, Compare (colours and list) | — | ✅ | P0 | KIMCAD's own feature (Slice 8). Competitors have backups and Revit compare add-ins at most |
-| Milestones, object history, before/after | — | ⬜ | P0 | Slice 9 of M5 (not the feedback Slice 9) |
+| Milestones, object history, before/after | — | ✅ | P0 | Slice 20 (M5) |
 | Combine options with conflict UI | — | ⬜ | P1 | M5 exit |
 | Several people on one project (Teamwork, Worksharing, Project Sharing) | AC RV VW | 🔮 | P2 | Git remotes first ([08](08-future.md)) |
 | External references (link another IFC/project, hotlinks, xrefs) | all | ⬜ | new | Models (D58) cover models inside one project only |

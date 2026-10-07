@@ -5,12 +5,18 @@
 
 #include "MainWindow.h"
 #include "SelfTest.h"
+#include "SheetExport.h"
 #include "Translations.h"
 
 int main(int argc, char* argv[])
 {
+    // Exporting a sheet needs no window: run without a display (CI, scripts).
+    for (int i = 1; i < argc; ++i)
+        if (qstrcmp(argv[i], "--export-sheet") == 0 && qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM"))
+            qputenv("QT_QPA_PLATFORM", "offscreen");
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("KIMCAD"));
+    QApplication::setOrganizationName(QStringLiteral("KIMCAD")); // QSettings: the window layout (D71)
     QApplication::setApplicationVersion(QStringLiteral(KIMCAD_VERSION));
 
     QCommandLineParser parser;
@@ -37,6 +43,14 @@ int main(int argc, char* argv[])
     parser.addOption(chunk);
     QCommandLineOption boxSelect(QStringLiteral("box-select"), QStringLiteral("Self-test: box-select the whole view."));
     parser.addOption(boxSelect);
+    QCommandLineOption popOut(QStringLiteral("pop-out"),
+        QStringLiteral("Self-test: move the 3D view to its own window and back; it must keep drawing."));
+    parser.addOption(popOut);
+    QCommandLineOption benchEdit(QStringLiteral("bench-edit"),
+        QStringLiteral("Self-test: time moving a wall of the loaded model (ms per edit and per refresh step)."));
+    parser.addOption(benchEdit);
+    QCommandLineOption planTab(QStringLiteral("plan-tab"), QStringLiteral("Self-test: with --bench-edit, edit in a plan tab."));
+    parser.addOption(planTab);
     QCommandLineOption drawWalls(QStringLiteral("draw-walls"),
         QStringLiteral("Self-test: on a new project, draw walls through these points (\"x,y;x,y;...\", metres)."),
         QStringLiteral("points"));
@@ -51,9 +65,19 @@ int main(int argc, char* argv[])
     parser.addOption(house);
     QCommandLineOption benchTools(QStringLiteral("bench-tools"), QStringLiteral("Self-test: time tool previews and wall placement."));
     parser.addOption(benchTools);
+    QCommandLineOption createDrawings(QStringLiteral("create-drawings"),
+        QStringLiteral("Self-test: View > Create floor plans and elevations after loading."));
+    parser.addOption(createDrawings);
+    QCommandLineOption openDrawing(QStringLiteral("open-drawing"),
+        QStringLiteral("Self-test: open this drawing (by name) in its tab and wait for it."), QStringLiteral("name"));
+    parser.addOption(openDrawing);
     QCommandLineOption screenshot(QStringLiteral("screenshot"), QStringLiteral("Self-test: save a PNG of the window."),
         QStringLiteral("png"));
     parser.addOption(screenshot);
+    QCommandLineOption exportSheet(QStringLiteral("export-sheet"),
+        QStringLiteral("Export sheet <number> of the IFC file to <out.pdf|out.svg> and exit (no window)."),
+        QStringLiteral("number"));
+    parser.addOption(exportSheet);
     parser.addPositionalArgument(QStringLiteral("file"), QStringLiteral("IFC file to open."), QStringLiteral("[file.ifc]"));
     parser.process(app);
 
@@ -63,6 +87,15 @@ int main(int argc, char* argv[])
     }
     kimcad::installTranslator(app, kimcad::pickLanguage(parser.value(lang)));
 
+    if (parser.isSet(exportSheet)) {
+        const QStringList args = parser.positionalArguments();
+        if (args.size() != 2) {
+            std::fprintf(stderr, "usage: kimcad-app --export-sheet NUMBER model.ifc out.pdf\n");
+            return 2;
+        }
+        return kimcad::exportSheetCommand(args.at(0), parser.value(exportSheet), args.at(1));
+    }
+
     if (parser.isSet(selfTest)) {
         kimcad::SelfTestOptions options;
         options.path = parser.value(selfTest);
@@ -71,6 +104,9 @@ int main(int argc, char* argv[])
         options.planCut = parser.isSet(planCut) ? parser.value(planCut).toDouble() : -1;
         options.chunkSize = qMax(1, parser.value(chunk).toInt());
         options.boxSelect = parser.isSet(boxSelect);
+        options.popOut = parser.isSet(popOut);
+        options.benchEdit = parser.isSet(benchEdit);
+        options.planTab = parser.isSet(planTab);
         options.drawWalls = parser.value(drawWalls);
         options.planView = parser.isSet(planView);
         options.linesOnly = parser.isSet(linesOnly);
@@ -78,6 +114,8 @@ int main(int argc, char* argv[])
         options.house = parser.isSet(house);
         options.benchTools = parser.isSet(benchTools);
         options.screenshot = parser.value(screenshot);
+        options.openDrawing = parser.value(openDrawing);
+        options.createDrawings = parser.isSet(createDrawings);
         return kimcad::runSelfTest(options);
     }
 

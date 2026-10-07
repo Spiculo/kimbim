@@ -12,6 +12,7 @@ This code is not production code. It exists to measure and to fail fast.
 | S3 | `s3_records/` | Does IFC → canonical records → IFC round-trip losslessly and deterministically? Do edits stay local? |
 | S4 | `s3_records/` (run on 2 OSs) | Do Windows and Linux produce identical record hashes? |
 | S5 | `s5_git_store/` | Can a Git object database (gitoxide) hold a 1M-record model? |
+| S6 | `s6_drawings/` | Can IfcOpenShell's SVG serializer make plans, sections and elevations of KIMCAD files, and how fast? |
 
 ## Setup
 
@@ -32,6 +33,10 @@ cd spikes/s3_records && ../.venv/Scripts/python run.py [filter]
 python3 -m pip install --target ~/kimcad-spike-pkgs ifcopenshell==0.9.0 blake3
 KIMCAD_SPIKE_OUT=out-linux PYTHONPATH=~/kimcad-spike-pkgs python3 run.py
 python compare_manifests.py out/manifest-windows.json out-linux/manifest-linux.json
+
+# S6 (drawings): writes plan.svg, section.svg, elevation.svg and prints timings
+python spikes/s6_drawings/drawing_bench.py build/house.ifc build/s6-house     # pixi run house first
+pixi run drawing-bench                                                       # Clinic, from the corpus
 
 # S2
 cd spikes/s2_geometry && ../.venv/Scripts/python geom_bench.py synth 100000
