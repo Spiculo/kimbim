@@ -177,6 +177,8 @@ class _Merger:
                 value = t
             elif t == b:
                 value = o
+            elif attr == "OwnerHistory":  # edit bookkeeping (IFC2X3): this option's, never a question
+                value = o
             elif (ifc_type, attr) in _PROPERTY_LISTS and all(isinstance(x, list) for x in (b, o, t)):
                 value = self.merge_properties(key, ifc_type, name, attr, b, o, t)
             elif attr in sets and all(isinstance(x, list) for x in (b or [], o or [], t or [])):

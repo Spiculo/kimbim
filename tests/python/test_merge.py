@@ -269,3 +269,13 @@ def test_project_merge_with_conflicts(tmp_path, capsys):
     assert len(p.log("HEAD", 1)[0].parents) == 2
     name = json.loads(p._records("HEAD")[c.key])["a"]["Name"]
     assert name == c.theirs
+
+
+def test_owner_history_is_bookkeeping_not_a_conflict():
+    base = {"o/W": rec("IfcWall", GlobalId="W", Name="a", OwnerHistory={"@n": "h0"})}
+    ours = {"o/W": rec("IfcWall", GlobalId="W", Name="a", OwnerHistory={"@n": "h1"})}
+    theirs = {"o/W": rec("IfcWall", GlobalId="W", Name="b", OwnerHistory={"@n": "h2"})}
+    r = merge_records(base, ours, theirs)
+    assert not [c for c in r.conflicts if c.attribute == "OwnerHistory"]
+    v = json.loads(r.records["o/W"])["a"]
+    assert v["Name"] == "b" and v["OwnerHistory"] == {"@n": "h1"}  # this option's history

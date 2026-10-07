@@ -246,3 +246,20 @@ to their level; sections and elevations get a visible-element pass first.
 - [05](05-geometry-rendering-drawings.md): hybrid CGAL/OCCT kernel for display tessellation.
 - [07](07-roadmap.md): spike status.
 - [decisions.md](decisions.md): D34–D39.
+
+## Slices 18–22 on Clinic (owner process rule: time on Clinic)
+
+`python spikes/m5_bench/clinic_bench.py Clinic_Architectural.ifc WORK_DIR` (`pixi run m5-bench`), Linux container, 2026-10-07. Clinic: 3,298 products, 1,080 walls, 269 (Revit) spaces, 14,432 property sets, IFC2X3.
+
+| Step | Time | Note |
+|---|---|---|
+| After-edit hooks (rooms re-fit, walls re-trimmed to roofs), per edit | 10 ms for a wall edit, < 1 ms otherwise | was 58 ms before rooms were found through their property sets and skipped when no wall changed |
+| Enable versioning / Save version | 100 s each | **pre-existing (Slice 8)**: Python decomposition of the whole model on every save. The Rust record layer (R1 port) or incremental decomposition is needed before large real projects |
+| Switch option | 13 s | export + reopen |
+| Milestone | 0.02 s | |
+| Object history (3 versions) | 0.4 s | tree entries per version |
+| Before/after | 19 s first, 0.02 s cached | composes the whole older version; reading only the element's records is a follow-up |
+| Combine preview | 4.5 s | reads the three record sets, merges |
+| Combine (write + open the combined model) | 18 s | |
+
+The bench also found two problems, both fixed: moving a Revit wall failed (ifcopenshell's wall regenerator needs a Body/MODEL_VIEW context; imported walls now keep their own geometry), and both options editing one IFC2X3 element raised a second conflict on its `OwnerHistory` (bookkeeping: this option's is kept, never asked).

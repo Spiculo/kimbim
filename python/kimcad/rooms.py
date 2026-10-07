@@ -185,15 +185,17 @@ def _inside(p, polygon) -> bool:
 # ---------------------------------------------------------------- rooms in the model
 
 def _rooms(storey=None):
+    """KIMCAD's rooms (spaces with KIMCAD_Room), found through their property sets: imported models can
+    have hundreds of other spaces."""
     out = []
-    for space in B._model.by_type("IfcSpace"):
-        data = ifcopenshell.util.element.get_pset(space, PSET)
-        if not data:
+    for pset in B._model.by_type("IfcPropertySet"):
+        if pset.Name != PSET:
             continue
-        if storey is not None and ifcopenshell.util.element.get_aggregate(space) != storey:
-            continue
-        out.append(space)
-    return out
+        for rel in pset.DefinesOccurrence or ():
+            for space in rel.RelatedObjects:
+                if space.is_a("IfcSpace") and (storey is None or ifcopenshell.util.element.get_aggregate(space) == storey):
+                    out.append(space)
+    return sorted(out, key=lambda s: s.id())
 
 
 def _height(storey) -> float:
@@ -344,11 +346,20 @@ def edit_room(guid: str, changes_json: str) -> str:
     return B._dump(B._run(action))
 
 
+def _is_wall(guid) -> bool:
+    try:
+        return B._model.by_guid(guid).is_a("IfcWall")
+    except RuntimeError:
+        return False
+
+
 def _refit(changed, removed):
     """After an edit: rooms on levels whose walls changed take their walls' new shape (same undo step).
     A room whose walls no longer enclose it keeps its last shape."""
     if B._model is None or not B._model.by_type("IfcSpace"):
         return []
+    if not removed and not any(_is_wall(g) for g in changed):
+        return []  # only walls shape rooms (cheap check for every edit)
     levels = set()
     for g in list(changed) + list(removed):
         try:

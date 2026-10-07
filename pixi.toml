@@ -50,6 +50,8 @@ app-test-nogui = { cmd = "ctest --test-dir build/app --output-on-failure -LE gui
 app = { cmd = "build/app/kimcad-app", depends-on = ["app-build", "build"], env = { KIMCAD_PYTHON_PATH = "$PIXI_PROJECT_ROOT/python" } }
 # Spike S6: SVG drawing generation (plan, section, elevation) timed on the large Clinic model
 drawing-bench = "python spikes/s6_drawings/drawing_bench.py Clinic_Architectural.ifc build/s6-clinic"
+# Slices 18-22 timed on Clinic: after-edit hooks, versioning, history, before/after, combining options
+m5-bench = "python spikes/m5_bench/clinic_bench.py Clinic_Architectural.ifc build/m5-clinic"
 check-translations = "python tools/check_translations.py"
 kimcad = { cmd = "python -m kimcad", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/python" } }
 
