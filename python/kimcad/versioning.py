@@ -87,7 +87,7 @@ def _open_head(project: Project) -> str:
     _end_combining()
     working = _working(project)
     working.parent.mkdir(parents=True, exist_ok=True)
-    project.export(working, overwrite=True)
+    project.export(working, overwrite=True, one_owner=True)
     _project = project
     info = json.loads(B.open_model(str(working)))  # keeps _project: it's our working copy
     _project = project

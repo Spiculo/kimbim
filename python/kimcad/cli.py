@@ -105,7 +105,7 @@ def run(args) -> int:
     elif args.cmd == "diff":
         _print_changes(proj.diff(args.rev_a, args.rev_b), as_json=args.json)
     elif args.cmd == "export":
-        out = proj.export(args.out, args.rev, overwrite=args.force)
+        out = proj.export(args.out, args.rev, overwrite=args.force, one_owner=True)
         print(f"wrote {out}")
     elif args.cmd == "show":
         print(json.dumps(proj.show(args.key, args.rev), ensure_ascii=False, indent=1, sort_keys=True))

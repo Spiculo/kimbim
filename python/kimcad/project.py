@@ -267,13 +267,17 @@ class Project:
         changes, _ = self._changes(old, self._records(b))
         return changes
 
-    def export(self, out_path, rev: str = "HEAD", overwrite: bool = False) -> pathlib.Path:
+    def export(self, out_path, rev: str = "HEAD", overwrite: bool = False, one_owner: bool = False) -> pathlib.Path:
+        """Write a version as IFC. `one_owner`: give each owner its own copy of values IFC wants owned
+        once (D70; the app and the CLI use it). Off by default: the bytes are then exactly compose()'s,
+        which the golden reference hashes pin."""
         out = pathlib.Path(out_path)
         records = self._records(rev)
         if out.exists() and not overwrite:
             raise TargetExists(f"{out} already exists (use --force to overwrite)")
         f = compose(records)
-        unshare(f)  # one owner where IFC requires it (records hash-cons identical values)
+        if one_owner:
+            unshare(f)  # one owner where IFC requires it (records hash-cons identical values)
         f.write(str(out))
         return out
 
