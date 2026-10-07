@@ -216,12 +216,12 @@ swing in their representation; Slice 15). Polygon HLR (`svg-poly`) gives the sam
 | same | section through the middle, exact / `svg-poly` | all | 9.9 / 8.0 s | 18.2 / 16.2 s | 32.5 / **25.6 s** |
 | same | south elevation, exact / `svg-poly` | all | 8.4 / 8.8 s | 58.9 / 42.1 s | 72.1 / **52.1 s** |
 | same | south elevation, only the visible front row | 240 products | 1.3 s | 1.9 s | **3.4 s** |
-| Clinic_Architectural (2,586 products drawn), CI Linux runner | section through the middle, `svg-poly` | all | 11.1 s | 13.4 s | **25.9 s** |
-| same | south elevation, `svg-poly` | all | 11.5 s | 21.4 s | **34.4 s** |
-| same | plan | — | — | — | first CI run used the lowest storey (5 elements, 0.3 s), not a real plan; the bench now picks the fullest storey |
+| Clinic_Architectural (2,586 products drawn), CI Linux runner, two runs | plan of First Floor (the fullest storey), `svg-poly` | 2,075 | 2.8 s | 3.3 s | **6.4 s** |
+| same | section through the middle, `svg-poly` | all | 7.2–11.1 s | 8.9–13.4 s | **17.0–25.9 s** |
+| same | south elevation, `svg-poly` | all | 7.3–11.5 s | 13.9–21.4 s | **22.2–34.4 s** |
 
-- Clinic confirms the synthetic results on a real Revit export: a section or elevation of the whole building takes
-  26–34 s, and geometry (11 s) matters too, not only HLR. The visible-element pass cuts both.
+- Clinic confirms the synthetic results on a real Revit export: a plan of its fullest floor takes 6.4 s, a section or
+  elevation of the whole building 17–34 s (runners vary), and geometry (7–11 s) matters too, not only HLR. The visible-element pass cuts both.
 - Hidden-line removal dominates, and it grows with everything behind the cut, not with what is visible. Sending only
   the elements the camera can see cut the elevation from 52 s to 3.4 s. KIMCAD already renders element IDs into an
   offscreen image for box selection (D52); the same pass from the drawing's camera gives the visible set.
