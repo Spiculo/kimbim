@@ -13,6 +13,9 @@
 #include <QJsonObject>
 #include <QTemporaryDir>
 #include <QTimer>
+#include <QBoxLayout>
+#include <QImage>
+#include <QSet>
 
 #include <cstdio>
 
@@ -333,6 +336,43 @@ int runSelfTest(const SelfTestOptions& options)
         QApplication::processEvents();
         result.insert(QStringLiteral("box_selected"), n);
         result.insert(QStringLiteral("tree_selected"), int(window.treePanel()->selectedGuids().size()));
+    }
+    if (options.popOut) {
+        // D71: a tab dragged out moves its view to a new top-level window (a new native window).
+        // The view must keep drawing there and after it is docked back.
+        auto drawsSomething = [&](Viewport* v) {
+            const QString file = QDir::temp().filePath(QStringLiteral("kimcad-popout.png"));
+            if (!v->dumpImage(file))
+                return false;
+            const QImage image(file);
+            QSet<QRgb> colours;
+            for (int y = 0; y < image.height() && colours.size() < 3; y += 7)
+                for (int x = 0; x < image.width() && colours.size() < 3; x += 7)
+                    colours.insert(image.pixel(x, y));
+            return colours.size() >= 2 && !v->pickAt(v->width() / 2, v->height() / 2).isNull();
+        };
+        QWidget* host = viewport->parentWidget();
+        auto* hostLayout = qobject_cast<QBoxLayout*>(host->layout());
+        const int at = hostLayout ? hostLayout->indexOf(viewport) : -1;
+        auto* floating = new QWidget;
+        auto* lay = new QVBoxLayout(floating);
+        lay->setContentsMargins(0, 0, 0, 0);
+        lay->addWidget(viewport);
+        floating->resize(w, h);
+        floating->show();
+        QApplication::processEvents();
+        viewport->fitAll();
+        QApplication::processEvents();
+        const bool outside = drawsSomething(viewport);
+        if (hostLayout)
+            hostLayout->insertWidget(std::max(at, 0), viewport, 1);
+        delete floating;
+        QApplication::processEvents();
+        viewport->fitAll();
+        QApplication::processEvents();
+        const bool back = drawsSomething(viewport);
+        result.insert(QStringLiteral("pop_out_outside"), outside);
+        result.insert(QStringLiteral("pop_out"), outside && back);
     }
     if (options.planCut >= 0) {
         window.setPlanCutHeight(options.planCut);

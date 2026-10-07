@@ -21,6 +21,7 @@ struct SelfTestOptions {
     QString drawWalls;            // "x,y;x,y;...": new project, draw this wall polyline with the wall tool
     bool createDrawings = false; // View > Create floor plans and elevations after loading (an opened IFC has none)
     QString openDrawing;          // a drawing's name: open it in its tab, wait for it, report its paper size
+    bool popOut = false;          // move the 3D view to its own window and back (a tab dragged out, D71)
 };
 
 // Opens the model in a real window, loads it, measures, prints one JSON line to stdout.

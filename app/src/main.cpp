@@ -42,6 +42,9 @@ int main(int argc, char* argv[])
     parser.addOption(chunk);
     QCommandLineOption boxSelect(QStringLiteral("box-select"), QStringLiteral("Self-test: box-select the whole view."));
     parser.addOption(boxSelect);
+    QCommandLineOption popOut(QStringLiteral("pop-out"),
+        QStringLiteral("Self-test: move the 3D view to its own window and back; it must keep drawing."));
+    parser.addOption(popOut);
     QCommandLineOption drawWalls(QStringLiteral("draw-walls"),
         QStringLiteral("Self-test: on a new project, draw walls through these points (\"x,y;x,y;...\", metres)."),
         QStringLiteral("points"));
@@ -95,6 +98,7 @@ int main(int argc, char* argv[])
         options.planCut = parser.isSet(planCut) ? parser.value(planCut).toDouble() : -1;
         options.chunkSize = qMax(1, parser.value(chunk).toInt());
         options.boxSelect = parser.isSet(boxSelect);
+        options.popOut = parser.isSet(popOut);
         options.drawWalls = parser.value(drawWalls);
         options.planView = parser.isSet(planView);
         options.linesOnly = parser.isSet(linesOnly);

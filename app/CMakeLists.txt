@@ -92,6 +92,7 @@ kimcad_gui_test(app_selftest_fixture
     "\"ok\":true.*\"pick_matched\":2.*\"pick_missed\":0.*\"tree_follows_selection\":true" :fixture: --frames 5)
 kimcad_gui_test(app_selftest_broken_file "\"ok\":false" ${CMAKE_CURRENT_BINARY_DIR}/broken.ifc)
 kimcad_gui_test(app_selftest_quit_during_load "\"ok\":true,\"quit_during_load\":true" :fixture: --quit-during-load --chunk 1)
+kimcad_gui_test(app_selftest_pop_out "\"ok\":true.*\"pop_out\":true" :fixture: --frames 2 --pop-out)
 kimcad_gui_test(app_selftest_plan_cut "\"ok\":true.*\"planes\":1" :fixture: --frames 5 --plan-cut 1.5)
 kimcad_gui_test(app_selftest_draw_walls "\"elements\":4,\"joins\":4,\"ok\":true,\"walls\":4" :new: --draw-walls "0,0 5,0 5,4 0,4 0,0")
 kimcad_gui_test(app_selftest_house "\"beams\":1,\"columns\":1,\"doors\":1,\"elements\":9,\"grid\":4,\"joins\":4,\"ok\":true,\"openings\":2,\"slabs\":1,\"walls\":4,\"windows\":1" :new: --house)
