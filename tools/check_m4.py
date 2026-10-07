@@ -31,7 +31,13 @@ def app() -> Path:
 
 
 def export(ifc: Path, out: Path) -> dict:
-    env = {**os.environ, "QT_QPA_PLATFORM": "offscreen", "KIMCAD_PYTHON_PATH": str(ROOT / "python")}
+    env = {**os.environ, "KIMCAD_PYTHON_PATH": str(ROOT / "python")}
+    if sys.platform == "win32":
+        # Qt's offscreen platform on Windows sees no system fonts, so the PDF's text came out as outlines
+        # (no fonts embedded). The native platform needs no visible window for an export.
+        env.setdefault("QT_QPA_FONTDIR", os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts"))
+    else:
+        env["QT_QPA_PLATFORM"] = "offscreen"
     done = subprocess.run([str(app()), "--export-sheet", "A01", str(ifc), str(out)], capture_output=True,
                           text=True, env=env, timeout=600)
     line = next((ln for ln in done.stdout.splitlines() if ln.startswith("{")), "")
