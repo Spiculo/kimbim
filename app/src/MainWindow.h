@@ -19,6 +19,7 @@
 #include <Bnd_Box.hxx>
 
 class QAction;
+class QMenu;
 class QDoubleSpinBox;
 
 class QComboBox;
@@ -333,6 +334,7 @@ private:
     QWidget* m_cutColumn = nullptr;    // the plan-cut slider, in the active model view
     QVector<std::function<void(Viewport*)>> m_viewConnectors;
     ToolPalette* m_palette = nullptr;
+    QMenu* m_viewMenu = nullptr;
     ToolOptionsBar* m_toolOptions = nullptr;
     StatusStrip* m_status = nullptr;
     // Each view has its own cuts (a plan tab is cut at its level; the 3D tab need not be).

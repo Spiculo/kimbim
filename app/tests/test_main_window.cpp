@@ -20,6 +20,7 @@
 #include "ToolPalette.h"
 #include <QComboBox>
 #include <QDoubleSpinBox>
+#include <QMenu>
 #include <QStatusBar>
 #include <QToolBar>
 #include <DockManager.h>
@@ -107,6 +108,20 @@ private slots:
         QCoreApplication::processEvents();
         const int center = w.dockLayout()->view("3d")->width();
         QVERIFY2(center >= int(0.6 * w.width()), qPrintable(QStringLiteral("%1 of %2").arg(center).arg(w.width())));
+    }
+
+    // A panel closed with its x comes back from View > Panels.
+    void closedPanelsComeBackFromTheViewMenu()
+    {
+        kimcad::MainWindow w(nullptr, true);
+        w.show();
+        ads::CDockWidget* tree = w.dockLayout()->manager()->findDockWidget("tree");
+        tree->closeDockWidget();
+        QVERIFY(tree->isClosed());
+        QMenu* panels = w.findChild<QMenu*>(QStringLiteral("panelsMenu"));
+        QVERIFY(panels && panels->actions().contains(tree->toggleViewAction()));
+        tree->toggleViewAction()->trigger();
+        QVERIFY(!tree->isClosed());
     }
 
     void layoutRestoreSkipsUnknownAndOffscreen()

@@ -2,6 +2,8 @@
 #define _USE_MATH_DEFINES
 #include "MainWindow.h"
 #include "DockLayout.h"
+#include <DockManager.h>
+#include <DockWidget.h>
 #include "Scene.h"
 #include "Icons.h"
 #include "StatusStrip.h"
@@ -300,6 +302,7 @@ void MainWindow::buildMenus()
     editAction(tr("&Offset..."), "actionOffset", QKeySequence(), [this] { offsetDialog(); });
 
     QMenu* view = menuBar()->addMenu(tr("&View"));
+    m_viewMenu = view;
     QAction* planView = view->addAction(tr("&Plan view"));
     planView->setObjectName(QStringLiteral("actionPlanView"));
     planView->setShortcut(Qt::Key_P);
@@ -499,7 +502,8 @@ void MainWindow::buildCutsToolbar()
         }
         updateCutSliderRange();
         m_viewport->setWorkPlaneZ(elevation);
-        if (m_viewport->isPlanView())
+        // A plan tab keeps its level and its camera (D71); only a 3D view put in plan mode follows.
+        if (m_viewport->isPlanView() && m_hosts.value(m_dock->current()) && m_hosts.value(m_dock->current())->storey().isEmpty())
             m_viewport->setPlanView(elevation);
         if (m_viewport->isDrawingMode()) {
             m_wallTool->finish();
@@ -1839,6 +1843,13 @@ void MainWindow::buildPalette()
     m_palette->addGroup(QStringLiteral("edit"), tr("Edit"), {tool(Tool::Move), tool(Tool::Rotate),
         tool(Tool::Stretch), mirror, act("actionCopyToLevel")});
     m_dock->addLeft(QStringLiteral("tools"), tr("Tools"), m_palette);
+    // View > Panels: a panel closed with its x comes back from here (D71).
+    m_viewMenu->addSeparator();
+    QMenu* panels = m_viewMenu->addMenu(tr("&Panels"));
+    panels->setObjectName(QStringLiteral("panelsMenu"));
+    for (const char* key : {"tools", "tree", "properties", "layers", "history", "drawings", "sheets"})
+        if (ads::CDockWidget* d = m_dock->manager()->findDockWidget(QLatin1String(key)))
+            panels->addAction(d->toggleViewAction());
 }
 
 void MainWindow::newSheetDialog(const QString& paper)
