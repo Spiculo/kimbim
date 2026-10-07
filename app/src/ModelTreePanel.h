@@ -47,6 +47,7 @@ signals:
     void isolateRequested(const QStringList& guids);
     void hideRequested(const QStringList& guids);
     void showAllRequested();
+    void guidActivated(const QString& guid); // double-click on an element or a level (not a category row)
 
 private:
     // `merged`: the names of single-child spatial rows above this one, shown as one row with it.

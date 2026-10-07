@@ -259,6 +259,7 @@ private:
     void drawingClick(QPointF p);
     void onDrawingGenerated(const QString& guid, const QJsonObject& result, const QString& error);
     void activateView(const QString& key);
+    void activateElement(const QString& guid); // double-click: properties, or a level's plan
     // Every model view gets the same signal handlers: `connect` runs for the views open now and
     // for every plan tab opened later.
     void onEachView(const std::function<void(Viewport*)>& connect);

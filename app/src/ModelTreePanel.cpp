@@ -105,6 +105,10 @@ ModelTreePanel::ModelTreePanel(QWidget* parent)
             emit guidsSelected(selectedGuids());
     });
     connect(m_tree, &QTreeWidget::customContextMenuRequested, this, &ModelTreePanel::showContextMenu);
+    connect(m_tree, &QTreeWidget::itemDoubleClicked, this, [this](QTreeWidgetItem* item) {
+        if (const QString g = item->data(0, GuidRole).toString(); !g.isEmpty())
+            emit guidActivated(g);
+    });
 }
 
 void ModelTreePanel::clear()

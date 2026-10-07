@@ -175,6 +175,8 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     connect(m_properties, &PropertiesPanel::resetToTypeRequested, this, &MainWindow::resetToType);
     connect(m_tree, &ModelTreePanel::isolateRequested, m_viewport, &Viewport::isolate);
     onEachView([this](Viewport* v) { connect(v, &Viewport::dragMoved, this, &MainWindow::dragMoveTo); });
+    onEachView([this](Viewport* v) { connect(v, &Viewport::elementDoubleClicked, this, &MainWindow::activateElement); });
+    connect(m_tree, &ModelTreePanel::guidActivated, this, &MainWindow::activateElement);
     onEachView([this](Viewport* v) { connect(v, &Viewport::zoomChanged, this, [this, v](double z) {
         if (v == m_viewport)
             m_status->setZoom(z);
@@ -2644,6 +2646,18 @@ void MainWindow::activateView(const QString& key)
         refreshDrawings();
         refreshSnapData();
     }
+}
+
+void MainWindow::activateElement(const QString& guid)
+{
+    if (m_tree->ifcTypeOf(guid) == QLatin1String("IfcBuildingStorey")) {
+        openPlanTab(guid);
+        return;
+    }
+    m_viewport->selectGuids({guid});
+    m_tree->selectGuids({guid});
+    setSelection({guid});
+    m_dock->raisePanel(QStringLiteral("properties")); // slides out if auto-hidden, raised if floating
 }
 
 void MainWindow::onEachView(const std::function<void(Viewport*)>& connect)

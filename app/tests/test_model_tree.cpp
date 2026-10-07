@@ -100,6 +100,18 @@ private slots:
         QCOMPARE(kimcad::ModelTreePanel::plainPlural("IfcSpace"), QString("Rooms"));
     }
 
+    void doubleClickActivates()
+    {
+        kimcad::ModelTreePanel panel;
+        panel.setTree(sampleTree());
+        QSignalSpy spy(&panel, &kimcad::ModelTreePanel::guidActivated);
+        emit panel.tree()->itemDoubleClicked(panel.itemFor("W1"), 0);
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(spy.first().first().toString(), QString("W1"));
+        emit panel.tree()->itemDoubleClicked(panel.itemFor("L1")->child(0), 0); // a category row
+        QCOMPARE(spy.count(), 1);
+    }
+
     void expandedGroupsSurviveARefresh()
     {
         kimcad::ModelTreePanel panel;

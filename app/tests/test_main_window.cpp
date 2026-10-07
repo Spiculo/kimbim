@@ -282,6 +282,26 @@ private slots:
         QVERIFY(bar->findChild<QDoubleSpinBox*>(QStringLiteral("planCutHeight")));
     }
 
+    // D71: double-click an element for its properties; a level for its plan.
+    void doubleClickShowsPropertiesOrOpensThePlan()
+    {
+        kimcad::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->setTolerance(0.05);
+        for (const QPointF& p : {QPointF(0, 0), QPointF(4, 0)})
+            w.wallTool()->click(p);
+        w.setTool(kimcad::MainWindow::Tool::None);
+        const QString wall = w.viewport()->guids().constLast();
+        w.dockLayout()->raisePanel(QStringLiteral("tree"));
+        QVERIFY(!w.dockLayout()->isPanelShown(QStringLiteral("properties")));
+        emit w.viewport()->elementDoubleClicked(wall);
+        QVERIFY(w.dockLayout()->isPanelShown(QStringLiteral("properties")));
+        QCOMPARE(w.selection(), QStringList({wall}));
+        emit w.treePanel()->guidActivated(w.levelsBar()->activeStorey()); // a level opens its plan
+        QCOMPARE(w.currentViewKey(), QStringLiteral("plan:") + w.levelsBar()->activeStorey());
+    }
+
     void visibilityActionsUseTheSelection()
     {
         kimcad::MainWindow w(nullptr, /*quiet=*/true);

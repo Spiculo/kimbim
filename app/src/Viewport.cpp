@@ -1005,6 +1005,19 @@ void Viewport::mouseDoubleClickEvent(QMouseEvent* e)
         emit drawingConfirmed();
         return;
     }
+    if (e->button() == Qt::LeftButton && ensureWindow()) {
+        const NCollection_Vec2<int> at = toPixels(e->position());
+        m_context->MoveTo(at.x(), at.y(), m_view, false);
+        QString guid;
+        if (Handle(ElementOwner) owner = Handle(ElementOwner)::DownCast(m_context->DetectedOwner()); !owner.IsNull())
+            guid = owner->batch()->guid(owner->index());
+        else if (Handle(AnnotationOwner) note = Handle(AnnotationOwner)::DownCast(m_context->DetectedOwner()); !note.IsNull())
+            guid = note->guid();
+        if (!guid.isEmpty()) {
+            emit elementDoubleClicked(guid);
+            return;
+        }
+    }
     QWidget::mouseDoubleClickEvent(e);
 }
 

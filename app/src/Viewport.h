@@ -172,6 +172,8 @@ signals:
     // The mouse rested on an element ("" when it left it): the app shows a hint.
     void hovered(const QString& guid, const QPoint& globalPos);
     void zoomChanged(double percent);
+    // Double-click on an element or a plan note (not while drawing): its properties (D71).
+    void elementDoubleClicked(const QString& guid);
     // Drag to move (owner feedback): left-drag that starts on a selected element; points on the work
     // plane, tolerance = ~10 px in metres.
     void dragMoved(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
