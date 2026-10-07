@@ -3,6 +3,8 @@
 
 #include <QByteArray>
 #include <QPointF>
+#include <QRectF>
+#include <QVector>
 #include <QWidget>
 
 #include <optional>
@@ -30,9 +32,18 @@ public:
     void setBusy(bool busy);
     void fit();
     double zoom() const { return m_scale; }
+    // Sheet mode (Slice 16): drawings placed on the sheet (paper mm, top-left at 0,0) can be dragged
+    // with the left button; dragging elsewhere pans.
+    struct Placed {
+        QString guid;
+        QRectF rect; // millimetres on the sheet
+    };
+    void setPlaced(const QVector<Placed>& placed) { m_placed = placed; }
+    QPointF toPaper(QPointF widget) const { return (widget - m_offset) / m_scale; }
 
 signals:
     void regenerateRequested(const QString& guid);
+    void placedMoved(const QString& drawing, QPointF topLeftMm);
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -57,6 +68,9 @@ private:
     bool m_stale = false;
     bool m_busy = false;
     std::optional<QPointF> m_panFrom;
+    QVector<Placed> m_placed;
+    int m_dragging = -1;     // index into m_placed while a placed drawing is dragged
+    QPointF m_dragStart;     // widget position where the drag started
 };
 
 } // namespace kimcad

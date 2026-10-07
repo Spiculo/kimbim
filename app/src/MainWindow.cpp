@@ -44,6 +44,8 @@
 #include "Cuts.h"
 #include "DrawingView.h"
 #include "DrawingsPanel.h"
+#include "SheetExport.h"
+#include "SheetsPanel.h"
 #include "ElementBatch.h"
 #include "HistoryPanel.h"
 #include "LayersPanel.h"
@@ -200,6 +202,16 @@ void MainWindow::buildMenus()
     saveAs->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_S));
     connect(saveAs, &QAction::triggered, this, &MainWindow::saveAsDialog);
     file->addSeparator();
+    QAction* info = file->addAction(tr("Project &info..."));
+    info->setObjectName(QStringLiteral("actionProjectInfo"));
+    connect(info, &QAction::triggered, this, &MainWindow::projectInfoDialog);
+    QAction* pdf = file->addAction(tr("Export sheet as &PDF..."));
+    pdf->setObjectName(QStringLiteral("actionExportSheetPdf"));
+    connect(pdf, &QAction::triggered, this, [this] { exportSheetDialog(true); });
+    QAction* svgExport = file->addAction(tr("Export sheet as S&VG..."));
+    svgExport->setObjectName(QStringLiteral("actionExportSheetSvg"));
+    connect(svgExport, &QAction::triggered, this, [this] { exportSheetDialog(false); });
+    file->addSeparator();
     QAction* enable = file->addAction(tr("Enable &versioning..."));
     enable->setObjectName(QStringLiteral("actionEnableVersioning"));
     connect(enable, &QAction::triggered, this, &MainWindow::enableVersioningDialog);
@@ -343,6 +355,37 @@ void MainWindow::buildDocks()
     addDockWidget(Qt::LeftDockWidgetArea, drawingsDock);
     tabifyDockWidget(layersDock, drawingsDock);
     connect(m_drawingsPanel, &DrawingsPanel::openRequested, this, [this](const QString& g) { openDrawing(g); });
+    m_sheetsPanel = new SheetsPanel(this);
+    auto* sheetsDock = new QDockWidget(tr("Sheets"), this);
+    sheetsDock->setObjectName(QStringLiteral("SheetsDock"));
+    sheetsDock->setWidget(m_sheetsPanel);
+    addDockWidget(Qt::LeftDockWidgetArea, sheetsDock);
+    tabifyDockWidget(drawingsDock, sheetsDock);
+    connect(m_sheetsPanel, &SheetsPanel::newRequested, this, [this](const QString& paper) {
+        bool ok = m_quiet;
+        const QString title = m_quiet ? QString()
+            : QInputDialog::getText(this, tr("New sheet"), tr("Title:"), QLineEdit::Normal, QString(), &ok);
+        if (ok) {
+            const QString number = addSheet(paper, title);
+            if (!number.isEmpty())
+                openSheet(number);
+        }
+    });
+    connect(m_sheetsPanel, &SheetsPanel::openRequested, this, [this](const QString& n) { openSheet(n); });
+    connect(m_sheetsPanel, &SheetsPanel::placeRequested, this, [this](const QString& n) {
+        const QString drawing = m_drawingsPanel->selectedDrawing();
+        if (drawing.isEmpty()) {
+            statusBar()->showMessage(tr("Select a drawing in the Drawings panel first"));
+            return;
+        }
+        placeOnSheet(n, drawing);
+    });
+    connect(m_sheetsPanel, &SheetsPanel::deleteRequested, this, [this](const QString& n) {
+        const QJsonObject r = bridge("delete_sheet", {n});
+        if (!r.value("ok").toBool())
+            statusBar()->showMessage(tr("Could not delete it: %1").arg(r.value("error").toString()));
+        afterEdit(r);
+    });
     connect(m_drawingsPanel, &DrawingsPanel::renameRequested, this, [this](const QString& g, const QString& name) {
         const QJsonObject r = bridge("rename_drawing", {g, name});
         if (!r.value("ok").toBool())
@@ -725,6 +768,7 @@ bool MainWindow::newProject()
     refreshLayers();
     refreshAnnotations();
     refreshDrawings();
+    refreshSheets();
     statusBar()->showMessage(tr("New project"));
     return true;
 }
@@ -2035,8 +2079,8 @@ void MainWindow::refreshDrawings()
     m_viewport->setDrawingMarkers(markers, m_levels->activeElevation());
     for (int i = m_tabs->count() - 1; i > 0; --i) {
         auto* view = qobject_cast<DrawingView*>(m_tabs->widget(i));
-        if (!view)
-            continue;
+        if (!view || view->guid().startsWith(QLatin1String("sheet:")))
+            continue; // sheets are refreshed by refreshSheets()
         const auto it = byGuid.constFind(view->guid());
         if (it == byGuid.constEnd()) { // deleted (or undone): its tab goes too
             closeDrawingTab(i);
@@ -2128,7 +2172,10 @@ void MainWindow::regenerateDrawing(const QString& guid)
     QPointer<MainWindow> self(this);
     QThread* worker = QThread::create([self, guid, include] {
         QString error;
-        const QJsonObject result = PythonEngine::instance().callJson("generate_drawing", {guid, include}, &error).object();
+        const bool sheet = guid.startsWith(QLatin1String("sheet:"));
+        const QJsonObject result = sheet
+            ? PythonEngine::instance().callJson("sheet_svg", {guid.mid(6)}, &error).object()
+            : PythonEngine::instance().callJson("generate_drawing", {guid, include}, &error).object();
         if (self)
             QMetaObject::invokeMethod(self, [self, guid, result, error] {
                 if (self)
@@ -2155,9 +2202,174 @@ void MainWindow::onDrawingGenerated(const QString& guid, const QJsonObject& resu
         return;
     }
     view->setSvg(result.value("svg").toString().toUtf8());
+    if (guid.startsWith(QLatin1String("sheet:"))) {
+        refreshSheets(false); // the drawings' places, for dragging
+        view->setStale(false);
+        if (m_generateAgain.remove(guid) && m_tabs->currentWidget() == view)
+            regenerateDrawing(guid);
+        return;
+    }
     refreshDrawings(); // stale again if the model changed while it was generated
     if (m_generateAgain.remove(guid) && view->isStale() && m_tabs->currentWidget() == view)
         regenerateDrawing(guid);
+}
+
+// ---------------------------------------------------------------- sheets (Slice 16)
+
+QString MainWindow::addSheet(const QString& paper, const QString& title)
+{
+    const QJsonObject r = bridge("add_sheet", {paper, title});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not add it: %1").arg(r.value("error").toString()));
+        return QString();
+    }
+    afterEdit(r);
+    return r.value("number").toString();
+}
+
+bool MainWindow::placeOnSheet(const QString& number, const QString& drawingGuid)
+{
+    statusBar()->showMessage(tr("Placing the drawing..."));
+    const QJsonObject r = bridge("place_drawing", {number, drawingGuid, QStringLiteral("-1"), QStringLiteral("-1"), QStringLiteral("100")});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not place it: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    openSheet(number);
+    return true;
+}
+
+bool MainWindow::openSheet(const QString& number)
+{
+    const QString key = QStringLiteral("sheet:") + number;
+    if (DrawingView* view = m_drawingViews.value(key)) {
+        m_tabs->setCurrentWidget(view);
+        return true;
+    }
+    bool exists = false;
+    for (const auto& v : bridge("sheets").value("sheets").toArray())
+        exists = exists || v.toObject().value("number").toString() == number;
+    if (!exists)
+        return false;
+    auto* view = new DrawingView(key, m_tabs);
+    connect(view, &DrawingView::regenerateRequested, this, &MainWindow::regenerateDrawing);
+    connect(view, &DrawingView::placedMoved, this, [this, number](const QString& drawing, QPointF topLeft) {
+        const QJsonObject r = bridge("move_placed", {number, drawing, QString::number(topLeft.x(), 'f', 1),
+            QString::number(topLeft.y(), 'f', 1)});
+        if (!r.value("ok").toBool())
+            statusBar()->showMessage(tr("Could not move it: %1").arg(r.value("error").toString()));
+        afterEdit(r);
+    });
+    m_drawingViews.insert(key, view);
+    view->setStale(true);
+    m_tabs->addTab(view, tr("Sheet %1").arg(number));
+    m_tabs->setCurrentWidget(view);
+    if (!m_generating.contains(key) && !view->hasDrawing())
+        regenerateDrawing(key);
+    return true;
+}
+
+void MainWindow::refreshSheets(bool changed)
+{
+    const QJsonArray list = bridge("sheets").value("sheets").toArray();
+    m_sheetsPanel->setSheets(list);
+    QHash<QString, QJsonObject> byNumber;
+    for (const auto& v : list)
+        byNumber.insert(v.toObject().value("number").toString(), v.toObject());
+    for (int i = m_tabs->count() - 1; i > 0; --i) {
+        auto* view = qobject_cast<DrawingView*>(m_tabs->widget(i));
+        if (!view || !view->guid().startsWith(QLatin1String("sheet:")))
+            continue;
+        const auto it = byNumber.constFind(view->guid().mid(6));
+        if (it == byNumber.constEnd()) {
+            closeDrawingTab(i);
+            continue;
+        }
+        QVector<DrawingView::Placed> placed;
+        for (const auto& pv : it->value("views").toArray()) {
+            const QJsonObject p = pv.toObject();
+            placed.push_back({p.value("drawing").toString(),
+                QRectF(p.value("x").toDouble(), p.value("y").toDouble(), p.value("w").toDouble(), p.value("h").toDouble())});
+        }
+        view->setPlaced(placed);
+        m_tabs->setTabText(i, tr("Sheet %1").arg(it->value("number").toString()));
+        if (changed && !m_generating.contains(view->guid()) && view->hasDrawing()) {
+            view->setStale(true); // the model or the sheet changed: compose it again
+            if (m_tabs->currentWidget() == view)
+                QMetaObject::invokeMethod(this, [this, g = view->guid()] { regenerateDrawing(g); }, Qt::QueuedConnection);
+        }
+    }
+}
+
+bool MainWindow::exportSheet(const QString& number, const QString& path)
+{
+    if (path.endsWith(QLatin1String(".svg"), Qt::CaseInsensitive)) {
+        const QJsonObject r = bridge("export_sheet_svg", {number, path});
+        if (!r.value("ok").toBool())
+            showError(tr("Could not export the sheet"), r.value("error").toString());
+        return r.value("ok").toBool();
+    }
+    const QJsonObject sheet = bridge("sheet_svg", {number});
+    QString error;
+    if (!sheet.value("ok").toBool()
+        || !exportSvgToPdf(sheet.value("svg").toString().toUtf8(), sheet.value("width").toDouble(),
+            sheet.value("height").toDouble(), path, &error)) {
+        showError(tr("Could not export the sheet"), error.isEmpty() ? sheet.value("error").toString() : error);
+        return false;
+    }
+    statusBar()->showMessage(tr("Sheet %1 exported to %2").arg(number, path));
+    return true;
+}
+
+void MainWindow::exportSheetDialog(bool pdf)
+{
+    QString number = m_sheetsPanel->selectedSheet();
+    if (auto* view = qobject_cast<DrawingView*>(m_tabs->currentWidget()); view && view->guid().startsWith(QLatin1String("sheet:")))
+        number = view->guid().mid(6);
+    if (number.isEmpty()) {
+        showError(tr("No sheet"), tr("Add a sheet in the Sheets panel first."));
+        return;
+    }
+    const QString path = QFileDialog::getSaveFileName(this, pdf ? tr("Export sheet as PDF") : tr("Export sheet as SVG"),
+        number + (pdf ? QStringLiteral(".pdf") : QStringLiteral(".svg")), pdf ? tr("PDF (*.pdf)") : tr("SVG (*.svg)"));
+    if (!path.isEmpty())
+        exportSheet(number, path);
+}
+
+bool MainWindow::setProjectInfo(const QJsonObject& info)
+{
+    const QJsonObject r = bridge("set_project_info", {QString::fromUtf8(QJsonDocument(info).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool())
+        showError(tr("Could not change the project info"), r.value("error").toString());
+    afterEdit(r);
+    return r.value("ok").toBool();
+}
+
+void MainWindow::projectInfoDialog()
+{
+    const QJsonObject current = bridge("project_info");
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Project info"));
+    auto* form = new QFormLayout(&dialog);
+    QLineEdit* fields[4];
+    const char* keys[4] = {"number", "name", "client", "address"};
+    const QString labels[4] = {tr("Project number:"), tr("Project name:"), tr("Client:"), tr("Address:")};
+    for (int i = 0; i < 4; ++i) {
+        fields[i] = new QLineEdit(current.value(QLatin1String(keys[i])).toString(), &dialog);
+        fields[i]->setMinimumWidth(320);
+        form->addRow(labels[i], fields[i]);
+    }
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    form->addRow(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    QJsonObject info;
+    for (int i = 0; i < 4; ++i)
+        info.insert(QLatin1String(keys[i]), fields[i]->text().trimmed());
+    setProjectInfo(info);
 }
 
 bool MainWindow::createModel(const QString& name)
@@ -2541,6 +2753,7 @@ void MainWindow::afterEdit(const QJsonObject& result)
     { StepTimer _(m_timings, "refreshLayers"); refreshLayers(); }
     { StepTimer _(m_timings, "refreshAnnotations"); refreshAnnotations(); }
     { StepTimer _(m_timings, "refreshDrawings"); refreshDrawings(); }
+    { StepTimer _(m_timings, "refreshSheets"); refreshSheets(); }
     StepTimer stateTimer(m_timings, "stateAndNames");
     const QJsonObject s = bridge("state");
     m_undo->setEnabled(s.value("can_undo").toBool());
@@ -2653,6 +2866,7 @@ void MainWindow::onOpened(const QJsonObject& info)
     refreshLayers();
     refreshAnnotations();
     refreshDrawings();
+    refreshSheets();
     statusBar()->showMessage(tr("Loading %1 (%2)...").arg(QFileInfo(m_path).fileName(), info.value("schema").toString()));
 }
 

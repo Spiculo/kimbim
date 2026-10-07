@@ -111,6 +111,12 @@ void DrawingView::paintEvent(QPaintEvent*)
     p.fillRect(paper, Qt::white);
     p.setRenderHint(QPainter::Antialiasing);
     m_renderer->render(&p, paper);
+    if (m_dragging >= 0 && m_panFrom) { // where the dragged drawing goes
+        const QRectF r = m_placed[m_dragging].rect;
+        const QPointF delta = (*m_panFrom - m_dragStart) / m_scale;
+        p.setPen(QPen(QColor(0x1a, 0x4d, 0xc0), 1.5, Qt::DashLine));
+        p.drawRect(QRectF(m_offset + (r.topLeft() + delta) * m_scale, r.size() * m_scale));
+    }
 }
 
 void DrawingView::wheelEvent(QWheelEvent* event)
@@ -127,12 +133,26 @@ void DrawingView::wheelEvent(QWheelEvent* event)
 
 void DrawingView::mousePressEvent(QMouseEvent* event)
 {
+    if (event->button() == Qt::LeftButton) {
+        const QPointF mm = toPaper(event->position());
+        for (int i = int(m_placed.size()) - 1; i >= 0; --i)
+            if (m_placed[i].rect.contains(mm)) { // drag a placed drawing (sheet mode)
+                m_dragging = i;
+                m_dragStart = event->position();
+                return;
+            }
+    }
     if (event->button() == Qt::MiddleButton || event->button() == Qt::LeftButton)
         m_panFrom = event->position();
 }
 
 void DrawingView::mouseMoveEvent(QMouseEvent* event)
 {
+    if (m_dragging >= 0) {
+        update(); // the outline follows in paintEvent
+        m_panFrom = event->position();
+        return;
+    }
     if (!m_panFrom)
         return;
     m_offset += event->position() - *m_panFrom;
@@ -140,8 +160,20 @@ void DrawingView::mouseMoveEvent(QMouseEvent* event)
     update();
 }
 
-void DrawingView::mouseReleaseEvent(QMouseEvent*)
+void DrawingView::mouseReleaseEvent(QMouseEvent* event)
 {
+    if (m_dragging >= 0) {
+        const QPointF delta = (event->position() - m_dragStart) / m_scale;
+        const Placed p = m_placed[m_dragging];
+        m_dragging = -1;
+        m_panFrom.reset();
+        if (delta.manhattanLength() > 0.5) {
+            m_placed.clear(); // stale until the sheet comes back
+            emit placedMoved(p.guid, p.rect.topLeft() + delta);
+        }
+        update();
+        return;
+    }
     m_panFrom.reset();
 }
 

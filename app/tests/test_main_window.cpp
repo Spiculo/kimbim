@@ -14,6 +14,7 @@
 
 #include "DrawingView.h"
 #include "DrawingsPanel.h"
+#include "SheetsPanel.h"
 #include "ElementBatch.h"
 #include "LevelsBar.h"
 #include "HostTool.h"
@@ -749,6 +750,33 @@ private slots:
         QVERIFY(w.deleteSelection());
         action(w, "actionCreateDrawings")->trigger();
         QCOMPARE(w.drawingsPanel()->count(), 5);
+        QVERIFY(w.close());
+    }
+
+    void sheetsAndPdf()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->setTolerance(0.05);
+        for (const QPointF& p : {QPointF(0, 0), QPointF(6, 0), QPointF(6, 4)})
+            w.wallTool()->click(p);
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QVERIFY(w.setProjectInfo(QJsonObject{{"number", "T-1"}, {"name", "Test house"}}));
+        const QString number = w.addSheet(QStringLiteral("A3"), QStringLiteral("Plans"));
+        QCOMPARE(number, QStringLiteral("A01"));
+        QCOMPARE(w.sheetsPanel()->count(), 1);
+        QVERIFY(w.placeOnSheet(number, w.drawingGuid(QStringLiteral("Level 1 Floor Plan"))));
+        kimcad::DrawingView* sheet = w.sheetView(number);
+        QVERIFY(sheet);
+        QTRY_VERIFY_WITH_TIMEOUT(sheet->hasDrawing(), 60000);
+        QCOMPARE(sheet->paperSize(), QSizeF(420, 297));
+        QTemporaryDir dir;
+        const QString pdf = dir.filePath(QStringLiteral("A01.pdf"));
+        QVERIFY(w.exportSheet(number, pdf));
+        QFile file(pdf);
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QVERIFY(file.read(5) == "%PDF-");
         QVERIFY(w.close());
     }
 

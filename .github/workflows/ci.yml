@@ -52,6 +52,8 @@ jobs:
         run: xvfb-run -a -s "-screen 0 1920x1080x24" pixi run ctest --test-dir build/app --output-on-failure -L gui
         env:
           KIMCAD_PYTHON_PATH: ${{ github.workspace }}/python
+      - name: M4 exit test - the house's sheet (plan, section, elevation, title block) exported to PDF
+        run: pixi run m4
       # Informational (Slice 14): the South Elevation of Clinic through the app's own pipeline (visible-element
       # pass + serializer in a child process); read drawing_s and drawing_visible from the log.
       - name: Slice 14 - Clinic elevation in the app (informational)

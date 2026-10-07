@@ -825,3 +825,17 @@ from .drawings import (  # noqa: E402,F401
     rename_drawing,
     set_drawing_depth,
 )
+from .sheets import (  # noqa: E402,F401
+    add_sheet,
+    delete_sheet,
+    edit_sheet,
+    export_sheet_svg,
+    move_placed,
+    place_drawing,
+    project_info,
+    remove_placed,
+    set_placed_scale,
+    set_project_info,
+    sheet_svg,
+    sheets,
+)

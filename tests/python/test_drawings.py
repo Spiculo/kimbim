@@ -40,6 +40,14 @@ def sections():
     return {n: d for n, d in drawings().items() if d["kind"] == "section"}
 
 
+def drawing(guid):
+    return next((d for d in call("drawings")["drawings"] if d["guid"] == guid), None)
+
+
+def new_sections(before):
+    return {n for n in sections() if n not in before}
+
+
 def test_new_project_has_the_four_template_elevations():
     assert call("new_project", "Casa")["ok"]
     listed = {n: d for n, d in drawings().items() if d["kind"] == "elevation"}
@@ -59,19 +67,20 @@ def test_opening_a_file_adds_no_drawings(tmp_path):
 
 
 def test_section_from_two_points_and_a_look_side(house):
+    before = set(sections())  # the house already has its M4 section
     r = call("create_section", -1.0, 4.5, 11.0, 4.5, 5.0, 8.0, -1)  # look north, infinite depth
     assert r["ok"], r
-    d = drawings()["Section 1"]
+    d = drawing(r["guid"])
     assert d["guid"] == r["guid"] and d["kind"] == "section" and d["depth"] is None and d["stale"]
     assert call("state")["can_undo"]
-    drawing = b._model.by_guid(r["guid"])
-    assert drawing.is_a("IfcAnnotation") and drawing.ObjectType == "DRAWING"
-    assert drawing.Representation.Representations[0].Items[0].TreeRootExpression.is_a("IfcBlock")
+    entity = b._model.by_guid(r["guid"])
+    assert entity.is_a("IfcAnnotation") and entity.ObjectType == "DRAWING"
+    assert entity.Representation.Representations[0].Items[0].TreeRootExpression.is_a("IfcBlock")
     assert r["guid"] not in [a["guid"] for a in call("annotations", house)["annotations"]]  # not a plan annotation
     logger = ifcopenshell.validate.json_logger()
     ifcopenshell.validate.validate(b._model, logger, express_rules=True)
     assert logger.statements == []
-    assert call("undo")["ok"] and sections() == {}
+    assert call("undo")["ok"] and new_sections(before) == set()
 
 
 def test_section_shows_cut_walls_and_slabs_filled_and_the_rest_in_projection(house):
@@ -79,14 +88,14 @@ def test_section_shows_cut_walls_and_slabs_filled_and_the_rest_in_projection(hou
     r = call("generate_drawing", guid, "")
     assert r["ok"], r
     svg = r["svg"]
-    assert '<g ifc:name="Section 1" class="section"' in svg or 'class="section"' in svg
+    assert 'class="section"' in svg
     cut = re.findall(r'class="(IfcWall|IfcSlab)"', svg)
     assert "IfcWall" in cut and "IfcSlab" in cut
     assert 'class="projection"' in svg
     assert "IfcOpeningElement" not in svg  # openings are voids, not cut fill
     w, h = (float(v) for v in re.search(r'width="([\d.]+)mm" height="([\d.]+)mm"', svg).groups())
     assert 100 < w < 140 and 60 < h < 110  # 1:100, cropped to the 10 m x ~7 m house section
-    assert not drawings()["Section 1"]["stale"]
+    assert not drawing(guid)["stale"]
     again = call("generate_drawing", guid, "")
     assert again["cached"] and again["svg"] == svg
 
@@ -96,7 +105,7 @@ def test_editing_a_wall_makes_drawings_stale_and_regenerating_shows_it(house):
     before = call("generate_drawing", guid, "")["svg"]
     wall = next(w for w in b._model.by_type("IfcWall") if abs(_x(w) - 10.0) < 1e-6)  # the east wall
     assert call("move_elements", json.dumps([wall.GlobalId]), 1.0, 0.0, 0.0)["ok"]
-    assert drawings()["Section 1"]["stale"]
+    assert drawing(guid)["stale"]
     after = call("generate_drawing", guid, "")
     assert not after["cached"] and after["svg"] != before
     assert call("undo")["ok"]
@@ -123,12 +132,12 @@ def test_template_elevations_follow_the_model_and_show_the_facade():
 
 def test_depth_and_delete(house):
     guid = call("create_section", -1.0, 4.5, 11.0, 4.5, 5.0, 8.0, 0.5)["guid"]
-    assert drawings()["Section 1"]["depth"] == 0.5
-    assert call("set_drawing_depth", guid, -1)["ok"] and drawings()["Section 1"]["depth"] is None
+    assert drawing(guid)["depth"] == 0.5
+    assert call("set_drawing_depth", guid, -1)["ok"] and drawing(guid)["depth"] is None
     assert call("rename_drawing", guid, "A-A")["ok"] and "A-A" in drawings()
     n = len(b._model.by_type("IfcShapeRepresentation"))
     psets = len([p for p in b._model.by_type("IfcPropertySet") if p.Name in ("KIMCAD_Drawing", "EPset_Drawing")])
-    assert call("delete_drawing", guid)["ok"] and sections() == {}
+    assert call("delete_drawing", guid)["ok"] and drawing(guid) is None
     assert len(b._model.by_type("IfcShapeRepresentation")) == n - 1
     assert len([p for p in b._model.by_type("IfcPropertySet") if p.Name in ("KIMCAD_Drawing", "EPset_Drawing")]) == psets - 2
     assert call("undo")["ok"] and "A-A" in drawings()
@@ -149,12 +158,12 @@ def test_drawings_are_not_meshed_in_3d():
 def test_moving_or_rotating_a_marker_moves_the_drawing_and_keeps_it_there(house):
     guid = call("create_section", -1.0, 4.5, 11.0, 4.5, 5.0, 8.0, -1)["guid"]
     assert call("move_elements", json.dumps([guid]), 0.0, -2.0, 0.0)["ok"]
-    d = drawings()["Section 1"]
+    d = drawing(guid)
     assert d["points"] == [[-1.0, 2.5], [11.0, 2.5]] and d["look"][1] > 2.5  # still looks north
     assert call("generate_drawing", guid, "")["ok"]  # refitting the infinite range keeps the move
-    assert drawings()["Section 1"]["points"] == [[-1.0, 2.5], [11.0, 2.5]]
+    assert drawing(guid)["points"] == [[-1.0, 2.5], [11.0, 2.5]]
     assert call("rotate_elements", json.dumps([guid]), 5.0, 2.5, math.pi / 2)["ok"]
-    d = drawings()["Section 1"]
+    d = drawing(guid)
     assert [[round(c, 6) for c in p] for p in d["points"]] == [[5.0, -3.5], [5.0, 8.5]] and d["look"][0] < 5.0
 
 

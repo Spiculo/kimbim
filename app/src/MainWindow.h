@@ -32,6 +32,7 @@ namespace kimcad {
 
 class LevelsBar;
 class DrawingsPanel;
+class SheetsPanel;
 class DrawingView;
 class HistoryPanel;
 class LayersPanel;
@@ -141,6 +142,14 @@ public:
     DrawingView* drawingView(const QString& guid) const { return m_drawingViews.value(guid); }
     void regenerateDrawing(const QString& guid);
     void showModelTab();
+    // Sheets and project info (Slice 16, M4 exit).
+    SheetsPanel* sheetsPanel() const { return m_sheetsPanel; }
+    QString addSheet(const QString& paper, const QString& title); // its number, "" on failure
+    bool placeOnSheet(const QString& number, const QString& drawingGuid);
+    bool openSheet(const QString& number);
+    DrawingView* sheetView(const QString& number) const { return m_drawingViews.value(QStringLiteral("sheet:") + number); }
+    bool exportSheet(const QString& number, const QString& path); // .pdf or .svg
+    bool setProjectInfo(const QJsonObject& info);
     // How many elements the last generation sent to the serializer (-1: all, no visible pass).
     int lastDrawingVisibleCount() const { return m_lastDrawingVisible; }
     // Drag to move (owner feedback): preview while dragging, move on release (Ctrl detaches).
@@ -199,6 +208,9 @@ private:
     void refreshAnnotations();
     void annotationClick(QPointF p, Qt::KeyboardModifiers modifiers = {});
     void refreshDrawings();
+    void refreshSheets(bool changed = true); // changed: the model changed, sheets need composing again
+    void projectInfoDialog();
+    void exportSheetDialog(bool pdf);
     void drawingClick(QPointF p);
     void onDrawingGenerated(const QString& guid, const QJsonObject& result, const QString& error);
     void closeDrawingTab(int index);
@@ -260,6 +272,7 @@ private:
     QVector<QPointF> m_annotationPoints; // the dimension/section tool's clicks so far
     QTabWidget* m_tabs = nullptr; // the model (3D/plan) and the open drawings
     DrawingsPanel* m_drawingsPanel = nullptr;
+    SheetsPanel* m_sheetsPanel = nullptr;
     QHash<QString, DrawingView*> m_drawingViews;
     QSet<QString> m_generating, m_generateAgain;
     QList<QThread*> m_drawingThreads;

@@ -5,10 +5,15 @@
 
 #include "MainWindow.h"
 #include "SelfTest.h"
+#include "SheetExport.h"
 #include "Translations.h"
 
 int main(int argc, char* argv[])
 {
+    // Exporting a sheet needs no window: run without a display (CI, scripts).
+    for (int i = 1; i < argc; ++i)
+        if (qstrcmp(argv[i], "--export-sheet") == 0 && qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM"))
+            qputenv("QT_QPA_PLATFORM", "offscreen");
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("KIMCAD"));
     QApplication::setApplicationVersion(QStringLiteral(KIMCAD_VERSION));
@@ -60,6 +65,10 @@ int main(int argc, char* argv[])
     QCommandLineOption screenshot(QStringLiteral("screenshot"), QStringLiteral("Self-test: save a PNG of the window."),
         QStringLiteral("png"));
     parser.addOption(screenshot);
+    QCommandLineOption exportSheet(QStringLiteral("export-sheet"),
+        QStringLiteral("Export sheet <number> of the IFC file to <out.pdf|out.svg> and exit (no window)."),
+        QStringLiteral("number"));
+    parser.addOption(exportSheet);
     parser.addPositionalArgument(QStringLiteral("file"), QStringLiteral("IFC file to open."), QStringLiteral("[file.ifc]"));
     parser.process(app);
 
@@ -68,6 +77,15 @@ int main(int argc, char* argv[])
         return 0;
     }
     kimcad::installTranslator(app, kimcad::pickLanguage(parser.value(lang)));
+
+    if (parser.isSet(exportSheet)) {
+        const QStringList args = parser.positionalArguments();
+        if (args.size() != 2) {
+            std::fprintf(stderr, "usage: kimcad-app --export-sheet NUMBER model.ifc out.pdf\n");
+            return 2;
+        }
+        return kimcad::exportSheetCommand(args.at(0), parser.value(exportSheet), args.at(1));
+    }
 
     if (parser.isSet(selfTest)) {
         kimcad::SelfTestOptions options;

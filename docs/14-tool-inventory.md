@@ -38,7 +38,7 @@ release notes, so check before relying on a single cell.
 | Autosave, crash recovery | AC RV VW | ⬜ | P0 | oplog ([03](03-versioning.md)) |
 | Recent projects | all | ⬜ | P0 | |
 | Imperial units, unit preferences | all | ⬜ | P0 | Metric only today |
-| Project info (address, client, number) used in title blocks | AC RV VW | ⬜ | new | `IfcProject` / `IfcBuilding` attributes |
+| Project info (address, client, number) used in title blocks | AC RV VW | ✅ | new | Slice 16: *File › Project info…*, in IFC fields (D63) |
 | Survey point, project base point, georeferencing | AC RV VW BB | ⬜ | P2 | `ifcopenshell.api.georeference` |
 | Story settings (levels table: edit heights, insert/delete) | AC RV | 🟡 | P0 | Add level exists; no levels table |
 | Purge unused types/materials | RV VW BB | ⬜ | new | |
@@ -253,11 +253,11 @@ release notes, so check before relying on a single cell.
 
 | Tool | Has | KIMCAD | Pri | Notes |
 |------|-----|--------|-----|-------|
-| Sheets / layouts with drawings placed at scale | all | ⬜ | P1 | M4 exit |
-| Title blocks filled from project data | all | ⬜ | P1 | |
+| Sheets / layouts with drawings placed at scale | all | ✅ | P1 | Slice 16 (M4 exit): A1/A3, numbered, drag to place (D62) |
+| Title blocks filled from project data | all | 🟡 | P1 | Slice 16: one built-in title block; custom templates later |
 | Drawing and sheet lists (auto-numbered) | AC RV VW | ⬜ | new | |
 | Revisions / issue management | AC RV VW | ⬜ | new | Could use versions and milestones (P2 item in 04) |
-| Print, PDF export | all | ⬜ | P1 | |
+| Print, PDF export | all | ✅ | P1 | Slice 16: PDF and SVG per sheet (Qt, vector) |
 | Batch publishing (sets of sheets to PDF/DWG) | AC RV VW | ⬜ | new | Archicad Publisher |
 | DWG/DXF export | AC RV VW BB | ⬜ | P1 | |
 

@@ -14,6 +14,7 @@ pixi run app                      # opens KIMCAD (English or Spanish, following 
 pixi run app -- model.ifc --lang es
 pixi run app -- --self-test model.ifc --screenshot shot.png   # load, measure fps/picking, print JSON
 pixi run app -- --self-test model.ifc --create-drawings --open-drawing "South Elevation"   # time a drawing
+pixi run m4                       # M4 exit test: the sample house's sheet exported to build/m4/house-A01.pdf and checked
 ```
 
 Open an IFC file. It appears progressively in the 3D view, with the spatial tree on the left and properties on the right.
@@ -40,6 +41,7 @@ Open an IFC file. It appears progressively in the 3D view, with the spatial tree
 | Sections / elevations | **V** section, **Shift+V** elevation: click the line's two ends, then the side it looks at (as in Archicad). New projects come with North/South/East/West elevations; *View › Create elevations* adds them to an opened IFC. Markers show in plan view; select, move, rotate or delete them like elements |
 | Floor plans | Every level has a floor plan drawing (cut at 1.10 m, as in Archicad): walls cut, door swings, window glass, your labels, dimensions and marks, and the section/elevation markers. *View › Create floor plans and elevations* adds them to an opened IFC |
 | Annotation | **A** text, **Q** dimension (Shift+click adds points to a chain; snaps to wall faces), **X** mark, **Shift+A** leader. Text size is in millimetres on paper (*Properties › KIMCAD_Annotation › Size*) |
+| Sheets and PDF | *Sheets* tab: *New* (A1/A3, numbered A01, A02…), select a drawing in *Drawings* and *Place drawing*; open the sheet and drag drawings into place. *File › Project info…* fills the title block; *File › Export sheet as PDF…/SVG…*. Without a window: `kimcad-app --export-sheet A01 model.ifc A01.pdf` |
 | Drawings | The *Drawings* tab (left) lists them; double-click opens one in a tab next to *Model* (wheel zoom, drag to pan). It is generated in the background and shows *Regenerate* when the model has changed |
 
 ## Try it (command line)
