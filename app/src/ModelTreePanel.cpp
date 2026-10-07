@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "ModelTreePanel.h"
 
+#include "Icons.h"
+
 #include <QHeaderView>
 #include <QJsonArray>
 #include <QLineEdit>
@@ -70,6 +72,7 @@ QTreeWidgetItem* ModelTreePanel::addNode(const QJsonObject& node, QTreeWidgetIte
     auto* item = parent ? new QTreeWidgetItem(parent) : new QTreeWidgetItem(m_tree);
     item->setText(0, name.isEmpty() ? type : name);
     item->setText(1, type);
+    item->setIcon(0, iconFor(type));
     item->setData(0, GuidRole, node.value("guid").toString());
     item->setToolTip(0, node.value("guid").toString());
     m_items.insert(node.value("guid").toString(), item);
@@ -140,6 +143,23 @@ void ModelTreePanel::updateNames(const QJsonObject& node)
     }
     for (const auto& child : node.value("children").toArray())
         updateNames(child.toObject());
+}
+
+QString ModelTreePanel::hintFor(const QString& guid) const
+{
+    const QTreeWidgetItem* item = m_items.value(guid);
+    if (!item)
+        return {};
+    QString level;
+    for (const QTreeWidgetItem* p = item->parent(); p; p = p->parent())
+        if (p->text(1) == QLatin1String("IfcBuildingStorey")) {
+            level = p->text(0);
+            break;
+        }
+    QStringList parts{item->text(0), item->text(1)};
+    if (!level.isEmpty())
+        parts << level;
+    return parts.join(QStringLiteral(" · "));
 }
 
 QStringList ModelTreePanel::selectedGuids() const

@@ -105,6 +105,44 @@ static int runDrawWalls(const SelfTestOptions& options)
     return report(result);
 }
 
+// Architect feedback: how long a preview update and a wall placement take in the real window.
+static int runBenchTools(const SelfTestOptions& options)
+{
+    MainWindow window(nullptr, /*quiet=*/true, options.chunkSize);
+    window.show();
+    QApplication::processEvents();
+    if (!window.newProject())
+        return fail(QStringLiteral("new project failed"));
+    window.setTool(MainWindow::Tool::Wall);
+    window.wallTool()->setTolerance(0.05);
+    QElapsedTimer t;
+    double moveMs = 0, clickMs = 0;
+    int moves = 0, clicks = 0;
+    window.wallTool()->click(QPointF(0, 0));
+    for (int i = 1; i <= 12; ++i) {
+        for (int k = 0; k < 10; ++k) { // the mouse travelling to the next point
+            t.start();
+            window.wallTool()->move(QPointF(i * 2.0 - 1.0 + k * 0.1, (i % 2) * 0.5 + k * 0.03));
+            QApplication::processEvents();
+            moveMs += double(t.nsecsElapsed()) / 1e6;
+            ++moves;
+        }
+        t.start();
+        window.wallTool()->click(QPointF(i * 2.0, (i % 2) * 3.0));
+        QApplication::processEvents();
+        clickMs += double(t.nsecsElapsed()) / 1e6;
+        ++clicks;
+    }
+    window.setTool(MainWindow::Tool::None);
+    QJsonObject steps;
+    for (auto it = window.timings().constBegin(); it != window.timings().constEnd(); ++it)
+        steps.insert(it.key(), it.value() / clicks);
+    QJsonObject result{{"ok", true}, {"move_ms", moveMs / moves}, {"click_ms", clickMs / clicks}, {"steps_ms", steps},
+        {"walls", window.viewport()->elementCount()}};
+    window.close();
+    return report(result);
+}
+
 // Slice 5: a small house through the real tools: 8 x 6 m walls, slab from walls, door and window.
 static int runHouse(const SelfTestOptions& options)
 {
@@ -173,6 +211,8 @@ int runSelfTest(const SelfTestOptions& options)
     QString error;
     if (!PythonEngine::instance().start(&error))
         return fail(error);
+    if (options.benchTools)
+        return runBenchTools(options);
     if (options.house)
         return runHouse(options);
     if (!options.drawWalls.isEmpty())

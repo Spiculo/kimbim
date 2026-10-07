@@ -6,6 +6,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSignalSpy>
+#include <QSlider>
 #include <QTemporaryDir>
 #include <QtTest>
 
@@ -490,6 +491,180 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // Feedback: the plan cut height is a slider at the right of the 3D view; using it turns the cut on.
+    void planCutSliderBesideTheView()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        auto* slider = w.findChild<QSlider*>(QStringLiteral("planCutSlider"));
+        QVERIFY(slider);
+        QCOMPARE(slider->orientation(), Qt::Vertical);
+        QCOMPARE(w.viewport()->clipPlaneCount(), 0);
+        slider->setValue(150); // centimetres above the level
+        QVERIFY(action(w, "actionPlanCut")->isChecked());
+        QCOMPARE(w.viewport()->clipPlaneCount(), 1);
+        QCOMPARE(w.planCutHeight(), 1.5);
+        w.setPlanCutHeight(2.0); // the toolbar field drives the slider too
+        QCOMPARE(slider->value(), 200);
+        QVERIFY(w.close());
+    }
+
+    // Owner feedback: editing a length in the Properties panel changes the element.
+    void editingDimensionsInThePanelChangesGeometry()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({5, 0});
+        w.setTool(kimcad::MainWindow::Tool::None);
+        const QString wall = w.viewport()->guids().first();
+        w.setSelection({wall});
+        QVERIFY(w.applyPropertyEdit(QStringLiteral("Dimensions"), QStringLiteral("Length"), QJsonValue(6.5)));
+        double x0, y0, z0, x1, y1, z1;
+        w.viewport()->boundsOf({wall}).Get(x0, y0, z0, x1, y1, z1);
+        QVERIFY(std::abs((x1 - x0) - 6.5) < 0.01);
+        QVERIFY(w.applyPropertyEdit(QStringLiteral("Dimensions"), QStringLiteral("Height"), QJsonValue(4.0)));
+        w.viewport()->boundsOf({wall}).Get(x0, y0, z0, x1, y1, z1);
+        QVERIFY(std::abs(z1 - 4.0) < 0.01);
+        QVERIFY(!w.applyPropertyEdit(QStringLiteral("Dimensions"), QStringLiteral("Thickness"), QJsonValue(0.5)));
+        QVERIFY(w.close());
+    }
+
+    // Owner feedback: drag to move — pressing on a selected element and dragging moves the selection
+    // (snapped: here 0.97 m becomes 1 m on the grid... the angle snap keeps it straight).
+    void draggingASelectedElementMovesIt()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({5, 0});
+        w.setTool(kimcad::MainWindow::Tool::None);
+        const QString wall = w.viewport()->guids().first();
+        w.setSelection({wall});
+        w.dragMoveTo(QPointF(2.5, 0.0), QPointF(2.52, -1.004), 0.05, Qt::NoModifier); // preview only
+        QVERIFY(w.dragFinished(QPointF(2.5, 0.0), QPointF(2.52, -1.004), 0.05, Qt::NoModifier));
+        double x0, y0, z0, x1, y1, z1;
+        w.viewport()->boundsOf({wall}).Get(x0, y0, z0, x1, y1, z1);
+        QVERIFY(std::abs((y0 + y1) / 2 - (-1.0)) < 0.01); // moved straight down 1 m (90 degree snap)
+        QVERIFY(std::abs(x0 - (-0.15)) < 0.02 || std::abs(x0) < 0.02);
+        QVERIFY(!w.dragFinished(QPointF(1, 1), QPointF(1, 1), 0.05, Qt::NoModifier)); // no movement
+        QVERIFY(w.close());
+    }
+
+    // Owner feedback: layers as boundaries, views as collections of layers.
+    void layersAndViews()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({5, 0});
+        w.wallTool()->finish();
+        w.wallTool()->click({0, 3});
+        w.wallTool()->click({5, 3});
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QStringList walls = w.viewport()->guids();
+        QVERIFY(w.columnAt(QPointF(8, 0)));
+        QCOMPARE(w.viewport()->visibleElementCount(), 3);
+
+        QVERIFY(w.createLayer(QStringLiteral("A-WALL")));
+        w.setSelection(walls);
+        QVERIFY(w.assignSelectionToLayer(QStringLiteral("A-WALL")));
+        w.setLayerVisible(QStringLiteral("A-WALL"), false);
+        QCOMPARE(w.viewport()->visibleElementCount(), 1);
+        QVERIFY(w.saveView(QStringLiteral("Structure")));
+        w.setLayerVisible(QStringLiteral("A-WALL"), true);
+        QCOMPARE(w.viewport()->visibleElementCount(), 3);
+        QVERIFY(w.applyView(QStringLiteral("Structure")));
+        QCOMPARE(w.viewport()->visibleElementCount(), 1);
+        w.setLayerVisible(QStringLiteral("A-WALL"), true);
+        w.setLayerLocked(QStringLiteral("A-WALL"), true);
+        QVERIFY(w.viewport()->isLocked(walls[0]));
+        QVERIFY(w.close());
+    }
+
+    // Owner feedback: "models" — an apartment drawn once and placed on many levels.
+    void modelsPlacedOnLevels()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        const QString level = w.levelsBar()->activeStorey();
+        QVERIFY(w.createModel(QStringLiteral("Apartment A")));
+        const QString model = w.levelsBar()->activeStorey();
+        QVERIFY(model != level); // the new model is where we draw now
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({5, 0});
+        w.wallTool()->click({5, 3});
+        w.wallTool()->finish();
+        w.setTool(kimcad::MainWindow::Tool::None);
+        const QStringList inModel = w.viewport()->guids();
+        QCOMPARE(w.viewport()->visibleElementCount(), 2);
+        w.levelsBar()->setActive(level);
+        QCOMPARE(w.viewport()->visibleElementCount(), 0); // models aren't part of the building
+
+        w.setTool(kimcad::MainWindow::Tool::PlaceModel);
+        QVERIFY(w.placeModelAt(QPointF(10, 0), false));
+        QVERIFY(w.placeModelAt(QPointF(10, 10), true));
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QCOMPARE(w.viewport()->visibleElementCount(), 4);
+
+        QString part;
+        for (const QString& g : w.viewport()->guids())
+            if (!inModel.contains(g))
+                part = g;
+        w.setSelection({part});
+        QCOMPARE(w.selection().size(), 2); // a click on an instance takes the whole instance
+
+        w.levelsBar()->setActive(model);
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 3});
+        w.wallTool()->click({0, 0});
+        w.wallTool()->finish();
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QVERIFY(w.updateModelInstances());
+        w.levelsBar()->setActive(level);
+        QCOMPARE(w.viewport()->visibleElementCount(), 6);
+
+        w.setSelection({part});
+        QVERIFY(w.explodeSelectedInstance());
+        w.setSelection({part});
+        QCOMPARE(w.selection().size(), 1);
+        QVERIFY(w.close());
+    }
+
+    // Owner feedback: architects put labels, dimensions and marks on the plan.
+    void planAnnotations()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        QVERIFY(w.addAnnotation(QStringLiteral("text"), {QPointF(1, 2)}, QStringLiteral("Living room")));
+        QVERIFY(w.addAnnotation(QStringLiteral("mark"), {QPointF(3, 3)}, QStringLiteral("A")));
+        QCOMPARE(w.viewport()->annotationCount(), 2);
+
+        // The dimension tool: click both ends, then where the dimension line goes.
+        w.setTool(kimcad::MainWindow::Tool::Dimension);
+        for (const QPointF p : {QPointF(0, 0), QPointF(4.5, 0), QPointF(2, -1)})
+            emit w.viewport()->workPointClicked(p, 0.01, Qt::NoModifier);
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QCOMPARE(w.viewport()->annotationCount(), 3);
+        QVERIFY(w.viewport()->annotationTexts().contains(QStringLiteral("4.50")));
+
+        // Annotations are selectable, deletable, and live on a level.
+        const QString label = w.viewport()->annotationGuids().first();
+        w.viewport()->selectGuids({label});
+        QCOMPARE(w.viewport()->selectedGuids(), QStringList{label});
+        w.setSelection({label});
+        QCOMPARE(w.viewport()->typeOf(label), QStringLiteral("IfcAnnotation"));
+        QVERIFY(w.deleteSelection());
+        QCOMPARE(w.viewport()->annotationCount(), 2);
+        QVERIFY(w.addLevel(QStringLiteral("Level 2"), 3.0));
+        QCOMPARE(w.viewport()->annotationCount(), 0); // each level has its own
+        QVERIFY(w.close());
+    }
+
     void shortcutsAreTheDocumentedOnes()
     {
         kimcad::MainWindow w(nullptr, true);
@@ -512,6 +687,10 @@ private slots:
         QCOMPARE(action(w, "actionRotateTool")->shortcut(), QKeySequence(Qt::Key_R));
         QCOMPARE(action(w, "actionStretchTool")->shortcut(), QKeySequence(Qt::Key_E));
         QCOMPARE(action(w, "actionStairTool")->shortcut(), QKeySequence(Qt::Key_T));
+        QCOMPARE(action(w, "actionPlaceModelTool")->shortcut(), QKeySequence(Qt::Key_U));
+        QCOMPARE(action(w, "actionTextTool")->shortcut(), QKeySequence(Qt::Key_A));
+        QCOMPARE(action(w, "actionDimensionTool")->shortcut(), QKeySequence(Qt::Key_Q));
+        QCOMPARE(action(w, "actionMarkTool")->shortcut(), QKeySequence(Qt::Key_X));
         QCOMPARE(action(w, "actionSlabOpeningTool")->shortcut(), QKeySequence(Qt::Key_O));
         QCOMPARE(action(w, "actionSaveVersion")->shortcut(), QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_S));
         QVERIFY(action(w, "actionLinesOnly")->isCheckable());

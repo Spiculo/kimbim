@@ -107,6 +107,39 @@ private slots:
         QCOMPARE(kimcad::ElementBatch::maxId(), 262143);
     }
 
+    // Owner feedback: cut elements need their section drawn (OCCT capping doesn't show on these
+    // meshes). The section of an element at height z = its closed outline(s) in plan.
+    void sectionOfACubeIsItsSquare()
+    {
+        const auto loops = kimcad::ElementBatch::sectionLoops(unitCube(), 0, 0.5);
+        QCOMPARE(int(loops.size()), 1);
+        double area = 0;
+        const auto& p = loops.front();
+        for (size_t i = 0; i < p.size(); ++i)
+            area += p[i].X() * p[(i + 1) % p.size()].Y() - p[(i + 1) % p.size()].X() * p[i].Y();
+        QVERIFY(std::abs(std::abs(area) / 2 - 1.0) < 1e-9);
+        QVERIFY(kimcad::ElementBatch::sectionLoops(unitCube(), 0, 1.5).empty()); // above it
+        QCOMPARE(int(p.size()), 4); // collinear points from the triangulation are merged
+    }
+
+    // Slice 11: layers can hide elements (separately from the user's H/I hiding) and lock them
+    // (locked elements can't be selected).
+    void layerHiddenAndLockedElements()
+    {
+        Handle(kimcad::ElementBatch) b = new kimcad::ElementBatch(threeElements());
+        b->setLayerHidden(0, true);
+        QVERIFY(b->isHidden(0));
+        QCOMPARE(b->visibleCount(), 2);
+        b->setHidden(0, false); // "show all" doesn't show what a layer hides
+        QVERIFY(b->isHidden(0));
+        b->setLayerHidden(0, false);
+        QVERIFY(!b->isHidden(0));
+        QCOMPARE(b->visibleCount(), 3);
+        b->setLocked(1, true);
+        QCOMPARE(selectionEntities(b), 2);
+        QVERIFY(b->isLocked(1));
+    }
+
     void acceptsShadedIdAndLinesModes()
     {
         Handle(kimcad::ElementBatch) b = new kimcad::ElementBatch(unitCube());

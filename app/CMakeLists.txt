@@ -12,6 +12,8 @@ qt_add_library(kimcad_core STATIC
     src/PropertiesPanel.cpp src/PropertiesPanel.h
     src/LevelsBar.cpp src/LevelsBar.h
     src/HistoryPanel.cpp src/HistoryPanel.h
+    src/LayersPanel.cpp src/LayersPanel.h
+    src/Icons.cpp src/Icons.h
     src/Snapper.cpp src/Snapper.h
     src/WallTool.cpp src/WallTool.h
     src/PolygonTool.cpp src/PolygonTool.h
@@ -23,6 +25,9 @@ qt_add_library(kimcad_core STATIC
     src/Cuts.cpp src/Cuts.h
 )
 target_include_directories(kimcad_core PUBLIC src)
+# Element icons (owner feedback: objects need an icon and a hint on hover).
+file(GLOB KIMCAD_ICONS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} resources/icons/*.svg)
+qt_add_resources(kimcad_core "kimcad_icons" PREFIX "/icons" BASE resources/icons FILES ${KIMCAD_ICONS})
 target_link_libraries(kimcad_core PUBLIC Qt6::Widgets Python3::Python
     TKernel TKMath TKService TKV3d TKOpenGl TKBRep TKG3d)
 target_include_directories(kimcad_core PUBLIC ${OpenCASCADE_INCLUDE_DIR})

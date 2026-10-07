@@ -5,6 +5,7 @@
 #include <optional>
 #include <utility>
 #include <gp_Pnt.hxx>
+#include <gp_Pnt2d.hxx>
 #include <Quantity_Color.hxx>
 #include <AIS_InteractiveObject.hxx>
 #include <Bnd_Box.hxx>
@@ -56,7 +57,12 @@ public:
     // Border lines of one element: boundary edges and creases sharper than angleDeg. Triangulation
     // diagonals and coplanar seams are skipped; unwelded meshes pair up by vertex position.
     static std::vector<std::pair<gp_Pnt, gp_Pnt>> featureEdges(const MeshChunk& chunk, int element, double angleDeg = 30.0);
+    // The element's section by the horizontal plane at z: closed outlines in plan (x, y).
+    static std::vector<std::vector<gp_Pnt2d>> sectionLoops(const MeshChunk& chunk, int element, double z);
+    std::vector<std::vector<gp_Pnt2d>> sectionLoops(int element, double z) const { return sectionLoops(m_chunk, element, z); }
     static void setBackground(const Quantity_Color& color) { s_background = color; }
+    // Previews skip border lines (computing them on every mouse move made drawing lag).
+    void setShowEdges(bool show) { m_showEdges = show; }
 
     // Element ids as colours (Ids mode): 6 bits per channel stored as value*4+2, so +-1 of colour
     // rounding still decodes; 0 and off-grid colours (background, lines) decode to -1.
@@ -85,7 +91,12 @@ public:
     int indexOf(const QString& guid) const { return m_index.value(guid, -1); }
 
     void setHidden(int i, bool hidden);
-    bool isHidden(int i) const { return m_hidden[size_t(i)] != 0; }
+    // Hidden by the user (H / isolate) or by its layer (a view's layer state); either hides it.
+    bool isHidden(int i) const { return m_hidden[size_t(i)] != 0 || m_layerHidden[size_t(i)] != 0; }
+    void setLayerHidden(int i, bool hidden);
+    // Locked by its layer: shown, but not selectable.
+    void setLocked(int i, bool locked) { m_locked[size_t(i)] = locked ? 1 : 0; }
+    bool isLocked(int i) const { return m_locked[size_t(i)] != 0; }
     // A retired element was replaced or deleted by an edit: hidden for good (never shown again).
     void retire(int i);
     bool isRetired(int i) const { return m_retired[size_t(i)] != 0; }
@@ -112,6 +123,9 @@ private:
     MeshChunk m_chunk;
     QHash<QString, int> m_index;
     std::vector<char> m_hidden;
+    std::vector<char> m_layerHidden;
+    std::vector<char> m_locked;
+    void updateVisible(int i, bool wasHidden);
     std::vector<char> m_retired;
     std::vector<std::optional<Quantity_Color>> m_override;
     int m_visible = 0;
@@ -124,6 +138,7 @@ private:
     std::vector<uint32_t> m_edgeOffsets; // per element: first segment, one past the last (size n+1)
     static Quantity_Color s_background;
     int m_idBase = 0;
+    bool m_showEdges = true;
 };
 
 } // namespace kimcad

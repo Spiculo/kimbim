@@ -13,13 +13,14 @@
 namespace kimcad {
 
 namespace {
-enum Role { GuidRole = Qt::UserRole, ElevationRole };
+enum Role { GuidRole = Qt::UserRole, ElevationRole, ModelRole };
 } // namespace
 
 LevelsBar::LevelsBar(QWidget* parent)
     : QWidget(parent)
     , m_combo(new QComboBox(this))
     , m_add(new QToolButton(this))
+    , m_newModel(new QToolButton(this))
 {
     m_combo->setObjectName(QStringLiteral("levelCombo"));
     m_combo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
@@ -30,6 +31,11 @@ LevelsBar::LevelsBar(QWidget* parent)
     layout->addWidget(new QLabel(tr("Level"), this));
     layout->addWidget(m_combo);
     layout->addWidget(m_add);
+    m_newModel->setText(tr("New model..."));
+    m_newModel->setObjectName(QStringLiteral("newModel"));
+    m_newModel->setToolTip(tr("A model is a unit (an apartment, a core...) drawn once and placed on many levels"));
+    layout->addWidget(m_newModel);
+    connect(m_newModel, &QToolButton::clicked, this, &LevelsBar::newModelRequested);
     connect(m_combo, &QComboBox::currentIndexChanged, this, &LevelsBar::onIndexChanged);
     connect(m_add, &QToolButton::clicked, this, &LevelsBar::addLevelRequested);
 }
@@ -40,16 +46,28 @@ void LevelsBar::setStoreys(const QJsonArray& storeys)
     for (const auto& s : storeys)
         sorted << s.toObject();
     std::stable_sort(sorted.begin(), sorted.end(), [](const QJsonObject& a, const QJsonObject& b) {
-        return a.value("elevation").toDouble() < b.value("elevation").toDouble();
+        const bool ma = a.value("model").toBool(), mb = b.value("model").toBool();
+        if (ma != mb)
+            return mb; // levels first, then models
+        return ma ? a.value("name").toString().localeAwareCompare(b.value("name").toString()) < 0
+                  : a.value("elevation").toDouble() < b.value("elevation").toDouble();
     });
     m_filling = true;
     m_combo->clear();
     int keep = -1;
+    bool separated = false;
     for (const auto& s : sorted) {
         const double elevation = s.value("elevation").toDouble();
-        m_combo->addItem(QStringLiteral("%1 (%2 m)").arg(s.value("name").toString(), QLocale().toString(elevation, 'f', 2)));
+        const bool model = s.value("model").toBool();
+        if (model && !separated) {
+            m_combo->insertSeparator(m_combo->count());
+            separated = true;
+        }
+        m_combo->addItem(model ? tr("Model: %1").arg(s.value("name").toString())
+                               : QStringLiteral("%1 (%2 m)").arg(s.value("name").toString(), QLocale().toString(elevation, 'f', 2)));
         m_combo->setItemData(m_combo->count() - 1, s.value("guid").toString(), GuidRole);
         m_combo->setItemData(m_combo->count() - 1, elevation, ElevationRole);
+        m_combo->setItemData(m_combo->count() - 1, model, ModelRole);
         if (s.value("guid").toString() == m_active)
             keep = m_combo->count() - 1;
     }
@@ -78,7 +96,15 @@ double LevelsBar::activeElevation() const
 
 int LevelsBar::count() const
 {
-    return m_combo->count();
+    int n = 0;
+    for (int i = 0; i < m_combo->count(); ++i)
+        n += m_combo->itemData(i, GuidRole).isValid() ? 1 : 0;
+    return n;
+}
+
+bool LevelsBar::activeIsModel() const
+{
+    return m_combo->currentData(ModelRole).toBool();
 }
 
 void LevelsBar::onIndexChanged(int index)

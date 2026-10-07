@@ -6,6 +6,7 @@
 #include <gp_Pnt.hxx>
 #include <QColor>
 #include <QHash>
+#include <QPoint>
 #include <QPointF>
 #include <QSet>
 #include <QVector>
@@ -22,6 +23,8 @@
 #include <vector>
 
 #include "ElementBatch.h"
+
+class QTimer;
 
 namespace kimcad {
 
@@ -54,6 +57,7 @@ public:
     // Drawing mode (wall tool): left clicks and moves become points on the work plane (z, metres)
     // instead of selection; middle-button navigation keeps working. Esc/right click end drawing.
     void setDrawingMode(bool on, double workPlaneZ = 0.0);
+    void setWorkPlaneZ(double z) { m_workZ = z; }
     bool isDrawingMode() const { return m_drawingMode; }
     // Rubber-band wall preview: a box along p1-p2 (plan metres); nullopt hides it.
     void setWallPreview(const std::optional<std::pair<QPointF, QPointF>>& axis, double thickness, double height);
@@ -69,6 +73,20 @@ public:
         QString tag;
     };
     void setGridLines(const QVector<GridLine>& lines, double z);
+    // Plan annotations of the active level (Slice 13): text labels, dimensions, marks; drawn on
+    // top, selectable (their guids join selectedGuids), hidden/locked with their layer.
+    struct Annotation {
+        QString guid, kind, text;
+        QVector<QPointF> points; // world metres: text/mark anchor; dimension a, b, line point
+    };
+    void setAnnotations(const QVector<Annotation>& annotations, double z);
+    int annotationCount() const { return int(m_annotations.size()); }
+    QStringList annotationGuids() const;
+    QStringList annotationTexts() const;
+    // The plan cut's sections (owner feedback): elements cut at height z get a dark fill and a bold
+    // outline (poché); nullopt removes them. Kept up to date as elements change.
+    void setSectionHeight(std::optional<double> z);
+    int sectionElementCount() const { return m_sectionElements; }
     int gridLineCount() const { return m_gridLineCount; }
     void clear();
     void fitAll();
@@ -81,6 +99,9 @@ public:
     void setElementColors(const QHash<QString, QColor>& colors);
     void clearElementColors() { setElementColors({}); }
     int coloredCount() const;
+    // Layers (Slice 11): elements hidden or locked by their layer's state in the current view.
+    void setLayerState(const QSet<QString>& hiddenGuids, const QSet<QString>& lockedGuids);
+    bool isLocked(const QString& guid) const;
     int visibleElementCount() const;
     qint64 triangleCount() const;
 
@@ -129,6 +150,12 @@ signals:
     void drawingEnded();      // Esc or right click: cancel / stop
     void drawingConfirmed();  // Enter or double click: finish the current shape
     void lengthKeyTyped(const QString& text);
+    // The mouse rested on an element ("" when it left it): the app shows a hint.
+    void hovered(const QString& guid, const QPoint& globalPos);
+    // Drag to move (owner feedback): left-drag that starts on a selected element; points on the work
+    // plane, tolerance = ~10 px in metres.
+    void dragMoved(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
+    void dragReleased(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
 
 protected:
     QPaintEngine* paintEngine() const override { return nullptr; }
@@ -140,6 +167,7 @@ protected:
     void wheelEvent(QWheelEvent*) override;
     void keyPressEvent(QKeyEvent*) override;
     void mouseDoubleClickEvent(QMouseEvent*) override;
+    void leaveEvent(QEvent*) override;
     void OnSelectionChanged(const Handle(AIS_InteractiveContext)& ctx, const Handle(V3d_View)& view) override;
     void handleSelectionPoly(const Handle(AIS_InteractiveContext)& ctx, const Handle(V3d_View)& view) override;
 
@@ -162,6 +190,8 @@ private:
     bool m_planView = false;
     bool m_linesOnly = false;
     QHash<QString, QColor> m_colors;
+    QSet<QString> m_layerHidden, m_layerLocked;
+    void applyLayerState(const Handle(ElementBatch)& batch) const;
     void applyColors(const Handle(ElementBatch)& batch) const;
     bool m_selectThrough = false;
     bool m_quietSelection = false;
@@ -170,9 +200,23 @@ private:
     void keepOnlyVisible(const QSet<QString>& before, AIS_SelectionScheme scheme, int x0, int y0, int x1, int y1);
     QSet<QString> selectedSet() const;
     bool m_drawingMode = false;
+    QTimer* m_hoverTimer = nullptr;
+    bool m_dragCandidate = false;
+    bool m_dragging = false;
+    QPointF m_dragPressPos;
+    QPointF m_dragStart;
+    QPointF m_hoverPos;
     double m_workZ = 0.0;
     Handle(ElementBatch) m_preview;
     Handle(AIS_InteractiveObject) m_grid;
+    QVector<Annotation> m_annotationData;
+    double m_annotationZ = 0.0;
+    QHash<QString, Handle(AIS_InteractiveObject)> m_annotations;
+    void displayAnnotations();
+    Handle(AIS_InteractiveObject) m_section;
+    std::optional<double> m_sectionZ;
+    int m_sectionElements = 0;
+    void rebuildSection();
     int m_gridLineCount = 0;
     bool workPoint(const QPointF& widgetPos, QPointF* point, double* tolerance);
     double m_planElevation = 0.0;

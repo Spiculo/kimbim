@@ -3,6 +3,7 @@
 
 #include <QElapsedTimer>
 #include <QHash>
+#include <QSet>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QPointF>
@@ -21,6 +22,8 @@ class QDoubleSpinBox;
 
 class QComboBox;
 class QToolBar;
+class QSlider;
+class QLabel;
 class QDoubleSpinBox;
 class QLineEdit;
 
@@ -28,6 +31,7 @@ namespace kimcad {
 
 class LevelsBar;
 class HistoryPanel;
+class LayersPanel;
 class WallTool;
 class PolygonTool;
 class HostTool;
@@ -57,6 +61,7 @@ public:
     ModelTreePanel* treePanel() const { return m_tree; }
     PropertiesPanel* propertiesPanel() const { return m_properties; }
     void setPlanCutHeight(double metres);
+    double planCutHeight() const;
 
     // Selection and editing (M2). Edits apply to every selected element as one undoable step.
     void setSelection(const QStringList& guids);
@@ -75,7 +80,7 @@ public:
     LevelsBar* levelsBar() const { return m_levels; }
     // Modeling tools (M3): one active at a time. Exposed for tests and the self-test, which drive
     // them with work-plane points.
-    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening };
+    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening, PlaceModel, Text, Dimension, Mark };
     void setTool(Tool tool);
     Tool tool() const { return m_tool; }
     WallTool* wallTool() const { return m_wallTool; }
@@ -107,6 +112,28 @@ public:
     bool switchOption(const QString& name);
     bool discardChanges();
     bool isVersioned() const { return m_versioned; }
+    // Layers and views (Slice 11, owner feedback).
+    bool createLayer(const QString& name);
+    bool assignSelectionToLayer(const QString& layer);
+    void setLayerVisible(const QString& layer, bool visible);
+    void setLayerLocked(const QString& layer, bool locked);
+    bool setActiveLayer(const QString& layer);
+    bool saveView(const QString& name);
+    bool applyView(const QString& name);
+    LayersPanel* layersPanel() const { return m_layersPanel; }
+    // Models (Slice 12, owner feedback): a unit drawn once and placed on many levels.
+    bool createModel(const QString& name);
+    bool placeModelAt(QPointF p, bool turned);
+    bool updateModelInstances();
+    bool explodeSelectedInstance();
+    // Plan annotations (Slice 13): kind "text" (1 point), "dimension" (a, b, line point), "mark".
+    bool addAnnotation(const QString& kind, const QVector<QPointF>& points, const QString& text);
+    // Drag to move (owner feedback): preview while dragging, move on release (Ctrl detaches).
+    void dragMoveTo(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
+    bool dragFinished(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
+    // Milliseconds spent per step of editing (accumulated; for the tool benchmark).
+    const QHash<QString, double>& timings() const { return m_timings; }
+    void resetTimings() { m_timings.clear(); }
     bool columnAt(QPointF p, bool turned = false);
     bool createSegment(QPointF p1, QPointF p2); // beam or grid axis, per the active tool
     int gridLineCount() const;
@@ -153,6 +180,9 @@ private:
     void copyToLevelDialog();
     void buildProjectToolbar();
     void refreshProject();
+    void refreshLayers();
+    void refreshAnnotations();
+    void annotationClick(QPointF p);
     void saveVersionDialog();
     void enableVersioningDialog();
     void openProjectDialog();
@@ -183,6 +213,9 @@ private:
     QThread m_thread;
     ModelLoader* m_loader;
     QStringList m_selection;
+    QSlider* m_cutSlider = nullptr;
+    QLabel* m_cutLabel = nullptr;
+    void updateCutSliderRange();
     LevelsBar* m_levels = nullptr;
     WallTool* m_wallTool = nullptr;
     PolygonTool* m_polygonTool = nullptr;
@@ -200,9 +233,16 @@ private:
     QAction* m_lengthAction = nullptr;
     bool m_warnedInconsistent = false;
     HistoryPanel* m_history = nullptr;
+    LayersPanel* m_layersPanel = nullptr;
+    QSet<QString> m_hiddenLayers, m_lockedLayers;
+    QString m_currentView;
+    QHash<QString, QString> m_instanceOf; // element -> model instance it belongs to
+    QHash<QString, QStringList> m_instanceMembers;
+    QVector<QPointF> m_annotationPoints; // the dimension tool's clicks so far
     QToolBar* m_projectBar = nullptr;
     QComboBox* m_options = nullptr;
     bool m_versioned = false;
+    QHash<QString, double> m_timings;
     QString m_projectFolder;
     QLineEdit* m_lengthInput = nullptr;
     QAction* m_undo = nullptr;

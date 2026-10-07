@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "Viewport.h"
+#include "PolygonTool.h"
 
 #include <Aspect_DisplayConnection.hxx>
 #include <Graphic3d_ClipPlane.hxx>
@@ -17,7 +18,11 @@
 #include <V3d_AmbientLight.hxx>
 #include <Graphic3d_Camera.hxx>
 #include <SelectMgr_EntityOwner.hxx>
+#include <SelectMgr_Selection.hxx>
+#include <Select3D_SensitivePoint.hxx>
+#include <Select3D_SensitiveSegment.hxx>
 #include <gp_Pnt.hxx>
+#include <gp_Vec.hxx>
 #ifdef _WIN32
 #include <WNT_Window.hxx>
 #else
@@ -27,6 +32,7 @@
 #include <QElapsedTimer>
 #include <QGuiApplication>
 #include <QKeyEvent>
+#include <QTimer>
 #include <QMouseEvent>
 #include <QWheelEvent>
 
@@ -71,13 +77,26 @@ Viewport::Viewport(QWidget* parent)
     setAttribute(Qt::WA_NoSystemBackground);
     setAttribute(Qt::WA_NativeWindow);
     setMouseTracking(true);
+    m_hoverTimer = new QTimer(this);
+    m_hoverTimer->setSingleShot(true);
+    m_hoverTimer->setInterval(450);
+    connect(m_hoverTimer, &QTimer::timeout, this, [this] {
+        if (m_drawingMode)
+            return;
+        Handle(ElementOwner) owner = Handle(ElementOwner)::DownCast(m_context->DetectedOwner());
+        const QString guid = owner.IsNull() || !owner->batch() ? QString() : owner->batch()->guid(owner->index());
+        emit hovered(guid, mapToGlobal(m_hoverPos.toPoint()));
+    });
     setFocusPolicy(Qt::StrongFocus);
     setMinimumSize(200, 200);
 
     Handle(Aspect_DisplayConnection) display = new Aspect_DisplayConnection();
     Handle(OpenGl_GraphicDriver) driver = new OpenGl_GraphicDriver(display, false);
-    // KIMCAD_NO_VSYNC=1: measure true frame cost in benchmarks (normal use keeps vsync: no tearing).
-    if (qEnvironmentVariableIntValue("KIMCAD_NO_VSYNC") == 1)
+    // No vsync by default: the view only redraws when something changes, so this never spins, and a
+    // frame takes ~1 ms. With vsync each redraw blocked the UI until the next screen refresh (33 ms
+    // on 30 Hz laptop panels), so drawing tools lagged behind the mouse (owner feedback).
+    // KIMCAD_VSYNC=1 turns it back on (e.g. if orbiting tears on some screen).
+    if (qEnvironmentVariableIntValue("KIMCAD_VSYNC") != 1)
         driver->ChangeOptions().swapInterval = 0;
     m_viewer = new V3d_Viewer(driver);
     // A fixed "sun" from the south-east above plus soft ambient and fill. A headlight along the
@@ -353,7 +372,10 @@ void Viewport::paintEvent(QPaintEvent*)
 {
     if (!ensureWindow())
         return;
-    m_view->InvalidateImmediate();
+    // One full redraw per paint (one buffer swap). Invalidating the immediate layer here as well
+    // made every paint swap twice, waiting two vsyncs, so tool previews lagged behind the mouse;
+    // not invalidating at all left the window blank after it was shown or uncovered.
+    m_view->Invalidate();
     FlushViewEvents(m_context, m_view, true);
 }
 
@@ -438,6 +460,269 @@ private:
 
 } // namespace
 
+namespace {
+
+// Cut sections: filled outlines (unlit, dark) plus bold borders, drawn just below the cut plane.
+class SectionPrs : public AIS_InteractiveObject {
+public:
+    SectionPrs(std::vector<std::vector<gp_Pnt2d>> loops, double z)
+        : m_loops(std::move(loops))
+        , m_z(z)
+    {
+    }
+    void Compute(const Handle(PrsMgr_PresentationManager)&, const Handle(Prs3d_Presentation)& prs, const int) override
+    {
+        int triangles = 0, segments = 0;
+        std::vector<std::vector<uint32_t>> tris;
+        for (const auto& loop : m_loops) {
+            QVector<QPointF> poly;
+            for (const auto& p : loop)
+                poly << QPointF(p.X(), p.Y());
+            tris.push_back(PolygonTool::triangulate(poly));
+            triangles += int(tris.back().size() / 3);
+            segments += int(loop.size());
+        }
+        const double z = m_z - 1e-4;
+        if (triangles > 0) {
+            Handle(Graphic3d_ArrayOfTriangles) fill = new Graphic3d_ArrayOfTriangles(triangles * 3);
+            for (size_t l = 0; l < m_loops.size(); ++l)
+                for (uint32_t i : tris[l])
+                    fill->AddVertex(gp_Pnt(m_loops[l][i].X(), m_loops[l][i].Y(), z));
+            Handle(Graphic3d_Group) g = prs->NewGroup();
+            Handle(Graphic3d_AspectFillArea3d) aspect = new Graphic3d_AspectFillArea3d();
+            aspect->SetInteriorStyle(Aspect_IS_SOLID);
+            aspect->SetInteriorColor(Quantity_Color(0.25, 0.25, 0.27, Quantity_TOC_RGB));
+            aspect->SetShadingModel(Graphic3d_TypeOfShadingModel_Unlit);
+            aspect->SetFaceCulling(Graphic3d_TypeOfBackfacingModel_DoubleSided);
+            g->SetGroupPrimitivesAspect(aspect);
+            g->AddPrimitiveArray(fill);
+        }
+        if (segments > 0) {
+            Handle(Graphic3d_ArrayOfSegments) lines = new Graphic3d_ArrayOfSegments(segments * 2);
+            for (const auto& loop : m_loops)
+                for (size_t i = 0; i < loop.size(); ++i) {
+                    lines->AddVertex(gp_Pnt(loop[i].X(), loop[i].Y(), z));
+                    lines->AddVertex(gp_Pnt(loop[(i + 1) % loop.size()].X(), loop[(i + 1) % loop.size()].Y(), z));
+                }
+            Handle(Graphic3d_Group) g = prs->NewGroup();
+            g->SetGroupPrimitivesAspect(new Graphic3d_AspectLine3d(Quantity_NOC_BLACK, Aspect_TOL_SOLID, 2.0));
+            g->AddPrimitiveArray(lines);
+        }
+    }
+    void ComputeSelection(const Handle(SelectMgr_Selection)&, const int) override {}
+
+private:
+    std::vector<std::vector<gp_Pnt2d>> m_loops;
+    double m_z;
+};
+
+} // namespace
+
+void Viewport::setSectionHeight(std::optional<double> z)
+{
+    m_sectionZ = z;
+    rebuildSection();
+}
+
+void Viewport::rebuildSection()
+{
+    if (!m_section.IsNull()) {
+        m_context->Remove(m_section, false);
+        m_section.Nullify();
+    }
+    m_sectionElements = 0;
+    if (!m_sectionZ) {
+        update();
+        return;
+    }
+    std::vector<std::vector<gp_Pnt2d>> loops;
+    for (const auto& b : m_batches)
+        for (int i = 0; i < b->elementCount(); ++i) {
+            if (b->isHidden(i))
+                continue;
+            auto element = b->sectionLoops(i, *m_sectionZ);
+            if (element.empty())
+                continue;
+            ++m_sectionElements;
+            for (auto& l : element)
+                loops.push_back(std::move(l));
+        }
+    if (!loops.empty()) {
+        m_section = new SectionPrs(std::move(loops), *m_sectionZ);
+        m_context->Display(m_section, 0, -1, false);
+    }
+    update();
+}
+
+namespace {
+
+// The owner of an annotation's sensitive entities: carries its guid for selection.
+class AnnotationOwner : public SelectMgr_EntityOwner {
+public:
+    AnnotationOwner(const Handle(SelectMgr_SelectableObject)& prs, const QString& guid)
+        : SelectMgr_EntityOwner(prs, 5)
+        , m_guid(guid)
+    {
+    }
+    const QString& guid() const { return m_guid; }
+
+private:
+    QString m_guid;
+};
+
+// One plan annotation: lines (dimension, mark circle) and its text, on top of the model.
+class AnnotationPrs : public AIS_InteractiveObject {
+public:
+    AnnotationPrs(Viewport::Annotation a, double z)
+        : m_a(std::move(a))
+        , m_z(z)
+    {
+        SetZLayer(Graphic3d_ZLayerId_Topmost);
+    }
+    const QString& guid() const { return m_a.guid; }
+    // Null until the annotation is selectable (not on a locked layer).
+    const Handle(SelectMgr_EntityOwner)& owner() const { return m_owner; }
+
+    void Compute(const Handle(PrsMgr_PresentationManager)&, const Handle(Prs3d_Presentation)& prs, const int) override
+    {
+        const Quantity_Color ink = m_a.kind == QLatin1String("mark") ? Quantity_Color(0.75, 0.15, 0.1, Quantity_TOC_RGB)
+                                                                      : Quantity_Color(0.1, 0.1, 0.12, Quantity_TOC_RGB);
+        const std::vector<std::pair<gp_Pnt, gp_Pnt>> segs = segments();
+        if (!segs.empty()) {
+            Handle(Graphic3d_ArrayOfSegments) arr = new Graphic3d_ArrayOfSegments(int(segs.size()) * 2);
+            for (const auto& s : segs) {
+                arr->AddVertex(s.first);
+                arr->AddVertex(s.second);
+            }
+            Handle(Graphic3d_Group) lines = prs->NewGroup();
+            lines->SetGroupPrimitivesAspect(new Graphic3d_AspectLine3d(ink, Aspect_TOL_SOLID, 1.5));
+            lines->AddPrimitiveArray(arr);
+        }
+        Handle(Prs3d_TextAspect) text = new Prs3d_TextAspect();
+        text->SetColor(ink);
+        text->SetHeight(m_a.kind == QLatin1String("text") ? 16 : 14);
+        if (m_a.kind == QLatin1String("dimension")) { // centred, sitting on the dimension line
+            text->SetHorizontalJustification(Graphic3d_HTA_CENTER);
+            text->SetVerticalJustification(Graphic3d_VTA_CENTER);
+        } else if (m_a.kind == QLatin1String("mark")) { // the tag in the circle
+            text->SetHorizontalJustification(Graphic3d_HTA_CENTER);
+            text->SetVerticalJustification(Graphic3d_VTA_CENTER);
+        }
+        Handle(Graphic3d_Group) labels = prs->NewGroup();
+        Prs3d_Text::Draw(labels, text, TCollection_ExtendedString(m_a.text.toUtf8().constData(), true), anchor());
+    }
+
+    void ComputeSelection(const Handle(SelectMgr_Selection)& selection, const int mode) override
+    {
+        if (mode != 0)
+            return;
+        if (m_owner.IsNull())
+            m_owner = new AnnotationOwner(this, m_a.guid);
+        const Handle(SelectMgr_EntityOwner)& owner = m_owner;
+        for (const auto& s : segments())
+            selection->Add(new Select3D_SensitiveSegment(owner, s.first, s.second));
+        Handle(Select3D_SensitivePoint) point = new Select3D_SensitivePoint(owner, anchor());
+        point->SetSensitivityFactor(12);
+        selection->Add(point);
+    }
+
+private:
+    gp_Pnt at(QPointF p) const { return gp_Pnt(p.x(), p.y(), m_z); }
+
+    gp_Pnt anchor() const
+    {
+        if (m_a.kind == QLatin1String("dimension") && m_a.points.size() == 3) {
+            const auto segs = segments();
+            const gp_Pnt a = segs[2].first, b = segs[2].second;
+            // Just off the dimension line, on the side away from what it measures.
+            gp_Vec away(segs[0].first, segs[0].second);
+            if (away.Magnitude() < 1e-9) {
+                const gp_Vec along(a, b);
+                away = gp_Vec(-along.Y(), along.X(), 0);
+            }
+            away.Normalize();
+            return gp_Pnt((a.X() + b.X()) / 2, (a.Y() + b.Y()) / 2, m_z).Translated(away * 0.12);
+        }
+        return m_a.points.isEmpty() ? gp_Pnt(0, 0, m_z) : at(m_a.points.first());
+    }
+
+    std::vector<std::pair<gp_Pnt, gp_Pnt>> segments() const
+    {
+        std::vector<std::pair<gp_Pnt, gp_Pnt>> out;
+        if (m_a.kind == QLatin1String("dimension") && m_a.points.size() == 3) {
+            const QPointF a = m_a.points[0], b = m_a.points[1], o = m_a.points[2];
+            const QPointF d = b - a;
+            const double len = std::hypot(d.x(), d.y());
+            if (len < 1e-9)
+                return out;
+            const QPointF n(-d.y() / len, d.x() / len);
+            const double off = QPointF::dotProduct(o - a, n);
+            const QPointF a2 = a + n * off, b2 = b + n * off, u = d / len;
+            out.push_back({at(a), at(a2)});
+            out.push_back({at(b), at(b2)});
+            out.push_back({at(a2), at(b2)});
+            const double t = 0.12; // architectural ticks at both ends
+            for (const QPointF& p : {a2, b2})
+                out.push_back({at(p - (u + n) * t), at(p + (u + n) * t)});
+        } else if (m_a.kind == QLatin1String("mark") && !m_a.points.isEmpty()) {
+            const QPointF c = m_a.points.first();
+            const int n = 32;
+            const double r = 0.4;
+            for (int i = 0; i < n; ++i) {
+                const double t0 = 2 * M_PI * i / n, t1 = 2 * M_PI * (i + 1) / n;
+                out.push_back({at(c + QPointF(std::cos(t0), std::sin(t0)) * r), at(c + QPointF(std::cos(t1), std::sin(t1)) * r)});
+            }
+        }
+        return out;
+    }
+
+    Viewport::Annotation m_a;
+    double m_z;
+    Handle(SelectMgr_EntityOwner) m_owner;
+};
+
+} // namespace
+
+void Viewport::setAnnotations(const QVector<Annotation>& annotations, double z)
+{
+    m_annotationData = annotations;
+    m_annotationZ = z;
+    displayAnnotations();
+}
+
+void Viewport::displayAnnotations()
+{
+    for (const auto& prs : std::as_const(m_annotations))
+        m_context->Remove(prs, false);
+    m_annotations.clear();
+    for (const Annotation& a : std::as_const(m_annotationData)) {
+        if (m_layerHidden.contains(a.guid))
+            continue;
+        Handle(AnnotationPrs) prs = new AnnotationPrs(a, m_annotationZ + 0.02);
+        m_context->Display(prs, 0, m_layerLocked.contains(a.guid) ? -1 : 0, false);
+        m_annotations.insert(a.guid, prs);
+    }
+    update();
+}
+
+QStringList Viewport::annotationGuids() const
+{
+    QStringList out;
+    for (const Annotation& a : m_annotationData)
+        if (m_annotations.contains(a.guid))
+            out << a.guid;
+    return out;
+}
+
+QStringList Viewport::annotationTexts() const
+{
+    QStringList out;
+    for (const Annotation& a : m_annotationData)
+        if (m_annotations.contains(a.guid))
+            out << a.text;
+    return out;
+}
+
 void Viewport::setGridLines(const QVector<GridLine>& lines, double z)
 {
     if (!m_grid.IsNull()) {
@@ -483,6 +768,8 @@ void Viewport::setPreviewBoxes(const QVector<PreviewBox>& boxes)
         c.voff.push_back(uint32_t(c.verts.size() / 3));
         c.toff.push_back(uint32_t(c.tris.size() / 3));
         m_preview = new ElementBatch(std::move(c));
+        m_preview->setShowEdges(false);
+        m_preview->SetZLayer(Graphic3d_ZLayerId_Top);
         m_context->Display(m_preview, 0, -1, false); // shown, never selectable
     }
     update();
@@ -508,6 +795,13 @@ void Viewport::keyPressEvent(QKeyEvent* e)
     QWidget::keyPressEvent(e);
 }
 
+void Viewport::leaveEvent(QEvent* e)
+{
+    m_hoverTimer->stop();
+    emit hovered(QString(), QPoint());
+    QWidget::leaveEvent(e);
+}
+
 void Viewport::mouseDoubleClickEvent(QMouseEvent* e)
 {
     if (m_drawingMode && e->button() == Qt::LeftButton) {
@@ -531,12 +825,40 @@ void Viewport::mousePressEvent(QMouseEvent* e)
         return; // drawing clicks never reach selection
     }
     // OCCT expects the button that changed (it keeps the set of held buttons itself).
+    if (e->button() == Qt::LeftButton && !(e->modifiers() & (Qt::ShiftModifier | Qt::AltModifier))) {
+        // Pressing on an element that is already selected may start a drag-move.
+        const NCollection_Vec2<int> px = toPixels(e->position());
+        const QString guid = pickAt(px.x(), px.y());
+        QPointF start;
+        double tolerance = 0;
+        if (!guid.isEmpty() && selectedGuids().contains(guid) && workPoint(e->position(), &start, &tolerance)) {
+            m_dragCandidate = true;
+            m_dragging = false;
+            m_dragPressPos = e->position();
+            m_dragStart = start;
+            return;
+        }
+    }
     if (PressMouseButton(toPixels(e->position()), toButtons(e->button()), toFlags(e->modifiers()), false))
         update();
 }
 
 void Viewport::mouseReleaseEvent(QMouseEvent* e)
 {
+    if (m_dragCandidate && e->button() == Qt::LeftButton) {
+        QPointF p;
+        double tolerance = 0;
+        const bool moved = m_dragging && workPoint(e->position(), &p, &tolerance);
+        m_dragCandidate = m_dragging = false;
+        if (moved) {
+            emit dragReleased(m_dragStart, p, tolerance, e->modifiers());
+        } else { // a plain click on a selected element: select just it, like any click
+            const NCollection_Vec2<int> px = toPixels(e->position());
+            selectGuids({pickAt(px.x(), px.y())});
+            emit selectionChanged(selectedGuids());
+        }
+        return;
+    }
     if (m_drawingMode && (e->button() == Qt::LeftButton || e->button() == Qt::RightButton))
         return;
     // The released button, not the ones still held: passing the held set kept pan/orbit running
@@ -547,6 +869,22 @@ void Viewport::mouseReleaseEvent(QMouseEvent* e)
 
 void Viewport::mouseMoveEvent(QMouseEvent* e)
 {
+    if (m_dragCandidate) {
+        if (!m_dragging && (e->position() - m_dragPressPos).manhattanLength() < 5)
+            return; // not a drag yet
+        m_dragging = true;
+        QPointF p;
+        double tolerance = 0;
+        if (workPoint(e->position(), &p, &tolerance))
+            emit dragMoved(m_dragStart, p, tolerance, e->modifiers());
+        return;
+    }
+    if (!m_drawingMode && e->buttons() == Qt::NoButton) { // rest the mouse on an element for a hint
+        m_hoverPos = e->position();
+        m_hoverTimer->start();
+    } else {
+        m_hoverTimer->stop();
+    }
     if (m_drawingMode) {
         QPointF p;
         double tolerance = 0;
@@ -580,12 +918,15 @@ void Viewport::addBatch(const Handle(ElementBatch)& batch)
     for (const auto& plane : m_clipPlanes)
         batch->AddClipPlane(plane);
     applyColors(batch);
+    applyLayerState(batch);
     batch->setIdBase(m_nextIdBase);
     m_idBases.push_back(m_nextIdBase);
     m_nextIdBase += batch->elementCount();
     const int mode = m_linesOnly ? ElementBatch::LinesOnly : ElementBatch::Shaded;
     batch->SetDisplayMode(mode); // the object's own mode, so later redisplays keep it
     m_context->Display(batch, mode, 0, false);
+    if (m_sectionZ)
+        rebuildSection();
     update();
 }
 
@@ -600,12 +941,18 @@ void Viewport::setLinesOnly(bool on)
 
 void Viewport::clear()
 {
+    for (const auto& prs : std::as_const(m_annotations))
+        m_context->Remove(prs, false);
+    m_annotations.clear();
+    m_annotationData.clear();
     m_context->RemoveAll(false);
     m_batches.clear();
     m_locate.clear();
     m_idBases.clear();
     m_grid.Nullify();
     m_gridLineCount = 0;
+    m_section.Nullify();
+    m_sectionElements = 0;
     m_preview.Nullify();
     m_nextIdBase = 0;
     update();
@@ -651,6 +998,40 @@ void Viewport::setElementColors(const QHash<QString, QColor>& colors)
     redisplay(touched);
 }
 
+void Viewport::applyLayerState(const Handle(ElementBatch)& batch) const
+{
+    for (int i = 0; i < batch->elementCount(); ++i) {
+        batch->setLayerHidden(i, m_layerHidden.contains(batch->guid(i)));
+        batch->setLocked(i, m_layerLocked.contains(batch->guid(i)));
+    }
+}
+
+void Viewport::setLayerState(const QSet<QString>& hiddenGuids, const QSet<QString>& lockedGuids)
+{
+    m_layerHidden = hiddenGuids;
+    m_layerLocked = lockedGuids;
+    // Hidden or locked elements can't stay selected.
+    for (const QString& g : selectedGuids())
+        if (hiddenGuids.contains(g) || lockedGuids.contains(g)) {
+            const auto it = m_locate.constFind(g);
+            if (it != m_locate.constEnd())
+                m_context->AddOrRemoveSelected(m_batches[size_t(it->batch)]->owner(it->index), false);
+        }
+    std::vector<int> touched;
+    for (size_t b = 0; b < m_batches.size(); ++b) {
+        applyLayerState(m_batches[b]);
+        touched.push_back(int(b));
+    }
+    redisplay(touched);
+    displayAnnotations();
+}
+
+bool Viewport::isLocked(const QString& guid) const
+{
+    const auto it = m_locate.constFind(guid);
+    return it != m_locate.constEnd() && m_batches[size_t(it->batch)]->isLocked(it->index);
+}
+
 int Viewport::coloredCount() const
 {
     int n = 0;
@@ -662,7 +1043,9 @@ int Viewport::coloredCount() const
 QString Viewport::typeOf(const QString& guid) const
 {
     const auto it = m_locate.constFind(guid);
-    return it == m_locate.constEnd() ? QString() : m_batches[size_t(it->batch)]->type(it->index);
+    if (it == m_locate.constEnd())
+        return m_annotations.contains(guid) ? QStringLiteral("IfcAnnotation") : QString();
+    return m_batches[size_t(it->batch)]->type(it->index);
 }
 
 bool Viewport::retire(const QString& guid, std::vector<int>* touched)
@@ -730,6 +1113,8 @@ QStringList Viewport::selectedGuids() const
         Handle(ElementOwner) owner = Handle(ElementOwner)::DownCast(m_context->SelectedOwner());
         if (!owner.IsNull())
             out << owner->batch()->guid(owner->index());
+        else if (Handle(AnnotationOwner) note = Handle(AnnotationOwner)::DownCast(m_context->SelectedOwner()); !note.IsNull())
+            out << note->guid();
     }
     return out;
 }
@@ -752,6 +1137,11 @@ void Viewport::selectGuids(const QStringList& guids)
         auto it = m_locate.constFind(g);
         if (it != m_locate.constEnd())
             m_context->AddOrRemoveSelected(m_batches[size_t(it->batch)]->owner(it->index), false);
+        else if (const auto note = m_annotations.constFind(g); note != m_annotations.constEnd()) {
+            const Handle(SelectMgr_EntityOwner)& owner = Handle(AnnotationPrs)::DownCast(*note)->owner();
+            if (!owner.IsNull())
+                m_context->AddOrRemoveSelected(owner, false);
+        }
     }
     m_context->UpdateCurrentViewer();
     update();
@@ -759,6 +1149,8 @@ void Viewport::selectGuids(const QStringList& guids)
 
 void Viewport::redisplay(const std::vector<int>& batches)
 {
+    if (m_sectionZ && !batches.empty())
+        rebuildSection();
     std::set<int> unique(batches.begin(), batches.end());
     for (int b : unique) {
         m_context->Redisplay(m_batches[size_t(b)], false, true);

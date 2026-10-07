@@ -3,8 +3,10 @@
 #include <QJsonObject>
 #include <QSignalSpy>
 #include <QTreeWidget>
+#include <QIcon>
 #include <QtTest>
 
+#include "Icons.h"
 #include "ModelTreePanel.h"
 
 namespace {
@@ -63,6 +65,28 @@ private slots:
         QVERIFY(panel.itemFor("W1")->isHidden());
         panel.setFilter("");
         QVERIFY(!panel.itemFor("W2")->isHidden());
+    }
+
+    // Owner feedback: objects get an icon (per kind of element) and a hint on hover.
+    void itemsHaveIconsByKind()
+    {
+        kimcad::ModelTreePanel panel;
+        panel.setTree(sampleTree());
+        const QIcon wall = panel.itemFor("W1")->icon(0);
+        QVERIFY(!wall.pixmap(16).isNull());
+        QCOMPARE(panel.itemFor("W2")->icon(0).cacheKey(), kimcad::iconFor("IfcWallStandardCase").cacheKey());
+        QVERIFY(panel.itemFor("D1")->icon(0).cacheKey() != wall.cacheKey());
+        QVERIFY(!panel.itemFor("L1")->icon(0).isNull());
+        QVERIFY(!kimcad::iconFor("IfcFurnishingElement").pixmap(16).isNull()); // a generic icon
+    }
+
+    void hoverHintNamesTypeAndLevel()
+    {
+        kimcad::ModelTreePanel panel;
+        panel.setTree(sampleTree());
+        const QString hint = panel.hintFor("W1");
+        QVERIFY(hint.contains("Muro Ñandú") && hint.contains("IfcWall") && hint.contains("Planta baja"));
+        QVERIFY(panel.hintFor("nope").isEmpty());
     }
 
     void storeyGuidsCollectsDescendants()

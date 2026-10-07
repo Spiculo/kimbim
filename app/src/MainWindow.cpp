@@ -12,7 +12,11 @@
 #include <QFileInfo>
 #include <algorithm>
 
+#include <QElapsedTimer>
 #include <QInputDialog>
+#include <QToolTip>
+#include <QHBoxLayout>
+#include <QSlider>
 #include <QVBoxLayout>
 #include <QListWidget>
 #include <QDir>
@@ -36,6 +40,7 @@
 #include "Cuts.h"
 #include "ElementBatch.h"
 #include "HistoryPanel.h"
+#include "LayersPanel.h"
 #include "LevelsBar.h"
 #include "HostTool.h"
 #include "PolygonTool.h"
@@ -52,6 +57,17 @@
 
 namespace kimcad {
 
+namespace {
+// Adds the time spent in a scope to a named counter.
+struct StepTimer {
+    QHash<QString, double>& into;
+    const char* name;
+    QElapsedTimer t;
+    StepTimer(QHash<QString, double>& h, const char* n) : into(h), name(n) { t.start(); }
+    ~StepTimer() { into[QLatin1String(name)] += double(t.nsecsElapsed()) / 1e6; }
+};
+} // namespace
+
 MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     : QMainWindow(parent)
     , m_quiet(quiet)
@@ -63,7 +79,27 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     qRegisterMetaType<kimcad::MeshChunk>();
     setWindowTitle(QStringLiteral("KIMCAD"));
     resize(1280, 800);
-    setCentralWidget(m_viewport);
+    // The 3D view with the plan-cut height slider at its right edge (owner feedback).
+    auto* central = new QWidget(this);
+    auto* row = new QHBoxLayout(central);
+    row->setContentsMargins(0, 0, 0, 0);
+    row->setSpacing(0);
+    row->addWidget(m_viewport, 1);
+    auto* cutColumn = new QVBoxLayout;
+    cutColumn->setContentsMargins(4, 6, 4, 6);
+    m_cutLabel = new QLabel(central);
+    m_cutLabel->setAlignment(Qt::AlignHCenter);
+    m_cutSlider = new QSlider(Qt::Vertical, central);
+    m_cutSlider->setObjectName(QStringLiteral("planCutSlider"));
+    m_cutSlider->setToolTip(tr("Plan cut height above the active level (drag to cut the model)"));
+    m_cutSlider->setRange(0, 300);
+    m_cutSlider->setValue(120);
+    m_cutSlider->setTickPosition(QSlider::TicksLeft);
+    m_cutSlider->setTickInterval(50);
+    cutColumn->addWidget(m_cutLabel);
+    cutColumn->addWidget(m_cutSlider, 1, Qt::AlignHCenter);
+    row->addLayout(cutColumn);
+    setCentralWidget(central);
     buildMenus();
     buildDocks();
     buildCutsToolbar();
@@ -96,6 +132,15 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     connect(m_properties, &PropertiesPanel::typeEditRequested, this, &MainWindow::typeEditDialog);
     connect(m_properties, &PropertiesPanel::resetToTypeRequested, this, &MainWindow::resetToType);
     connect(m_tree, &ModelTreePanel::isolateRequested, m_viewport, &Viewport::isolate);
+    connect(m_viewport, &Viewport::dragMoved, this, &MainWindow::dragMoveTo);
+    connect(m_viewport, &Viewport::dragReleased, this, &MainWindow::dragFinished);
+    connect(m_viewport, &Viewport::hovered, this, [this](const QString& guid, const QPoint& at) {
+        const QString hint = guid.isEmpty() ? QString() : m_tree->hintFor(guid);
+        if (hint.isEmpty())
+            QToolTip::hideText();
+        else
+            QToolTip::showText(at, hint, m_viewport);
+    });
     connect(m_tree, &ModelTreePanel::hideRequested, this, [this](const QStringList& g) { m_viewport->setHidden(g, true); });
     connect(m_tree, &ModelTreePanel::showAllRequested, m_viewport, &Viewport::showAll);
 
@@ -251,6 +296,56 @@ void MainWindow::buildDocks()
         m_tree->selectGuids({guid});
         setSelection({guid});
     });
+    m_layersPanel = new LayersPanel(this);
+    auto* layersDock = new QDockWidget(tr("Layers"), this);
+    layersDock->setObjectName(QStringLiteral("LayersDock"));
+    layersDock->setWidget(m_layersPanel);
+    addDockWidget(Qt::LeftDockWidgetArea, layersDock);
+    tabifyDockWidget(treeDock, layersDock);
+    treeDock->raise();
+    connect(m_layersPanel, &LayersPanel::visibilityToggled, this, &MainWindow::setLayerVisible);
+    connect(m_layersPanel, &LayersPanel::lockToggled, this, &MainWindow::setLayerLocked);
+    connect(m_layersPanel, &LayersPanel::activeRequested, this, &MainWindow::setActiveLayer);
+    connect(m_layersPanel, &LayersPanel::assignRequested, this, &MainWindow::assignSelectionToLayer);
+    connect(m_layersPanel, &LayersPanel::createRequested, this, [this] {
+        bool ok = false;
+        const QString name = QInputDialog::getText(this, tr("New layer"), tr("Layer name:"), QLineEdit::Normal, QString(), &ok);
+        if (ok && !name.trimmed().isEmpty())
+            createLayer(name.trimmed());
+    });
+    connect(m_layersPanel, &LayersPanel::deleteRequested, this, [this](const QString& name) {
+        const QJsonObject r = bridge("delete_layer", {name});
+        if (!r.value("ok").toBool())
+            statusBar()->showMessage(r.value("error").toString());
+        m_hiddenLayers.remove(name);
+        m_lockedLayers.remove(name);
+        afterEdit(r);
+    });
+    connect(m_layersPanel, &LayersPanel::renameRequested, this, [this](const QString& from, const QString& to) {
+        const QJsonObject r = bridge("rename_layer", {from, to});
+        if (!r.value("ok").toBool())
+            statusBar()->showMessage(r.value("error").toString());
+        else {
+            if (m_hiddenLayers.remove(from))
+                m_hiddenLayers.insert(to);
+            if (m_lockedLayers.remove(from))
+                m_lockedLayers.insert(to);
+        }
+        afterEdit(r);
+    });
+    connect(m_layersPanel, &LayersPanel::viewRequested, this, &MainWindow::applyView);
+    connect(m_layersPanel, &LayersPanel::saveViewRequested, this, [this] {
+        bool ok = false;
+        const QString name = QInputDialog::getText(this, tr("Save view"), tr("View name:"), QLineEdit::Normal, m_currentView, &ok);
+        if (ok && !name.trimmed().isEmpty())
+            saveView(name.trimmed());
+    });
+    connect(m_layersPanel, &LayersPanel::deleteViewRequested, this, [this](const QString& name) {
+        const QJsonObject r = bridge("delete_view", {name});
+        if (m_currentView == name)
+            m_currentView.clear();
+        afterEdit(r);
+    });
     resizeDocks({treeDock, propsDock}, {340, 360}, Qt::Horizontal);
 }
 
@@ -261,7 +356,17 @@ void MainWindow::buildCutsToolbar()
     m_levels = new LevelsBar(levels);
     levels->addWidget(m_levels);
     connect(m_levels, &LevelsBar::addLevelRequested, this, &MainWindow::addLevelDialog);
+    connect(m_levels, &LevelsBar::newModelRequested, this, [this] {
+        bool ok = false;
+        const QString name = QInputDialog::getText(this, tr("New model"),
+            tr("Model name (e.g. Apartment A). Draw it, then place it on levels with Place model:"), QLineEdit::Normal,
+            QString(), &ok);
+        if (ok && !name.trimmed().isEmpty())
+            createModel(name.trimmed());
+    });
     connect(m_levels, &LevelsBar::activeStoreyChanged, this, [this](const QString&, double elevation) {
+        updateCutSliderRange();
+        m_viewport->setWorkPlaneZ(elevation);
         if (m_viewport->isPlanView())
             m_viewport->setPlanView(elevation);
         if (m_viewport->isDrawingMode()) {
@@ -271,6 +376,8 @@ void MainWindow::buildCutsToolbar()
             refreshSnapData();
         }
         applyCuts();
+        refreshLayers(); // models show only while one is active
+        refreshAnnotations(); // each level has its own
     });
     QToolBar* bar = addToolBar(tr("Cuts"));
     bar->setObjectName(QStringLiteral("CutsToolbar"));
@@ -284,10 +391,21 @@ void MainWindow::buildCutsToolbar()
     m_cutHeight->setValue(1.2); // typical plan cut height above a floor
     m_cutHeight->setToolTip(tr("Plan cut height"));
     bar->addWidget(m_cutHeight);
-    connect(m_cutHeight, &QDoubleSpinBox::valueChanged, this, [this] {
+    connect(m_cutHeight, &QDoubleSpinBox::valueChanged, this, [this](double metres) {
+        {
+            const QSignalBlocker block(m_cutSlider);
+            m_cutSlider->setValue(int(std::lround(metres * 100)));
+        }
+        m_cutLabel->setText(QLocale().toString(metres, 'f', 2) + QStringLiteral(" m"));
         if (m_planCut->isChecked())
             applyCuts();
     });
+    connect(m_cutSlider, &QSlider::valueChanged, this, [this](int centimetres) {
+        m_cutHeight->setValue(centimetres / 100.0); // updates the label and the cut
+        if (!m_planCut->isChecked())
+            m_planCut->setChecked(true); // using the slider means cutting
+    });
+    m_cutLabel->setText(QLocale().toString(m_cutHeight->value(), 'f', 2) + QStringLiteral(" m"));
     bar->addSeparator();
     bar->addAction(m_sectionBox);
 }
@@ -295,6 +413,19 @@ void MainWindow::buildCutsToolbar()
 void MainWindow::setPlanCutHeight(double metres)
 {
     m_cutHeight->setValue(metres);
+}
+
+double MainWindow::planCutHeight() const
+{
+    return m_cutHeight->value();
+}
+
+void MainWindow::updateCutSliderRange()
+{
+    // From the level up to the next level (or 4 m), in centimetres.
+    const QSignalBlocker block(m_cutSlider);
+    m_cutSlider->setRange(0, int(std::lround(std::max(heightToNextLevel(), 1.0) * 100)));
+    m_cutSlider->setValue(int(std::lround(m_cutHeight->value() * 100)));
 }
 
 void MainWindow::applyCuts()
@@ -307,6 +438,7 @@ void MainWindow::applyCuts()
     state.bounds = m_boxBounds;
     m_viewport->clearClipPlanes();
     m_viewport->addClipPlanes(makePlanes(state));
+    m_viewport->setSectionHeight(state.planCut ? std::optional<double>(state.height) : std::nullopt);
 }
 
 void MainWindow::showAbout()
@@ -395,7 +527,17 @@ QString jsonValue(const QJsonValue& v)
 
 void MainWindow::setSelection(const QStringList& guids)
 {
-    m_selection = guids;
+    QStringList expanded = guids;
+    for (const QString& g : guids)
+        if (const auto it = m_instanceOf.constFind(g); it != m_instanceOf.constEnd())
+            for (const QString& m : m_instanceMembers.value(*it))
+                if (!expanded.contains(m))
+                    expanded << m;
+    if (expanded.size() != guids.size()) { // a click on an instance takes the whole instance
+        m_viewport->selectGuids(expanded);
+        m_tree->selectGuids(expanded);
+    }
+    m_selection = expanded;
     refreshProperties();
     if (!guids.isEmpty())
         statusBar()->showMessage(tr("%n element(s) selected", nullptr, int(guids.size())));
@@ -414,7 +556,20 @@ bool MainWindow::applyPropertyEdit(const QString& pset, const QString& prop, con
 {
     if (m_selection.isEmpty())
         return false;
-    const QJsonObject r = bridge("set_property", {jsonList(m_selection), pset, prop, jsonValue(value)});
+    // The Dimensions group is live geometry, not a property set: it edits the elements' shape.
+    if (pset == QLatin1String("KIMCAD_Annotation") && prop == QLatin1String("Text")) {
+        bool all = true;
+        for (const QString& g : std::as_const(m_selection)) {
+            const QJsonObject r = bridge("set_annotation_text", {g, value.toString()});
+            all = all && r.value("ok").toBool();
+            afterEdit(r);
+        }
+        return all;
+    }
+    const QJsonObject r = pset == QLatin1String("Dimensions")
+        ? bridge("set_dimension", {jsonList(m_selection), prop,
+              value.isDouble() ? QString::number(value.toDouble(), 'g', 17) : value.toString()})
+        : bridge("set_property", {jsonList(m_selection), pset, prop, jsonValue(value)});
     if (!r.value("ok").toBool())
         showError(tr("Could not change %1").arg(prop), r.value("error").toString());
     afterEdit(r);
@@ -508,6 +663,11 @@ bool MainWindow::newProject()
     setWindowTitle(QStringLiteral("KIMCAD — %1[*]").arg(tr("Untitled")));
     afterEdit();
     refreshProject();
+    m_hiddenLayers.clear();
+    m_lockedLayers.clear();
+    m_currentView.clear();
+    refreshLayers();
+    refreshAnnotations();
     statusBar()->showMessage(tr("New project"));
     return true;
 }
@@ -604,6 +764,12 @@ void MainWindow::buildModelingToolbar()
             tr("Draw a stair: click where it starts, then the direction it climbs; it goes up to the next level")},
         {Tool::SlabOpening, "actionSlabOpeningTool", tr("Slab &opening"), Qt::Key_O,
             tr("Cut a hole in the selected slab: draw its outline like a slab")},
+        {Tool::PlaceModel, "actionPlaceModelTool", tr("Place mo&del"), Qt::Key_U,
+            tr("Place a model (an apartment drawn once) on this level: click where its origin goes; Shift turns it 90 degrees")},
+        {Tool::Text, "actionTextTool", tr("Te&xt label"), Qt::Key_A, tr("Put a text label on the plan: click where it goes")},
+        {Tool::Dimension, "actionDimensionTool", tr("Dimensi&on"), Qt::Key_Q,
+            tr("Dimension: click the two points to measure, then where the dimension line goes")},
+        {Tool::Mark, "actionMarkTool", tr("Mar&k"), Qt::Key_X, tr("Mark something on the plan: a circle with a tag")},
     };
     for (const Def& d : defs) {
         QAction* a = bar->addAction(d.text);
@@ -620,6 +786,14 @@ void MainWindow::buildModelingToolbar()
     QAction* copyAction = model->addAction(tr("Copy to &level..."));
     copyAction->setObjectName(QStringLiteral("actionCopyToLevel"));
     connect(copyAction, &QAction::triggered, this, &MainWindow::copyToLevelDialog);
+    QAction* updateModels = model->addAction(tr("&Update model instances"));
+    updateModels->setObjectName(QStringLiteral("actionUpdateModelInstances"));
+    updateModels->setToolTip(tr("Apply the model's changes to every place it is used"));
+    connect(updateModels, &QAction::triggered, this, &MainWindow::updateModelInstances);
+    QAction* explode = model->addAction(tr("E&xplode model instance"));
+    explode->setObjectName(QStringLiteral("actionExplodeInstance"));
+    explode->setToolTip(tr("Unlink the selected instance: its elements become ordinary elements you can edit one by one"));
+    connect(explode, &QAction::triggered, this, &MainWindow::explodeSelectedInstance);
     QAction* heightAction = model->addAction(tr("Wall &height..."));
     heightAction->setObjectName(QStringLiteral("actionWallHeight"));
     connect(heightAction, &QAction::triggered, this, &MainWindow::wallHeightDialog);
@@ -709,6 +883,12 @@ void MainWindow::buildModelingToolbar()
             m_columnHover = m_twoPointTool->snapper().snap(p, tolerance).point;
             updateToolPreview();
             break;
+        case Tool::PlaceModel:
+        case Tool::Text:
+        case Tool::Dimension:
+        case Tool::Mark:
+            m_twoPointTool->setTolerance(tolerance);
+            break;
         case Tool::Move:
             m_twoPointTool->setTolerance(tolerance);
             m_twoPointTool->setOrtho(ortho);
@@ -761,6 +941,16 @@ void MainWindow::buildModelingToolbar()
         case Tool::Column:
             m_twoPointTool->setTolerance(tolerance);
             columnAt(p, ortho);
+            break;
+        case Tool::PlaceModel:
+            m_twoPointTool->setTolerance(tolerance);
+            placeModelAt(m_twoPointTool->snapper().snap(p, tolerance).point, ortho);
+            break;
+        case Tool::Text:
+        case Tool::Dimension:
+        case Tool::Mark:
+            m_twoPointTool->setTolerance(tolerance);
+            annotationClick(m_twoPointTool->snapper().snap(p, tolerance).point);
             break;
         case Tool::Move:
             m_detach = mods & Qt::ControlModifier;
@@ -868,6 +1058,13 @@ void MainWindow::refreshTypes()
     case Tool::Beam:
         source = "beam_types";
         break;
+    case Tool::PlaceModel:
+        source = "models";
+        break;
+    case Tool::Text:
+    case Tool::Dimension:
+    case Tool::Mark:
+        break;
     case Tool::Grid:
     case Tool::None:
         break;
@@ -877,7 +1074,8 @@ void MainWindow::refreshTypes()
     m_types->clear();
     if (!source)
         return;
-    for (const auto& t : bridge(source, args).value("types").toArray()) {
+    const QJsonObject listing = bridge(source, args);
+    for (const auto& t : listing.value(listing.contains("models") ? "models" : "types").toArray()) {
         const QJsonObject o = t.toObject();
         m_types->addItem(o.value("name").toString(), o);
         if (o.value("guid").toString() == current)
@@ -999,6 +1197,7 @@ void MainWindow::setTool(Tool tool)
     m_rotateTool->cancel();
     m_gripTool->cancel();
     m_columnHover.reset();
+    m_annotationPoints.clear();
     m_tool = tool;
     for (auto it = m_toolActions.constBegin(); it != m_toolActions.constEnd(); ++it) {
         const QSignalBlocker block(it.value());
@@ -1009,7 +1208,7 @@ void MainWindow::setTool(Tool tool)
         || tool == Tool::Rotate || tool == Tool::Stretch);
     m_lengthInput->setPlaceholderText(tool == Tool::Rotate ? tr("Angle (degrees)") : tr("Length (m)"));
     const bool typed = tool == Tool::Wall || tool == Tool::Slab || tool == Tool::Door || tool == Tool::Window
-        || tool == Tool::Column || tool == Tool::Beam;
+        || tool == Tool::Column || tool == Tool::Beam || tool == Tool::PlaceModel;
     m_types->setVisible(typed);
     const bool needsSlab = tool == Tool::SlabOpening
         && (m_selection.size() != 1 || m_viewport->typeOf(m_selection.first()) != QLatin1String("IfcSlab"));
@@ -1062,6 +1261,19 @@ void MainWindow::setTool(Tool tool)
         break;
     case Tool::SlabOpening:
         statusBar()->showMessage(tr("Slab opening: draw the hole's outline; click the first point or press Enter to close"));
+        break;
+    case Tool::Text:
+        statusBar()->showMessage(tr("Text: click where the label goes"));
+        break;
+    case Tool::Dimension:
+        statusBar()->showMessage(tr("Dimension: click the first point to measure"));
+        break;
+    case Tool::Mark:
+        statusBar()->showMessage(tr("Mark: click what to mark"));
+        break;
+    case Tool::PlaceModel:
+        statusBar()->showMessage(m_types->count() ? tr("Place model: click where its origin goes (Shift: turned 90 degrees)")
+                                                  : tr("There are no models yet: use New model... next to the levels"));
         break;
     default:
         statusBar()->showMessage(tr("Click on a wall to place it"));
@@ -1521,6 +1733,324 @@ bool MainWindow::discardChanges()
     return true;
 }
 
+static QPointF dragTarget(Snapper& snapper, QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers m)
+{
+    return snapper.snap(current, tolerance, &start, m & Qt::ShiftModifier).point;
+}
+
+void MainWindow::dragMoveTo(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers)
+{
+    if (m_selection.isEmpty())
+        return;
+    const QPointF delta = dragTarget(m_twoPointTool->snapper(), start, current, tolerance, modifiers) - start;
+    // Preview: the selection's footprint where it would go, plus the drag line.
+    double x0, y0, z0, x1, y1, z1;
+    const Bnd_Box box = m_viewport->boundsOf(m_selection);
+    QVector<Viewport::PreviewBox> boxes;
+    if (!box.IsVoid()) {
+        box.Get(x0, y0, z0, x1, y1, z1);
+        const QPointF a(x0 + delta.x(), y0 + delta.y()), b(x1 + delta.x(), y0 + delta.y()),
+            c(x1 + delta.x(), y1 + delta.y()), d(x0 + delta.x(), y1 + delta.y());
+        for (const auto& [p, q] : {std::pair{a, b}, std::pair{b, c}, std::pair{c, d}, std::pair{d, a}})
+            boxes.push_back({p, q, 0.04, z0, z1});
+    }
+    boxes.push_back({start, start + delta, 0.03, m_levels->activeElevation(), m_levels->activeElevation() + 0.02});
+    m_viewport->setPreviewBoxes(boxes);
+    statusBar()->showMessage(tr("Move %1 m (Ctrl: detach joined walls, Shift: straight)")
+                                 .arg(QLocale().toString(std::hypot(delta.x(), delta.y()), 'f', 3)));
+}
+
+bool MainWindow::dragFinished(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers)
+{
+    m_viewport->setPreviewBoxes({});
+    const QPointF delta = dragTarget(m_twoPointTool->snapper(), start, current, tolerance, modifiers) - start;
+    if (std::hypot(delta.x(), delta.y()) < 1e-4)
+        return false;
+    return moveSelection(delta, modifiers & Qt::ControlModifier);
+}
+
+void MainWindow::refreshLayers()
+{
+    const QJsonObject state = bridge("layer_members"); // one pass over the model per edit
+    const QJsonObject members = state.value("layers").toObject();
+    QJsonArray listing;
+    for (auto it = members.constBegin(); it != members.constEnd(); ++it) // QJsonObject keys are sorted
+        listing.append(QJsonObject{{"name", it.key()}, {"count", it.value().toArray().size()}});
+    QSet<QString> hidden, locked;
+    for (auto it = members.constBegin(); it != members.constEnd(); ++it)
+        for (const auto& g : it.value().toArray()) {
+            if (m_hiddenLayers.contains(it.key()))
+                hidden.insert(g.toString());
+            if (m_lockedLayers.contains(it.key()))
+                locked.insert(g.toString());
+        }
+    const QJsonObject inModels = bridge("model_elements");
+    const QString active = m_levels->activeStorey();
+    if (m_levels->activeIsModel()) { // drawing a model: only that model
+        const QJsonArray mine = inModels.value("models").toObject().value(active).toArray();
+        QSet<QString> keep;
+        for (const auto& g : mine)
+            keep.insert(g.toString());
+        for (const QString& g : m_viewport->guids())
+            if (!keep.contains(g))
+                hidden.insert(g);
+    } else {
+        for (const auto& g : inModels.value("guids").toArray())
+            hidden.insert(g.toString());
+    }
+    m_instanceOf.clear();
+    m_instanceMembers.clear();
+    const QJsonObject instances = bridge("instance_members").value("instances").toObject();
+    for (auto it = instances.constBegin(); it != instances.constEnd(); ++it)
+        for (const auto& g : it.value().toArray()) {
+            m_instanceOf.insert(g.toString(), it.key());
+            m_instanceMembers[it.key()] << g.toString();
+        }
+    m_viewport->setLayerState(hidden, locked);
+    m_layersPanel->setLayers(listing, state.value("active").toString(), m_hiddenLayers, m_lockedLayers);
+    QStringList names;
+    for (const auto& v : bridge("views").value("views").toArray())
+        names << v.toObject().value("name").toString();
+    m_layersPanel->setViews(names, m_currentView);
+}
+
+void MainWindow::refreshAnnotations()
+{
+    QVector<Viewport::Annotation> list;
+    for (const auto& v : bridge("annotations", {m_levels->activeStorey()}).value("annotations").toArray()) {
+        const QJsonObject o = v.toObject();
+        Viewport::Annotation a{o.value("guid").toString(), o.value("kind").toString(), o.value("text").toString(), {}};
+        for (const auto& p : o.value("points").toArray())
+            a.points << QPointF(p.toArray().at(0).toDouble(), p.toArray().at(1).toDouble());
+        list << a;
+    }
+    m_viewport->setAnnotations(list, m_levels->activeElevation());
+    if (!m_selection.isEmpty())
+        m_viewport->selectGuids(m_selection);
+}
+
+bool MainWindow::addAnnotation(const QString& kind, const QVector<QPointF>& points, const QString& text)
+{
+    QJsonArray pts;
+    for (const QPointF& p : points)
+        pts.append(QJsonArray{p.x(), p.y()});
+    const QJsonObject r = bridge("add_annotation", {m_levels->activeStorey(), kind,
+        QString::fromUtf8(QJsonDocument(pts).toJson(QJsonDocument::Compact)), text});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not add it: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    return true;
+}
+
+void MainWindow::annotationClick(QPointF p)
+{
+    if (m_tool == Tool::Dimension) {
+        m_annotationPoints << p;
+        if (m_annotationPoints.size() == 1)
+            statusBar()->showMessage(tr("Dimension: click the second point"));
+        else if (m_annotationPoints.size() == 2)
+            statusBar()->showMessage(tr("Dimension: click where the dimension line goes"));
+        else {
+            const QVector<QPointF> pts = m_annotationPoints;
+            m_annotationPoints.clear();
+            addAnnotation(QStringLiteral("dimension"), pts, QString());
+            statusBar()->showMessage(tr("Dimension: click the first point to measure"));
+        }
+        return;
+    }
+    const bool mark = m_tool == Tool::Mark;
+    bool ok = false;
+    const QString text = QInputDialog::getText(this, mark ? tr("Mark") : tr("Text label"),
+        mark ? tr("Tag (e.g. A, 1, R2):") : tr("Text:"), QLineEdit::Normal, QString(), &ok);
+    if (ok && !text.trimmed().isEmpty())
+        addAnnotation(mark ? QStringLiteral("mark") : QStringLiteral("text"), {p}, text.trimmed());
+}
+
+bool MainWindow::createModel(const QString& name)
+{
+    const QJsonObject r = bridge("create_model", {name});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not create the model"), r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
+    m_levels->setActive(r.value("guid").toString());
+    statusBar()->showMessage(tr("Draw the model here, then place it on levels with Place model (U)"));
+    return true;
+}
+
+bool MainWindow::placeModelAt(QPointF p, bool turned)
+{
+    if (m_levels->activeIsModel()) {
+        statusBar()->showMessage(tr("Choose a building level to place the model on"));
+        return false;
+    }
+    QJsonObject model = m_tool == Tool::PlaceModel ? currentType() : QJsonObject();
+    if (model.isEmpty())
+        model = bridge("models").value("models").toArray().first().toObject();
+    auto num = [](double v) { return QString::number(v, 'g', 17); };
+    const QJsonObject r = bridge("place_model", {model.value("guid").toString(), m_levels->activeStorey(), num(p.x()),
+        num(p.y()), num(turned ? M_PI / 2 : 0.0)});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not place it: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    return true;
+}
+
+bool MainWindow::updateModelInstances()
+{
+    const QJsonArray models = bridge("models").value("models").toArray();
+    QString guid;
+    if (m_levels->activeIsModel())
+        guid = m_levels->activeStorey();
+    else if (models.size() == 1)
+        guid = models.first().toObject().value("guid").toString();
+    else if (!models.isEmpty()) {
+        QStringList names;
+        for (const auto& m : models)
+            names << m.toObject().value("name").toString();
+        bool ok = false;
+        const QString choice = QInputDialog::getItem(this, tr("Update model instances"), tr("Model:"), names, 0, false, &ok);
+        if (!ok)
+            return false;
+        guid = models.at(names.indexOf(choice)).toObject().value("guid").toString();
+    }
+    if (guid.isEmpty()) {
+        statusBar()->showMessage(tr("There are no models yet"));
+        return false;
+    }
+    const QJsonObject r = bridge("update_model_instances", {guid});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not update: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    statusBar()->showMessage(tr("%n instance(s) updated", nullptr, r.value("count").toInt()));
+    return true;
+}
+
+bool MainWindow::explodeSelectedInstance()
+{
+    QString instance;
+    for (const QString& g : std::as_const(m_selection))
+        if (m_instanceOf.contains(g))
+            instance = m_instanceOf.value(g);
+    if (instance.isEmpty()) {
+        statusBar()->showMessage(tr("Select a placed model first"));
+        return false;
+    }
+    const QJsonObject r = bridge("explode_instance", {instance});
+    if (!r.value("ok").toBool())
+        return false;
+    afterEdit(r);
+    return true;
+}
+
+bool MainWindow::createLayer(const QString& name)
+{
+    const QJsonObject r = bridge("create_layer", {name});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not create the layer: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    return true;
+}
+
+bool MainWindow::assignSelectionToLayer(const QString& layer)
+{
+    const QJsonObject r = bridge("assign_layer", {jsonList(m_selection), layer});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not change the layer: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    statusBar()->showMessage(tr("%n element(s) moved to %1", nullptr, int(m_selection.size())).arg(layer));
+    return true;
+}
+
+void MainWindow::setLayerVisible(const QString& layer, bool visible)
+{
+    if (visible)
+        m_hiddenLayers.remove(layer);
+    else
+        m_hiddenLayers.insert(layer);
+    refreshLayers();
+}
+
+void MainWindow::setLayerLocked(const QString& layer, bool locked)
+{
+    if (locked)
+        m_lockedLayers.insert(layer);
+    else
+        m_lockedLayers.remove(layer);
+    refreshLayers();
+}
+
+bool MainWindow::setActiveLayer(const QString& layer)
+{
+    const QJsonObject r = bridge("set_active_layer", {layer});
+    refreshLayers();
+    if (r.value("ok").toBool())
+        statusBar()->showMessage(tr("New elements go on layer %1").arg(layer));
+    return r.value("ok").toBool();
+}
+
+bool MainWindow::saveView(const QString& name)
+{
+    QJsonObject data{{"hidden", QJsonArray::fromStringList(QStringList(m_hiddenLayers.begin(), m_hiddenLayers.end()))},
+        {"locked", QJsonArray::fromStringList(QStringList(m_lockedLayers.begin(), m_lockedLayers.end()))},
+        {"level", m_levels->activeStorey()}, {"plan", m_viewport->isPlanView()},
+        {"cut", m_planCut->isChecked() ? QJsonValue(m_cutHeight->value()) : QJsonValue()},
+        {"linesOnly", m_viewport->linesOnly()}};
+    const QJsonObject r = bridge("save_view", {name, QString::fromUtf8(QJsonDocument(data).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not save the view: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    m_currentView = name;
+    afterEdit(r);
+    return true;
+}
+
+bool MainWindow::applyView(const QString& name)
+{
+    for (const auto& v : bridge("views").value("views").toArray()) {
+        const QJsonObject o = v.toObject();
+        if (o.value("name").toString() != name)
+            continue;
+        const QJsonObject data = o.value("data").toObject();
+        m_hiddenLayers.clear();
+        m_lockedLayers.clear();
+        for (const auto& l : data.value("hidden").toArray())
+            m_hiddenLayers.insert(l.toString());
+        for (const auto& l : data.value("locked").toArray())
+            m_lockedLayers.insert(l.toString());
+        if (!data.value("level").toString().isEmpty())
+            m_levels->setActive(data.value("level").toString());
+        if (data.contains("linesOnly"))
+            findChild<QAction*>(QStringLiteral("actionLinesOnly"))->setChecked(data.value("linesOnly").toBool());
+        if (data.value("cut").isDouble()) {
+            m_cutHeight->setValue(data.value("cut").toDouble());
+            m_planCut->setChecked(true);
+        } else if (data.contains("cut")) {
+            m_planCut->setChecked(false);
+        }
+        if (data.contains("plan"))
+            setPlanView(data.value("plan").toBool());
+        applyCuts();
+        m_currentView = name;
+        refreshLayers();
+        statusBar()->showMessage(tr("View %1").arg(name));
+        return true;
+    }
+    return false;
+}
+
 int MainWindow::gridLineCount() const
 {
     return m_viewport->gridLineCount();
@@ -1637,6 +2167,7 @@ bool MainWindow::createWall(const WallSegment& s)
         type = types.first().toObject();
     }
     auto num = [](double v) { return QString::number(v, 'g', 17); };
+    StepTimer createTimer(m_timings, "bridgeCreateWall");
     const QJsonObject r = bridge("create_wall", {m_levels->activeStorey(), type.value("guid").toString(),
         num(s.p1.x()), num(s.p1.y()), num(s.p2.x()), num(s.p2.y()), num(m_wallHeight->value()), s.joinStart, s.joinEnd});
     if (!r.value("ok").toBool()) {
@@ -1679,12 +2210,22 @@ void MainWindow::applyGeometry(const QJsonObject& geometry)
         MeshChunk chunk;
         bool none = false;
         QString error;
-        if (!fetchElementMeshes(PythonEngine::instance(), changed, &chunk, &none, &error))
+        bool fetched = false;
+        {
+            StepTimer _(m_timings, "fetchMeshes");
+            fetched = fetchElementMeshes(PythonEngine::instance(), changed, &chunk, &none, &error);
+        }
+        if (!fetched)
             showError(tr("Could not update the 3D view"), error);
-        else if (!none)
+        else if (!none) {
+            StepTimer _(m_timings, "replaceElements");
             m_viewport->replaceElements(chunk);
+        }
     }
-    m_tree->refreshTree(bridge("spatial_tree")); // elements can appear or disappear
+    {
+        StepTimer _(m_timings, "refreshTree");
+        m_tree->refreshTree(bridge("spatial_tree")); // elements can appear or disappear
+    }
     QStringList kept;
     for (const QString& g : std::as_const(m_selection))
         if (!removed.contains(g))
@@ -1694,16 +2235,20 @@ void MainWindow::applyGeometry(const QJsonObject& geometry)
         setSelection(kept);
 }
 
+
 void MainWindow::afterEdit(const QJsonObject& result)
 {
-    applyGeometry(result.value("geometry").toObject());
-    refreshLevels();
+    { StepTimer _(m_timings, "applyGeometry"); applyGeometry(result.value("geometry").toObject()); }
+    { StepTimer _(m_timings, "refreshLevels"); refreshLevels(); }
     if (!m_warnedInconsistent && bridge("state").value("inconsistent").toBool()) {
         m_warnedInconsistent = true;
         showError(tr("The model may be inconsistent"),
             tr("An edit failed and could not be undone. Save a copy if you need it, then reopen the file."));
     }
-    refreshSnapData(); // undo/redo can add or remove walls and grid lines
+    { StepTimer _(m_timings, "refreshSnapData"); refreshSnapData(); } // undo/redo can add or remove walls and grid lines
+    { StepTimer _(m_timings, "refreshLayers"); refreshLayers(); }
+    { StepTimer _(m_timings, "refreshAnnotations"); refreshAnnotations(); }
+    StepTimer stateTimer(m_timings, "stateAndNames");
     const QJsonObject s = bridge("state");
     m_undo->setEnabled(s.value("can_undo").toBool());
     m_redo->setEnabled(s.value("can_redo").toBool());
@@ -1808,7 +2353,12 @@ void MainWindow::onOpened(const QJsonObject& info)
     QString error;
     const QJsonObject tree = PythonEngine::instance().callJson("spatial_tree", {}, &error).object();
     m_tree->setTree(tree);
+    m_hiddenLayers.clear();
+    m_lockedLayers.clear();
+    m_currentView.clear();
     refreshProject();
+    refreshLayers();
+    refreshAnnotations();
     statusBar()->showMessage(tr("Loading %1 (%2)...").arg(QFileInfo(m_path).fileName(), info.value("schema").toString()));
 }
 

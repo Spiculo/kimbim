@@ -59,6 +59,10 @@ def build(out: str) -> dict:
     call("create_stair", l1, 1.0, 1.2, 0.0, 1.0, 3.0)
     call("add_slab_opening", slab2, json.dumps([[0.9, 0.6], [6.0, 0.6], [6.0, 1.8], [0.9, 1.8]]))
 
+    # Plan annotations (Slice 13): a label, a dimension and a mark on Level 1.
+    call("add_annotation", l1, "text", json.dumps([[3.0, 2.0]]), "Living room")
+    call("add_annotation", l1, "dimension", json.dumps([[0.0, 0.0], [10.0, 0.0], [0.0, -1.0]]), "")
+    call("add_annotation", l1, "mark", json.dumps([[8.0, 6.0]]), "A")
     roof = call("add_storey", "Roof", 6.0)["guid"]
     call("copy_to_storey", json.dumps([slab1]), roof)
 

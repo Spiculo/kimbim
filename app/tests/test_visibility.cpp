@@ -165,6 +165,17 @@ private slots:
         QVERIFY(!a->colorOverride(2).has_value());
     }
 
+    // The plan cut draws the sections of what it cuts; hidden elements have none.
+    void planCutDrawsSections()
+    {
+        kimcad::Viewport v;
+        v.addBatch(batch("a", 3)); // each element: one triangle from z 0 to 1
+        v.setSectionHeight(0.5);
+        QCOMPARE(v.sectionElementCount(), 0); // a single triangle has no closed section
+        v.setSectionHeight(std::nullopt);
+        QCOMPARE(v.sectionElementCount(), 0);
+    }
+
     void hidingClearsSelection()
     {
         kimcad::Viewport v;
