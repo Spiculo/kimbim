@@ -28,6 +28,7 @@ M4 Libraries + cloning + drawings          R4 Merge + reconciliation
 | S3 | Does the record decomposition round-trip the test corpus losslessly? | ✅ Yes: 77/77 valid files lossless, fixed point, deterministic export (D34–D36) |
 | S4 | Do Windows and Linux produce identical record hashes? | ✅ Yes: 77/77 identical state hashes and IFC exports |
 | S5 | How do `gix` writes perform at 1M blobs: commit time, repo size, checkout-to-model time? | ✅ Viable with packs only and no deltas (D39) |
+| S6 | Is IfcOpenShell's SVG serializer good and fast enough for KIMCAD's drawings (Slice 14 risk check)? | ✅ Quality yes; speed needs polygon HLR, visible elements only, and a child process (D60, proposed) |
 
 The spike code lives in [`spikes/`](../spikes/README.md).
 
@@ -76,7 +77,13 @@ Done in Slice 4: new IFC4 project (mm), levels, plan view, layered wall types, w
 
 ### M4 — Libraries, cloning, drawings
 Library browser and bundled library, copy/paste/duplicate/array/mirror/copy-to-storeys, plan/section/elevation generation, annotations, sheets, PDF export.
-**Exit:** the M3 house produces a plan, a section and an elevation on a sheet, exported to PDF.
+**Exit:** the M3 house produces a plan, a section and an elevation on a sheet with a title block, exported to PDF. CI checks this automatically, as it checks M3.
+
+Slices (numbering continues after the architect-feedback track, Slices 9–13): 14 sections and elevations → 15 plan drawings and annotation on drawings → 16 sheets and PDF export (= M4 exit) → 17 everyday editing (copy/paste, duplicate, Ctrl+drag copy, mirror, arrays, offset).
+M4 comes before the end of M5 (owner plan, 2026-10-07): drawings are what an architect hands to a client, and Combine options (Slice 22) needs the R4 merge engine, which is easier to judge once real projects with drawings exist.
+
+### After M4: modeling gaps
+Slices 18 rooms and areas (`IfcSpace` from the surrounding walls, room stamps, room schedule) → 19 roofs (flat; pitched/hip/gable from a footprint, porting Bonsai's roof generator with attribution; walls attach to the roof). Then M5 resumes.
 
 ## Repo track
 
@@ -106,7 +113,7 @@ Three-way merge with conflict model, integrity pass, conflict serialization for 
 **Exit:** merge test suite (including ported `ifcmerge` cases) passes; re-importing a Revit-exported file with regenerated GlobalIds keeps more than 95% of identities on the corpus pair.
 
 ## M5 — Versioned projects in the app 🟡 (Slice 8 done: [plan](superpowers/plans/2026-10-06-slice8-versioned-projects.md))
-Slices: **8 ✅ enable/open, Save version, History, Compare (colours + list), design options** → 9 milestones (tags), object history, before/after, delete option → 10 Combine options (three-way merge, conflict UI) = M5 exit.
+Slices: **8 ✅ enable/open, Save version, History, Compare (colours + list), design options** → 20 milestones (tags), object history, before/after, delete option → 21 R4 merge engine (repository side, not in the app yet) → 22 Combine options (conflict UI: mine or theirs per element and property, 3D preview, commit) = M5 exit. (These were called 9 and 10 before the architect-feedback track took Slices 9–13.)
 
 Enable/disable versioning, Save version, history timeline, Compare (viewport coloring and before/after), design options, milestones, Combine options with conflict UI, object history panel, re-import with reconciliation review.
 **Exit:** two design options of the house are created, edited separately, compared and combined with one conflict resolved in the UI.

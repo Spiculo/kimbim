@@ -287,7 +287,7 @@ release notes, so check before relying on a single cell.
 | Tool | Has | KIMCAD | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Save version, History, Compare (colours and list) | — | ✅ | P0 | KIMCAD's own feature (Slice 8). Competitors have backups and Revit compare add-ins at most |
-| Milestones, object history, before/after | — | ⬜ | P0 | Slice 9 of M5 (not the feedback Slice 9) |
+| Milestones, object history, before/after | — | ⬜ | P0 | Slice 20 (M5) |
 | Combine options with conflict UI | — | ⬜ | P1 | M5 exit |
 | Several people on one project (Teamwork, Worksharing, Project Sharing) | AC RV VW | 🔮 | P2 | Git remotes first ([08](08-future.md)) |
 | External references (link another IFC/project, hotlinks, xrefs) | all | ⬜ | new | Models (D58) cover models inside one project only |

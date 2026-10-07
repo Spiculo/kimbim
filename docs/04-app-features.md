@@ -130,9 +130,9 @@ Clones get **new KIMCAD IDs and GlobalIds**. They never share identity with the 
 | Feature | Pri | Notes |
 |---------|-----|-------|
 | "Save version" dialog: message, changed-objects summary | P0 | ✅ Slice 8 (Ctrl+Alt+S; Ctrl+S in a versioned project) |
-| History timeline (versions, milestones, design options) | P0 | ✅ Slice 8: History dock per option; milestones: Slice 9 |
-| Compare any two versions: viewport coloring + change list + before/after | P0 | ✅ Slice 8: version vs current or two versions, added green / modified orange, change list (click selects); before/after: Slice 9 |
-| Design options: create, switch, delete | P0 | Branches. ✅ Slice 8: create, switch (with an unsaved-changes guard); delete: Slice 9 |
+| History timeline (versions, milestones, design options) | P0 | ✅ Slice 8: History dock per option; milestones: Slice 20 |
+| Compare any two versions: viewport coloring + change list + before/after | P0 | ✅ Slice 8: version vs current or two versions, added green / modified orange, change list (click selects); before/after: Slice 20 |
+| Design options: create, switch, delete | P0 | Branches. ✅ Slice 8: create, switch (with an unsaved-changes guard); delete: Slice 20 |
 | Combine options with conflict resolution UI | P1 | [03](03-versioning.md#merge-combine-options) |
 | Milestones | P0 | Tags |
 | Re-import from external tool with reconciliation report | P1 | [03](03-versioning.md#import-reconciliation) |
