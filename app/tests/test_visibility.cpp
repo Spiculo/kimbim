@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Visibility logic on the real Viewport, without showing a window (no OpenGL drawing needed).
+#include <QColor>
 #include <QtTest>
 
 #include "ElementBatch.h"
@@ -144,6 +145,24 @@ private slots:
         v.setLinesOnly(false);
         QCOMPARE(a->DisplayMode(), int(kimcad::ElementBatch::Shaded));
         QCOMPARE(b->DisplayMode(), int(kimcad::ElementBatch::Shaded));
+    }
+
+    // Slice 8: Compare colours changed elements; the colours follow elements that get re-meshed.
+    void elementColoursOverrideAndClear()
+    {
+        kimcad::Viewport v;
+        Handle(kimcad::ElementBatch) a = batch("a", 3);
+        v.addBatch(a);
+        v.setElementColors({{"a0", QColor(40, 200, 80)}, {"a2", QColor(240, 150, 30)}, {"nope", Qt::red}});
+        QCOMPARE(v.coloredCount(), 2);
+        QVERIFY(a->colorOverride(0).has_value());
+        QVERIFY(!a->colorOverride(1).has_value());
+        v.replaceElements(chunk("a", 1)); // a0 re-meshed: still coloured
+        QCOMPARE(v.coloredCount(), 2);
+        v.addBatch(batch("b", 1));
+        v.clearElementColors();
+        QCOMPARE(v.coloredCount(), 0);
+        QVERIFY(!a->colorOverride(2).has_value());
     }
 
     void hidingClearsSelection()

@@ -67,3 +67,5 @@ Development: see [CONTRIBUTING.md](CONTRIBUTING.md).
 The original specification (v0.1) is kept in [doc.md](doc.md). The `docs/` folder supersedes it.
 
 **Sample two-storey house:** `pixi run house` writes `build/house.ifc`; `pixi run interop` validates it (IFC4 schema + EXPRESS rules) and opens it with web-ifc. See [docs/12-m3-exit.md](docs/12-m3-exit.md).
+
+**Versioned projects:** *File › Enable versioning…* turns a model into a project folder with history. *Save version* (**Ctrl+Alt+S**, or **Ctrl+S** in a project) asks for a message and shows what changed. The **History** panel lists versions; *Compare with current* or *Compare the two selected* colours the 3D view (added green, modified orange) and lists the changes. Design options are in the **Option** toolbar (*New option…*, switch with the list). *File › Open project…* reopens a project folder.

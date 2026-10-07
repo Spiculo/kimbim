@@ -13,6 +13,9 @@
 #include <algorithm>
 
 #include <QInputDialog>
+#include <QVBoxLayout>
+#include <QListWidget>
+#include <QDir>
 #include <QFormLayout>
 #include <QDialogButtonBox>
 #include <QDialog>
@@ -32,6 +35,7 @@
 
 #include "Cuts.h"
 #include "ElementBatch.h"
+#include "HistoryPanel.h"
 #include "LevelsBar.h"
 #include "HostTool.h"
 #include "PolygonTool.h"
@@ -64,6 +68,7 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     buildDocks();
     buildCutsToolbar();
     buildModelingToolbar();
+    buildProjectToolbar();
     statusBar()->showMessage(tr("Ready"));
 
     m_loader->moveToThread(&m_thread);
@@ -116,6 +121,9 @@ void MainWindow::buildMenus()
     QAction* open = file->addAction(tr("&Open IFC..."));
     open->setShortcut(QKeySequence::Open);
     connect(open, &QAction::triggered, this, &MainWindow::openDialog);
+    QAction* openProjectAction = file->addAction(tr("Open &project..."));
+    openProjectAction->setObjectName(QStringLiteral("actionOpenProject"));
+    connect(openProjectAction, &QAction::triggered, this, &MainWindow::openProjectDialog);
     QAction* saveAction = file->addAction(tr("&Save"));
     saveAction->setObjectName(QStringLiteral("actionSave"));
     saveAction->setShortcut(QKeySequence::Save);
@@ -124,6 +132,14 @@ void MainWindow::buildMenus()
     saveAs->setObjectName(QStringLiteral("actionSaveAs"));
     saveAs->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_S));
     connect(saveAs, &QAction::triggered, this, &MainWindow::saveAsDialog);
+    file->addSeparator();
+    QAction* enable = file->addAction(tr("Enable &versioning..."));
+    enable->setObjectName(QStringLiteral("actionEnableVersioning"));
+    connect(enable, &QAction::triggered, this, &MainWindow::enableVersioningDialog);
+    QAction* saveVersionAction = file->addAction(tr("Save &version..."));
+    saveVersionAction->setObjectName(QStringLiteral("actionSaveVersion"));
+    saveVersionAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_S));
+    connect(saveVersionAction, &QAction::triggered, this, &MainWindow::saveVersionDialog);
     file->addSeparator();
     QAction* quit = file->addAction(tr("&Quit"));
     quit->setShortcut(QKeySequence::Quit);
@@ -221,6 +237,20 @@ void MainWindow::buildDocks()
     propsDock->setObjectName(QStringLiteral("PropertiesDock"));
     propsDock->setWidget(m_properties);
     addDockWidget(Qt::RightDockWidgetArea, propsDock);
+    m_history = new HistoryPanel(this);
+    auto* historyDock = new QDockWidget(tr("History"), this);
+    historyDock->setObjectName(QStringLiteral("HistoryDock"));
+    historyDock->setWidget(m_history);
+    addDockWidget(Qt::RightDockWidgetArea, historyDock);
+    tabifyDockWidget(propsDock, historyDock);
+    propsDock->raise();
+    connect(m_history, &HistoryPanel::compareRequested, this, [this](const QString& a, const QString& b) { compareWith(a, b); });
+    connect(m_history, &HistoryPanel::endCompareRequested, this, &MainWindow::endCompare);
+    connect(m_history, &HistoryPanel::elementActivated, this, [this](const QString& guid) {
+        m_viewport->selectGuids({guid});
+        m_tree->selectGuids({guid});
+        setSelection({guid});
+    });
     resizeDocks({treeDock, propsDock}, {340, 360}, Qt::Horizontal);
 }
 
@@ -477,6 +507,7 @@ bool MainWindow::newProject()
     m_warnedInconsistent = false;
     setWindowTitle(QStringLiteral("KIMCAD — %1[*]").arg(tr("Untitled")));
     afterEdit();
+    refreshProject();
     statusBar()->showMessage(tr("New project"));
     return true;
 }
@@ -1254,6 +1285,242 @@ void MainWindow::copyToLevelDialog()
         copyToLevel(m_selection, guids.value(names.indexOf(choice)));
 }
 
+void MainWindow::buildProjectToolbar()
+{
+    m_projectBar = addToolBar(tr("Project"));
+    m_projectBar->setObjectName(QStringLiteral("projectToolbar"));
+    m_projectBar->addWidget(new QLabel(tr("Option"), m_projectBar));
+    m_options = new QComboBox(m_projectBar);
+    m_options->setObjectName(QStringLiteral("optionCombo"));
+    m_options->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    m_projectBar->addWidget(m_options);
+    QAction* newOption = m_projectBar->addAction(tr("New option..."));
+    newOption->setObjectName(QStringLiteral("actionNewOption"));
+    connect(newOption, &QAction::triggered, this, &MainWindow::newOptionDialog);
+    connect(m_options, &QComboBox::activated, this, [this](int index) {
+        const QString wanted = m_options->itemText(index);
+        if (!switchOption(wanted))
+            refreshProject(); // put the combo back on the current option
+    });
+    m_projectBar->setVisible(false);
+}
+
+void MainWindow::refreshProject()
+{
+    const QJsonObject s = bridge("project_state");
+    m_versioned = s.value("versioned").toBool();
+    m_projectBar->setVisible(m_versioned);
+    if (!m_versioned) {
+        m_projectFolder.clear();
+        m_history->setVersions({});
+        endCompare();
+        return;
+    }
+    m_projectFolder = s.value("folder").toString();
+    const QString option = s.value("option").toString();
+    {
+        const QSignalBlocker block(m_options);
+        m_options->clear();
+        for (const auto& o : s.value("options").toArray())
+            m_options->addItem(o.toString());
+        m_options->setCurrentText(option);
+    }
+    m_history->setVersions(bridge("history", {QStringLiteral("200")}).value("versions").toArray());
+    setWindowTitle(QStringLiteral("KIMCAD — %1 (%2)[*]").arg(QFileInfo(m_projectFolder).fileName(), option));
+    setWindowModified(s.value("dirty").toBool());
+}
+
+bool MainWindow::enableVersioning(const QString& folder, const QString& message)
+{
+    const QJsonObject r = bridge("enable_versioning", {folder, message.isEmpty() ? tr("Initial import") : message});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not enable versioning"), r.value("error").toString());
+        return false;
+    }
+    m_path = QDir(folder).filePath(QStringLiteral(".kimcad/working.ifc"));
+    afterEdit();
+    refreshProject();
+    statusBar()->showMessage(tr("Versioning enabled: first version saved"));
+    return true;
+}
+
+void MainWindow::enableVersioningDialog()
+{
+    if (m_versioned) {
+        statusBar()->showMessage(tr("This model is already versioned"));
+        return;
+    }
+    const QString folder = QFileDialog::getExistingDirectory(this, tr("Choose an empty folder for the project"));
+    if (!folder.isEmpty())
+        enableVersioning(folder);
+}
+
+bool MainWindow::openProject(const QString& folder)
+{
+    if (!maybeSave())
+        return false;
+    const QJsonObject r = bridge("open_project", {folder});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not open the project"), r.value("error").toString());
+        return false;
+    }
+    endCompare();
+    openFile(r.value("path").toString()); // meshes the working copy; the project stays open
+    return true;
+}
+
+void MainWindow::openProjectDialog()
+{
+    const QString folder = QFileDialog::getExistingDirectory(this, tr("Open a KIMCAD project folder"));
+    if (!folder.isEmpty())
+        openProject(folder);
+}
+
+bool MainWindow::saveVersion(const QString& message)
+{
+    const QJsonObject r = bridge("save_version", {message});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("No version saved: %1").arg(r.value("error").toString()));
+        refreshProject();
+        return false;
+    }
+    afterEdit();
+    refreshProject();
+    statusBar()->showMessage(tr("Version saved: %1 added, %2 modified, %3 removed")
+                                 .arg(r.value("added").toInt()).arg(r.value("modified").toInt()).arg(r.value("removed").toInt()));
+    return true;
+}
+
+void MainWindow::saveVersionDialog()
+{
+    if (!m_versioned) {
+        statusBar()->showMessage(tr("Enable versioning first (File menu)"));
+        return;
+    }
+    const QJsonObject changes = bridge("version_changes");
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Save version"));
+    auto* layout = new QVBoxLayout(&dialog);
+    layout->addWidget(new QLabel(tr("%1 added, %2 modified, %3 removed since the last version")
+                                     .arg(changes.value("added").toInt()).arg(changes.value("modified").toInt())
+                                     .arg(changes.value("removed").toInt()), &dialog));
+    auto* list = new QListWidget(&dialog);
+    for (const auto& v : changes.value("items").toArray()) {
+        const QJsonObject o = v.toObject();
+        list->addItem(QStringLiteral("%1 · %2 · %3").arg(o.value("kind").toString(), o.value("type").toString(),
+            o.value("name").toString().isEmpty() ? o.value("guid").toString() : o.value("name").toString()));
+    }
+    layout->addWidget(list);
+    layout->addWidget(new QLabel(tr("What changed (the version's message):"), &dialog));
+    auto* message = new QLineEdit(&dialog);
+    layout->addWidget(message);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dialog);
+    layout->addWidget(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    if (dialog.exec() == QDialog::Accepted)
+        saveVersion(message->text());
+}
+
+QJsonArray MainWindow::history()
+{
+    return bridge("history", {QStringLiteral("200")}).value("versions").toArray();
+}
+
+bool MainWindow::compareWith(const QString& revA, const QString& revB)
+{
+    const QJsonObject r = bridge("compare", {revA, revB});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not compare: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    QHash<QString, QColor> colors;
+    for (const auto& v : r.value("added").toArray())
+        colors.insert(v.toObject().value("guid").toString(), HistoryPanel::addedColor());
+    for (const auto& v : r.value("modified").toArray())
+        colors.insert(v.toObject().value("guid").toString(), HistoryPanel::modifiedColor());
+    m_viewport->setElementColors(colors);
+    m_history->setChanges(r);
+    statusBar()->showMessage(tr("Compare: %1 added, %2 modified, %3 removed")
+                                 .arg(r.value("added").toArray().size()).arg(r.value("modified").toArray().size())
+                                 .arg(r.value("removed").toArray().size()));
+    return true;
+}
+
+void MainWindow::endCompare()
+{
+    m_viewport->clearElementColors();
+    m_history->setChanges({});
+}
+
+int MainWindow::compareChangeCount() const
+{
+    return m_history->changeCount();
+}
+
+bool MainWindow::createOption(const QString& name)
+{
+    const QJsonObject r = bridge("create_option", {name});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not create the option"), r.value("error").toString());
+        return false;
+    }
+    refreshProject();
+    statusBar()->showMessage(tr("Now working on option %1").arg(name));
+    return true;
+}
+
+void MainWindow::newOptionDialog()
+{
+    bool ok = false;
+    const QString name = QInputDialog::getText(this, tr("New design option"), tr("Name of the option:"), QLineEdit::Normal,
+        QString(), &ok);
+    if (ok && !name.trimmed().isEmpty())
+        createOption(name.trimmed());
+}
+
+bool MainWindow::resolveUnsavedForSwitch()
+{
+    if (!isDirty())
+        return true;
+    if (m_quiet)
+        return false; // never a modal dialog in quiet mode
+    const auto answer = QMessageBox::warning(this, tr("Unsaved changes"),
+        tr("Save a version of your changes before switching options?"),
+        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Save);
+    if (answer == QMessageBox::Save) {
+        saveVersionDialog();
+        return !isDirty();
+    }
+    if (answer == QMessageBox::Discard)
+        return bridge("discard_changes").value("ok").toBool();
+    return false;
+}
+
+bool MainWindow::switchOption(const QString& name)
+{
+    if (!resolveUnsavedForSwitch())
+        return false;
+    const QJsonObject r = bridge("switch_option", {name});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not switch options"), r.value("error").toString());
+        return false;
+    }
+    endCompare();
+    openFile(r.value("path").toString());
+    return true;
+}
+
+bool MainWindow::discardChanges()
+{
+    const QJsonObject r = bridge("discard_changes");
+    if (!r.value("ok").toBool())
+        return false;
+    endCompare();
+    openFile(r.value("path").toString());
+    return true;
+}
+
 int MainWindow::gridLineCount() const
 {
     return m_viewport->gridLineCount();
@@ -1454,6 +1721,12 @@ bool MainWindow::isDirty() const
 
 bool MainWindow::save()
 {
+    if (m_versioned) { // the file is only a working copy: saving means saving a version
+        if (m_quiet)
+            return saveVersion(tr("Saved from KIMCAD")) || !isDirty();
+        saveVersionDialog();
+        return !isDirty();
+    }
     if (m_path.isEmpty()) {
         saveAsDialog();
         return !isDirty();
@@ -1535,6 +1808,7 @@ void MainWindow::onOpened(const QJsonObject& info)
     QString error;
     const QJsonObject tree = PythonEngine::instance().callJson("spatial_tree", {}, &error).object();
     m_tree->setTree(tree);
+    refreshProject();
     statusBar()->showMessage(tr("Loading %1 (%2)...").arg(QFileInfo(m_path).fileName(), info.value("schema").toString()));
 }
 

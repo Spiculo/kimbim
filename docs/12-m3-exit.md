@@ -30,8 +30,9 @@ The first web-ifc run found one real interoperability issue: profiles without an
 
 The automatic checks cover "valid" and "opens in another engine". The criterion asks for **two other tools** people actually use, so please open `build/house.ifc` in:
 
-- **Bonsai** (Blender + Bonsai add-on, free): *File › Open IFC Project*.
-- **One commercial viewer**, for example BIMvision (free), Solibri Anywhere, or Autodesk Viewer (online, so the file gets uploaded).
+- **A commercial viewer: this is the check that counts.** It reads IFC with its own code, independent of KIMCAD. Examples: BIMvision (free), Solibri Anywhere, Revit's IFC import, or Autodesk Viewer (online, so the file gets uploaded).
+- **Bonsai** (Blender + Bonsai add-on, free): *File › Open IFC Project*. Bonsai reads files with **IfcOpenShell, the same library KIMCAD writes them with**, so a pass there shows the file works in a real architect's tool, but says little about compatibility.
+- If you can, **a second tool that doesn't use IfcOpenShell**, for example xBIM Xplorer (free, .NET), so two independent engines besides web-ifc have opened the file.
 
 and check:
 
@@ -43,4 +44,4 @@ and check:
 6. Selecting a wall shows its type (Exterior 300) and layered material (Brick / Insulation / Block).
 7. A door shows its type, `OverallWidth`/`OverallHeight`, and the `KIMCAD_OpeningDefaults` pset on its type.
 
-Note anything odd in an issue. When both tools pass, M3 is done.
+Note anything odd in an issue. When the commercial viewer passes (and Bonsai), M3 is done.

@@ -579,6 +579,7 @@ void Viewport::addBatch(const Handle(ElementBatch)& batch)
         m_locate.insert(batch->guid(i), Loc{b, i});
     for (const auto& plane : m_clipPlanes)
         batch->AddClipPlane(plane);
+    applyColors(batch);
     batch->setIdBase(m_nextIdBase);
     m_idBases.push_back(m_nextIdBase);
     m_nextIdBase += batch->elementCount();
@@ -627,6 +628,35 @@ QStringList Viewport::guids() const
             if (!b->isRetired(i))
                 out << b->guid(i);
     return out;
+}
+
+void Viewport::applyColors(const Handle(ElementBatch)& batch) const
+{
+    for (int i = 0; i < batch->elementCount(); ++i) {
+        const auto it = m_colors.constFind(batch->guid(i));
+        batch->setColorOverride(i, it == m_colors.constEnd()
+                ? std::nullopt
+                : std::optional<Quantity_Color>(Quantity_Color(it->redF(), it->greenF(), it->blueF(), Quantity_TOC_sRGB)));
+    }
+}
+
+void Viewport::setElementColors(const QHash<QString, QColor>& colors)
+{
+    m_colors = colors;
+    std::vector<int> touched;
+    for (size_t b = 0; b < m_batches.size(); ++b) {
+        applyColors(m_batches[b]);
+        touched.push_back(int(b));
+    }
+    redisplay(touched);
+}
+
+int Viewport::coloredCount() const
+{
+    int n = 0;
+    for (auto it = m_colors.constBegin(); it != m_colors.constEnd(); ++it)
+        n += m_locate.contains(it.key()) ? 1 : 0;
+    return n;
 }
 
 QString Viewport::typeOf(const QString& guid) const

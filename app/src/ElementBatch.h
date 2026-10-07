@@ -2,6 +2,7 @@
 #pragma once
 
 #include <array>
+#include <optional>
 #include <utility>
 #include <gp_Pnt.hxx>
 #include <Quantity_Color.hxx>
@@ -88,6 +89,9 @@ public:
     // A retired element was replaced or deleted by an edit: hidden for good (never shown again).
     void retire(int i);
     bool isRetired(int i) const { return m_retired[size_t(i)] != 0; }
+    // A colour that replaces the IFC-class colour (Compare); nullopt restores it. Redisplay after.
+    void setColorOverride(int i, std::optional<Quantity_Color> color) { m_override[size_t(i)] = color; }
+    std::optional<Quantity_Color> colorOverride(int i) const { return m_override[size_t(i)]; }
     int visibleCount() const { return m_visible; }
 
     Bnd_Box elementBounds(int i) const;
@@ -109,6 +113,7 @@ private:
     QHash<QString, int> m_index;
     std::vector<char> m_hidden;
     std::vector<char> m_retired;
+    std::vector<std::optional<Quantity_Color>> m_override;
     int m_visible = 0;
     std::vector<Handle(ElementOwner)> m_owners;
     Handle(Graphic3d_ArrayOfTriangles) m_pickArray; // indexed positions for Select3D_SensitivePrimitiveArray

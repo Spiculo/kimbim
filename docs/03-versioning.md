@@ -68,6 +68,7 @@ geometry/<aa>/<hash>.json                # heavy geometry records
 | **Versioned** | A project folder (Git repo + `kimcad.toml`) | Full history, design options, compare, combine, object history. |
 
 - **Enable versioning:** creates the repository from the current model. The first commit is "Initial import".
+- **Working copy (Slice 8):** the open model is the working state. *Save version* writes it to `<project>/.kimcad/working.ifc` (local, never committed) and commits it. Opening a project or switching option exports that option's latest version to the same file. Unsaved work is guarded on close, open and option switches (save a version / discard / cancel).
 - **Disable versioning:** exports the current state to `.ifc` and reverts to Plain mode. History stays in the folder unless the user deletes it.
 
 ## Working state, operations and commits

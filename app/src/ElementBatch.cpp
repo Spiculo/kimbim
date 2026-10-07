@@ -112,6 +112,7 @@ ElementBatch::ElementBatch(MeshChunk chunk)
     : m_chunk(std::move(chunk))
     , m_hidden(size_t(m_chunk.elementCount()), 0)
     , m_retired(size_t(m_chunk.elementCount()), 0)
+    , m_override(size_t(m_chunk.elementCount()))
     , m_visible(m_chunk.elementCount())
     , m_owners(size_t(m_chunk.elementCount()))
 {
@@ -168,7 +169,7 @@ Handle(ElementOwner) ElementBatch::owner(int i)
 
 void ElementBatch::addElement(Graphic3d_ArrayOfTriangles& out, int i, bool withColors, const Quantity_Color* fixed) const
 {
-    const Quantity_Color color = fixed ? *fixed : colorFor(m_chunk.types.at(i));
+    const Quantity_Color color = fixed ? *fixed : m_override[size_t(i)].value_or(colorFor(m_chunk.types.at(i)));
     for (uint32_t t = m_chunk.toff[size_t(i)]; t < m_chunk.toff[size_t(i) + 1]; ++t) {
         const gp_Pnt a = vertex(m_chunk, m_chunk.tris[3 * t]);
         const gp_Pnt b = vertex(m_chunk, m_chunk.tris[3 * t + 1]);
