@@ -33,6 +33,7 @@
 #include <QElapsedTimer>
 #include <QGuiApplication>
 #include <QKeyEvent>
+#include <QThread>
 #include <QTimer>
 #include <QMouseEvent>
 #include <QWheelEvent>
@@ -71,6 +72,31 @@ Aspect_VKeyFlags toFlags(Qt::KeyboardModifiers mods)
 
 } // namespace
 
+namespace {
+
+// One display connection per process, shared by every view (on X11 each one is a connection to the X
+// server). Opening a connection can fail for a moment on a busy server (CI's Xvfb did, aborting the
+// app with an uncaught OCCT exception), so it is retried a few times before giving up.
+Handle(Aspect_DisplayConnection) sharedDisplay()
+{
+    static Handle(Aspect_DisplayConnection) display;
+    if (!display.IsNull())
+        return display;
+    for (int attempt = 0;; ++attempt) {
+        try {
+            display = new Aspect_DisplayConnection();
+            return display;
+        } catch (const Standard_Failure& e) {
+            if (attempt >= 9)
+                throw;
+            qWarning("KIMCAD: no display connection yet (%s), retrying", e.what());
+            QThread::msleep(200);
+        }
+    }
+}
+
+} // namespace
+
 Viewport::Viewport(QWidget* parent)
     : QWidget(parent)
 {
@@ -91,8 +117,7 @@ Viewport::Viewport(QWidget* parent)
     setFocusPolicy(Qt::StrongFocus);
     setMinimumSize(200, 200);
 
-    Handle(Aspect_DisplayConnection) display = new Aspect_DisplayConnection();
-    Handle(OpenGl_GraphicDriver) driver = new OpenGl_GraphicDriver(display, false);
+    Handle(OpenGl_GraphicDriver) driver = new OpenGl_GraphicDriver(sharedDisplay(), false);
     // No vsync by default: the view only redraws when something changes, so this never spins, and a
     // frame takes ~1 ms. With vsync each redraw blocked the UI until the next screen refresh (33 ms
     // on 30 Hz laptop panels), so drawing tools lagged behind the mouse (owner feedback).
