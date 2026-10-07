@@ -94,6 +94,7 @@ def new_project(name: str = "") -> str:
         _make_storey("Level 1", 0.0)
         from . import drawings
 
+        drawings.create_plan(B._model.by_type("IfcBuildingStorey")[0].GlobalId, undoable=False)  # every story has one
         drawings.create_template_elevations()  # D61: like Archicad's default template
     except Exception as ex:
         return _fail(f"{type(ex).__name__}: {ex}")
@@ -140,7 +141,10 @@ def add_storey(name: str, elevation) -> str:
     made = {}
 
     def action():
+        from . import drawings
+
         made["storey"] = _make_storey(name or "Level", elevation)
+        drawings.create_plan(made["storey"].GlobalId, undoable=False)  # Archicad: every story has a floor plan
         return 1
 
     r = B._run(action)

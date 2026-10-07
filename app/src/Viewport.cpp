@@ -669,16 +669,22 @@ public:
         }
         Handle(Prs3d_TextAspect) text = new Prs3d_TextAspect();
         text->SetColor(ink);
-        text->SetHeight(m_a.kind == QLatin1String("text") ? 16 : 14);
-        if (marker || m_a.kind == QLatin1String("dimension")) { // centred, sitting on the dimension line
-            text->SetHorizontalJustification(Graphic3d_HTA_CENTER);
+        if (marker) {
+            text->SetHeight(14); // markers are symbols: screen-sized
+        } else {
+            // Slice 15: text size is in millimetres on paper; drawings print it at that size. On
+            // screen it stays readable at any zoom, in proportion (2.5 mm -> 15 px).
+            text->SetHeight(std::clamp(m_a.size * 6.0, 8.0, 72.0));
+        }
+        if (marker || m_a.kind == QLatin1String("dimension") || m_a.kind == QLatin1String("mark")) {
+            text->SetHorizontalJustification(Graphic3d_HTA_CENTER); // centred on the line / in the circle
             text->SetVerticalJustification(Graphic3d_VTA_CENTER);
-        } else if (m_a.kind == QLatin1String("mark")) { // the tag in the circle
-            text->SetHorizontalJustification(Graphic3d_HTA_CENTER);
+        } else if (m_a.kind == QLatin1String("leader")) {
             text->SetVerticalJustification(Graphic3d_VTA_CENTER);
         }
-        Handle(Graphic3d_Group) labels = prs->NewGroup();
-        Prs3d_Text::Draw(labels, text, TCollection_ExtendedString(m_a.text.toUtf8().constData(), true), anchor());
+        Handle(Graphic3d_Group) group = prs->NewGroup();
+        for (const auto& [value, at] : labels())
+            Prs3d_Text::Draw(group, text, TCollection_ExtendedString(value.toUtf8().constData(), true), at);
     }
 
     void ComputeSelection(const Handle(SelectMgr_Selection)& selection, const int mode) override
@@ -715,20 +721,51 @@ private:
         return true;
     }
 
+    // A dimension chain's measured points and their projections on the dimension line (parallel to
+    // first-last, through the last point given); false if degenerate.
+    bool chain(QVector<QPointF>* measured, QVector<QPointF>* onLine, QPointF* u, QPointF* n) const
+    {
+        if (m_a.kind != QLatin1String("dimension") || m_a.points.size() < 3)
+            return false;
+        *measured = m_a.points.mid(0, m_a.points.size() - 1);
+        const QPointF a = measured->first(), b = measured->last(), o = m_a.points.last(), d = b - a;
+        const double len = std::hypot(d.x(), d.y());
+        if (len < 1e-9)
+            return false;
+        *u = d / len;
+        *n = QPointF(-u->y(), u->x());
+        const double off = QPointF::dotProduct(o - a, *n);
+        onLine->clear();
+        for (const QPointF& p : *measured)
+            *onLine << p + *n * (off - QPointF::dotProduct(p - a, *n));
+        if (off < 0)
+            *n = -*n; // n points away from what is measured
+        return true;
+    }
+
+    std::vector<std::pair<QString, gp_Pnt>> labels() const
+    {
+        std::vector<std::pair<QString, gp_Pnt>> out;
+        QVector<QPointF> measured, onLine;
+        QPointF u, n;
+        if (chain(&measured, &onLine, &u, &n)) { // one measurement per segment, just off the line
+            const QStringList texts = m_a.text.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+            for (int i = 0; i + 1 < onLine.size(); ++i)
+                out.push_back({i < texts.size() ? texts[i] : QString(), at((onLine[i] + onLine[i + 1]) / 2 + n * 0.12)});
+            return out;
+        }
+        out.push_back({m_a.text, anchor()});
+        return out;
+    }
+
     gp_Pnt anchor() const
     {
-        if (m_a.kind == QLatin1String("dimension") && m_a.points.size() == 3) {
-            const auto segs = segments();
-            const gp_Pnt a = segs[2].first, b = segs[2].second;
-            // Just off the dimension line, on the side away from what it measures.
-            gp_Vec away(segs[0].first, segs[0].second);
-            if (away.Magnitude() < 1e-9) {
-                const gp_Vec along(a, b);
-                away = gp_Vec(-along.Y(), along.X(), 0);
-            }
-            away.Normalize();
-            return gp_Pnt((a.X() + b.X()) / 2, (a.Y() + b.Y()) / 2, m_z).Translated(away * 0.12);
+        if (m_a.kind == QLatin1String("dimension")) {
+            const auto l = labels();
+            return l.empty() ? gp_Pnt(0, 0, m_z) : l.front().second;
         }
+        if (m_a.kind == QLatin1String("leader") && m_a.points.size() >= 2)
+            return at(m_a.points.last() + QPointF(0.1, 0));
         QPointF u, n;
         if (isMarker() && markerFrame(&u, &n)) { // the name beside the start of the line, behind it
             return m_a.kind == QLatin1String("section") ? at(m_a.points[0] - u * 0.6)
@@ -740,21 +777,25 @@ private:
     std::vector<std::pair<gp_Pnt, gp_Pnt>> segments() const
     {
         std::vector<std::pair<gp_Pnt, gp_Pnt>> out;
-        if (m_a.kind == QLatin1String("dimension") && m_a.points.size() == 3) {
-            const QPointF a = m_a.points[0], b = m_a.points[1], o = m_a.points[2];
-            const QPointF d = b - a;
-            const double len = std::hypot(d.x(), d.y());
-            if (len < 1e-9)
-                return out;
-            const QPointF n(-d.y() / len, d.x() / len);
-            const double off = QPointF::dotProduct(o - a, n);
-            const QPointF a2 = a + n * off, b2 = b + n * off, u = d / len;
-            out.push_back({at(a), at(a2)});
-            out.push_back({at(b), at(b2)});
-            out.push_back({at(a2), at(b2)});
-            const double t = 0.12; // architectural ticks at both ends
-            for (const QPointF& p : {a2, b2})
+        QVector<QPointF> measured, onLine;
+        QPointF u, n;
+        if (chain(&measured, &onLine, &u, &n)) {
+            for (int i = 0; i < measured.size(); ++i)
+                out.push_back({at(measured[i]), at(onLine[i])});
+            out.push_back({at(onLine.first()), at(onLine.last())});
+            const double t = 0.12; // architectural ticks at every point of the chain
+            for (const QPointF& p : onLine)
                 out.push_back({at(p - (u + n) * t), at(p + (u + n) * t)});
+        } else if (m_a.kind == QLatin1String("leader") && m_a.points.size() >= 2) {
+            for (int i = 0; i + 1 < m_a.points.size(); ++i)
+                out.push_back({at(m_a.points[i]), at(m_a.points[i + 1])});
+            const QPointF tip = m_a.points[0], d = m_a.points[1] - tip;
+            const double len = std::hypot(d.x(), d.y());
+            if (len > 1e-9) { // the arrowhead
+                const QPointF v = d / len, w(-v.y(), v.x());
+                out.push_back({at(tip), at(tip + v * 0.25 + w * 0.08)});
+                out.push_back({at(tip), at(tip + v * 0.25 - w * 0.08)});
+            }
         } else if (QPointF u, n; isMarker() && markerFrame(&u, &n)) {
             const QPointF a = m_a.points[0], b = m_a.points[1];
             if (m_a.kind == QLatin1String("section")) {

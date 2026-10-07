@@ -654,6 +654,20 @@ private slots:
         QCOMPARE(w.viewport()->annotationCount(), 3);
         QVERIFY(w.viewport()->annotationTexts().contains(QStringLiteral("4.50")));
 
+        // Slice 15: Shift+click chains more points; the Leader tool points at something.
+        w.setTool(kimcad::MainWindow::Tool::Dimension);
+        emit w.viewport()->workPointClicked(QPointF(0, 5), 0.01, Qt::NoModifier);
+        emit w.viewport()->workPointClicked(QPointF(3, 5), 0.01, Qt::NoModifier);
+        emit w.viewport()->workPointClicked(QPointF(7, 5), 0.01, Qt::ShiftModifier);
+        emit w.viewport()->workPointClicked(QPointF(2, 6), 0.01, Qt::NoModifier);
+        QVERIFY(w.viewport()->annotationTexts().contains(QStringLiteral("3.00 4.00")));
+        w.setTool(kimcad::MainWindow::Tool::Leader);
+        emit w.viewport()->workPointClicked(QPointF(1, 1), 0.01, Qt::NoModifier);
+        emit w.viewport()->workPointClicked(QPointF(2, 2), 0.01, Qt::NoModifier);
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QCOMPARE(w.viewport()->annotationCount(), 5);
+        QVERIFY(w.viewport()->annotationTexts().contains(QStringLiteral("Note")));
+
         // Annotations are selectable, deletable, and live on a level.
         const QString label = w.viewport()->annotationGuids().first();
         w.viewport()->selectGuids({label});
@@ -661,7 +675,7 @@ private slots:
         w.setSelection({label});
         QCOMPARE(w.viewport()->typeOf(label), QStringLiteral("IfcAnnotation"));
         QVERIFY(w.deleteSelection());
-        QCOMPARE(w.viewport()->annotationCount(), 2);
+        QCOMPARE(w.viewport()->annotationCount(), 4);
         QVERIFY(w.addLevel(QStringLiteral("Level 2"), 3.0));
         QCOMPARE(w.viewport()->annotationCount(), 0); // each level has its own
         QVERIFY(w.close());
@@ -672,7 +686,7 @@ private slots:
         kimcad::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         // D61: a new project has Archicad's four template elevations, listed and marked in plan.
-        QCOMPARE(w.drawingsPanel()->count(), 4);
+        QCOMPARE(w.drawingsPanel()->count(), 5);
         w.viewport()->set3DView();
         QCOMPARE(w.viewport()->markerCount(), 0); // plan symbols, not shown in 3D (Archicad)
         action(w, "actionPlanView")->trigger();
@@ -690,7 +704,7 @@ private slots:
         for (const QPointF p : {QPointF(4, -2), QPointF(4, 6), QPointF(6, 0)})
             emit w.viewport()->workPointClicked(p, 0.01, Qt::NoModifier);
         w.setTool(kimcad::MainWindow::Tool::None);
-        QCOMPARE(w.drawingsPanel()->count(), 5);
+        QCOMPARE(w.drawingsPanel()->count(), 6);
         QCOMPARE(w.viewport()->markerCount(), 5);
         const QString section = w.drawingGuid(QStringLiteral("Section 1"));
         QVERIFY(!section.isEmpty());
@@ -718,16 +732,23 @@ private slots:
         w.viewport()->selectGuids({section});
         w.setSelection({section});
         QVERIFY(w.deleteSelection());
-        QCOMPARE(w.drawingsPanel()->count(), 4);
+        QCOMPARE(w.drawingsPanel()->count(), 5);
         QVERIFY(!w.drawingView(section)); // its tab closed
+
+        // Slice 15: the level's floor plan opens like any drawing.
+        const QString plan = w.drawingGuid(QStringLiteral("Level 1 Floor Plan"));
+        QVERIFY(!plan.isEmpty());
+        QVERIFY(w.openDrawing(plan));
+        QTRY_VERIFY_WITH_TIMEOUT(w.drawingView(plan)->hasDrawing(), 60000);
+        w.showModelTab();
 
         // An opened IFC has no drawings; View > Create elevations adds the missing ones.
         const QString south = w.drawingGuid(QStringLiteral("South Elevation"));
         w.viewport()->selectGuids({south});
         w.setSelection({south});
         QVERIFY(w.deleteSelection());
-        action(w, "actionCreateElevations")->trigger();
-        QCOMPARE(w.drawingsPanel()->count(), 4);
+        action(w, "actionCreateDrawings")->trigger();
+        QCOMPARE(w.drawingsPanel()->count(), 5);
         QVERIFY(w.close());
     }
 
@@ -735,6 +756,7 @@ private slots:
     {
         kimcad::MainWindow w(nullptr, true);
         QCOMPARE(action(w, "actionSectionTool")->shortcut(), QKeySequence(Qt::Key_V));
+        QCOMPARE(action(w, "actionLeaderTool")->shortcut(), QKeySequence(Qt::SHIFT | Qt::Key_A));
         QCOMPARE(action(w, "actionElevationTool")->shortcut(), QKeySequence(Qt::SHIFT | Qt::Key_V));
         QCOMPARE(action(w, "actionHideSelected")->shortcut(), QKeySequence(Qt::Key_H));
         QCOMPARE(action(w, "actionIsolateSelected")->shortcut(), QKeySequence(Qt::Key_I));

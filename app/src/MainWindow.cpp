@@ -238,17 +238,17 @@ void MainWindow::buildMenus()
     view3D->setObjectName(QStringLiteral("action3DView"));
     view3D->setShortcut(Qt::Key_3);
     connect(view3D, &QAction::triggered, this, [this] { setPlanView(false); });
-    QAction* elevations = view->addAction(tr("Create &elevations"));
-    elevations->setObjectName(QStringLiteral("actionCreateElevations"));
-    elevations->setToolTip(tr("Add the North, South, East and West elevations the model is missing"));
+    QAction* elevations = view->addAction(tr("Create floor plans and &elevations"));
+    elevations->setObjectName(QStringLiteral("actionCreateDrawings"));
+    elevations->setToolTip(tr("Add a floor plan for every level and the North, South, East and West elevations the model is missing"));
     connect(elevations, &QAction::triggered, this, [this] {
-        const QJsonObject r = bridge("create_elevations");
+        const QJsonObject r = bridge("create_drawings");
         if (!r.value("ok").toBool()) {
             statusBar()->showMessage(tr("Could not add them: %1").arg(r.value("error").toString()));
             return;
         }
         afterEdit(r);
-        statusBar()->showMessage(tr("%n elevation(s) added", nullptr, r.value("created").toInt()));
+        statusBar()->showMessage(tr("%n drawing(s) added", nullptr, r.value("created").toInt()));
     });
     QAction* through = view->addAction(tr("Select &hidden elements too"));
     through->setObjectName(QStringLiteral("actionSelectThrough"));
@@ -610,10 +610,13 @@ bool MainWindow::applyPropertyEdit(const QString& pset, const QString& prop, con
     if (m_selection.isEmpty())
         return false;
     // The Dimensions group is live geometry, not a property set: it edits the elements' shape.
-    if (pset == QLatin1String("KIMCAD_Annotation") && prop == QLatin1String("Text")) {
+    if (pset == QLatin1String("KIMCAD_Annotation") && (prop == QLatin1String("Text") || prop == QLatin1String("Size"))) {
         bool all = true;
         for (const QString& g : std::as_const(m_selection)) {
-            const QJsonObject r = bridge("set_annotation_text", {g, value.toString()});
+            const QString v = value.isDouble() ? QString::number(value.toDouble(), 'g', 17) : value.toString();
+            const QJsonObject r = bridge(prop == QLatin1String("Size") ? "set_annotation_size" : "set_annotation_text", {g, v});
+            if (!r.value("ok").toBool())
+                statusBar()->showMessage(tr("Could not change %1").arg(prop) + QStringLiteral(": ") + r.value("error").toString());
             all = all && r.value("ok").toBool();
             afterEdit(r);
         }
@@ -824,6 +827,8 @@ void MainWindow::buildModelingToolbar()
         {Tool::Dimension, "actionDimensionTool", tr("Dimensi&on"), Qt::Key_Q,
             tr("Dimension: click the two points to measure, then where the dimension line goes")},
         {Tool::Mark, "actionMarkTool", tr("Mar&k"), Qt::Key_X, tr("Mark something on the plan: a circle with a tag")},
+        {Tool::Leader, "actionLeaderTool", tr("&Leader"), QKeyCombination(Qt::SHIFT, Qt::Key_A),
+            tr("Leader: click what it points at, then where its text goes")},
         {Tool::Section, "actionSectionTool", tr("Sect&ion"), Qt::Key_V,
             tr("Section: click the two ends of the section line, then the side it looks at")},
         {Tool::Elevation, "actionElevationTool", tr("&Elevation"), QKeyCombination(Qt::SHIFT, Qt::Key_V),
@@ -945,6 +950,7 @@ void MainWindow::buildModelingToolbar()
         case Tool::Text:
         case Tool::Dimension:
         case Tool::Mark:
+        case Tool::Leader:
         case Tool::Section:
         case Tool::Elevation:
             m_twoPointTool->setTolerance(tolerance);
@@ -1009,8 +1015,9 @@ void MainWindow::buildModelingToolbar()
         case Tool::Text:
         case Tool::Dimension:
         case Tool::Mark:
+        case Tool::Leader:
             m_twoPointTool->setTolerance(tolerance);
-            annotationClick(m_twoPointTool->snapper().snap(p, tolerance).point);
+            annotationClick(m_twoPointTool->snapper().snap(p, tolerance).point, mods);
             break;
         case Tool::Section:
         case Tool::Elevation:
@@ -1129,6 +1136,7 @@ void MainWindow::refreshTypes()
     case Tool::Text:
     case Tool::Dimension:
     case Tool::Mark:
+    case Tool::Leader:
     case Tool::Section:
     case Tool::Elevation:
         break;
@@ -1266,6 +1274,7 @@ void MainWindow::setTool(Tool tool)
     m_columnHover.reset();
     m_annotationPoints.clear();
     m_tool = tool;
+    m_twoPointTool->snapper().setFaceSnapping(tool == Tool::Dimension); // dimensions measure wall faces
     for (auto it = m_toolActions.constBegin(); it != m_toolActions.constEnd(); ++it) {
         const QSignalBlocker block(it.value());
         it.value()->setChecked(it.key() == int(tool));
@@ -1337,6 +1346,9 @@ void MainWindow::setTool(Tool tool)
         break;
     case Tool::Mark:
         statusBar()->showMessage(tr("Mark: click what to mark"));
+        break;
+    case Tool::Leader:
+        statusBar()->showMessage(tr("Leader: click what it points at"));
         break;
     case Tool::Section:
         statusBar()->showMessage(tr("Section: click where the section line starts"));
@@ -1892,7 +1904,8 @@ void MainWindow::refreshAnnotations()
     QVector<Viewport::Annotation> list;
     for (const auto& v : bridge("annotations", {m_levels->activeStorey()}).value("annotations").toArray()) {
         const QJsonObject o = v.toObject();
-        Viewport::Annotation a{o.value("guid").toString(), o.value("kind").toString(), o.value("text").toString(), {}};
+        Viewport::Annotation a{o.value("guid").toString(), o.value("kind").toString(), o.value("text").toString(), {},
+            o.value("size").toDouble(2.5)};
         for (const auto& p : o.value("points").toArray())
             a.points << QPointF(p.toArray().at(0).toDouble(), p.toArray().at(1).toDouble());
         list << a;
@@ -1917,14 +1930,33 @@ bool MainWindow::addAnnotation(const QString& kind, const QVector<QPointF>& poin
     return true;
 }
 
-void MainWindow::annotationClick(QPointF p)
+void MainWindow::annotationClick(QPointF p, Qt::KeyboardModifiers modifiers)
 {
+    if (m_tool == Tool::Leader) {
+        m_annotationPoints << p;
+        if (m_annotationPoints.size() == 1) {
+            statusBar()->showMessage(tr("Leader: click where its text goes"));
+            return;
+        }
+        const QVector<QPointF> pts = m_annotationPoints;
+        m_annotationPoints.clear();
+        bool ok = false;
+        const QString text = m_quiet ? QStringLiteral("Note")
+            : QInputDialog::getText(this, tr("Leader"), tr("Text:"), QLineEdit::Normal, QString(), &ok);
+        if ((ok || m_quiet) && !text.trimmed().isEmpty())
+            addAnnotation(QStringLiteral("leader"), pts, text.trimmed());
+        statusBar()->showMessage(tr("Leader: click what it points at"));
+        return;
+    }
     if (m_tool == Tool::Dimension) {
+        // Slice 15: Shift+click adds another point to the chain; a plain click after two points
+        // places the dimension line (Archicad builds chains the same way, one click per point).
+        const bool chainMore = m_annotationPoints.size() >= 2 && (modifiers & Qt::ShiftModifier);
         m_annotationPoints << p;
         if (m_annotationPoints.size() == 1)
             statusBar()->showMessage(tr("Dimension: click the second point"));
-        else if (m_annotationPoints.size() == 2)
-            statusBar()->showMessage(tr("Dimension: click where the dimension line goes"));
+        else if (m_annotationPoints.size() == 2 || chainMore)
+            statusBar()->showMessage(tr("Dimension: Shift+click to add a point, or click where the dimension line goes"));
         else {
             const QVector<QPointF> pts = m_annotationPoints;
             m_annotationPoints.clear();
@@ -1991,6 +2023,8 @@ void MainWindow::refreshDrawings()
     for (const auto& v : list) {
         const QJsonObject d = v.toObject();
         byGuid.insert(d.value("guid").toString(), d);
+        if (d.value("kind").toString() == QLatin1String("plan"))
+            continue; // floor plans have no marker
         Viewport::Annotation m{d.value("guid").toString(), d.value("kind").toString(), d.value("name").toString(), {}};
         for (const auto& p : d.value("points").toArray())
             m.points << QPointF(p.toArray().at(0).toDouble(), p.toArray().at(1).toDouble());

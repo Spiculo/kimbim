@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "Snapper.h"
 
+#include <array>
+
 #include <QJsonArray>
 
 #include <cmath>
@@ -108,6 +110,24 @@ Snap Snapper::snap(QPointF p, double tolerance, const QPointF* from, bool ortho)
                 }
             }
     }
+    // Wall faces (Slice 15): the axis offset by half the thickness on each side.
+    auto faces = [](const SnapWall& w) {
+        const QPointF d = w.b - w.a;
+        const double len = std::hypot(d.x(), d.y());
+        const QPointF n = len > 1e-12 ? QPointF(-d.y() / len, d.x() / len) * (w.thickness / 2) : QPointF();
+        return std::array<std::pair<QPointF, QPointF>, 2>{std::pair{w.a + n, w.b + n}, std::pair{w.a - n, w.b - n}};
+    };
+    if (s.kind == Snap::None && m_faces)
+        s = best(Snap::FaceEnd, [&](const SnapWall& w, QPointF* q) {
+            double bestD = std::numeric_limits<double>::max();
+            for (const auto& [a, b] : faces(w))
+                for (const QPointF& c : {a, b})
+                    if (dist(p, c) < bestD) {
+                        bestD = dist(p, c);
+                        *q = c;
+                    }
+            return true;
+        });
     if (s.kind == Snap::None)
         s = best(Snap::Midpoint, [&](const SnapWall& w, QPointF* q) {
             *q = (w.a + w.b) / 2;
@@ -118,6 +138,21 @@ Snap Snapper::snap(QPointF p, double tolerance, const QPointF* from, bool ortho)
             bool inside = false;
             *q = project(*from, w.a, w.b, &inside);
             return inside;
+        });
+    if (s.kind == Snap::None && m_faces)
+        s = best(Snap::OnFace, [&](const SnapWall& w, QPointF* q) {
+            double bestD = std::numeric_limits<double>::max();
+            bool any = false;
+            for (const auto& [a, b] : faces(w)) {
+                bool inside = false;
+                const QPointF r = project(p, a, b, &inside);
+                if (inside && dist(p, r) < bestD) {
+                    bestD = dist(p, r);
+                    *q = r;
+                    any = true;
+                }
+            }
+            return any;
         });
     if (s.kind == Snap::None)
         s = best(Snap::OnWall, [&](const SnapWall& w, QPointF* q) {

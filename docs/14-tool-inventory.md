@@ -210,6 +210,7 @@ release notes, so check before relying on a single cell.
 
 | Tool | Has | KIMCAD | Pri | Notes |
 |------|-----|--------|-----|-------|
+| Floor plan drawings (one per story, cut plane, symbols) | all | ✅ | P1 | Slice 15: cut at 1.10 m (Archicad), door swings, window glass, annotations and markers drawn on |
 | Section views (marker in plan, linked view) | all | 🟡 | P1 | Slice 14: Section tool (V), Archicad's three clicks; SVG from IfcOpenShell's serializer, in a tab (D60, D61). Not yet: scale setting, detail level, cropping by hand |
 | Elevations (building, interior) | all | 🟡 | P1 | Slice 14: template N/S/E/W elevations in new projects, *Create elevations*, Elevation tool (Shift+V). Interior elevations: an elevation with a limited depth |
 | Detail views (enlarged, cropped, with extra 2D) | all | ⬜ | P1 | Archicad details and worksheets, Revit callouts |
@@ -236,12 +237,12 @@ release notes, so check before relying on a single cell.
 | Text labels | all | ✅ | P1 | Screen-sized; paper-unit size is open (doc 13) |
 | Linear dimension (two points) | all | ✅ | P1 | |
 | Marks (circle with a tag) | AC | ✅ | P1 | |
-| Dimension chains, overall dimensions | all | ⬜ | P1 | Open in doc 13 |
-| Snap dimensions to wall faces, openings and layers | all | ⬜ | P1 | |
+| Dimension chains, overall dimensions | all | 🟡 | P1 | Slice 15: chains (Shift+click); no overall dimension yet |
+| Snap dimensions to wall faces, openings and layers | all | 🟡 | P1 | Slice 15: wall faces; openings and layer lines later |
 | Automatic dimensioning of walls and openings | AC RV VW | ⬜ | new | |
 | Angle, radius, arc-length, level and spot-elevation dimensions | all | ⬜ | P1 | |
 | Associative labels and tags (show a property, follow the element) | all | ⬜ | P1 | Door/window/room/wall tags |
-| Leaders and arrows | all | ⬜ | P1 | Open in doc 13 |
+| Leaders and arrows | all | ✅ | P1 | Slice 15: Leader tool (Shift+A) |
 | Revision clouds | AC RV VW | ⬜ | new | Open in doc 13 |
 | Section, elevation and detail markers | all | 🟡 | P1 | Section and elevation markers in plan (Slice 14); detail markers later |
 | North arrow, scale bar | all | ⬜ | new | |

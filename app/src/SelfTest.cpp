@@ -343,8 +343,8 @@ int runSelfTest(const SelfTestOptions& options)
         result.insert(QStringLiteral("planes"), viewport->clipPlaneCount());
         result.insert(QStringLiteral("fps_with_cut"), viewport->measureFps(options.frames));
     }
-    if (options.createElevations) {
-        window.findChild<QAction*>(QStringLiteral("actionCreateElevations"))->trigger();
+    if (options.createDrawings) {
+        window.findChild<QAction*>(QStringLiteral("actionCreateDrawings"))->trigger();
         window.findChild<QAction*>(QStringLiteral("actionPlanView"))->trigger();
         QApplication::processEvents();
     }

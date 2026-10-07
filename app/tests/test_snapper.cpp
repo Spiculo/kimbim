@@ -115,6 +115,22 @@ private slots:
         const Snapper s = withWalls();
         QCOMPARE(s.snap(QPointF(2.5, 1.5), 0.1).kind, Snap::Grid);
     }
+
+    // Slice 15: dimensions snap to wall faces (the dimension tool turns this on).
+    void wallFacesWhenEnabled()
+    {
+        Snapper s;
+        s.setWalls({kimcad::SnapWall{QStringLiteral("w"), QPointF(0, 0), QPointF(4, 0), 0.3}});
+        QCOMPARE(s.snap(QPointF(0.02, 0.17), 0.1).kind, Snap::Grid); // off by default
+        s.setFaceSnapping(true);
+        const Snap corner = s.snap(QPointF(0.02, 0.17), 0.1);
+        QCOMPARE(corner.kind, Snap::FaceEnd);
+        QVERIFY(near(corner.point, QPointF(0, 0.15)));
+        const Snap face = s.snap(QPointF(2.3, -0.12), 0.1);
+        QCOMPARE(face.kind, Snap::OnFace);
+        QVERIFY(near(face.point, QPointF(2.3, -0.15)));
+        QCOMPARE(s.snap(QPointF(0.01, 0.01), 0.1).kind, Snap::Endpoint); // the axis end still wins
+    }
 };
 
 QTEST_MAIN(TestSnapper)

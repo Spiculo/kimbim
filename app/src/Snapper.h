@@ -22,7 +22,7 @@ struct SnapLine {
 };
 
 struct Snap {
-    enum Kind { None, Endpoint, Midpoint, Perpendicular, OnWall, Angle, Grid, GridCross, GridLine };
+    enum Kind { None, Endpoint, Midpoint, Perpendicular, OnWall, Angle, Grid, GridCross, GridLine, FaceEnd, OnFace };
     QPointF point;
     Kind kind = None;
     QString wallGuid; // the wall an object snap landed on
@@ -41,6 +41,10 @@ public:
     void setWalls(QVector<SnapWall> walls) { m_walls = std::move(walls); }
     const QVector<SnapWall>& walls() const { return m_walls; }
     void setGrid(double step) { m_grid = step; }
+    // Wall faces (axis +- half the thickness) as snap targets: their corners after the axis ends,
+    // anywhere along them before "on wall". For dimensions (Slice 15), off by default.
+    void setFaceSnapping(bool on) { m_faces = on; }
+    bool faceSnapping() const { return m_faces; }
     double grid() const { return m_grid; }
 
     // `tolerance` in metres (the app converts ~10 screen pixels); `from` is the previous point.
@@ -53,6 +57,7 @@ private:
     QVector<SnapWall> m_walls;
     QVector<SnapLine> m_lines;
     double m_grid = 0.01; // 10 mm
+    bool m_faces = false;
 };
 
 } // namespace kimcad

@@ -13,7 +13,7 @@ pixi install
 pixi run app                      # opens KIMCAD (English or Spanish, following your system)
 pixi run app -- model.ifc --lang es
 pixi run app -- --self-test model.ifc --screenshot shot.png   # load, measure fps/picking, print JSON
-pixi run app -- --self-test model.ifc --create-elevations --open-drawing "South Elevation"   # time a drawing
+pixi run app -- --self-test model.ifc --create-drawings --open-drawing "South Elevation"   # time a drawing
 ```
 
 Open an IFC file. It appears progressively in the 3D view, with the spatial tree on the left and properties on the right.
@@ -38,6 +38,8 @@ Open an IFC file. It appears progressively in the 3D view, with the spatial tree
 | Upper floors | *Model › Copy to level…* (walls bring their doors, windows and corner joins), **T** stair to the next level (two clicks), **O** hole in the selected slab |
 | Delete | **Del** (deleting a wall also deletes its doors and windows) |
 | Sections / elevations | **V** section, **Shift+V** elevation: click the line's two ends, then the side it looks at (as in Archicad). New projects come with North/South/East/West elevations; *View › Create elevations* adds them to an opened IFC. Markers show in plan view; select, move, rotate or delete them like elements |
+| Floor plans | Every level has a floor plan drawing (cut at 1.10 m, as in Archicad): walls cut, door swings, window glass, your labels, dimensions and marks, and the section/elevation markers. *View › Create floor plans and elevations* adds them to an opened IFC |
+| Annotation | **A** text, **Q** dimension (Shift+click adds points to a chain; snaps to wall faces), **X** mark, **Shift+A** leader. Text size is in millimetres on paper (*Properties › KIMCAD_Annotation › Size*) |
 | Drawings | The *Drawings* tab (left) lists them; double-click opens one in a tab next to *Model* (wheel zoom, drag to pan). It is generated in the background and shows *Regenerate* when the model has changed |
 
 ## Try it (command line)

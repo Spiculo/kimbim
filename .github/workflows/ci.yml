@@ -57,6 +57,6 @@ jobs:
       - name: Slice 14 - Clinic elevation in the app (informational)
         if: runner.os == 'Linux'
         continue-on-error: true
-        run: xvfb-run -a -s "-screen 0 1920x1080x24" pixi run build/app/app/kimcad-app --self-test "$(find tests/corpus/files -name Clinic_Architectural.ifc | head -1)" --frames 1 --create-elevations --open-drawing "South Elevation"
+        run: xvfb-run -a -s "-screen 0 1920x1080x24" pixi run build/app/app/kimcad-app --self-test "$(find tests/corpus/files -name Clinic_Architectural.ifc | head -1)" --frames 1 --create-drawings --open-drawing "South Elevation"
         env:
           KIMCAD_PYTHON_PATH: ${{ github.workspace }}/python

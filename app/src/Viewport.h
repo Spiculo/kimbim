@@ -77,7 +77,8 @@ public:
     // top, selectable (their guids join selectedGuids), hidden/locked with their layer.
     struct Annotation {
         QString guid, kind, text;
-        QVector<QPointF> points; // world metres: text/mark anchor; dimension a, b, line point
+        QVector<QPointF> points; // world metres: text/mark anchor; dimension chain points + line point; leader tip..text
+        double size = 2.5;       // text size in millimetres on paper (printed at 1:100)
     };
     void setAnnotations(const QVector<Annotation>& annotations, double z);
     int annotationCount() const;

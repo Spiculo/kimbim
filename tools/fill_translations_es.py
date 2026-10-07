@@ -338,6 +338,15 @@ ES = {
     "Add the North, South, East and West elevations the model is missing":
         "Agregar los alzados Norte, Sur, Este y Oeste que le faltan al modelo",
     "Could not add them: %1": "No se pudieron agregar: %1",
+    "Create floor plans and &elevations": "Crear plantas y &alzados",
+    "Add a floor plan for every level and the North, South, East and West elevations the model is missing": "Agregar una planta por nivel y los alzados Norte, Sur, Este y Oeste que le faltan al modelo",
+    "%n drawing(s) added": ("%n dibujo agregado", "%n dibujos agregados"),
+    "&Leader": "&Directriz",
+    "Leader: click what it points at, then where its text goes": "Directriz: haga clic en lo que señala y luego donde va su texto",
+    "Leader: click what it points at": "Directriz: haga clic en lo que señala",
+    "Leader: click where its text goes": "Directriz: haga clic donde va su texto",
+    "Leader": "Directriz",
+    "Dimension: Shift+click to add a point, or click where the dimension line goes": "Cota: Mayús+clic para agregar un punto, o clic donde va la línea de cota",
 }
 
 

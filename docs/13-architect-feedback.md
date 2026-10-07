@@ -24,6 +24,6 @@ Place model **U** · Text label **A** · Dimension **Q** · Mark **X** (with the
 ## Still open for the next session
 
 - Confirm 9 (flash) and the feel of 1 and 8 on your screen; tests can't see either.
-- Annotations: revision clouds, leaders/arrows, text size in paper units (they're screen-sized now), dimension chains and snapping to wall faces.
+- Annotations: revision clouds. (Leaders, text size in paper units, dimension chains and snapping to wall faces: done in Slice 15.)
 - Models: editing an instance in place (today: edit the model, then Update), nested models, a model library across projects.
 - Views: per-view graphic overrides (colours/line weights per layer), sheets.

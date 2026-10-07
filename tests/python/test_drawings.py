@@ -42,9 +42,10 @@ def sections():
 
 def test_new_project_has_the_four_template_elevations():
     assert call("new_project", "Casa")["ok"]
-    listed = drawings()
+    listed = {n: d for n, d in drawings().items() if d["kind"] == "elevation"}
     assert sorted(listed) == ["East Elevation", "North Elevation", "South Elevation", "West Elevation"]
     assert all(d["kind"] == "elevation" and d["auto"] and d["depth"] is None for d in listed.values())
+    assert drawings()["Level 1 Floor Plan"]["kind"] == "plan"  # Archicad: every story has a floor plan
     assert call("state")["dirty"] is False and call("state")["can_undo"] is False  # part of the new project
 
 
@@ -173,6 +174,38 @@ def test_create_elevations_adds_the_missing_ones_to_an_opened_file(tmp_path):
     assert call("delete_drawing", south)["ok"]
     r = call("create_elevations")
     assert r["ok"] and r["created"] == 1
-    assert sorted(drawings()) == ["East Elevation", "North Elevation", "South Elevation", "West Elevation"]
+    assert sorted(n for n in drawings() if "Elevation" in n) == ["East Elevation", "North Elevation", "South Elevation", "West Elevation"]
     assert call("create_elevations")["created"] == 0  # nothing missing
     assert call("undo")["ok"] and "South Elevation" not in drawings()  # one step; the no-op made none
+
+
+
+# ---------------------------------------------------------------- Slice 15: floor plans
+
+def test_every_level_gets_a_floor_plan_and_an_opened_file_can_add_them(tmp_path):
+    assert call("new_project", "Casa")["ok"]
+    assert call("add_storey", "Level 2", 3.0)["ok"]
+    plans = [d["name"] for d in call("drawings")["drawings"] if d["kind"] == "plan"]
+    assert plans == ["Level 1 Floor Plan", "Level 2 Floor Plan"]  # ordered by height, listed first
+    assert call("undo")["ok"]
+    assert [d["name"] for d in call("drawings")["drawings"] if d["kind"] == "plan"] == ["Level 1 Floor Plan"]
+    for d in call("drawings")["drawings"]:
+        assert call("delete_drawing", d["guid"])["ok"]
+    assert call("create_drawings")["created"] == 5  # the plan and the four elevations
+    assert call("create_drawings")["created"] == 0
+
+
+def test_house_floor_plan_reads_like_a_permit_plan(house):
+    assert call("create_drawings")["ok"]
+    plan = drawings()["Level 1 Floor Plan"]
+    r = call("generate_drawing", plan["guid"], "")
+    assert r["ok"], r
+    svg = r["svg"]
+    assert 'class="IfcWall"' in svg and 'class="section"' in svg  # walls cut (poché)
+    assert svg.count('class="swing"') >= 1  # the front door swings
+    overlay = svg.split('class="kimcad-overlay"', 1)[1]
+    assert ">Living room</text>" in overlay  # the plan's text label
+    assert ">10.00</text>" in overlay  # the dimension, measured
+    assert ">South Elevation</text>" in overlay and ">North Elevation</text>" in overlay  # markers
+    upper = call("generate_drawing", drawings()["Level 2 Floor Plan"]["guid"], "")["svg"]
+    assert ">Living room</text>" not in upper  # annotations belong to their level

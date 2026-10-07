@@ -84,11 +84,11 @@ Spike S6 (`spikes/s6_drawings/drawing_bench.py`), results in 11.
 - [x] Drawings dock (next to Layers): list, double-click or *Open*, rename in place, delete.
 - [x] The central area is tabbed: *Model* plus one tab per open drawing; `DrawingView` paints the SVG with `QSvgRenderer` (paper on a grey desk), wheel zoom at the cursor, drag to pan, fit on first show.
 - [x] Generation on a worker thread; the old drawing stays until the new one arrives; an out-of-date bar with *Regenerate*; a stale drawing brought to the front regenerates; deleting a drawing closes its tab.
-- [x] Self-test `--open-drawing NAME` (with `--create-elevations`, `--screenshot`) reports `drawing_shown`, `drawing_s`, `drawing_visible`, paper size.
+- [x] Self-test `--open-drawing NAME` (with `--create-drawings`, `--screenshot`) reports `drawing_shown`, `drawing_s`, `drawing_visible`, paper size.
 - [ ] Follow-up: keep generated SVGs in `.kimcad/drawings/` for versioned projects, so reopening is instant.
 
 ### Task 5: Timing on Clinic in CI (informational)
-- [x] Two non-blocking Linux CI steps: `pixi run drawing-bench` (S6, every element) and the app pipeline on Clinic (`--create-elevations --open-drawing "South Elevation"`, with the visible-element pass). **Clinic's South Elevation in the app: 5.1 s with 120 visible elements of 2,586** (22–34 s with every element in S6). Numbers in 11.
+- [x] Two non-blocking Linux CI steps: `pixi run drawing-bench` (S6, every element) and the app pipeline on Clinic (`--create-drawings --open-drawing "South Elevation"`, with the visible-element pass). **Clinic's South Elevation in the app: 5.1 s with 120 visible elements of 2,586** (22–34 s with every element in S6). Numbers in 11.
 
 ### Task 6: Docs and verification ✅
 - [x] D60 (proposed), D61 (owner); doc 05 "As built"; doc 04 §8; doc 14 §11 and §13; roadmap M4; README.

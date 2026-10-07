@@ -47,10 +47,16 @@ def drawings() -> str:
         key = _state_key()
         for d in _drawings():
             s = G.settings_of(d)
+            storey = G._storey(d, s) if s["kind"] == "plan" else None
+            if s["kind"] == "plan" and storey is None:
+                continue  # its level was deleted
             out.append({"guid": d.GlobalId, "name": d.Name or "", "kind": s["kind"], "depth": s["depth"],
                         "auto": s["auto"], "points": s["points"], "look": s["look"],
+                        **({"storey": s["storey"], "elevation": round(G.storey_elevation(storey), 6)} if storey else {}),
                         "stale": not any(k[:2] == key for k in _cache.get(d.GlobalId, {}))})
-        out.sort(key=lambda d: (d["kind"] != "elevation", d["name"]))
+        # Archicad's Project Map order: floor plans (by story height), sections, elevations.
+        order = {"plan": 0, "section": 1, "elevation": 2}
+        out.sort(key=lambda d: (order[d["kind"]], d.get("elevation", 0.0), d["name"]))
     return B._dump({"drawings": out})
 
 
@@ -71,6 +77,64 @@ def create_template_elevations():
         points, look = G.auto_marker(side, bounds)
         _new(f"{side.capitalize()} Elevation",
              {"kind": "elevation", "points": points, "look": look, "depth": None, "auto": True, "side": side})
+
+
+def plan_name(storey) -> str:
+    return f"{storey.Name or 'Level'} Floor Plan"
+
+
+def create_plan(storey_guid: str, undoable: bool = True) -> str:
+    """The floor plan of a story (Archicad: every story has one), cut 1.10 m above it."""
+    storey = A._by_guid(storey_guid) if B._model is not None else None
+    if storey is None or not storey.is_a("IfcBuildingStorey"):
+        return A._fail("unknown level")
+    made = {}
+
+    def action():
+        made["guid"] = _new(plan_name(storey), {"kind": "plan", "points": [], "look": [], "depth": None,
+                                                "auto": True, "side": "", "storey": storey.GlobalId,
+                                                "cut": G.PLAN_CUT}).GlobalId
+        return 1
+
+    if not undoable:  # part of another action (a new level, a new project)
+        action()
+        return B._dump({"ok": True, "guid": made["guid"]})
+    return B._dump({**B._run(action), "guid": made["guid"]})
+
+
+def _plans_by_storey() -> dict:
+    out = {}
+    for d in _drawings():
+        s = G.settings_of(d)
+        if s["kind"] == "plan":
+            out[s["storey"]] = d
+    return out
+
+
+def create_drawings() -> str:
+    """Add what a model is missing (an opened IFC has no drawings): a floor plan for every story and
+    the North/South/East/West elevations, fitted to the model. One undoable step."""
+    if B._model is None:
+        return A._fail("no model open")
+    have_plans = _plans_by_storey()
+    stories = [st for st in B._model.by_type("IfcBuildingStorey")
+               if st.GlobalId not in have_plans and not A._is_model(st)]
+    have = {G.settings_of(d).get("side") for d in _drawings()}
+    missing = [side for side in SIDES if side not in have]
+
+    def action():
+        bounds = G.model_bounds(B._model)
+        for st in stories:
+            create_plan(st.GlobalId, undoable=False)
+        for side in missing:
+            points, look = G.auto_marker(side, bounds)
+            _new(f"{side.capitalize()} Elevation",
+                 {"kind": "elevation", "points": points, "look": look, "depth": None, "auto": True, "side": side})
+        return len(stories) + len(missing)
+
+    if not stories and not missing:
+        return B._dump({"ok": True, "created": 0})
+    return B._dump({**B._run(action), "created": len(stories) + len(missing)})
 
 
 def create_elevations() -> str:

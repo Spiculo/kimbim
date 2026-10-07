@@ -36,8 +36,11 @@ import numpy as np
 
 W = ifcopenshell.ifcopenshell_wrapper
 PSET = "KIMCAD_Drawing"
-KINDS = ("section", "elevation")
-TARGET_VIEW = {"section": "SECTION_VIEW", "elevation": "ELEVATION_VIEW"}
+KINDS = ("section", "elevation", "plan")
+TARGET_VIEW = {"section": "SECTION_VIEW", "elevation": "ELEVATION_VIEW", "plan": "PLAN_VIEW"}
+PLAN_CUT = 1.10  # metres above the story: Archicad's default floor plan cut plane
+TEXT_SIZE = 2.5  # millimetres on paper, the default for annotation text
+ANNOTATION_PSET = "KIMCAD_Annotation"
 SCALE = 100  # 1:100 until drawings get a scale setting
 MARGIN = 1.0  # metres added around the model for infinite ranges
 EMPTY_BOUNDS = (np.array([0.0, 0.0, 0.0]), np.array([10.0, 10.0, 3.0]))  # a new project has no elements yet
@@ -140,6 +143,9 @@ def settings_of(drawing) -> dict | None:
     data = ifcopenshell.util.element.get_pset(drawing, PSET) or {}
     if data.get("Kind") not in KINDS:
         return None
+    if data["Kind"] == "plan":
+        return {"kind": "plan", "points": [], "look": [], "depth": None, "auto": True, "side": "",
+                "storey": data.get("Storey") or "", "cut": float(data.get("Cut") or PLAN_CUT)}
     points, look = marker(drawing) or ([], [])
     depth = data.get("Depth")
     return {"kind": data["Kind"], "points": points, "look": look,
@@ -171,12 +177,43 @@ def _body_context(f):
     return context
 
 
+def storey_elevation(storey) -> float:
+    """A story's elevation in metres, from its placement (what geometry uses)."""
+    unit = ifcopenshell.util.unit.calculate_unit_scale(storey.file)
+    if storey.ObjectPlacement is not None:
+        return float(ifcopenshell.util.placement.get_local_placement(storey.ObjectPlacement)[2][3]) * unit
+    return float(storey.Elevation or 0.0) * unit
+
+
+def plan_camera(storey, cut, bounds):
+    """A floor plan (Archicad): looking down from the cut plane, `cut` metres above the story, to just
+    below its floor, over the whole model's extent."""
+    lo, hi = bounds
+    z = storey_elevation(storey)
+    m = np.eye(4)
+    m[:3, 3] = [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, z + cut]
+    return m, (hi[0] - lo[0] + 2 * MARGIN, hi[1] - lo[1] + 2 * MARGIN, cut + 0.3)
+
+
+def _storey(drawing, s):
+    try:
+        return drawing.file.by_guid(s["storey"]) if s.get("storey") else None
+    except RuntimeError:
+        return None
+
+
 def place(f, drawing, s, bounds):
     """Write the camera placement and box of `drawing` from its marker settings `s`."""
     unit = ifcopenshell.util.unit.calculate_unit_scale(f)
     if s["auto"] and s.get("side"):
         s["points"], s["look"] = auto_marker(s["side"], bounds)
-    m, (w, h, d) = camera(s["points"], s["look"], bounds, s["depth"])
+    if s["kind"] == "plan":
+        storey = _storey(drawing, s)
+        if storey is None:
+            raise ValueError("the drawing's story no longer exists")
+        m, (w, h, d) = plan_camera(storey, s["cut"], bounds)
+    else:
+        m, (w, h, d) = camera(s["points"], s["look"], bounds, s["depth"])
     ifcopenshell.api.geometry.edit_object_placement(f, product=drawing, matrix=m, is_si=True)
     w, h, d = (v / unit for v in (w, h, d))
     block = f.createIfcBlock(f.createIfcAxis2Placement3D(f.createIfcCartesianPoint((-w / 2, -h / 2, -d))), w, h, d)
@@ -199,11 +236,271 @@ def write_settings(f, drawing, s):
     pset = f.by_id(pset["id"]) if pset else ifcopenshell.api.pset.add_pset(f, product=drawing, name=PSET)
     ifcopenshell.api.pset.edit_pset(f, pset=pset, properties={
         "Kind": s["kind"], "Depth": -1.0 if s["depth"] is None else float(s["depth"]), "Auto": bool(s["auto"]),
-        **({"Side": s["side"]} if s.get("side") else {})})
+        **({"Side": s["side"]} if s.get("side") else {}),
+        **({"Storey": s["storey"], "Cut": float(s["cut"])} if s["kind"] == "plan" else {})})
     epset = ifcopenshell.util.element.get_pset(drawing, "EPset_Drawing")
     epset = f.by_id(epset["id"]) if epset else ifcopenshell.api.pset.add_pset(f, product=drawing, name="EPset_Drawing")
     ifcopenshell.api.pset.edit_pset(f, pset=epset, properties={
         "TargetView": TARGET_VIEW[s["kind"]], "Scale": f"1/{SCALE}", "HumanScale": f"1:{SCALE}"})
+
+
+# ---------------------------------------------------------------- overlay (Slice 15)
+# What the serializer does not draw, drawn by KIMCAD on top, in paper millimetres: door swings and
+# window glass lines in plans, plan annotations (text, dimension chains, marks, leaders), and the
+# section and elevation markers in plans.
+
+def paper_mapping(svg: str):
+    """World metres -> paper millimetres for the drawing in `svg`, from the serializer's drawing
+    group: ifc:plane (the drawing plane, local -> world) and ifc:matrix3 (plane 2D -> paper); the
+    plane's 2D coordinates are (x, -y). None if the SVG has no drawing group."""
+    m = re.search(r'class="section"[^>]*?ifc:plane="([^"]+)"[^>]*?ifc:matrix3="([^"]+)"', svg)
+    if m is None:
+        return None
+    plane = np.array(json.loads(m.group(1)), dtype=float)
+    m3 = np.array(json.loads(m.group(2)), dtype=float)
+    inverse = np.linalg.inv(plane)
+    unit_to_m = 1.0  # the serializer works in metres (setUnitNameAndMagnitude default)
+
+    def to_paper(x, y, z=0.0):
+        local = inverse @ np.array([x * unit_to_m, y * unit_to_m, z, 1.0])
+        p = m3 @ np.array([local[0], -local[1], 1.0])
+        return float(p[0]), float(p[1])
+
+    return to_paper
+
+
+def _f(v: float) -> str:
+    return f"{v:.3f}"
+
+
+def _path(points, closed=False) -> str:
+    d = "M" + " L".join(f"{_f(x)},{_f(y)}" for x, y in points) + (" Z" if closed else "")
+    return f'<path d="{d}"/>'
+
+
+def _text(x, y, value, size, anchor="middle", angle=0.0, baseline="auto") -> str:
+    value = (value or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    rotate = f' transform="rotate({_f(angle)} {_f(x)} {_f(y)})"' if abs(angle) > 1e-6 else ""
+    return (f'<text x="{_f(x)}" y="{_f(y)}" font-size="{_f(size)}" text-anchor="{anchor}" '
+            f'dominant-baseline="{baseline}"{rotate}>{value}</text>')
+
+
+def _readable(angle: float) -> float:
+    """Text along a line keeps reading left to right or bottom to top."""
+    while angle > 90:
+        angle -= 180
+    while angle <= -90:
+        angle += 180
+    return angle
+
+
+def _wall_thickness(element) -> float:
+    """Thickness (metres) of the wall hosting a door/window, from its layer set; 0 if unknown."""
+    unit = ifcopenshell.util.unit.calculate_unit_scale(element.file)
+    for fill in getattr(element, "FillsVoids", ()) or ():
+        for void in getattr(fill.RelatingOpeningElement, "VoidsElements", ()) or ():
+            usage = ifcopenshell.util.element.get_material(void.RelatingBuildingElement)
+            layers = getattr(getattr(usage, "ForLayerSet", None), "MaterialLayers", None) or \
+                getattr(usage, "MaterialLayers", None) or ()
+            total = sum(float(layer.LayerThickness or 0.0) for layer in layers)
+            if total:
+                return total * unit
+    return 0.0
+
+
+def _operation(door) -> str:
+    op = getattr(door, "OperationType", None)
+    if not op or op == "NOTDEFINED":
+        door_type = ifcopenshell.util.element.get_type(door)
+        op = getattr(door_type, "OperationType", None) or getattr(door_type, "OperationType", None)
+    return op or "SINGLE_SWING_LEFT"
+
+
+def door_swings(door, to_paper):
+    """Plan symbol of a door: each leaf drawn open at 90 degrees with its swing arc, into the side
+    the door's local +Y points to (KIMCAD places doors on the wall's outer face, +Y into the wall)."""
+    unit = ifcopenshell.util.unit.calculate_unit_scale(door.file)
+    m = ifcopenshell.util.placement.get_local_placement(door.ObjectPlacement)
+    width = float(door.OverallWidth or 0.0) * unit
+    if width <= 0:
+        return []
+    t = _wall_thickness(door)
+    o, x, y = m[:3, 3] * unit, m[:3, 0], m[:3, 1]
+    z = o[2]
+
+    def world(lx, ly):
+        p = o + x * lx + y * ly
+        return to_paper(p[0], p[1], z)
+
+    op = _operation(door)
+    if op.startswith("DOUBLE_DOOR"):
+        leaves = [(0.0, width / 2, 1), (width, width / 2, -1)]
+    elif op.endswith("RIGHT"):
+        leaves = [(width, width, -1)]
+    else:
+        leaves = [(0.0, width, 1)]
+    out = []
+    for hinge_x, leaf, direction in leaves:
+        hinge = world(hinge_x, t)
+        closed = world(hinge_x + direction * leaf, t)
+        opened = world(hinge_x, t + leaf)
+        out.append(_path([hinge, opened]))
+        r = math.dist(hinge, opened)
+        cross = (closed[0] - hinge[0]) * (opened[1] - hinge[1]) - (closed[1] - hinge[1]) * (opened[0] - hinge[0])
+        sweep = 1 if cross > 0 else 0
+        out.append(f'<path class="swing" d="M{_f(closed[0])},{_f(closed[1])} A{_f(r)},{_f(r)} 0 0 {sweep} '
+                   f'{_f(opened[0])},{_f(opened[1])}"/>')
+    return out
+
+
+def window_symbol(window, to_paper):
+    """Plan symbol of a window: the glass as a double line across the middle of the wall."""
+    unit = ifcopenshell.util.unit.calculate_unit_scale(window.file)
+    m = ifcopenshell.util.placement.get_local_placement(window.ObjectPlacement)
+    width = float(window.OverallWidth or 0.0) * unit
+    t = _wall_thickness(window)
+    if width <= 0 or t <= 0:
+        return []
+    o, x, y = m[:3, 3] * unit, m[:3, 0], m[:3, 1]
+    out = []
+    for ly in (t / 2 - 0.02, t / 2 + 0.02):
+        a, b = o + y * ly, o + x * width + y * ly
+        out.append(_path([to_paper(a[0], a[1], o[2]), to_paper(b[0], b[1], o[2])]))
+    return out
+
+
+def plan_annotations(storey, to_paper, size_default=TEXT_SIZE):
+    """The story's plan annotations (KIMCAD_Annotation): text, dimension chains, marks, leaders."""
+    f = storey.file
+    unit = ifcopenshell.util.unit.calculate_unit_scale(f)
+    out = []
+    for a in f.by_type("IfcAnnotation"):
+        if a.ObjectPlacement is None or ifcopenshell.util.element.get_container(a) != storey:
+            continue
+        data = ifcopenshell.util.element.get_pset(a, ANNOTATION_PSET) or {}
+        kind = data.get("Kind")
+        try:
+            local = json.loads(data.get("Points") or "[]")
+        except ValueError:
+            continue
+        if not local:
+            continue
+        m = ifcopenshell.util.placement.get_local_placement(a.ObjectPlacement)
+        size = float(data.get("Size") or size_default)
+        text = data.get("Text") or ""
+        pts = []
+        for lx, ly in local:
+            w = m @ np.array([lx / unit, ly / unit, 0.0, 1.0]) * unit
+            pts.append(to_paper(w[0], w[1], w[2]))
+        if kind == "text":
+            out.append(_text(pts[0][0], pts[0][1], text, size, anchor="start"))
+        elif kind == "mark":
+            (cx, cy), r = pts[0], 0.4 * 1000 / SCALE
+            out.append(f'<circle cx="{_f(cx)}" cy="{_f(cy)}" r="{_f(r)}" fill="none"/>')
+            out.append(_text(cx, cy, text, size, baseline="central"))
+        elif kind == "leader" and len(pts) >= 2:
+            out.append(_path(pts))
+            (ax, ay), (bx, by) = pts[0], pts[1]
+            ang = math.atan2(ay - by, ax - bx)
+            head = 1.5
+            out.append(_path([(ax - head * math.cos(ang - 0.35), ay - head * math.sin(ang - 0.35)), (ax, ay),
+                              (ax - head * math.cos(ang + 0.35), ay - head * math.sin(ang + 0.35))]))
+            end = pts[-1]
+            out.append(_text(end[0] + 1.0, end[1], text, size, anchor="start", baseline="central"))
+        elif kind == "dimension" and len(pts) >= 3:
+            out += dimension_chain(pts[:-1], pts[-1], text.split(), size)
+    return out
+
+
+def dimension_chain(points, through, texts, size):
+    """A chain of linear dimensions (paper mm): extension lines from each measured point to the
+    dimension line (parallel to first-last, through `through`), ticks, one text per segment."""
+    (ax, ay), (bx, by) = points[0], points[-1]
+    dx, dy = bx - ax, by - ay
+    length = math.hypot(dx, dy)
+    if length < 1e-9:
+        return []
+    ux, uy = dx / length, dy / length
+    nx, ny = -uy, ux
+    off = (through[0] - ax) * nx + (through[1] - ay) * ny
+    on_line = [(px + nx * (off - ((px - ax) * nx + (py - ay) * ny)), py + ny * (off - ((px - ax) * nx + (py - ay) * ny)))
+               for px, py in points]
+    out = [_path([p, q]) for p, q in zip(points, on_line)]
+    out.append(_path([on_line[0], on_line[-1]]))
+    tick = 1.0
+    for px, py in on_line:
+        out.append(_path([(px - (ux + nx) * tick, py - (uy + ny) * tick), (px + (ux + nx) * tick, py + (uy + ny) * tick)]))
+    angle = _readable(math.degrees(math.atan2(uy, ux)))
+    side = 1 if off >= 0 else -1  # the text sits on the far side of the line from what it measures
+    for i, (p, q) in enumerate(zip(on_line, on_line[1:])):
+        label = texts[i] if i < len(texts) else ""
+        mx, my = (p[0] + q[0]) / 2 + nx * side * size * 0.6, (p[1] + q[1]) / 2 + ny * side * size * 0.6
+        out.append(_text(mx, my, label, size, angle=angle, baseline="central"))
+    return out
+
+
+def markers(f, to_paper, z):
+    """Section and elevation markers in a plan drawing (Archicad style, as in the 3D view's plan)."""
+    out = []
+    for d in f.by_type("IfcAnnotation"):
+        if not is_drawing(d):
+            continue
+        s = settings_of(d)
+        if s is None or s["kind"] == "plan" or len(s["points"]) != 2:
+            continue
+        (x1, y1), (x2, y2) = s["points"]
+        look = s["look"]
+        length = math.hypot(x2 - x1, y2 - y1)
+        if length < 1e-9:
+            continue
+        ux, uy = (x2 - x1) / length, (y2 - y1) / length
+        nx, ny = -uy, ux
+        if (look[0] - x1) * nx + (look[1] - y1) * ny < 0:
+            nx, ny = -nx, -ny
+        P = lambda x, y: to_paper(x, y, z)  # noqa: E731
+        if s["kind"] == "section":
+            out.append(_path([P(x1, y1), P(x2, y2)]))
+            for ex, ey in ((x1, y1), (x2, y2)):
+                tx, ty = ex + nx * 0.8, ey + ny * 0.8
+                out.append(_path([P(ex, ey), P(tx, ty)]))
+                out.append(_path([P(tx - nx * 0.25 + ux * 0.15, ty - ny * 0.25 + uy * 0.15), P(tx, ty),
+                                  P(tx - nx * 0.25 - ux * 0.15, ty - ny * 0.25 - uy * 0.15)]))
+            lx, ly = P(x1 - ux * 0.6, y1 - uy * 0.6)
+        else:
+            mx, my = (x1 + x2) / 2, (y1 + y2) / 2
+            out.append(_path([P(mx - ux * 0.4, my - uy * 0.4), P(mx + nx * 0.6, my + ny * 0.6),
+                              P(mx + ux * 0.4, my + uy * 0.4)], closed=True))
+            lx, ly = P(mx - nx * 0.6, my - ny * 0.6)
+            tip = P(mx, my)
+            anchor = "end" if lx < tip[0] - 1 else "start" if lx > tip[0] + 1 else "middle"
+            out.append(_text(lx, ly, d.Name or "", TEXT_SIZE, anchor=anchor, baseline="central"))
+            continue
+        out.append(_text(lx, ly, d.Name or "", TEXT_SIZE, baseline="central"))
+    return out
+
+
+def overlay(f, drawing, s, svg: str) -> str:
+    to_paper = paper_mapping(svg)
+    if to_paper is None:
+        return svg
+    parts = []
+    if s["kind"] == "plan":
+        storey = _storey(drawing, s)
+        if storey is not None:
+            for e in f.by_type("IfcDoor"):
+                if ifcopenshell.util.element.get_container(e) == storey and e.ObjectPlacement is not None:
+                    parts += door_swings(e, to_paper)
+            for e in f.by_type("IfcWindow"):
+                if ifcopenshell.util.element.get_container(e) == storey and e.ObjectPlacement is not None:
+                    parts += window_symbol(e, to_paper)
+            parts += plan_annotations(storey, to_paper)
+            parts += markers(f, to_paper, storey_elevation(storey))
+    if not parts:
+        return svg
+    group = ('<g class="kimcad-overlay" fill="none" stroke="#000000" stroke-width="0.18" '
+             'font-family="sans-serif">\n' + "\n".join(parts) + "\n</g>\n")
+    group = group.replace("<text ", '<text fill="#000000" stroke="none" ')
+    return svg.replace("</svg>", group + "</svg>", 1)
 
 
 _NUMBER_PAIR = re.compile(r"(-?\d+(?:\.\d+)?(?:e-?\d+)?),(-?\d+(?:\.\d+)?(?:e-?\d+)?)")
@@ -216,6 +513,14 @@ def crop(svg: str, margin: float = 5.0) -> str:
         for a, b in _NUMBER_PAIR.findall(d):
             xs.append(float(a))
             ys.append(float(b))
+    # Overlay text and circles count too (their extent estimated from the font size or radius).
+    for x, y, size, body in re.findall(r'<text [^>]*?x="([-\d.]+)" y="([-\d.]+)" font-size="([\d.]+)"[^>]*>([^<]*)<', svg):
+        half = 0.3 * float(size) * max(len(body), 1)
+        xs += [float(x) - half, float(x) + half]
+        ys += [float(y) - float(size), float(y) + float(size)]
+    for cx, cy, r in re.findall(r'<circle cx="([-\d.]+)" cy="([-\d.]+)" r="([\d.]+)"', svg):
+        xs += [float(cx) - float(r), float(cx) + float(r)]
+        ys += [float(cy) - float(r), float(cy) + float(r)]
     if not xs:
         return svg
     x0, y0, x1, y1 = min(xs) - margin, min(ys) - margin, max(xs) + margin, max(ys) + margin
@@ -235,6 +540,9 @@ def generate(f, drawing, include=None) -> tuple[str, dict]:
         if s["auto"] or s["depth"] is None:
             place(f, drawing, s, model_bounds(f))
     products = drawn_products(f)
+    if s is not None and s["kind"] == "plan":
+        storey = _storey(drawing, s)
+        products = [p for p in products if ifcopenshell.util.element.get_container(p) == storey]
     if include is not None:
         wanted = set(include)
         products = [p for p in products if p.GlobalId in wanted]
@@ -260,7 +568,10 @@ def generate(f, drawing, include=None) -> tuple[str, dict]:
     t2 = time.perf_counter()
     serializer.finalize()
     t3 = time.perf_counter()
-    svg = crop(buffer.get_value())
+    svg = buffer.get_value()
+    if s is not None:
+        svg = overlay(f, drawing, s, svg)
+    svg = crop(svg)
     return svg, {"elements": count, "prepare_s": round(t1 - t0, 3), "geometry_s": round(t2 - t1, 3),
                  "hlr_s": round(t3 - t2, 3), "total_s": round(time.perf_counter() - t0, 3)}
 
