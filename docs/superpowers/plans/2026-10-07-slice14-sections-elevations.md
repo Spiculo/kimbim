@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** draft for the owner's review. Task 0 (the risk check) is done; its results are below and in [11](../../11-spike-results.md#s6--drawings-svg-serializer-slice-14-risk-check). Tasks 1–6 wait for the scope questions at the end.
+**Status:** ready. Task 0 (the risk check) is done; its results are below and in [11](../../11-spike-results.md#s6--drawings-svg-serializer-slice-14-risk-check). The owner answered the scope questions on 2026-10-07: **follow Archicad's conventions** (D61, see "Owner decisions" at the end).
 
 **Goal:** an architect can draw a section line in plan, get the automatic North/South/East/West elevations, list the drawings, and open any of them in a 2D tab (pan, zoom) that regenerates when the model changes.
 
@@ -61,7 +61,7 @@ Spike S6 (`spikes/s6_drawings/drawing_bench.py`), results in 11.
 
 ### Task 1: Bridge — drawing definitions and generation
 - [ ] `python -m kimcad.drawgen SNAPSHOT.ifc GUID [GUID...]` child process: generates and prints `{guid: svg}` JSON; `generate_drawing` snapshots the model and runs it (S6: the serializer holds the GIL).
-- [ ] `kimcad/drawings.py`: `create_section(storey_guid, x1, y1, x2, y2, look_side, depth, height)`, `create_elevations()` (four, from the building box; idempotent: re-running updates them), `drawings()` → `[{guid, name, kind, scale, stale}]`, `rename_drawing`, `delete_drawing`, `edit_drawing` (scale, depth), `generate_drawing(guid)` → `{svg, seconds}` (cached).
+- [ ] `kimcad/drawings.py`: `create_section(storey_guid, x1, y1, x2, y2, look_side, depth=None)` (None = Infinite), `create_elevation(...)`, `create_template_elevations()` (the four N/S/E/W; called by `new_project`), `drawings()` → `[{guid, name, kind, scale, stale}]`, `rename_drawing`, `delete_drawing`, `edit_drawing` (scale, depth), `generate_drawing(guid)` → `{svg, seconds}` (cached).
 - [ ] Tests `tests/python/test_drawings.py`: the house section has cut groups for walls and slabs (`class="cut"` paths with fill) and projection groups; elevations exist for N/S/E/W; edit a wall → stale → regenerated SVG differs; delete is undoable; a model with drawings validates; `annotations()` ignores drawings; golden hashes unchanged.
 
 ### Task 2: Keep drawings out of the 3D view
@@ -72,10 +72,12 @@ Spike S6 (`spikes/s6_drawings/drawing_bench.py`), results in 11.
 - [ ] `Viewport::visibleElements(camera, box)`: render IDs from the drawing's camera offscreen (the D52 pass), return the GlobalIds seen; the bridge adds the elements the cut plane crosses and passes the union to `generate_drawing`.
 - [ ] Test: the synthetic grid model's south elevation is generated from the front row only; timing written in 11.
 
-### Task 3: App — Section tool and elevations
-- [ ] Section tool (shortcut to agree): click, click, click for the look side; preview line with direction arrows; typed length like the wall tool. Section and elevation markers drawn in plan (overlay, like annotations).
-- [ ] View › Create elevations.
-- [ ] Tests in `test_main_window`: draw a section on the house → one drawing listed; create elevations → four listed.
+### Task 3: App — Section and Elevation tools, template elevations
+- [ ] Section tool (**V**): click, click for the line, then a third click on the side to look at (Archicad's eye cursor); preview line with direction arrows; typed length like the wall tool. Horizontal range **Infinite** by default; Limited (a depth) and Zero depth in the drawing's settings.
+- [ ] Elevation tool (**Shift+V**): same three clicks, for an elevation marker placed by hand.
+- [ ] New projects get **North, South, East and West elevations**, like Archicad's default template. Their markers sit outside the building and their extent follows the model's bounds when generated, until the user moves a marker. Opening an existing IFC adds nothing (no model change on open).
+- [ ] Section and elevation markers drawn in plan (overlay, like annotations); selectable, movable, deletable.
+- [ ] Tests in `test_main_window`: draw a section on the house → one drawing listed; a new project lists four elevations. Python tests that count elements in new projects are updated deliberately (drawings are not products of a level).
 
 ### Task 4: App — Drawings panel and 2D tab
 - [ ] Drawings dock: list (kind icon, name, scale), double-click opens; rename, delete.
@@ -90,9 +92,11 @@ Spike S6 (`spikes/s6_drawings/drawing_bench.py`), results in 11.
 - [ ] D60 in decisions.md; doc 05 drawing flow updated (no `addDrawing`, `svg-poly`, the cache key); doc 04 §8 status; doc 14 §11 rows; roadmap M4 progress; README "try it".
 - [ ] EN/ES strings (`pixi run check-translations`); full `pixi run test`, `golden`, `app-test` on Windows and Linux.
 
-## Questions for the owner before Task 1
+## Owner decisions (2026-10-07): follow Archicad's conventions (D61)
 
-1. **Section look direction:** after the two clicks, a third click picks the side it looks at (Archicad), or the direction is always to the left of the line and a Flip button reverses it (Revit)?
-2. **Section depth:** unlimited by default (everything behind the cut, as Revit's default far clip is "no clip" for sections), or a default depth such as 10 m?
-3. **Shortcut** for the Section tool: Archicad has none by default; KIMCAD uses single letters. Is `C` (cut) acceptable, or something else?
-4. **Automatic elevations:** create them once on demand (View › Create elevations), or create them automatically for every new project?
+1. **Look direction:** two clicks for the section line, a third click on the side to look at (Archicad's eye cursor).
+2. **Depth:** horizontal range Infinite by default (Archicad's default); Limited and Zero depth are drawing settings.
+3. **Shortcut:** Archicad has no default key for the Section tool. KIMCAD's single letters are all taken except **V** (`C` is the plan cut), so Section = **V**, Elevation = **Shift+V**.
+4. **Elevations:** created automatically for every new project, like the four elevations in Archicad's default template.
+
+The general rule for later slices: where the owner has not decided otherwise, a drawing or documentation behaviour copies Archicad's default.
