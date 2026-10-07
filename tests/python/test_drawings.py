@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Slice 14 (M4): sections and elevations (D60 drawing definitions, D61 Archicad conventions)."""
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -142,3 +143,25 @@ def test_drawings_are_not_meshed_in_3d():
     assert call("new_project", "Casa")["ok"]
     guids = [d["guid"] for d in call("drawings")["drawings"]]
     assert b.mesh_elements(json.dumps(guids)) is None
+
+
+def test_moving_or_rotating_a_marker_moves_the_drawing_and_keeps_it_there(house):
+    guid = call("create_section", -1.0, 4.5, 11.0, 4.5, 5.0, 8.0, -1)["guid"]
+    assert call("move_elements", json.dumps([guid]), 0.0, -2.0, 0.0)["ok"]
+    d = drawings()["Section 1"]
+    assert d["points"] == [[-1.0, 2.5], [11.0, 2.5]] and d["look"][1] > 2.5  # still looks north
+    assert call("generate_drawing", guid, "")["ok"]  # refitting the infinite range keeps the move
+    assert drawings()["Section 1"]["points"] == [[-1.0, 2.5], [11.0, 2.5]]
+    assert call("rotate_elements", json.dumps([guid]), 5.0, 2.5, math.pi / 2)["ok"]
+    d = drawings()["Section 1"]
+    assert [[round(c, 6) for c in p] for p in d["points"]] == [[5.0, -3.5], [5.0, 8.5]] and d["look"][0] < 5.0
+
+
+def test_a_moved_template_elevation_stays_where_it_was_put():
+    assert call("new_project", "Casa")["ok"]
+    south = drawings()["South Elevation"]
+    assert call("move_elements", json.dumps([south["guid"]]), 0.0, -5.0, 0.0)["ok"]
+    moved = drawings()["South Elevation"]
+    assert not moved["auto"]
+    assert call("generate_drawing", south["guid"], "")["ok"]
+    assert drawings()["South Elevation"]["points"] == moved["points"]

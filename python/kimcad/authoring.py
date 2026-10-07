@@ -31,6 +31,7 @@ import ifcopenshell.util.unit
 import numpy as np
 
 from . import app_bridge as B
+from . import drawgen
 from . import layers
 
 # Default wall types created the first time a model without layered wall types needs one.
@@ -1018,6 +1019,8 @@ def _transform(guids_json: str, transform_si, detach=False) -> str:
             world = ifcopenshell.util.placement.get_local_placement(e.ObjectPlacement)
             ifcopenshell.api.geometry.edit_object_placement(
                 f, product=e, matrix=t_units @ world, is_si=False, should_transform_children=True)
+            if drawgen.is_drawing(e):
+                drawgen.release(f, e)  # a moved template elevation stays where it was put (D61)
         for n, (p1, p2) in dragged.items():
             _reaxis(n, p1, p2)
         for w in [*walls, *neighbours]:

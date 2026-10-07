@@ -60,8 +60,6 @@ def _new(name: str, s: dict):
     drawing.ObjectType = "DRAWING"
     G.write_settings(f, drawing, s)
     G.place(f, drawing, s, G.model_bounds(f))
-    if s["auto"]:
-        G.write_settings(f, drawing, s)  # the template marker's fitted position
     return drawing
 
 

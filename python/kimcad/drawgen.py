@@ -3,8 +3,9 @@
 
 A drawing is an IfcAnnotation with ObjectType DRAWING, as in Bonsai: its placement is the camera
 (it looks along its local -Z, X is the drawing's right, Y is up) and its Body is an IfcBlock giving
-width x height x depth. KIMCAD keeps the marker it was drawn from in the property set
-KIMCAD_Drawing, so infinite ranges (D61, Archicad's default) can follow the model.
+width x height x depth. The marker line in plan is the camera's X axis over the block's width, so
+moving or rotating the annotation moves the drawing. KIMCAD_Drawing keeps the rest (kind, depth,
+template elevation side), so infinite ranges (D61, Archicad's default) can follow the model.
 
 This module needs only ifcopenshell and numpy, so it also runs on its own in a child process:
 the serializer holds the GIL for its whole hidden-line pass (spike S6), which would freeze the app.
@@ -113,15 +114,33 @@ def camera(points, look, bounds, depth=None):
     return m, (length, z1 - z0, depth)
 
 
+def marker(drawing):
+    """The marker line (two world points, metres) and a point on the side looked at, from the
+    camera placement and box; None without them."""
+    block = _block(drawing)
+    if block is None or drawing.ObjectPlacement is None:
+        return None
+    unit = ifcopenshell.util.unit.calculate_unit_scale(drawing.file)
+    m = ifcopenshell.util.placement.get_local_placement(drawing.ObjectPlacement)
+    o, x, z = m[:2, 3] * unit, m[:2, 0], m[:2, 2]
+    half = float(block.XLength) * unit / 2
+    p1, p2, look = o - x * half, o + x * half, o - z
+    return [[round(float(c), 6) for c in p] for p in (p1, p2)], [round(float(c), 6) for c in look]
+
+
+def _block(drawing):
+    for rep in drawing.Representation.Representations if drawing.Representation else ():
+        for item in rep.Items:
+            if item.is_a("IfcCsgSolid") and item.TreeRootExpression.is_a("IfcBlock"):
+                return item.TreeRootExpression
+    return None
+
+
 def settings_of(drawing) -> dict | None:
     data = ifcopenshell.util.element.get_pset(drawing, PSET) or {}
     if data.get("Kind") not in KINDS:
         return None
-    try:
-        points = json.loads(data.get("Points") or "[]")
-        look = json.loads(data.get("Look") or "[]")
-    except ValueError:
-        return None
+    points, look = marker(drawing) or ([], [])
     depth = data.get("Depth")
     return {"kind": data["Kind"], "points": points, "look": look,
             "depth": None if depth is None or depth < 0 else float(depth), "auto": bool(data.get("Auto")),
@@ -168,13 +187,18 @@ def place(f, drawing, s, bounds):
     ifcopenshell.api.geometry.assign_representation(f, product=drawing, representation=rep)
 
 
+def release(f, drawing):
+    """A template elevation the user moved stays where it was put (no longer follows the model)."""
+    pset = ifcopenshell.util.element.get_pset(drawing, PSET)
+    if pset and pset.get("Auto"):
+        ifcopenshell.api.pset.edit_pset(f, pset=f.by_id(pset["id"]), properties={"Auto": False})
+
+
 def write_settings(f, drawing, s):
     pset = ifcopenshell.util.element.get_pset(drawing, PSET)
     pset = f.by_id(pset["id"]) if pset else ifcopenshell.api.pset.add_pset(f, product=drawing, name=PSET)
     ifcopenshell.api.pset.edit_pset(f, pset=pset, properties={
-        "Kind": s["kind"], "Points": json.dumps([[round(x, 6), round(y, 6)] for x, y in s["points"]]),
-        "Look": json.dumps([round(s["look"][0], 6), round(s["look"][1], 6)]),
-        "Depth": -1.0 if s["depth"] is None else float(s["depth"]), "Auto": bool(s["auto"]),
+        "Kind": s["kind"], "Depth": -1.0 if s["depth"] is None else float(s["depth"]), "Auto": bool(s["auto"]),
         **({"Side": s["side"]} if s.get("side") else {})})
     epset = ifcopenshell.util.element.get_pset(drawing, "EPset_Drawing")
     epset = f.by_id(epset["id"]) if epset else ifcopenshell.api.pset.add_pset(f, product=drawing, name="EPset_Drawing")
