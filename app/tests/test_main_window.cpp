@@ -14,7 +14,10 @@
 
 #include "CombineDialog.h"
 #include "DockLayout.h"
+#include "ToolOptionsBar.h"
 #include "ToolPalette.h"
+#include <QComboBox>
+#include <QDoubleSpinBox>
 #include <QToolBar>
 #include <DockManager.h>
 #include <DockWidget.h>
@@ -219,6 +222,28 @@ private slots:
         const int sheets = w.sheetsPanel()->count();
         action(w, "actionNewSheet")->trigger();
         QCOMPARE(w.sheetsPanel()->count(), sheets + 1);
+    }
+
+    // D71: the active tool's fields in a strip above the active view, only while a tool is active.
+    void toolOptionsFollowTheTool()
+    {
+        kimcad::MainWindow w(nullptr, true);
+        w.show();
+        QVERIFY(w.newProject());
+        kimcad::ToolOptionsBar* bar = w.toolOptions();
+        QVERIFY(bar->isHidden());
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        QVERIFY(!bar->isHidden());
+        QVERIFY(w.findChild<QDoubleSpinBox*>(QStringLiteral("wallHeight"))->isVisibleTo(bar));
+        QVERIFY(!w.findChild<QComboBox*>(QStringLiteral("roofKind"))->isVisibleTo(bar));
+        w.setTool(kimcad::MainWindow::Tool::Roof);
+        QVERIFY(w.findChild<QComboBox*>(QStringLiteral("roofKind"))->isVisibleTo(bar));
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QVERIFY(bar->isHidden());
+        QVERIFY(w.dockLayout()->view(w.currentViewKey())->isAncestorOf(bar)); // in the active tab
+        QVERIFY(w.openPlanTab(w.levelsBar()->activeStorey()));
+        QVERIFY(w.dockLayout()->view(w.currentViewKey())->isAncestorOf(bar)); // it moves with the active view
+        QVERIFY(!w.findChild<QToolBar*>(QStringLiteral("toolFieldsToolbar")));
     }
 
     void visibilityActionsUseTheSelection()

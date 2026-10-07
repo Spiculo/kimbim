@@ -4,6 +4,7 @@
 #include "DockLayout.h"
 #include "Scene.h"
 #include "Icons.h"
+#include "ToolOptionsBar.h"
 #include "ToolPalette.h"
 #include "ViewHost.h"
 
@@ -844,9 +845,9 @@ void MainWindow::setPlanView(bool plan)
 
 void MainWindow::buildModelingToolbar()
 {
-    // The tools' fields (type, heights, roof, length) until the tool options strip takes them.
-    QToolBar* bar = addToolBar(tr("Tool fields"));
-    bar->setObjectName(QStringLiteral("toolFieldsToolbar"));
+    // The tools' fields (type, heights, roof, length): a strip above the active view (D71).
+    m_toolOptions = new ToolOptionsBar(this);
+    ToolOptionsBar* bar = m_toolOptions;
     QMenu* model = menuBar()->addMenu(tr("&Model"));
     m_wallTool = new WallTool(this);
     m_polygonTool = new PolygonTool(this);
@@ -954,7 +955,7 @@ void MainWindow::buildModelingToolbar()
     m_types->setToolTip(tr("Type"));
     m_types->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     m_types->setMinimumContentsLength(16);
-    bar->addWidget(m_types);
+    bar->addField(m_types);
     connect(m_types, &QComboBox::currentIndexChanged, this, [this] {
         m_hostTool->setWidth(currentType().value("width").toDouble(0.9));
         updateToolPreview();
@@ -967,7 +968,7 @@ void MainWindow::buildModelingToolbar()
     m_wallHeight->setValue(3.0);
     m_wallHeight->setSuffix(QStringLiteral(" m"));
     m_wallHeight->setToolTip(tr("Wall height"));
-    m_wallHeightAction = bar->addWidget(m_wallHeight);
+    bar->addField(m_wallHeight);
     m_roofKind = new QComboBox(bar);
     m_roofKind->setObjectName(QStringLiteral("roofKind"));
     m_roofKind->addItem(tr("Flat"), QStringLiteral("flat"));
@@ -988,13 +989,14 @@ void MainWindow::buildModelingToolbar()
     roofRow->setContentsMargins(0, 0, 0, 0);
     roofRow->addWidget(m_roofKind);
     roofRow->addWidget(m_roofPitch);
-    m_roofAction = bar->addWidget(roofBox);
-    m_roofAction->setVisible(false);
+    bar->addField(roofBox);
+    roofBox->setVisible(false);
     m_lengthInput = new QLineEdit(bar);
     m_lengthInput->setObjectName(QStringLiteral("lengthInput"));
     m_lengthInput->setPlaceholderText(tr("Length (m)"));
     m_lengthInput->setMaximumWidth(110);
-    m_lengthAction = bar->addWidget(m_lengthInput);
+    bar->addField(m_lengthInput);
+    m_hosts.value(QStringLiteral("3d"))->adoptChrome(m_toolOptions, nullptr);
     connect(m_lengthInput, &QLineEdit::returnPressed, this, [this] {
         bool ok = false;
         double value = QLocale().toDouble(m_lengthInput->text(), &ok);
@@ -1192,7 +1194,7 @@ void MainWindow::buildModelingToolbar()
             m_polygonTool->finish();
     }); });
     onEachView([this](Viewport* v) { connect(v, &Viewport::lengthKeyTyped, this, [this](const QString& text) {
-        if (!m_lengthAction->isVisible())
+        if (m_lengthInput->isHidden() || m_toolOptions->isHidden())
             return;
         m_lengthInput->setFocus();
         m_lengthInput->insert(text);
@@ -1391,6 +1393,11 @@ void MainWindow::showSnap(const Snap& snap)
 
 void MainWindow::setTool(Tool tool)
 {
+    // However setTool ends, the options strip shows only while a tool is active (D71).
+    struct ShowOptions {
+        MainWindow* w;
+        ~ShowOptions() { w->m_toolOptions->setActive(w->m_tool != Tool::None); }
+    } showOptions{this};
     if (tool != Tool::None && m_levels->activeStorey().isEmpty()) {
         showError(tr("Cannot model"), tr("The model has no level. Add a level first."));
         tool = Tool::None;
@@ -1408,10 +1415,10 @@ void MainWindow::setTool(Tool tool)
         const QSignalBlocker block(it.value());
         it.value()->setChecked(it.key() == int(tool));
     }
-    m_wallHeightAction->setVisible(tool == Tool::Wall || tool == Tool::Column || tool == Tool::Beam || tool == Tool::Roof);
+    m_wallHeight->setVisible(tool == Tool::Wall || tool == Tool::Column || tool == Tool::Beam || tool == Tool::Roof);
     m_wallHeight->setToolTip(tool == Tool::Roof ? tr("Eaves height above the level") : tr("Wall height"));
-    m_roofAction->setVisible(tool == Tool::Roof);
-    m_lengthAction->setVisible(tool == Tool::Wall || tool == Tool::Beam || tool == Tool::Grid || tool == Tool::Move
+    m_roofKind->parentWidget()->setVisible(tool == Tool::Roof);
+    m_lengthInput->setVisible(tool == Tool::Wall || tool == Tool::Beam || tool == Tool::Grid || tool == Tool::Move
         || tool == Tool::Rotate || tool == Tool::Stretch);
     m_lengthInput->setPlaceholderText(tool == Tool::Rotate ? tr("Angle (degrees)") : tr("Length (m)"));
     const bool typed = tool == Tool::Wall || tool == Tool::Slab || tool == Tool::Door || tool == Tool::Window
@@ -2587,7 +2594,7 @@ void MainWindow::activateView(const QString& key)
         m_cutHeight->setValue(cut.height);
         m_boxBounds = cut.bounds;
     }
-    host->adoptChrome(nullptr, m_cutColumn);
+    host->adoptChrome(m_toolOptions, m_cutColumn);
     if (!host->storey().isEmpty() && host->storey() != m_levels->activeStorey())
         m_levels->setActive(host->storey()); // a plan tab's level is the active level
     if (switched) {

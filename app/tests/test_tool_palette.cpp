@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // D71: the left tool palette, the tool options strip and the bottom bar.
 #include <QAction>
+#include <QLineEdit>
 #include <QToolButton>
 #include <QtTest>
 
+#include "ToolOptionsBar.h"
 #include "ToolPalette.h"
 
 class TestToolPalette : public QObject {
@@ -26,6 +28,21 @@ private slots:
         p.setCompact(true);
         for (QToolButton* b : buttons)
             QCOMPARE(b->toolButtonStyle(), Qt::ToolButtonIconOnly);
+    }
+
+    void optionsStripShowsOnlyWithAToolAndAField()
+    {
+        kimcad::ToolOptionsBar bar;
+        auto* height = new QLineEdit;
+        bar.addField(height);
+        bar.show();
+        bar.setActive(false);
+        QVERIFY(bar.isHidden());
+        bar.setActive(true);
+        QVERIFY(!bar.isHidden());
+        height->hide();
+        bar.setActive(true);
+        QVERIFY(bar.isHidden()); // nothing to show
     }
 };
 

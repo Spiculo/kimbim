@@ -32,6 +32,7 @@ namespace kimcad {
 
 class LevelsBar;
 class ToolPalette;
+class ToolOptionsBar;
 class DockLayout;
 class Scene;
 class ViewHost;
@@ -162,6 +163,7 @@ public:
     Viewport* openPlanTab(const QString& storey); // nullptr if it isn't a level of this model
     Viewport* modelView() const;                  // the 3D tab's view
     ToolPalette* toolPalette() const { return m_palette; } // D71: the tools on the left
+    ToolOptionsBar* toolOptions() const { return m_toolOptions; } // the active tool's fields
     // Sheets and project info (Slice 16, M4 exit).
     SheetsPanel* sheetsPanel() const { return m_sheetsPanel; }
     QString addSheet(const QString& paper, const QString& title); // its number, "" on failure
@@ -312,11 +314,8 @@ private:
     QHash<int, QAction*> m_toolActions;
     QComboBox* m_types = nullptr;
     QDoubleSpinBox* m_wallHeight = nullptr;
-    QAction* m_wallHeightAction = nullptr;
     QComboBox* m_roofKind = nullptr;
     QDoubleSpinBox* m_roofPitch = nullptr;
-    QAction* m_roofAction = nullptr;
-    QAction* m_lengthAction = nullptr;
     bool m_warnedInconsistent = false;
     HistoryPanel* m_history = nullptr;
     LayersPanel* m_layersPanel = nullptr;
@@ -331,6 +330,7 @@ private:
     QWidget* m_cutColumn = nullptr;    // the plan-cut slider, in the active model view
     QVector<std::function<void(Viewport*)>> m_viewConnectors;
     ToolPalette* m_palette = nullptr;
+    ToolOptionsBar* m_toolOptions = nullptr;
     // Each view has its own cuts (a plan tab is cut at its level; the 3D tab need not be).
     struct CutSettings {
         bool planCut = false;
