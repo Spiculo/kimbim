@@ -72,7 +72,10 @@ Handle(V3d_View) Scene::createView()
 
 void Scene::removeView(const Handle(V3d_View)& view)
 {
-    if (!view.IsNull())
+    // A view that never got a native window (a plan tab closed before it was shown) was never set up
+    // in OpenGL: there is nothing to release, and OCCT's driver dereferences the missing GL window when
+    // other views remain. Such a view is inert (never defined, never redrawn).
+    if (!view.IsNull() && !view->Window().IsNull())
         view->Remove();
     emit viewsChanged();
 }

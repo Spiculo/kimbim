@@ -2744,6 +2744,8 @@ void MainWindow::closeView(const QString& key)
             m_dock->raise(QStringLiteral("3d")); // the 3D tab takes over (and the tool stops)
         m_cuts.remove(host->viewport());
         m_hosts.remove(key);
+        // The view goes now, while the scene it is part of exists; the dock deletes the tab later.
+        delete host->viewport();
     }
     m_dock->removeView(key);
 }

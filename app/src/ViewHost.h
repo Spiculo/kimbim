@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <QPointer>
 #include <QString>
 #include <QWidget>
 
@@ -23,7 +24,7 @@ public:
     QString storey() const { return m_storey; }
 
 private:
-    Viewport* m_view;
+    QPointer<Viewport> m_view; // a closed plan tab's view is deleted before its host
     QVBoxLayout* m_top; // tool options strip
     QHBoxLayout* m_row; // view | cut column
     QString m_storey;

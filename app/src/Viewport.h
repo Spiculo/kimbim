@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <QPointer>
+
 #include <AIS_InteractiveContext.hxx>
 #include <AIS_ViewController.hxx>
 #include <gp_Pnt.hxx>
@@ -200,7 +202,8 @@ private:
     bool retire(const QString& guid, std::vector<int>* touched); // true if it was selected
     NCollection_Vec2<int> toPixels(const QPointF& p) const;
 
-    Scene* m_scene;                           // shared with the other views of the model
+    QPointer<Scene> m_scene;                  // shared with the other views of the model (a closed tab's view
+                                              // can be deleted late: never touch a scene that is gone)
     Handle(AIS_InteractiveContext) m_context; // == m_scene->context()
     Handle(V3d_View) m_view;
     bool m_planView = false;

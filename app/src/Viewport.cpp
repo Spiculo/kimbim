@@ -406,7 +406,8 @@ Viewport::~Viewport()
             m_context->Remove(o, false);
     for (const auto& a : std::as_const(m_annotations))
         m_context->Remove(a, false);
-    m_scene->removeView(m_view);
+    if (m_scene)
+        m_scene->removeView(m_view);
 }
 
 bool Viewport::ensureWindow()
