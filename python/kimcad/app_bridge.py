@@ -86,8 +86,9 @@ def properties(guid: str) -> str:
 _iterator = None
 _iterator_done = True
 # Voids are subtracted from their hosts; spaces are room volumes that would hide walls and windows.
-# Both stay in the tree and properties; spaces get a "show spaces" toggle later.
-NOT_DISPLAYED = ["IfcOpeningElement", "IfcSpace"]
+# Both stay in the tree and properties; spaces get a "show spaces" toggle later. Annotations are 2D
+# (drawn by the plan overlay) or drawing cameras, whose box would hide the model (D60).
+NOT_DISPLAYED = ["IfcOpeningElement", "IfcSpace", "IfcAnnotation"]
 
 
 def start_meshing(threads: int = 0) -> str:
@@ -812,3 +813,12 @@ from .layers import (  # noqa: E402,F401
     views,
 )
 from .annotations import add_annotation, annotations, set_annotation_text  # noqa: E402,F401
+from .drawings import (  # noqa: E402,F401
+    create_elevation,
+    create_section,
+    delete_drawing,
+    drawings,
+    generate_drawing,
+    rename_drawing,
+    set_drawing_depth,
+)

@@ -59,13 +59,13 @@
 ### Task 0: Risk check ✅
 Spike S6 (`spikes/s6_drawings/drawing_bench.py`), results in 11.
 
-### Task 1: Bridge — drawing definitions and generation
-- [ ] `python -m kimcad.drawgen SNAPSHOT.ifc GUID [GUID...]` child process: generates and prints `{guid: svg}` JSON; `generate_drawing` snapshots the model and runs it (S6: the serializer holds the GIL).
-- [ ] `kimcad/drawings.py`: `create_section(storey_guid, x1, y1, x2, y2, look_side, depth=None)` (None = Infinite), `create_elevation(...)`, `create_template_elevations()` (the four N/S/E/W; called by `new_project`), `drawings()` → `[{guid, name, kind, scale, stale}]`, `rename_drawing`, `delete_drawing`, `edit_drawing` (scale, depth), `generate_drawing(guid)` → `{svg, seconds}` (cached).
-- [ ] Tests `tests/python/test_drawings.py`: the house section has cut groups for walls and slabs (`class="cut"` paths with fill) and projection groups; elevations exist for N/S/E/W; edit a wall → stale → regenerated SVG differs; delete is undoable; a model with drawings validates; `annotations()` ignores drawings; golden hashes unchanged.
+### Task 1: Bridge — drawing definitions and generation ✅
+- [x] `kimcad/drawgen.py` (ifcopenshell + numpy only): camera from a marker line and a look point, infinite ranges fitted to the model, template markers, SVG cropped to its content; runs as `python drawgen.py SNAPSHOT.ifc GUID [INCLUDE.json]` in a child process (S6: the serializer holds the GIL).
+- [x] `kimcad/drawings.py`: `create_section(x1, y1, x2, y2, look_x, look_y, depth)` (depth < 0 = Infinite, 0 = the cut only; no level, as in Archicad), `create_elevation(...)`, `create_template_elevations()` (N/S/E/W; called by `new_project`, outside the undo history), `drawings()` → `[{guid, name, kind, depth, auto, points, look, stale}]`, `rename_drawing`, `set_drawing_depth`, `delete_drawing`, `generate_drawing(guid, include_json)` → `{svg, cached, timing}`; the cache keeps the last 4 model states per drawing, so undo returns to a cached drawing.
+- [x] Tests `tests/python/test_drawings.py` (9): template elevations in new projects only; section from two points and a look side (undoable, validates, not a plan annotation); cut walls and slabs + projection, openings not drawn, cropped at 1:100, cached; moving a wall → stale → different SVG, undo → the old one; template elevations follow the model; depth, rename, delete (no orphan representation or property sets), undo; bad input refused; drawings not meshed.
 
 ### Task 2: Keep drawings out of the 3D view
-- [ ] `start_meshing` / `mesh_elements` skip `IfcAnnotation` with ObjectType DRAWING; the model tree lists drawings under a Drawings node instead of the level.
+- [x] `start_meshing` / `mesh_elements` skip `IfcAnnotation` (plan annotations are 2D and drawn by the overlay; the iterator cannot exclude single instances by class name and GlobalId together). Drawings are not in a level, so the model tree does not list them; the Drawings panel does (Task 4).
 - [ ] Test: house + section → mesh count unchanged.
 
 ### Task 2b: Visible-element pass

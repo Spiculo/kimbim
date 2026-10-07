@@ -91,6 +91,9 @@ def new_project(name: str = "") -> str:
             ifcopenshell.api.geometry.edit_object_placement(f, product=product)
         B._model = f
         _make_storey("Level 1", 0.0)
+        from . import drawings
+
+        drawings.create_template_elevations()  # D61: like Archicad's default template
     except Exception as ex:
         return _fail(f"{type(ex).__name__}: {ex}")
     B._reset_history("")

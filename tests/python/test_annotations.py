@@ -40,6 +40,8 @@ def test_text_dimension_and_mark_are_ifc_annotations_on_the_level(plan):
     assert shown[m["guid"]]["kind"] == "mark"
     assert listed(plan["l2"]) == {}
     for a in b._model.by_type("IfcAnnotation"):
+        if a.ObjectType == "DRAWING":
+            continue  # the new project's template elevations (D61)
         rep = a.Representation.Representations[0]
         assert rep.ContextOfItems.ContextType == "Plan" and rep.RepresentationIdentifier == "Annotation"
     meshed = b.mesh_elements(g(t["guid"]))
