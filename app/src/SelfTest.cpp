@@ -343,6 +343,11 @@ int runSelfTest(const SelfTestOptions& options)
         result.insert(QStringLiteral("planes"), viewport->clipPlaneCount());
         result.insert(QStringLiteral("fps_with_cut"), viewport->measureFps(options.frames));
     }
+    if (options.createElevations) {
+        window.findChild<QAction*>(QStringLiteral("actionCreateElevations"))->trigger();
+        window.findChild<QAction*>(QStringLiteral("actionPlanView"))->trigger();
+        QApplication::processEvents();
+    }
     if (!options.openDrawing.isEmpty()) { // Slice 14: a section or elevation, generated in the background
         const QString guid = window.drawingGuid(options.openDrawing);
         QElapsedTimer drawingTimer;

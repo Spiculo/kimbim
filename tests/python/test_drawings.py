@@ -165,3 +165,14 @@ def test_a_moved_template_elevation_stays_where_it_was_put():
     assert not moved["auto"]
     assert call("generate_drawing", south["guid"], "")["ok"]
     assert drawings()["South Elevation"]["points"] == moved["points"]
+
+
+def test_create_elevations_adds_the_missing_ones_to_an_opened_file(tmp_path):
+    assert call("new_project", "Casa")["ok"]
+    south = drawings()["South Elevation"]["guid"]
+    assert call("delete_drawing", south)["ok"]
+    r = call("create_elevations")
+    assert r["ok"] and r["created"] == 1
+    assert sorted(drawings()) == ["East Elevation", "North Elevation", "South Elevation", "West Elevation"]
+    assert call("create_elevations")["created"] == 0  # nothing missing
+    assert call("undo")["ok"] and "South Elevation" not in drawings()  # one step; the no-op made none

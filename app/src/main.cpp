@@ -51,6 +51,9 @@ int main(int argc, char* argv[])
     parser.addOption(house);
     QCommandLineOption benchTools(QStringLiteral("bench-tools"), QStringLiteral("Self-test: time tool previews and wall placement."));
     parser.addOption(benchTools);
+    QCommandLineOption createElevations(QStringLiteral("create-elevations"),
+        QStringLiteral("Self-test: View > Create elevations after loading."));
+    parser.addOption(createElevations);
     QCommandLineOption openDrawing(QStringLiteral("open-drawing"),
         QStringLiteral("Self-test: open this drawing (by name) in its tab and wait for it."), QStringLiteral("name"));
     parser.addOption(openDrawing);
@@ -82,6 +85,7 @@ int main(int argc, char* argv[])
         options.benchTools = parser.isSet(benchTools);
         options.screenshot = parser.value(screenshot);
         options.openDrawing = parser.value(openDrawing);
+        options.createElevations = parser.isSet(createElevations);
         return kimcad::runSelfTest(options);
     }
 

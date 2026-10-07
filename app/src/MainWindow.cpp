@@ -238,6 +238,18 @@ void MainWindow::buildMenus()
     view3D->setObjectName(QStringLiteral("action3DView"));
     view3D->setShortcut(Qt::Key_3);
     connect(view3D, &QAction::triggered, this, [this] { setPlanView(false); });
+    QAction* elevations = view->addAction(tr("Create &elevations"));
+    elevations->setObjectName(QStringLiteral("actionCreateElevations"));
+    elevations->setToolTip(tr("Add the North, South, East and West elevations the model is missing"));
+    connect(elevations, &QAction::triggered, this, [this] {
+        const QJsonObject r = bridge("create_elevations");
+        if (!r.value("ok").toBool()) {
+            statusBar()->showMessage(tr("Could not add them: %1").arg(r.value("error").toString()));
+            return;
+        }
+        afterEdit(r);
+        statusBar()->showMessage(tr("%n elevation(s) added", nullptr, r.value("created").toInt()));
+    });
     QAction* through = view->addAction(tr("Select &hidden elements too"));
     through->setObjectName(QStringLiteral("actionSelectThrough"));
     through->setCheckable(true);

@@ -19,6 +19,7 @@ struct SelfTestOptions {
     bool benchTools = false;      // time tool previews and wall creation (ms), report them
     bool house = false;           // new project: walls, slab from walls, a door and a window
     QString drawWalls;            // "x,y;x,y;...": new project, draw this wall polyline with the wall tool
+    bool createElevations = false; // View > Create elevations after loading (an opened IFC has none)
     QString openDrawing;          // a drawing's name: open it in its tab, wait for it, report its paper size
 };
 

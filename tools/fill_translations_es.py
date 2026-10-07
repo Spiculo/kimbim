@@ -308,6 +308,7 @@ ES = {
     "Loading... %n element(s)": ("Cargando... %n elemento", "Cargando... %n elementos"),
     "%n element(s) selected": ("%n elemento seleccionado", "%n elementos seleccionados"),
     "%n element(s) loaded in %1 s": ("%n elemento cargado en %1 s", "%n elementos cargados en %1 s"),
+    "%n elevation(s) added": ("%n alzado agregado", "%n alzados agregados"),
     # Slice 14: sections and elevations (Archicad's Spanish terms: Sección, Alzado)
     "Regenerate": "Regenerar",
     "Generating the drawing...": "Generando el dibujo...",
@@ -333,6 +334,10 @@ ES = {
     "Elevation: click where the elevation line ends": "Alzado: haga clic donde termina la línea de alzado",
     "Click the side the drawing looks at": "Haga clic en el lado hacia el que mira el dibujo",
     "Could not generate the drawing: %1": "No se pudo generar el dibujo: %1",
+    "Create &elevations": "Crear &alzados",
+    "Add the North, South, East and West elevations the model is missing":
+        "Agregar los alzados Norte, Sur, Este y Oeste que le faltan al modelo",
+    "Could not add them: %1": "No se pudieron agregar: %1",
 }
 
 

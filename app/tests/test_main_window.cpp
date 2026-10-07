@@ -720,6 +720,14 @@ private slots:
         QVERIFY(w.deleteSelection());
         QCOMPARE(w.drawingsPanel()->count(), 4);
         QVERIFY(!w.drawingView(section)); // its tab closed
+
+        // An opened IFC has no drawings; View > Create elevations adds the missing ones.
+        const QString south = w.drawingGuid(QStringLiteral("South Elevation"));
+        w.viewport()->selectGuids({south});
+        w.setSelection({south});
+        QVERIFY(w.deleteSelection());
+        action(w, "actionCreateElevations")->trigger();
+        QCOMPARE(w.drawingsPanel()->count(), 4);
         QVERIFY(w.close());
     }
 

@@ -52,3 +52,11 @@ jobs:
         run: xvfb-run -a -s "-screen 0 1920x1080x24" pixi run ctest --test-dir build/app --output-on-failure -L gui
         env:
           KIMCAD_PYTHON_PATH: ${{ github.workspace }}/python
+      # Informational (Slice 14): the South Elevation of Clinic through the app's own pipeline (visible-element
+      # pass + serializer in a child process); read drawing_s and drawing_visible from the log.
+      - name: Slice 14 - Clinic elevation in the app (informational)
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        run: xvfb-run -a -s "-screen 0 1920x1080x24" pixi run build/app/app/kimcad-app --self-test "$(find tests/corpus/files -name Clinic_Architectural.ifc | head -1)" --frames 1 --create-elevations --open-drawing "South Elevation"
+        env:
+          KIMCAD_PYTHON_PATH: ${{ github.workspace }}/python

@@ -815,6 +815,7 @@ from .layers import (  # noqa: E402,F401
 from .annotations import add_annotation, annotations, set_annotation_text  # noqa: E402,F401
 from .drawings import (  # noqa: E402,F401
     create_elevation,
+    create_elevations,
     create_section,
     delete_drawing,
     drawings,

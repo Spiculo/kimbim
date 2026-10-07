@@ -73,6 +73,27 @@ def create_template_elevations():
              {"kind": "elevation", "points": points, "look": look, "depth": None, "auto": True, "side": side})
 
 
+def create_elevations() -> str:
+    """Add the North/South/East/West elevations a model is missing (an opened IFC has none), fitted
+    to the model like a new project's template elevations. One undoable step."""
+    if B._model is None:
+        return A._fail("no model open")
+    have = {G.settings_of(d).get("side") for d in _drawings()}
+    missing = [side for side in SIDES if side not in have]
+
+    def action():
+        bounds = G.model_bounds(B._model)
+        for side in missing:
+            points, look = G.auto_marker(side, bounds)
+            _new(f"{side.capitalize()} Elevation",
+                 {"kind": "elevation", "points": points, "look": look, "depth": None, "auto": True, "side": side})
+        return len(missing)
+
+    if not missing:
+        return B._dump({"ok": True, "created": 0})
+    return B._dump({**B._run(action), "created": len(missing)})
+
+
 def _next_name(prefix: str) -> str:
     taken = {d.Name for d in _drawings()}
     n = 1
