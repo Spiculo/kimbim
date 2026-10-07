@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "Scene.h"
 
+#include <Aspect_DisplayConnection.hxx>
 #include <OpenGl_GraphicDriver.hxx>
 #include <Prs3d_Drawer.hxx>
 #include <Standard_Failure.hxx>
@@ -10,6 +11,8 @@
 #include <QThread>
 
 namespace kimcad {
+
+namespace {
 
 // One display connection per process, shared by every view (on X11 each one is a connection to the X
 // server). Opening a connection can fail for a moment on a busy server (CI's Xvfb did, aborting the
@@ -31,6 +34,8 @@ Handle(Aspect_DisplayConnection) sharedDisplay()
         }
     }
 }
+
+} // namespace
 
 Scene::Scene(QObject* parent)
     : QObject(parent)

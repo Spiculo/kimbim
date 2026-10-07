@@ -40,6 +40,8 @@ public:
     ads::CDockWidget* addLeft(const QString& key, const QString& title, QWidget* widget);
     void raisePanel(const QString& key);         // shows it even when auto-hidden or floating
     bool isPanelShown(const QString& key) const;
+    // The side columns' widths (pixels); the center views get the rest (the point of D71: room).
+    void setSideWidths(int left, int right);
 
     // Layout memory.
     QByteArray saveLayout() const;
@@ -55,7 +57,7 @@ private:
     bool onSomeScreen() const;
 
     ads::CDockManager* m_manager;
-    QPointer<ads::CDockAreaWidget> m_center, m_panels;
+    QPointer<ads::CDockAreaWidget> m_center, m_panels, m_left;
     QStringList m_views;
     QString m_current;
     QByteArray m_default;

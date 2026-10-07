@@ -98,6 +98,17 @@ private slots:
         QVERIFY(dock->view("3d"));
     }
 
+    // The rework is for room: the model view gets most of the width; the side columns stay narrow.
+    void theModelViewGetsMostOfTheWidth()
+    {
+        kimcad::MainWindow w(nullptr, true);
+        w.resize(1600, 1000);
+        w.show();
+        QCoreApplication::processEvents();
+        const int center = w.dockLayout()->view("3d")->width();
+        QVERIFY2(center >= int(0.6 * w.width()), qPrintable(QStringLiteral("%1 of %2").arg(center).arg(w.width())));
+    }
+
     void layoutRestoreSkipsUnknownAndOffscreen()
     {
         QByteArray saved;

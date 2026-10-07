@@ -12,6 +12,8 @@
 #include <QMainWindow>
 #include <QScreen>
 
+#include <algorithm>
+
 namespace kimcad {
 
 DockLayout::DockLayout(QMainWindow* window)
@@ -23,6 +25,10 @@ DockLayout::DockLayout(QMainWindow* window)
     ads::CDockManager::setAutoHideConfigFlags(ads::CDockManager::DefaultAutoHideConfig);
     m_manager = new ads::CDockManager(window); // becomes the window's central widget
     m_manager->setObjectName(QStringLiteral("dockManager"));
+    // ADS draws inactive tab titles in palette(dark): unreadable on a dark palette (the owner's screen).
+    m_manager->setStyleSheet(m_manager->styleSheet() + QStringLiteral(
+        "ads--CDockWidgetTab QLabel, ads--CAutoHideTab { color: palette(placeholder-text); }"
+        "ads--CDockWidgetTab[activeTab=\"true\"] QLabel { color: palette(window-text); }"));
     connect(m_manager, &ads::CDockManager::focusedDockWidgetChanged, this,
         [this](ads::CDockWidget*, ads::CDockWidget* now) {
             if (now && m_views.contains(now->objectName()) && m_current != now->objectName()) {
@@ -132,7 +138,7 @@ ads::CDockWidget* DockLayout::addLeft(const QString& key, const QString& title, 
     ads::CDockWidget* dock = makeDock(key, title, widget);
     dock->setFeature(ads::CDockWidget::CustomCloseHandling, false);
     dock->setFeature(ads::CDockWidget::DockWidgetClosable, false);
-    m_manager->addDockWidget(ads::LeftDockWidgetArea, dock);
+    m_left = m_manager->addDockWidget(ads::LeftDockWidgetArea, dock);
     return dock;
 }
 
@@ -153,6 +159,27 @@ bool DockLayout::isPanelShown(const QString& key) const
 {
     ads::CDockWidget* dock = m_manager->findDockWidget(key);
     return dock && !dock->isClosed() && dock->isCurrentTab();
+}
+
+void DockLayout::setSideWidths(int left, int right)
+{
+    if (!m_center)
+        return;
+    // The root splitter holds [left column,] the center [, right column], in that order.
+    const QList<int> now = m_manager->splitterSizes(m_center);
+    int total = 0;
+    for (int s : now)
+        total += s;
+    if (total <= 0) // not shown yet: the sizes act as proportions of a nominal 1600 px window
+        total = std::max(1600, left + right + 400);
+    QList<int> sizes;
+    if (m_left)
+        sizes << left;
+    sizes << std::max(total - (m_left ? left : 0) - (m_panels ? right : 0), 200);
+    if (m_panels)
+        sizes << right;
+    if (sizes.size() == now.size())
+        m_manager->setSplitterSizes(m_center, sizes);
 }
 
 QByteArray DockLayout::saveLayout() const

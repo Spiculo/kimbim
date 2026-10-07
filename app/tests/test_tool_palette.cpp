@@ -2,6 +2,7 @@
 // D71: the left tool palette, the tool options strip and the bottom bar.
 #include <QAction>
 #include <QComboBox>
+#include <QLayout>
 #include <QLineEdit>
 #include <QMenu>
 #include <QSignalSpy>
@@ -29,6 +30,12 @@ private slots:
         p.setCollapsed("3d", true);
         QVERIFY(p.isCollapsed("3d") && !p.isCollapsed("plane"));
         QVERIFY(buttons.first()->isHidden() || !buttons.first()->parentWidget()->isVisibleTo(&p));
+        // Owner's screen: buttons read left to right (icon, then label), and the column stays narrow.
+        for (QToolButton* b : buttons) {
+            QLayout* list = b->parentWidget()->layout();
+            QVERIFY(list->itemAt(list->indexOf(b))->alignment() & Qt::AlignLeft);
+        }
+        QVERIFY2(p.sizeHint().width() <= 220, qPrintable(QString::number(p.sizeHint().width())));
         p.setCompact(true);
         for (QToolButton* b : buttons)
             QCOMPARE(b->toolButtonStyle(), Qt::ToolButtonIconOnly);

@@ -2,7 +2,6 @@
 #pragma once
 
 #include <AIS_InteractiveContext.hxx>
-#include <Aspect_DisplayConnection.hxx>
 #include <V3d_View.hxx>
 #include <V3d_Viewer.hxx>
 
@@ -17,9 +16,6 @@
 #include "ElementBatch.h"
 
 namespace kimcad {
-
-// One display connection per process, shared by every view.
-Handle(Aspect_DisplayConnection) sharedDisplay();
 
 // The loaded model as OCCT shows it (D71): one viewer and interactive context, the element batches,
 // the selection, element colours and layer state. Each tab's Viewport is one V3d_View of it, so a 3D

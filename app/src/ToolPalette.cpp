@@ -47,8 +47,7 @@ void ToolPalette::addGroup(const QString& id, const QString& title, const QList<
         b->setDefaultAction(a);
         b->setAutoRaise(true);
         b->setToolButtonStyle(m_compact ? Qt::ToolButtonIconOnly : Qt::ToolButtonTextBesideIcon);
-        b->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-        list->addWidget(b);
+        list->addWidget(b, 0, Qt::AlignLeft); // icon then label, read left to right; the column stays narrow
         m_buttons << b;
     }
     connect(header, &QToolButton::toggled, this, [header, body](bool open) {

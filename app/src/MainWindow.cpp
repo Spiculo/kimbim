@@ -195,7 +195,9 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     QString error;
     if (!PythonEngine::instance().start(&error))
         showError(tr("KIMCAD cannot start"), error);
-    // The window layout of the last session (D71); tests and the self-test start from the default.
+    // The window layout of the last session (D71); tests and the self-test start from the default,
+    // where the model view gets most of the width.
+    m_dock->setSideWidths(200, 320);
     m_dock->captureDefault();
     if (!m_quiet)
         m_dock->restoreLayout(QSettings().value(QStringLiteral("layout/state")).toByteArray());

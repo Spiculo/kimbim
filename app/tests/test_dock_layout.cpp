@@ -6,6 +6,9 @@
 
 #include <DockManager.h>
 #include <DockWidget.h>
+#include <DockWidgetTab.h>
+#include <ElidingLabel.h>
+#include <QApplication>
 
 #include "DockLayout.h"
 
@@ -61,6 +64,34 @@ private slots:
         QVERIFY(layout.isPanelShown("properties"));
         QCOMPARE(layout.manager()->findDockWidget("tree")->dockAreaWidget(),
                  layout.manager()->findDockWidget("properties")->dockAreaWidget()); // one tabbed area
+    }
+
+    // Owner's screen (dark palette): ADS draws inactive tab titles in palette(dark), unreadable there.
+    void inactiveTabTitlesAreReadableOnADarkPalette()
+    {
+        const QPalette before = QApplication::palette();
+        QPalette dark;
+        dark.setColor(QPalette::Window, QColor(32, 32, 32));
+        dark.setColor(QPalette::WindowText, QColor(230, 230, 230));
+        dark.setColor(QPalette::Dark, QColor(20, 20, 20));
+        dark.setColor(QPalette::PlaceholderText, QColor(160, 160, 160));
+        QApplication::setPalette(dark);
+        {
+            QMainWindow w;
+            kimcad::DockLayout layout(&w);
+            layout.addView("3d", "3D", new QLabel, false);
+            layout.addPanel("tree", "Model", new QLabel);
+            layout.addPanel("properties", "Properties", new QLabel);
+            layout.raisePanel("tree");
+            w.show();
+            QCoreApplication::processEvents();
+            auto* title = layout.manager()->findDockWidget("properties")->tabWidget()->findChild<ads::CElidingLabel*>();
+            QVERIFY(title);
+            title->ensurePolished();
+            const QColor text = title->palette().color(QPalette::WindowText);
+            QVERIFY2(text.lightnessF() - 0.125 > 0.35, qPrintable(text.name())); // well above the dark background
+        }
+        QApplication::setPalette(before);
     }
 
     void layoutRoundTripsAndFallsBack()
