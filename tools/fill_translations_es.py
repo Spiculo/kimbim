@@ -408,6 +408,23 @@ ES = {
     "Select walls or slabs to offset first": "Primero seleccione muros o losas para desfasar",
     "Offset": "Desfase",
     "Distance (m): walls get a parallel copy to the left of their axis (negative: right); slabs grow (negative: shrink)": "Distancia (m): los muros reciben una copia paralela a la izquierda de su eje (negativa: a la derecha); las losas crecen (negativa: se achican)",
+    "&Room schedule...": "Planilla de &zonas...",
+    "R&oom": "&Zona",
+    "Room: click inside walls; the room takes the shape they enclose and shows its name, number and area": "Zona: haga clic dentro de los muros; la zona toma la forma que encierran y muestra su nombre, número y superficie",
+    "Room: click inside the walls that enclose it": "Zona: haga clic dentro de los muros que la encierran",
+    "Room": "Zona",
+    "No room here: %1": "No hay zona aquí: %1",
+    "Room schedule": "Planilla de zonas",
+    "Number": "Número",
+    "Area (m²)": "Superficie (m²)",
+    "Perimeter (m)": "Perímetro (m)",
+    "Height (m)": "Altura (m)",
+    "Total": "Total",
+    "Export &CSV...": "Exportar &CSV...",
+    "Export room schedule": "Exportar planilla de zonas",
+    "CSV files (*.csv)": "Archivos CSV (*.csv)",
+    "Room schedule saved to %1": "Planilla de zonas guardada en %1",
+    "Could not export it: %1": "No se pudo exportar: %1",
 }
 
 

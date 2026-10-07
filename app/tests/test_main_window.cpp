@@ -816,6 +816,29 @@ private slots:
         QVERIFY(w.close());
     }
 
+    void roomsAndSchedule()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->setTolerance(0.05);
+        for (const QPointF& p : {QPointF(0, 0), QPointF(6, 0), QPointF(6, 4), QPointF(0, 4), QPointF(0, 0)})
+            w.wallTool()->click(p);
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QCOMPARE(w.viewport()->elementCount(), 4);
+        const int before = w.viewport()->annotationCount();
+        w.setTool(kimcad::MainWindow::Tool::Room); // Z: click inside the walls
+        emit w.viewport()->workPointClicked(QPointF(20, 20), 0.01, Qt::NoModifier); // outside: nothing
+        QCOMPARE(w.viewport()->annotationCount(), before);
+        emit w.viewport()->workPointClicked(QPointF(3, 2), 0.01, Qt::NoModifier);
+        QCOMPARE(w.viewport()->annotationCount(), before + 1);
+        const QString stamp = w.viewport()->annotationTexts().last();
+        QVERIFY2(stamp.startsWith(QStringLiteral("Room\n101\n")) && stamp.endsWith(QStringLiteral(" m²")), qPrintable(stamp));
+        QVERIFY(action(w, "actionRoomSchedule"));
+        QCOMPARE(action(w, "actionRoomTool")->shortcut(), QKeySequence(Qt::Key_Z));
+        QVERIFY(w.close());
+    }
+
     void shortcutsAreTheDocumentedOnes()
     {
         kimcad::MainWindow w0(nullptr, true);

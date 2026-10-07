@@ -412,6 +412,54 @@ def plan_annotations(storey, to_paper, size_default=TEXT_SIZE):
     return out
 
 
+def _space_outline(space):
+    """A room's outline in world metres from its extruded body, or []."""
+    unit = ifcopenshell.util.unit.calculate_unit_scale(space.file)
+    body = ifcopenshell.util.representation.get_representation(space, "Model", "Body", "MODEL_VIEW")
+    solid = next((i for i in (body.Items if body else ()) if i.is_a("IfcExtrudedAreaSolid")), None)
+    if solid is None or not solid.SweptArea.is_a("IfcArbitraryClosedProfileDef"):
+        return []
+    curve = solid.SweptArea.OuterCurve
+    if curve.is_a("IfcPolyline"):
+        pts = [p.Coordinates[:2] for p in curve.Points]
+    elif curve.is_a("IfcIndexedPolyCurve"):
+        pts = [p[:2] for p in curve.Points.CoordList]
+    else:
+        return []
+    if len(pts) > 1 and np.allclose(pts[0], pts[-1]):
+        pts = pts[:-1]
+    m = ifcopenshell.util.placement.get_local_placement(space.ObjectPlacement)
+    if solid.Position is not None:
+        m = m @ ifcopenshell.util.placement.get_axis2placement(solid.Position)
+    return [tuple((m @ np.array([x, y, 0.0, 1.0]))[:3] * unit) for x, y in pts]
+
+
+def room_stamps(storey, to_paper, size=TEXT_SIZE):
+    """Archicad's zone stamp for each room on the story: number, name and area at its middle."""
+    out = []
+    for space in storey.file.by_type("IfcSpace"):
+        if ifcopenshell.util.element.get_aggregate(space) != storey or space.ObjectPlacement is None:
+            continue
+        pts = _space_outline(space)
+        if len(pts) < 3:
+            continue
+        xy = np.array([p[:2] for p in pts])
+        x, y = np.roll(xy[:, 0], -1), np.roll(xy[:, 1], -1)
+        cross = xy[:, 0] * y - x * xy[:, 1]
+        area = cross.sum() / 2
+        if abs(area) < 1e-9:
+            continue
+        cx = ((xy[:, 0] + x) * cross).sum() / (6 * area)
+        cy = ((xy[:, 1] + y) * cross).sum() / (6 * area)
+        qto = ifcopenshell.util.element.get_pset(space, "Qto_SpaceBaseQuantities") or {}
+        value = float(qto.get("NetFloorArea") or abs(area))
+        px, py = to_paper(cx, cy, pts[0][2])
+        out.append(_text(px, py - 1.6 * size, space.LongName or "", size * 1.2, baseline="central"))
+        out.append(_text(px, py, space.Name or "", size, baseline="central"))
+        out.append(_text(px, py + 1.6 * size, f"{value:.2f} m²", size, baseline="central"))
+    return out
+
+
 def dimension_chain(points, through, texts, size):
     """A chain of linear dimensions (paper mm): extension lines from each measured point to the
     dimension line (parallel to first-last, through `through`), ticks, one text per segment."""
@@ -493,6 +541,7 @@ def overlay(f, drawing, s, svg: str) -> str:
             for e in f.by_type("IfcWindow"):
                 if ifcopenshell.util.element.get_container(e) == storey and e.ObjectPlacement is not None:
                     parts += window_symbol(e, to_paper)
+            parts += room_stamps(storey, to_paper)
             parts += plan_annotations(storey, to_paper)
             parts += markers(f, to_paper, storey_elevation(storey))
     if not parts:

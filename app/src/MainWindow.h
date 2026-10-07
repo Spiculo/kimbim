@@ -84,7 +84,7 @@ public:
     LevelsBar* levelsBar() const { return m_levels; }
     // Modeling tools (M3): one active at a time. Exposed for tests and the self-test, which drive
     // them with work-plane points.
-    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening, PlaceModel, Text, Dimension, Mark, Section, Elevation, Leader, Mirror };
+    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening, PlaceModel, Text, Dimension, Mark, Section, Elevation, Leader, Mirror, Room };
     void setTool(Tool tool);
     Tool tool() const { return m_tool; }
     WallTool* wallTool() const { return m_wallTool; }
@@ -167,6 +167,8 @@ public:
     const QHash<QString, double>& timings() const { return m_timings; }
     void resetTimings() { m_timings.clear(); }
     bool columnAt(QPointF p, bool turned = false);
+    // Slice 18: a room (Archicad zone) filling the walls around p; name asked unless quiet.
+    bool roomAt(QPointF p, const QString& name = QString());
     bool createSegment(QPointF p1, QPointF p2); // beam or grid axis, per the active tool
     int gridLineCount() const;
     void setWallToolActive(bool on) { setTool(on ? Tool::Wall : Tool::None); }
@@ -221,6 +223,7 @@ private:
     void refreshDrawings();
     void refreshSheets(bool changed = true); // changed: the model changed, sheets need composing again
     void projectInfoDialog();
+    void roomScheduleDialog();
     void exportSheetDialog(bool pdf);
     void drawingClick(QPointF p);
     void onDrawingGenerated(const QString& guid, const QJsonObject& result, const QString& error);

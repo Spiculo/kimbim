@@ -64,6 +64,9 @@ def build(out: str) -> dict:
     call("add_annotation", l1, "text", json.dumps([[3.0, 2.0]]), "Living room")
     call("add_annotation", l1, "dimension", json.dumps([[0.0, 0.0], [10.0, 0.0], [0.0, -1.0]]), "")
     call("add_annotation", l1, "mark", json.dumps([[8.0, 6.0]]), "A")
+    # Rooms (Slice 18): one per level, from the walls around a point.
+    call("create_room", l1, 2.0, 6.0, "Living room")
+    call("create_room", l2, 5.0, 6.0, "Bedroom")
     roof = call("add_storey", "Roof", 6.0)["guid"]
     call("copy_to_storey", json.dumps([slab1]), roof)
 
@@ -83,7 +86,7 @@ def build(out: str) -> dict:
     count = lambda cls: len(b._model.by_type(cls))  # noqa: E731
     return {"file": out, "storeys": count("IfcBuildingStorey"), "walls": count("IfcWall"), "slabs": count("IfcSlab"),
             "doors": count("IfcDoor"), "windows": count("IfcWindow"), "stairs": count("IfcStair"),
-            "columns": count("IfcColumn"), "beams": count("IfcBeam"), "openings": count("IfcOpeningElement"),
+            "columns": count("IfcColumn"), "rooms": count("IfcSpace"), "beams": count("IfcBeam"), "openings": count("IfcOpeningElement"),
             "drawings": len(call("drawings")["drawings"]), "sheets": len(call("sheets")["sheets"])}
 
 

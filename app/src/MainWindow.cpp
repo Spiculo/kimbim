@@ -41,6 +41,9 @@
 #include <QTabBar>
 #include <QTabWidget>
 #include <QTimer>
+#include <QHeaderView>
+#include <QTableWidget>
+#include <QPushButton>
 
 #include "Cuts.h"
 #include "DrawingView.h"
@@ -212,6 +215,9 @@ void MainWindow::buildMenus()
     QAction* svgExport = file->addAction(tr("Export sheet as S&VG..."));
     svgExport->setObjectName(QStringLiteral("actionExportSheetSvg"));
     connect(svgExport, &QAction::triggered, this, [this] { exportSheetDialog(false); });
+    QAction* schedule = file->addAction(tr("&Room schedule..."));
+    schedule->setObjectName(QStringLiteral("actionRoomSchedule"));
+    connect(schedule, &QAction::triggered, this, &MainWindow::roomScheduleDialog);
     file->addSeparator();
     QAction* enable = file->addAction(tr("Enable &versioning..."));
     enable->setObjectName(QStringLiteral("actionEnableVersioning"));
@@ -891,6 +897,8 @@ void MainWindow::buildModelingToolbar()
         {Tool::Mark, "actionMarkTool", tr("Mar&k"), Qt::Key_X, tr("Mark something on the plan: a circle with a tag")},
         {Tool::Leader, "actionLeaderTool", tr("&Leader"), QKeyCombination(Qt::SHIFT, Qt::Key_A),
             tr("Leader: click what it points at, then where its text goes")},
+        {Tool::Room, "actionRoomTool", tr("R&oom"), Qt::Key_Z,
+            tr("Room: click inside walls; the room takes the shape they enclose and shows its name, number and area")},
         {Tool::Section, "actionSectionTool", tr("Sect&ion"), Qt::Key_V,
             tr("Section: click the two ends of the section line, then the side it looks at")},
         {Tool::Elevation, "actionElevationTool", tr("&Elevation"), QKeyCombination(Qt::SHIFT, Qt::Key_V),
@@ -1013,6 +1021,7 @@ void MainWindow::buildModelingToolbar()
         case Tool::Dimension:
         case Tool::Mark:
         case Tool::Leader:
+        case Tool::Room:
         case Tool::Mirror:
         case Tool::Section:
         case Tool::Elevation:
@@ -1070,6 +1079,9 @@ void MainWindow::buildModelingToolbar()
         case Tool::Column:
             m_twoPointTool->setTolerance(tolerance);
             columnAt(p, ortho);
+            break;
+        case Tool::Room:
+            roomAt(p);
             break;
         case Tool::PlaceModel:
             m_twoPointTool->setTolerance(tolerance);
@@ -1213,6 +1225,7 @@ void MainWindow::refreshTypes()
     case Tool::Dimension:
     case Tool::Mark:
     case Tool::Leader:
+    case Tool::Room:
     case Tool::Mirror:
     case Tool::Section:
     case Tool::Elevation:
@@ -1426,6 +1439,9 @@ void MainWindow::setTool(Tool tool)
         break;
     case Tool::Leader:
         statusBar()->showMessage(tr("Leader: click what it points at"));
+        break;
+    case Tool::Room:
+        statusBar()->showMessage(tr("Room: click inside the walls that enclose it"));
         break;
     case Tool::Mirror:
         statusBar()->showMessage(m_selection.isEmpty() ? tr("Mirror: select what to mirror first")
@@ -1993,6 +2009,18 @@ void MainWindow::refreshAnnotations()
             a.points << QPointF(p.toArray().at(0).toDouble(), p.toArray().at(1).toDouble());
         list << a;
     }
+    // Room stamps (Slice 18): kind "room", the stamp point first, then the outline.
+    for (const auto& v : bridge("rooms", {m_levels->activeStorey()}).value("rooms").toArray()) {
+        const QJsonObject o = v.toObject();
+        const QJsonArray label = o.value("label").toArray();
+        Viewport::Annotation a{o.value("guid").toString(), QStringLiteral("room"),
+            o.value("name").toString() + QLatin1Char('\n') + o.value("number").toString() + QLatin1Char('\n')
+                + QLocale().toString(o.value("area").toDouble(), 'f', 2) + QStringLiteral(" m²"),
+            {QPointF(label.at(0).toDouble(), label.at(1).toDouble())}};
+        for (const auto& p : o.value("points").toArray())
+            a.points << QPointF(p.toArray().at(0).toDouble(), p.toArray().at(1).toDouble());
+        list << a;
+    }
     m_viewport->setAnnotations(list, m_levels->activeElevation());
     if (!m_selection.isEmpty())
         m_viewport->selectGuids(m_selection);
@@ -2383,6 +2411,72 @@ bool MainWindow::setProjectInfo(const QJsonObject& info)
         showError(tr("Could not change the project info"), r.value("error").toString());
     afterEdit(r);
     return r.value("ok").toBool();
+}
+
+bool MainWindow::roomAt(QPointF p, const QString& name)
+{
+    auto num = [](double v) { return QString::number(v, 'g', 17); };
+    QString text = name;
+    if (text.isEmpty() && !m_quiet) {
+        bool ok = false;
+        text = QInputDialog::getText(this, tr("Room"), tr("Name:"), QLineEdit::Normal, tr("Room"), &ok);
+        if (!ok)
+            return false;
+    }
+    const QJsonObject r = bridge("create_room", {m_levels->activeStorey(), num(p.x()), num(p.y()), text});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("No room here: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    statusBar()->showMessage(tr("Room: click inside the walls that enclose it"));
+    return true;
+}
+
+void MainWindow::roomScheduleDialog()
+{
+    QDialog dialog(this);
+    dialog.setObjectName(QStringLiteral("roomScheduleDialog"));
+    dialog.setWindowTitle(tr("Room schedule"));
+    auto* layout = new QVBoxLayout(&dialog);
+    auto* table = new QTableWidget(&dialog);
+    table->setObjectName(QStringLiteral("roomScheduleTable"));
+    const QStringList headers = {tr("Number"), tr("Name"), tr("Level"), tr("Area (m²)"), tr("Perimeter (m)"), tr("Height (m)")};
+    table->setColumnCount(int(headers.size()));
+    table->setHorizontalHeaderLabels(headers);
+    table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    const QJsonObject data = bridge("room_schedule");
+    const QJsonArray rows = data.value("rows").toArray();
+    table->setRowCount(int(rows.size()) + 1);
+    const QLocale locale;
+    for (int i = 0; i < rows.size(); ++i) {
+        const QJsonObject r = rows[i].toObject();
+        const QStringList cells = {r.value("number").toString(), r.value("name").toString(), r.value("level").toString(),
+            locale.toString(r.value("area").toDouble(), 'f', 2), locale.toString(r.value("perimeter").toDouble(), 'f', 2),
+            locale.toString(r.value("height").toDouble(), 'f', 2)};
+        for (int c = 0; c < cells.size(); ++c)
+            table->setItem(i, c, new QTableWidgetItem(cells[c]));
+    }
+    table->setItem(int(rows.size()), 0, new QTableWidgetItem(tr("Total")));
+    table->setItem(int(rows.size()), 3, new QTableWidgetItem(locale.toString(data.value("total_area").toDouble(), 'f', 2)));
+    table->horizontalHeader()->setStretchLastSection(true);
+    table->resizeColumnsToContents();
+    table->setMinimumSize(560, 300);
+    layout->addWidget(table);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dialog);
+    QPushButton* csv = buttons->addButton(tr("Export &CSV..."), QDialogButtonBox::ActionRole);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    connect(csv, &QPushButton::clicked, &dialog, [this, &dialog] {
+        const QString path = QFileDialog::getSaveFileName(&dialog, tr("Export room schedule"), QStringLiteral("rooms.csv"),
+            tr("CSV files (*.csv)"));
+        if (path.isEmpty())
+            return;
+        const QJsonObject r = bridge("export_room_schedule", {path});
+        statusBar()->showMessage(r.value("ok").toBool() ? tr("Room schedule saved to %1").arg(path)
+                                                        : tr("Could not export it: %1").arg(r.value("error").toString()));
+    });
+    layout->addWidget(buttons);
+    dialog.exec();
 }
 
 void MainWindow::projectInfoDialog()

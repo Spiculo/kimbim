@@ -243,6 +243,11 @@ def state() -> str:
     return _dump({"dirty": _current_id() != _saved_id, "path": _path, "inconsistent": _inconsistent, **_flags()})
 
 
+# Called inside every edit's transaction with (geometry_changed, geometry_removed) GlobalIds; returns
+# more changed GlobalIds. Modules register follow-ups that must be part of the same undo step.
+AFTER_ACTION: list = []
+
+
 def _run(action) -> dict:
     """Run `action()` as one undoable transaction. It returns the number of changed elements, or
     (count, geometry_changed_guids, geometry_removed_guids) when it touched shapes."""
@@ -252,6 +257,11 @@ def _run(action) -> dict:
     _model.begin_transaction()
     try:
         changed = action()
+        count, geo_changed, geo_removed = changed if isinstance(changed, tuple) else (changed, [], [])
+        # Follow-ups inside the same undo step (e.g. rooms re-fitted to walls that moved, Slice 18).
+        for hook in AFTER_ACTION:
+            geo_changed = list(geo_changed) + list(hook(list(geo_changed), list(geo_removed)) or ())
+        changed = (count, geo_changed, geo_removed)
     except BaseException as failure:
         # Roll back a half-applied action so the model and the history stay as they were.
         _model.end_transaction()
@@ -847,3 +857,4 @@ from .editing import (  # noqa: E402,F401
     offset_elements,
     slab_outline,
 )
+from .rooms import create_room, edit_room, export_room_schedule, room_schedule, rooms  # noqa: E402,F401

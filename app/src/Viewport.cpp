@@ -678,7 +678,9 @@ public:
     void Compute(const Handle(PrsMgr_PresentationManager)&, const Handle(Prs3d_Presentation)& prs, const int) override
     {
         const bool marker = isMarker();
+        const bool room = m_a.kind == QLatin1String("room");
         const Quantity_Color ink = m_a.kind == QLatin1String("mark") ? Quantity_Color(0.75, 0.15, 0.1, Quantity_TOC_RGB)
+            : room ? Quantity_Color(0.1, 0.45, 0.3, Quantity_TOC_RGB)
             : marker ? Quantity_Color(0.1, 0.3, 0.75, Quantity_TOC_RGB)
                      : Quantity_Color(0.1, 0.1, 0.12, Quantity_TOC_RGB);
         const std::vector<std::pair<gp_Pnt, gp_Pnt>> segs = segments();
@@ -689,7 +691,7 @@ public:
                 arr->AddVertex(s.second);
             }
             Handle(Graphic3d_Group) lines = prs->NewGroup();
-            lines->SetGroupPrimitivesAspect(new Graphic3d_AspectLine3d(ink, Aspect_TOL_SOLID, 1.5));
+            lines->SetGroupPrimitivesAspect(new Graphic3d_AspectLine3d(ink, room ? Aspect_TOL_DOT : Aspect_TOL_SOLID, room ? 1.0 : 1.5));
             lines->AddPrimitiveArray(arr);
         }
         Handle(Prs3d_TextAspect) text = new Prs3d_TextAspect();
@@ -701,7 +703,7 @@ public:
             // screen it stays readable at any zoom, in proportion (2.5 mm -> 15 px).
             text->SetHeight(std::clamp(m_a.size * 6.0, 8.0, 72.0));
         }
-        if (marker || m_a.kind == QLatin1String("dimension") || m_a.kind == QLatin1String("mark")) {
+        if (marker || room || m_a.kind == QLatin1String("dimension") || m_a.kind == QLatin1String("mark")) {
             text->SetHorizontalJustification(Graphic3d_HTA_CENTER); // centred on the line / in the circle
             text->SetVerticalJustification(Graphic3d_VTA_CENTER);
         } else if (m_a.kind == QLatin1String("leader")) {
@@ -719,8 +721,10 @@ public:
         if (m_owner.IsNull())
             m_owner = new AnnotationOwner(this, m_a.guid);
         const Handle(SelectMgr_EntityOwner)& owner = m_owner;
-        for (const auto& s : segments())
-            selection->Add(new Select3D_SensitiveSegment(owner, s.first, s.second));
+        // A room is picked by its stamp only: its outline lies on the wall faces.
+        if (m_a.kind != QLatin1String("room"))
+            for (const auto& s : segments())
+                selection->Add(new Select3D_SensitiveSegment(owner, s.first, s.second));
         Handle(Select3D_SensitivePoint) point = new Select3D_SensitivePoint(owner, anchor());
         point->SetSensitivityFactor(12);
         selection->Add(point);
@@ -841,6 +845,9 @@ private:
                 out.push_back({at(l), at(tip)});
                 out.push_back({at(tip), at(r)});
             }
+        } else if (m_a.kind == QLatin1String("room") && m_a.points.size() >= 4) { // the outline, after the stamp point
+            for (int i = 1; i < m_a.points.size(); ++i)
+                out.push_back({at(m_a.points[i]), at(m_a.points[i + 1 < m_a.points.size() ? i + 1 : 1])});
         } else if (m_a.kind == QLatin1String("mark") && !m_a.points.isEmpty()) {
             const QPointF c = m_a.points.first();
             const int n = 32;
