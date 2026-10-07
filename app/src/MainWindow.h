@@ -9,6 +9,7 @@
 #include <QPointF>
 #include <QVector>
 
+#include <functional>
 #include <optional>
 #include <QJsonValue>
 #include <QStringList>
@@ -156,6 +157,9 @@ public:
     // guid or "sheet:<number>").
     DockLayout* dockLayout() const { return m_dock; }
     QString currentViewKey() const;
+    // A level's plan tab (D71): opened once, raised after; a view of the same model as the 3D tab.
+    Viewport* openPlanTab(const QString& storey); // nullptr if it isn't a level of this model
+    Viewport* modelView() const;                  // the 3D tab's view
     // Sheets and project info (Slice 16, M4 exit).
     SheetsPanel* sheetsPanel() const { return m_sheetsPanel; }
     QString addSheet(const QString& paper, const QString& title); // its number, "" on failure
@@ -247,6 +251,10 @@ private:
     void drawingClick(QPointF p);
     void onDrawingGenerated(const QString& guid, const QJsonObject& result, const QString& error);
     void activateView(const QString& key);
+    // Every model view gets the same signal handlers: `connect` runs for the views open now and
+    // for every plan tab opened later.
+    void onEachView(const std::function<void(Viewport*)>& connect);
+    void closePlanTabs(const QStringList& keep = {});
     void closeView(const QString& key);
     void saveVersionDialog();
     void enableVersioningDialog();
@@ -317,6 +325,15 @@ private:
     DockLayout* m_dock = nullptr;     // center views and side panels (D71)
     QHash<QString, ViewHost*> m_hosts; // model views by key: "3d", "plan:<guid>"
     QWidget* m_cutColumn = nullptr;    // the plan-cut slider, in the active model view
+    QVector<std::function<void(Viewport*)>> m_viewConnectors;
+    // Each view has its own cuts (a plan tab is cut at its level; the 3D tab need not be).
+    struct CutSettings {
+        bool planCut = false;
+        bool box = false;
+        double height = 1.2;
+        Bnd_Box bounds;
+    };
+    QHash<Viewport*, CutSettings> m_cuts;
     DrawingsPanel* m_drawingsPanel = nullptr;
     SheetsPanel* m_sheetsPanel = nullptr;
     QHash<QString, DrawingView*> m_drawingViews;

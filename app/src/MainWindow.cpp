@@ -139,10 +139,10 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     m_thread.start();
 
     // Selection sync: viewport -> tree + properties, tree -> viewport + properties.
-    connect(m_viewport, &Viewport::selectionChanged, this, [this](const QStringList& guids) {
+    onEachView([this](Viewport* v) { connect(v, &Viewport::selectionChanged, this, [this](const QStringList& guids) {
         m_tree->selectGuids(guids);
         setSelection(guids);
-    });
+    }); });
     connect(m_tree, &ModelTreePanel::guidsSelected, this, [this](const QStringList& guids) {
         m_viewport->selectGuids(guids);
         setSelection(guids);
@@ -155,15 +155,15 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     connect(m_properties, &PropertiesPanel::typeEditRequested, this, &MainWindow::typeEditDialog);
     connect(m_properties, &PropertiesPanel::resetToTypeRequested, this, &MainWindow::resetToType);
     connect(m_tree, &ModelTreePanel::isolateRequested, m_viewport, &Viewport::isolate);
-    connect(m_viewport, &Viewport::dragMoved, this, &MainWindow::dragMoveTo);
-    connect(m_viewport, &Viewport::dragReleased, this, &MainWindow::dragFinished);
-    connect(m_viewport, &Viewport::hovered, this, [this](const QString& guid, const QPoint& at) {
+    onEachView([this](Viewport* v) { connect(v, &Viewport::dragMoved, this, &MainWindow::dragMoveTo); });
+    onEachView([this](Viewport* v) { connect(v, &Viewport::dragReleased, this, &MainWindow::dragFinished); });
+    onEachView([this](Viewport* v) { connect(v, &Viewport::hovered, this, [this](const QString& guid, const QPoint& at) {
         const QString hint = guid.isEmpty() ? QString() : m_tree->hintFor(guid);
         if (hint.isEmpty())
             QToolTip::hideText();
         else
             QToolTip::showText(at, hint, m_viewport);
-    });
+    }); });
     connect(m_tree, &ModelTreePanel::hideRequested, this, [this](const QStringList& g) { m_viewport->setHidden(g, true); });
     connect(m_tree, &ModelTreePanel::showAllRequested, m_viewport, &Viewport::showAll);
 
@@ -291,7 +291,10 @@ void MainWindow::buildMenus()
     through->setObjectName(QStringLiteral("actionSelectThrough"));
     through->setCheckable(true);
     through->setToolTip(tr("Box selection also takes elements hidden behind others (same as holding Alt while dragging)"));
-    connect(through, &QAction::toggled, m_viewport, &Viewport::setSelectThrough);
+    connect(through, &QAction::toggled, this, [this](bool on) {
+        for (ViewHost* h : std::as_const(m_hosts))
+            h->viewport()->setSelectThrough(on);
+    });
     QAction* linesOnly = view->addAction(tr("&Lines only"));
     linesOnly->setObjectName(QStringLiteral("actionLinesOnly"));
     linesOnly->setShortcut(Qt::Key_L);
@@ -301,7 +304,7 @@ void MainWindow::buildMenus()
     view->addSeparator();
     QAction* fit = view->addAction(tr("&Fit all"));
     fit->setShortcut(Qt::Key_F);
-    connect(fit, &QAction::triggered, m_viewport, &Viewport::fitAll);
+    connect(fit, &QAction::triggered, this, [this] { m_viewport->fitAll(); });
     view->addSeparator();
     QAction* hide = view->addAction(tr("&Hide selected"));
     hide->setObjectName(QStringLiteral("actionHideSelected"));
@@ -466,7 +469,11 @@ void MainWindow::buildCutsToolbar()
         if (ok && !name.trimmed().isEmpty())
             createModel(name.trimmed());
     });
-    connect(m_levels, &LevelsBar::activeStoreyChanged, this, [this](const QString&, double elevation) {
+    connect(m_levels, &LevelsBar::activeStoreyChanged, this, [this](const QString& storey, double elevation) {
+        if (ViewHost* host = m_hosts.value(m_dock->current()); host && !host->storey().isEmpty() && host->storey() != storey) {
+            openPlanTab(storey); // a plan tab shows one level: another level is another tab
+            return;
+        }
         updateCutSliderRange();
         m_viewport->setWorkPlaneZ(elevation);
         if (m_viewport->isPlanView())
@@ -532,6 +539,11 @@ void MainWindow::updateCutSliderRange()
 
 void MainWindow::applyCuts()
 {
+    CutSettings& mine = m_cuts[m_viewport]; // the active view's cuts follow the controls
+    mine.planCut = m_planCut->isChecked();
+    mine.box = m_sectionBox->isChecked();
+    mine.height = m_cutHeight->value();
+    mine.bounds = m_boxBounds;
     CutState state;
     state.planCut = m_planCut->isChecked();
     // The cut height is measured from the active level (like a plan's view range).
@@ -570,6 +582,7 @@ void MainWindow::openDialog()
 void MainWindow::openFile(const QString& path)
 {
     stopLoading();
+    closePlanTabs(); // the old model's levels
     m_viewport->clear();
     m_tree->clear();
     m_properties->clear();
@@ -759,6 +772,7 @@ bool MainWindow::newProject()
         showError(tr("Could not create the project"), r.value("error").toString());
         return false;
     }
+    closePlanTabs(); // the old model's levels
     m_viewport->clear();
     m_properties->clear();
     m_selection.clear();
@@ -784,7 +798,12 @@ bool MainWindow::newProject()
 void MainWindow::refreshLevels()
 {
     const int before = m_levels->count();
-    m_levels->setStoreys(bridge("storeys").value("storeys").toArray());
+    const QJsonArray storeys = bridge("storeys").value("storeys").toArray();
+    QStringList keep; // plan tabs of levels that still exist (deleted or undone levels: their tabs go)
+    for (const auto& s : storeys)
+        keep << QStringLiteral("plan:") + s.toObject().value("guid").toString();
+    closePlanTabs(keep);
+    m_levels->setStoreys(storeys);
     if (before != m_levels->count() && before > 0)
         m_tree->refreshTree(bridge("spatial_tree")); // a level was added or undone
 }
@@ -822,13 +841,11 @@ void MainWindow::addLevelDialog()
 
 void MainWindow::setPlanView(bool plan)
 {
-    if (plan) {
-        m_viewport->setPlanView(m_levels->activeElevation());
-        m_planCut->setChecked(true); // a plan is a horizontal cut
-    } else {
-        m_viewport->set3DView();
-    }
-    applyCuts();
+    // D71: a plan is its level's tab; 3 goes back to the 3D tab.
+    if (plan)
+        openPlanTab(m_levels->activeStorey());
+    else
+        m_dock->raise(QStringLiteral("3d"));
 }
 
 void MainWindow::buildModelingToolbar()
@@ -996,7 +1013,7 @@ void MainWindow::buildModelingToolbar()
     });
     setTool(Tool::None);
 
-    connect(m_viewport, &Viewport::workPointMoved, this, [this](QPointF p, double tolerance, Qt::KeyboardModifiers mods) {
+    onEachView([this](Viewport* v) { connect(v, &Viewport::workPointMoved, this, [this](QPointF p, double tolerance, Qt::KeyboardModifiers mods) {
         const bool ortho = mods & Qt::ShiftModifier;
         switch (m_tool) {
         case Tool::Wall:
@@ -1061,8 +1078,8 @@ void MainWindow::buildModelingToolbar()
         case Tool::None:
             break;
         }
-    });
-    connect(m_viewport, &Viewport::workPointClicked, this, [this](QPointF p, double tolerance, Qt::KeyboardModifiers mods) {
+    }); });
+    onEachView([this](Viewport* v) { connect(v, &Viewport::workPointClicked, this, [this](QPointF p, double tolerance, Qt::KeyboardModifiers mods) {
         const bool ortho = mods & Qt::ShiftModifier;
         switch (m_tool) {
         case Tool::Wall:
@@ -1149,8 +1166,8 @@ void MainWindow::buildModelingToolbar()
         case Tool::None:
             break;
         }
-    });
-    connect(m_viewport, &Viewport::drawingEnded, this, [this] {
+    }); });
+    onEachView([this](Viewport* v) { connect(v, &Viewport::drawingEnded, this, [this] {
         // Esc / right click: stop the current shape, or leave the tool when nothing is in progress.
         if (m_tool == Tool::Wall && m_wallTool->isDrawing())
             m_wallTool->finish();
@@ -1165,19 +1182,19 @@ void MainWindow::buildModelingToolbar()
             m_gripTool->cancel();
         else
             setTool(Tool::None);
-    });
-    connect(m_viewport, &Viewport::drawingConfirmed, this, [this] {
+    }); });
+    onEachView([this](Viewport* v) { connect(v, &Viewport::drawingConfirmed, this, [this] {
         if (m_tool == Tool::Wall)
             m_wallTool->finish();
         else if (m_tool == Tool::Slab || m_tool == Tool::SlabOpening || m_tool == Tool::Roof)
             m_polygonTool->finish();
-    });
-    connect(m_viewport, &Viewport::lengthKeyTyped, this, [this](const QString& text) {
+    }); });
+    onEachView([this](Viewport* v) { connect(v, &Viewport::lengthKeyTyped, this, [this](const QString& text) {
         if (!m_lengthAction->isVisible())
             return;
         m_lengthInput->setFocus();
         m_lengthInput->insert(text);
-    });
+    }); });
     connect(m_wallTool, &WallTool::previewChanged, this, &MainWindow::updateToolPreview);
     connect(m_polygonTool, &PolygonTool::previewChanged, this, &MainWindow::updateToolPreview);
     connect(m_hostTool, &HostTool::previewChanged, this, &MainWindow::updateToolPreview);
@@ -2514,11 +2531,83 @@ void MainWindow::activateView(const QString& key)
     ViewHost* host = m_hosts.value(key);
     if (!host)
         return;
-    if (host->viewport() != m_viewport) {
+    const bool switched = host->viewport() != m_viewport;
+    if (switched) {
         setTool(Tool::None); // a tool doesn't carry over to another view
         m_viewport = host->viewport();
+        const CutSettings cut = m_cuts.value(m_viewport); // this view's own cuts into the controls
+        const QSignalBlocker b1(m_planCut), b2(m_sectionBox), b3(m_cutHeight), b4(m_cutSlider);
+        m_planCut->setChecked(cut.planCut);
+        m_sectionBox->setChecked(cut.box);
+        m_cutHeight->setValue(cut.height);
+        m_boxBounds = cut.bounds;
     }
     host->adoptChrome(nullptr, m_cutColumn);
+    if (!host->storey().isEmpty() && host->storey() != m_levels->activeStorey())
+        m_levels->setActive(host->storey()); // a plan tab's level is the active level
+    if (switched) {
+        updateCutSliderRange();
+        m_cutLabel->setText(QLocale().toString(m_cutHeight->value(), 'f', 2) + QStringLiteral(" m"));
+        m_viewport->setWorkPlaneZ(m_levels->activeElevation());
+        applyCuts();
+        refreshAnnotations(); // this view's level notes, grid and markers
+        refreshDrawings();
+        refreshSnapData();
+    }
+}
+
+void MainWindow::onEachView(const std::function<void(Viewport*)>& connect)
+{
+    m_viewConnectors << connect;
+    for (ViewHost* h : std::as_const(m_hosts))
+        connect(h->viewport());
+}
+
+Viewport* MainWindow::modelView() const
+{
+    return m_hosts.value(QStringLiteral("3d"))->viewport();
+}
+
+Viewport* MainWindow::openPlanTab(const QString& storey)
+{
+    const QString key = QStringLiteral("plan:") + storey;
+    if (ViewHost* host = m_hosts.value(key)) {
+        m_dock->raise(key);
+        return host->viewport();
+    }
+    double elevation = 0.0;
+    QString name;
+    for (const auto& v : bridge("storeys").value("storeys").toArray()) {
+        const QJsonObject s = v.toObject();
+        if (s.value("guid").toString() == storey) {
+            elevation = s.value("elevation").toDouble();
+            name = s.value("name").toString();
+        }
+    }
+    if (name.isEmpty())
+        return nullptr; // not a level of this model
+    auto* view = new Viewport(m_scene);
+    view->setSelectThrough(modelView()->selectThrough());
+    auto* host = new ViewHost(view);
+    host->setStorey(storey);
+    m_hosts.insert(key, host);
+    for (const auto& c : std::as_const(m_viewConnectors))
+        c(view);
+    view->setPlanView(elevation);
+    CutSettings cut;
+    cut.planCut = true; // a plan is a horizontal cut
+    cut.height = m_cutHeight->value();
+    m_cuts.insert(view, cut);
+    m_dock->addView(key, tr("%1 plan").arg(name), host, true);
+    m_dock->raise(key); // activateView(): the level, the cut, the chrome, the annotations
+    return view;
+}
+
+void MainWindow::closePlanTabs(const QStringList& keep)
+{
+    for (const QString& key : m_hosts.keys())
+        if (key.startsWith(QLatin1String("plan:")) && !keep.contains(key))
+            closeView(key);
 }
 
 void MainWindow::closeView(const QString& key)
@@ -2527,6 +2616,12 @@ void MainWindow::closeView(const QString& key)
         return; // the 3D tab stays
     if (auto* view = qobject_cast<DrawingView*>(m_dock->view(key)))
         m_drawingViews.remove(view->guid());
+    if (ViewHost* host = m_hosts.value(key)) { // a plan tab
+        if (host->viewport() == m_viewport)
+            m_dock->raise(QStringLiteral("3d")); // the 3D tab takes over (and the tool stops)
+        m_cuts.remove(host->viewport());
+        m_hosts.remove(key);
+    }
     m_dock->removeView(key);
 }
 

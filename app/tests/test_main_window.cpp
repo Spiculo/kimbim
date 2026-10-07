@@ -108,6 +108,78 @@ private slots:
         QVERIFY(w.dockLayout()->manager()->findDockWidget("tree"));
     }
 
+    // D71: plan tabs per level, views of the one loaded model.
+    void planTabsShareTheModel()
+    {
+        kimcad::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        const QString l1 = w.levelsBar()->activeStorey();
+        kimcad::Viewport* plan = w.openPlanTab(l1);
+        QVERIFY(plan && plan != w.modelView());
+        QCOMPARE(w.viewport(), plan);
+        QVERIFY(plan->isPlanView());
+        QCOMPARE(w.currentViewKey(), QStringLiteral("plan:") + l1);
+        QCOMPARE(w.openPlanTab(l1), plan); // opened once, raised again
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->setTolerance(0.05);
+        for (const QPointF& p : {QPointF(0, 0), QPointF(4, 0)})
+            w.wallTool()->click(p);
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QCOMPARE(w.modelView()->elementCount(), plan->elementCount()); // one model
+        QVERIFY(plan->elementCount() > 0);
+        w.modelView()->selectGuids(plan->guids().mid(0, 1));
+        QCOMPARE(plan->selectedGuids().size(), 1);
+        QVERIFY(!w.modelView()->isPlanView());
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        action(w, "action3DView")->trigger();
+        QCOMPARE(w.viewport(), w.modelView());
+        QCOMPARE(w.tool(), kimcad::MainWindow::Tool::None); // switching views cancels the tool
+        action(w, "actionPlanView")->trigger(); // P: the active level's plan tab
+        QCOMPARE(w.viewport(), plan);
+    }
+
+    void deletingTheActivePlanLevel()
+    {
+        kimcad::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        QVERIFY(w.addLevel(QStringLiteral("Level 2"), 3.0));
+        const QString l2 = w.levelsBar()->activeStorey();
+        QVERIFY(w.openPlanTab(l2));
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->setTolerance(0.05);
+        w.wallTool()->click(QPointF(0, 0)); // a wall half-drawn
+        action(w, "actionUndo")->trigger(); // the level goes (undoing Add level)
+        QVERIFY(!w.dockLayout()->view(QStringLiteral("plan:") + l2));
+        QCOMPARE(w.currentViewKey(), QString("3d"));
+        QCOMPARE(w.tool(), kimcad::MainWindow::Tool::None);
+        QCOMPARE(w.viewport(), w.modelView());
+    }
+
+    void openingAFileClosesPlanTabs()
+    {
+        kimcad::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        QVERIFY(w.openPlanTab(w.levelsBar()->activeStorey()));
+        QVERIFY(w.newProject());
+        for (const QString& key : w.dockLayout()->viewKeys())
+            QVERIFY2(!key.startsWith(QLatin1String("plan:")), qPrintable(key));
+        QCOMPARE(w.viewport(), w.modelView());
+    }
+
+    void eachViewKeepsItsOwnCut()
+    {
+        kimcad::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        kimcad::Viewport* plan = w.openPlanTab(w.levelsBar()->activeStorey());
+        QVERIFY(plan->clipPlaneCount() >= 1); // a plan is cut
+        QVERIFY(action(w, "actionPlanCut")->isChecked());
+        w.dockLayout()->raise(QStringLiteral("3d"));
+        QCOMPARE(w.modelView()->clipPlaneCount(), 0); // the 3D tab is not
+        QVERIFY(!action(w, "actionPlanCut")->isChecked());
+        w.dockLayout()->raise(QStringLiteral("plan:") + w.levelsBar()->activeStorey());
+        QVERIFY(action(w, "actionPlanCut")->isChecked());
+    }
+
     void visibilityActionsUseTheSelection()
     {
         kimcad::MainWindow w(nullptr, /*quiet=*/true);
