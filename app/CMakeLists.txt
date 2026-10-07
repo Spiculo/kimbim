@@ -91,3 +91,7 @@ kimcad_gui_test(app_selftest_house "\"beams\":1,\"columns\":1,\"doors\":1,\"elem
 kimcad_gui_test(app_selftest_box_select_visible "\"box_selected\":1,.*\"ok\":true" :occlusion: --frames 5 --box-select)
 kimcad_gui_test(app_selftest_box_select_through "\"box_selected\":2,.*\"ok\":true" :occlusion: --frames 5 --box-select --select-through)
 kimcad_gui_test(app_selftest_box_select "\"box_selected\":2.*\"ok\":true.*\"tree_selected\":2" :fixture: --frames 5 --box-select)
+# Slice 14: an elevation sends only the elements it can see to the serializer (the short wall is hidden
+# behind the tall one from the south, in front of it from the north).
+kimcad_gui_test(app_selftest_drawing_visible_south "\"drawing_shown\":true,\"drawing_visible\":1," :occlusion: --frames 1 --open-drawing "South Elevation")
+kimcad_gui_test(app_selftest_drawing_visible_north "\"drawing_shown\":true,\"drawing_visible\":2," :occlusion: --frames 1 --open-drawing "North Elevation")

@@ -146,6 +146,10 @@ public:
     bool selectThrough() const { return m_selectThrough; }
     // Guids with at least one visible pixel in the rectangle (nullopt: cannot tell, e.g. no window).
     std::optional<QSet<QString>> visibleIn(int x0, int y0, int x1, int y1);
+    // Elements a section/elevation can see (Slice 14 visible-element pass, spike S6): an
+    // orthographic camera on the line p1-p2 looking towards `look`, between heights z0 and z1,
+    // up to `depth` metres beyond the line (< 0: no limit). Rendered offscreen in id colours.
+    std::optional<QSet<QString>> visibleFrom(QPointF p1, QPointF p2, QPointF look, double z0, double z1, double depth);
 
 signals:
     void selectionChanged(const QStringList& guids);
@@ -203,6 +207,8 @@ private:
     int m_nextIdBase = 0;
     std::vector<int> m_idBases; // per batch, for decoding ids
     void keepOnlyVisible(const QSet<QString>& before, AIS_SelectionScheme scheme, int x0, int y0, int x1, int y1);
+    // Renders the view's camera into a w x h offscreen image in id colours; guids seen in the rectangle.
+    std::optional<QSet<QString>> idsInImage(int w, int h, int x0, int y0, int x1, int y1);
     QSet<QString> selectedSet() const;
     bool m_drawingMode = false;
     QTimer* m_hoverTimer = nullptr;

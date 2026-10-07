@@ -4,6 +4,7 @@
 
 #include <Aspect_DisplayConnection.hxx>
 #include <Graphic3d_ClipPlane.hxx>
+#include <gp_Pln.hxx>
 #include <OpenGl_GraphicDriver.hxx>
 #include <Prs3d_Drawer.hxx>
 #include <Standard_Failure.hxx>
@@ -206,6 +207,11 @@ std::optional<QSet<QString>> Viewport::visibleIn(int x0, int y0, int x1, int y1)
     m_view->Window()->Size(w, h);
     if (w <= 0 || h <= 0)
         return std::nullopt;
+    return idsInImage(w, h, x0, y0, x1, y1);
+}
+
+std::optional<QSet<QString>> Viewport::idsInImage(int w, int h, int x0, int y0, int x1, int y1)
+{
     // Draw every element in its id colour on black, without highlights or lines, into an
     // offscreen image of the view; clip planes still apply, hidden elements are not drawn.
     const Quantity_Color background = m_view->BackgroundColor();
@@ -279,6 +285,61 @@ std::optional<QSet<QString>> Viewport::visibleIn(int x0, int y0, int x1, int y1)
             out.insert(m_batches[b]->guid(index));
     }
     return out;
+}
+
+std::optional<QSet<QString>> Viewport::visibleFrom(QPointF p1, QPointF p2, QPointF look, double z0, double z1, double depth)
+{
+    const QPointF d = p2 - p1;
+    const double len = std::hypot(d.x(), d.y());
+    if (!ensureWindow() || m_batches.empty() || m_nextIdBase > ElementBatch::maxId() || len < 1e-6 || z1 <= z0)
+        return std::nullopt;
+    const QPointF u = d / len;
+    QPointF n(-u.y(), u.x());
+    if (QPointF::dotProduct(look - p1, n) < 0)
+        n = -n;
+    // Keep only what the drawing can see: behind the cut line, within the line's ends (and the
+    // depth); the view's own cuts (plan cut, section box) are set aside meanwhile.
+    std::vector<Handle(Graphic3d_ClipPlane)> planes;
+    auto keep = [&](QPointF at, QPointF towards) {
+        planes.push_back(new Graphic3d_ClipPlane(gp_Pln(gp_Pnt(at.x(), at.y(), 0), gp_Dir(towards.x(), towards.y(), 0))));
+    };
+    keep(p1, n);
+    keep(p1, u);
+    keep(p2, -u);
+    if (depth >= 0)
+        keep(p1 + n * depth, -n);
+    for (const auto& b : m_batches) {
+        for (const auto& plane : m_clipPlanes)
+            b->RemoveClipPlane(plane);
+        for (const auto& plane : planes)
+            b->AddClipPlane(plane);
+    }
+    Handle(Graphic3d_Camera) saved = new Graphic3d_Camera();
+    saved->Copy(m_view->Camera());
+    const Handle(Graphic3d_Camera)& camera = m_view->Camera();
+    const QPointF mid = (p1 + p2) / 2;
+    const double zm = (z0 + z1) / 2, height = z1 - z0;
+    camera->SetProjectionType(Graphic3d_Camera::Projection_Orthographic);
+    camera->SetUp(gp_Dir(0, 0, 1));
+    camera->SetCenter(gp_Pnt(mid.x(), mid.y(), zm));
+    camera->SetEye(gp_Pnt(mid.x() - n.x() * 10, mid.y() - n.y() * 10, zm));
+    // An ortho camera's scale is its larger side; the image has the drawing's proportions.
+    camera->SetScale(std::max(len, height) * 1.02);
+    const int w = len >= height ? 2048 : std::max(64, int(std::lround(2048 * len / height)));
+    const int h = len >= height ? std::max(64, int(std::lround(2048 * height / len))) : 2048;
+    camera->SetAspect(double(w) / h);
+    m_view->ZFitAll();
+    const auto ids = idsInImage(w, h, 0, 0, w - 1, h - 1);
+    for (const auto& b : m_batches) {
+        for (const auto& plane : planes)
+            b->RemoveClipPlane(plane);
+        for (const auto& plane : m_clipPlanes)
+            b->AddClipPlane(plane);
+    }
+    m_view->Camera()->Copy(saved);
+    m_view->Invalidate();
+    update();
+    return ids;
 }
 
 void Viewport::keepOnlyVisible(const QSet<QString>& before, AIS_SelectionScheme scheme, int x0, int y0, int x1, int y1)

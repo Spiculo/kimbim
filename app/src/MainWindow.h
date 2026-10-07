@@ -141,6 +141,8 @@ public:
     DrawingView* drawingView(const QString& guid) const { return m_drawingViews.value(guid); }
     void regenerateDrawing(const QString& guid);
     void showModelTab();
+    // How many elements the last generation sent to the serializer (-1: all, no visible pass).
+    int lastDrawingVisibleCount() const { return m_lastDrawingVisible; }
     // Drag to move (owner feedback): preview while dragging, move on release (Ctrl detaches).
     void dragMoveTo(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
     bool dragFinished(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
@@ -261,6 +263,7 @@ private:
     QHash<QString, DrawingView*> m_drawingViews;
     QSet<QString> m_generating, m_generateAgain;
     QList<QThread*> m_drawingThreads;
+    int m_lastDrawingVisible = -1;
     QToolBar* m_projectBar = nullptr;
     QComboBox* m_options = nullptr;
     bool m_versioned = false;

@@ -2050,12 +2050,39 @@ void MainWindow::regenerateDrawing(const QString& guid)
     }
     m_generating.insert(guid);
     view->setBusy(true);
+    // Only the elements the drawing can see go to the serializer: hidden-line removal grows with
+    // everything behind the cut (spike S6: an elevation 52 s with all elements, 3.4 s with the
+    // visible ones). The 3D view renders that set here, on the GUI thread; without a view (tests,
+    // headless) every element goes.
+    QString include;
+    for (const auto& v : bridge("drawings").value("drawings").toArray()) {
+        const QJsonObject d = v.toObject();
+        if (d.value("guid").toString() != guid)
+            continue;
+        const QJsonArray pts = d.value("points").toArray(), look = d.value("look").toArray();
+        const Bnd_Box bounds = m_viewport->boundsOf({});
+        if (pts.size() != 2 || look.size() != 2 || bounds.IsVoid())
+            break;
+        double x0, y0, z0, x1, y1, z1;
+        bounds.Get(x0, y0, z0, x1, y1, z1);
+        auto pt = [](const QJsonValue& p) { return QPointF(p.toArray().at(0).toDouble(), p.toArray().at(1).toDouble()); };
+        const double depth = d.value("depth").isNull() ? -1.0 : d.value("depth").toDouble();
+        const auto seen = m_viewport->visibleFrom(pt(pts.at(0)), pt(pts.at(1)),
+            QPointF(look.at(0).toDouble(), look.at(1).toDouble()), z0 - 1.0, z1 + 1.0, depth);
+        if (seen) {
+            QStringList sorted(seen->begin(), seen->end());
+            sorted.sort(); // a stable list keeps the drawing cache useful
+            include = QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(sorted)).toJson(QJsonDocument::Compact));
+        }
+        break;
+    }
+    m_lastDrawingVisible = include.isEmpty() ? -1 : int(QJsonDocument::fromJson(include.toUtf8()).array().size());
     // The bridge snapshots the model and runs IfcOpenShell's serializer in a child process, which
     // can take seconds on real files (spike S6); waiting for it here would freeze the window.
     QPointer<MainWindow> self(this);
-    QThread* worker = QThread::create([self, guid] {
+    QThread* worker = QThread::create([self, guid, include] {
         QString error;
-        const QJsonObject result = PythonEngine::instance().callJson("generate_drawing", {guid, QString()}, &error).object();
+        const QJsonObject result = PythonEngine::instance().callJson("generate_drawing", {guid, include}, &error).object();
         if (self)
             QMetaObject::invokeMethod(self, [self, guid, result, error] {
                 if (self)
