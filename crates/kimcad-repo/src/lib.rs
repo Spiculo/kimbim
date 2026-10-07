@@ -158,6 +158,18 @@ impl Repo {
     }
 
     pub fn commit(&self, changes: &BTreeMap<String, Option<Vec<u8>>>, message: &str, author: &Signature) -> Result<String> {
+        self.commit_merge(changes, message, author, &[])
+    }
+
+    /// A commit on the current branch whose extra parents are `merged` (a merge commit when non-empty).
+    pub fn commit_merge(
+        &self,
+        changes: &BTreeMap<String, Option<Vec<u8>>>,
+        message: &str,
+        author: &Signature,
+        merged: &[String],
+    ) -> Result<String> {
+        let merged = merged.iter().map(|r| self.resolve(r)).collect::<Result<Vec<_>>>()?;
         for path in changes.keys() {
             validate_path(path)?;
         }
@@ -179,6 +191,9 @@ impl Repo {
             w.write_all(b"\n")?;
             if let Some(p) = &parent {
                 writeln!(w, "from {p}")?;
+            }
+            for m in &merged {
+                writeln!(w, "merge {m}")?;
             }
             for (path, data) in changes {
                 match data {
@@ -251,6 +266,28 @@ impl Repo {
         }
         std::fs::write(self.git_dir.join("HEAD"), format!("ref: refs/heads/{name}\n"))?;
         Ok(())
+    }
+
+    /// The best common ancestor of two versions, if any.
+    pub fn merge_base(&self, a: &str, b: &str) -> Result<Option<String>> {
+        let (a, b) = (self.resolve(a)?, self.resolve(b)?);
+        let out = self.git().args(["merge-base", &a, &b]).output()?;
+        if !out.status.success() {
+            return Ok(None); // no common history
+        }
+        Ok(Some(String::from_utf8_lossy(&out.stdout).trim().to_string()))
+    }
+
+    /// Move the current branch forward to `rev` (which must contain its head).
+    pub fn fast_forward(&self, rev: &str) -> Result<String> {
+        let target = self.resolve(rev)?;
+        let branch = self.current_branch()?;
+        let head = self.head()?.ok_or_else(|| Error::Git("nothing to fast-forward".into()))?;
+        if self.merge_base(&head, &target)?.as_deref() != Some(head.as_str()) {
+            return Err(Error::Git(format!("{rev} does not contain the current version")));
+        }
+        self.run(self.git().args(["update-ref", &format!("refs/heads/{branch}"), &target, &head]))?;
+        Ok(target)
     }
 
     pub fn delete_branch(&self, name: &str) -> Result<()> {

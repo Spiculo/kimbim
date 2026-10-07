@@ -83,6 +83,30 @@ impl Repo {
         py.detach(|| self.inner.commit(&changes, message, &sig)).map_err(err)
     }
 
+    #[pyo3(signature = (changes, message, author_name, author_email, time, merged))]
+    #[allow(clippy::too_many_arguments)]
+    fn commit_merge(
+        &self,
+        py: Python<'_>,
+        changes: BTreeMap<String, Option<Vec<u8>>>,
+        message: &str,
+        author_name: String,
+        author_email: String,
+        time: i64,
+        merged: Vec<String>,
+    ) -> PyResult<String> {
+        let sig = kimcad_repo::Signature { name: author_name, email: author_email, time };
+        py.detach(|| self.inner.commit_merge(&changes, message, &sig, &merged)).map_err(err)
+    }
+
+    fn merge_base(&self, a: &str, b: &str) -> PyResult<Option<String>> {
+        self.inner.merge_base(a, b).map_err(err)
+    }
+
+    fn fast_forward(&self, rev: &str) -> PyResult<String> {
+        self.inner.fast_forward(rev).map_err(err)
+    }
+
     fn log(&self, rev: &str, limit: usize) -> PyResult<Vec<Commit>> {
         Ok(self
             .inner

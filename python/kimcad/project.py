@@ -50,10 +50,25 @@ class TargetExists(KimcadError):
     pass
 
 
+class MergeConflicts(KimcadError):
+    def __init__(self, result):
+        super().__init__(f"{len(result.unresolved)} conflict(s) to resolve before combining")
+        self.result = result
+
+
 class InvalidInput(KimcadError):
     def __init__(self, message: str, messages: list[str]):
         super().__init__(message)
         self.messages = messages
+
+
+@dataclass
+class MergePreview:
+    status: str  # "up_to_date" | "fast_forward" | "merge"
+    base: str | None
+    ours: str
+    theirs: str
+    result: object = None  # kimcad.merge.MergeResult for "merge"
 
 
 @dataclass
@@ -331,4 +346,43 @@ class Project:
                 kind = "modified"
             out.append((c, kind))
         return out
+
+    # ---- combining options (R4 merge) ----
+    def merge_preview(self, other: str, resolutions: dict | None = None) -> MergePreview:
+        """What combining `other` into the current option would do; for a real merge, the merged records
+        and the conflicts (with `resolutions` applied)."""
+        from .merge import merge_records
+
+        ours, theirs = self._rev("HEAD"), self._rev(other)
+        base = self.repo.merge_base(ours, theirs)
+        if base == theirs:
+            return MergePreview("up_to_date", base, ours, theirs)
+        if base == ours:
+            return MergePreview("fast_forward", base, ours, theirs)
+        base_records = self._records(base) if base else {}
+        result = merge_records(base_records, self._records(ours), self._records(theirs), resolutions)
+        return MergePreview("merge", base, ours, theirs, result)
+
+    def merge(self, other: str, message: str, resolutions: dict | None = None, *,
+              author: tuple[str, str] | None = None, time: int | None = None) -> str:
+        """Combine `other` into the current option: fast-forward, or a merge commit with two parents.
+        Raises MergeConflicts while conflicts remain unresolved."""
+        preview = self.merge_preview(other, resolutions)
+        if preview.status == "up_to_date":
+            return preview.ours
+        if preview.status == "fast_forward":
+            try:
+                return self.repo.fast_forward(preview.theirs)
+            except _core.RepoError as e:
+                raise KimcadError(str(e)) from None
+        if not preview.result.clean:
+            raise MergeConflicts(preview.result)
+        compose(preview.result.records)  # the result must be writable as IFC (lossless guarantee)
+        _changes, writes = self._changes(self._head_entries(), preview.result.records)
+        name, email = author or _author()
+        try:
+            return self.repo.commit_merge(writes, message, name, email,
+                                          int(time if time is not None else _time.time()), [preview.theirs])
+        except _core.RepoError as e:
+            raise KimcadError(str(e)) from None
 

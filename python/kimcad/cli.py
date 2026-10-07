@@ -10,7 +10,7 @@ import sys
 
 from . import _core
 from .layout import key_to_path
-from .project import Changes, KimcadError, Project
+from .project import Changes, KimcadError, MergeConflicts, Project
 
 SYMBOL = {"added": "+", "modified": "~", "removed": "-"}
 MAX_LINES = 200
@@ -64,6 +64,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("-m", "--message", default="")
     s.add_argument("--rev", default="HEAD")
     s.add_argument("--delete", action="store_true")
+    s = sub.add_parser("merge", help="combine another design option into the current one")
+    s.add_argument("option")
+    s.add_argument("-m", "--message", default="")
+    s.add_argument("--resolve", action="append", default=[], metavar="CONFLICT=CHOICE",
+                   help="a conflict's choice (ours, theirs, or one of its options); repeatable")
+    s.add_argument("--json", action="store_true", help="print the conflicts as JSON")
     s = sub.add_parser("blame", help="object history: the versions that changed an object (by GlobalId)")
     s.add_argument("guid")
     s.add_argument("--rev", default="HEAD")
@@ -125,6 +131,27 @@ def run(args) -> int:
             for t in proj.tags():
                 first_line = (t.message.strip().splitlines() or [""])[0]
                 print(f"{t.name}  {t.target[:10]}  {first_line}")
+    elif args.cmd == "merge":
+        resolutions = dict(r.rsplit("=", 1) for r in args.resolve if "=" in r)
+        message = args.message or f"Combine {args.option} into {proj.current_branch()}"
+        try:
+            cid = proj.merge(args.option, message, resolutions)
+        except MergeConflicts as e:
+            conflicts = [c.to_dict() for c in e.result.conflicts if c.id in e.result.unresolved]
+            if args.json:
+                print(json.dumps(conflicts, ensure_ascii=False, indent=1, default=str))
+            else:
+                print(f"{len(conflicts)} conflict(s); choose with --resolve ID=CHOICE:")
+                for c in conflicts:
+                    what = c["attribute"] or ""
+                    if c["property"]:
+                        what += f"[{c['property']}]"
+                    print(f"  {c['id']}  {c['kind']}  {c['ifc_type']} {c['name']!r} {what}  options: {', '.join(c['options'])}")
+                    if c["kind"] in ("attribute", "property", "class"):
+                        print(f"      base {json.dumps(c['base'], default=str)[:80]}  ours {json.dumps(c['ours'], default=str)[:80]}"
+                              f"  theirs {json.dumps(c['theirs'], default=str)[:80]}")
+            return 1
+        print(f"[{proj.current_branch()} {cid[:10]}] {message}")
     elif args.cmd == "blame":
         steps = proj.history_of(key_to_path("o/" + args.guid), rev=args.rev, limit=args.n)
         if not steps:

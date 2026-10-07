@@ -138,3 +138,31 @@ fn delete_branch_but_not_the_current_one() {
     assert_eq!(repo.branches().unwrap(), vec!["main"]);
     assert!(matches!(repo.delete_branch("option-b"), Err(Error::UnknownBranch(_))));
 }
+
+#[test]
+fn merge_commits_merge_base_and_fast_forward() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = Repo::init(dir.path()).unwrap();
+    let base = repo.commit(&changes(&[("a.json", Some("1"))]), "base", &sig(1)).unwrap();
+    repo.create_branch("b", "HEAD").unwrap();
+    let ours = repo.commit(&changes(&[("a.json", Some("2"))]), "ours", &sig(2)).unwrap();
+    repo.switch("b").unwrap();
+    let theirs = repo.commit(&changes(&[("c.json", Some("3"))]), "theirs", &sig(3)).unwrap();
+    repo.switch("main").unwrap();
+    assert_eq!(repo.merge_base("main", "b").unwrap().as_deref(), Some(base.as_str()));
+    let m = repo.commit_merge(&changes(&[("c.json", Some("3"))]), "combine b", &sig(4), &["b".to_string()]).unwrap();
+    let log = repo.log("HEAD", 1).unwrap();
+    assert_eq!(log[0].id, m);
+    assert_eq!(log[0].parents, vec![ours.clone(), theirs.clone()]);
+    assert_eq!(repo.tree_entries("HEAD").unwrap().keys().cloned().collect::<Vec<_>>(), vec!["a.json", "c.json"]);
+    // b is behind main now: main contains it, b can fast-forward to main.
+    assert_eq!(repo.merge_base("main", "b").unwrap().as_deref(), Some(theirs.as_str()));
+    repo.switch("b").unwrap();
+    assert_eq!(repo.fast_forward("main").unwrap(), m);
+    assert_eq!(repo.head().unwrap().as_deref(), Some(m.as_str()));
+    repo.switch("main").unwrap();
+    let other = repo.commit(&changes(&[("a.json", Some("5"))]), "more", &sig(5)).unwrap();
+    repo.switch("b").unwrap();
+    repo.commit(&changes(&[("d.json", Some("6"))]), "diverged", &sig(6)).unwrap();
+    assert!(repo.fast_forward(&other).is_err()); // not a fast-forward any more
+}
