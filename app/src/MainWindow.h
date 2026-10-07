@@ -31,6 +31,7 @@ class QLineEdit;
 namespace kimcad {
 
 class LevelsBar;
+class ToolPalette;
 class DockLayout;
 class Scene;
 class ViewHost;
@@ -160,6 +161,7 @@ public:
     // A level's plan tab (D71): opened once, raised after; a view of the same model as the 3D tab.
     Viewport* openPlanTab(const QString& storey); // nullptr if it isn't a level of this model
     Viewport* modelView() const;                  // the 3D tab's view
+    ToolPalette* toolPalette() const { return m_palette; } // D71: the tools on the left
     // Sheets and project info (Slice 16, M4 exit).
     SheetsPanel* sheetsPanel() const { return m_sheetsPanel; }
     QString addSheet(const QString& paper, const QString& title); // its number, "" on failure
@@ -232,6 +234,8 @@ private:
     void addLevelDialog();
     void setPlanView(bool plan);
     void buildModelingToolbar();
+    void buildPalette();
+    void newSheetDialog(const QString& paper);
     void refreshTypes();
     void wallHeightDialog();
     void copyToLevelDialog();
@@ -326,6 +330,7 @@ private:
     QHash<QString, ViewHost*> m_hosts; // model views by key: "3d", "plan:<guid>"
     QWidget* m_cutColumn = nullptr;    // the plan-cut slider, in the active model view
     QVector<std::function<void(Viewport*)>> m_viewConnectors;
+    ToolPalette* m_palette = nullptr;
     // Each view has its own cuts (a plan tab is cut at its level; the 3D tab need not be).
     struct CutSettings {
         bool planCut = false;

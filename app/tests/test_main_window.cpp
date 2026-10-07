@@ -14,6 +14,8 @@
 
 #include "CombineDialog.h"
 #include "DockLayout.h"
+#include "ToolPalette.h"
+#include <QToolBar>
 #include <DockManager.h>
 #include <DockWidget.h>
 #include "DrawingView.h"
@@ -178,6 +180,45 @@ private slots:
         QVERIFY(!action(w, "actionPlanCut")->isChecked());
         w.dockLayout()->raise(QStringLiteral("plan:") + w.levelsBar()->activeStorey());
         QVERIFY(action(w, "actionPlanCut")->isChecked());
+    }
+
+    // D71: tools on the left in four groups; each tool in exactly one.
+    void everyToolIsInOnePaletteGroup()
+    {
+        kimcad::MainWindow w(nullptr, true);
+        kimcad::ToolPalette* p = w.toolPalette();
+        QCOMPARE(p->groups(), QStringList({"3d", "plane", "view", "edit"}));
+        const QHash<QString, QStringList> expected = {
+            {"3d", {"actionWallTool", "actionSlabTool", "actionColumnTool", "actionBeamTool", "actionDoorTool",
+                       "actionWindowTool", "actionStairTool", "actionRoofTool", "actionRoomTool",
+                       "actionSlabOpeningTool", "actionPlaceModelTool"}},
+            {"plane", {"actionTextTool", "actionDimensionTool", "actionLeaderTool", "actionMarkTool", "actionGridTool"}},
+            {"view", {"actionSectionTool", "actionElevationTool", "actionNewPlanTab", "actionNewSheet"}},
+            {"edit", {"actionMoveTool", "actionRotateTool", "actionStretchTool", "actionMirror", "actionCopyToLevel"}}};
+        QStringList seen;
+        for (const QString& g : p->groups()) {
+            QStringList names;
+            for (QAction* a : p->actions(g))
+                names << (a ? a->objectName() : QStringLiteral("(missing)"));
+            QCOMPARE(names, expected.value(g));
+            seen << names;
+        }
+        QCOMPARE(QSet<QString>(seen.begin(), seen.end()).size(), seen.size()); // each in one group only
+        QVERIFY(!w.findChild<QToolBar*>(QStringLiteral("modelingToolbar"))); // the old toolbar is gone
+        QVERIFY(w.dockLayout()->manager()->findDockWidget("tools"));
+        action(w, "actionMirror")->trigger();
+        QCOMPARE(w.tool(), kimcad::MainWindow::Tool::None); // nothing selected: refused, as before
+    }
+
+    void newPlanTabAndNewSheetFromThePalette()
+    {
+        kimcad::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        action(w, "actionNewPlanTab")->trigger();
+        QCOMPARE(w.currentViewKey(), QStringLiteral("plan:") + w.levelsBar()->activeStorey());
+        const int sheets = w.sheetsPanel()->count();
+        action(w, "actionNewSheet")->trigger();
+        QCOMPARE(w.sheetsPanel()->count(), sheets + 1);
     }
 
     void visibilityActionsUseTheSelection()

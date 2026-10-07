@@ -3,6 +3,8 @@
 #include "MainWindow.h"
 #include "DockLayout.h"
 #include "Scene.h"
+#include "Icons.h"
+#include "ToolPalette.h"
 #include "ViewHost.h"
 
 #include <QApplication>
@@ -127,6 +129,7 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     buildDocks();
     buildCutsToolbar();
     buildModelingToolbar();
+    buildPalette();
     buildProjectToolbar();
     statusBar()->showMessage(tr("Ready"));
 
@@ -261,7 +264,7 @@ void MainWindow::buildMenus()
     editAction(tr("&Copy"), "actionCopy", QKeySequence::Copy, [this] { copyToClipboard(); });
     editAction(tr("&Paste"), "actionPaste", QKeySequence::Paste, [this] { paste(); });
     editAction(tr("D&uplicate"), "actionDuplicate", QKeySequence(Qt::CTRL | Qt::Key_D), [this] { duplicateSelection(); });
-    editAction(tr("&Mirror"), "actionMirror", QKeySequence(Qt::CTRL | Qt::Key_M), [this] { setTool(Tool::Mirror); })
+    editAction(tr("&Mirror"), "actionMirror", QKeySequence(Qt::CTRL | Qt::Key_M), [this](bool on) { setTool(on ? Tool::Mirror : Tool::None); })
         ->setToolTip(tr("Mirror the selection: click two points of the mirror line (hold Ctrl on the second click to mirror a copy)"));
     editAction(tr("Multi&ply..."), "actionMultiply", QKeySequence(Qt::CTRL | Qt::Key_U), [this] { multiplyDialog(); });
     editAction(tr("&Offset..."), "actionOffset", QKeySequence(), [this] { offsetDialog(); });
@@ -371,16 +374,7 @@ void MainWindow::buildDocks()
         setSelection({guid});
     });
     connect(m_drawingsPanel, &DrawingsPanel::openRequested, this, [this](const QString& g) { openDrawing(g); });
-    connect(m_sheetsPanel, &SheetsPanel::newRequested, this, [this](const QString& paper) {
-        bool ok = m_quiet;
-        const QString title = m_quiet ? QString()
-            : QInputDialog::getText(this, tr("New sheet"), tr("Title:"), QLineEdit::Normal, QString(), &ok);
-        if (ok) {
-            const QString number = addSheet(paper, title);
-            if (!number.isEmpty())
-                openSheet(number);
-        }
-    });
+    connect(m_sheetsPanel, &SheetsPanel::newRequested, this, &MainWindow::newSheetDialog);
     connect(m_sheetsPanel, &SheetsPanel::openRequested, this, [this](const QString& n) { openSheet(n); });
     connect(m_sheetsPanel, &SheetsPanel::placeRequested, this, [this](const QString& n) {
         const QString drawing = m_drawingsPanel->selectedDrawing();
@@ -850,8 +844,9 @@ void MainWindow::setPlanView(bool plan)
 
 void MainWindow::buildModelingToolbar()
 {
-    QToolBar* bar = addToolBar(tr("Modeling"));
-    bar->setObjectName(QStringLiteral("modelingToolbar"));
+    // The tools' fields (type, heights, roof, length) until the tool options strip takes them.
+    QToolBar* bar = addToolBar(tr("Tool fields"));
+    bar->setObjectName(QStringLiteral("toolFieldsToolbar"));
     QMenu* model = menuBar()->addMenu(tr("&Model"));
     m_wallTool = new WallTool(this);
     m_polygonTool = new PolygonTool(this);
@@ -907,9 +902,16 @@ void MainWindow::buildModelingToolbar()
         {Tool::Elevation, "actionElevationTool", tr("&Elevation"), QKeyCombination(Qt::SHIFT, Qt::Key_V),
             tr("Elevation: click the two ends of the elevation line, then the side it looks at")},
     };
+    // The tools' icons: the IFC class each one makes (the tree's icons).
+    const QHash<int, QString> iconClass = {{int(Tool::Wall), "IfcWall"}, {int(Tool::Slab), "IfcSlab"},
+        {int(Tool::Door), "IfcDoor"}, {int(Tool::Window), "IfcWindow"}, {int(Tool::Column), "IfcColumn"},
+        {int(Tool::Beam), "IfcBeam"}, {int(Tool::Stair), "IfcStair"}, {int(Tool::Roof), "IfcRoof"},
+        {int(Tool::Room), "IfcSpace"}, {int(Tool::Grid), "IfcGrid"}};
     for (const Def& d : defs) {
-        QAction* a = bar->addAction(d.text);
+        auto* a = new QAction(d.text, this); // shown in the tool palette (D71) and the Model menu
         a->setObjectName(QLatin1String(d.name));
+        if (iconClass.contains(int(d.tool)))
+            a->setIcon(iconFor(iconClass.value(int(d.tool))));
         a->setShortcut(d.key);
         a->setCheckable(true);
         a->setToolTip(d.tip);
@@ -1755,6 +1757,49 @@ void MainWindow::buildProjectToolbar()
             refreshProject(); // put the combo back on the current option
     });
     m_projectBar->setVisible(false);
+}
+
+void MainWindow::buildPalette()
+{
+    // The View group's two commands that aren't drawing tools.
+    auto* newPlan = new QAction(tr("New &plan tab"), this);
+    newPlan->setObjectName(QStringLiteral("actionNewPlanTab"));
+    newPlan->setToolTip(tr("Open the active level's floor plan in its own tab"));
+    connect(newPlan, &QAction::triggered, this, [this] { openPlanTab(m_levels->activeStorey()); });
+    auto* newSheet = new QAction(tr("New &sheet"), this);
+    newSheet->setObjectName(QStringLiteral("actionNewSheet"));
+    newSheet->setToolTip(tr("Add an A1 sheet and open it"));
+    connect(newSheet, &QAction::triggered, this, [this] { newSheetDialog(QStringLiteral("A1")); });
+    // Mirror is a tool like the others: it shows as active while it is.
+    QAction* mirror = findChild<QAction*>(QStringLiteral("actionMirror"));
+    mirror->setCheckable(true);
+    m_toolActions.insert(int(Tool::Mirror), mirror);
+
+    auto act = [this](const char* name) { return findChild<QAction*>(QLatin1String(name)); };
+    auto tool = [this](Tool t) { return m_toolActions.value(int(t)); };
+    m_palette = new ToolPalette(this);
+    m_palette->addGroup(QStringLiteral("3d"), tr("3D"), {tool(Tool::Wall), tool(Tool::Slab), tool(Tool::Column),
+        tool(Tool::Beam), tool(Tool::Door), tool(Tool::Window), tool(Tool::Stair), tool(Tool::Roof), tool(Tool::Room),
+        tool(Tool::SlabOpening), tool(Tool::PlaceModel)});
+    m_palette->addGroup(QStringLiteral("plane"), tr("Plane"), {tool(Tool::Text), tool(Tool::Dimension),
+        tool(Tool::Leader), tool(Tool::Mark), tool(Tool::Grid)});
+    m_palette->addGroup(QStringLiteral("view"), tr("View"), {tool(Tool::Section), tool(Tool::Elevation),
+        newPlan, newSheet});
+    m_palette->addGroup(QStringLiteral("edit"), tr("Edit"), {tool(Tool::Move), tool(Tool::Rotate),
+        tool(Tool::Stretch), mirror, act("actionCopyToLevel")});
+    m_dock->addLeft(QStringLiteral("tools"), tr("Tools"), m_palette);
+}
+
+void MainWindow::newSheetDialog(const QString& paper)
+{
+    bool ok = m_quiet;
+    const QString title = m_quiet ? QString()
+        : QInputDialog::getText(this, tr("New sheet"), tr("Title:"), QLineEdit::Normal, QString(), &ok);
+    if (ok) {
+        const QString number = addSheet(paper, title);
+        if (!number.isEmpty())
+            openSheet(number);
+    }
 }
 
 void MainWindow::refreshProject()
