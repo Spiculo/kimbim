@@ -88,7 +88,8 @@ void DockLayout::removeView(const QString& key)
         return;
     m_views.removeAll(key);
     m_manager->removeDockWidget(dock);
-    delete dock; // and its widget
+    // Later: a close request arrives from inside the dock's own code (its close button).
+    dock->deleteLater(); // and its widget
     if (m_current == key) {
         m_current.clear();
         if (!m_views.isEmpty())

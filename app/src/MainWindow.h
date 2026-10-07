@@ -21,7 +21,6 @@ class QAction;
 class QDoubleSpinBox;
 
 class QComboBox;
-class QTabWidget;
 class QToolBar;
 class QSlider;
 class QLabel;
@@ -31,6 +30,9 @@ class QLineEdit;
 namespace kimcad {
 
 class LevelsBar;
+class DockLayout;
+class Scene;
+class ViewHost;
 class DrawingsPanel;
 class SheetsPanel;
 class DrawingView;
@@ -150,6 +152,10 @@ public:
     DrawingView* drawingView(const QString& guid) const { return m_drawingViews.value(guid); }
     void regenerateDrawing(const QString& guid);
     void showModelTab();
+    // D71: the docking layout; the key of the current center view ("3d", "plan:<guid>", a drawing
+    // guid or "sheet:<number>").
+    DockLayout* dockLayout() const { return m_dock; }
+    QString currentViewKey() const;
     // Sheets and project info (Slice 16, M4 exit).
     SheetsPanel* sheetsPanel() const { return m_sheetsPanel; }
     QString addSheet(const QString& paper, const QString& title); // its number, "" on failure
@@ -240,7 +246,8 @@ private:
     void exportSheetDialog(bool pdf);
     void drawingClick(QPointF p);
     void onDrawingGenerated(const QString& guid, const QJsonObject& result, const QString& error);
-    void closeDrawingTab(int index);
+    void activateView(const QString& key);
+    void closeView(const QString& key);
     void saveVersionDialog();
     void enableVersioningDialog();
     void openProjectDialog();
@@ -270,7 +277,8 @@ private:
     int m_loadedElements = 0;
     QString m_path;
     QElapsedTimer m_loadTimer;
-    Viewport* m_viewport;
+    Scene* m_scene;
+    Viewport* m_viewport; // the active model view (3D or a plan tab)
     ModelTreePanel* m_tree;
     PropertiesPanel* m_properties;
     QThread m_thread;
@@ -306,7 +314,9 @@ private:
     QHash<QString, QStringList> m_instanceMembers;
     QVector<QPointF> m_annotationPoints; // the dimension/section tool's clicks so far
     QStringList m_clipboard;            // Ctrl+C
-    QTabWidget* m_tabs = nullptr; // the model (3D/plan) and the open drawings
+    DockLayout* m_dock = nullptr;     // center views and side panels (D71)
+    QHash<QString, ViewHost*> m_hosts; // model views by key: "3d", "plan:<guid>"
+    QWidget* m_cutColumn = nullptr;    // the plan-cut slider, in the active model view
     DrawingsPanel* m_drawingsPanel = nullptr;
     SheetsPanel* m_sheetsPanel = nullptr;
     QHash<QString, DrawingView*> m_drawingViews;

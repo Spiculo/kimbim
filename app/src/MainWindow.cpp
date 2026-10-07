@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #define _USE_MATH_DEFINES
 #include "MainWindow.h"
+#include "DockLayout.h"
+#include "Scene.h"
+#include "ViewHost.h"
 
 #include <QApplication>
 #include <QCloseEvent>
-#include <QDockWidget>
+#include <QSettings>
 #include <QDoubleSpinBox>
 #include <QLabel>
 #include <QToolBar>
@@ -87,7 +90,8 @@ struct StepTimer {
 MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     : QMainWindow(parent)
     , m_quiet(quiet)
-    , m_viewport(new Viewport(this))
+    , m_scene(new Scene(this))
+    , m_viewport(new Viewport(m_scene))
     , m_tree(new ModelTreePanel(this))
     , m_properties(new PropertiesPanel(this))
     , m_loader(new ModelLoader(chunkSize))
@@ -95,17 +99,13 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     qRegisterMetaType<kimcad::MeshChunk>();
     setWindowTitle(QStringLiteral("KIMCAD"));
     resize(1280, 800);
-    // The 3D view with the plan-cut height slider at its right edge (owner feedback).
-    auto* central = new QWidget(this);
-    auto* row = new QHBoxLayout(central);
-    row->setContentsMargins(0, 0, 0, 0);
-    row->setSpacing(0);
-    row->addWidget(m_viewport, 1);
-    auto* cutColumn = new QVBoxLayout;
+    // The plan-cut height slider at the right edge of the active model view (owner feedback).
+    m_cutColumn = new QWidget(this);
+    auto* cutColumn = new QVBoxLayout(m_cutColumn);
     cutColumn->setContentsMargins(4, 6, 4, 6);
-    m_cutLabel = new QLabel(central);
+    m_cutLabel = new QLabel(m_cutColumn);
     m_cutLabel->setAlignment(Qt::AlignHCenter);
-    m_cutSlider = new QSlider(Qt::Vertical, central);
+    m_cutSlider = new QSlider(Qt::Vertical, m_cutColumn);
     m_cutSlider->setObjectName(QStringLiteral("planCutSlider"));
     m_cutSlider->setToolTip(tr("Plan cut height above the active level (drag to cut the model)"));
     m_cutSlider->setRange(0, 300);
@@ -114,22 +114,15 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     m_cutSlider->setTickInterval(50);
     cutColumn->addWidget(m_cutLabel);
     cutColumn->addWidget(m_cutSlider, 1, Qt::AlignHCenter);
-    row->addLayout(cutColumn);
-    // The model is the first tab; drawings open next to it (Slice 14).
-    m_tabs = new QTabWidget(this);
-    m_tabs->setObjectName(QStringLiteral("mainTabs"));
-    m_tabs->setDocumentMode(true);
-    m_tabs->addTab(central, tr("Model"));
-    m_tabs->setTabsClosable(true);
-    m_tabs->tabBar()->setTabButton(0, QTabBar::RightSide, nullptr); // the model tab stays
-    m_tabs->tabBar()->setTabButton(0, QTabBar::LeftSide, nullptr);
-    connect(m_tabs, &QTabWidget::tabCloseRequested, this, &MainWindow::closeDrawingTab);
-    connect(m_tabs, &QTabWidget::currentChanged, this, [this](int index) {
-        auto* view = qobject_cast<DrawingView*>(m_tabs->widget(index));
-        if (view && (view->isStale() || !view->hasDrawing()))
-            regenerateDrawing(view->guid()); // a drawing brought to the front is brought up to date
-    });
-    setCentralWidget(m_tabs);
+    // D71: the 3D view is the first center tab; plans, drawings and sheets open next to it, and any
+    // tab can be dragged out to its own window.
+    m_dock = new DockLayout(this);
+    auto* host = new ViewHost(m_viewport);
+    m_hosts.insert(QStringLiteral("3d"), host);
+    host->adoptChrome(nullptr, m_cutColumn);
+    m_dock->addView(QStringLiteral("3d"), tr("3D"), host, false);
+    connect(m_dock, &DockLayout::currentChanged, this, &MainWindow::activateView);
+    connect(m_dock, &DockLayout::closeRequested, this, &MainWindow::closeView);
     buildMenus();
     buildDocks();
     buildCutsToolbar();
@@ -177,6 +170,10 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     QString error;
     if (!PythonEngine::instance().start(&error))
         showError(tr("KIMCAD cannot start"), error);
+    // The window layout of the last session (D71); tests and the self-test start from the default.
+    m_dock->captureDefault();
+    if (!m_quiet)
+        m_dock->restoreLayout(QSettings().value(QStringLiteral("layout/state")).toByteArray());
 }
 
 MainWindow::~MainWindow()
@@ -348,21 +345,17 @@ void MainWindow::buildMenus()
 
 void MainWindow::buildDocks()
 {
-    auto* treeDock = new QDockWidget(tr("Model"), this);
-    treeDock->setObjectName(QStringLiteral("ModelDock"));
-    treeDock->setWidget(m_tree);
-    addDockWidget(Qt::LeftDockWidgetArea, treeDock);
-    auto* propsDock = new QDockWidget(tr("Properties"), this);
-    propsDock->setObjectName(QStringLiteral("PropertiesDock"));
-    propsDock->setWidget(m_properties);
-    addDockWidget(Qt::RightDockWidgetArea, propsDock);
+    // D71: the panels are tabs in one area on the right (it can auto-hide or float).
     m_history = new HistoryPanel(this);
-    auto* historyDock = new QDockWidget(tr("History"), this);
-    historyDock->setObjectName(QStringLiteral("HistoryDock"));
-    historyDock->setWidget(m_history);
-    addDockWidget(Qt::RightDockWidgetArea, historyDock);
-    tabifyDockWidget(propsDock, historyDock);
-    propsDock->raise();
+    m_layersPanel = new LayersPanel(this);
+    m_drawingsPanel = new DrawingsPanel(this);
+    m_sheetsPanel = new SheetsPanel(this);
+    m_dock->addPanel(QStringLiteral("tree"), tr("Model"), m_tree);
+    m_dock->addPanel(QStringLiteral("properties"), tr("Properties"), m_properties);
+    m_dock->addPanel(QStringLiteral("layers"), tr("Layers"), m_layersPanel);
+    m_dock->addPanel(QStringLiteral("history"), tr("History"), m_history);
+    m_dock->addPanel(QStringLiteral("drawings"), tr("Drawings"), m_drawingsPanel);
+    m_dock->addPanel(QStringLiteral("sheets"), tr("Sheets"), m_sheetsPanel);
     connect(m_history, &HistoryPanel::compareRequested, this, [this](const QString& a, const QString& b) { compareWith(a, b); });
     connect(m_history, &HistoryPanel::endCompareRequested, this, &MainWindow::endCompare);
     connect(m_history, &HistoryPanel::beforeAfterRequested, this, [this](const QString& guid) {
@@ -374,25 +367,7 @@ void MainWindow::buildDocks()
         m_tree->selectGuids({guid});
         setSelection({guid});
     });
-    m_layersPanel = new LayersPanel(this);
-    auto* layersDock = new QDockWidget(tr("Layers"), this);
-    layersDock->setObjectName(QStringLiteral("LayersDock"));
-    layersDock->setWidget(m_layersPanel);
-    addDockWidget(Qt::LeftDockWidgetArea, layersDock);
-    tabifyDockWidget(treeDock, layersDock);
-    m_drawingsPanel = new DrawingsPanel(this);
-    auto* drawingsDock = new QDockWidget(tr("Drawings"), this);
-    drawingsDock->setObjectName(QStringLiteral("DrawingsDock"));
-    drawingsDock->setWidget(m_drawingsPanel);
-    addDockWidget(Qt::LeftDockWidgetArea, drawingsDock);
-    tabifyDockWidget(layersDock, drawingsDock);
     connect(m_drawingsPanel, &DrawingsPanel::openRequested, this, [this](const QString& g) { openDrawing(g); });
-    m_sheetsPanel = new SheetsPanel(this);
-    auto* sheetsDock = new QDockWidget(tr("Sheets"), this);
-    sheetsDock->setObjectName(QStringLiteral("SheetsDock"));
-    sheetsDock->setWidget(m_sheetsPanel);
-    addDockWidget(Qt::LeftDockWidgetArea, sheetsDock);
-    tabifyDockWidget(drawingsDock, sheetsDock);
     connect(m_sheetsPanel, &SheetsPanel::newRequested, this, [this](const QString& paper) {
         bool ok = m_quiet;
         const QString title = m_quiet ? QString()
@@ -430,7 +405,7 @@ void MainWindow::buildDocks()
             statusBar()->showMessage(tr("Could not delete it: %1").arg(r.value("error").toString()));
         afterEdit(r);
     });
-    treeDock->raise();
+    m_dock->raisePanel(QStringLiteral("tree"));
     connect(m_layersPanel, &LayersPanel::visibilityToggled, this, &MainWindow::setLayerVisible);
     connect(m_layersPanel, &LayersPanel::lockToggled, this, &MainWindow::setLayerLocked);
     connect(m_layersPanel, &LayersPanel::activeRequested, this, &MainWindow::setActiveLayer);
@@ -474,7 +449,6 @@ void MainWindow::buildDocks()
             m_currentView.clear();
         afterEdit(r);
     });
-    resizeDocks({treeDock, propsDock}, {340, 360}, Qt::Horizontal);
 }
 
 void MainWindow::buildCutsToolbar()
@@ -626,6 +600,8 @@ void MainWindow::closeEvent(QCloseEvent* event)
         return;
     }
     stopLoading();
+    if (!m_quiet)
+        QSettings().setValue(QStringLiteral("layout/state"), m_dock->saveLayout()); // D71: the next session's layout
     event->accept();
 }
 
@@ -2480,24 +2456,24 @@ void MainWindow::refreshDrawings()
         markers << m;
     }
     m_viewport->setDrawingMarkers(markers, m_levels->activeElevation());
-    for (int i = m_tabs->count() - 1; i > 0; --i) {
-        auto* view = qobject_cast<DrawingView*>(m_tabs->widget(i));
+    for (const QString& key : m_dock->viewKeys()) {
+        auto* view = qobject_cast<DrawingView*>(m_dock->view(key));
         if (!view || view->guid().startsWith(QLatin1String("sheet:")))
             continue; // sheets are refreshed by refreshSheets()
         const auto it = byGuid.constFind(view->guid());
         if (it == byGuid.constEnd()) { // deleted (or undone): its tab goes too
-            closeDrawingTab(i);
+            closeView(key);
             continue;
         }
-        m_tabs->setTabText(i, it->value("name").toString());
+        m_dock->setTitle(key, it->value("name").toString());
         view->setStale(it->value("stale").toBool());
     }
 }
 
 bool MainWindow::openDrawing(const QString& guid)
 {
-    if (DrawingView* view = m_drawingViews.value(guid)) {
-        m_tabs->setCurrentWidget(view);
+    if (m_drawingViews.contains(guid)) {
+        m_dock->raise(guid);
         return true;
     }
     QString name;
@@ -2506,12 +2482,12 @@ bool MainWindow::openDrawing(const QString& guid)
             name = v.toObject().value("name").toString();
     if (name.isEmpty())
         return false;
-    auto* view = new DrawingView(guid, m_tabs);
+    auto* view = new DrawingView(guid);
     connect(view, &DrawingView::regenerateRequested, this, &MainWindow::regenerateDrawing);
     m_drawingViews.insert(guid, view);
     view->setStale(true);
-    m_tabs->addTab(view, name);
-    m_tabs->setCurrentWidget(view); // brings it up to date (currentChanged)
+    m_dock->addView(guid, name, view, true);
+    m_dock->raise(guid); // brings it up to date (activateView)
     if (!m_generating.contains(guid) && !view->hasDrawing())
         regenerateDrawing(guid);
     return true;
@@ -2519,17 +2495,39 @@ bool MainWindow::openDrawing(const QString& guid)
 
 void MainWindow::showModelTab()
 {
-    m_tabs->setCurrentIndex(0);
+    m_dock->raise(QStringLiteral("3d"));
 }
 
-void MainWindow::closeDrawingTab(int index)
+QString MainWindow::currentViewKey() const
 {
-    auto* view = qobject_cast<DrawingView*>(m_tabs->widget(index));
-    if (!view)
-        return; // the model tab stays
-    m_drawingViews.remove(view->guid());
-    m_tabs->removeTab(index);
-    view->deleteLater();
+    return m_dock->current();
+}
+
+void MainWindow::activateView(const QString& key)
+{
+    if (auto* view = qobject_cast<DrawingView*>(m_dock->view(key))) {
+        setTool(Tool::None); // the tools draw in model views
+        if (view->isStale() || !view->hasDrawing())
+            regenerateDrawing(view->guid()); // a drawing brought to the front is brought up to date
+        return;
+    }
+    ViewHost* host = m_hosts.value(key);
+    if (!host)
+        return;
+    if (host->viewport() != m_viewport) {
+        setTool(Tool::None); // a tool doesn't carry over to another view
+        m_viewport = host->viewport();
+    }
+    host->adoptChrome(nullptr, m_cutColumn);
+}
+
+void MainWindow::closeView(const QString& key)
+{
+    if (key == QLatin1String("3d"))
+        return; // the 3D tab stays
+    if (auto* view = qobject_cast<DrawingView*>(m_dock->view(key)))
+        m_drawingViews.remove(view->guid());
+    m_dock->removeView(key);
 }
 
 void MainWindow::regenerateDrawing(const QString& guid)
@@ -2608,12 +2606,12 @@ void MainWindow::onDrawingGenerated(const QString& guid, const QJsonObject& resu
     if (guid.startsWith(QLatin1String("sheet:"))) {
         refreshSheets(false); // the drawings' places, for dragging
         view->setStale(false);
-        if (m_generateAgain.remove(guid) && m_tabs->currentWidget() == view)
+        if (m_generateAgain.remove(guid) && m_dock->current() == guid)
             regenerateDrawing(guid);
         return;
     }
     refreshDrawings(); // stale again if the model changed while it was generated
-    if (m_generateAgain.remove(guid) && view->isStale() && m_tabs->currentWidget() == view)
+    if (m_generateAgain.remove(guid) && view->isStale() && m_dock->current() == guid)
         regenerateDrawing(guid);
 }
 
@@ -2646,8 +2644,8 @@ bool MainWindow::placeOnSheet(const QString& number, const QString& drawingGuid)
 bool MainWindow::openSheet(const QString& number)
 {
     const QString key = QStringLiteral("sheet:") + number;
-    if (DrawingView* view = m_drawingViews.value(key)) {
-        m_tabs->setCurrentWidget(view);
+    if (m_drawingViews.contains(key)) {
+        m_dock->raise(key);
         return true;
     }
     bool exists = false;
@@ -2655,7 +2653,7 @@ bool MainWindow::openSheet(const QString& number)
         exists = exists || v.toObject().value("number").toString() == number;
     if (!exists)
         return false;
-    auto* view = new DrawingView(key, m_tabs);
+    auto* view = new DrawingView(key);
     connect(view, &DrawingView::regenerateRequested, this, &MainWindow::regenerateDrawing);
     connect(view, &DrawingView::placedMoved, this, [this, number](const QString& drawing, QPointF topLeft) {
         const QJsonObject r = bridge("move_placed", {number, drawing, QString::number(topLeft.x(), 'f', 1),
@@ -2666,8 +2664,8 @@ bool MainWindow::openSheet(const QString& number)
     });
     m_drawingViews.insert(key, view);
     view->setStale(true);
-    m_tabs->addTab(view, tr("Sheet %1").arg(number));
-    m_tabs->setCurrentWidget(view);
+    m_dock->addView(key, tr("Sheet %1").arg(number), view, true);
+    m_dock->raise(key);
     if (!m_generating.contains(key) && !view->hasDrawing())
         regenerateDrawing(key);
     return true;
@@ -2680,13 +2678,13 @@ void MainWindow::refreshSheets(bool changed)
     QHash<QString, QJsonObject> byNumber;
     for (const auto& v : list)
         byNumber.insert(v.toObject().value("number").toString(), v.toObject());
-    for (int i = m_tabs->count() - 1; i > 0; --i) {
-        auto* view = qobject_cast<DrawingView*>(m_tabs->widget(i));
+    for (const QString& key : m_dock->viewKeys()) {
+        auto* view = qobject_cast<DrawingView*>(m_dock->view(key));
         if (!view || !view->guid().startsWith(QLatin1String("sheet:")))
             continue;
         const auto it = byNumber.constFind(view->guid().mid(6));
         if (it == byNumber.constEnd()) {
-            closeDrawingTab(i);
+            closeView(key);
             continue;
         }
         QVector<DrawingView::Placed> placed;
@@ -2696,10 +2694,10 @@ void MainWindow::refreshSheets(bool changed)
                 QRectF(p.value("x").toDouble(), p.value("y").toDouble(), p.value("w").toDouble(), p.value("h").toDouble())});
         }
         view->setPlaced(placed);
-        m_tabs->setTabText(i, tr("Sheet %1").arg(it->value("number").toString()));
+        m_dock->setTitle(key, tr("Sheet %1").arg(it->value("number").toString()));
         if (changed && !m_generating.contains(view->guid()) && view->hasDrawing()) {
             view->setStale(true); // the model or the sheet changed: compose it again
-            if (m_tabs->currentWidget() == view)
+            if (m_dock->current() == key)
                 QMetaObject::invokeMethod(this, [this, g = view->guid()] { regenerateDrawing(g); }, Qt::QueuedConnection);
         }
     }
@@ -2728,7 +2726,7 @@ bool MainWindow::exportSheet(const QString& number, const QString& path)
 void MainWindow::exportSheetDialog(bool pdf)
 {
     QString number = m_sheetsPanel->selectedSheet();
-    if (auto* view = qobject_cast<DrawingView*>(m_tabs->currentWidget()); view && view->guid().startsWith(QLatin1String("sheet:")))
+    if (auto* view = qobject_cast<DrawingView*>(m_dock->view(m_dock->current())); view && view->guid().startsWith(QLatin1String("sheet:")))
         number = view->guid().mid(6);
     if (number.isEmpty()) {
         showError(tr("No sheet"), tr("Add a sheet in the Sheets panel first."));

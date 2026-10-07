@@ -13,6 +13,9 @@
 #include <cmath>
 
 #include "CombineDialog.h"
+#include "DockLayout.h"
+#include <DockManager.h>
+#include <DockWidget.h>
 #include "DrawingView.h"
 #include "PythonEngine.h"
 #include <QPushButton>
@@ -65,6 +68,46 @@ QAction* action(kimcad::MainWindow& w, const char* name)
 class TestMainWindow : public QObject {
     Q_OBJECT
 private slots:
+    // D71: the 3D view, drawings and sheets are center tabs; the panels are tabbed on the right.
+    void viewsAndPanelsLiveInTheDockLayout()
+    {
+        kimcad::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        kimcad::DockLayout* dock = w.dockLayout();
+        QVERIFY(dock->view("3d"));
+        QVERIFY(!dock->manager()->findDockWidget("3d")->features().testFlag(ads::CDockWidget::DockWidgetClosable));
+        for (const char* panel : {"tree", "properties", "layers", "history", "drawings", "sheets"})
+            QVERIFY2(dock->manager()->findDockWidget(QLatin1String(panel)), panel);
+        QCOMPARE(w.currentViewKey(), QString("3d"));
+        const QString south = w.drawingGuid(QStringLiteral("South Elevation"));
+        QVERIFY(w.openDrawing(south));
+        QCOMPARE(w.currentViewKey(), south);
+        emit dock->closeRequested(south); // the tab's x
+        QVERIFY(!w.drawingView(south));
+        QVERIFY(!dock->view(south));
+        QCOMPARE(w.currentViewKey(), QString("3d"));
+        emit dock->closeRequested("3d"); // never closes
+        QVERIFY(dock->view("3d"));
+    }
+
+    void layoutRestoreSkipsUnknownAndOffscreen()
+    {
+        QByteArray saved;
+        {
+            kimcad::MainWindow w(nullptr, true);
+            QVERIFY(w.newProject());
+            QVERIFY(w.openDrawing(w.drawingGuid(QStringLiteral("North Elevation"))));
+            saved = w.dockLayout()->saveLayout();
+        }
+        kimcad::MainWindow w(nullptr, true); // a new session: that drawing tab doesn't exist here
+        QVERIFY(w.newProject());
+        w.dockLayout()->restoreLayout(saved); // never throws, never loses the 3D tab
+        QVERIFY(w.dockLayout()->view("3d"));
+        QVERIFY(!w.dockLayout()->restoreLayout(QByteArray("garbage")));
+        QVERIFY(w.dockLayout()->view("3d"));
+        QVERIFY(w.dockLayout()->manager()->findDockWidget("tree"));
+    }
+
     void visibilityActionsUseTheSelection()
     {
         kimcad::MainWindow w(nullptr, /*quiet=*/true);

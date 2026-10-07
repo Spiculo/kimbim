@@ -30,6 +30,7 @@ qt_add_library(kimcad_core STATIC
     src/SheetsPanel.cpp src/SheetsPanel.h
     src/DockLayout.cpp src/DockLayout.h
     src/Scene.cpp src/Scene.h
+    src/ViewHost.cpp src/ViewHost.h
 )
 target_include_directories(kimcad_core PUBLIC src)
 # Element icons (owner feedback: objects need an icon and a hint on hover).

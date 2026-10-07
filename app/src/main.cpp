@@ -16,6 +16,7 @@ int main(int argc, char* argv[])
             qputenv("QT_QPA_PLATFORM", "offscreen");
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("KIMCAD"));
+    QApplication::setOrganizationName(QStringLiteral("KIMCAD")); // QSettings: the window layout (D71)
     QApplication::setApplicationVersion(QStringLiteral(KIMCAD_VERSION));
 
     QCommandLineParser parser;

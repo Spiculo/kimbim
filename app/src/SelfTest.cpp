@@ -13,13 +13,15 @@
 #include <QJsonObject>
 #include <QTemporaryDir>
 #include <QTimer>
-#include <QBoxLayout>
 #include <QImage>
 #include <QSet>
 
 #include <cstdio>
 
+#include "DockLayout.h"
 #include "DrawingView.h"
+#include <DockManager.h>
+#include <DockWidget.h>
 #include "MainWindow.h"
 #include "HostTool.h"
 #include "TwoPointTool.h"
@@ -351,22 +353,16 @@ int runSelfTest(const SelfTestOptions& options)
                     colours.insert(image.pixel(x, y));
             return colours.size() >= 2 && !v->pickAt(v->width() / 2, v->height() / 2).isNull();
         };
-        QWidget* host = viewport->parentWidget();
-        auto* hostLayout = qobject_cast<QBoxLayout*>(host->layout());
-        const int at = hostLayout ? hostLayout->indexOf(viewport) : -1;
-        auto* floating = new QWidget;
-        auto* lay = new QVBoxLayout(floating);
-        lay->setContentsMargins(0, 0, 0, 0);
-        lay->addWidget(viewport);
-        floating->resize(w, h);
-        floating->show();
+        DockLayout* dock = window.dockLayout();
+        const QByteArray docked = dock->saveLayout();
+        ads::CDockWidget* tab = dock->manager()->findDockWidget(QStringLiteral("3d"));
+        tab->setFloating(); // what dragging the tab out does
         QApplication::processEvents();
+        result.insert(QStringLiteral("pop_out_floating"), tab->isFloating());
         viewport->fitAll();
         QApplication::processEvents();
-        const bool outside = drawsSomething(viewport);
-        if (hostLayout)
-            hostLayout->insertWidget(std::max(at, 0), viewport, 1);
-        delete floating;
+        const bool outside = tab->isFloating() && drawsSomething(viewport);
+        dock->restoreLayout(docked); // docked back
         QApplication::processEvents();
         viewport->fitAll();
         QApplication::processEvents();
