@@ -208,6 +208,12 @@ MainWindow::~MainWindow()
     stopLoading();
     m_thread.quit();
     m_thread.wait();
+    // The 3D views go while the window still has its native handles: destroying the window destroys
+    // its child windows, and a view torn down after that can't release its OpenGL context (D71).
+    for (ViewHost* host : std::as_const(m_hosts))
+        delete host->viewport();
+    m_hosts.clear();
+    m_viewport = nullptr;
 }
 
 void MainWindow::buildMenus()

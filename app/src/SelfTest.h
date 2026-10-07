@@ -22,6 +22,8 @@ struct SelfTestOptions {
     bool createDrawings = false; // View > Create floor plans and elevations after loading (an opened IFC has none)
     QString openDrawing;          // a drawing's name: open it in its tab, wait for it, report its paper size
     bool popOut = false;          // move the 3D view to its own window and back (a tab dragged out, D71)
+    bool benchEdit = false;       // time moving a wall back and forth (ms per edit, and per refresh step)
+    bool planTab = false;         // with benchEdit: a plan tab of the active level open and active
 };
 
 // Opens the model in a real window, loads it, measures, prints one JSON line to stdout.

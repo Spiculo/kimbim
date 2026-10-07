@@ -46,6 +46,11 @@ int main(int argc, char* argv[])
     QCommandLineOption popOut(QStringLiteral("pop-out"),
         QStringLiteral("Self-test: move the 3D view to its own window and back; it must keep drawing."));
     parser.addOption(popOut);
+    QCommandLineOption benchEdit(QStringLiteral("bench-edit"),
+        QStringLiteral("Self-test: time moving a wall of the loaded model (ms per edit and per refresh step)."));
+    parser.addOption(benchEdit);
+    QCommandLineOption planTab(QStringLiteral("plan-tab"), QStringLiteral("Self-test: with --bench-edit, edit in a plan tab."));
+    parser.addOption(planTab);
     QCommandLineOption drawWalls(QStringLiteral("draw-walls"),
         QStringLiteral("Self-test: on a new project, draw walls through these points (\"x,y;x,y;...\", metres)."),
         QStringLiteral("points"));
@@ -100,6 +105,8 @@ int main(int argc, char* argv[])
         options.chunkSize = qMax(1, parser.value(chunk).toInt());
         options.boxSelect = parser.isSet(boxSelect);
         options.popOut = parser.isSet(popOut);
+        options.benchEdit = parser.isSet(benchEdit);
+        options.planTab = parser.isSet(planTab);
         options.drawWalls = parser.value(drawWalls);
         options.planView = parser.isSet(planView);
         options.linesOnly = parser.isSet(linesOnly);

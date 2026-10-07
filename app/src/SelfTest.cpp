@@ -32,6 +32,7 @@
 #include <cmath>
 #include <utility>
 
+#include "LevelsBar.h"
 #include "ModelTreePanel.h"
 #include "PythonEngine.h"
 #include "Viewport.h"
@@ -378,6 +379,37 @@ int runSelfTest(const SelfTestOptions& options)
         result.insert(QStringLiteral("plan_cut"), options.planCut);
         result.insert(QStringLiteral("planes"), viewport->clipPlaneCount());
         result.insert(QStringLiteral("fps_with_cut"), viewport->measureFps(options.frames));
+    }
+    if (options.benchEdit) {
+        // D71: an edit's refresh with one view (3D) or with a plan tab open and active (its cut on).
+        if (options.planTab)
+            window.openPlanTab(window.levelsBar()->activeStorey());
+        QApplication::processEvents();
+        QString wall;
+        for (const QString& g : window.viewport()->guids())
+            if (window.viewport()->typeOf(g).startsWith(QLatin1String("IfcWall"))) {
+                wall = g;
+                break;
+            }
+        const int edits = 6;
+        double total = 0;
+        bool moved = !wall.isEmpty();
+        window.resetTimings();
+        for (int i = 0; moved && i < edits; ++i) {
+            window.setSelection({wall});
+            QElapsedTimer t;
+            t.start();
+            moved = window.moveSelection(QPointF(i % 2 ? -0.1 : 0.1, 0.0), /*detach=*/true);
+            QApplication::processEvents();
+            total += double(t.nsecsElapsed()) / 1e6;
+        }
+        QJsonObject steps;
+        for (auto it = window.timings().constBegin(); it != window.timings().constEnd(); ++it)
+            steps.insert(it.key(), it.value() / edits);
+        result.insert(QStringLiteral("edit_ms"), total / edits);
+        result.insert(QStringLiteral("edit_steps_ms"), steps);
+        result.insert(QStringLiteral("edit_views"), options.planTab ? 2 : 1);
+        result.insert(QStringLiteral("ok"), result.value("ok").toBool() && moved);
     }
     if (options.createDrawings) {
         window.findChild<QAction*>(QStringLiteral("actionCreateDrawings"))->trigger();
