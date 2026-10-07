@@ -66,7 +66,7 @@ Display (Slice 4b): every element has border lines (outline and creases); View �
 | **Type vs. element values** (D50): values inherited from the element's type are dimmed; editing writes the element's own value (an override); *Edit type value…* changes the type for every element of it, after a confirmation with the count; *Reset to type value* drops the override | P0 | `ifcopenshell.util.element.get_type` |
 | **Schedules**: table views of objects × properties, editable, CSV/XLSX export | P1 | Bonsai/IfcOpenShell `ifccsv` |
 | Search and filter with a query language | P0 | `ifcopenshell.util.selector` syntax (e.g. `IfcWall, Pset_WallCommon.FireRating=EI60`) |
-| Object history panel (versioned projects) | P0 | [03](03-versioning.md#object-history-blame) |
+| Object history panel (versioned projects) | P0 | ✅ Slice 20: *Object history…* dialog ([03](03-versioning.md#object-history-blame)) |
 
 ## 5. Modeling
 
@@ -134,7 +134,7 @@ Clones get **new KIMCAD IDs and GlobalIds**. They never share identity with the 
 | Compare any two versions: viewport coloring + change list + before/after | P0 | ✅ Slice 8: version vs current or two versions, added green / modified orange, change list (click selects); ✅ Slice 20: before/after per element (field by field) |
 | Design options: create, switch, delete | P0 | Branches. ✅ Slice 8: create, switch (with an unsaved-changes guard); delete: Slice 20 |
 | Combine options with conflict resolution UI | P1 | [03](03-versioning.md#merge-combine-options) |
-| Milestones | P0 | Tags |
+| Milestones | P0 | ✅ Slice 20: annotated tags (D67) |
 | Re-import from external tool with reconciliation report | P1 | [03](03-versioning.md#import-reconciliation) |
 | Remotes: push/pull to a Git host | P2 | [08](08-future.md) |
 
