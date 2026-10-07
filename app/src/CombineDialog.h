@@ -46,6 +46,7 @@ private:
     QJsonObject m_resolutions;
     QJsonObject m_preview;
     bool m_refreshing = false;
+    bool m_refreshQueued = false; // a choice queued a refresh; a direct refresh() makes it unneeded
 };
 
 } // namespace kimcad

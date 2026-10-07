@@ -106,3 +106,27 @@ def test_compare_two_options_by_name(options):
     r = call("compare", "Scheme B", "main")
     assert r["ok"], r
     assert options["w1"] in [x["guid"] for x in r["modified"]]
+
+
+def test_a_fast_forward_compares_the_versions_once(options):
+    """combine_options repeated the merge preview through combine_preview, which diffed the two versions
+    twice: four decompositions of the model for one fast-forward (seconds on real files)."""
+    from kimcad import versioning
+
+    c = call("combine_preview", "Scheme B", "{}")["conflicts"][0]
+    assert call("combine_options", "Scheme B", json.dumps({c["id"]: "theirs"}))["ok"]
+    assert call("save_version", "Combine Scheme B")["ok"]
+    assert call("switch_option", "Scheme B")["ok"]
+    project = versioning._project
+    calls = {"diff": 0, "merge_preview": 0}
+    for name in calls:
+        real = getattr(project, name)
+
+        def spy(*args, _real=real, _name=name, **kwargs):
+            calls[_name] += 1
+            return _real(*args, **kwargs)
+
+        setattr(project, name, spy)
+    ff = call("combine_options", "main", "{}")
+    assert ff["ok"] and ff["status"] == "fast_forward"
+    assert calls == {"diff": 1, "merge_preview": 1}

@@ -59,6 +59,12 @@ def project_info() -> str:
                     "address": ", ".join(address.AddressLines or ()) if address is not None and address.AddressLines else ""})
 
 
+def _remove_if_unused(f, entity):
+    """Remove a replaced organization, role or address once nothing refers to it (no loose records)."""
+    if entity is not None and f.get_total_inverses(entity) == 0:
+        f.remove(entity)
+
+
 def set_project_info(info_json: str) -> str:
     """{number, name, client, address}: any of them; empty strings clear."""
     if B._model is None:
@@ -83,13 +89,17 @@ def set_project_info(info_json: str) -> str:
                         building.BuildingAddress = f.createIfcPostalAddress(Purpose="SITE")
                     building.BuildingAddress.AddressLines = [info["address"]]
                 else:
-                    building.BuildingAddress = None
+                    old, building.BuildingAddress = building.BuildingAddress, None
+                    _remove_if_unused(f, old)
         if "client" in info:
             rel = _client_actor()
             if rel is not None:
-                actor = rel.RelatingActor
+                actor, role = rel.RelatingActor, rel.ActingRole
                 f.remove(rel)
+                org = actor.TheActor
                 f.remove(actor)
+                _remove_if_unused(f, role)
+                _remove_if_unused(f, org)  # imported files can share it (e.g. with owner history)
             if info["client"]:
                 org = f.createIfcOrganization(Name=info["client"])
                 actor = f.createIfcActor(GlobalId=ifcopenshell.guid.new(), Name=info["client"], TheActor=org)
@@ -134,8 +144,7 @@ def _drawing_size(guid: str):
     r = json.loads(D.generate_drawing(guid, ""))
     if not r.get("ok"):
         return None, r.get("error", "could not generate the drawing")
-    m = re.search(r'viewBox="([-\d.]+) ([-\d.]+) ([\d.]+) ([\d.]+)"', r["svg"])
-    return (float(m.group(3)), float(m.group(4))) if m else (0.0, 0.0), r["svg"]
+    return _svg_size(r["svg"]), r["svg"]
 
 
 def sheets() -> str:
@@ -157,15 +166,31 @@ def sheets() -> str:
     return B._dump({"sheets": out})
 
 
-_sizes: dict[str, tuple] = {}
+_sizes: dict[str, tuple] = {}  # drawing GlobalId -> (model state, size): the last size measured
+
+
+def _svg_size(svg: str):
+    m = re.search(r'viewBox="([-\d.]+) ([-\d.]+) ([\d.]+) ([\d.]+)"', svg)
+    return (float(m.group(3)), float(m.group(4))) if m else (0.0, 0.0)
 
 
 def _cached_size(guid: str):
-    key = (guid, *D._state_key())
-    if key not in _sizes:
-        size, _ = _drawing_size(guid)
-        _sizes[key] = size or (0.0, 0.0)
-    return _sizes[key]
+    """The drawing's size on paper. sheets() runs on the GUI thread after every edit, so a drawing is
+    generated here only when it was never measured; otherwise its last size is kept until a generation
+    at the current state (the sheet's, in the background) is in the drawing cache."""
+    state = D._state_key()
+    known = _sizes.get(guid)
+    if known is not None and known[0] == state:
+        return known[1]
+    svg = next((s for k, s in D._cache.get(guid, {}).items() if k[:2] == state), None)
+    if svg is not None:
+        size = _svg_size(svg)
+    elif known is not None:
+        return known[1]
+    else:
+        size = _drawing_size(guid)[0] or (0.0, 0.0)
+    _sizes[guid] = (state, size)
+    return size
 
 
 def _next_number() -> str:
@@ -356,13 +381,15 @@ def _esc(value: str) -> str:
 
 
 def _inner(svg: str):
-    """A drawing SVG's style and its content without the outer <svg> element."""
-    style = "\n".join(re.findall(r"<style[^>]*>.*?</style>", svg, re.S))
+    """A drawing SVG's styles, its <defs> (markers its style points at with url(#...)) and its content
+    without the outer <svg> element."""
+    styles = re.findall(r"<style[^>]*>.*?</style>", svg, re.S)
+    defs = re.findall(r"<defs>.*?</defs>", svg, re.S)
     body = re.sub(r"^.*?<svg[^>]*>", "", svg, count=1, flags=re.S)
     body = body.rsplit("</svg>", 1)[0]
     body = re.sub(r"<style[^>]*>.*?</style>", "", body, flags=re.S)
     body = re.sub(r"<defs>.*?</defs>", "", body, flags=re.S)
-    return style, body
+    return styles, defs, body
 
 
 def _title_block(sheet, width, height, info) -> list:
@@ -408,9 +435,10 @@ def sheet_svg(number: str) -> str:
         k = 100.0 / p["scale"]
         m = re.search(r'viewBox="([-\d.]+) ([-\d.]+) ([\d.]+) ([\d.]+)"', svg)
         vx, vy = (float(m.group(1)), float(m.group(2))) if m else (0.0, 0.0)
-        style, body = _inner(svg)
-        if style and not styles:
-            styles.append(style)
+        own_styles, own_defs, body = _inner(svg)
+        for block in own_styles + own_defs:  # the drawings share them: each distinct one once
+            if block not in styles:
+                styles.append(block)
         parts.append(f'<g class="kimcad-view" transform="translate({p["x"]:.3f} {p["y"]:.3f}) scale({k:g}) '
                      f'translate({-vx:.3f} {-vy:.3f})">\n{body}\n</g>')
         tx, ty = p["x"], p["y"] + size[1] * k + 6

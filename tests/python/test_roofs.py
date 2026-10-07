@@ -137,3 +137,23 @@ def test_roof_in_a_section(box):
     s = call("create_section", -2.0, 4.0, 12.0, 4.0, 5.0, 8.0, -1)["guid"]
     svg = call("generate_drawing", s, "")["svg"]
     assert "IfcRoof" in svg  # the serializer draws the roof
+
+
+def test_attached_walls_are_found_in_ifc2x3_models():
+    """IFC2X3 names the pset->relationship inverse PropertyDefinitionOf (IFC4: DefinesOccurrence);
+    reading the IFC4 name raised AttributeError in every after-edit hook of an imported Revit model."""
+    import ifcopenshell.api
+    from kimcad import roofs
+    from kimcad.testing import _reset_owner, build_model
+
+    try:
+        f = build_model(schema="IFC2X3", walls=1)
+        wall = f.by_type("IfcWall")[0]
+        roof = ifcopenshell.api.run("root.create_entity", f, ifc_class="IfcRoof", name="R")
+        pset = ifcopenshell.api.run("pset.add_pset", f, product=wall, name=roofs.ATTACH)
+        ifcopenshell.api.run("pset.edit_pset", f, pset=pset, properties={"Roof": roof.GlobalId})
+    finally:
+        _reset_owner()  # the IFC2X3 owner callbacks are global: later IFC4 models must not get them
+    b._model = f
+    assert roofs._attached() == [(wall, roof.GlobalId)]
+    b._model = None

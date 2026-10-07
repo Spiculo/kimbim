@@ -408,7 +408,7 @@ def plan_annotations(storey, to_paper, size_default=TEXT_SIZE):
             end = pts[-1]
             out.append(_text(end[0] + 1.0, end[1], text, size, anchor="start", baseline="central"))
         elif kind == "dimension" and len(pts) >= 3:
-            out += dimension_chain(pts[:-1], pts[-1], text.split(), size)
+            out += dimension_chain(pts[:-1], pts[-1], segment_labels(text, len(pts) - 2), size)
     return out
 
 
@@ -471,6 +471,18 @@ def room_stamps(storey, to_paper, size=TEXT_SIZE):
         out.append(_text(px, py, space.Name or "", size, baseline="central"))
         out.append(_text(px, py + 1.6 * size, f"{value:.2f} m²", size, baseline="central"))
     return out
+
+
+def segment_labels(text: str, segments: int) -> list:
+    """One label per dimension segment. A single segment shows its whole text ("2.50 m"); a chain's labels
+    are separated by "|" ("to grid A | 3.50"), or by spaces as measured ("4.00 3.50", older files)."""
+    if "|" in text:
+        labels = [t.strip() for t in text.split("|")]
+    elif segments <= 1:
+        labels = [text.strip()]
+    else:
+        labels = text.split()
+    return (labels + [""] * segments)[:segments]
 
 
 def dimension_chain(points, through, texts, size):

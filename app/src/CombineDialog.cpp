@@ -93,6 +93,7 @@ void CombineDialog::refresh()
     if (m_refreshing)
         return;
     m_refreshing = true;
+    m_refreshQueued = false;
     m_preview = m_option->currentText().isEmpty()
         ? QJsonObject()
         : m_bridge("combine_preview",
@@ -154,7 +155,14 @@ void CombineDialog::refresh()
             else
                 m_resolutions.insert(id, choice);
             // A choice can raise new questions (e.g. deleting what a new element refers to).
-            QMetaObject::invokeMethod(this, &CombineDialog::refresh, Qt::QueuedConnection);
+            // Queued once; choose() refreshes at once, and then the queued one is not needed.
+            if (!m_refreshQueued) {
+                m_refreshQueued = true;
+                QMetaObject::invokeMethod(this, [this] {
+                    if (m_refreshQueued)
+                        refresh();
+                }, Qt::QueuedConnection);
+            }
         });
         m_table->setCellWidget(i, Choice, box);
     }

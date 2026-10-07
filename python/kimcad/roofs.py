@@ -471,9 +471,8 @@ def _attached():
             continue
         roof = next((p.NominalValue.wrappedValue for p in pset.HasProperties
                      if p.Name == "Roof" and p.is_a("IfcPropertySingleValue") and p.NominalValue), None)
-        for rel in pset.DefinesOccurrence or ():
-            for wall in rel.RelatedObjects:
-                out.append((wall, roof))
+        for wall in B._pset_users(pset):
+            out.append((wall, roof))
     return out
 
 

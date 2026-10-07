@@ -111,8 +111,8 @@ void DrawingView::paintEvent(QPaintEvent*)
     p.fillRect(paper, Qt::white);
     p.setRenderHint(QPainter::Antialiasing);
     m_renderer->render(&p, paper);
-    if (m_dragging >= 0 && m_panFrom) { // where the dragged drawing goes
-        const QRectF r = m_placed[m_dragging].rect;
+    if (m_dragging && m_panFrom) { // where the dragged drawing goes
+        const QRectF r = m_dragging->rect;
         const QPointF delta = (*m_panFrom - m_dragStart) / m_scale;
         p.setPen(QPen(QColor(0x1a, 0x4d, 0xc0), 1.5, Qt::DashLine));
         p.drawRect(QRectF(m_offset + (r.topLeft() + delta) * m_scale, r.size() * m_scale));
@@ -137,7 +137,7 @@ void DrawingView::mousePressEvent(QMouseEvent* event)
         const QPointF mm = toPaper(event->position());
         for (int i = int(m_placed.size()) - 1; i >= 0; --i)
             if (m_placed[i].rect.contains(mm)) { // drag a placed drawing (sheet mode)
-                m_dragging = i;
+                m_dragging = m_placed[i];
                 m_dragStart = event->position();
                 return;
             }
@@ -148,7 +148,7 @@ void DrawingView::mousePressEvent(QMouseEvent* event)
 
 void DrawingView::mouseMoveEvent(QMouseEvent* event)
 {
-    if (m_dragging >= 0) {
+    if (m_dragging) {
         update(); // the outline follows in paintEvent
         m_panFrom = event->position();
         return;
@@ -162,10 +162,10 @@ void DrawingView::mouseMoveEvent(QMouseEvent* event)
 
 void DrawingView::mouseReleaseEvent(QMouseEvent* event)
 {
-    if (m_dragging >= 0) {
+    if (m_dragging) {
         const QPointF delta = (event->position() - m_dragStart) / m_scale;
-        const Placed p = m_placed[m_dragging];
-        m_dragging = -1;
+        const Placed p = *m_dragging;
+        m_dragging.reset();
         m_panFrom.reset();
         if (delta.manhattanLength() > 0.5) {
             m_placed.clear(); // stale until the sheet comes back

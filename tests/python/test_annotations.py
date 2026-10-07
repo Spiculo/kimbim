@@ -102,3 +102,22 @@ def test_text_size_is_in_paper_millimetres(plan):
     literal = next(i for i in b._model.by_guid(t).Representation.Representations[0].Items if i.is_a("IfcTextLiteralWithExtent"))
     assert abs(literal.Extent.SizeInY - 500.0) < 1e-6  # 5 mm at 1:100 = 0.5 m, in millimetres
     assert not call("set_annotation_size", t, 0)["ok"]
+
+
+def _literals(guid):
+    rep = b._model.by_guid(guid).Representation.Representations[0]
+    return [i.Literal for i in rep.Items if i.is_a("IfcTextLiteral")]
+
+
+def test_typed_dimension_text_with_spaces_is_kept_whole(plan):
+    """Labels were split on whitespace (one word per segment): "2.50 m" printed as "2.50"."""
+    from kimcad import drawgen
+
+    one = call("add_annotation", plan["l1"], "dimension", json.dumps([[0, 0], [2.5, 0], [0, -1]]), "2.50 m")["guid"]
+    assert _literals(one) == ["2.50 m"]
+    chain = call("add_annotation", plan["l1"], "dimension", json.dumps([[0, 0], [4, 0], [7.5, 0], [0, -1]]),
+                 "to grid A | 3.50")["guid"]
+    assert _literals(chain) == ["to grid A", "3.50"]
+    assert drawgen.segment_labels("4.00 3.50", 2) == ["4.00", "3.50"]  # measured chains, older files
+    svg = "".join(drawgen.plan_annotations(b._model.by_guid(plan["l1"]), lambda x, y, z: (x * 10, y * 10)))
+    assert ">2.50 m<" in svg and ">to grid A<" in svg

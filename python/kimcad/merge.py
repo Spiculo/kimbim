@@ -161,6 +161,11 @@ class _Merger:
             pick = self.conflict(Conflict(f"{key}#class", "class", key, ifc_type, name, attribute="(class)",
                                           base=vb["t"], ours=vo["t"], theirs=vt["t"]))
             return t if pick == THEIRS else o
+        if vo["t"] == "IfcOwnerHistory":  # edit bookkeeping updated in place (IFC2X3): the newer one
+            def modified(v):
+                value = v.get("a", {}).get("LastModifiedDate")
+                return value if isinstance(value, (int, float)) else -1
+            return t if modified(vt) > modified(vo) else o
         return canon(self.merge_entity(key, vb, vo, vt, name))
 
     # ---------------------------------------------------------------- per attribute

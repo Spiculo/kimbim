@@ -172,8 +172,7 @@ def _summary(changes) -> dict:
         if B._model is not None:
             try:
                 pset = B._model.by_guid(guid)
-                for rel in getattr(pset, "DefinesOccurrence", ()) or ():
-                    users += list(rel.RelatedObjects)
+                users += B._pset_users(pset)
             except RuntimeError:
                 pass
         if not users:
@@ -547,8 +546,7 @@ def combine_preview(option: str, resolutions_json: str = "{}") -> str:
     out = {"ok": True, "status": preview.status, "option": option, "conflicts": [], "unresolved": [], "from_theirs": [],
            "warnings": []}
     if preview.status == "fast_forward":
-        out["from_theirs"] = [x["guid"] for x in _summary(_project.diff(preview.ours, preview.theirs))["modified"]
-                              + _summary(_project.diff(preview.ours, preview.theirs))["added"]]
+        out["from_theirs"] = _fast_forward_changes(preview)
     if preview.status == "merge":
         r = preview.result
         out["conflicts"] = [_conflict_json(c, resolutions) for c in r.conflicts]
@@ -557,6 +555,12 @@ def combine_preview(option: str, resolutions_json: str = "{}") -> str:
         out["warnings"] = r.warnings
         out["stats"] = r.stats
     return B._dump(out)
+
+
+def _fast_forward_changes(preview) -> list:
+    """Elements (GlobalIds) a fast-forward brings: the two versions are compared once."""
+    s = _summary(_project.diff(preview.ours, preview.theirs))
+    return [x["guid"] for x in s["modified"] + s["added"]]
 
 
 def _from_theirs(preview) -> list:
@@ -583,7 +587,7 @@ def combine_options(option: str, resolutions_json: str = "{}") -> str:
     if preview.status == "up_to_date":
         return B._dump({"ok": True, "status": "up_to_date", "from_theirs": []})
     if preview.status == "fast_forward":
-        changed = json.loads(combine_preview(option))["from_theirs"]
+        changed = _fast_forward_changes(preview)
         try:
             _project.repo.fast_forward(preview.theirs)
             info = json.loads(_open_head(_project))

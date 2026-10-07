@@ -49,6 +49,19 @@ def test_project_info_lives_in_ifc_fields():
     assert call("undo")["ok"] and call("project_info")["client"] == ""
 
 
+def test_changing_the_client_or_address_leaves_no_orphans():
+    """Replacing the client removed the actor but left its organization and role behind (loose records
+    that showed up in Compare); clearing the address left the postal address."""
+    assert call("new_project", "Casa")["ok"]
+    f = b._model
+    before = {t: len(f.by_type(t)) for t in ("IfcOrganization", "IfcActorRole", "IfcPostalAddress")}
+    for client in ("Ana", "Beto", ""):
+        assert call("set_project_info", json.dumps({"client": client, "address": "Calle 1"}))["ok"]
+    assert call("set_project_info", json.dumps({"address": ""}))["ok"]
+    assert {t: len(f.by_type(t)) for t in before} == before
+    assert call("project_info")["client"] == "" and call("project_info")["address"] == ""
+
+
 def test_sheets_are_numbered_and_hold_drawings_at_scale(house):
     a1 = call("add_sheet", "A1", "Plans")
     a3 = call("add_sheet", "A3", "Details")
@@ -75,6 +88,43 @@ def test_sheets_are_numbered_and_hold_drawings_at_scale(house):
     assert call("delete_sheet", "A03")["ok"]
     assert [s["number"] for s in call("sheets")["sheets"]] == ["A01", "A02"]
     assert call("undo")["ok"] and len(call("sheets")["sheets"]) == 3
+
+
+def test_listing_sheets_after_an_edit_never_generates_drawings(house, monkeypatch):
+    """sheets() runs on the GUI thread after every edit. It measured each placed drawing at the new model
+    state by generating it (52 s for a real elevation); it now reuses the last size until the background
+    generation of the sheet brings the new one."""
+    from kimcad import drawings as D
+
+    sizes = {v["drawing"]: (v["w"], v["h"]) for s in call("sheets")["sheets"] for v in s["views"]}
+    assert sizes
+    first = next(iter(sizes))
+    assert call("move_placed", "A01", first, 40, 50)["ok"]  # an edit: a new model state
+
+    def generate(*_):
+        raise AssertionError("sheets() generated a drawing on the GUI thread")
+
+    with monkeypatch.context() as m:
+        m.setattr(D, "generate_drawing", generate)
+        after = {v["drawing"]: (v["w"], v["h"]) for s in call("sheets")["sheets"] for v in s["views"]}
+    assert after == sizes
+    assert call("sheet_svg", "A01")["ok"]  # the background generation of the sheet...
+    with monkeypatch.context() as m:
+        m.setattr(D, "generate_drawing", generate)
+        assert {v["drawing"] for s in call("sheets")["sheets"] for v in s["views"]} == set(sizes)  # ...is reused
+
+
+def test_every_reference_on_a_composed_sheet_resolves(house):
+    """The drawings' <defs> (the serializer's dimension arrow markers) were dropped while their style,
+    which points at them with url(#...), was kept."""
+    import re
+
+    svg = call("sheet_svg", "A01")["svg"]
+    refs = set(re.findall(r"url\(#([^)]+)\)", svg)) | set(re.findall(r'href="#([^"]+)"', svg))
+    assert refs
+    ids = re.findall(r' id="([^"]+)"', svg)
+    assert refs <= set(ids), refs - set(ids)
+    assert len(re.findall(r"<style", svg)) == 1  # the drawings share one stylesheet; it is not repeated
 
 
 def test_m4_exit_sheet_has_plan_section_elevation_and_title_block(house, tmp_path):

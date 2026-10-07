@@ -392,6 +392,13 @@ def _template_schema() -> str:
     return "IFC4X3" if s.startswith("IFC4X3") else ("IFC2X3" if s == "IFC2X3" else "IFC4")
 
 
+def _pset_users(pset) -> list:
+    """The objects a property set is attached to. The inverse is DefinesOccurrence in IFC4 and
+    PropertyDefinitionOf in IFC2X3 (imported Revit files)."""
+    rels = pset.DefinesOccurrence if hasattr(pset, "DefinesOccurrence") else getattr(pset, "PropertyDefinitionOf", ())
+    return [o for rel in rels or () for o in rel.RelatedObjects]
+
+
 def _own_pset(e, pset: str):
     """The element's own (occurrence) property set entity, or None. Type-level psets are not edited."""
     for rel in getattr(e, "IsDefinedBy", None) or ():

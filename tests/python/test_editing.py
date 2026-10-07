@@ -94,6 +94,22 @@ def test_mirror_in_place_keeps_guids_and_flips_the_door(room):
     assert valid() == []
 
 
+def test_mirroring_one_wall_of_a_join_rebuilds_the_other(room):
+    """The join to a wall that is not mirrored is dropped; that wall loses its corner (rebuilt with a
+    plain end) and is reported, so the viewport and the undo record update it."""
+    def body(guid):
+        rep = ifcopenshell.util.representation.get_representation(b._model.by_guid(guid), "Model", "Body", "MODEL_VIEW")
+        return sorted(str(i.get_info(recursive=True, include_identifier=False)) for i in rep.Items)
+
+    before = body(room["w2"])
+    r = call("mirror_elements", g(room["w1"]), 0, 2, 10, 2, False)
+    assert r["ok"], r
+    assert room["w2"] in r["geometry"]["changed"]
+    assert body(room["w2"]) != before
+    assert authoring._connected_walls(b._model.by_guid(room["w2"])) == []
+    assert valid() == []
+
+
 def test_mirror_a_copy_reflects_slab_outlines(room):
     r = call("mirror_elements", g(room["slab"]), 10, 0, 10, 1, True)  # across x = 10, as a copy
     assert r["ok"] and len(r["guids"]) == 1

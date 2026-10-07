@@ -177,7 +177,8 @@ def _flip_hand(door):
 def _mirror(elements, point, direction):
     """Inside an action: mirror elements in place (GlobalIds kept). Walls are reversed so their
     layers land on the mirrored side; their doors/windows move to the mirrored spot (and swing the
-    other way); slab outlines are reflected; other elements get a reflected position and heading."""
+    other way); slab outlines are reflected; other elements get a reflected position and heading.
+    Returns the other elements it changed: the moved doors/windows and the walls that lost a join."""
     f = B._model
     walls = [e for e in elements if e.is_a("IfcWall") and A._axis_world(e) is not None]
     # Openings first read in the original walls (their distance from the wall start).
@@ -189,14 +190,18 @@ def _mirror(elements, point, direction):
                 info = A._opening_info(fill.RelatedBuildingElement)
                 if info is not None:
                     hosted.append((fill.RelatedBuildingElement, w, length, info))
+    released = []
     for w in walls:
         p1, p2 = A._axis_world(w)
-        # Joins to walls that are not mirrored are dropped (they would no longer meet).
+        # Joins to walls that are not mirrored are dropped (they would no longer meet); those walls
+        # lose their corner, so they are rebuilt below.
         for rel in list(getattr(w, "ConnectedTo", ()) or ()) + list(getattr(w, "ConnectedFrom", ()) or ()):
             if rel.is_a("IfcRelConnectsPathElements"):
                 other = rel.RelatedElement if rel.RelatingElement == w else rel.RelatingElement
                 if other not in walls:
                     f.remove(rel)
+                    if other.is_a("IfcWall") and other not in released:
+                        released.append(other)
         A._reaxis(w, point(p2), point(p1))  # reversed: start <-> end
     for w in walls:  # joins between mirrored walls: their ends swapped
         for rel in getattr(w, "ConnectedTo", ()) or ():
@@ -204,7 +209,7 @@ def _mirror(elements, point, direction):
                 swap = {"ATSTART": "ATEND", "ATEND": "ATSTART"}
                 rel.RelatingConnectionType = swap.get(rel.RelatingConnectionType, rel.RelatingConnectionType)
                 rel.RelatedConnectionType = swap.get(rel.RelatedConnectionType, rel.RelatedConnectionType)
-    for w in walls:
+    for w in walls + released:
         if A._layer_set(w) is not None:
             A._regenerate(f, w)
     for element, wall, length, (opening, _, along, width, height, sill) in hosted:
@@ -219,7 +224,7 @@ def _mirror(elements, point, direction):
             _set_slab_outline(e, list(reversed(outline)))
         else:
             _mirror_placement(e, point, direction)
-    return [h[0] for h in hosted]
+    return [h[0] for h in hosted] + released
 
 
 def mirror_elements(guids_json: str, x1, y1, x2, y2, copy=False) -> str:

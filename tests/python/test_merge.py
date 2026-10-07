@@ -279,3 +279,20 @@ def test_owner_history_is_bookkeeping_not_a_conflict():
     assert not [c for c in r.conflicts if c.attribute == "OwnerHistory"]
     v = json.loads(r.records["o/W"])["a"]
     assert v["Name"] == "b" and v["OwnerHistory"] == {"@n": "h1"}  # this option's history
+
+
+def test_an_owner_history_edited_on_both_sides_is_not_a_conflict():
+    """In IFC2X3 an element's own IfcOwnerHistory is updated in place and keeps its node id, so both
+    options change the same n/<id>: its dates and ChangeAction are bookkeeping; the newer one is kept."""
+    def history(modified, action):
+        return rec("IfcOwnerHistory", ChangeAction=action, CreationDate=100, LastModifiedDate=modified)
+
+    wall = rec("IfcWall", GlobalId="W", Name="a", OwnerHistory={"@n": "H"})
+    base = {"o/W": wall, "n/H": history(100, "NOCHANGE")}
+    ours = {"o/W": wall, "n/H": history(300, "MODIFIED")}
+    theirs = {"o/W": wall, "n/H": history(200, "MODIFIED")}
+    r = merge_records(base, ours, theirs)
+    assert r.conflicts == []
+    assert json.loads(r.records["n/H"])["a"]["LastModifiedDate"] == 300
+    r = merge_records(base, theirs, ours)
+    assert r.conflicts == [] and json.loads(r.records["n/H"])["a"]["LastModifiedDate"] == 300

@@ -191,10 +191,9 @@ def _rooms(storey=None):
     for pset in B._model.by_type("IfcPropertySet"):
         if pset.Name != PSET:
             continue
-        for rel in pset.DefinesOccurrence or ():
-            for space in rel.RelatedObjects:
-                if space.is_a("IfcSpace") and (storey is None or ifcopenshell.util.element.get_aggregate(space) == storey):
-                    out.append(space)
+        for space in B._pset_users(pset):
+            if space.is_a("IfcSpace") and (storey is None or ifcopenshell.util.element.get_aggregate(space) == storey):
+                out.append(space)
     return sorted(out, key=lambda s: s.id())
 
 

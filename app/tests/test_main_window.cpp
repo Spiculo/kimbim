@@ -565,6 +565,44 @@ private slots:
     }
 
     // Slice 20: milestones, object history, before/after, deleting an option.
+    void sheetRefreshedMidDragStillMovesTheDraggedDrawing()
+    {
+        // The drag kept an index into the placed drawings; a sheet refresh (a background generation
+        // finishing) replaced them mid-drag, and paint/release read past the end of the list.
+        kimcad::DrawingView view(QStringLiteral("sheet:A01"));
+        view.resize(400, 300);
+        view.setPlaced({{QStringLiteral("d1"), QRectF(0, 0, 50, 50)}, {QStringLiteral("d2"), QRectF(60, 0, 50, 50)}});
+        QSignalSpy moved(&view, &kimcad::DrawingView::placedMoved);
+        const QPointF from = (QPointF(80, 10) - view.toPaper(QPointF(0, 0))) * view.zoom(); // on d2
+        QTest::mousePress(&view, Qt::LeftButton, {}, from.toPoint());
+        view.setPlaced({{QStringLiteral("d1"), QRectF(0, 0, 50, 50)}}); // d2's plan was deleted meanwhile
+        QTest::mouseMove(&view, (from + QPointF(20, 20)).toPoint());
+        view.repaint();
+        QTest::mouseRelease(&view, Qt::LeftButton, {}, (from + QPointF(20, 20)).toPoint());
+        QCOMPARE(moved.size(), 1);
+        QCOMPARE(moved.at(0).at(0).toString(), QStringLiteral("d2"));
+    }
+
+    void combineDialogPreviewsOncePerChoice()
+    {
+        // A choice queued a refresh and choose() refreshed again: the three-way merge ran twice.
+        int previews = 0;
+        kimcad::CombineDialog::Bridge bridge = [&previews](const char* fn, const QStringList&) {
+            if (QByteArray(fn) == "combine_preview")
+                ++previews;
+            const QJsonObject conflict{{"id", "o/W#Name"}, {"kind", "attribute"}, {"attribute", "Name"},
+                {"options", QJsonArray{"ours", "theirs"}}};
+            return QJsonObject{{"ok", true}, {"status", "merge"}, {"conflicts", QJsonArray{conflict}},
+                {"unresolved", QJsonArray{}}, {"from_theirs", QJsonArray{}}};
+        };
+        kimcad::CombineDialog dialog(bridge, {QStringLiteral("Scheme B")});
+        QCoreApplication::processEvents();
+        previews = 0;
+        QVERIFY(dialog.choose(0, QStringLiteral("theirs")));
+        QCoreApplication::processEvents();
+        QCOMPARE(previews, 1);
+    }
+
     void milestonesHistoryAndDeleteOption()
     {
         QTemporaryDir tmp;

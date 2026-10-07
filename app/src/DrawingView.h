@@ -69,7 +69,8 @@ private:
     bool m_busy = false;
     std::optional<QPointF> m_panFrom;
     QVector<Placed> m_placed;
-    int m_dragging = -1;     // index into m_placed while a placed drawing is dragged
+    // The placed drawing being dragged, a copy: the sheet can be refreshed (setPlaced) mid-drag.
+    std::optional<Placed> m_dragging;
     QPointF m_dragStart;     // widget position where the drag started
 };
 

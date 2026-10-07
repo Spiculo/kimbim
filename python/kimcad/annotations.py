@@ -23,6 +23,7 @@ import numpy as np
 
 from . import app_bridge as B
 from . import authoring as A
+from . import drawgen as G
 from . import layers
 
 PSET = "KIMCAD_Annotation"
@@ -94,9 +95,8 @@ def _representation(kind, text, points, size=TEXT_SIZE):
     elif kind == "dimension":
         lines, middles = _dimension_lines(points)
         items += [f.createIfcPolyline([pt(a), pt(b)]) for a, b in lines]
-        labels = text.split()
-        for i, middle in enumerate(middles):
-            items.append(literal(middle, labels[i] if i < len(labels) else ""))
+        for middle, label in zip(middles, G.segment_labels(text, len(middles))):
+            items.append(literal(middle, label))
     elif kind == "leader":
         items.append(f.createIfcPolyline([pt(p) for p in points]))
         items.append(literal(points[-1], text))
