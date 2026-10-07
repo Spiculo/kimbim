@@ -28,13 +28,14 @@ qt_add_library(kimcad_core STATIC
     src/DrawingView.cpp src/DrawingView.h
     src/SheetExport.cpp src/SheetExport.h
     src/SheetsPanel.cpp src/SheetsPanel.h
+    src/DockLayout.cpp src/DockLayout.h
 )
 target_include_directories(kimcad_core PUBLIC src)
 # Element icons (owner feedback: objects need an icon and a hint on hover).
 file(GLOB KIMCAD_ICONS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} resources/icons/*.svg)
 qt_add_resources(kimcad_core "kimcad_icons" PREFIX "/icons" BASE resources/icons FILES ${KIMCAD_ICONS})
 target_link_libraries(kimcad_core PUBLIC Qt6::Widgets Qt6::Svg Python3::Python
-    TKernel TKMath TKService TKV3d TKOpenGl TKBRep TKG3d)
+    TKernel TKMath TKService TKV3d TKOpenGl TKBRep TKG3d ads::qtadvanceddocking-qt6)
 target_include_directories(kimcad_core PUBLIC ${OpenCASCADE_INCLUDE_DIR})
 target_compile_definitions(kimcad_core PUBLIC KIMCAD_VERSION="${PROJECT_VERSION}" _USE_MATH_DEFINES)
 qt_add_translations(kimcad_core
@@ -72,6 +73,7 @@ kimcad_test(test_host_tool)
 kimcad_test(test_two_point_tool)
 kimcad_test(test_rotate_tool)
 kimcad_test(test_grip_tool)
+kimcad_test(test_dock_layout)
 
 # GUI self-tests: need a real OpenGL window (GPU, or Mesa on the Linux CI runner). Label "gui".
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/broken.ifc "ISO-10303-21;
