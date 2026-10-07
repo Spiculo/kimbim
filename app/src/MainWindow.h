@@ -84,7 +84,7 @@ public:
     LevelsBar* levelsBar() const { return m_levels; }
     // Modeling tools (M3): one active at a time. Exposed for tests and the self-test, which drive
     // them with work-plane points.
-    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening, PlaceModel, Text, Dimension, Mark, Section, Elevation, Leader };
+    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening, PlaceModel, Text, Dimension, Mark, Section, Elevation, Leader, Mirror };
     void setTool(Tool tool);
     Tool tool() const { return m_tool; }
     WallTool* wallTool() const { return m_wallTool; }
@@ -152,6 +152,14 @@ public:
     bool setProjectInfo(const QJsonObject& info);
     // How many elements the last generation sent to the serializer (-1: all, no visible pass).
     int lastDrawingVisibleCount() const { return m_lastDrawingVisible; }
+    // Everyday editing (Slice 17, Archicad's Edit menu). Copies are selected afterwards.
+    bool copySelection(QPointF delta);          // a moved copy (Ctrl+drag)
+    void copyToClipboard();                     // Ctrl+C
+    bool paste();                               // Ctrl+V: onto the active level, same plan position
+    bool duplicateSelection();                  // Ctrl+D
+    bool mirrorSelection(QPointF a, QPointF b, bool copy); // Ctrl+M tool: two clicks; Ctrl copies
+    bool multiplySelection(const QString& kind, const QJsonObject& params); // Ctrl+U: linear / polar
+    bool offsetSelection(double distance);
     // Drag to move (owner feedback): preview while dragging, move on release (Ctrl detaches).
     void dragMoveTo(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
     bool dragFinished(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
@@ -207,6 +215,9 @@ private:
     void refreshLayers();
     void refreshAnnotations();
     void annotationClick(QPointF p, Qt::KeyboardModifiers modifiers = {});
+    void afterCopy(const QJsonObject& result);
+    void multiplyDialog();
+    void offsetDialog();
     void refreshDrawings();
     void refreshSheets(bool changed = true); // changed: the model changed, sheets need composing again
     void projectInfoDialog();
@@ -270,6 +281,7 @@ private:
     QHash<QString, QString> m_instanceOf; // element -> model instance it belongs to
     QHash<QString, QStringList> m_instanceMembers;
     QVector<QPointF> m_annotationPoints; // the dimension/section tool's clicks so far
+    QStringList m_clipboard;            // Ctrl+C
     QTabWidget* m_tabs = nullptr; // the model (3D/plan) and the open drawings
     DrawingsPanel* m_drawingsPanel = nullptr;
     SheetsPanel* m_sheetsPanel = nullptr;

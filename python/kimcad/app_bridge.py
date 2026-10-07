@@ -839,3 +839,11 @@ from .sheets import (  # noqa: E402,F401
     sheet_svg,
     sheets,
 )
+from .editing import (  # noqa: E402,F401
+    array_elements,
+    copy_elements,
+    duplicate_elements,
+    mirror_elements,
+    offset_elements,
+    slab_outline,
+)

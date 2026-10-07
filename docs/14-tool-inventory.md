@@ -92,12 +92,12 @@ release notes, so check before relying on a single cell.
 | Move, drag to move | all | ✅ | P0 | Joined walls follow; Ctrl detaches (D54) |
 | Rotate | all | ✅ | P0 | |
 | Stretch / extend a wall end | all | ✅ | P0 | |
-| Copy / paste in the project | all | ⬜ | P0 | |
-| Duplicate, drag a copy (Ctrl+drag) | all | ⬜ | P0 | |
+| Copy / paste in the project | all | ✅ | P0 | Slice 17 (Ctrl+C / Ctrl+V onto the active level) |
+| Duplicate, drag a copy (Ctrl+drag) | all | ✅ | P0 | Slice 17 (Ctrl+D, Ctrl+drag) |
 | Copy to another level | AC RV | ✅ | P0 | |
-| Mirror | all | ⬜ | P1 | |
-| Array: linear, rectangular, polar | all | ⬜ | P1 | |
-| Offset (parallel copy) | all | ⬜ | new | |
+| Mirror | all | ✅ | P1 | Slice 17 (Ctrl+M; Ctrl mirrors a copy) |
+| Array: linear, rectangular, polar | all | 🟡 | P1 | Slice 17: linear and polar (Ctrl+U); rectangular = two linear |
+| Offset (parallel copy) | all | ✅ | new | Slice 17: walls (parallel copy), slabs (grow/shrink) |
 | Trim, extend to boundary, split, join | all | ⬜ | new | Walls, beams, 2D lines |
 | Align (to an edge or face) | RV VW | ⬜ | new | |
 | Elevate (change vertical position) | AC RV | 🟡 | new | Wall height; no general elevate |

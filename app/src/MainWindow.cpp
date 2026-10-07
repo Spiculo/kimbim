@@ -17,6 +17,7 @@
 #include <QToolTip>
 #include <QHBoxLayout>
 #include <QSlider>
+#include <QSpinBox>
 #include <QVBoxLayout>
 #include <QListWidget>
 #include <QDir>
@@ -240,6 +241,23 @@ void MainWindow::buildMenus()
     del->setObjectName(QStringLiteral("actionDelete"));
     del->setShortcut(QKeySequence::Delete);
     connect(del, &QAction::triggered, this, &MainWindow::deleteSelection);
+    editMenu->addSeparator();
+    // Slice 17: Archicad's Edit menu and shortcuts.
+    auto editAction = [&](const QString& text, const char* name, const QKeySequence& key, auto slot) {
+        QAction* a = editMenu->addAction(text);
+        a->setObjectName(QLatin1String(name));
+        if (!key.isEmpty())
+            a->setShortcut(key);
+        connect(a, &QAction::triggered, this, slot);
+        return a;
+    };
+    editAction(tr("&Copy"), "actionCopy", QKeySequence::Copy, [this] { copyToClipboard(); });
+    editAction(tr("&Paste"), "actionPaste", QKeySequence::Paste, [this] { paste(); });
+    editAction(tr("D&uplicate"), "actionDuplicate", QKeySequence(Qt::CTRL | Qt::Key_D), [this] { duplicateSelection(); });
+    editAction(tr("&Mirror"), "actionMirror", QKeySequence(Qt::CTRL | Qt::Key_M), [this] { setTool(Tool::Mirror); })
+        ->setToolTip(tr("Mirror the selection: click two points of the mirror line (hold Ctrl on the second click to mirror a copy)"));
+    editAction(tr("Multi&ply..."), "actionMultiply", QKeySequence(Qt::CTRL | Qt::Key_U), [this] { multiplyDialog(); });
+    editAction(tr("&Offset..."), "actionOffset", QKeySequence(), [this] { offsetDialog(); });
 
     QMenu* view = menuBar()->addMenu(tr("&View"));
     QAction* planView = view->addAction(tr("&Plan view"));
@@ -995,6 +1013,7 @@ void MainWindow::buildModelingToolbar()
         case Tool::Dimension:
         case Tool::Mark:
         case Tool::Leader:
+        case Tool::Mirror:
         case Tool::Section:
         case Tool::Elevation:
             m_twoPointTool->setTolerance(tolerance);
@@ -1068,6 +1087,19 @@ void MainWindow::buildModelingToolbar()
             m_twoPointTool->setTolerance(tolerance);
             drawingClick(m_twoPointTool->snapper().snap(p, tolerance).point);
             break;
+        case Tool::Mirror: {
+            m_twoPointTool->setTolerance(tolerance);
+            m_annotationPoints << m_twoPointTool->snapper().snap(p, tolerance).point;
+            if (m_annotationPoints.size() == 1) {
+                statusBar()->showMessage(tr("Mirror: click the second point of the mirror line (Ctrl: mirror a copy)"));
+            } else {
+                const QVector<QPointF> pts = m_annotationPoints;
+                m_annotationPoints.clear();
+                mirrorSelection(pts[0], pts[1], mods & Qt::ControlModifier);
+                setTool(Tool::None);
+            }
+            break;
+        }
         case Tool::Move:
             m_detach = mods & Qt::ControlModifier;
             m_twoPointTool->setTolerance(tolerance);
@@ -1181,6 +1213,7 @@ void MainWindow::refreshTypes()
     case Tool::Dimension:
     case Tool::Mark:
     case Tool::Leader:
+    case Tool::Mirror:
     case Tool::Section:
     case Tool::Elevation:
         break;
@@ -1393,6 +1426,10 @@ void MainWindow::setTool(Tool tool)
         break;
     case Tool::Leader:
         statusBar()->showMessage(tr("Leader: click what it points at"));
+        break;
+    case Tool::Mirror:
+        statusBar()->showMessage(m_selection.isEmpty() ? tr("Mirror: select what to mirror first")
+                                                       : tr("Mirror: click the first point of the mirror line"));
         break;
     case Tool::Section:
         statusBar()->showMessage(tr("Section: click where the section line starts"));
@@ -1885,7 +1922,7 @@ void MainWindow::dragMoveTo(QPointF start, QPointF current, double tolerance, Qt
     }
     boxes.push_back({start, start + delta, 0.03, m_levels->activeElevation(), m_levels->activeElevation() + 0.02});
     m_viewport->setPreviewBoxes(boxes);
-    statusBar()->showMessage(tr("Move %1 m (Ctrl: detach joined walls, Shift: straight)")
+    statusBar()->showMessage(tr("Move %1 m (Ctrl: copy, Alt: detach joined walls, Shift: straight)")
                                  .arg(QLocale().toString(std::hypot(delta.x(), delta.y()), 'f', 3)));
 }
 
@@ -1895,7 +1932,9 @@ bool MainWindow::dragFinished(QPointF start, QPointF current, double tolerance, 
     const QPointF delta = dragTarget(m_twoPointTool->snapper(), start, current, tolerance, modifiers) - start;
     if (std::hypot(delta.x(), delta.y()) < 1e-4)
         return false;
-    return moveSelection(delta, modifiers & Qt::ControlModifier);
+    if (modifiers & Qt::ControlModifier) // Archicad: Ctrl while dragging makes a copy
+        return copySelection(delta);
+    return moveSelection(delta, modifiers & Qt::AltModifier);
 }
 
 void MainWindow::refreshLayers()
@@ -2370,6 +2409,174 @@ void MainWindow::projectInfoDialog()
     for (int i = 0; i < 4; ++i)
         info.insert(QLatin1String(keys[i]), fields[i]->text().trimmed());
     setProjectInfo(info);
+}
+
+// ---------------------------------------------------------------- everyday editing (Slice 17)
+
+void MainWindow::afterCopy(const QJsonObject& result)
+{
+    afterEdit(result);
+    QStringList copies;
+    for (const auto& v : result.value("guids").toArray())
+        copies << v.toString();
+    if (!copies.isEmpty()) {
+        m_viewport->selectGuids(copies);
+        setSelection(copies);
+    }
+}
+
+bool MainWindow::copySelection(QPointF delta)
+{
+    if (m_selection.isEmpty())
+        return false;
+    auto num = [](double v) { return QString::number(v, 'g', 17); };
+    const QJsonObject r = bridge("copy_elements", {jsonList(m_selection), num(delta.x()), num(delta.y()), QStringLiteral("0"), QString()});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not copy: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterCopy(r);
+    return true;
+}
+
+void MainWindow::copyToClipboard()
+{
+    m_clipboard = m_selection;
+    statusBar()->showMessage(tr("%n element(s) copied", nullptr, int(m_clipboard.size())));
+}
+
+bool MainWindow::paste()
+{
+    if (m_clipboard.isEmpty())
+        return false;
+    const QJsonObject r = bridge("copy_elements", {jsonList(m_clipboard), QStringLiteral("0"), QStringLiteral("0"),
+        QStringLiteral("0"), m_levels->activeStorey()});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not paste: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterCopy(r);
+    statusBar()->showMessage(tr("Pasted; drag the copies where they go"));
+    return true;
+}
+
+bool MainWindow::duplicateSelection()
+{
+    if (m_selection.isEmpty())
+        return false;
+    const QJsonObject r = bridge("duplicate_elements", {jsonList(m_selection)});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not duplicate: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterCopy(r);
+    return true;
+}
+
+bool MainWindow::mirrorSelection(QPointF a, QPointF b, bool copy)
+{
+    if (m_selection.isEmpty())
+        return false;
+    auto num = [](double v) { return QString::number(v, 'g', 17); };
+    const QJsonObject r = bridge("mirror_elements", {jsonList(m_selection), num(a.x()), num(a.y()), num(b.x()), num(b.y()),
+        copy ? QStringLiteral("1") : QStringLiteral("0")});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not mirror: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    if (copy)
+        afterCopy(r);
+    else
+        afterEdit(r);
+    return true;
+}
+
+bool MainWindow::multiplySelection(const QString& kind, const QJsonObject& params)
+{
+    if (m_selection.isEmpty())
+        return false;
+    const QJsonObject r = bridge("array_elements", {jsonList(m_selection), kind,
+        QString::fromUtf8(QJsonDocument(params).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not multiply: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterCopy(r);
+    return true;
+}
+
+bool MainWindow::offsetSelection(double distance)
+{
+    if (m_selection.isEmpty())
+        return false;
+    const QJsonObject r = bridge("offset_elements", {jsonList(m_selection), QString::number(distance, 'g', 17)});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not offset: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    if (r.value("guids").toArray().isEmpty())
+        afterEdit(r);
+    else
+        afterCopy(r);
+    return true;
+}
+
+void MainWindow::multiplyDialog()
+{
+    if (m_selection.isEmpty()) {
+        statusBar()->showMessage(tr("Select what to multiply first"));
+        return;
+    }
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Multiply"));
+    auto* form = new QFormLayout(&dialog);
+    auto* kind = new QComboBox(&dialog);
+    kind->addItem(tr("Linear (move each copy by a distance)"), QStringLiteral("linear"));
+    kind->addItem(tr("Polar (rotate each copy around a centre)"), QStringLiteral("polar"));
+    auto spin = [&](double lo, double hi, double value, int decimals) {
+        auto* b = new QDoubleSpinBox(&dialog);
+        b->setRange(lo, hi);
+        b->setDecimals(decimals);
+        b->setValue(value);
+        return b;
+    };
+    auto* count = new QSpinBox(&dialog);
+    count->setRange(1, 1000);
+    count->setValue(3);
+    QDoubleSpinBox *dx = spin(-1e4, 1e4, 1.0, 3), *dy = spin(-1e4, 1e4, 0.0, 3);
+    QDoubleSpinBox *cx = spin(-1e5, 1e5, 0.0, 3), *cy = spin(-1e5, 1e5, 0.0, 3), *angle = spin(-360, 360, 90, 2);
+    form->addRow(tr("Kind:"), kind);
+    form->addRow(tr("Number of copies:"), count);
+    form->addRow(tr("Distance X (m):"), dx);
+    form->addRow(tr("Distance Y (m):"), dy);
+    form->addRow(tr("Centre X (m):"), cx);
+    form->addRow(tr("Centre Y (m):"), cy);
+    form->addRow(tr("Angle per copy (degrees):"), angle);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    form->addRow(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    if (kind->currentData().toString() == QLatin1String("linear"))
+        multiplySelection(QStringLiteral("linear"), {{"dx", dx->value()}, {"dy", dy->value()}, {"count", count->value()}});
+    else
+        multiplySelection(QStringLiteral("polar"), {{"cx", cx->value()}, {"cy", cy->value()},
+            {"angle", angle->value() * M_PI / 180.0}, {"count", count->value()}});
+}
+
+void MainWindow::offsetDialog()
+{
+    if (m_selection.isEmpty()) {
+        statusBar()->showMessage(tr("Select walls or slabs to offset first"));
+        return;
+    }
+    bool ok = false;
+    const double distance = QInputDialog::getDouble(this, tr("Offset"),
+        tr("Distance (m): walls get a parallel copy to the left of their axis (negative: right); slabs grow (negative: shrink)"),
+        0.5, -1000, 1000, 3, &ok);
+    if (ok)
+        offsetSelection(distance);
 }
 
 bool MainWindow::createModel(const QString& name)

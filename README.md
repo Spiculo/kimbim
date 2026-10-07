@@ -37,6 +37,7 @@ Open an IFC file. It appears progressively in the 3D view, with the spatial tree
 | Stretch a wall | **E**, click near a wall end, click its new position (or type the length) |
 | Wall height / door size | *Model › Wall height…* / *Model › Door/window size…* for the selection |
 | Upper floors | *Model › Copy to level…* (walls bring their doors, windows and corner joins), **T** stair to the next level (two clicks), **O** hole in the selected slab |
+| Copy, mirror, multiply | **Ctrl+C**/**Ctrl+V** (paste onto the active level), **Ctrl+D** duplicate, **Ctrl**+drag copies (**Alt**+drag detaches joined walls), **Ctrl+M** mirror (two clicks; **Ctrl** on the second mirrors a copy), **Ctrl+U** multiply (linear or polar), *Edit › Offset…* (parallel wall copy; grow/shrink a slab) |
 | Delete | **Del** (deleting a wall also deletes its doors and windows) |
 | Sections / elevations | **V** section, **Shift+V** elevation: click the line's two ends, then the side it looks at (as in Archicad). New projects come with North/South/East/West elevations; *View › Create elevations* adds them to an opened IFC. Markers show in plan view; select, move, rotate or delete them like elements |
 | Floor plans | Every level has a floor plan drawing (cut at 1.10 m, as in Archicad): walls cut, door swings, window glass, your labels, dimensions and marks, and the section/elevation markers. *View › Create floor plans and elevations* adds them to an opened IFC |

@@ -780,8 +780,49 @@ private slots:
         QVERIFY(w.close());
     }
 
+    void everydayEditing()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->setTolerance(0.05);
+        for (const QPointF& p : {QPointF(0, 0), QPointF(5, 0)})
+            w.wallTool()->click(p);
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QCOMPARE(w.viewport()->elementCount(), 1);
+        const QString wall = w.viewport()->guids().first();
+        w.setSelection({wall});
+        QVERIFY(w.duplicateSelection()); // Ctrl+D
+        QCOMPARE(w.viewport()->elementCount(), 2);
+        QVERIFY(w.selection() != QStringList{wall}); // the copy is selected
+        w.setSelection({wall});
+        w.copyToClipboard();
+        QVERIFY(w.paste()); // Ctrl+V: in place on the active level
+        QCOMPARE(w.viewport()->elementCount(), 3);
+        w.setSelection({wall});
+        QVERIFY(w.dragFinished(QPointF(2, 0), QPointF(2, 3), 0.01, Qt::ControlModifier)); // Ctrl+drag copies
+        QCOMPARE(w.viewport()->elementCount(), 4);
+        w.setSelection({wall});
+        QVERIFY(w.multiplySelection(QStringLiteral("linear"), {{"dx", 0.0}, {"dy", 6.0}, {"count", 2}}));
+        QCOMPARE(w.viewport()->elementCount(), 6);
+        w.setSelection({wall});
+        w.setTool(kimcad::MainWindow::Tool::Mirror); // Ctrl+M: two clicks; Ctrl on the second copies
+        emit w.viewport()->workPointClicked(QPointF(0, -2), 0.01, Qt::NoModifier);
+        emit w.viewport()->workPointClicked(QPointF(5, -2), 0.01, Qt::ControlModifier);
+        QCOMPARE(w.viewport()->elementCount(), 7);
+        w.setSelection({wall});
+        QVERIFY(w.offsetSelection(1.0));
+        QCOMPARE(w.viewport()->elementCount(), 8);
+        QVERIFY(w.close());
+    }
+
     void shortcutsAreTheDocumentedOnes()
     {
+        kimcad::MainWindow w0(nullptr, true);
+        QCOMPARE(action(w0, "actionDuplicate")->shortcut(), QKeySequence(Qt::CTRL | Qt::Key_D));
+        QCOMPARE(action(w0, "actionMirror")->shortcut(), QKeySequence(Qt::CTRL | Qt::Key_M));
+        QCOMPARE(action(w0, "actionMultiply")->shortcut(), QKeySequence(Qt::CTRL | Qt::Key_U));
+        QCOMPARE(action(w0, "actionCopy")->shortcut(), QKeySequence(QKeySequence::Copy));
         kimcad::MainWindow w(nullptr, true);
         QCOMPARE(action(w, "actionSectionTool")->shortcut(), QKeySequence(Qt::Key_V));
         QCOMPARE(action(w, "actionLeaderTool")->shortcut(), QKeySequence(Qt::SHIFT | Qt::Key_A));

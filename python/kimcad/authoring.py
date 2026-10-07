@@ -1058,6 +1058,12 @@ def _follow_end(end, other_end, moved_wall, t):
     return other_end + d_own * (cross(q1 - other_end, d_moved) / denom)
 
 
+def _world(element):
+    """An element's placement origin in world metres (x, y, z)."""
+    m = ifcopenshell.util.placement.get_local_placement(element.ObjectPlacement)
+    return tuple(float(v) for v in m[:3, 3] * _scale())
+
+
 def _truthy(value) -> bool:
     return str(value).strip().lower() in ("1", "true", "yes")
 
