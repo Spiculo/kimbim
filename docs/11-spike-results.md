@@ -12,7 +12,7 @@ Code and instructions: [`spikes/`](../spikes/README.md). Test corpus: 80 buildin
 | S3 | Lossless, deterministic IFC ↔ records round-trip? Local edits? | **Yes**, after three design rules found by the spike (below). |
 | S4 | Identical hashes on Windows and Linux? | **Yes: 77/77 identical state hashes and byte-identical IFC exports.** |
 | S5 | Git object DB for a 1M-record model? | **Yes, if records are written as packs (never loose objects) and packs avoid deltas.** |
-| S6 | Can IfcOpenShell's SVG serializer make KIMCAD's drawings, fast enough? | **Yes for quality; speed needs three measures**: polygon HLR, sending only visible elements, and generating in a child process (the serializer holds the GIL). |
+| S6 | Can IfcOpenShell's SVG serializer make KIMCAD's drawings, fast enough? | **Yes for quality; speed needs**: sending only visible elements (the big win), polygon HLR (a smaller one), and generating in a child process (the serializer holds the GIL). |
 
 ---
 
@@ -211,18 +211,19 @@ swing in their representation; Slice 15). Polygon HLR (`svg-poly`) gives the sam
 | Model | Drawing | Elements given | Geometry | HLR | Total |
 |-------|---------|----------------|----------|-----|-------|
 | House (24 products) | plan / section / elevation | 18 / 33 / 33 | 0.07–0.14 s | 0.15–0.17 s | **0.25–0.33 s** |
-| Synthetic, 2,880 products (12 × 12 rooms × 4 levels) | plan, level 1, exact HLR | 1,297 | 1.8 s | 20.9 s | 23 s |
+| Synthetic, 2,880 products (12 × 12 rooms × 4 levels) | plan, level 1, exact HLR | 1,297 | 2.1 s | 7.3 s | 10.6 s |
 | same | plan, level 1, `svg-poly` | 1,297 | 1.9 s | 4.6 s | **6.8 s** |
-| same | section through the middle, `svg-poly` | all | 8.0 s | 16.2 s | **25.6 s** |
-| same | south elevation, `svg-poly` | all | 8.8 s | 42.1 s | **52.1 s** |
+| same | section through the middle, exact / `svg-poly` | all | 9.9 / 8.0 s | 18.2 / 16.2 s | 32.5 / **25.6 s** |
+| same | south elevation, exact / `svg-poly` | all | 8.4 / 8.8 s | 58.9 / 42.1 s | 72.1 / **52.1 s** |
 | same | south elevation, only the visible front row | 240 products | 1.3 s | 1.9 s | **3.4 s** |
 | Clinic_Architectural (3,258 elements) | — | — | — | — | measured in CI (`pixi run drawing-bench`, informational step); not reachable from the spike machine |
 
 - Hidden-line removal dominates, and it grows with everything behind the cut, not with what is visible. Sending only
   the elements the camera can see cut the elevation from 52 s to 3.4 s. KIMCAD already renders element IDs into an
   offscreen image for box selection (D52); the same pass from the drawing's camera gives the visible set.
-- `svg-poly` cut plan HLR from about 21 s to under 7 s with identical output; with `svg-unify-inputs` off and
-  `svg-prefilter` on as well, it was 4.6–5.1 s across runs.
+- `svg-poly` (with `svg-prefilter` on and `svg-unify-inputs` off) makes HLR 1.1–1.6× faster with the same drawings,
+  and `write` 3–4× faster. Worth having, but it is not the fix. (Earlier runs that showed a 4× gain were taken while
+  other benchmarks shared the 4 cores; the table uses sequential runs only.)
 - **The serializer holds the GIL** during `write` and `finalize`: a Python thread ticking every 10 ms stalled for
   4.7 s while a plan generated. Generating in-process would freeze the app, because the GUI calls Python. A snapshot
   for a child process is cheap: `to_string` 0.25 s and `from_string` 0.31 s for the 5 MB synthetic model.

@@ -28,7 +28,7 @@ M4 Libraries + cloning + drawings          R4 Merge + reconciliation
 | S3 | Does the record decomposition round-trip the test corpus losslessly? | ✅ Yes: 77/77 valid files lossless, fixed point, deterministic export (D34–D36) |
 | S4 | Do Windows and Linux produce identical record hashes? | ✅ Yes: 77/77 identical state hashes and IFC exports |
 | S5 | How do `gix` writes perform at 1M blobs: commit time, repo size, checkout-to-model time? | ✅ Viable with packs only and no deltas (D39) |
-| S6 | Is IfcOpenShell's SVG serializer good and fast enough for KIMCAD's drawings (Slice 14 risk check)? | ✅ Quality yes; speed needs polygon HLR, visible elements only, and a child process (D60, proposed) |
+| S6 | Is IfcOpenShell's SVG serializer good and fast enough for KIMCAD's drawings (Slice 14 risk check)? | ✅ Quality yes; speed needs visible elements only, polygon HLR and a child process (D60, proposed) |
 
 The spike code lives in [`spikes/`](../spikes/README.md).
 
