@@ -1,4 +1,4 @@
-# 11 — Spike Results (S1–S5)
+# 11 — Spike Results (S1–S6)
 
 Run 2026-10-03/04 on Windows 11 (16 threads, 32 GB) and WSL Ubuntu, ifcopenshell 0.9.0, gix 0.88.
 Code and instructions: [`spikes/`](../spikes/README.md). Test corpus: 80 buildingSMART sample files (IFC2X3, IFC4, IFC4X3), including real Revit/ArchiCAD exports (Duplex, Clinic, Schependomlaan, Esplanades).
@@ -12,6 +12,7 @@ Code and instructions: [`spikes/`](../spikes/README.md). Test corpus: 80 buildin
 | S3 | Lossless, deterministic IFC ↔ records round-trip? Local edits? | **Yes**, after three design rules found by the spike (below). |
 | S4 | Identical hashes on Windows and Linux? | **Yes: 77/77 identical state hashes and byte-identical IFC exports.** |
 | S5 | Git object DB for a 1M-record model? | **Yes, if records are written as packs (never loose objects) and packs avoid deltas.** |
+| S6 | Can IfcOpenShell's SVG serializer make KIMCAD's drawings, fast enough? | **Yes for quality; speed needs three measures**: polygon HLR, sending only visible elements, and generating in a child process (the serializer holds the GIL). |
 
 ---
 
@@ -187,6 +188,48 @@ Synthetic ~700-byte canonical records, sharded `objects/<aa>/<bb>/<id>.json`, on
 - MVP import uses `git fast-import` followed by `git repack -adf --window=0`. The repack is slow (636 s at 1M records), so it should be a background step after import.
 - Later, a native pack writer through `gix-pack`, with parallel compression and no deltas for records.
 - Keep the local model cache (`.kimcad/cache`, keyed by tree hash) so opening a project normally skips the read-all path.
+
+---
+
+## S6 — Drawings: SVG serializer (Slice 14 risk check)
+
+Run 2026-10-07 on Linux (4 threads), ifcopenshell 0.9.0 (PyPI wheel; same version as the conda-forge build), with
+[`spikes/s6_drawings/drawing_bench.py`](../spikes/s6_drawings/drawing_bench.py).
+
+**API.** In 0.9.0 the serializer has no `addDrawing()` from Python. Custom drawings work the way `ifcopenshell.draw` and
+Bonsai do it: an `IfcAnnotation` with `ObjectType = "DRAWING"` whose placement is the camera (it looks along −Z) and
+whose `Body` is an `IfcBlock` (width × height × depth), passed with the `elevation-ref-guid` setting. The annotation
+itself must be among the iterator's elements, otherwise the output is empty. `IfcOpeningElement` must be left out,
+otherwise openings are drawn as cut fill across doors and windows. Output is in paper millimetres (`bounds`, `scale`).
+
+**Quality (the M4 house).** Plan, section and elevation are correct: walls and slabs cut with a solid fill (poché),
+windows and doors in projection, storeys and slabs in the right places. Missing: door swings in plan (the doors have no
+swing in their representation; Slice 15). Polygon HLR (`svg-poly`) gives the same drawings as exact HLR.
+
+**Speed.**
+
+| Model | Drawing | Elements given | Geometry | HLR | Total |
+|-------|---------|----------------|----------|-----|-------|
+| House (24 products) | plan / section / elevation | 18 / 33 / 33 | 0.07–0.14 s | 0.15–0.17 s | **0.25–0.33 s** |
+| Synthetic, 2,880 products (12 × 12 rooms × 4 levels) | plan, level 1, exact HLR | 1,297 | 1.8 s | 20.9 s | 23 s |
+| same | plan, level 1, `svg-poly` | 1,297 | 1.9 s | 4.6 s | **6.8 s** |
+| same | section through the middle, `svg-poly` | all | 8.0 s | 16.2 s | **25.6 s** |
+| same | south elevation, `svg-poly` | all | 8.8 s | 42.1 s | **52.1 s** |
+| same | south elevation, only the visible front row | 240 products | 1.3 s | 1.9 s | **3.4 s** |
+| Clinic_Architectural (3,258 elements) | — | — | — | — | measured in CI (`pixi run drawing-bench`, informational step); not reachable from the spike machine |
+
+- Hidden-line removal dominates, and it grows with everything behind the cut, not with what is visible. Sending only
+  the elements the camera can see cut the elevation from 52 s to 3.4 s. KIMCAD already renders element IDs into an
+  offscreen image for box selection (D52); the same pass from the drawing's camera gives the visible set.
+- `svg-poly` cut plan HLR from about 21 s to under 7 s with identical output; with `svg-unify-inputs` off and
+  `svg-prefilter` on as well, it was 4.6–5.1 s across runs.
+- **The serializer holds the GIL** during `write` and `finalize`: a Python thread ticking every 10 ms stalled for
+  4.7 s while a plan generated. Generating in-process would freeze the app, because the GUI calls Python. A snapshot
+  for a child process is cheap: `to_string` 0.25 s and `from_string` 0.31 s for the 5 MB synthetic model.
+
+**Decisions** (D60, proposed in the [Slice 14 plan](superpowers/plans/2026-10-07-slice14-sections-elevations.md)):
+drawings are DRAWING annotations; generation runs in a child process from a snapshot; `svg-poly`; plans pre-filtered
+to their level; sections and elevations get a visible-element pass first.
 
 ---
 

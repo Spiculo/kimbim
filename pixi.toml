@@ -42,6 +42,8 @@ app-build = { cmd = "cmake --build build/app", depends-on = ["app-configure"] }
 app-test = { cmd = "ctest --test-dir build/app --output-on-failure", depends-on = ["app-build", "build"], env = { KIMCAD_PYTHON_PATH = "$PIXI_PROJECT_ROOT/python" } }
 app-test-nogui = { cmd = "ctest --test-dir build/app --output-on-failure -LE gui", depends-on = ["app-build", "build"], env = { KIMCAD_PYTHON_PATH = "$PIXI_PROJECT_ROOT/python" } }
 app = { cmd = "build/app/kimcad-app", depends-on = ["app-build", "build"], env = { KIMCAD_PYTHON_PATH = "$PIXI_PROJECT_ROOT/python" } }
+# Spike S6: SVG drawing generation (plan, section, elevation) timed on the large Clinic model
+drawing-bench = "python spikes/s6_drawings/drawing_bench.py Clinic_Architectural.ifc build/s6-clinic"
 check-translations = "python tools/check_translations.py"
 kimcad = { cmd = "python -m kimcad", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/python" } }
 

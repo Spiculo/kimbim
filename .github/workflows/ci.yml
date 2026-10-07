@@ -31,6 +31,11 @@ jobs:
         run: pixi run check-translations
       - name: M3 exit test - two-storey house validates (schema + EXPRESS rules) and opens in web-ifc
         run: pixi run interop
+      # Informational (Slice 14 risk check): drawing generation times on Clinic, read from the log.
+      - name: Spike S6 - drawing generation timing on Clinic (informational)
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        run: pixi run drawing-bench
       # On Linux, OCCT connects to an X display as soon as a viewer exists (even without drawing),
       # so the non-GPU app tests also need a virtual display there.
       - name: Desktop app - build and tests that need no GPU (Windows)
