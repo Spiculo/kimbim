@@ -391,7 +391,7 @@ def _trim(wall, roof):
     needed = _needed_height(wall, planes) + 0.01
     if needed > A._wall_height(wall):
         _set_height(wall, needed)
-    ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=wall)
+    A._regenerate(f, wall)
     body = ifcopenshell.util.representation.get_representation(wall, "Model", "Body", "MODEL_VIEW")
     if body is None or not body.Items:
         return
@@ -415,7 +415,7 @@ def _release(wall):
         _set_height(wall, float(data["Height"]))
     if data:
         ifcopenshell.api.pset.remove_pset(B._model, product=wall, pset=B._model.by_id(data["id"]))
-    ifcopenshell.api.geometry.regenerate_wall_representation(B._model, wall=wall)
+    A._regenerate(B._model, wall)
 
 
 def attach_walls_to_roof(roof_guid: str, walls_json: str) -> str:

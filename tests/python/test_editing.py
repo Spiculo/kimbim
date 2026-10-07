@@ -5,6 +5,7 @@ import json
 import math
 
 import ifcopenshell.util.element
+import ifcopenshell.util.representation
 import ifcopenshell.validate
 import pytest
 
@@ -126,3 +127,21 @@ def test_offset_copies_a_wall_parallel_and_grows_a_slab(room):
     xs = [p[0] for p in outline]
     assert abs(max(xs) - 6.5) < 1e-6 and abs(min(p[1] for p in outline) + 0.5) < 1e-6
     assert valid() == []
+
+
+def test_moving_walls_of_an_imported_model_keeps_their_geometry(room):
+    """Revit's IFC2X3 exports put wall bodies on the Model context itself (no Body/MODEL_VIEW
+    sub-context). Moving such walls moves them; their geometry is theirs, not rebuilt as KIMCAD walls."""
+    f = b._model
+    body = ifcopenshell.util.representation.get_context(f, "Model", "Body", "MODEL_VIEW")
+    model = body.ParentContext
+    for rep in f.by_type("IfcShapeRepresentation"):
+        if rep.ContextOfItems == body:
+            rep.ContextOfItems = model
+    f.remove(body)
+    w1 = b._model.by_guid(room["w1"])
+    items = [r.Items for r in w1.Representation.Representations if r.RepresentationIdentifier == "Body"]
+    r = call("move_elements", g(room["w1"]), 0, 1, 0)
+    assert r["ok"], r
+    assert axis(room["w1"])[0][1] == 1.0
+    assert [r.Items for r in w1.Representation.Representations if r.RepresentationIdentifier == "Body"] == items

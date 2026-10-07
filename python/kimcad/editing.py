@@ -206,7 +206,7 @@ def _mirror(elements, point, direction):
                 rel.RelatedConnectionType = swap.get(rel.RelatedConnectionType, rel.RelatedConnectionType)
     for w in walls:
         if A._layer_set(w) is not None:
-            ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=w)
+            A._regenerate(f, w)
     for element, wall, length, (opening, _, along, width, height, sill) in hosted:
         A._apply_opening_edit(element, opening, wall, length - along, width, height, sill)
         if element.is_a("IfcDoor"):
