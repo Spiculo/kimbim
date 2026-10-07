@@ -25,6 +25,16 @@ Navigation preset (D48, owner choice): middle-drag pans, Shift+middle-drag orbit
 
 Display (Slice 4b): every element has border lines (outline and creases); View › **Lines only** (L) shows a line drawing with hidden lines removed, meant for plans. Plan view (P) and 3D view (3) exist; other preset views are in the backlog below.
 
+**Window layout (D71).** The center holds tabs: **3D**, a **plan tab per level** (P opens the active level's, or double-click a level in the tree; View › New plan tab), sections, elevations and sheets. Any tab can be dragged out to its own window (a second monitor) and docked back, or placed beside another. The 3D and plan tabs show one loaded model: selecting in one selects in all; each has its own camera and cut (a plan tab is cut at its level). Switching tabs ends a tool in progress, like Esc.
+- **Left:** the tools, in collapsible groups **3D** (wall, slab, column, beam, door, window, stair, roof, room, slab opening, place model), **Plane** (text, dimension, leader, mark, grid line), **View** (section, elevation, new plan tab, new sheet) and **Edit** (move, rotate, stretch, mirror, copy to level). Shortcuts and the Model menu are unchanged.
+- **Above the active view:** the active tool's fields (type, height, roof shape and pitch, typed length), only while a tool is active.
+- **Right:** the model tree, Properties, Layers, History, Drawings and Sheets as tabs; the area can auto-hide or float. **Double-click** an element (in a view or the tree) to bring Properties forward.
+- **Bottom:** the current pen (pen sets come later), the active layer, the visible layers, the zoom, the selection ("2 Walls") and messages.
+- **Top:** one bar with the design option (versioned projects), the active level and the cut controls.
+- The layout is remembered between sessions; a window left on a missing monitor comes back to the default layout.
+
+**Model tree:** one row for Project › Site › Building when there is only one of each; plain names ("Wall"); a level's elements grouped by category with a count ("Walls (12)"); the IFC class shows on hover and the search still matches it.
+
 **Navigation backlog** (owner, 2026-10-05: "we need those, document them for now"):
 - **View cube** (clickable faces/edges/corners to jump to a view; drag to orbit), like Revit/ArchiCAD/most CAD.
 - **Preset views**: front, back, left, right, top, bottom, plus the isometric ones, from a menu and the view cube.
@@ -178,6 +188,7 @@ Rules:
 ## UX principles
 
 - **Architect vocabulary in the UI** ([00](00-vision-and-scope.md#audience)). Show IFC class names as secondary information, not as the primary label.
-- **Familiar patterns** from mainstream BIM tools: ribbon or toolbar with tools by discipline, properties on the right, project browser on the left, status bar with snapping.
+- **Familiar patterns** from mainstream BIM tools: tools grouped by category on the left, the model tree and properties on the right (D71), a bottom bar with layers, zoom and selection.
+- **Room for the model.** Panels are tabbed and can auto-hide; views are tabs that can move to another window.
 - **Nothing blocks.** Long operations show progress and can be cancelled.
 - **Every action can be undone.** Versioned projects add a second safety net: any saved version can be restored.
