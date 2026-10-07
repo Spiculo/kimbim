@@ -141,3 +141,31 @@ def test_m4_exit_sheet_has_plan_section_elevation_and_title_block(house, tmp_pat
         assert f">{text}<" in svg, text
     out = tmp_path / "A01.svg"
     assert call("export_sheet_svg", "A01", str(out))["ok"] and out.read_text(encoding="utf-8") == svg
+
+
+def test_sheets_work_on_ifc2x3_models(tmp_path):
+    """IFC2X3 names the sheet number DocumentId and the drawing link ItemReference, and its references
+    have no Description: adding an A1 sheet to the Clinic (IFC2X3) failed outright."""
+    from kimcad.testing import build_model
+    path = tmp_path / "x3.ifc"
+    build_model(schema="IFC2X3", walls=2).write(str(path))
+    assert call("open_model", str(path))["ok"]
+    storey = b._model.by_type("IfcBuildingStorey")[0].GlobalId
+    assert call("create_plan", storey)["ok"]
+    plan = drawing("Level 1 Floor Plan")
+    a1 = call("add_sheet", "A1", "Plans")
+    assert a1["ok"], a1
+    r = call("place_drawing", a1["number"], plan, -1, -1, 100)
+    assert r["ok"], r
+    assert call("move_placed", a1["number"], plan, 40, 50)["ok"]
+    sheet = next(s for s in call("sheets")["sheets"] if s["number"] == a1["number"])
+    assert sheet["paper"] == "A1" and sheet["title"] == "Plans"
+    assert [(v["drawing"], v["x"], v["y"]) for v in sheet["views"]] == [(plan, 40, 50)]
+    assert call("edit_sheet", a1["number"], json.dumps({"number": "B01", "paper": "A3"}))["ok"]
+    assert [s["number"] for s in call("sheets")["sheets"]] == ["B01"]
+    logger = ifcopenshell.validate.json_logger()
+    ifcopenshell.validate.validate(b._model, logger, express_rules=True)
+    # (the test model's own CSG wall bodies break an IFC2X3 rule; only the sheet records matter here)
+    assert [x for x in logger.statements if "Document" in str(x.get("instance"))] == []
+    assert call("remove_placed", "B01", plan)["ok"]
+    assert call("delete_sheet", "B01")["ok"] and call("sheets")["sheets"] == []

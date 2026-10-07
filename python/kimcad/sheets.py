@@ -4,7 +4,9 @@
 A sheet (Archicad: a layout) is an IfcDocumentInformation with Purpose "SHEET" (Bonsai stores sheets
 the same way): Identification = sheet number, Name = title, Scope = paper size. Each drawing placed on it
 is an IfcDocumentReference to that sheet: Identification = the drawing's GlobalId (its name is read
-from the drawing; IFC allows a Name or a referenced document, not both), Description = where it sits ({"x", "y"} top-left in sheet millimetres, "scale" as 1:n). Sheets are model
+from the drawing; IFC allows a Name or a referenced document, not both), Description = where it sits ({"x", "y"} top-left in sheet millimetres, "scale" as 1:n). IFC2X3 names these DocumentId and
+ItemReference; its references have no Description (and a Name is not allowed beside the document), so
+there the position follows the marker in Location: "kimcad:drawing#{...}". Sheets are model
 data (versioned, undoable); their SVG is composed on demand from the drawings' cached SVG.
 
 Project info goes where IFC keeps it (and where Archicad's IFC export puts it): project number in
@@ -28,6 +30,39 @@ PURPOSE = "SHEET"
 PAPERS = {"A1": (841, 594), "A3": (420, 297)}  # landscape, millimetres
 MARGIN = 10.0
 TITLE_W, TITLE_H = 180.0, 50.0
+
+
+def _x3() -> bool:
+    return B._model.schema == "IFC2X3"
+
+
+def _number_attr() -> str:  # a sheet's number
+    return "DocumentId" if _x3() else "Identification"
+
+
+def _link_attr() -> str:  # the GlobalId of the drawing a placed view shows
+    return "ItemReference" if _x3() else "Identification"
+
+
+MARKER = "kimcad:drawing"
+
+
+def _data(ref) -> str:  # where a placed view sits, as JSON
+    if _x3():
+        return (ref.Location or "").partition("#")[2]
+    return ref.Description or ""
+
+
+def _data_fields(data: str) -> dict:
+    return {"Location": f"{MARKER}#{data}"} if _x3() else {"Location": MARKER, "Description": data}
+
+
+def _number(sheet) -> str:
+    return getattr(sheet, _number_attr())
+
+
+def _link(ref) -> str:
+    return getattr(ref, _link_attr())
 GAP = 15.0  # between placed drawings
 TITLE_BAND = 12.0  # the drawing title under each drawing
 
@@ -115,25 +150,26 @@ def set_project_info(info_json: str) -> str:
 
 def _sheets():
     out = [d for d in B._model.by_type("IfcDocumentInformation") if d.Purpose == PURPOSE]
-    return sorted(out, key=lambda d: d.Identification or "")
+    return sorted(out, key=lambda d: _number(d) or "")
 
 
 def _sheet(number: str):
-    return next((d for d in _sheets() if d.Identification == number), None)
+    return next((d for d in _sheets() if _number(d) == number), None)
 
 
 def _views(sheet):
-    return [r for r in getattr(sheet, "HasDocumentReferences", ()) or () if r.Location == "kimcad:drawing"]
+    refs = sheet.DocumentReferences if _x3() else getattr(sheet, "HasDocumentReferences", ())
+    return [r for r in refs or () if (r.Location or "").partition("#")[0] == MARKER]
 
 
 def _name(ref) -> str:
-    d = D._drawing(ref.Identification)
+    d = D._drawing(_link(ref))
     return (d.Name or "") if d is not None else ""
 
 
 def _placement(ref) -> dict:
     try:
-        data = json.loads(ref.Description or "{}")
+        data = json.loads(_data(ref) or "{}")
     except ValueError:
         data = {}
     return {"x": float(data.get("x", MARGIN)), "y": float(data.get("y", MARGIN)), "scale": int(data.get("scale", 100))}
@@ -157,11 +193,11 @@ def sheets() -> str:
         views = []
         for ref in _views(sheet):
             p = _placement(ref)
-            size = _cached_size(ref.Identification)
+            size = _cached_size(_link(ref))
             k = 100.0 / p["scale"]
-            views.append({"drawing": ref.Identification, "name": _name(ref), "x": p["x"], "y": p["y"],
+            views.append({"drawing": _link(ref), "name": _name(ref), "x": p["x"], "y": p["y"],
                           "w": round(size[0] * k, 3), "h": round(size[1] * k, 3), "scale": p["scale"]})
-        out.append({"number": sheet.Identification, "title": sheet.Name or "", "paper": sheet.Scope or "A1",
+        out.append({"number": _number(sheet), "title": sheet.Name or "", "paper": sheet.Scope or "A1",
                     "width": w, "height": h, "views": views})
     return B._dump({"sheets": out})
 
@@ -194,7 +230,7 @@ def _cached_size(guid: str):
 
 
 def _next_number() -> str:
-    taken = {d.Identification for d in _sheets()}
+    taken = {_number(d) for d in _sheets()}
     n = 1
     while f"A{n:02d}" in taken:
         n += 1
@@ -213,7 +249,7 @@ def add_sheet(paper: str, title: str) -> str:
         f = B._model
         info = ifcopenshell.api.document.add_information(f)
         ifcopenshell.api.document.edit_information(f, information=info, attributes={
-            "Identification": number, "Name": (title or "").strip() or f"Sheet {number}",
+            _number_attr(): number, "Name": (title or "").strip() or f"Sheet {number}",
             "Purpose": PURPOSE, "Scope": paper})
         return 1
 
@@ -239,7 +275,7 @@ def edit_sheet(number: str, changes_json: str) -> str:
         if changes.get("title"):
             attributes["Name"] = changes["title"]
         if changes.get("number"):
-            attributes["Identification"] = changes["number"]
+            attributes[_number_attr()] = changes["number"]
         if changes.get("paper"):
             attributes["Scope"] = changes["paper"]
         ifcopenshell.api.document.edit_information(B._model, information=sheet, attributes=attributes)
@@ -268,7 +304,7 @@ def _free_spot(sheet, w, h):
     taken = []
     for ref in _views(sheet):
         p = _placement(ref)
-        sw, sh = _cached_size(ref.Identification)
+        sw, sh = _cached_size(_link(ref))
         k = 100.0 / p["scale"]
         taken.append((p["x"], p["y"], sw * k, sh * k + TITLE_BAND))
     taken.append((width - MARGIN - TITLE_W, height - MARGIN - TITLE_H, TITLE_W, TITLE_H))
@@ -308,7 +344,7 @@ def place_drawing(number: str, drawing_guid: str, x=-1, y=-1, scale=100) -> str:
         return A._fail("bad position or scale")
     if scale <= 0:
         return A._fail("bad scale")
-    if any(r.Identification == drawing_guid for r in _views(sheet)):
+    if any(_link(r) == drawing_guid for r in _views(sheet)):
         return A._fail("the drawing is already on this sheet")
     size, _ = _drawing_size(drawing_guid)
     if size is None:
@@ -321,8 +357,8 @@ def place_drawing(number: str, drawing_guid: str, x=-1, y=-1, scale=100) -> str:
         f = B._model
         ref = ifcopenshell.api.document.add_reference(f, information=sheet)
         ifcopenshell.api.document.edit_reference(f, reference=ref, attributes={
-            "Identification": drawing_guid, "Location": "kimcad:drawing",
-            "Description": json.dumps({"x": round(x, 3), "y": round(y, 3), "scale": scale})})
+            _link_attr(): drawing_guid,
+            **_data_fields(json.dumps({"x": round(x, 3), "y": round(y, 3), "scale": scale}))})
         return 1
 
     return B._dump(B._run(action))
@@ -330,14 +366,16 @@ def place_drawing(number: str, drawing_guid: str, x=-1, y=-1, scale=100) -> str:
 
 def _edit_placed(number, drawing_guid, change):
     sheet = _sheet(number) if B._model is not None else None
-    ref = next((r for r in _views(sheet) if r.Identification == drawing_guid), None) if sheet else None
+    ref = next((r for r in _views(sheet) if _link(r) == drawing_guid), None) if sheet else None
     if ref is None:
         return A._fail("the drawing is not on that sheet")
 
     def action():
         p = _placement(ref)
         change(p)
-        ref.Description = json.dumps({"x": round(p["x"], 3), "y": round(p["y"], 3), "scale": p["scale"]})
+        data = json.dumps({"x": round(p["x"], 3), "y": round(p["y"], 3), "scale": p["scale"]})
+        for name, value in _data_fields(data).items():
+            setattr(ref, name, value)
         return 1
 
     return B._dump(B._run(action))
@@ -363,7 +401,7 @@ def set_placed_scale(number: str, drawing_guid: str, scale) -> str:
 
 def remove_placed(number: str, drawing_guid: str) -> str:
     sheet = _sheet(number) if B._model is not None else None
-    ref = next((r for r in _views(sheet) if r.Identification == drawing_guid), None) if sheet else None
+    ref = next((r for r in _views(sheet) if _link(r) == drawing_guid), None) if sheet else None
     if ref is None:
         return A._fail("the drawing is not on that sheet")
 
@@ -411,7 +449,7 @@ def _title_block(sheet, width, height, info) -> list:
            f'<path d="M{x0},{y0 + 28} L{x0 + TITLE_W},{y0 + 28}" stroke="#000" stroke-width="0.25"/>',
            f'<path d="M{x0 + 130},{y0 + 28} L{x0 + 130},{y0 + TITLE_H}" stroke="#000" stroke-width="0.25"/>',
            f'<text x="{x0 + 133}" y="{y0 + 34}" font-size="2.5">Sheet</text>',
-           f'<text x="{x0 + 133}" y="{y0 + 44}" font-size="7">{_esc(sheet.Identification)}</text>',
+           f'<text x="{x0 + 133}" y="{y0 + 44}" font-size="7">{_esc(_number(sheet))}</text>',
            f'<text x="{x0 + 100}" y="{y0 + 45}" font-size="3">{_esc(scale)}</text>']
     for x, y, size, value in rows:
         if value:
@@ -428,7 +466,7 @@ def sheet_svg(number: str) -> str:
     info = json.loads(project_info())
     styles, parts = [], []
     for ref in _views(sheet):
-        size, svg = _drawing_size(ref.Identification)
+        size, svg = _drawing_size(_link(ref))
         if size is None:
             return A._fail(f"could not generate {_name(ref)}: {svg}")
         p = _placement(ref)
