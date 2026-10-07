@@ -72,33 +72,17 @@ Aspect_VKeyFlags toFlags(Qt::KeyboardModifiers mods)
 
 } // namespace
 
-namespace {
-
-// One display connection per process, shared by every view (on X11 each one is a connection to the X
-// server). Opening a connection can fail for a moment on a busy server (CI's Xvfb did, aborting the
-// app with an uncaught OCCT exception), so it is retried a few times before giving up.
-Handle(Aspect_DisplayConnection) sharedDisplay()
-{
-    static Handle(Aspect_DisplayConnection) display;
-    if (!display.IsNull())
-        return display;
-    for (int attempt = 0;; ++attempt) {
-        try {
-            display = new Aspect_DisplayConnection();
-            return display;
-        } catch (const Standard_Failure& e) {
-            if (attempt >= 9)
-                throw;
-            qWarning("KIMCAD: no display connection yet (%s), retrying", e.what());
-            QThread::msleep(200);
-        }
-    }
-}
-
-} // namespace
 
 Viewport::Viewport(QWidget* parent)
+    : Viewport(new Scene, parent)
+{
+    m_scene->setParent(this); // owned: this view is its only one
+}
+
+Viewport::Viewport(Scene* scene, QWidget* parent)
     : QWidget(parent)
+    , m_scene(scene)
+    , m_context(scene->context())
 {
     setAttribute(Qt::WA_PaintOnScreen);
     setAttribute(Qt::WA_NoSystemBackground);
@@ -117,33 +101,17 @@ Viewport::Viewport(QWidget* parent)
     setFocusPolicy(Qt::StrongFocus);
     setMinimumSize(200, 200);
 
-    Handle(OpenGl_GraphicDriver) driver = new OpenGl_GraphicDriver(sharedDisplay(), false);
-    // No vsync by default: the view only redraws when something changes, so this never spins, and a
-    // frame takes ~1 ms. With vsync each redraw blocked the UI until the next screen refresh (33 ms
-    // on 30 Hz laptop panels), so drawing tools lagged behind the mouse (owner feedback).
-    // KIMCAD_VSYNC=1 turns it back on (e.g. if orbiting tears on some screen).
-    if (qEnvironmentVariableIntValue("KIMCAD_VSYNC") != 1)
-        driver->ChangeOptions().swapInterval = 0;
-    m_viewer = new V3d_Viewer(driver);
-    // A fixed "sun" from the south-east above plus soft ambient and fill. A headlight along the
-    // isometric view direction lights the top and both visible sides equally, so boxes look flat.
-    Handle(V3d_AmbientLight) ambient = new V3d_AmbientLight(Quantity_Color(0.42, 0.42, 0.42, Quantity_TOC_RGB));
-    Handle(V3d_DirectionalLight) sun = new V3d_DirectionalLight(gp_Dir(-0.3, 0.5, -0.8), Quantity_NOC_WHITE);
-    sun->SetIntensity(0.75f);
-    Handle(V3d_DirectionalLight) fill = new V3d_DirectionalLight(gp_Dir(0.6, -0.25, -0.35), Quantity_NOC_WHITE);
-    fill->SetIntensity(0.25f);
-    for (const Handle(V3d_Light)& light : {Handle(V3d_Light)(ambient), Handle(V3d_Light)(sun), Handle(V3d_Light)(fill)})
-        m_viewer->AddLight(light);
-    m_viewer->SetLightOn();
-    m_context = new AIS_InteractiveContext(m_viewer);
-    m_view = m_viewer->CreateView();
+    m_view = m_scene->createView();
     const Quantity_Color background(0.93, 0.94, 0.95, Quantity_TOC_RGB);
     m_view->SetBackgroundColor(background);
     ElementBatch::setBackground(background); // lines-only faces blend into it
     m_view->SetProj(V3d_XposYnegZpos);
-    m_context->HighlightStyle(Prs3d_TypeOfHighlight_Dynamic)->SetColor(Quantity_Color(0.98, 0.75, 0.20, Quantity_TOC_RGB));
-    m_context->HighlightStyle(Prs3d_TypeOfHighlight_Selected)->SetColor(Quantity_Color(0.15, 0.50, 0.95, Quantity_TOC_RGB));
     applyNavigationPreset();
+    connect(m_scene, &Scene::redrawRequested, this, qOverload<>(&QWidget::update));
+    connect(m_scene, &Scene::elementsAltered, this, [this] {
+        if (m_sectionZ)
+            rebuildSection();
+    });
 }
 
 void Viewport::setPlanView(double elevation)
@@ -226,7 +194,7 @@ QSet<QString> Viewport::selectedSet() const
 
 std::optional<QSet<QString>> Viewport::visibleIn(int x0, int y0, int x1, int y1)
 {
-    if (!ensureWindow() || m_nextIdBase > ElementBatch::maxId())
+    if (!ensureWindow() || m_scene->nextIdBase > ElementBatch::maxId())
         return std::nullopt;
     int w = 0, h = 0;
     m_view->Window()->Size(w, h);
@@ -246,7 +214,7 @@ std::optional<QSet<QString>> Viewport::idsInImage(int w, int h, int x0, int y0, 
         m_context->Erase(m_preview, false);
     m_context->ClearDetected(false);
     m_context->UnhilightSelected(false);
-    for (const auto& b : m_batches)
+    for (const auto& b : m_scene->batches)
         m_context->SetDisplayMode(b, ElementBatch::Ids, false);
     Image_PixMap image;
     V3d_ImageDumpOptions options;
@@ -254,8 +222,8 @@ std::optional<QSet<QString>> Viewport::idsInImage(int w, int h, int x0, int y0, 
     options.Height = h;
     options.BufferType = Graphic3d_BT_RGB;
     const bool ok = m_view->ToPixMap(image, options);
-    const int mode = m_linesOnly ? ElementBatch::LinesOnly : ElementBatch::Shaded;
-    for (const auto& b : m_batches)
+    const int mode = m_scene->linesOnly ? ElementBatch::LinesOnly : ElementBatch::Shaded;
+    for (const auto& b : m_scene->batches)
         m_context->SetDisplayMode(b, mode, false);
     m_view->SetBackgroundColor(background);
     if (!m_preview.IsNull())
@@ -301,13 +269,13 @@ std::optional<QSet<QString>> Viewport::idsInImage(int w, int h, int x0, int y0, 
     }
     QSet<QString> out;
     for (int id : std::as_const(ids)) {
-        const auto it = std::upper_bound(m_idBases.begin(), m_idBases.end(), id - 1);
-        if (it == m_idBases.begin())
+        const auto it = std::upper_bound(m_scene->idBases.begin(), m_scene->idBases.end(), id - 1);
+        if (it == m_scene->idBases.begin())
             continue;
-        const size_t b = size_t(std::distance(m_idBases.begin(), it) - 1);
-        const int index = id - 1 - m_idBases[b];
-        if (index < m_batches[b]->elementCount() && !m_batches[b]->isRetired(index))
-            out.insert(m_batches[b]->guid(index));
+        const size_t b = size_t(std::distance(m_scene->idBases.begin(), it) - 1);
+        const int index = id - 1 - m_scene->idBases[b];
+        if (index < m_scene->batches[b]->elementCount() && !m_scene->batches[b]->isRetired(index))
+            out.insert(m_scene->batches[b]->guid(index));
     }
     return out;
 }
@@ -316,7 +284,7 @@ std::optional<QSet<QString>> Viewport::visibleFrom(QPointF p1, QPointF p2, QPoin
 {
     const QPointF d = p2 - p1;
     const double len = std::hypot(d.x(), d.y());
-    if (!ensureWindow() || m_batches.empty() || m_nextIdBase > ElementBatch::maxId() || len < 1e-6 || z1 <= z0)
+    if (!ensureWindow() || m_scene->batches.empty() || m_scene->nextIdBase > ElementBatch::maxId() || len < 1e-6 || z1 <= z0)
         return std::nullopt;
     const QPointF u = d / len;
     QPointF n(-u.y(), u.x());
@@ -333,7 +301,7 @@ std::optional<QSet<QString>> Viewport::visibleFrom(QPointF p1, QPointF p2, QPoin
     keep(p2, -u);
     if (depth >= 0)
         keep(p1 + n * depth, -n);
-    for (const auto& b : m_batches) {
+    for (const auto& b : m_scene->batches) {
         for (const auto& plane : m_clipPlanes)
             b->RemoveClipPlane(plane);
         for (const auto& plane : planes)
@@ -355,7 +323,7 @@ std::optional<QSet<QString>> Viewport::visibleFrom(QPointF p1, QPointF p2, QPoin
     camera->SetAspect(double(w) / h);
     m_view->ZFitAll();
     const auto ids = idsInImage(w, h, 0, 0, w - 1, h - 1);
-    for (const auto& b : m_batches) {
+    for (const auto& b : m_scene->batches) {
         for (const auto& plane : planes)
             b->RemoveClipPlane(plane);
         for (const auto& plane : m_clipPlanes)
@@ -379,9 +347,9 @@ void Viewport::keepOnlyVisible(const QSet<QString>& before, AIS_SelectionScheme 
     for (const QString& g : touched) {
         if (visible->contains(g))
             continue;
-        const auto it = m_locate.constFind(g);
-        if (it != m_locate.constEnd())
-            m_context->AddOrRemoveSelected(m_batches[size_t(it->batch)]->owner(it->index), false);
+        const auto it = m_scene->locate.constFind(g);
+        if (it != m_scene->locate.constEnd())
+            m_context->AddOrRemoveSelected(m_scene->batches[size_t(it->batch)]->owner(it->index), false);
     }
     m_context->UpdateCurrentViewer();
 }
@@ -398,9 +366,9 @@ void Viewport::handleSelectionPoly(const Handle(AIS_InteractiveContext)& ctx, co
     const NCollection_Vec2<int> a = points.First(), b = points.Last();
     const AIS_SelectionScheme scheme = myUI.Selection.Scheme;
     const QSet<QString> before = selectedSet();
-    m_quietSelection = true; // one notification, after hidden elements were dropped
+    m_scene->quietSelection = true; // one notification, after hidden elements were dropped
     AIS_ViewController::handleSelectionPoly(ctx, view);
-    m_quietSelection = false;
+    m_scene->quietSelection = false;
     // We are inside the paint pass: render the id image afterwards.
     QMetaObject::invokeMethod(this, [this, before, scheme, a, b] {
         keepOnlyVisible(before, scheme == AIS_SelectionScheme_UNKNOWN ? AIS_SelectionScheme_Replace : scheme, a.x(), a.y(), b.x(), b.y());
@@ -431,7 +399,14 @@ AIS_MouseGesture Viewport::gestureFor(Aspect_VKeyMouse button, Aspect_VKeyFlags 
 
 Viewport::~Viewport()
 {
-    m_context->RemoveAll(false);
+    // This view's own overlays leave the shared context; the elements stay for the other views.
+    for (const Handle(AIS_InteractiveObject)& o :
+         {Handle(AIS_InteractiveObject)(m_preview), Handle(AIS_InteractiveObject)(m_grid), Handle(AIS_InteractiveObject)(m_section)})
+        if (!o.IsNull())
+            m_context->Remove(o, false);
+    for (const auto& a : std::as_const(m_annotations))
+        m_context->Remove(a, false);
+    m_scene->removeView(m_view);
 }
 
 bool Viewport::ensureWindow()
@@ -446,7 +421,7 @@ bool Viewport::ensureWindow()
 #ifdef _WIN32
         Handle(WNT_Window) window = new WNT_Window(reinterpret_cast<Aspect_Handle>(winId()));
 #else
-        Handle(Xw_Window) window = new Xw_Window(m_viewer->Driver()->GetDisplayConnection(), Aspect_Drawable(winId()));
+        Handle(Xw_Window) window = new Xw_Window(m_scene->viewer()->Driver()->GetDisplayConnection(), Aspect_Drawable(winId()));
 #endif
         m_view->SetWindow(window);
         if (!window->IsMapped())
@@ -628,7 +603,7 @@ void Viewport::rebuildSection()
         return;
     }
     std::vector<std::vector<gp_Pnt2d>> loops;
-    for (const auto& b : m_batches)
+    for (const auto& b : m_scene->batches)
         for (int i = 0; i < b->elementCount(); ++i) {
             if (b->isHidden(i))
                 continue;
@@ -884,10 +859,10 @@ void Viewport::displayAnnotations()
         if (list == &m_markerData && !m_planView)
             continue;
         for (const Annotation& a : *list) {
-            if (m_layerHidden.contains(a.guid))
+            if (m_scene->layerHidden.contains(a.guid))
                 continue;
             Handle(AnnotationPrs) prs = new AnnotationPrs(a, m_annotationZ + 0.02);
-            m_context->Display(prs, 0, m_layerLocked.contains(a.guid) ? -1 : 0, false);
+            m_context->Display(prs, 0, m_scene->layerLocked.contains(a.guid) ? -1 : 0, false);
             m_annotations.insert(a.guid, prs);
         }
     }
@@ -1117,38 +1092,36 @@ void Viewport::wheelEvent(QWheelEvent* e)
 
 void Viewport::OnSelectionChanged(const Handle(AIS_InteractiveContext)&, const Handle(V3d_View)&)
 {
-    if (!m_quietSelection)
+    if (!m_scene->quietSelection)
         emit selectionChanged(selectedGuids());
 }
 
 void Viewport::addBatch(const Handle(ElementBatch)& batch)
 {
-    const int b = int(m_batches.size());
-    m_batches.push_back(batch);
+    const int b = int(m_scene->batches.size());
+    m_scene->batches.push_back(batch);
     for (int i = 0; i < batch->elementCount(); ++i)
-        m_locate.insert(batch->guid(i), Loc{b, i});
+        m_scene->locate.insert(batch->guid(i), Scene::Loc{b, i});
     for (const auto& plane : m_clipPlanes)
         batch->AddClipPlane(plane);
     applyColors(batch);
     applyLayerState(batch);
-    batch->setIdBase(m_nextIdBase);
-    m_idBases.push_back(m_nextIdBase);
-    m_nextIdBase += batch->elementCount();
-    const int mode = m_linesOnly ? ElementBatch::LinesOnly : ElementBatch::Shaded;
+    batch->setIdBase(m_scene->nextIdBase);
+    m_scene->idBases.push_back(m_scene->nextIdBase);
+    m_scene->nextIdBase += batch->elementCount();
+    const int mode = m_scene->linesOnly ? ElementBatch::LinesOnly : ElementBatch::Shaded;
     batch->SetDisplayMode(mode); // the object's own mode, so later redisplays keep it
     m_context->Display(batch, mode, 0, false);
-    if (m_sectionZ)
-        rebuildSection();
-    update();
+    m_scene->elementsChanged(); // every view with a plan cut rebuilds its poché, and repaints
 }
 
 void Viewport::setLinesOnly(bool on)
 {
-    m_linesOnly = on;
+    m_scene->linesOnly = on;
     const int mode = on ? ElementBatch::LinesOnly : ElementBatch::Shaded;
-    for (const auto& b : m_batches)
+    for (const auto& b : m_scene->batches)
         m_context->SetDisplayMode(b, mode, false);
-    update();
+    m_scene->changed();
 }
 
 void Viewport::clear()
@@ -1159,16 +1132,16 @@ void Viewport::clear()
     m_annotationData.clear();
     m_markerData.clear();
     m_context->RemoveAll(false);
-    m_batches.clear();
-    m_locate.clear();
-    m_idBases.clear();
+    m_scene->batches.clear();
+    m_scene->locate.clear();
+    m_scene->idBases.clear();
     m_grid.Nullify();
     m_gridLineCount = 0;
     m_section.Nullify();
     m_sectionElements = 0;
     m_preview.Nullify();
-    m_nextIdBase = 0;
-    update();
+    m_scene->nextIdBase = 0;
+    m_scene->changed();
 }
 
 void Viewport::fitAll()
@@ -1183,7 +1156,7 @@ void Viewport::fitAll()
 QStringList Viewport::guids() const
 {
     QStringList out;
-    for (const auto& b : m_batches)
+    for (const auto& b : m_scene->batches)
         for (int i = 0; i < b->elementCount(); ++i)
             if (!b->isRetired(i))
                 out << b->guid(i);
@@ -1193,8 +1166,8 @@ QStringList Viewport::guids() const
 void Viewport::applyColors(const Handle(ElementBatch)& batch) const
 {
     for (int i = 0; i < batch->elementCount(); ++i) {
-        const auto it = m_colors.constFind(batch->guid(i));
-        batch->setColorOverride(i, it == m_colors.constEnd()
+        const auto it = m_scene->colors.constFind(batch->guid(i));
+        batch->setColorOverride(i, it == m_scene->colors.constEnd()
                 ? std::nullopt
                 : std::optional<Quantity_Color>(Quantity_Color(it->redF(), it->greenF(), it->blueF(), Quantity_TOC_sRGB)));
     }
@@ -1202,10 +1175,10 @@ void Viewport::applyColors(const Handle(ElementBatch)& batch) const
 
 void Viewport::setElementColors(const QHash<QString, QColor>& colors)
 {
-    m_colors = colors;
+    m_scene->colors = colors;
     std::vector<int> touched;
-    for (size_t b = 0; b < m_batches.size(); ++b) {
-        applyColors(m_batches[b]);
+    for (size_t b = 0; b < m_scene->batches.size(); ++b) {
+        applyColors(m_scene->batches[b]);
         touched.push_back(int(b));
     }
     redisplay(touched);
@@ -1214,25 +1187,25 @@ void Viewport::setElementColors(const QHash<QString, QColor>& colors)
 void Viewport::applyLayerState(const Handle(ElementBatch)& batch) const
 {
     for (int i = 0; i < batch->elementCount(); ++i) {
-        batch->setLayerHidden(i, m_layerHidden.contains(batch->guid(i)));
-        batch->setLocked(i, m_layerLocked.contains(batch->guid(i)));
+        batch->setLayerHidden(i, m_scene->layerHidden.contains(batch->guid(i)));
+        batch->setLocked(i, m_scene->layerLocked.contains(batch->guid(i)));
     }
 }
 
 void Viewport::setLayerState(const QSet<QString>& hiddenGuids, const QSet<QString>& lockedGuids)
 {
-    m_layerHidden = hiddenGuids;
-    m_layerLocked = lockedGuids;
+    m_scene->layerHidden = hiddenGuids;
+    m_scene->layerLocked = lockedGuids;
     // Hidden or locked elements can't stay selected.
     for (const QString& g : selectedGuids())
         if (hiddenGuids.contains(g) || lockedGuids.contains(g)) {
-            const auto it = m_locate.constFind(g);
-            if (it != m_locate.constEnd())
-                m_context->AddOrRemoveSelected(m_batches[size_t(it->batch)]->owner(it->index), false);
+            const auto it = m_scene->locate.constFind(g);
+            if (it != m_scene->locate.constEnd())
+                m_context->AddOrRemoveSelected(m_scene->batches[size_t(it->batch)]->owner(it->index), false);
         }
     std::vector<int> touched;
-    for (size_t b = 0; b < m_batches.size(); ++b) {
-        applyLayerState(m_batches[b]);
+    for (size_t b = 0; b < m_scene->batches.size(); ++b) {
+        applyLayerState(m_scene->batches[b]);
         touched.push_back(int(b));
     }
     redisplay(touched);
@@ -1241,39 +1214,39 @@ void Viewport::setLayerState(const QSet<QString>& hiddenGuids, const QSet<QStrin
 
 bool Viewport::isLocked(const QString& guid) const
 {
-    const auto it = m_locate.constFind(guid);
-    return it != m_locate.constEnd() && m_batches[size_t(it->batch)]->isLocked(it->index);
+    const auto it = m_scene->locate.constFind(guid);
+    return it != m_scene->locate.constEnd() && m_scene->batches[size_t(it->batch)]->isLocked(it->index);
 }
 
 int Viewport::coloredCount() const
 {
     int n = 0;
-    for (auto it = m_colors.constBegin(); it != m_colors.constEnd(); ++it)
-        n += m_locate.contains(it.key()) ? 1 : 0;
+    for (auto it = m_scene->colors.constBegin(); it != m_scene->colors.constEnd(); ++it)
+        n += m_scene->locate.contains(it.key()) ? 1 : 0;
     return n;
 }
 
 QString Viewport::typeOf(const QString& guid) const
 {
-    const auto it = m_locate.constFind(guid);
-    if (it == m_locate.constEnd())
+    const auto it = m_scene->locate.constFind(guid);
+    if (it == m_scene->locate.constEnd())
         return m_annotations.contains(guid) ? QStringLiteral("IfcAnnotation") : QString();
-    return m_batches[size_t(it->batch)]->type(it->index);
+    return m_scene->batches[size_t(it->batch)]->type(it->index);
 }
 
 bool Viewport::retire(const QString& guid, std::vector<int>* touched)
 {
-    auto it = m_locate.find(guid);
-    if (it == m_locate.end())
+    auto it = m_scene->locate.find(guid);
+    if (it == m_scene->locate.end())
         return false;
-    const auto& batch = m_batches[size_t(it->batch)];
+    const auto& batch = m_scene->batches[size_t(it->batch)];
     Handle(ElementOwner) owner = batch->owner(it->index);
     const bool wasSelected = owner->IsSelected();
     if (wasSelected)
         m_context->AddOrRemoveSelected(owner, false);
     batch->retire(it->index);
     touched->push_back(it->batch);
-    m_locate.erase(it);
+    m_scene->locate.erase(it);
     return wasSelected;
 }
 
@@ -1289,10 +1262,10 @@ void Viewport::replaceElements(const MeshChunk& chunk)
     redisplay(touched);
     addBatch(new ElementBatch(chunk));
     for (const QString& g : reselect) {
-        const Loc loc = m_locate.value(g);
-        m_context->AddOrRemoveSelected(m_batches[size_t(loc.batch)]->owner(loc.index), false);
+        const Scene::Loc loc = m_scene->locate.value(g);
+        m_context->AddOrRemoveSelected(m_scene->batches[size_t(loc.batch)]->owner(loc.index), false);
     }
-    update();
+    m_scene->changed();
 }
 
 void Viewport::removeElements(const QStringList& guids)
@@ -1306,7 +1279,7 @@ void Viewport::removeElements(const QStringList& guids)
 int Viewport::visibleElementCount() const
 {
     int n = 0;
-    for (const auto& b : m_batches)
+    for (const auto& b : m_scene->batches)
         n += b->visibleCount();
     return n;
 }
@@ -1314,7 +1287,7 @@ int Viewport::visibleElementCount() const
 qint64 Viewport::triangleCount() const
 {
     qint64 n = 0;
-    for (const auto& b : m_batches)
+    for (const auto& b : m_scene->batches)
         n += b->triangleCount();
     return n;
 }
@@ -1337,19 +1310,19 @@ void Viewport::selectGuids(const QStringList& guids)
     m_context->ClearSelected(false);
     std::vector<int> unhide;
     for (const QString& g : guids) {
-        auto it = m_locate.constFind(g);
-        if (it == m_locate.constEnd())
+        auto it = m_scene->locate.constFind(g);
+        if (it == m_scene->locate.constEnd())
             continue;
-        if (m_batches[size_t(it->batch)]->isHidden(it->index)) { // selecting a hidden element reveals it
-            m_batches[size_t(it->batch)]->setHidden(it->index, false);
+        if (m_scene->batches[size_t(it->batch)]->isHidden(it->index)) { // selecting a hidden element reveals it
+            m_scene->batches[size_t(it->batch)]->setHidden(it->index, false);
             unhide.push_back(it->batch);
         }
     }
     redisplay(unhide);
     for (const QString& g : guids) {
-        auto it = m_locate.constFind(g);
-        if (it != m_locate.constEnd())
-            m_context->AddOrRemoveSelected(m_batches[size_t(it->batch)]->owner(it->index), false);
+        auto it = m_scene->locate.constFind(g);
+        if (it != m_scene->locate.constEnd())
+            m_context->AddOrRemoveSelected(m_scene->batches[size_t(it->batch)]->owner(it->index), false);
         else if (const auto note = m_annotations.constFind(g); note != m_annotations.constEnd()) {
             const Handle(SelectMgr_EntityOwner)& owner = Handle(AnnotationPrs)::DownCast(*note)->owner();
             if (!owner.IsNull())
@@ -1357,30 +1330,28 @@ void Viewport::selectGuids(const QStringList& guids)
         }
     }
     m_context->UpdateCurrentViewer();
-    update();
+    m_scene->changed();
 }
 
 void Viewport::redisplay(const std::vector<int>& batches)
 {
-    if (m_sectionZ && !batches.empty())
-        rebuildSection();
     std::set<int> unique(batches.begin(), batches.end());
     for (int b : unique) {
-        m_context->Redisplay(m_batches[size_t(b)], false, true);
-        m_context->RecomputeSelectionOnly(m_batches[size_t(b)]);
+        m_context->Redisplay(m_scene->batches[size_t(b)], false, true);
+        m_context->RecomputeSelectionOnly(m_scene->batches[size_t(b)]);
     }
     if (!unique.empty())
-        update();
+        m_scene->elementsChanged(); // every view with a plan cut rebuilds its poché, and repaints
 }
 
 void Viewport::setHidden(const QStringList& guids, bool hidden)
 {
     std::vector<int> touched;
     for (const QString& g : guids) {
-        auto it = m_locate.constFind(g);
-        if (it == m_locate.constEnd())
+        auto it = m_scene->locate.constFind(g);
+        if (it == m_scene->locate.constEnd())
             continue;
-        const auto& batch = m_batches[size_t(it->batch)];
+        const auto& batch = m_scene->batches[size_t(it->batch)];
         if (hidden) { // a hidden element can't stay selected; the rest of the selection stays
             Handle(ElementOwner) owner = batch->owner(it->index);
             if (owner->IsSelected())
@@ -1397,8 +1368,8 @@ void Viewport::isolate(const QStringList& guids)
     QSet<QString> keep(guids.begin(), guids.end());
     m_context->ClearSelected(false);
     std::vector<int> touched;
-    for (size_t b = 0; b < m_batches.size(); ++b) {
-        const auto& batch = m_batches[b];
+    for (size_t b = 0; b < m_scene->batches.size(); ++b) {
+        const auto& batch = m_scene->batches[b];
         bool changed = false;
         for (int i = 0; i < batch->elementCount(); ++i) {
             const bool hide = !keep.contains(batch->guid(i));
@@ -1416,8 +1387,8 @@ void Viewport::isolate(const QStringList& guids)
 void Viewport::showAll()
 {
     std::vector<int> touched;
-    for (size_t b = 0; b < m_batches.size(); ++b) {
-        const auto& batch = m_batches[b];
+    for (size_t b = 0; b < m_scene->batches.size(); ++b) {
+        const auto& batch = m_scene->batches[b];
         if (batch->visibleCount() == batch->elementCount())
             continue;
         for (int i = 0; i < batch->elementCount(); ++i)
@@ -1431,7 +1402,7 @@ void Viewport::addClipPlanes(const std::vector<Handle(Graphic3d_ClipPlane)>& pla
 {
     for (const auto& plane : planes) {
         m_clipPlanes.push_back(plane);
-        for (const auto& b : m_batches)
+        for (const auto& b : m_scene->batches)
             b->AddClipPlane(plane);
     }
     update();
@@ -1440,7 +1411,7 @@ void Viewport::addClipPlanes(const std::vector<Handle(Graphic3d_ClipPlane)>& pla
 void Viewport::clearClipPlanes()
 {
     for (const auto& plane : m_clipPlanes)
-        for (const auto& b : m_batches)
+        for (const auto& b : m_scene->batches)
             b->RemoveClipPlane(plane);
     m_clipPlanes.clear();
     update();
@@ -1450,14 +1421,14 @@ Bnd_Box Viewport::boundsOf(const QStringList& guids) const
 {
     Bnd_Box box;
     if (guids.isEmpty()) {
-        for (const auto& b : m_batches)
+        for (const auto& b : m_scene->batches)
             box.Add(b->visibleBounds());
         return box;
     }
     for (const QString& g : guids) {
-        auto it = m_locate.constFind(g);
-        if (it != m_locate.constEnd())
-            box.Add(m_batches[size_t(it->batch)]->elementBounds(it->index));
+        auto it = m_scene->locate.constFind(g);
+        if (it != m_scene->locate.constEnd())
+            box.Add(m_scene->batches[size_t(it->batch)]->elementBounds(it->index));
     }
     return box;
 }
@@ -1510,10 +1481,10 @@ QString Viewport::pickAt(int x, int y)
 
 bool Viewport::projectCenterOf(const QString& guid, int* x, int* y) const
 {
-    auto it = m_locate.constFind(guid);
-    if (it == m_locate.constEnd() || m_view->Window().IsNull())
+    auto it = m_scene->locate.constFind(guid);
+    if (it == m_scene->locate.constEnd() || m_view->Window().IsNull())
         return false;
-    const Bnd_Box box = m_batches[size_t(it->batch)]->elementBounds(it->index);
+    const Bnd_Box box = m_scene->batches[size_t(it->batch)]->elementBounds(it->index);
     if (box.IsVoid())
         return false;
     double x0, y0, z0, x1, y1, z1;

@@ -29,6 +29,7 @@ qt_add_library(kimcad_core STATIC
     src/SheetExport.cpp src/SheetExport.h
     src/SheetsPanel.cpp src/SheetsPanel.h
     src/DockLayout.cpp src/DockLayout.h
+    src/Scene.cpp src/Scene.h
 )
 target_include_directories(kimcad_core PUBLIC src)
 # Element icons (owner feedback: objects need an icon and a hint on hover).
@@ -74,6 +75,7 @@ kimcad_test(test_two_point_tool)
 kimcad_test(test_rotate_tool)
 kimcad_test(test_grip_tool)
 kimcad_test(test_dock_layout)
+kimcad_test(test_scene)
 
 # GUI self-tests: need a real OpenGL window (GPU, or Mesa on the Linux CI runner). Label "gui".
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/broken.ifc "ISO-10303-21;

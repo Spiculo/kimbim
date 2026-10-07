@@ -23,18 +23,22 @@
 #include <vector>
 
 #include "ElementBatch.h"
+#include "Scene.h"
 
 class QTimer;
 
 namespace kimcad {
 
 // OCCT 3D view in a native Qt widget (D45). Navigation and click-selection come from
-// AIS_ViewController; the model is a set of ElementBatch objects (D42).
+// AIS_ViewController; the model is a set of ElementBatch objects (D42) held by a Scene that several
+// views can share (D71: the 3D tab and plan tabs).
 class Viewport : public QWidget, protected AIS_ViewController {
     Q_OBJECT
 public:
-    explicit Viewport(QWidget* parent = nullptr);
+    explicit Viewport(QWidget* parent = nullptr);               // owns a new Scene (tests, self-test)
+    explicit Viewport(Scene* scene, QWidget* parent = nullptr); // one view of `scene`
     ~Viewport() override;
+    Scene* scene() const { return m_scene; }
 
     void addBatch(const Handle(ElementBatch)& batch);
     // Live edits (Slice 4): new geometry for these elements (old instances retired, selection kept),
@@ -48,7 +52,7 @@ public:
     bool isPlanView() const { return m_planView; }
     // Lines only (hidden-line drawing, Slice 4b): every batch, including later ones.
     void setLinesOnly(bool on);
-    bool linesOnly() const { return m_linesOnly; }
+    bool linesOnly() const { return m_scene->linesOnly; }
     double planElevation() const { return m_planElevation; }
     // Screen point -> point on the horizontal plane z (metres). False without a window or when the
     // view ray is parallel to the plane.
@@ -97,8 +101,8 @@ public:
     void clear();
     void fitAll();
 
-    int batchCount() const { return int(m_batches.size()); }
-    int elementCount() const { return m_locate.size(); }
+    int batchCount() const { return int(m_scene->batches.size()); }
+    int elementCount() const { return m_scene->locate.size(); }
     QStringList guids() const; // in batch order
     QString typeOf(const QString& guid) const; // IFC class of a shown element ("" if unknown)
     // Compare (Slice 8): colour these elements (others keep their class colour) until cleared.
@@ -182,31 +186,19 @@ protected:
     void handleSelectionPoly(const Handle(AIS_InteractiveContext)& ctx, const Handle(V3d_View)& view) override;
 
 private:
-    struct Loc {
-        int batch;
-        int index;
-    };
     bool ensureWindow();
     void applyNavigationPreset();
     void redisplay(const std::vector<int>& batches);
     bool retire(const QString& guid, std::vector<int>* touched); // true if it was selected
     NCollection_Vec2<int> toPixels(const QPointF& p) const;
 
-    Handle(V3d_Viewer) m_viewer;
+    Scene* m_scene;                           // shared with the other views of the model
+    Handle(AIS_InteractiveContext) m_context; // == m_scene->context()
     Handle(V3d_View) m_view;
-    Handle(AIS_InteractiveContext) m_context;
-    std::vector<Handle(ElementBatch)> m_batches;
-    QHash<QString, Loc> m_locate;
     bool m_planView = false;
-    bool m_linesOnly = false;
-    QHash<QString, QColor> m_colors;
-    QSet<QString> m_layerHidden, m_layerLocked;
     void applyLayerState(const Handle(ElementBatch)& batch) const;
     void applyColors(const Handle(ElementBatch)& batch) const;
     bool m_selectThrough = false;
-    bool m_quietSelection = false;
-    int m_nextIdBase = 0;
-    std::vector<int> m_idBases; // per batch, for decoding ids
     void keepOnlyVisible(const QSet<QString>& before, AIS_SelectionScheme scheme, int x0, int y0, int x1, int y1);
     // Renders the view's camera into a w x h offscreen image in id colours; guids seen in the rectangle.
     std::optional<QSet<QString>> idsInImage(int w, int h, int x0, int y0, int x1, int y1);
