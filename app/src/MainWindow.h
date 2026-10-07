@@ -348,7 +348,8 @@ private:
     QSet<QString> m_generating, m_generateAgain;
     QList<QThread*> m_drawingThreads;
     int m_lastDrawingVisible = -1;
-    QToolBar* m_projectBar = nullptr;
+    QToolBar* m_topBar = nullptr;       // D71: design option, level and cuts in one bar
+    QList<QAction*> m_projectActions;  // the design-option part, shown in versioned projects
     QComboBox* m_options = nullptr;
     QString m_compareA, m_compareB; // the versions being compared (empty when not comparing)
     bool m_versioned = false;

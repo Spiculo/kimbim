@@ -266,6 +266,21 @@ private slots:
         QVERIFY(w.statusBar()->isHidden());
     }
 
+    // D71: one slim top bar: design option, level and cuts.
+    void oneTopBar()
+    {
+        kimcad::MainWindow w(nullptr, true);
+        QStringList top;
+        for (QToolBar* b : w.findChildren<QToolBar*>())
+            if (w.toolBarArea(b) == Qt::TopToolBarArea)
+                top << b->objectName();
+        QCOMPARE(top, QStringList({"topToolbar"}));
+        QToolBar* bar = w.findChild<QToolBar*>(QStringLiteral("topToolbar"));
+        QVERIFY(bar->findChild<QComboBox*>(QStringLiteral("optionCombo")));
+        QVERIFY(bar->findChild<kimcad::LevelsBar*>());
+        QVERIFY(bar->findChild<QDoubleSpinBox*>(QStringLiteral("planCutHeight")));
+    }
+
     void visibilityActionsUseTheSelection()
     {
         kimcad::MainWindow w(nullptr, /*quiet=*/true);

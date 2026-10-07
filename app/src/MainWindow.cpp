@@ -140,10 +140,13 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     connect(m_dock, &DockLayout::closeRequested, this, &MainWindow::closeView);
     buildMenus();
     buildDocks();
-    buildCutsToolbar();
+    m_topBar = addToolBar(tr("Project"));
+    m_topBar->setObjectName(QStringLiteral("topToolbar"));
+    m_topBar->setMovable(false);
+    buildProjectToolbar(); // first: the design option (versioned projects)
+    buildCutsToolbar();    // then the level and the cuts
     buildModelingToolbar();
     buildPalette();
-    buildProjectToolbar();
     m_status->showMessage(tr("Ready"));
 
     m_loader->moveToThread(&m_thread);
@@ -467,8 +470,7 @@ void MainWindow::buildDocks()
 
 void MainWindow::buildCutsToolbar()
 {
-    QToolBar* levels = addToolBar(tr("Levels"));
-    levels->setObjectName(QStringLiteral("levelsToolbar"));
+    QToolBar* levels = m_topBar;
     m_levels = new LevelsBar(levels);
     levels->addWidget(m_levels);
     connect(m_levels, &LevelsBar::addLevelRequested, this, &MainWindow::addLevelDialog);
@@ -499,8 +501,8 @@ void MainWindow::buildCutsToolbar()
         refreshLayers(); // models show only while one is active
         refreshAnnotations(); // each level has its own
     });
-    QToolBar* bar = addToolBar(tr("Cuts"));
-    bar->setObjectName(QStringLiteral("CutsToolbar"));
+    QToolBar* bar = m_topBar;
+    bar->addSeparator();
     bar->addAction(m_planCut);
     m_cutHeight = new QDoubleSpinBox(bar);
     m_cutHeight->setObjectName(QStringLiteral("planCutHeight"));
@@ -1758,29 +1760,33 @@ void MainWindow::copyToLevelDialog()
 
 void MainWindow::buildProjectToolbar()
 {
-    m_projectBar = addToolBar(tr("Project"));
-    m_projectBar->setObjectName(QStringLiteral("projectToolbar"));
-    m_projectBar->addWidget(new QLabel(tr("Option"), m_projectBar));
-    m_options = new QComboBox(m_projectBar);
+    QToolBar* bar = m_topBar;
+    m_projectActions << bar->addWidget(new QLabel(tr("Option"), bar));
+    m_options = new QComboBox(bar);
     m_options->setObjectName(QStringLiteral("optionCombo"));
     m_options->setSizeAdjustPolicy(QComboBox::AdjustToContents);
-    m_projectBar->addWidget(m_options);
-    QAction* newOption = m_projectBar->addAction(tr("New option..."));
+    m_projectActions << bar->addWidget(m_options);
+    QAction* newOption = bar->addAction(tr("New option..."));
+    m_projectActions << newOption;
     newOption->setObjectName(QStringLiteral("actionNewOption"));
     connect(newOption, &QAction::triggered, this, &MainWindow::newOptionDialog);
-    QAction* deleteOptionAction = m_projectBar->addAction(tr("Delete option..."));
+    QAction* deleteOptionAction = bar->addAction(tr("Delete option..."));
+    m_projectActions << deleteOptionAction;
     deleteOptionAction->setObjectName(QStringLiteral("actionDeleteOption"));
     connect(deleteOptionAction, &QAction::triggered, this, &MainWindow::deleteOptionDialog);
-    QAction* combineAction = m_projectBar->addAction(tr("Combine options..."));
+    QAction* combineAction = bar->addAction(tr("Combine options..."));
+    m_projectActions << combineAction;
     combineAction->setObjectName(QStringLiteral("actionCombineOptions"));
     combineAction->setToolTip(tr("Bring another design option's work into this one, choosing where both changed the same thing"));
     connect(combineAction, &QAction::triggered, this, &MainWindow::combineDialog);
-    m_projectBar->addSeparator();
-    QAction* milestoneAction = m_projectBar->addAction(tr("Milestone..."));
+    m_projectActions << bar->addSeparator();
+    QAction* milestoneAction = bar->addAction(tr("Milestone..."));
+    m_projectActions << milestoneAction;
     milestoneAction->setObjectName(QStringLiteral("actionAddMilestone"));
     milestoneAction->setToolTip(tr("Name the latest saved version (Concept, Schematic design, Tender...)"));
     connect(milestoneAction, &QAction::triggered, this, &MainWindow::milestoneDialog);
-    QAction* objectHistoryAction = m_projectBar->addAction(tr("Object history..."));
+    QAction* objectHistoryAction = bar->addAction(tr("Object history..."));
+    m_projectActions << objectHistoryAction << bar->addSeparator();
     objectHistoryAction->setObjectName(QStringLiteral("actionObjectHistory"));
     objectHistoryAction->setToolTip(tr("The versions that changed the selected element"));
     connect(objectHistoryAction, &QAction::triggered, this, &MainWindow::objectHistoryDialog);
@@ -1789,7 +1795,8 @@ void MainWindow::buildProjectToolbar()
         if (!switchOption(wanted))
             refreshProject(); // put the combo back on the current option
     });
-    m_projectBar->setVisible(false);
+    for (QAction* a : std::as_const(m_projectActions))
+        a->setVisible(false); // shown once the project is versioned
 }
 
 void MainWindow::buildPalette()
@@ -1839,7 +1846,8 @@ void MainWindow::refreshProject()
 {
     const QJsonObject s = bridge("project_state");
     m_versioned = s.value("versioned").toBool();
-    m_projectBar->setVisible(m_versioned);
+    for (QAction* a : std::as_const(m_projectActions))
+        a->setVisible(m_versioned);
     if (!m_versioned) {
         m_projectFolder.clear();
         m_history->setVersions({});
