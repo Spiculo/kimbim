@@ -27,6 +27,7 @@
 #include <QMenu>
 #include <QSignalBlocker>
 #include <cmath>
+#include <memory>
 #include <QLocale>
 #include <QComboBox>
 #include <QJsonArray>
@@ -47,6 +48,7 @@
 #include <QDateTime>
 #include <QPushButton>
 
+#include "CombineDialog.h"
 #include "Cuts.h"
 #include "DrawingView.h"
 #include "DrawingsPanel.h"
@@ -1741,6 +1743,10 @@ void MainWindow::buildProjectToolbar()
     QAction* deleteOptionAction = m_projectBar->addAction(tr("Delete option..."));
     deleteOptionAction->setObjectName(QStringLiteral("actionDeleteOption"));
     connect(deleteOptionAction, &QAction::triggered, this, &MainWindow::deleteOptionDialog);
+    QAction* combineAction = m_projectBar->addAction(tr("Combine options..."));
+    combineAction->setObjectName(QStringLiteral("actionCombineOptions"));
+    combineAction->setToolTip(tr("Bring another design option's work into this one, choosing where both changed the same thing"));
+    connect(combineAction, &QAction::triggered, this, &MainWindow::combineDialog);
     m_projectBar->addSeparator();
     QAction* milestoneAction = m_projectBar->addAction(tr("Milestone..."));
     milestoneAction->setObjectName(QStringLiteral("actionAddMilestone"));
@@ -1968,6 +1974,67 @@ void MainWindow::milestoneDialog()
     form->addRow(buttons);
     if (dialog.exec() == QDialog::Accepted && !name->currentText().trimmed().isEmpty())
         addMilestone(name->currentText().trimmed(), note->text().trimmed());
+}
+
+bool MainWindow::combineOptions(const QString& option, const QJsonObject& choices)
+{
+    const QJsonObject r = bridge("combine_options",
+        {option, QString::fromUtf8(QJsonDocument(choices).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not combine the options"), r.value("error").toString());
+        return false;
+    }
+    const QString status = r.value("status").toString();
+    if (status == QLatin1String("up_to_date")) {
+        statusBar()->showMessage(tr("This option already contains everything in %1").arg(option));
+        return true;
+    }
+    endCompare();
+    openFile(r.value("path").toString());
+    // Colour what the other option brought (green) and what was chosen in a conflict (orange) once
+    // the combined model is shown.
+    QHash<QString, QColor> colors;
+    for (const auto& g : r.value("from_theirs").toArray())
+        colors.insert(g.toString(), HistoryPanel::addedColor());
+    for (const auto& g : r.value("resolved").toArray())
+        colors.insert(g.toString(), HistoryPanel::modifiedColor());
+    auto connection = std::make_shared<QMetaObject::Connection>();
+    *connection = connect(this, &MainWindow::loadFinished, this, [this, colors, connection, status, option](int, bool stopped) {
+        disconnect(*connection);
+        if (stopped)
+            return;
+        m_viewport->setElementColors(colors);
+        refreshProject();
+        statusBar()->showMessage(status == QLatin1String("fast_forward")
+                ? tr("This option now has %1's latest version").arg(option)
+                : tr("Combined with %1: review it (changes from %1 in green, your choices in orange), then Save version or Discard").arg(option));
+    });
+    return true;
+}
+
+void MainWindow::combineDialog()
+{
+    if (!m_versioned) {
+        statusBar()->showMessage(tr("Combining needs a versioned project with design options"));
+        return;
+    }
+    if (isDirty() && !resolveUnsavedForSwitch())
+        return;
+    QStringList others;
+    for (const auto& o : bridge("options").value("options").toArray())
+        if (o.toString() != m_options->currentText())
+            others << o.toString();
+    if (others.isEmpty()) {
+        statusBar()->showMessage(tr("There is no other option to combine with"));
+        return;
+    }
+    CombineDialog dialog([this](const char* fn, const QStringList& args) { return bridge(fn, args); }, others, this);
+    connect(&dialog, &CombineDialog::elementActivated, this, [this](const QString& guid) {
+        m_viewport->selectGuids({guid});
+        setSelection({guid});
+    });
+    if (dialog.exec() == QDialog::Accepted)
+        combineOptions(dialog.option(), dialog.resolutions());
 }
 
 bool MainWindow::deleteOption(const QString& name)

@@ -381,6 +381,45 @@ def compose(records: dict[str, bytes]) -> ifcopenshell.file:
     return Composer(records).build()
 
 
+# Inverses that IFC's WHERE rules limit to one owner although the schema declares a set
+# (IfcShapeModel.WR11: a shape representation belongs to one product shape, map or aspect).
+_ONE_OWNER = {"OfProductRepresentation"}
+
+
+def unshare(f: ifcopenshell.file) -> int:
+    """Give each owner its own copy of entities IFC allows only one owner for (a material layer in
+    one layer set, a shape representation in one product shape...). Records hash-cons identical
+    values, so composing can share them; decomposing the copies hash-conses them again, so records
+    (and every stored hash) are unchanged. Deterministic (entity id order). Returns the copies made."""
+    schema = W.schema_by_name(f.schema)
+    exclusive: dict[str, list] = {}
+
+    def single_owner(type_name):
+        if type_name not in exclusive:
+            d = schema.declaration_by_name(type_name).as_entity()
+            exclusive[type_name] = [
+                (inv.name(), inv.attribute_reference().name()) for inv in d.all_inverse_attributes()
+                if inv.type_of_aggregation_string() == "" or inv.bound2() == 1 or inv.name() in _ONE_OWNER]
+        return exclusive[type_name]
+
+    copies = 0
+    for e in sorted(f, key=lambda x: x.id()):
+        for inverse, forward in single_owner(e.is_a()):
+            owners = getattr(e, inverse, None)
+            if owners is None:
+                continue
+            owners = sorted(owners if isinstance(owners, (list, tuple)) else [owners], key=lambda x: x.id())
+            for owner in owners[1:]:
+                copy = f.create_entity(e.is_a(), *list(e))
+                value = getattr(owner, forward)
+                if isinstance(value, (list, tuple)):
+                    setattr(owner, forward, [copy if v == e else v for v in value])
+                elif value == e:
+                    setattr(owner, forward, copy)
+                copies += 1
+    return copies
+
+
 def state_hash(records: dict[str, bytes]) -> str:
     """Hash of the whole state: sorted (key, record-hash) pairs. Stand-in for a Git root tree hash."""
     hh = blake3.blake3()

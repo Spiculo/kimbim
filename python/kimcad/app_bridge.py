@@ -799,6 +799,8 @@ from .authoring import (  # noqa: E402,F401
 )
 from .versioning import (  # noqa: E402,F401
     before_after,
+    combine_options,
+    combine_preview,
     compare,
     create_milestone,
     create_option,

@@ -117,6 +117,9 @@ public:
     // Slice 20: milestones (named versions), deleting an option, object history, before/after.
     bool addMilestone(const QString& name, const QString& message = QString());
     bool deleteOption(const QString& name);
+    // Slice 22: combine another option into the current one (choices: conflict id -> choice); the
+    // combined model opens as unsaved work, coloured by what the other option brought.
+    bool combineOptions(const QString& option, const QJsonObject& choices = QJsonObject());
     QJsonObject objectHistory(const QString& guid);
     QJsonObject beforeAfter(const QString& guid, const QString& revA, const QString& revB = QStringLiteral("WORKING"));
     bool discardChanges();
@@ -244,6 +247,7 @@ private:
     void newOptionDialog();
     void milestoneDialog();
     void deleteOptionDialog();
+    void combineDialog();
     void objectHistoryDialog();
     void beforeAfterDialog(const QString& guid, const QString& revA, const QString& revB);
     bool resolveUnsavedForSwitch();

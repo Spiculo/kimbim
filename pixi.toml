@@ -30,6 +30,9 @@ house = "python tools/make_house.py build/house.ifc"
 # M4 exit test: the house's sheet A01 (plan, section, elevation, title block) exported to PDF by the app
 # (no window) and checked: one A3 page, vector content, fonts; the sheet holds the three drawings.
 m4 = { cmd = "python tools/check_m4.py build/house.ifc build/m4", depends-on = ["house", "app-build", "build"] }
+# M5 exit test: two design options of the house are created, edited separately, compared and combined
+# with one conflict resolved (the UI path is test_main_window's m5ExitCombineOptions).
+m5 = { cmd = "python tools/check_m5.py build/m5", depends-on = ["build"] }
 interop-install = { cmd = "npm ci --no-audit --no-fund", cwd = "tools/interop" }
 interop = { cmd = "python tools/check_interop.py build/house.ifc", depends-on = ["interop-install", "house"] }
 build = "maturin develop --release --skip-install"

@@ -16,7 +16,7 @@ import ifcopenshell.validate
 from . import _core
 from .layout import META_PATH, blob_oid, key_to_path, path_to_key
 from .nodeids import decompose_against_head
-from .records import compose
+from .records import compose, unshare
 
 REPACK_THRESHOLD = 10_000  # changed records; D39
 GLOBALID = re.compile(r"[0-9A-Za-z_$]{22}")  # IFC GlobalId: 22 chars of the IFC base-64 alphabet
@@ -231,13 +231,23 @@ class Project:
         changes, _ = self._changes(self._head_entries(), self._decompose_file(ifc_path))
         return changes
 
-    def commit(self, ifc_path, message: str, *, author: tuple[str, str] | None = None, time: int | None = None):
+    def commit(self, ifc_path, message: str, *, author: tuple[str, str] | None = None, time: int | None = None,
+               merged: list[str] | None = None):
+        """A new version from an IFC file; `merged`: other versions it combines (a merge commit, which
+        is recorded even when the result equals the current version)."""
         records = self._decompose_file(ifc_path)
         changes, writes = self._changes(self._head_entries(), records)
-        if not changes:
+        if not changes and not merged:
             raise NothingToCommit("nothing to commit: the file matches the current version")
         name, email = author or _author()
-        cid = self.repo.commit(writes, message, name, email, int(time if time is not None else _time.time()))
+        when = int(time if time is not None else _time.time())
+        if merged:
+            try:
+                cid = self.repo.commit_merge(writes, message, name, email, when, list(merged))
+            except _core.RepoError as e:
+                raise KimcadError(str(e)) from None
+        else:
+            cid = self.repo.commit(writes, message, name, email, when)
         if len(writes) > REPACK_THRESHOLD:
             self.repo.repack_no_delta()
         return cid, changes
@@ -262,7 +272,9 @@ class Project:
         records = self._records(rev)
         if out.exists() and not overwrite:
             raise TargetExists(f"{out} already exists (use --force to overwrite)")
-        compose(records).write(str(out))
+        f = compose(records)
+        unshare(f)  # one owner where IFC requires it (records hash-cons identical values)
+        f.write(str(out))
         return out
 
     def show(self, key: str, rev: str = "HEAD") -> dict:

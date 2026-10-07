@@ -12,7 +12,11 @@
 
 #include <cmath>
 
+#include "CombineDialog.h"
 #include "DrawingView.h"
+#include "PythonEngine.h"
+#include <QPushButton>
+#include <QTableWidget>
 #include "DrawingsPanel.h"
 #include "SheetsPanel.h"
 #include "ElementBatch.h"
@@ -491,6 +495,72 @@ private slots:
         QCOMPARE(w.viewport()->elementCount(), 2); // main still has both walls
         QVERIFY(w.windowTitle().contains(QStringLiteral("main")));
         QVERIFY(!w.isDirty());
+        QVERIFY(w.close());
+    }
+
+    // M5 exit (Slice 22): two design options are created, edited separately, compared and combined
+    // with one conflict resolved in the UI.
+    void m5ExitCombineOptions()
+    {
+        QTemporaryDir tmp;
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({5, 0});
+        w.wallTool()->finish();
+        w.wallTool()->click({0, 3});
+        w.wallTool()->click({5, 3});
+        w.setTool(kimcad::MainWindow::Tool::None);
+        const QStringList walls = w.viewport()->guids();
+        QCOMPARE(walls.size(), 2);
+        QVERIFY(w.enableVersioning(tmp.filePath(QStringLiteral("casa"))));
+
+        // Option B: the south wall renamed, a third wall added.
+        QVERIFY(w.createOption(QStringLiteral("Scheme B")));
+        w.setSelection({walls[0]});
+        QVERIFY(w.applyName(QStringLiteral("South wall (B)")));
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 6});
+        w.wallTool()->click({5, 6});
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QVERIFY(w.saveVersion(QStringLiteral("B: rename, third wall")));
+
+        // main: the same wall renamed differently.
+        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        QVERIFY(w.switchOption(QStringLiteral("main")));
+        QVERIFY(loaded.wait(60000));
+        w.setSelection({walls[0]});
+        QVERIFY(w.applyName(QStringLiteral("South wall (A)")));
+        QVERIFY(w.saveVersion(QStringLiteral("A: rename")));
+
+        // Compared.
+        QVERIFY(w.compareWith(QStringLiteral("Scheme B"), QStringLiteral("WORKING")));
+        QCOMPARE(w.compareChangeCount(), 2); // the renamed wall and the third wall
+        w.endCompare();
+
+        // Combined in the dialog: one conflict, resolved by choosing the other option's name.
+        auto bridge = [](const char* fn, const QStringList& args) {
+            QString error;
+            return kimcad::PythonEngine::instance().callJson(fn, args, &error).object();
+        };
+        kimcad::CombineDialog dialog(bridge, {QStringLiteral("Scheme B")});
+        QCOMPARE(dialog.option(), QStringLiteral("Scheme B"));
+        QCOMPARE(dialog.table()->rowCount(), 1);
+        QVERIFY(dialog.table()->item(0, 0)->text().contains(QStringLiteral("IfcWall")));
+        QVERIFY(!dialog.combineButton()->isEnabled()); // a choice is needed first
+        QVERIFY(dialog.choose(0, QStringLiteral("theirs")));
+        QVERIFY(dialog.combineButton()->isEnabled());
+        loaded.clear();
+        QVERIFY(w.combineOptions(dialog.option(), dialog.resolutions()));
+        QVERIFY(loaded.wait(60000));
+        QCOMPARE(w.viewport()->elementCount(), 3); // both options' work
+        QVERIFY(w.viewport()->coloredCount() >= 2); // what B brought (green), the choice (orange)
+        QVERIFY(w.isDirty()); // reviewed before saving
+        QVERIFY(w.saveVersion(QStringLiteral("Combine Scheme B")));
+        const QJsonObject top = w.history().first().toObject();
+        QCOMPARE(top.value("parents").toArray().size(), 2);
+        QVERIFY(action(w, "actionCombineOptions"));
         QVERIFY(w.close());
     }
 

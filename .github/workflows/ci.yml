@@ -54,6 +54,8 @@ jobs:
           KIMCAD_PYTHON_PATH: ${{ github.workspace }}/python
       - name: M4 exit test - the house's sheet (plan, section, elevation, title block) exported to PDF
         run: pixi run m4
+      - name: M5 exit test - two options of the house edited, compared and combined with a conflict resolved
+        run: pixi run m5
       # Informational (Slice 14): the South Elevation of Clinic through the app's own pipeline (visible-element
       # pass + serializer in a child process); read drawing_s and drawing_visible from the log.
       - name: Slice 14 - Clinic elevation in the app (informational)

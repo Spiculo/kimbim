@@ -127,3 +127,25 @@ def test_a_property_change_shows_the_element_that_uses_it(versioned):
     call("set_property", g(w1), "Pset_WallCommon", "FireRating", '"EI60"')
     c = call("compare", call("history", 1)["versions"][0]["id"], "WORKING")
     assert [x["guid"] for x in c["modified"]] == [w1]
+
+
+def test_versions_open_as_valid_ifc(tmp_path):
+    """Records share identical values (hash-consing); IFC wants some of them to have one owner (a
+    representation per product shape, a material layer per layer set). Opening a version un-shares
+    them, so the model stays valid, and saving it again records no change."""
+    import ifcopenshell.validate
+
+    assert call("new_project", "Valid")["ok"]
+    level = call("storeys")["storeys"][0]["guid"]
+    types = {t["name"]: t["guid"] for t in call("slab_types")["types"]}
+    t = call("wall_types")["types"][0]["guid"]
+    for y in (0, 3, 6):  # identical walls: identical axis representations
+        call("create_wall", level, t, 0, y, 5, y, 3.0, "", "")
+    for name in types:  # slab types share an identical material layer
+        call("create_slab", level, types[name], json.dumps([[0, 0], [5, 0], [5, 6], [0, 6]]), 0.0)
+    assert call("enable_versioning", str(tmp_path / "p"), "Initial import")["ok"]
+    assert call("discard_changes")["ok"]  # reopen the version from its records
+    log = ifcopenshell.validate.json_logger()
+    ifcopenshell.validate.validate(b._model, log, express_rules=True)
+    assert log.statements == []
+    assert call("version_changes")["modified"] == 0 and call("version_changes")["added"] == 0
