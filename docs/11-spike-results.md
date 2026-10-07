@@ -219,6 +219,7 @@ swing in their representation; Slice 15). Polygon HLR (`svg-poly`) gives the sam
 | Clinic_Architectural (2,586 products drawn), CI Linux runner, two runs | plan of First Floor (the fullest storey), `svg-poly` | 2,075 | 2.8 s | 3.3 s | **6.4 s** |
 | same | section through the middle, `svg-poly` | all | 7.2–11.1 s | 8.9–13.4 s | **17.0–25.9 s** |
 | same | south elevation, `svg-poly` | all | 7.3–11.5 s | 13.9–21.4 s | **22.2–34.4 s** |
+| same, **in the app (Slice 14)** | South Elevation from *Create elevations*, visible-element pass + child process | 120 visible of 2,586 | — | — | **5.1 s** (CI Linux runner, end to end) |
 
 - Clinic confirms the synthetic results on a real Revit export: a plan of its fullest floor takes 6.4 s, a section or
   elevation of the whole building 17–34 s (runners vary), and geometry (7–11 s) matters too, not only HLR. The visible-element pass cuts both.

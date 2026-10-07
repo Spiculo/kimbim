@@ -88,7 +88,7 @@ Spike S6 (`spikes/s6_drawings/drawing_bench.py`), results in 11.
 - [ ] Follow-up: keep generated SVGs in `.kimcad/drawings/` for versioned projects, so reopening is instant.
 
 ### Task 5: Timing on Clinic in CI (informational)
-- [x] Two non-blocking Linux CI steps: `pixi run drawing-bench` (S6, every element) and the app pipeline on Clinic (`--create-elevations --open-drawing "South Elevation"`, with the visible-element pass). Numbers in 11.
+- [x] Two non-blocking Linux CI steps: `pixi run drawing-bench` (S6, every element) and the app pipeline on Clinic (`--create-elevations --open-drawing "South Elevation"`, with the visible-element pass). **Clinic's South Elevation in the app: 5.1 s with 120 visible elements of 2,586** (22–34 s with every element in S6). Numbers in 11.
 
 ### Task 6: Docs and verification ✅
 - [x] D60 (proposed), D61 (owner); doc 05 "As built"; doc 04 §8; doc 14 §11 and §13; roadmap M4; README.
