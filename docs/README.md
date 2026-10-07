@@ -21,6 +21,8 @@ These documents guide development. They come from the original spec (`../doc.md`
 | 10 | [Forge Feasibility](10-forge-feasibility.md) | An architect-oriented alternative to GitHub (future) |
 | 11 | [Spike Results](11-spike-results.md) | What spikes S1–S5 measured and what they changed in the design |
 | 12 | [M3 Exit](12-m3-exit.md) | The two-storey sample house, the automatic validity and interop checks, and the manual check in Bonsai + a commercial viewer |
+| 13 | [Architect Feedback](13-architect-feedback.md) | The owner's first hands-on notes and what changed |
+| 14 | [Tool Inventory](14-tool-inventory.md) | The tools Archicad, Revit, Vectorworks and Bonsai give architects, and which ones KIMCAD still lacks |
 | — | [Decision Log](decisions.md) | Every architectural decision and its status |
 | — | [Open Questions](open-questions.md) | What is still undecided |
 | — | [Glossary](glossary.md) | BIM / IFC / VCS terms |
