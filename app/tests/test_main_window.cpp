@@ -839,6 +839,36 @@ private slots:
         QVERIFY(w.close());
     }
 
+    void roofsAndTrimToRoof()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->setTolerance(0.05);
+        for (const QPointF& p : {QPointF(0, 0), QPointF(6, 0), QPointF(6, 4), QPointF(0, 4), QPointF(0, 0)})
+            w.wallTool()->click(p);
+        w.setTool(kimcad::MainWindow::Tool::None);
+        const QStringList walls = w.viewport()->guids();
+        QCOMPARE(walls.size(), 4);
+        w.setTool(kimcad::MainWindow::Tool::Roof); // Shift+R: the eaves outline, like a slab
+        w.setRoofKind(QStringLiteral("hip"), 35.0);
+        w.polygonTool()->setTolerance(0.01);
+        for (const QPointF& p : {QPointF(-0.5, -0.5), QPointF(6.5, -0.5), QPointF(6.5, 4.5), QPointF(-0.5, 4.5), QPointF(-0.5, -0.5)})
+            w.polygonTool()->click(p);
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QCOMPARE(w.viewport()->elementCount(), 5);
+        QString roof;
+        for (const QString& g : w.viewport()->guids())
+            if (w.viewport()->typeOf(g) == QLatin1String("IfcRoof"))
+                roof = g;
+        QVERIFY(!roof.isEmpty());
+        QVERIFY(!w.trimWallsToRoof(walls)); // no roof selected
+        QVERIFY(w.trimWallsToRoof(QStringList(walls) << roof));
+        QVERIFY(w.releaseWallsFromRoof(walls));
+        QCOMPARE(action(w, "actionRoofTool")->shortcut(), QKeySequence(Qt::SHIFT | Qt::Key_R));
+        QVERIFY(w.close());
+    }
+
     void shortcutsAreTheDocumentedOnes()
     {
         kimcad::MainWindow w0(nullptr, true);

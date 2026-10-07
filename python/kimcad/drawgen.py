@@ -434,8 +434,18 @@ def _space_outline(space):
     return [tuple((m @ np.array([x, y, 0.0, 1.0]))[:3] * unit) for x, y in pts]
 
 
+def _inside_2d(p, polygon) -> bool:
+    inside = False
+    n = len(polygon)
+    for i in range(n):
+        a, b = polygon[i], polygon[(i + 1) % n]
+        if (a[1] > p[1]) != (b[1] > p[1]) and p[0] < a[0] + (p[1] - a[1]) * (b[0] - a[0]) / (b[1] - a[1]):
+            inside = not inside
+    return inside
+
+
 def room_stamps(storey, to_paper, size=TEXT_SIZE):
-    """Archicad's zone stamp for each room on the story: number, name and area at its middle."""
+    """Archicad's zone stamp for each room on the story: name, number and area at its reference point."""
     out = []
     for space in storey.file.by_type("IfcSpace"):
         if ifcopenshell.util.element.get_aggregate(space) != storey or space.ObjectPlacement is None:
@@ -453,6 +463,9 @@ def room_stamps(storey, to_paper, size=TEXT_SIZE):
         cy = ((xy[:, 1] + y) * cross).sum() / (6 * area)
         qto = ifcopenshell.util.element.get_pset(space, "Qto_SpaceBaseQuantities") or {}
         value = float(qto.get("NetFloorArea") or abs(area))
+        seed = ifcopenshell.util.element.get_pset(space, "KIMCAD_Room") or {}
+        if "SeedX" in seed and _inside_2d((float(seed["SeedX"]), float(seed["SeedY"])), xy):
+            cx, cy = float(seed["SeedX"]), float(seed["SeedY"])  # where it was clicked (Archicad's reference point)
         px, py = to_paper(cx, cy, pts[0][2])
         out.append(_text(px, py - 1.6 * size, space.LongName or "", size * 1.2, baseline="central"))
         out.append(_text(px, py, space.Name or "", size, baseline="central"))

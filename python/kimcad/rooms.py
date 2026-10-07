@@ -287,9 +287,19 @@ def rooms(storey_guid: str) -> str:
             out.append({"guid": space.GlobalId, "number": space.Name or "", "name": space.LongName or "",
                         "area": round(float(qto.get("NetFloorArea", abs(_signed_area(pts)))), 6),
                         "perimeter": round(float(qto.get("NetPerimeter", _perimeter(pts))), 6),
-                        "points": [[round(px, 6), round(py, 6)] for px, py in pts], "label": _label_point(pts)})
+                        "points": [[round(px, 6), round(py, 6)] for px, py in pts], "label": _stamp_point(space, pts)})
     out.sort(key=lambda r: r["number"])
     return B._dump({"rooms": out})
+
+
+def _stamp_point(space, points):
+    """Where the stamp goes: where the room was clicked (Archicad's zone reference point) while that is
+    inside the room, else a point inside it."""
+    data = ifcopenshell.util.element.get_pset(space, PSET) or {}
+    seed = (float(data.get("SeedX", math.nan)), float(data.get("SeedY", math.nan)))
+    if not math.isnan(seed[0]) and _inside(seed, points):
+        return [round(seed[0], 6), round(seed[1], 6)]
+    return _label_point(points)
 
 
 def _label_point(points):

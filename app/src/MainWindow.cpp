@@ -897,6 +897,8 @@ void MainWindow::buildModelingToolbar()
         {Tool::Mark, "actionMarkTool", tr("Mar&k"), Qt::Key_X, tr("Mark something on the plan: a circle with a tag")},
         {Tool::Leader, "actionLeaderTool", tr("&Leader"), QKeyCombination(Qt::SHIFT, Qt::Key_A),
             tr("Leader: click what it points at, then where its text goes")},
+        {Tool::Roof, "actionRoofTool", tr("Roo&f"), QKeyCombination(Qt::SHIFT, Qt::Key_R),
+            tr("Roof: draw its eaves outline like a slab; flat, shed, gable or hip with the pitch from the toolbar")},
         {Tool::Room, "actionRoomTool", tr("R&oom"), Qt::Key_Z,
             tr("Room: click inside walls; the room takes the shape they enclose and shows its name, number and area")},
         {Tool::Section, "actionSectionTool", tr("Sect&ion"), Qt::Key_V,
@@ -936,6 +938,13 @@ void MainWindow::buildModelingToolbar()
     QAction* slabFromWallsAction = model->addAction(tr("Slab from selected &walls"));
     slabFromWallsAction->setObjectName(QStringLiteral("actionSlabFromWalls"));
     connect(slabFromWallsAction, &QAction::triggered, this, [this] { slabFromWalls(m_selection); });
+    QAction* trimAction = model->addAction(tr("&Trim walls to roof"));
+    trimAction->setObjectName(QStringLiteral("actionTrimToRoof"));
+    trimAction->setToolTip(tr("Select a roof and walls: the walls reach up to the roof and stop at its underside"));
+    connect(trimAction, &QAction::triggered, this, [this] { trimWallsToRoof(m_selection); });
+    QAction* releaseAction = model->addAction(tr("&Release walls from roof"));
+    releaseAction->setObjectName(QStringLiteral("actionReleaseFromRoof"));
+    connect(releaseAction, &QAction::triggered, this, [this] { releaseWallsFromRoof(m_selection); });
 
     m_types = new QComboBox(bar);
     m_types->setObjectName(QStringLiteral("typeCombo"));
@@ -956,6 +965,28 @@ void MainWindow::buildModelingToolbar()
     m_wallHeight->setSuffix(QStringLiteral(" m"));
     m_wallHeight->setToolTip(tr("Wall height"));
     m_wallHeightAction = bar->addWidget(m_wallHeight);
+    m_roofKind = new QComboBox(bar);
+    m_roofKind->setObjectName(QStringLiteral("roofKind"));
+    m_roofKind->addItem(tr("Flat"), QStringLiteral("flat"));
+    m_roofKind->addItem(tr("Shed"), QStringLiteral("shed"));
+    m_roofKind->addItem(tr("Gable"), QStringLiteral("gable"));
+    m_roofKind->addItem(tr("Hip"), QStringLiteral("hip"));
+    m_roofKind->setCurrentIndex(2);
+    m_roofKind->setToolTip(tr("Roof kind"));
+    m_roofPitch = new QDoubleSpinBox(bar);
+    m_roofPitch->setObjectName(QStringLiteral("roofPitch"));
+    m_roofPitch->setRange(1.0, 85.0);
+    m_roofPitch->setDecimals(1);
+    m_roofPitch->setValue(30.0);
+    m_roofPitch->setSuffix(QStringLiteral("°"));
+    m_roofPitch->setToolTip(tr("Roof pitch"));
+    auto* roofBox = new QWidget(bar);
+    auto* roofRow = new QHBoxLayout(roofBox);
+    roofRow->setContentsMargins(0, 0, 0, 0);
+    roofRow->addWidget(m_roofKind);
+    roofRow->addWidget(m_roofPitch);
+    m_roofAction = bar->addWidget(roofBox);
+    m_roofAction->setVisible(false);
     m_lengthInput = new QLineEdit(bar);
     m_lengthInput->setObjectName(QStringLiteral("lengthInput"));
     m_lengthInput->setPlaceholderText(tr("Length (m)"));
@@ -990,6 +1021,7 @@ void MainWindow::buildModelingToolbar()
             showSnap(m_wallTool->move(p));
             break;
         case Tool::Slab:
+        case Tool::Roof:
             m_polygonTool->setTolerance(tolerance);
             m_polygonTool->setOrtho(ortho);
             m_polygonTool->move(p);
@@ -1055,6 +1087,7 @@ void MainWindow::buildModelingToolbar()
             m_wallTool->click(p);
             break;
         case Tool::Slab:
+        case Tool::Roof:
             m_polygonTool->setTolerance(tolerance);
             m_polygonTool->setOrtho(ortho);
             m_polygonTool->click(p);
@@ -1137,7 +1170,7 @@ void MainWindow::buildModelingToolbar()
         // Esc / right click: stop the current shape, or leave the tool when nothing is in progress.
         if (m_tool == Tool::Wall && m_wallTool->isDrawing())
             m_wallTool->finish();
-        else if ((m_tool == Tool::Slab || m_tool == Tool::SlabOpening) && m_polygonTool->isDrawing())
+        else if ((m_tool == Tool::Slab || m_tool == Tool::SlabOpening || m_tool == Tool::Roof) && m_polygonTool->isDrawing())
             m_polygonTool->cancel();
         else if ((m_tool == Tool::Beam || m_tool == Tool::Grid || m_tool == Tool::Move || m_tool == Tool::Stair)
             && m_twoPointTool->isDrawing())
@@ -1152,7 +1185,7 @@ void MainWindow::buildModelingToolbar()
     connect(m_viewport, &Viewport::drawingConfirmed, this, [this] {
         if (m_tool == Tool::Wall)
             m_wallTool->finish();
-        else if (m_tool == Tool::Slab || m_tool == Tool::SlabOpening)
+        else if (m_tool == Tool::Slab || m_tool == Tool::SlabOpening || m_tool == Tool::Roof)
             m_polygonTool->finish();
     });
     connect(m_viewport, &Viewport::lengthKeyTyped, this, [this](const QString& text) {
@@ -1181,6 +1214,8 @@ void MainWindow::buildModelingToolbar()
     connect(m_polygonTool, &PolygonTool::polygonFinished, this, [this](const QVector<QPointF>& outline) {
         if (m_tool == Tool::SlabOpening)
             addSlabOpening(outline);
+        else if (m_tool == Tool::Roof)
+            createRoof(outline);
         else
             createSlab(outline);
     });
@@ -1280,6 +1315,7 @@ void MainWindow::updateToolPreview()
             boxes.push_back({seg->first, seg->second, 1.0, z, z + heightToNextLevel()});
         break;
     case Tool::SlabOpening:
+    case Tool::Roof:
     case Tool::Slab: {
         // The outline as thin walls of the slab's depth, its top at the level.
         QVector<QPointF> pts = m_polygonTool->points();
@@ -1369,7 +1405,9 @@ void MainWindow::setTool(Tool tool)
         const QSignalBlocker block(it.value());
         it.value()->setChecked(it.key() == int(tool));
     }
-    m_wallHeightAction->setVisible(tool == Tool::Wall || tool == Tool::Column || tool == Tool::Beam);
+    m_wallHeightAction->setVisible(tool == Tool::Wall || tool == Tool::Column || tool == Tool::Beam || tool == Tool::Roof);
+    m_wallHeight->setToolTip(tool == Tool::Roof ? tr("Eaves height above the level") : tr("Wall height"));
+    m_roofAction->setVisible(tool == Tool::Roof);
     m_lengthAction->setVisible(tool == Tool::Wall || tool == Tool::Beam || tool == Tool::Grid || tool == Tool::Move
         || tool == Tool::Rotate || tool == Tool::Stretch);
     m_lengthInput->setPlaceholderText(tool == Tool::Rotate ? tr("Angle (degrees)") : tr("Length (m)"));
@@ -1442,6 +1480,9 @@ void MainWindow::setTool(Tool tool)
         break;
     case Tool::Room:
         statusBar()->showMessage(tr("Room: click inside the walls that enclose it"));
+        break;
+    case Tool::Roof:
+        statusBar()->showMessage(tr("Roof: click the eaves outline's points; click the first point or press Enter to close"));
         break;
     case Tool::Mirror:
         statusBar()->showMessage(m_selection.isEmpty() ? tr("Mirror: select what to mirror first")
@@ -2411,6 +2452,67 @@ bool MainWindow::setProjectInfo(const QJsonObject& info)
         showError(tr("Could not change the project info"), r.value("error").toString());
     afterEdit(r);
     return r.value("ok").toBool();
+}
+
+void MainWindow::setRoofKind(const QString& kind, double pitch)
+{
+    m_roofKind->setCurrentIndex(std::max(0, m_roofKind->findData(kind)));
+    m_roofPitch->setValue(pitch);
+}
+
+bool MainWindow::createRoof(const QVector<QPointF>& outline)
+{
+    QJsonArray pts;
+    for (const QPointF& p : outline)
+        pts.append(QJsonArray{p.x(), p.y()});
+    auto num = [](double v) { return QString::number(v, 'g', 17); };
+    const QJsonObject r = bridge("create_roof", {m_levels->activeStorey(),
+        QString::fromUtf8(QJsonDocument(pts).toJson(QJsonDocument::Compact)), m_roofKind->currentData().toString(),
+        num(m_roofPitch->value()), QStringLiteral("0.25"), num(m_wallHeight->value()), QString()});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not create the roof: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    return true;
+}
+
+bool MainWindow::trimWallsToRoof(const QStringList& selection)
+{
+    QString roof;
+    QStringList walls;
+    for (const QString& g : selection) {
+        const QString type = m_viewport->typeOf(g);
+        if (type == QLatin1String("IfcRoof"))
+            roof = g;
+        else if (type.startsWith(QLatin1String("IfcWall")))
+            walls << g;
+    }
+    if (roof.isEmpty() || walls.isEmpty()) {
+        statusBar()->showMessage(tr("Select a roof and the walls to trim to it"));
+        return false;
+    }
+    const QJsonObject r = bridge("attach_walls_to_roof", {roof,
+        QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(walls)).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(tr("Could not trim the walls: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    statusBar()->showMessage(tr("%n wall(s) trimmed to the roof", nullptr, int(walls.size())));
+    return true;
+}
+
+bool MainWindow::releaseWallsFromRoof(const QStringList& selection)
+{
+    const QJsonObject r = bridge("detach_walls_from_roof",
+        {QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(selection)).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool()) {
+        statusBar()->showMessage(r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
+    return true;
 }
 
 bool MainWindow::roomAt(QPointF p, const QString& name)

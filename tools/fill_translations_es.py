@@ -425,6 +425,23 @@ ES = {
     "CSV files (*.csv)": "Archivos CSV (*.csv)",
     "Room schedule saved to %1": "Planilla de zonas guardada en %1",
     "Could not export it: %1": "No se pudo exportar: %1",
+    "Roo&f": "&Cubierta",
+    "Roof: draw its eaves outline like a slab; flat, shed, gable or hip with the pitch from the toolbar": "Cubierta: dibuje el contorno del alero como una losa; plana, a un agua, a dos aguas o a cuatro aguas con la pendiente de la barra",
+    "&Trim walls to roof": "&Recortar muros a la cubierta",
+    "Select a roof and walls: the walls reach up to the roof and stop at its underside": "Seleccione una cubierta y muros: los muros suben hasta la cubierta y terminan en su cara inferior",
+    "&Release walls from roof": "&Liberar muros de la cubierta",
+    "Flat": "Plana",
+    "Shed": "A un agua",
+    "Gable": "A dos aguas",
+    "Hip": "A cuatro aguas",
+    "Roof kind": "Tipo de cubierta",
+    "Roof pitch": "Pendiente de la cubierta",
+    "Eaves height above the level": "Altura del alero sobre el nivel",
+    "Roof: click the eaves outline's points; click the first point or press Enter to close": "Cubierta: haga clic en los puntos del contorno del alero; haga clic en el primer punto o pulse Intro para cerrar",
+    "Could not create the roof: %1": "No se pudo crear la cubierta: %1",
+    "Select a roof and the walls to trim to it": "Seleccione una cubierta y los muros que se recortan a ella",
+    "Could not trim the walls: %1": "No se pudieron recortar los muros: %1",
+    "%n wall(s) trimmed to the roof": ("%n muro recortado a la cubierta", "%n muros recortados a la cubierta"),
 }
 
 

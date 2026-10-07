@@ -858,3 +858,4 @@ from .editing import (  # noqa: E402,F401
     slab_outline,
 )
 from .rooms import create_room, edit_room, export_room_schedule, room_schedule, rooms  # noqa: E402,F401
+from .roofs import attach_walls_to_roof, create_roof, detach_walls_from_roof, roof_info  # noqa: E402,F401

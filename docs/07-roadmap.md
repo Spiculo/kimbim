@@ -83,7 +83,7 @@ Slices (numbering continues after the architect-feedback track, Slices 9–13): 
 M4 comes before the end of M5 (owner plan, 2026-10-07): drawings are what an architect hands to a client, and Combine options (Slice 22) needs the R4 merge engine, which is easier to judge once real projects with drawings exist.
 
 ### After M4: modeling gaps
-Slices **18 ✅ rooms and areas** (`IfcSpace` from the surrounding walls, room stamps, room schedule with CSV; [plan](superpowers/plans/2026-10-07-slice18-rooms.md)) → 19 roofs (flat; pitched/hip/gable from a footprint, porting Bonsai's roof generator with attribution; walls attach to the roof). Then M5 resumes.
+Slices **18 ✅ rooms and areas** (`IfcSpace` from the surrounding walls, room stamps, room schedule with CSV; [plan](superpowers/plans/2026-10-07-slice18-rooms.md)) → **19 ✅ roofs** (flat, shed, gable, hip and per-edge slopes from a footprint; walls trimmed to the roof; [plan](superpowers/plans/2026-10-07-slice19-roofs.md)). Then M5 resumes.
 
 ## Repo track
 

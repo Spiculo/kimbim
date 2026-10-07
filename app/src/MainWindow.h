@@ -84,7 +84,7 @@ public:
     LevelsBar* levelsBar() const { return m_levels; }
     // Modeling tools (M3): one active at a time. Exposed for tests and the self-test, which drive
     // them with work-plane points.
-    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening, PlaceModel, Text, Dimension, Mark, Section, Elevation, Leader, Mirror, Room };
+    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening, PlaceModel, Text, Dimension, Mark, Section, Elevation, Leader, Mirror, Room, Roof };
     void setTool(Tool tool);
     Tool tool() const { return m_tool; }
     WallTool* wallTool() const { return m_wallTool; }
@@ -169,6 +169,11 @@ public:
     bool columnAt(QPointF p, bool turned = false);
     // Slice 18: a room (Archicad zone) filling the walls around p; name asked unless quiet.
     bool roomAt(QPointF p, const QString& name = QString());
+    // Slice 19: a roof over an outline (the roof kind and pitch from the toolbar); walls trimmed to it.
+    bool createRoof(const QVector<QPointF>& outline);
+    bool trimWallsToRoof(const QStringList& selection);
+    bool releaseWallsFromRoof(const QStringList& selection);
+    void setRoofKind(const QString& kind, double pitch);
     bool createSegment(QPointF p1, QPointF p2); // beam or grid axis, per the active tool
     int gridLineCount() const;
     void setWallToolActive(bool on) { setTool(on ? Tool::Wall : Tool::None); }
@@ -275,6 +280,9 @@ private:
     QComboBox* m_types = nullptr;
     QDoubleSpinBox* m_wallHeight = nullptr;
     QAction* m_wallHeightAction = nullptr;
+    QComboBox* m_roofKind = nullptr;
+    QDoubleSpinBox* m_roofPitch = nullptr;
+    QAction* m_roofAction = nullptr;
     QAction* m_lengthAction = nullptr;
     bool m_warnedInconsistent = false;
     HistoryPanel* m_history = nullptr;

@@ -258,7 +258,15 @@ def _free_spot(sheet, w, h):
                 return x, y
             x = clash[0] + clash[2] + GAP
         y += 10
-    return MARGIN + 5, MARGIN + 5  # no room left: top left, the user moves it
+    # No free room: the spot overlapping the others least (the user moves it), not on top of another drawing.
+    def overlap(x, y):
+        return sum(max(0.0, min(x + w, t[0] + t[2]) - max(x, t[0])) * max(0.0, min(y + h + TITLE_BAND, t[1] + t[3]) - max(y, t[1]))
+                   for t in taken)
+
+    candidates = [(MARGIN + 5 + i * 5.0, MARGIN + 5 + j * 5.0)
+                  for j in range(int(max(0.0, height - 2 * MARGIN - 5 - h) // 5) + 1)
+                  for i in range(int(max(0.0, width - 2 * MARGIN - 5 - w) // 5) + 1)]
+    return min(candidates, key=lambda c: (round(overlap(*c), 3), c[1], c[0]))
 
 
 def place_drawing(number: str, drawing_guid: str, x=-1, y=-1, scale=100) -> str:

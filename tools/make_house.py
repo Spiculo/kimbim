@@ -69,6 +69,10 @@ def build(out: str) -> dict:
     call("create_room", l2, 5.0, 6.0, "Bedroom")
     roof = call("add_storey", "Roof", 6.0)["guid"]
     call("copy_to_storey", json.dumps([slab1]), roof)
+    # Roof (Slice 19): a 30-degree gable roof with 0.5 m eaves; the upper walls are trimmed to it.
+    pitched = call("create_roof", roof, json.dumps([[-0.5, -0.5], [10.5, -0.5], [10.5, 8.5], [-0.5, 8.5]]), "gable",
+                   30, 0.25, 0.0, "")["guid"]
+    call("attach_walls_to_roof", pitched, json.dumps(upper[:4]))
 
     # M4 exit (Slices 14-16): a section across the house and sheet A01 with the ground floor plan, the
     # section and the south elevation, under a title block filled from the project info.
@@ -86,7 +90,7 @@ def build(out: str) -> dict:
     count = lambda cls: len(b._model.by_type(cls))  # noqa: E731
     return {"file": out, "storeys": count("IfcBuildingStorey"), "walls": count("IfcWall"), "slabs": count("IfcSlab"),
             "doors": count("IfcDoor"), "windows": count("IfcWindow"), "stairs": count("IfcStair"),
-            "columns": count("IfcColumn"), "rooms": count("IfcSpace"), "beams": count("IfcBeam"), "openings": count("IfcOpeningElement"),
+            "columns": count("IfcColumn"), "rooms": count("IfcSpace"), "roofs": count("IfcRoof"), "beams": count("IfcBeam"), "openings": count("IfcOpeningElement"),
             "drawings": len(call("drawings")["drawings"]), "sheets": len(call("sheets")["sheets"])}
 
 
