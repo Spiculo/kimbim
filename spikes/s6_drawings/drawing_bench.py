@@ -5,7 +5,7 @@ For an IFC file it adds drawing definitions the way Bonsai does (an IfcAnnotatio
 DRAWING: placement = camera, Body = IfcBlock giving width x height x depth, EPset_Drawing.Scale),
 then generates each drawing with `elevation-ref-guid` and times the stages:
 
-  - plan of the first storey (cut 1.2 m above it, 1.5 m deep, only that storey's elements)
+  - plan of the storey holding the most elements (cut 1.2 m above it, 1.5 m deep, only its elements)
   - a section through the middle of the building, looking north
   - the south elevation
 
@@ -105,12 +105,17 @@ def main():
     prods = products(f)
     lo, hi = bounds(f, prods)
     mid, size = (lo + hi) / 2, hi - lo
-    storeys = sorted(f.by_type("IfcBuildingStorey"), key=lambda s: s.Elevation or 0.0)
+    by_storey = {}
+    for p in prods:
+        container = ifcopenshell.util.element.get_container(p)
+        if container is not None and container.is_a("IfcBuildingStorey"):
+            by_storey.setdefault(container, []).append(p)
+    storey = max(by_storey, key=lambda s: len(by_storey[s]), default=None)
     unit = ifcopenshell.util.unit.calculate_unit_scale(f)
-    z0 = (storeys[0].Elevation or 0.0) * unit if storeys else lo[2]
-    results = {"file": src.name, "products": len(prods), "open_s": round(time.perf_counter() - t, 2)}
-    plan_prods = prods if all_elements or not storeys else \
-        [p for p in prods if ifcopenshell.util.element.get_container(p) == storeys[0]]
+    z0 = (storey.Elevation or 0.0) * unit if storey else lo[2]
+    results = {"file": src.name, "products": len(prods), "open_s": round(time.perf_counter() - t, 2),
+               "plan_storey": storey.Name if storey else None}
+    plan_prods = prods if all_elements or storey is None else by_storey[storey]
     jobs = [
         ("plan", (mid[0], mid[1], z0 + 1.2), (0, 0, 1), (1, 0, 0), (size[0], size[1], 1.5), "PLAN_VIEW", plan_prods),
         ("section", (mid[0], mid[1], mid[2]), (0, -1, 0), (1, 0, 0), (size[0], size[2], size[1] / 2 + 3), "SECTION_VIEW", prods),
