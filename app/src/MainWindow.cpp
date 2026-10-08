@@ -96,12 +96,14 @@ struct StepTimer {
 MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     : QMainWindow(parent)
     , m_quiet(quiet)
+    , m_prefs(quiet ? QString() : Preferences::defaultPath())
     , m_scene(new Scene(this))
     , m_viewport(new Viewport(m_scene))
     , m_tree(new ModelTreePanel(this))
     , m_properties(new PropertiesPanel(this))
     , m_loader(new ModelLoader(chunkSize))
 {
+    m_prefs.load();
     qRegisterMetaType<kimcad::MeshChunk>();
     // D71: the bottom bar (pen, layers, zoom, selection, messages) replaces the status bar.
     m_status = new StatusStrip(this);
@@ -2612,7 +2614,7 @@ bool MainWindow::openDrawing(const QString& guid)
     connect(view, &DrawingView::regenerateRequested, this, &MainWindow::regenerateDrawing);
     m_drawingViews.insert(guid, view);
     view->setStale(true);
-    m_dock->addView(guid, name, view, true);
+    m_dock->addView(guid, name, view, true, newViewPlacement());
     m_dock->raise(guid); // brings it up to date (activateView)
     if (!m_generating.contains(guid) && !view->hasDrawing())
         regenerateDrawing(guid);
@@ -2721,7 +2723,7 @@ Viewport* MainWindow::openPlanTab(const QString& storey)
     cut.planCut = true; // a plan is a horizontal cut
     cut.height = m_cutHeight->value();
     m_cuts.insert(view, cut);
-    m_dock->addView(key, tr("%1 plan").arg(name), host, true);
+    m_dock->addView(key, tr("%1 plan").arg(name), host, true, newViewPlacement());
     m_dock->raise(key); // activateView(): the level, the cut, the chrome, the annotations
     return view;
 }
@@ -2884,7 +2886,7 @@ bool MainWindow::openSheet(const QString& number)
     });
     m_drawingViews.insert(key, view);
     view->setStale(true);
-    m_dock->addView(key, tr("Sheet %1").arg(number), view, true);
+    m_dock->addView(key, tr("Sheet %1").arg(number), view, true, newViewPlacement());
     m_dock->raise(key);
     if (!m_generating.contains(key) && !view->hasDrawing())
         regenerateDrawing(key);

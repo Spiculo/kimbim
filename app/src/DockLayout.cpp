@@ -48,14 +48,31 @@ ads::CDockWidget* DockLayout::makeDock(const QString& key, const QString& title,
     return dock;
 }
 
-ads::CDockWidget* DockLayout::addView(const QString& key, const QString& title, QWidget* widget, bool closable)
+ads::CDockWidget* DockLayout::addView(const QString& key, const QString& title, QWidget* widget, bool closable,
+    Placement placement)
 {
     ads::CDockWidget* dock = makeDock(key, title, widget);
     dock->setFeature(ads::CDockWidget::DockWidgetClosable, closable);
-    if (m_center)
-        m_manager->addDockWidgetTabToArea(dock, m_center);
-    else
+    if (!m_center) {
         m_center = m_manager->addDockWidget(ads::CenterDockWidgetArea, dock);
+    } else if (placement == Placement::Floating) {
+        // D72: a free window centred over the main window at 70 % of its size.
+        ads::CFloatingDockContainer* f = m_manager->addDockWidgetFloating(dock);
+        const QRect main = m_manager->window()->geometry();
+        const QSize size(main.width() * 7 / 10, main.height() * 7 / 10);
+        f->resize(size);
+        f->move(main.center() - QPoint(size.width() / 2, size.height() / 2));
+    } else {
+        // Right after the current tab, when it is docked in the main window; else at the end of the center.
+        ads::CDockWidget* current = m_current.isEmpty() ? nullptr : m_manager->findDockWidget(m_current);
+        ads::CDockAreaWidget* area = current && current->dockAreaWidget()
+                && !current->dockContainer()->isFloating() ? current->dockAreaWidget() : m_center.data();
+        int index = -1;
+        for (int i = 0; current && current->dockAreaWidget() == area && i < area->dockWidgetsCount(); ++i)
+            if (area->dockWidget(i) == current)
+                index = i + 1;
+        m_manager->addDockWidgetTabToArea(dock, area, index);
+    }
     m_views << key;
     if (m_current.isEmpty())
         m_current = key;

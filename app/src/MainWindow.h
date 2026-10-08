@@ -14,6 +14,9 @@
 #include <QJsonValue>
 #include <QStringList>
 #include <QMainWindow>
+
+#include "DockLayout.h"
+#include "Preferences.h"
 #include <QThread>
 
 #include <Bnd_Box.hxx>
@@ -35,7 +38,6 @@ class LevelsBar;
 class ToolPalette;
 class StatusStrip;
 class ToolOptionsBar;
-class DockLayout;
 class Scene;
 class ViewHost;
 class DrawingsPanel;
@@ -68,6 +70,12 @@ public:
 
     void openFile(const QString& path);
     bool isLoading() const { return m_loading; }
+    Preferences& preferences() { return m_prefs; }
+    DockLayout::Placement newViewPlacement() const
+    {
+        return m_prefs.newViews() == QLatin1String("window") ? DockLayout::Placement::Floating
+                                                             : DockLayout::Placement::AfterCurrent;
+    }
     Viewport* viewport() const { return m_viewport; }
     ModelTreePanel* treePanel() const { return m_tree; }
     PropertiesPanel* propertiesPanel() const { return m_properties; }
@@ -291,6 +299,7 @@ private:
     void onFailed(const QString& error);
 
     bool m_quiet;
+    Preferences m_prefs; // D72: user preferences (in memory only in quiet mode)
     bool m_loading = false;
     int m_loadedElements = 0;
     QString m_path;

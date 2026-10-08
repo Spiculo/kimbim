@@ -9,6 +9,10 @@
 #include <DockWidgetTab.h>
 #include <ElidingLabel.h>
 #include <QApplication>
+#include <DockAreaWidget.h>
+#include <DockContainerWidget.h>
+
+#include <cmath>
 
 #include "DockLayout.h"
 
@@ -106,6 +110,34 @@ private slots:
         QVERIFY(layout.restoreLayout(state));
         QVERIFY(!layout.restoreLayout(QByteArray("not a layout"))); // falls back to the default
         QVERIFY(layout.view("3d"));
+    }
+
+    void aNewViewOpensRightAfterTheCurrentTab()
+    {
+        QMainWindow w;
+        kimcad::DockLayout layout(&w);
+        layout.addView("3d", "3D", new QLabel, false);
+        layout.addView("plan:A", "A", new QLabel, true); // after 3D (current): 3d, plan:A
+        layout.addView("D1", "Section", new QLabel, true); // after 3D still: 3d, D1, plan:A
+        layout.raise("D1");
+        layout.addView("plan:B", "B", new QLabel, true); // after D1, not at the end
+        ads::CDockAreaWidget* area = layout.manager()->findDockWidget("3d")->dockAreaWidget();
+        QStringList order;
+        for (int i = 0; i < area->dockWidgetsCount(); ++i)
+            order << area->dockWidget(i)->objectName();
+        QCOMPARE(order, QStringList({"3d", "D1", "plan:B", "plan:A"}));
+    }
+
+    void aNewViewCanOpenAsAFreeWindow()
+    {
+        QMainWindow w;
+        w.resize(1000, 800);
+        kimcad::DockLayout layout(&w);
+        layout.addView("3d", "3D", new QLabel, false);
+        ads::CDockWidget* dock = layout.addView("S1", "Sheet", new QLabel, true, kimcad::DockLayout::Placement::Floating);
+        QVERIFY(dock->isFloating());
+        QCOMPARE(layout.view("S1") != nullptr, true);
+        QVERIFY(std::abs(dock->dockContainer()->window()->width() - 700) <= 50);
     }
 };
 

@@ -22,11 +22,15 @@ namespace kimcad {
 class DockLayout : public QObject {
     Q_OBJECT
 public:
+    // Where a new view opens (D72: the "new_views" preference).
+    enum class Placement { AfterCurrent, Floating };
+
     explicit DockLayout(QMainWindow* window);
     ads::CDockManager* manager() const { return m_manager; }
 
     // Center views (3D, plans, drawings, sheets), keyed ("3d", "plan:<guid>", "<drawing guid>", "sheet:A01").
-    ads::CDockWidget* addView(const QString& key, const QString& title, QWidget* widget, bool closable);
+    ads::CDockWidget* addView(const QString& key, const QString& title, QWidget* widget, bool closable,
+        Placement placement = Placement::AfterCurrent);
     QWidget* view(const QString& key) const;     // nullptr if none
     QString keyOf(const QWidget* widget) const;  // "" if none
     QStringList viewKeys() const;                // in creation order

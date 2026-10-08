@@ -1319,6 +1319,20 @@ private slots:
         QCOMPARE(action(w, "actionSaveVersion")->shortcut(), QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_S));
         QVERIFY(action(w, "actionLinesOnly")->isCheckable());
     }
+
+    // D72: new views follow the "new_views" preference.
+    void newViewsFollowThePreference()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        QCOMPARE(w.newViewPlacement(), kimcad::DockLayout::Placement::AfterCurrent);
+        w.preferences().setValue("new_views", "window");
+        QCOMPARE(w.newViewPlacement(), kimcad::DockLayout::Placement::Floating);
+        w.openPlanTab(w.levelsBar()->activeStorey());
+        const QString key = QStringLiteral("plan:") + w.levelsBar()->activeStorey();
+        QVERIFY(w.dockLayout()->manager()->findDockWidget(key)->isFloating());
+        QVERIFY(w.close());
+    }
 };
 
 QTEST_MAIN(TestMainWindow)
