@@ -31,6 +31,26 @@ The owner's UI notes after Slices 14–22 ([spec](superpowers/specs/2026-10-07-m
 
 Next: **step 2**, the `.kim` file (one file, or open as a folder) with project and user preferences and office templates; **step 3**, pen sets. Several models open together is future research ([08](08-future.md#federation-and-linked-models)).
 
+## 2026-10-08: `.kim` file, preferences and templates (step 2 of 3)
+
+([spec](superpowers/specs/2026-10-08-kim-file-and-preferences-design.md), D72)
+
+| Note | What KIMCAD does now | Try it |
+|------|----------------------|--------|
+| A file format beyond plain IFC | A `.kim` holds the model, the project settings and the whole version history in one file | File › Save As… › `.kim` |
+| Saving | Ctrl+S saves the file; Save version… (Ctrl+Alt+S) adds a history entry; optional automatic versions | Edit › Preferences › Automatic versions |
+| Opening an IFC | Makes a `.kim` beside it (the IFC is left untouched); a preference edits the IFC directly | File › Open… an `.ifc` |
+| Open as folder | File › Open project folder… / Save as project folder… | |
+| One person at a time | A second person (or window) opens the file read-only, with who has it and since when | Open a `.kim` that's open elsewhere |
+| User preferences | Edit › Preferences: language, templates folder, your name, new views as tabs or free windows, IFC opening, automatic versions, recovery copy | |
+| Project settings | File › Project settings: plan cut height, drawing scale on sheets, sheet paper, length units; layer show/lock states are kept too | |
+| Office templates | File › Save as template… saves into the templates folder; File › New project… lists them | |
+| New views | Open as a tab right after the current one (default) or as a free window (preference) | P, or open a sheet |
+| Crash recovery | A recovery copy of unsaved work every 5 minutes, offered at the next start | |
+| A1 sheet could not be created | Fixed: sheets work on IFC2X3 files such as the Clinic | View › New sheet on the Clinic |
+
+Plan tabs (a standard floor plan without the cut slider) are on hold for the architect's answers ([open questions](open-questions.md#for-the-architect-asked-2026-10-07-waiting)). Next: **step 3**, pen sets (the colour palettes switched per purpose).
+
 ## Shortcuts added
 
 Place model **U** · Text label **A** · Dimension **Q** · Mark **X** (with the earlier W, S, D, N, K, J, G, M, R, E, T, O).

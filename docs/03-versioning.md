@@ -66,6 +66,9 @@ geometry/<aa>/<hash>.json                # heavy geometry records
 |------|---------|--------------|
 | **Plain** | A single `.ifc` file | Open → edit → save IFC. Undo/redo only. Works like any IFC editor. |
 | **Versioned** | A project folder (Git repo + `kimcad.toml`) | Full history, design options, compare, combine, object history. |
+| **`.kim` file** (D72) | One zip of the versioned project folder (plus `kimcad-file.json`) | The same as a project folder, as one file to email or archive. Unpacked to a local working folder while open, packed back on Ctrl+S. |
+
+**Since D72:** every `.kim` is versioned. Ctrl+S saves the file (the working copy and the project settings) without making a version; *Save version* adds one. Opening an `.ifc` makes a `.kim` beside it with a first version "Imported from …" (a preference keeps the old Plain mode). Project settings are `settings.json` in each version's tree. A `.kim` or project folder is locked (`<file>.kim.lock`, or `.kimcad/lock`) while someone edits it; others open it read-only.
 
 - **Enable versioning:** creates the repository from the current model. The first commit is "Initial import".
 - **Working copy (Slice 8):** the open model is the working state. *Save version* writes it to `<project>/.kimcad/working.ifc` (local, never committed) and commits it. Opening a project or switching option exports that option's latest version to the same file. Unsaved work is guarded on close, open and option switches (save a version / discard / cancel).
