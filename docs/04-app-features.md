@@ -33,7 +33,8 @@ Display (Slice 4b): every element has border lines (outline and creases); View �
 - **Left:** the tools, in collapsible groups **3D** (wall, slab, column, beam, door, window, stair, roof, room, slab opening, place model), **Plane** (text, dimension, leader, mark, grid line), **View** (section, elevation, new plan tab, new sheet) and **Edit** (move, rotate, stretch, mirror, copy to level). Shortcuts and the Model menu are unchanged.
 - **Above the active view:** the active tool's fields (type, height, roof shape and pitch, typed length), only while a tool is active.
 - **Right:** the model tree, Properties, Layers, History, Drawings and Sheets as tabs; the area can auto-hide or float. **Double-click** an element (in a view or the tree) to bring Properties forward.
-- **Bottom:** the current pen (pen sets come later), the active layer, the visible layers, the zoom, the selection ("2 Walls") and messages.
+- **Bottom:** the **purpose** (D73: Working, Highlight, Permit, Presentation, Demo, or your own; "…" changes its pen set, visibility, overrides and layers), the current pen (click: a 16×16 grid), the active layer, the visible layers, the zoom, the selection ("2 Walls") and messages.
+- **Graphics menu** (D73): pen sets, line types, element styles, visibility sets, graphic overrides, layer combinations, purposes. View › True line weights draws lines as thick as their pens.
 - **Top:** one bar with the design option (versioned projects), the active level and the cut controls.
 - The layout is remembered between sessions; a window left on a missing monitor comes back to the default layout.
 

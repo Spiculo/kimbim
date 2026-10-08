@@ -201,8 +201,9 @@ release notes, so check before relying on a single cell.
 |------|-----|--------|-----|-------|
 | Layered (composite) wall and slab types | all | ✅ | P0 | |
 | Material editor (cut fill, surface, physical data) | all | ⬜ | P0 | |
-| Pen sets / line weights by scale | AC RV VW | ⬜ | new | Needed for printed drawings |
-| Line types and fill patterns (hatches) | all | ⬜ | new | |
+| Pen sets / line weights by scale | AC RV VW | 🟡 | new | D73: pen sets (255 pens), element styles, purposes; weights don't change with the scale yet |
+| Graphic overrides and model view options (visibility by kind, rules) | AC RV VW | ✅ | new | D73: visibility sets, override rules (property, layer, material), layer combinations in purposes |
+| Line types and fill patterns (hatches) | all | 🟡 | new | D73: line types (dash patterns in mm); cut fills are solid, no hatches yet |
 | Surfaces / textures for 3D and rendering | all | ⬜ | new | |
 | Attribute manager (import/export standards between projects) | AC RV VW | ⬜ | new | |
 
