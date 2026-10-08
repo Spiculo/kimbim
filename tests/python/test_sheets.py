@@ -121,10 +121,9 @@ def test_every_reference_on_a_composed_sheet_resolves(house):
 
     svg = call("sheet_svg", "A01")["svg"]
     refs = set(re.findall(r"url\(#([^)]+)\)", svg)) | set(re.findall(r'href="#([^"]+)"', svg))
-    assert refs
     ids = re.findall(r' id="([^"]+)"', svg)
     assert refs <= set(ids), refs - set(ids)
-    assert len(re.findall(r"<style", svg)) == 1  # the drawings share one stylesheet; it is not repeated
+    assert "<style" not in svg  # D73: drawings are styled by attributes (graphics.style_svg), not CSS
 
 
 def test_m4_exit_sheet_has_plan_section_elevation_and_title_block(house, tmp_path):
@@ -176,3 +175,20 @@ def _check_ifc2x3_sheets(path):
     assert [x for x in logger.statements if "Document" in str(x.get("instance"))] == []
     assert call("remove_placed", "B01", plan)["ok"]
     assert call("delete_sheet", "B01")["ok"] and call("sheets")["sheets"] == []
+
+
+def test_sheet_weights_do_not_scale(house):
+    """A pen prints at its weight whatever the scale: the sheet divides weights by its scaling (D73)."""
+    from kimcad import settings as s
+    number = call("add_sheet", "A1", "Weights")["number"]
+    assert call("place_drawing", number, drawing("Level 1 Floor Plan"), -1, -1, 50)["ok"]
+    svg = call("sheet_svg", number)["svg"]
+    view = svg.split('class="kimcad-view"', 1)[1]
+    widths = {float(w) for w in re.findall(r'<g [^>]*class="IfcWall"[^>]*stroke-width="([\d.]+)"', view)}
+    assert widths == {0.25}  # 0.50 mm pen / k (k = 100/50 = 2): prints 0.50 mm on paper
+    assert 'stroke="#5a3a22"' in svg  # the current purpose (Working)
+    assert call("set_sheet_purpose", number, "Permit")["ok"]
+    assert 'stroke="#5a3a22"' not in call("sheet_svg", number)["svg"]
+    assert call("set_sheet_purpose", number, "")["ok"]
+    assert not call("set_sheet_purpose", number, "Nope")["ok"]
+    s.load(None)

@@ -175,9 +175,10 @@ def _placement(ref) -> dict:
     return {"x": float(data.get("x", MARGIN)), "y": float(data.get("y", MARGIN)), "scale": int(data.get("scale", 100))}
 
 
-def _drawing_size(guid: str):
-    """The drawing's size on paper at 1:100 (mm), from its generated SVG (generated if needed)."""
-    r = json.loads(D.generate_drawing(guid, ""))
+def _drawing_size(guid: str, hidden=()):
+    """The drawing's size on paper at 1:100 (mm) and its unstyled SVG (generated if needed); `hidden`:
+    the elements the sheet's purpose leaves out (D73)."""
+    r = D.raw_drawing(guid, "", hidden)
     if not r.get("ok"):
         return None, r.get("error", "could not generate the drawing")
     return _svg_size(r["svg"]), r["svg"]
@@ -462,15 +463,19 @@ def sheet_svg(number: str) -> str:
     sheet = _sheet(number) if B._model is not None else None
     if sheet is None:
         return A._fail("unknown sheet")
+    from . import graphics, settings as S
+
     width, height = PAPERS.get(sheet.Scope or "A1", PAPERS["A1"])
     info = json.loads(project_info())
+    resolved = graphics.resolve(S.current().get("sheet_purposes", {}).get(number) or None)
     styles, parts = [], []
     for ref in _views(sheet):
-        size, svg = _drawing_size(_link(ref))
+        size, svg = _drawing_size(_link(ref), resolved["hidden"])
         if size is None:
             return A._fail(f"could not generate {_name(ref)}: {svg}")
         p = _placement(ref)
         k = 100.0 / p["scale"]
+        svg = graphics.style_svg(svg, resolved, k)  # a pen prints at its weight at any scale
         m = re.search(r'viewBox="([-\d.]+) ([-\d.]+) ([\d.]+) ([\d.]+)"', svg)
         vx, vy = (float(m.group(1)), float(m.group(2))) if m else (0.0, 0.0)
         own_styles, own_defs, body = _inner(svg)
@@ -502,3 +507,19 @@ def export_sheet_svg(number: str, path: str) -> str:
     except OSError as ex:
         return A._fail(str(ex))
     return B._dump({"ok": True, "path": path})
+
+
+def set_sheet_purpose(number: str, purpose: str) -> str:
+    from . import graphics, settings as S
+
+    if _sheet(number) is None:
+        return A._fail("unknown sheet")
+    current = dict(S.current().get("sheet_purposes", {}))
+    if purpose:
+        if purpose not in graphics.effective("purposes"):
+            return A._fail(f"no purpose called {purpose}")
+        current[number] = purpose
+    else:
+        current.pop(number, None)
+    r = json.loads(S.set_project_settings(json.dumps({"sheet_purposes": current})))
+    return B._dump({"ok": r["ok"], "dirty": r.get("dirty", False)})

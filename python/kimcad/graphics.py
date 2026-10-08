@@ -316,6 +316,8 @@ _KIND_CLASSES = (
     ("rooms", ("IfcSpace",)), ("annotations", ("IfcAnnotation",)), ("grids", ("IfcGrid",)),
 )
 _MEP = ("plumbing", "hvac", "electrical")
+# Kinds whose cut isn't filled (door swings, glazing, room outlines), unless an override gives a fill.
+NO_FILL = ("doors", "windows", "rooms", "annotations", "grids")
 _SKIP = ("IfcProject", "IfcSite", "IfcBuilding", "IfcBuildingStorey", "IfcOpeningElement")
 
 
@@ -533,6 +535,8 @@ def resolve(purpose: str | None = None, model=None, settings: dict | None = None
         base = styles_by_kind.get(facts.kind) or builtin_styles[facts.kind]
         cut_pen, proj_pen = base["cut"]["pen"], base["projection"]["pen"]
         cut_line, proj_line, fill_pen = base["cut"]["line"], base["projection"]["line"], base["fill"]
+        if facts.kind in NO_FILL:
+            fill_pen = None
         surface = transparency = None
         rule = next((r for r in rules if matches(r.get("when", {}), e, facts)), None)  # the first match wins
         if rule is not None:
@@ -548,7 +552,8 @@ def resolve(purpose: str | None = None, model=None, settings: dict | None = None
             surface, transparency = then.get("surface"), then.get("transparency")
         style = {"cut": _line(pens, line_types, cut_pen, cut_line),
                  "projection": _line(pens, line_types, proj_pen, proj_line),
-                 "fill": pen(pens, fill_pen)["color"], "surface": surface, "transparency": transparency}
+                 "fill": pen(pens, fill_pen)["color"] if fill_pen is not None else None,
+                 "surface": surface, "transparency": transparency}
         k = json.dumps(style, sort_keys=True)
         if k not in index:
             index[k] = len(styles)
@@ -660,3 +665,70 @@ def set_current_pen(n: str) -> str:
         return _fail("the current pen must be 1-255")
     r = json.loads(S.set_project_settings(json.dumps({"current_pen": value})))
     return B._dump({"ok": r["ok"], "dirty": r.get("dirty", False), **({"error": r["error"]} if not r["ok"] else {})})
+
+
+# ---------------------------------------------------------------- drawings
+
+_GROUP = re.compile(r'<g\b([^>]*?)\bifc:guid="([^"]+)"([^>]*)>')
+
+
+def _end_of_group(svg: str, start: int) -> int:
+    """Index just after the </g> closing the <g> that starts at `start`."""
+    depth, i = 0, start
+    for m in re.finditer(r"<g\b[^>]*?(/?)>|</g>", svg[start:]):
+        if m.group(0).startswith("</g"):
+            depth -= 1
+        elif not m.group(1):
+            depth += 1
+        if depth == 0:
+            return start + m.end()
+    return len(svg)
+
+
+def _fmt(v: float) -> str:
+    return f"{v:.4f}".rstrip("0").rstrip(".")
+
+
+def _stroke(line: dict, k: float) -> str:
+    out = f' stroke="{line["color"]}" stroke-width="{_fmt(line["weight"] / k)}" stroke-linecap="butt"'
+    if line["dash"]:
+        out += f' stroke-dasharray="{" ".join(_fmt(d / k) for d in line["dash"])}"'
+    return out
+
+
+def style_svg(svg: str, resolved: dict, k: float = 1.0) -> str:
+    svg = re.sub(r"<style[^>]*>.*?</style>", "", svg, flags=re.S)
+    hidden = set(resolved.get("hidden", []))
+    elements, styles = resolved.get("elements", {}), resolved.get("styles", [])
+    pens = resolved.get("pens", {})
+    out, pos = [], 0
+    for m in _GROUP.finditer(svg):
+        if m.start() < pos:
+            continue  # inside a removed group
+        out.append(svg[pos:m.start()])
+        guid, attrs = m.group(2), m.group(1) + m.group(3)
+        if guid in hidden:
+            pos = _end_of_group(svg, m.start())
+            continue
+        tag = m.group(0)
+        if 'data-kind="annotation"' in attrs:
+            pm = re.search(r'data-pen="(\d+)"', attrs)
+            p = pen(pens, int(pm.group(1)) if pm else resolved.get("annotation_pen", 23))
+            tag = tag[:-1] + _stroke({"color": p["color"], "weight": p["weight"], "dash": []}, k) + f' color="{p["color"]}">'
+        elif guid in elements:
+            st = styles[elements[guid]]
+            if re.search(r'class="projection\b', attrs):
+                tag = tag[:-1] + _stroke(st["projection"], k) + ' fill="none">'
+            else:
+                fill = f' fill="{st["fill"]}" fill-rule="evenodd"' if st["fill"] else ' fill="none"'
+                tag = tag[:-1] + _stroke(st["cut"], k) + fill + ">"
+        out.append(tag)
+        pos = m.end()
+    out.append(svg[pos:])
+    svg = "".join(out)
+    # Annotation text is filled in its pen's colour (the overlay writes black text).
+    svg = re.sub(r'(<g data-kind="annotation"[^>]*color="(#[0-9a-fA-F]{6})"[^>]*>)(.*?)(</g>)',
+                 lambda m: m.group(1) + m.group(3).replace('fill="#000000"', f'fill="{m.group(2)}"') + m.group(4),
+                 svg, flags=re.S)
+    return svg.replace('class="kimcad-overlay" fill="none" stroke="#000000" stroke-width="0.18"',
+                       f'class="kimcad-overlay" fill="none" stroke="#000000" stroke-width="{_fmt(0.18 / k)}"', 1)

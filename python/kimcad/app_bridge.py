@@ -872,6 +872,7 @@ from .sheets import (  # noqa: E402,F401
     remove_placed,
     set_placed_scale,
     set_project_info,
+    set_sheet_purpose,
     sheet_svg,
     sheets,
 )

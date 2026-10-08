@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Step 3 (D73): pen sets, line types, element styles, visibility, overrides, purposes."""
 import json
+import re
 
 import pytest
 
@@ -282,3 +283,35 @@ def test_set_purpose_applies_its_layer_combination():
 def test_set_current_pen():
     assert call("set_current_pen", "7")["ok"] and s.current()["current_pen"] == 7
     assert not call("set_current_pen", "0")["ok"]
+
+
+SVG = ('<svg xmlns="http://www.w3.org/2000/svg" xmlns:ifc="http://www.ifcopenshell.org/ns">'
+       '<g class="section"><g class="IfcWall" ifc:guid="W1"><path d="M0,0 L1,1"/></g>'
+       '<g class="IfcFurniture" ifc:guid="F1"><path d="M0,0 L2,2"/><g><path d="M1,1"/></g></g></g>'
+       '<g class="projection IfcWall" ifc:guid="W1"><path d="M3,3"/></g></svg>')
+
+
+def test_style_svg_applies_lines_fills_and_removes_hidden():
+    resolved = {"styles": [{"cut": {"color": "#111111", "weight": 0.5, "dash": []},
+                            "projection": {"color": "#222222", "weight": 0.18, "dash": [3.0, 1.5]},
+                            "fill": "#333333", "surface": None, "transparency": None}],
+                "elements": {"W1": 0}, "hidden": ["F1"], "pens": {}, "annotation_pen": 23}
+    out = g.style_svg(SVG, resolved, k=2.0)
+    assert 'ifc:guid="F1"' not in out and "M2,2" not in out and "M1,1" not in out
+    cut = re.search(r'<g class="IfcWall" ifc:guid="W1"([^>]*)>', out).group(1)
+    assert 'stroke="#111111"' in cut and 'stroke-width="0.25"' in cut and 'fill="#333333"' in cut
+    proj = re.search(r'<g class="projection IfcWall" ifc:guid="W1"([^>]*)>', out).group(1)
+    assert 'stroke="#222222"' in proj and 'stroke-width="0.09"' in proj and 'stroke-dasharray="1.5 0.75"' in proj
+    assert 'fill="none"' in proj
+
+
+def test_doors_windows_and_rooms_have_no_cut_fill():
+    """Door swings and room outlines must not be filled (the serializer's CSS did this before D73)."""
+    f = _model()
+    door, room, wall = _el(f, "IfcDoor"), _el(f, "IfcSpace"), _el(f, "IfcWall")
+    r = g.resolve("Working", model=f)
+    assert r["styles"][r["elements"][door.GlobalId]]["fill"] is None
+    assert r["styles"][r["elements"][room.GlobalId]]["fill"] is None
+    assert r["styles"][r["elements"][wall.GlobalId]]["fill"] == "#b8a898"
+    out = g.style_svg(f'<g class="IfcDoor" ifc:guid="{door.GlobalId}"><path d="M0,0"/></g>', r)
+    assert 'fill="none"' in out and "fill-rule" not in out

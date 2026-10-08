@@ -91,7 +91,7 @@ def test_section_shows_cut_walls_and_slabs_filled_and_the_rest_in_projection(hou
     assert 'class="section"' in svg
     cut = re.findall(r'class="(IfcWall|IfcSlab)"', svg)
     assert "IfcWall" in cut and "IfcSlab" in cut
-    assert 'class="projection"' in svg
+    assert 'class="projection' in svg
     assert "IfcOpeningElement" not in svg  # openings are voids, not cut fill
     w, h = (float(v) for v in re.search(r'width="([\d.]+)mm" height="([\d.]+)mm"', svg).groups())
     assert 100 < w < 140 and 60 < h < 110  # 1:100, cropped to the 10 m x ~7 m house section
@@ -124,8 +124,8 @@ def test_template_elevations_follow_the_model_and_show_the_facade():
     south = drawings()["South Elevation"]
     r = call("generate_drawing", south["guid"], "")
     assert r["ok"], r
-    projection = r["svg"].split('class="projection"', 1)[1]
-    assert projection.count("<path") >= 1  # the wall's face (projection is merged, without classes)
+    projection = r["svg"].split('class="projection IfcWall"', 1)[1]  # D73: projection grouped per element
+    assert projection.count("<path") >= 1  # the wall's face
     w = float(re.search(r'width="([\d.]+)mm"', r["svg"]).group(1))
     assert 95 < w < 125  # the 10 m wall at 1:100, cropped
 
@@ -218,3 +218,28 @@ def test_house_floor_plan_reads_like_a_permit_plan(house):
     assert ">South Elevation</text>" in overlay and ">North Elevation</text>" in overlay  # markers
     upper = call("generate_drawing", drawings()["Level 2 Floor Plan"]["guid"], "")["svg"]
     assert ">Living room</text>" not in upper  # annotations belong to their level
+
+
+def test_drawings_are_styled_by_the_purpose(house):
+    from kimcad import settings as s
+    guid = call("create_section", -1.0, 4.5, 11.0, 4.5, 5.0, 8.0, -1)["guid"]
+    working = call("generate_drawing", guid, "")["svg"]
+    assert 'stroke="#5a3a22"' in working  # Working: walls cut, dark brown
+    assert call("set_purpose", "Permit")["ok"]
+    permit = call("generate_drawing", guid, "")["svg"]
+    assert 'stroke="#5a3a22"' not in permit and 'stroke="#000000"' in permit
+    assert call("set_purpose", "Working")["ok"]
+    s.load(None)
+
+
+def test_hidden_kinds_are_left_out_of_drawings(house):
+    from kimcad import settings as s
+    guid = call("create_section", -1.0, 4.5, 11.0, 4.5, 5.0, 8.0, -1)["guid"]
+    assert "IfcWall" in call("generate_drawing", guid, "")["svg"]
+    vis = {**call("graphics_tables")["tables"]["visibility_sets"], "No walls": {"hidden_kinds": ["walls"], "rules": []}}
+    purposes = {**call("graphics_tables")["tables"]["purposes"],
+                "NW": {"pen_set": "Working", "visibility": "No walls", "overrides": "None", "layers": None}}
+    assert call("set_graphics", json.dumps({"visibility_sets": vis, "purposes": purposes}))["ok"]
+    assert call("set_purpose", "NW")["ok"]
+    assert "IfcWall" not in call("generate_drawing", guid, "")["svg"]
+    s.load(None)

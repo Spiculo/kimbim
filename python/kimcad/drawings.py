@@ -255,16 +255,28 @@ def _python() -> str:
     raise RuntimeError("no Python interpreter found for drawing generation")
 
 
-def generate_drawing(guid: str, include_json: str = "") -> str:
-    """{ok, svg, cached, timing}: the drawing's SVG for the current model state. include_json: the
-    GlobalIds of the elements to draw (the visible ones, from the app); empty = all."""
+def _without_hidden(include_json: str, hidden) -> str:
+    """The include list minus the elements the purpose hides (D73): they are left out of the hidden-line
+    pass, so they don't hide what is behind them."""
+    if not hidden:
+        return include_json
+    gone = set(hidden)
+    wanted = json.loads(include_json) if include_json else [p.GlobalId for p in G.drawn_products(B._model)]
+    return json.dumps(sorted(g for g in wanted if g not in gone))
+
+
+def raw_drawing(guid: str, include_json: str = "", hidden=()) -> dict:
+    """{ok, svg (unstyled), cached, timing}: the drawing's geometry for the current model state, cached.
+    include_json: the GlobalIds of the elements to draw (the visible ones, from the app); empty = all.
+    hidden: GlobalIds the purpose hides."""
     d = _drawing(guid)
     if d is None:
-        return A._fail("not a drawing")
+        return {"ok": False, "error": "not a drawing"}
+    include_json = _without_hidden(include_json, hidden)
     key = (*_state_key(), include_json or "")  # the state and the elements given
     hit = _cache.get(guid, {}).get(key)
     if hit is not None:
-        return B._dump({"ok": True, "svg": hit, "cached": True})
+        return {"ok": True, "svg": hit, "cached": True}
     try:
         with tempfile.TemporaryDirectory(prefix="kimcad-draw-") as tmp:
             snapshot = os.path.join(tmp, "model.ifc")
@@ -276,14 +288,25 @@ def generate_drawing(guid: str, include_json: str = "") -> str:
                 args.append(include)
             done = subprocess.run(args, capture_output=True, text=True, encoding="utf-8",
                                   creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        result = json.loads(done.stdout) if done.stdout.strip() else \
-            {"ok": False, "error": (done.stderr.strip().splitlines() or ["drawing generation failed"])[-1]}
+        result = json.loads(done.stdout) if done.stdout.strip() else             {"ok": False, "error": (done.stderr.strip().splitlines() or ["drawing generation failed"])[-1]}
     except Exception as ex:
-        return A._fail(f"{type(ex).__name__}: {ex}")
+        return {"ok": False, "error": f"{type(ex).__name__}: {ex}"}
     if not result.get("ok"):
-        return B._dump(result)
+        return result
     entries = _cache.setdefault(guid, {})
     entries[key] = result["svg"]
     while len(entries) > _CACHE_SIZE:
         entries.pop(next(iter(entries)))
-    return B._dump({"ok": True, "svg": result["svg"], "cached": False, "timing": result["timing"]})
+    return {"ok": True, "svg": result["svg"], "cached": False, "timing": result["timing"]}
+
+
+def generate_drawing(guid: str, include_json: str = "") -> str:
+    """{ok, svg, cached, timing}: the drawing's SVG for the current model state, styled by the current
+    purpose (D73: pens, line types, overrides; hidden elements left out)."""
+    from . import graphics
+
+    resolved = graphics.resolve()
+    r = raw_drawing(guid, include_json, resolved["hidden"])
+    if r.get("ok"):
+        r["svg"] = graphics.style_svg(r["svg"], resolved, 1.0)
+    return B._dump(r)

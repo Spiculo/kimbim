@@ -388,6 +388,9 @@ def plan_annotations(storey, to_paper, size_default=TEXT_SIZE):
         m = ifcopenshell.util.placement.get_local_placement(a.ObjectPlacement)
         size = float(data.get("Size") or size_default)
         text = data.get("Text") or ""
+        pen = data.get("Pen")
+        pen_attr = f' data-pen="{int(pen)}"' if isinstance(pen, int) and not isinstance(pen, bool) else ""
+        out.append(f'<g data-kind="annotation" ifc:guid="{a.GlobalId}"{pen_attr}>')
         pts = []
         for lx, ly in local:
             w = m @ np.array([lx / unit, ly / unit, 0.0, 1.0]) * unit
@@ -409,6 +412,7 @@ def plan_annotations(storey, to_paper, size_default=TEXT_SIZE):
             out.append(_text(end[0] + 1.0, end[1], text, size, anchor="start", baseline="central"))
         elif kind == "dimension" and len(pts) >= 3:
             out += dimension_chain(pts[:-1], pts[-1], segment_labels(text, len(pts) - 2), size)
+        out.append("</g>")
     return out
 
 
@@ -553,6 +557,11 @@ def markers(f, to_paper, z):
     return out
 
 
+def _tagged(kind: str, parts: list) -> list:
+    """Overlay parts grouped by what they are, so graphics.style_svg can style them (D73)."""
+    return [f'<g data-kind="{kind}">', *parts, "</g>"] if parts else []
+
+
 def overlay(f, drawing, s, svg: str) -> str:
     to_paper = paper_mapping(svg)
     if to_paper is None:
@@ -563,13 +572,13 @@ def overlay(f, drawing, s, svg: str) -> str:
         if storey is not None:
             for e in f.by_type("IfcDoor"):
                 if ifcopenshell.util.element.get_container(e) == storey and e.ObjectPlacement is not None:
-                    parts += door_swings(e, to_paper)
+                    parts += _tagged("swing", door_swings(e, to_paper))
             for e in f.by_type("IfcWindow"):
                 if ifcopenshell.util.element.get_container(e) == storey and e.ObjectPlacement is not None:
-                    parts += window_symbol(e, to_paper)
-            parts += room_stamps(storey, to_paper)
-            parts += plan_annotations(storey, to_paper)
-            parts += markers(f, to_paper, storey_elevation(storey))
+                    parts += _tagged("window", window_symbol(e, to_paper))
+            parts += _tagged("room", room_stamps(storey, to_paper))
+            parts += plan_annotations(storey, to_paper)  # tags each annotation (guid, pen) itself
+            parts += _tagged("marker", markers(f, to_paper, storey_elevation(storey)))
     if not parts:
         return svg
     group = ('<g class="kimcad-overlay" fill="none" stroke="#000000" stroke-width="0.18" '
@@ -626,7 +635,9 @@ def generate(f, drawing, include=None) -> tuple[str, dict]:
                        ("apply-default-materials", True), ("elevation-ref-guid", drawing.GlobalId),
                        ("svg-without-storeys", True), ("svg-write-poly", True), ("svg-xmlns", True),
                        ("svg-project", True), ("bounds", "1189x841"), ("scale", str(1 / SCALE)),
-                       ("door-arcs", True), ("svg-poly", True), ("svg-prefilter", True), ("svg-unify-inputs", False)):
+                       ("door-arcs", True), ("svg-poly", True), ("svg-prefilter", True), ("svg-unify-inputs", False),
+                       # D73: projection lines grouped per element (styled by graphics.style_svg), no CSS
+                       ("svg-segment-projection", True), ("svg-no-css", True)):
         gs.set(key, value)
     buffer = W.buffer()
     serializer = ifcopenshell.geom.serializers.svg(buffer, gs)
