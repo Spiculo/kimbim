@@ -125,6 +125,11 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     addToolBar(Qt::BottomToolBarArea, bottom);
     statusBar()->hide();
     connect(m_status, &StatusStrip::activeLayerRequested, this, &MainWindow::setActiveLayer);
+    connect(m_status, &StatusStrip::purposeRequested, this, [this](const QString& name) {
+        if (name != m_viewport->graphics().purpose())
+            setPurpose(name);
+    });
+    connect(m_status, &StatusStrip::graphicsPopupRequested, this, &MainWindow::editPurposePieces);
     connect(m_status, &StatusStrip::penRequested, this, [this] {
         const Graphics& g = m_viewport->graphics();
         const int pen = PenGrid::pick(m_status->findChild<QWidget*>(QStringLiteral("penButton")), g.pens(),
@@ -456,6 +461,13 @@ void MainWindow::buildMenus()
     graphics->addSeparator();
     editor("actionVisibilitySets", tr("&Visibility sets..."), [this](const QJsonObject& r) { return new VisibilitySetsDialog(r, this); });
     editor("actionOverrides", tr("Graphic &overrides..."), [this](const QJsonObject& r) { return new OverridesDialog(r, this); });
+    editor("actionLayerCombinations", tr("Layer &combinations..."), [this](const QJsonObject& r) {
+        const QStringList layers = bridge("layer_members").value("layers").toObject().keys();
+        return new LayerCombinationsDialog(r, layers, QStringList(m_hiddenLayers.begin(), m_hiddenLayers.end()),
+            QStringList(m_lockedLayers.begin(), m_lockedLayers.end()), this);
+    });
+    graphics->addSeparator();
+    editor("actionPurposes", tr("P&urposes..."), [this](const QJsonObject& r) { return new PurposesDialog(r, this); });
     m_graphicsMenu = graphics;
     QMenu* help = menuBar()->addMenu(tr("&Help"));
     QAction* about = help->addAction(tr("&About KIMCAD"));
@@ -497,6 +509,7 @@ void MainWindow::buildDocks()
         }
         placeOnSheet(n, drawing);
     });
+    connect(m_sheetsPanel, &SheetsPanel::purposeRequested, this, &MainWindow::setSheetPurpose);
     connect(m_sheetsPanel, &SheetsPanel::deleteRequested, this, [this](const QString& n) {
         const QJsonObject r = bridge("delete_sheet", {n});
         if (!r.value("ok").toBool())
@@ -2712,6 +2725,76 @@ void MainWindow::refreshGraphics()
     const Graphics& g = m_viewport->graphics();
     const LineStyle pen = g.pen(g.currentPen());
     m_status->setPen(g.currentPen(), pen.color, pen.weight);
+    m_status->setPurposes(g.purposes(), g.purpose());
+    if (m_sheetsPanel)
+        m_sheetsPanel->setPurposes(g.purposes(), m_settings.value("sheet_purposes").toObject());
+}
+
+bool MainWindow::customizePurpose(const QString& penSet, const QString& visibility, const QString& overrides,
+    const QString& layers)
+{
+    const QJsonObject reply = bridge("graphics_tables");
+    QString name = reply.value("purpose").toString();
+    QJsonObject purposes = reply.value("tables").toObject().value("purposes").toObject();
+    QStringList builtins;
+    for (const auto& b : reply.value("builtins").toObject().value("purposes").toArray())
+        builtins << b.toString();
+    if (builtins.contains(name)) // the built-ins stay as they are
+        name = tr("%1 (modified)").arg(name);
+    purposes.insert(name, QJsonObject{{"pen_set", penSet}, {"visibility", visibility}, {"overrides", overrides},
+        {"layers", layers.isEmpty() ? QJsonValue() : QJsonValue(layers)}});
+    if (!setGraphics(QString::fromUtf8(QJsonDocument(QJsonObject{{"purposes", purposes}}).toJson(QJsonDocument::Compact))))
+        return false;
+    return setPurpose(name);
+}
+
+void MainWindow::editPurposePieces()
+{
+    const QJsonObject reply = bridge("graphics_tables");
+    const QJsonObject tables = reply.value("tables").toObject();
+    const QJsonObject current = tables.value("purposes").toObject().value(reply.value("purpose").toString()).toObject();
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Purpose: %1").arg(reply.value("purpose").toString()));
+    auto* form = new QFormLayout(&dialog);
+    auto combo = [&](const QString& table, const QString& value, bool none) {
+        auto* c = new QComboBox(&dialog);
+        if (none)
+            c->addItem(tr("(keep the layers as they are)"), QString());
+        for (const QString& k : tables.value(table).toObject().keys())
+            c->addItem(k, k);
+        c->setCurrentIndex(std::max(0, c->findData(value)));
+        return c;
+    };
+    QComboBox* pens = combo(QStringLiteral("pen_sets"), current.value("pen_set").toString(), false);
+    QComboBox* vis = combo(QStringLiteral("visibility_sets"), current.value("visibility").toString(), false);
+    QComboBox* ovr = combo(QStringLiteral("override_sets"), current.value("overrides").toString(), false);
+    QComboBox* lay = combo(QStringLiteral("layer_combinations"), current.value("layers").toString(), true);
+    form->addRow(tr("Pen set:"), pens);
+    form->addRow(tr("Visibility set:"), vis);
+    form->addRow(tr("Graphic overrides:"), ovr);
+    form->addRow(tr("Layer combination:"), lay);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    form->addRow(buttons);
+    if (dialog.exec() == QDialog::Accepted)
+        customizePurpose(pens->currentData().toString(), vis->currentData().toString(), ovr->currentData().toString(),
+            lay->currentData().toString());
+}
+
+bool MainWindow::setSheetPurpose(const QString& number, const QString& purpose)
+{
+    const QJsonObject r = bridge("set_sheet_purpose", {number, purpose});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(r.value("error").toString());
+        return false;
+    }
+    m_settings = bridge("project_settings").value("settings").toObject();
+    if (m_drawingViews.contains(QStringLiteral("sheet:") + number))
+        regenerateDrawing(QStringLiteral("sheet:") + number);
+    refreshGraphics();
+    setWindowModified(isDirty());
+    return true;
 }
 
 bool MainWindow::setCurrentPen(int pen)
@@ -3778,7 +3861,7 @@ bool MainWindow::saveView(const QString& name)
         {"locked", QJsonArray::fromStringList(QStringList(m_lockedLayers.begin(), m_lockedLayers.end()))},
         {"level", m_levels->activeStorey()}, {"plan", m_viewport->isPlanView()},
         {"cut", m_planCut->isChecked() ? QJsonValue(m_cutHeight->value()) : QJsonValue()},
-        {"linesOnly", m_viewport->linesOnly()}};
+        {"linesOnly", m_viewport->linesOnly()}, {"purpose", m_viewport->graphics().purpose()}};
     const QJsonObject r = bridge("save_view", {name, QString::fromUtf8(QJsonDocument(data).toJson(QJsonDocument::Compact))});
     if (!r.value("ok").toBool()) {
         m_status->showMessage(tr("Could not save the view: %1").arg(r.value("error").toString()));
@@ -3796,6 +3879,9 @@ bool MainWindow::applyView(const QString& name)
         if (o.value("name").toString() != name)
             continue;
         const QJsonObject data = o.value("data").toObject();
+        if (!data.value("purpose").toString().isEmpty()) // D73; the view's own layer states win below
+            bridge("set_purpose", {data.value("purpose").toString()});
+        m_settings = bridge("project_settings").value("settings").toObject();
         m_hiddenLayers.clear();
         m_lockedLayers.clear();
         for (const auto& l : data.value("hidden").toArray())
@@ -3818,6 +3904,8 @@ bool MainWindow::applyView(const QString& name)
         m_currentView = name;
         saveLayerStates();
         refreshLayers();
+        refreshAnnotations();
+        regenerateOpenDrawings();
         m_status->showMessage(tr("View %1").arg(name));
         return true;
     }

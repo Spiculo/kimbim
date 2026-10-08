@@ -203,6 +203,32 @@ private slots:
         e.setRule(hide);
         QCOMPARE(e.rule(), hide);
     }
+    void purposesPickTheirPieces()
+    {
+        kimcad::PurposesDialog d(tablesFromBridge(), nullptr);
+        d.selectSet(QStringLiteral("Permit"));
+        d.setPieces(QStringLiteral("Presentation"), QStringLiteral("No furniture"), QStringLiteral("None"),
+            QStringLiteral("All visible"));
+        const QJsonObject p = d.changes().value("purposes").toObject().value("Permit").toObject();
+        QCOMPARE(p.value("pen_set").toString(), QString("Presentation"));
+        QCOMPARE(p.value("visibility").toString(), QString("No furniture"));
+        QCOMPARE(p.value("layers").toString(), QString("All visible"));
+        d.setPieces(QStringLiteral("Permit"), QStringLiteral("No furniture"), QStringLiteral("None"), QString());
+        QVERIFY(d.changes().value("purposes").toObject().value("Permit").toObject().value("layers").isNull());
+    }
+    void layerCombinationsTakeTheCurrentLayers()
+    {
+        kimcad::LayerCombinationsDialog d(tablesFromBridge(), {"A-Wall", "A-Furniture"}, {"A-Furniture"}, {"A-Wall"}, nullptr);
+        d.selectSet(QStringLiteral("All visible"));
+        d.takeCurrent();
+        QJsonObject c = d.changes().value("layer_combinations").toObject().value("All visible").toObject();
+        QCOMPARE(c.value("hidden").toArray(), QJsonArray{"A-Furniture"});
+        QCOMPARE(c.value("locked").toArray(), QJsonArray{"A-Wall"});
+        d.setShown(QStringLiteral("A-Furniture"), true);
+        d.setLocked(QStringLiteral("A-Wall"), false);
+        c = d.changes().value("layer_combinations").toObject().value("All visible").toObject();
+        QVERIFY(c.value("hidden").toArray().isEmpty() && c.value("locked").toArray().isEmpty());
+    }
 };
 
 QTEST_MAIN(TestGraphics)

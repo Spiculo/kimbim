@@ -218,4 +218,40 @@ public:
     OverridesDialog(const QJsonObject& reply, QWidget* parent);
 };
 
+// Graphics > Layer combinations: which layers are shown and locked, by name.
+class LayerCombinationsDialog : public NamedSetsDialog {
+    Q_OBJECT
+public:
+    LayerCombinationsDialog(const QJsonObject& reply, const QStringList& layers, const QStringList& hidden,
+        const QStringList& locked, QWidget* parent);
+    void setShown(const QString& layer, bool shown);
+    void setLocked(const QString& layer, bool locked);
+    void takeCurrent(); // the layers as they are now (the ones given)
+
+protected:
+    void showSet(const QString& name) override;
+
+private:
+    void setIn(const QString& list, const QString& layer, bool in);
+    QStringList m_layers, m_hiddenNow, m_lockedNow;
+    QTableWidget* m_states = nullptr;
+    bool m_loading = false;
+};
+
+// Graphics > Purposes: each purpose's pen set, visibility set, override set and layer combination.
+class PurposesDialog : public NamedSetsDialog {
+    Q_OBJECT
+public:
+    PurposesDialog(const QJsonObject& reply, QWidget* parent);
+    // An empty layers name means none (the purpose leaves the layers as they are).
+    void setPieces(const QString& penSet, const QString& visibility, const QString& overrides, const QString& layers);
+
+protected:
+    void showSet(const QString& name) override;
+
+private:
+    QComboBox *m_penSet = nullptr, *m_visibility = nullptr, *m_overrides = nullptr, *m_layers = nullptr;
+    bool m_loading = false;
+};
+
 } // namespace kimcad

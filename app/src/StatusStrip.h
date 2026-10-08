@@ -29,13 +29,18 @@ public:
     QString layersText() const { return m_layersText; } // "visible/all"
     // D73: the current pen (number, colour, weight in mm).
     void setPen(int number, const QColor& color, double weight);
+    // D73: the purposes and the current one (the drop-down left of the pen).
+    void setPurposes(const QStringList& names, const QString& current);
 
 signals:
     void activeLayerRequested(const QString& layer);
     void layerVisibilityToggled(const QString& layer, bool visible);
     void penRequested(); // the pen button: pick a pen
+    void purposeRequested(const QString& name);
+    void graphicsPopupRequested(); // the "..." button: this purpose's pen set, visibility, overrides, layers
 
 private:
+    QComboBox* m_purpose;
     QToolButton* m_pen;
     QComboBox* m_layer;
     QToolButton* m_layers;

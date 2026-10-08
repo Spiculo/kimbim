@@ -154,6 +154,11 @@ public:
     void setTrueLineWeights(bool on);
     // The pen for new annotations (the bottom bar's); selected annotations take it too.
     bool setCurrentPen(int pen);
+    // Changes the current purpose's pieces (bottom bar "..."); a built-in purpose is copied first as
+    // "<name> (modified)", which becomes current. Empty layers: none.
+    bool customizePurpose(const QString& penSet, const QString& visibility, const QString& overrides, const QString& layers);
+    bool setSheetPurpose(const QString& number, const QString& purpose); // "" = the current purpose
+    QStringList hiddenLayers() const { return QStringList(m_hiddenLayers.begin(), m_hiddenLayers.end()); }
     QString formatLength(double metres) const;            // in the project's unit and decimals
     // D72: recovery copies of unsaved work (written every N minutes; offered after a crash).
     bool writeRecovery();
@@ -297,6 +302,7 @@ private:
     void refreshLayers();
     void refreshGraphics();
     void regenerateOpenDrawings();
+    void editPurposePieces();
     void refreshAnnotations();
     void annotationClick(QPointF p, Qt::KeyboardModifiers modifiers = {});
     void afterCopy(const QJsonObject& result);

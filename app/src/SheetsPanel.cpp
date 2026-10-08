@@ -46,6 +46,17 @@ SheetsPanel::SheetsPanel(QWidget* parent)
         if (!selectedSheet().isEmpty())
             emit placeRequested(selectedSheet());
     });
+    m_list->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_list, &QListWidget::customContextMenuRequested, this, [this](const QPoint& at) {
+        const QListWidgetItem* item = m_list->itemAt(at);
+        if (!item)
+            return;
+        QMenu menu(this);
+        QMenu* purposes = purposeMenu(item->data(NumberRole).toString());
+        purposes->setParent(&menu, purposes->windowFlags());
+        menu.addMenu(purposes);
+        menu.exec(m_list->viewport()->mapToGlobal(at));
+    });
     connect(remove, &QPushButton::clicked, this, [this] {
         if (!selectedSheet().isEmpty())
             emit deleteRequested(selectedSheet());
@@ -77,6 +88,30 @@ QString SheetsPanel::selectedSheet() const
 int SheetsPanel::count() const
 {
     return m_list->count();
+}
+
+void SheetsPanel::setPurposes(const QStringList& names, const QJsonObject& sheetPurposes)
+{
+    m_purposes = names;
+    m_sheetPurposes = sheetPurposes;
+}
+
+QMenu* SheetsPanel::purposeMenu(const QString& number)
+{
+    auto* menu = new QMenu(tr("Purpose"));
+    const QString current = m_sheetPurposes.value(number).toString();
+    QAction* follow = menu->addAction(tr("Current (as the views)"));
+    follow->setCheckable(true);
+    follow->setChecked(current.isEmpty());
+    connect(follow, &QAction::triggered, this, [this, number] { emit purposeRequested(number, QString()); });
+    menu->addSeparator();
+    for (const QString& p : std::as_const(m_purposes)) {
+        QAction* a = menu->addAction(p);
+        a->setCheckable(true);
+        a->setChecked(p == current);
+        connect(a, &QAction::triggered, this, [this, number, p] { emit purposeRequested(number, p); });
+    }
+    return menu;
 }
 
 } // namespace kimcad

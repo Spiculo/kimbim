@@ -1599,8 +1599,74 @@ private slots:
     {
         kimcad::MainWindow w(nullptr, /*quiet=*/true);
         for (const char* name : {"actionPenSets", "actionLineTypes", "actionElementStyles", "actionVisibilitySets",
-                 "actionOverrides"})
+                 "actionOverrides", "actionLayerCombinations", "actionPurposes"})
             QVERIFY2(action(w, name) && action(w, name)->isEnabled(), name);
+    }
+
+    // D73: the bottom bar switches purpose; a purpose with a layer combination applies it.
+    void theBottomBarSwitchesPurposeAndAppliesItsLayers()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        const QString layer = QStringLiteral("A-Furniture");
+        QVERIFY(w.setGraphics(QStringLiteral(R"({"layer_combinations": {"Hide": {"hidden": ["A-Furniture"], "locked": []}},
+            "purposes": {"Working": {"pen_set": "Working", "visibility": "Everything", "overrides": "None", "layers": null},
+                         "Hide": {"pen_set": "Permit", "visibility": "Everything", "overrides": "None", "layers": "Hide"}}})")));
+        auto* combo = w.findChild<QComboBox*>(QStringLiteral("purpose"));
+        QVERIFY(combo);
+        QCOMPARE(combo->count(), 2);
+        QCOMPARE(combo->currentText(), QString("Working"));
+        combo->setCurrentText(QStringLiteral("Hide"));
+        QCOMPARE(w.viewport()->graphics().purpose(), QString("Hide"));
+        QVERIFY(w.hiddenLayers().contains(layer));
+        QVERIFY(w.findChild<QToolButton*>(QStringLiteral("graphicsButton")));
+    }
+
+    // D73: changing a built-in purpose's pieces makes a "(modified)" copy; the built-in stays.
+    void customizingABuiltInPurposeCopiesIt()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        QVERIFY(w.setPurpose(QStringLiteral("Permit")));
+        QVERIFY(w.customizePurpose(QStringLiteral("Permit"), QStringLiteral("No furniture"), QStringLiteral("None"), QString()));
+        QCOMPARE(w.viewport()->graphics().purpose(), QString("Permit (modified)"));
+        const QJsonObject tables = kimcad::PythonEngine::instance().callJson("graphics_tables", {}).object()
+                                       .value("tables").toObject();
+        QCOMPARE(tables.value("purposes").toObject().value("Permit").toObject().value("visibility").toString(), QString("Architectural"));
+        QCOMPARE(tables.value("purposes").toObject().value("Permit (modified)").toObject().value("visibility").toString(), QString("No furniture"));
+        // a purpose already customised is changed in place
+        QVERIFY(w.customizePurpose(QStringLiteral("Working"), QStringLiteral("No furniture"), QStringLiteral("None"), QString()));
+        QCOMPARE(w.viewport()->graphics().purpose(), QString("Permit (modified)"));
+    }
+
+    void viewsRememberTheirPurpose()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        QVERIFY(w.setPurpose(QStringLiteral("Permit")));
+        QVERIFY(w.saveView(QStringLiteral("Permit plan")));
+        QVERIFY(w.setPurpose(QStringLiteral("Working")));
+        QVERIFY(w.applyView(QStringLiteral("Permit plan")));
+        QCOMPARE(w.viewport()->graphics().purpose(), QString("Permit"));
+    }
+
+    void sheetsPrintWithTheirPurpose()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        drawWall(w);
+        auto& py = kimcad::PythonEngine::instance();
+        QVERIFY(py.callJson("create_drawings", {}).object().value("ok").toBool());
+        const QString number = py.callJson("add_sheet", {QStringLiteral("A3"), QStringLiteral("Plan")}).object().value("number").toString();
+        QString plan;
+        for (const auto& d : py.callJson("drawings", {}).object().value("drawings").toArray())
+            if (d.toObject().value("kind").toString() == QLatin1String("plan"))
+                plan = d.toObject().value("guid").toString();
+        QVERIFY(py.callJson("place_drawing", {number, plan, "-1", "-1", "100"}).object().value("ok").toBool());
+        QVERIFY(py.callJson("sheet_svg", {number}).object().value("svg").toString().contains("#5a3a22")); // Working
+        QVERIFY(w.setSheetPurpose(number, QStringLiteral("Permit")));
+        QVERIFY(!py.callJson("sheet_svg", {number}).object().value("svg").toString().contains("#5a3a22"));
+        QVERIFY(w.isWindowModified());
     }
 
     void trueLineWeightsAreAPreference()

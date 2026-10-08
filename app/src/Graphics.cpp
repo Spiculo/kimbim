@@ -32,6 +32,8 @@ Graphics Graphics::fromJson(const QJsonObject& state)
     if (!state.value("ok").toBool())
         return g;
     g.m_purpose = state.value("purpose").toString();
+    for (const auto& p : state.value("purposes").toArray())
+        g.m_purposes << p.toString();
     g.m_currentPen = state.value("current_pen").toInt(23);
     g.m_annotationPen = state.value("annotation_pen").toInt(23);
     for (const auto& v : state.value("styles").toArray()) {

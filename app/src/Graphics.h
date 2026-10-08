@@ -38,6 +38,7 @@ public:
     int currentPen() const { return m_currentPen; }
     int annotationPen() const { return m_annotationPen; }
     QString purpose() const { return m_purpose; }
+    const QStringList& purposes() const { return m_purposes; } // every purpose, for the bottom bar
     bool isEmpty() const { return m_styles.isEmpty() && m_hidden.isEmpty(); }
     // Screen width in pixels: 1, or with true weights clamp(round(weight * 4), 1, 6).
     static float pixels(double weightMm, bool trueWeights);
@@ -51,5 +52,6 @@ private:
     QHash<int, QString> m_penNames;
     int m_currentPen = 23, m_annotationPen = 23;
     QString m_purpose;
+    QStringList m_purposes;
 };
 }

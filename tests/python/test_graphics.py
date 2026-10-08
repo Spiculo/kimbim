@@ -321,3 +321,7 @@ def test_graphics_state_names_the_pens():
     r = call("graphics_state")
     assert r["pen_names"]["23"] == "Annotations" and r["pen_names"]["10"] == "Walls cut"
     assert "30" not in r["pen_names"]  # free pens have no name
+
+
+def test_graphics_state_lists_the_purposes():
+    assert call("graphics_state")["purposes"] == ["Working", "Highlight", "Permit", "Presentation", "Demo"]

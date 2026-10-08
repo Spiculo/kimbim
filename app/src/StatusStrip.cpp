@@ -22,6 +22,21 @@ StatusStrip::StatusStrip(QWidget* parent)
     auto* row = new QHBoxLayout(this);
     row->setContentsMargins(6, 2, 6, 2);
     row->setSpacing(10);
+    m_purpose = new QComboBox(this);
+    m_purpose->setObjectName(QStringLiteral("purpose"));
+    m_purpose->setToolTip(tr("Purpose: how the views, drawings and sheets look (pen set, visibility, overrides, layers)"));
+    m_purpose->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    connect(m_purpose, &QComboBox::currentTextChanged, this, [this](const QString& name) {
+        if (!name.isEmpty())
+            emit purposeRequested(name);
+    });
+    row->addWidget(m_purpose);
+    auto* pieces = new QToolButton(this);
+    pieces->setObjectName(QStringLiteral("graphicsButton"));
+    pieces->setText(QStringLiteral("..."));
+    pieces->setToolTip(tr("Change this purpose's pen set, visibility, overrides and layer combination"));
+    connect(pieces, &QToolButton::clicked, this, &StatusStrip::graphicsPopupRequested);
+    row->addWidget(pieces);
     m_pen = new QToolButton(this);
     m_pen->setObjectName(QStringLiteral("penButton"));
     m_pen->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
@@ -119,6 +134,21 @@ void StatusStrip::setPen(int number, const QColor& color, double weight)
     swatch.fill(color);
     m_pen->setIcon(QIcon(swatch));
     m_pen->setText(QStringLiteral("%1 · %2").arg(number).arg(QLocale().toString(weight, 'f', 2)));
+}
+
+void StatusStrip::setPurposes(const QStringList& names, const QString& current)
+{
+    QSignalBlocker block(m_purpose); // showing the state isn't a request
+    if (m_purpose->count() != names.size() || [&] {
+            for (int i = 0; i < names.size(); ++i)
+                if (m_purpose->itemText(i) != names[i])
+                    return true;
+            return false;
+        }()) {
+        m_purpose->clear();
+        m_purpose->addItems(names);
+    }
+    m_purpose->setCurrentText(current);
 }
 
 } // namespace kimcad
