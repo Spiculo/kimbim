@@ -9,6 +9,7 @@ import colorsys
 import copy
 import json
 import re
+import weakref
 
 import ifcopenshell.util.element
 
@@ -508,10 +509,13 @@ def resolve(purpose: str | None = None, model=None, settings: dict | None = None
     st = _settings(settings)
     purposes = effective("purposes", st)
     name = purpose if purpose in purposes else current_purpose(st)
-    key = (id(model), B._current_id() if model is B._model else id(model), name,
+    # Keyed by the model state and the settings; the entry also holds a weak reference to its model, as
+    # a new model can reuse a freed one's id().
+    key = (id(model), B._current_id() if model is B._model else 0, name,
            json.dumps({k: st.get(k) for k in GRAPHICS_KEYS}, sort_keys=True))
-    if key in _cache:
-        return _cache[key]
+    hit = _cache.get(key)
+    if hit is not None and hit[0]() is model:
+        return hit[1]
     p = purposes[name]
     pen_sets, vis_sets, ovr_sets = effective("pen_sets", st), effective("visibility_sets", st), effective("override_sets", st)
     set_name = p.get("pen_set") if p.get("pen_set") in pen_sets else next(iter(pen_sets))
@@ -566,7 +570,7 @@ def resolve(purpose: str | None = None, model=None, settings: dict | None = None
            "styles": styles, "elements": elements, "hidden": hidden}
     if len(_cache) > 8:
         _cache.clear()
-    _cache[key] = out
+    _cache[key] = (weakref.ref(model) if model is not None else (lambda: None), out)
     return out
 
 

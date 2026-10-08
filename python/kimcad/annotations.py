@@ -25,6 +25,7 @@ from . import app_bridge as B
 from . import authoring as A
 from . import drawgen as G
 from . import layers
+from . import settings
 
 PSET = "KIMCAD_Annotation"
 # Kind -> (fewest points, most points); None = no limit. A dimension is a chain: the measured points,
@@ -108,10 +109,14 @@ def _representation(kind, text, points, size=TEXT_SIZE):
     return f.createIfcShapeRepresentation(_context(), "Annotation", "Annotation2D", items)
 
 
-def _set(annotation, kind, text, local, size=None):
+def _set(annotation, kind, text, local, size=None, pen=None):
+    """`pen`: the annotation's pen (D73); None keeps the one it has (if any)."""
     f = B._model
+    old_data = ifcopenshell.util.element.get_pset(annotation, PSET) or {}
     if size is None:
-        size = float((ifcopenshell.util.element.get_pset(annotation, PSET) or {}).get("Size") or TEXT_SIZE)
+        size = float(old_data.get("Size") or TEXT_SIZE)
+    if pen is None:
+        pen = _pen(old_data)
     old = list(annotation.Representation.Representations) if annotation.Representation else []
     new = _representation(kind, text, local, size)
     for rep in old:
@@ -123,7 +128,12 @@ def _set(annotation, kind, text, local, size=None):
     pset = f.by_id(pset["id"]) if pset else ifcopenshell.api.pset.add_pset(f, product=annotation, name=PSET)
     ifcopenshell.api.pset.edit_pset(f, pset=pset, properties={
         "Kind": kind, "Text": text, "Points": json.dumps([[round(x, 6), round(y, 6)] for x, y in local]),
-        "Size": float(size)})
+        "Size": float(size), **({"Pen": int(pen)} if pen is not None else {})})
+
+
+def _pen(data: dict):
+    pen = data.get("Pen")
+    return pen if isinstance(pen, int) and not isinstance(pen, bool) and 1 <= pen <= 255 else None
 
 
 def _read(annotation):
@@ -134,7 +144,7 @@ def _read(annotation):
         local = json.loads(data.get("Points") or "[]")
     except ValueError:
         return None
-    return data["Kind"], data.get("Text") or "", local, float(data.get("Size") or TEXT_SIZE)
+    return data["Kind"], data.get("Text") or "", local, float(data.get("Size") or TEXT_SIZE), _pen(data)
 
 
 def add_annotation(storey_guid: str, kind: str, points_json: str, text: str) -> str:
@@ -176,7 +186,7 @@ def add_annotation(storey_guid: str, kind: str, points_json: str, text: str) -> 
         matrix = np.eye(4)
         matrix[0][3], matrix[1][3], matrix[2][3] = origin[0], origin[1], A._elevation(storey)
         ifcopenshell.api.geometry.edit_object_placement(f, product=annotation, matrix=matrix, is_si=True)
-        _set(annotation, kind, text, local)
+        _set(annotation, kind, text, local, pen=settings.current().get("current_pen"))
         layers.assign_active(annotation)
         made["guid"] = annotation.GlobalId
         return 1, [annotation.GlobalId], []
@@ -197,13 +207,13 @@ def annotations(storey_guid: str) -> str:
             data = _read(a)
             if data is None:
                 continue
-            kind, text, local, size = data
+            kind, text, local, size, pen = data
             m = ifcopenshell.util.placement.get_local_placement(a.ObjectPlacement)
             points = []
             for x, y in local:
                 w = m @ np.array([x / s, y / s, 0.0, 1.0])
                 points.append([round(float(w[0] * s), 6), round(float(w[1] * s), 6)])
-            out.append({"guid": a.GlobalId, "kind": kind, "text": text, "points": points, "size": size})
+            out.append({"guid": a.GlobalId, "kind": kind, "text": text, "points": points, "size": size, "pen": pen})
     return B._dump({"annotations": out})
 
 
@@ -212,7 +222,7 @@ def set_annotation_text(guid: str, text: str) -> str:
     data = _read(a) if a is not None and a.is_a("IfcAnnotation") else None
     if data is None:
         return A._fail("not an annotation")
-    kind, _, local, _size = data
+    kind, _, local, _size, _pen_no = data
     text = (text or "").strip()
     if kind == "dimension" and not text:
         text = _measure(local)  # an emptied dimension text measures again
@@ -239,10 +249,31 @@ def set_annotation_size(guid: str, size) -> str:
         return A._fail("bad size")
     if not 0.5 <= size <= 50:
         return A._fail("the size must be between 0.5 and 50 mm")
-    kind, text, local, _ = data
+    kind, text, local, _, _pen_no = data
 
     def action():
         _set(a, kind, text, local, size)
+        return 1, [a.GlobalId], []
+
+    return B._dump(B._run(action))
+
+
+def set_annotation_pen(guid: str, pen) -> str:
+    """The annotation's pen (D73): its lines and text take that pen's colour and weight."""
+    a = A._by_guid(guid) if B._model is not None else None
+    data = _read(a) if a is not None and a.is_a("IfcAnnotation") else None
+    if data is None:
+        return A._fail("not an annotation")
+    try:
+        pen = int(pen)
+    except (TypeError, ValueError):
+        return A._fail("pens are 1-255")
+    if not 1 <= pen <= 255:
+        return A._fail("pens are 1-255")
+    kind, text, local, size, _ = data
+
+    def action():
+        _set(a, kind, text, local, size, pen)
         return 1, [a.GlobalId], []
 
     return B._dump(B._run(action))

@@ -848,7 +848,13 @@ from .layers import (  # noqa: E402,F401
     set_active_layer,
     views,
 )
-from .annotations import add_annotation, annotations, set_annotation_size, set_annotation_text  # noqa: E402,F401
+from .annotations import (  # noqa: E402,F401
+    add_annotation,
+    annotations,
+    set_annotation_pen,
+    set_annotation_size,
+    set_annotation_text,
+)
 from .drawings import (  # noqa: E402,F401
     create_drawings,
     create_elevation,

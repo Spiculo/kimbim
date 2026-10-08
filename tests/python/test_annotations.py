@@ -34,7 +34,7 @@ def test_text_dimension_and_mark_are_ifc_annotations_on_the_level(plan):
     m = call("add_annotation", plan["l1"], "mark", json.dumps([[3, 3]]), "A")
     assert t["ok"] and d["ok"] and m["ok"], (t, d, m)
     shown = listed(plan["l1"])
-    assert shown[t["guid"]] == {"guid": t["guid"], "kind": "text", "text": "Living room", "points": [[1.0, 2.0]], "size": 2.5}
+    assert shown[t["guid"]] == {"guid": t["guid"], "kind": "text", "text": "Living room", "points": [[1.0, 2.0]], "size": 2.5, "pen": 23}
     assert shown[d["guid"]]["text"] == "4.50"  # dimensions measure themselves
     assert shown[d["guid"]]["points"] == [[0.0, 0.0], [4.5, 0.0], [0.0, -1.0]]
     assert shown[m["guid"]]["kind"] == "mark"
@@ -122,3 +122,18 @@ def test_typed_dimension_text_with_spaces_is_kept_whole(plan):
     assert drawgen.segment_labels("ver nota; detalle 3", 1) == ["ver nota; detalle 3"]
     svg = "".join(drawgen.plan_annotations(b._model.by_guid(plan["l1"]), lambda x, y, z: (x * 10, y * 10)))
     assert ">2.50 m<" in svg and ">a eje A<" in svg
+
+
+def test_annotations_take_the_current_pen_and_can_change_it(plan):
+    """D73: new annotations take the current pen (the bottom bar's); a selected one can take another."""
+    from kimcad import settings as s
+    assert json.loads(s.set_project_settings(json.dumps({"current_pen": 26})))["ok"]
+    guid = call("add_annotation", plan["l1"], "text", json.dumps([[1.0, 1.0]]), "Hello")["guid"]
+    assert listed(plan["l1"])[guid]["pen"] == 26
+    assert call("set_annotation_pen", guid, "5")["ok"]
+    assert listed(plan["l1"])[guid]["pen"] == 5
+    assert call("set_annotation_text", guid, "Bye")["ok"]  # other edits keep the pen
+    assert listed(plan["l1"])[guid]["pen"] == 5
+    assert not call("set_annotation_pen", guid, "300")["ok"]
+    assert call("undo")["ok"] and listed(plan["l1"])[guid]["pen"] == 5 and listed(plan["l1"])[guid]["text"] == "Hello"
+    s.load(None)
