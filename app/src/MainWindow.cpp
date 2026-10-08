@@ -14,6 +14,7 @@
 #include <QApplication>
 #include <QCloseEvent>
 #include <QSettings>
+#include <QStandardPaths>
 #include <QDoubleSpinBox>
 #include <QLabel>
 #include <QToolBar>
@@ -199,12 +200,19 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     QString error;
     if (!PythonEngine::instance().start(&error))
         showError(tr("KIMCAD cannot start"), error);
+    bridge("set_app_paths", {QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)});
+    bridge("set_author", {m_prefs.authorName(), m_prefs.authorEmail()});
+    m_sinceVersion.start();
     // The window layout of the last session (D71); tests and the self-test start from the default,
     // where the model view gets most of the width.
     m_dock->setSideWidths(200, 320);
     m_dock->captureDefault();
-    if (!m_quiet)
-        m_dock->restoreLayout(QSettings().value(QStringLiteral("layout/state")).toByteArray());
+    if (!m_quiet) {
+        QByteArray state = m_prefs.layout();
+        if (state.isEmpty()) // once: the layout saved by the first D71 build
+            state = QSettings().value(QStringLiteral("layout/state")).toByteArray();
+        m_dock->restoreLayout(state);
+    }
 }
 
 MainWindow::~MainWindow()
@@ -225,16 +233,21 @@ MainWindow::~MainWindow()
 void MainWindow::buildMenus()
 {
     QMenu* file = menuBar()->addMenu(tr("&File"));
-    QAction* newProjectAction = file->addAction(tr("&New project"));
+    QAction* newProjectAction = file->addAction(tr("&New project..."));
     newProjectAction->setObjectName(QStringLiteral("actionNewProject"));
     newProjectAction->setShortcut(QKeySequence::New);
-    connect(newProjectAction, &QAction::triggered, this, [this] { newProject(); });
-    QAction* open = file->addAction(tr("&Open IFC..."));
+    connect(newProjectAction, &QAction::triggered, this, &MainWindow::newProjectDialog);
+    QAction* open = file->addAction(tr("&Open..."));
+    open->setObjectName(QStringLiteral("actionOpen"));
     open->setShortcut(QKeySequence::Open);
     connect(open, &QAction::triggered, this, &MainWindow::openDialog);
-    QAction* openProjectAction = file->addAction(tr("Open &project..."));
+    QAction* openProjectAction = file->addAction(tr("Open project &folder..."));
     openProjectAction->setObjectName(QStringLiteral("actionOpenProject"));
     connect(openProjectAction, &QAction::triggered, this, &MainWindow::openProjectDialog);
+    m_recentMenu = file->addMenu(tr("&Recent files"));
+    m_recentMenu->setObjectName(QStringLiteral("recentMenu"));
+    connect(m_recentMenu, &QMenu::aboutToShow, this, &MainWindow::fillRecentMenu);
+    file->addSeparator();
     QAction* saveAction = file->addAction(tr("&Save"));
     saveAction->setObjectName(QStringLiteral("actionSave"));
     saveAction->setShortcut(QKeySequence::Save);
@@ -243,6 +256,23 @@ void MainWindow::buildMenus()
     saveAs->setObjectName(QStringLiteral("actionSaveAs"));
     saveAs->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_S));
     connect(saveAs, &QAction::triggered, this, &MainWindow::saveAsDialog);
+    QAction* saveFolder = file->addAction(tr("Save as project f&older..."));
+    saveFolder->setObjectName(QStringLiteral("actionSaveAsFolder"));
+    connect(saveFolder, &QAction::triggered, this, &MainWindow::saveAsFolderDialog);
+    QAction* saveTemplate = file->addAction(tr("Save as &template..."));
+    saveTemplate->setObjectName(QStringLiteral("actionSaveAsTemplate"));
+    connect(saveTemplate, &QAction::triggered, this, &MainWindow::saveAsTemplateDialog);
+    QAction* exportIfcAction = file->addAction(tr("&Export IFC..."));
+    exportIfcAction->setObjectName(QStringLiteral("actionExportIfc"));
+    connect(exportIfcAction, &QAction::triggered, this, &MainWindow::exportIfcDialog);
+    QAction* saveVersionAction = file->addAction(tr("Save &version..."));
+    saveVersionAction->setObjectName(QStringLiteral("actionSaveVersion"));
+    saveVersionAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_S));
+    connect(saveVersionAction, &QAction::triggered, this, &MainWindow::saveVersionDialog);
+    file->addSeparator();
+    QAction* settingsAction = file->addAction(tr("Project se&ttings..."));
+    settingsAction->setObjectName(QStringLiteral("actionProjectSettings"));
+    connect(settingsAction, &QAction::triggered, this, &MainWindow::projectSettingsDialog);
     file->addSeparator();
     QAction* info = file->addAction(tr("Project &info..."));
     info->setObjectName(QStringLiteral("actionProjectInfo"));
@@ -257,13 +287,6 @@ void MainWindow::buildMenus()
     schedule->setObjectName(QStringLiteral("actionRoomSchedule"));
     connect(schedule, &QAction::triggered, this, &MainWindow::roomScheduleDialog);
     file->addSeparator();
-    QAction* enable = file->addAction(tr("Enable &versioning..."));
-    enable->setObjectName(QStringLiteral("actionEnableVersioning"));
-    connect(enable, &QAction::triggered, this, &MainWindow::enableVersioningDialog);
-    QAction* saveVersionAction = file->addAction(tr("Save &version..."));
-    saveVersionAction->setObjectName(QStringLiteral("actionSaveVersion"));
-    saveVersionAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_S));
-    connect(saveVersionAction, &QAction::triggered, this, &MainWindow::saveVersionDialog);
     file->addSeparator();
     QAction* quit = file->addAction(tr("&Quit"));
     quit->setShortcut(QKeySequence::Quit);
@@ -601,11 +624,10 @@ void MainWindow::showError(const QString& title, const QString& message)
 
 void MainWindow::openDialog()
 {
-    if (!maybeSave())
-        return;
-    const QString path = QFileDialog::getOpenFileName(this, tr("Open IFC"), QString(), tr("IFC files (*.ifc)"));
+    const QString path = QFileDialog::getOpenFileName(this, tr("Open"), QString(),
+        tr("KIMCAD and IFC files (*.kim *.ifc);;KIMCAD projects (*.kim);;IFC files (*.ifc)"));
     if (!path.isEmpty())
-        openFile(path);
+        openPath(path);
 }
 
 void MainWindow::openFile(const QString& path)
@@ -642,8 +664,11 @@ void MainWindow::closeEvent(QCloseEvent* event)
         return;
     }
     stopLoading();
-    if (!m_quiet)
-        QSettings().setValue(QStringLiteral("layout/state"), m_dock->saveLayout()); // D71: the next session's layout
+    bridge("close_document"); // the lock and the working folder go
+    if (!m_quiet) {
+        m_prefs.setLayout(m_dock->saveLayout()); // D71: the next session's layout (D72: in preferences)
+        m_prefs.save();
+    }
     event->accept();
 }
 
@@ -821,7 +846,6 @@ bool MainWindow::newProject()
     refreshLevels();
     m_types->clear();
     m_warnedInconsistent = false;
-    setWindowTitle(QStringLiteral("KIMCAD — %1[*]").arg(tr("Untitled")));
     afterEdit();
     refreshProject();
     m_hiddenLayers.clear();
@@ -1872,63 +1896,156 @@ void MainWindow::refreshProject()
     m_versioned = s.value("versioned").toBool();
     for (QAction* a : std::as_const(m_projectActions))
         a->setVisible(m_versioned);
+    QString option;
     if (!m_versioned) {
         m_projectFolder.clear();
         m_history->setVersions({});
         endCompare();
-        return;
+    } else {
+        m_projectFolder = s.value("folder").toString();
+        option = s.value("option").toString();
+        {
+            const QSignalBlocker block(m_options);
+            m_options->clear();
+            for (const auto& o : s.value("options").toArray())
+                m_options->addItem(o.toString());
+            m_options->setCurrentText(option);
+        }
+        m_history->setVersions(bridge("history", {QStringLiteral("200")}).value("versions").toArray());
     }
-    m_projectFolder = s.value("folder").toString();
-    const QString option = s.value("option").toString();
-    {
-        const QSignalBlocker block(m_options);
-        m_options->clear();
-        for (const auto& o : s.value("options").toArray())
-            m_options->addItem(o.toString());
-        m_options->setCurrentText(option);
-    }
-    m_history->setVersions(bridge("history", {QStringLiteral("200")}).value("versions").toArray());
-    setWindowTitle(QStringLiteral("KIMCAD — %1 (%2)[*]").arg(QFileInfo(m_projectFolder).fileName(), option));
-    setWindowModified(s.value("dirty").toBool());
+    const QJsonObject doc = documentState();
+    QString name = doc.value("untitled").toBool() ? tr("Untitled") : doc.value("name").toString();
+    if (m_versioned)
+        name += QStringLiteral(" (%1)").arg(option);
+    if (doc.value("read_only").toBool())
+        name += QStringLiteral(" [%1]").arg(tr("read-only"));
+    setWindowTitle(QStringLiteral("KIMCAD — %1[*]").arg(name));
+    setWindowModified(isDirty());
 }
 
-bool MainWindow::enableVersioning(const QString& folder, const QString& message)
+bool MainWindow::openPath(const QString& path)
 {
-    const QJsonObject r = bridge("enable_versioning", {folder, message.isEmpty() ? tr("Initial import") : message});
-    if (!r.value("ok").toBool()) {
-        showError(tr("Could not enable versioning"), r.value("error").toString());
-        return false;
-    }
-    m_path = QDir(folder).filePath(QStringLiteral(".kimcad/working.ifc"));
-    afterEdit();
-    refreshProject();
-    m_status->showMessage(tr("Versioning enabled: first version saved"));
-    return true;
+    const QFileInfo info(path);
+    if (info.isDir())
+        return openProject(path);
+    if (info.suffix().compare(QLatin1String("kim"), Qt::CaseInsensitive) == 0)
+        return openKim(path);
+    return openIfc(path);
 }
 
-void MainWindow::enableVersioningDialog()
-{
-    if (m_versioned) {
-        m_status->showMessage(tr("This model is already versioned"));
-        return;
-    }
-    const QString folder = QFileDialog::getExistingDirectory(this, tr("Choose an empty folder for the project"));
-    if (!folder.isEmpty())
-        enableVersioning(folder);
-}
-
-bool MainWindow::openProject(const QString& folder)
+bool MainWindow::closeDocument()
 {
     if (!maybeSave())
         return false;
-    const QJsonObject r = bridge("open_project", {folder});
+    stopLoading();
+    bridge("close_document");
+    return true;
+}
+
+// A lock held by someone else: ask (quiet mode: read-only).
+bool MainWindow::askReadOnly(const QJsonObject& r)
+{
+    if (!r.contains("locked"))
+        return false;
+    if (m_quiet)
+        return true;
+    return QMessageBox::question(this, tr("File in use"),
+               tr("%1\nOpen it read-only?").arg(r.value("error").toString()),
+               QMessageBox::Open | QMessageBox::Cancel, QMessageBox::Open) == QMessageBox::Open;
+}
+
+bool MainWindow::openKim(const QString& path, bool readOnly)
+{
+    if (!closeDocument())
+        return false;
+    QJsonObject r = bridge("open_kim", {path, readOnly ? QStringLiteral("1") : QString()});
+    if (!r.value("ok").toBool() && askReadOnly(r))
+        r = bridge("open_kim", {path, QStringLiteral("1")});
     if (!r.value("ok").toBool()) {
-        showError(tr("Could not open the project"), r.value("error").toString());
+        if (!r.contains("locked"))
+            showError(tr("Could not open the file"), r.value("error").toString());
         return false;
     }
     endCompare();
-    openFile(r.value("path").toString()); // meshes the working copy; the project stays open
+    openFile(r.value("path").toString());
+    rememberRecent(path);
     return true;
+}
+
+bool MainWindow::openIfc(const QString& path)
+{
+    if (!closeDocument())
+        return false;
+    if (m_prefs.openIfc() == QLatin1String("edit_ifc")) {
+        openFile(path);
+        rememberRecent(path);
+        return true;
+    }
+    const QJsonObject beside = bridge("kim_beside", {path});
+    QString kim = beside.value("kim").toString();
+    if (beside.value("exists").toBool()) {
+        auto answer = QMessageBox::Open;
+        if (!m_quiet) {
+            QMessageBox box(QMessageBox::Question, tr("Open IFC"),
+                tr("%1 already exists next to %2.").arg(QFileInfo(kim).fileName(), QFileInfo(path).fileName()),
+                QMessageBox::Open | QMessageBox::Cancel, this);
+            QPushButton* make = box.addButton(tr("Make a new one"), QMessageBox::AcceptRole);
+            box.setDefaultButton(QMessageBox::Open);
+            box.exec();
+            answer = box.clickedButton() == make ? QMessageBox::Save
+                : box.clickedButton() == box.button(QMessageBox::Open) ? QMessageBox::Open : QMessageBox::Cancel;
+        }
+        if (answer == QMessageBox::Open)
+            return openKim(kim);
+        if (answer == QMessageBox::Cancel)
+            return false;
+        kim = beside.value("free").toString();
+    }
+    m_status->showMessage(tr("Making %1...").arg(QFileInfo(kim).fileName()));
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    const QJsonObject r = bridge("import_ifc", {path, kim});
+    QApplication::restoreOverrideCursor();
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not make the project file"), r.value("error").toString());
+        return false;
+    }
+    endCompare();
+    openFile(r.value("path").toString());
+    rememberRecent(kim);
+    return true;
+}
+
+bool MainWindow::openProject(const QString& folder, bool readOnly)
+{
+    if (!closeDocument())
+        return false;
+    QJsonObject r = bridge("open_folder", {folder, readOnly ? QStringLiteral("1") : QString()});
+    if (!r.value("ok").toBool() && askReadOnly(r))
+        r = bridge("open_folder", {folder, QStringLiteral("1")});
+    if (!r.value("ok").toBool()) {
+        if (!r.contains("locked"))
+            showError(tr("Could not open the project"), r.value("error").toString());
+        return false;
+    }
+    endCompare();
+    openFile(r.value("path").toString());
+    rememberRecent(folder);
+    return true;
+}
+
+void MainWindow::rememberRecent(const QString& path)
+{
+    m_prefs.addRecent(QDir::toNativeSeparators(QFileInfo(path).absoluteFilePath()));
+    m_prefs.save();
+}
+
+void MainWindow::fillRecentMenu()
+{
+    m_recentMenu->clear();
+    for (const QString& p : m_prefs.recent())
+        m_recentMenu->addAction(p, this, [this, p] { openPath(p); });
+    if (m_recentMenu->isEmpty())
+        m_recentMenu->addAction(tr("(none)"))->setEnabled(false);
 }
 
 void MainWindow::openProjectDialog()
@@ -1940,12 +2057,24 @@ void MainWindow::openProjectDialog()
 
 bool MainWindow::saveVersion(const QString& message)
 {
+    if (!commitVersion(message))
+        return false;
+    if (documentState().value("mode").toString() == QLatin1String("kim"))
+        bridge("save_document"); // the .kim holds the new version
+    refreshProject();
+    return true;
+}
+
+bool MainWindow::commitVersion(const QString& message)
+{
     const QJsonObject r = bridge("save_version", {message});
     if (!r.value("ok").toBool()) {
         m_status->showMessage(tr("No version saved: %1").arg(r.value("error").toString()));
         refreshProject();
         return false;
     }
+    m_savesSinceVersion = 0;
+    m_sinceVersion.restart();
     afterEdit();
     refreshProject();
     m_status->showMessage(tr("Version saved: %1 added, %2 modified, %3 removed")
@@ -2050,14 +2179,14 @@ bool MainWindow::addMilestone(const QString& name, const QString& message)
 
 void MainWindow::milestoneDialog()
 {
-    if (isDirty() && !m_quiet) {
+    if (hasUnversionedWork() && !m_quiet) {
         const auto answer = QMessageBox::question(this, tr("Milestone"),
             tr("A milestone names a saved version. Save a version of your changes first?"),
             QMessageBox::Save | QMessageBox::Cancel, QMessageBox::Save);
         if (answer != QMessageBox::Save)
             return;
         saveVersionDialog();
-        if (isDirty())
+        if (hasUnversionedWork())
             return;
     }
     QDialog dialog(this);
@@ -2121,7 +2250,7 @@ void MainWindow::combineDialog()
         m_status->showMessage(tr("Combining needs a versioned project with design options"));
         return;
     }
-    if (isDirty() && !resolveUnsavedForSwitch())
+    if (hasUnversionedWork() && !resolveUnsavedForSwitch())
         return;
     QStringList others;
     for (const auto& o : bridge("options").value("options").toArray())
@@ -2314,7 +2443,7 @@ void MainWindow::newOptionDialog()
 
 bool MainWindow::resolveUnsavedForSwitch()
 {
-    if (!isDirty())
+    if (!hasUnversionedWork())
         return true;
     if (m_quiet)
         return false; // never a modal dialog in quiet mode
@@ -2323,7 +2452,7 @@ bool MainWindow::resolveUnsavedForSwitch()
         QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Save);
     if (answer == QMessageBox::Save) {
         saveVersionDialog();
-        return !isDirty();
+        return !hasUnversionedWork();
     }
     if (answer == QMessageBox::Discard)
         return bridge("discard_changes").value("ok").toBool();
@@ -3688,40 +3817,139 @@ bool MainWindow::isDirty() const
     return PythonEngine::instance().callJson("state", {}, &error).object().value("dirty").toBool();
 }
 
+QJsonObject MainWindow::documentState()
+{
+    m_document = bridge("document_state");
+    return m_document;
+}
+
+bool MainWindow::hasUnversionedWork()
+{
+    return bridge("project_state").value("unversioned").toBool();
+}
+
 bool MainWindow::save()
 {
-    if (m_versioned) { // the file is only a working copy: saving means saving a version
+    const QJsonObject doc = documentState();
+    if (doc.value("read_only").toBool() || doc.value("untitled").toBool()) {
         if (m_quiet)
-            return saveVersion(tr("Saved from KIMCAD")) || !isDirty();
-        saveVersionDialog();
-        return !isDirty();
-    }
-    if (m_path.isEmpty()) {
+            return false; // never a dialog in quiet mode
         saveAsDialog();
         return !isDirty();
     }
-    return saveAs(m_path);
+    maybeAutoVersion();
+    const QJsonObject r = bridge("save_document");
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not save"), r.value("error").toString());
+        return false;
+    }
+    afterSave();
+    return true;
+}
+
+// D72: an automatic version every N saves or N minutes, when the preference asks for it.
+void MainWindow::maybeAutoVersion()
+{
+    if (!m_versioned || m_prefs.autoVersion() == QLatin1String("off") || !hasUnversionedWork())
+        return;
+    ++m_savesSinceVersion;
+    const bool due = m_prefs.autoVersion() == QLatin1String("saves")
+        ? m_savesSinceVersion >= m_prefs.autoVersionEvery()
+        : m_sinceVersion.elapsed() >= qint64(m_prefs.autoVersionEvery()) * 60000;
+    if (due)
+        commitVersion(tr("Automatic version"));
+}
+
+void MainWindow::afterSave()
+{
+    afterEdit();
+    refreshProject();
+    m_status->showMessage(tr("Saved %1").arg(documentState().value("name").toString()));
 }
 
 bool MainWindow::saveAs(const QString& path)
 {
-    const QJsonObject r = bridge("save", {path});
+    const bool ifc = QFileInfo(path).suffix().compare(QLatin1String("ifc"), Qt::CaseInsensitive) == 0;
+    const QJsonObject r = bridge(ifc ? "save_as_ifc" : "save_as_kim", {path});
     if (!r.value("ok").toBool()) {
         showError(tr("Could not save"), r.value("error").toString());
         return false;
     }
     m_path = path;
-    setWindowTitle(QStringLiteral("KIMCAD — %1[*]").arg(QFileInfo(path).fileName()));
-    afterEdit();
-    m_status->showMessage(tr("Saved %1").arg(QFileInfo(path).fileName()));
+    rememberRecent(path);
+    afterSave();
     return true;
 }
 
 void MainWindow::saveAsDialog()
 {
-    const QString path = QFileDialog::getSaveFileName(this, tr("Save IFC"), m_path, tr("IFC files (*.ifc)"));
+    QString selected;
+    const QString path = QFileDialog::getSaveFileName(this, tr("Save As"), m_document.value("path").toString(),
+        tr("KIMCAD project (*.kim);;IFC file (*.ifc)"), &selected);
     if (!path.isEmpty())
         saveAs(path);
+}
+
+bool MainWindow::saveAsFolder(const QString& folder)
+{
+    const QJsonObject r = bridge("save_as_folder", {folder});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not save the project folder"), r.value("error").toString());
+        return false;
+    }
+    rememberRecent(folder);
+    afterSave();
+    return true;
+}
+
+bool MainWindow::enableVersioning(const QString& folder, const QString& message)
+{
+    const QJsonObject r = bridge("save_as_folder", {folder, message.isEmpty() ? tr("Initial import") : message});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not enable versioning"), r.value("error").toString());
+        return false;
+    }
+    afterSave();
+    m_status->showMessage(tr("Versioning enabled: first version saved"));
+    return true;
+}
+
+bool MainWindow::exportIfc(const QString& path)
+{
+    const QJsonObject r = bridge("export_ifc", {path});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not export"), r.value("error").toString());
+        return false;
+    }
+    m_status->showMessage(tr("Exported %1").arg(QFileInfo(path).fileName()));
+    return true;
+}
+
+void MainWindow::saveAsFolderDialog()
+{
+    const QString folder = QFileDialog::getExistingDirectory(this, tr("Choose an empty folder for the project"));
+    if (!folder.isEmpty())
+        saveAsFolder(folder);
+}
+
+void MainWindow::exportIfcDialog()
+{
+    const QString path = QFileDialog::getSaveFileName(this, tr("Export IFC"), QString(), tr("IFC files (*.ifc)"));
+    if (!path.isEmpty())
+        exportIfc(path);
+}
+
+void MainWindow::newProjectDialog()
+{
+    newProject();
+}
+
+void MainWindow::saveAsTemplateDialog()
+{
+}
+
+void MainWindow::projectSettingsDialog()
+{
 }
 
 bool MainWindow::maybeSave()
@@ -3767,8 +3995,6 @@ void MainWindow::addPropertySetDialog()
 
 void MainWindow::onOpened(const QJsonObject& info)
 {
-    setWindowTitle(QStringLiteral("KIMCAD — %1[*]").arg(QFileInfo(m_path).fileName()));
-    setWindowModified(false);
     refreshLevels();
     m_types->clear();
     m_warnedInconsistent = false;

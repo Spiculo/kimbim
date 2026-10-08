@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // MainWindow wiring: visibility actions act on the viewport selection (no window shown).
 #include <QAction>
+#include <QDir>
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -8,6 +9,7 @@
 #include <QSignalSpy>
 #include <QSlider>
 #include <QTemporaryDir>
+#include <QStandardPaths>
 #include <QtTest>
 
 #include <cmath>
@@ -77,6 +79,8 @@ QAction* action(kimcad::MainWindow& w, const char* name)
 class TestMainWindow : public QObject {
     Q_OBJECT
 private slots:
+    void initTestCase() { QStandardPaths::setTestModeEnabled(true); }
+
     // D71: the 3D view, drawings and sheets are center tabs; the panels are tabbed on the right.
     void viewsAndPanelsLiveInTheDockLayout()
     {
@@ -1332,6 +1336,94 @@ private slots:
         const QString key = QStringLiteral("plan:") + w.levelsBar()->activeStorey();
         QVERIFY(w.dockLayout()->manager()->findDockWidget(key)->isFloating());
         QVERIFY(w.close());
+    }
+
+    // D72: a new project saved as .kim, edited, saved (no version), reopened; Save version packs too.
+    void kimFileFlow()
+    {
+        QTemporaryDir tmp;
+        const QString kim = tmp.filePath(QStringLiteral("Casa ñ.kim"));
+        {
+            kimcad::MainWindow w(nullptr, /*quiet=*/true);
+            QVERIFY(w.newProject());
+            w.setTool(kimcad::MainWindow::Tool::Wall);
+            w.wallTool()->click({0, 0});
+            w.wallTool()->click({5, 0});
+            w.wallTool()->finish();
+            w.setTool(kimcad::MainWindow::Tool::None);
+            QVERIFY(w.saveAs(kim));
+            QVERIFY(QFile::exists(kim) && QFile::exists(kim + ".lock"));
+            QVERIFY(w.windowTitle().contains(QStringLiteral("Casa ñ.kim")));
+            QCOMPARE(w.history().size(), 1);
+            w.setSelection(w.viewport()->guids());
+            QVERIFY(w.applyName(QStringLiteral("Muro")));
+            QVERIFY(w.save());
+            QVERIFY(!w.isDirty() && w.hasUnversionedWork());
+            QCOMPARE(w.history().size(), 1);
+            QVERIFY(w.saveVersion(QStringLiteral("Named the wall")));
+            QVERIFY(!w.hasUnversionedWork());
+            QVERIFY(w.close());
+        }
+        QVERIFY(!QFile::exists(kim + ".lock"));
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        QVERIFY(w.openPath(kim));
+        QVERIFY(loaded.wait(60000));
+        QCOMPARE(w.viewport()->elementCount(), 1);
+        QCOMPARE(w.history().size(), 2);
+        QCOMPARE(w.preferences().recent().first(), QDir::toNativeSeparators(kim));
+        QVERIFY(w.close());
+    }
+
+    // D72: opening an IFC makes a .kim beside it (default) or edits the IFC (preference).
+    void openingAnIfcFollowsThePreference()
+    {
+        QTemporaryDir tmp;
+        const QString ifc = tmp.filePath(QStringLiteral("House.ifc"));
+        {
+            kimcad::MainWindow w(nullptr, /*quiet=*/true);
+            QVERIFY(w.newProject());
+            QVERIFY(w.exportIfc(ifc));
+            QVERIFY(w.close());
+        }
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        QVERIFY(w.openPath(ifc));
+        QVERIFY(loaded.wait(60000));
+        QVERIFY(QFile::exists(tmp.filePath(QStringLiteral("House.kim"))));
+        QCOMPARE(w.documentState().value("mode").toString(), QString("kim"));
+        w.preferences().setValue("open_ifc", "edit_ifc");
+        QVERIFY(w.openPath(ifc));
+        QVERIFY(loaded.wait(60000));
+        QCOMPARE(w.documentState().value("mode").toString(), QString("plain"));
+        QCOMPARE(w.documentState().value("name").toString(), QString("House.ifc"));
+        QVERIFY(w.close());
+    }
+
+    // D72: someone else's lock opens the file read-only (quiet mode answers "read-only").
+    void aLockedKimOpensReadOnly()
+    {
+        QTemporaryDir tmp;
+        const QString kim = tmp.filePath(QStringLiteral("a.kim"));
+        {
+            kimcad::MainWindow w(nullptr, /*quiet=*/true);
+            QVERIFY(w.newProject());
+            QVERIFY(w.saveAs(kim));
+            QVERIFY(w.close());
+        }
+        QFile lock(kim + ".lock");
+        QVERIFY(lock.open(QIODevice::WriteOnly));
+        lock.write(R"({"user": "Ana", "account": "ana", "machine": "OTHER-PC", "pid": 4, "since": "2026-10-08T10:42"})");
+        lock.close();
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        QVERIFY(w.openPath(kim));
+        QVERIFY(loaded.wait(60000));
+        QVERIFY(w.documentState().value("read_only").toBool());
+        QVERIFY(w.windowTitle().contains(QStringLiteral("read-only")));
+        QVERIFY(!w.save());
+        QVERIFY(w.close());
+        QVERIFY(QFile::exists(kim + ".lock")); // Ana's lock is left alone
     }
 };
 

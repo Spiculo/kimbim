@@ -122,6 +122,6 @@ int main(int argc, char* argv[])
     kimcad::MainWindow window;
     window.show();
     if (!parser.positionalArguments().isEmpty())
-        window.openFile(parser.positionalArguments().first());
+        window.openPath(parser.positionalArguments().first());
     return app.exec();
 }

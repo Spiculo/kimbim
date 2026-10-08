@@ -402,6 +402,21 @@ def save_as_folder(folder: str, message: str = "") -> str:
     return B._dump({"ok": True, "path": str(path)})
 
 
+def save_as_ifc(path: str) -> str:
+    """Keep editing the model as a plain IFC at `path` (no history, default settings not kept)."""
+    global _doc
+    if B._model is None:
+        return _fail("no model open")
+    _close()
+    _doc = _plain(path)
+    V._project = None
+    S.kept = False
+    r = json.loads(B.save(path))
+    if r.get("ok"):
+        S.mark_saved()
+    return B._dump(r)
+
+
 def export_ifc(path: str) -> str:
     if B._model is None:
         return _fail("no model open")

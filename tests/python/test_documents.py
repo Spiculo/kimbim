@@ -261,3 +261,14 @@ def test_an_opened_template_saves_back_as_a_template(tmp_path):
     assert call("set_project_settings", json.dumps({"sheet_paper": "A3"}))["ok"]
     assert call("save_document")["ok"]
     assert K.read_manifest(folder / "Base.kim")["kind"] == "template"
+
+
+def test_save_as_ifc_turns_the_document_into_that_ifc(tmp_path):
+    house()
+    kim = tmp_path / "a.kim"
+    assert call("save_as_kim", str(kim), "")["ok"]
+    r = call("save_as_ifc", str(tmp_path / "b.ifc"))
+    assert r["ok"], r
+    assert not K.lock_path(kim).exists() and (tmp_path / "b.ifc").exists()
+    st = call("document_state")
+    assert st["mode"] == "plain" and st["name"] == "b.ifc" and call("project_state")["versioned"] is False

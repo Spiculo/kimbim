@@ -899,6 +899,7 @@ from .documents import (  # noqa: E402,F401
     recover,
     recoveries,
     save_as_folder,
+    save_as_ifc,
     save_as_kim,
     save_document,
     save_template,

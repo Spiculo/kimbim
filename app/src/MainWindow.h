@@ -13,6 +13,8 @@
 #include <optional>
 #include <QJsonValue>
 #include <QStringList>
+#include <QElapsedTimer>
+#include <QJsonObject>
 #include <QMainWindow>
 
 #include "DockLayout.h"
@@ -121,7 +123,16 @@ public:
     double heightToNextLevel();
     // Versioned projects (Slice 8, docs/03).
     bool enableVersioning(const QString& folder, const QString& message = QString());
-    bool openProject(const QString& folder);
+    // D72: files. openPath picks by kind: a folder (project folder), .kim, or .ifc (per preference).
+    bool openPath(const QString& path);
+    bool openKim(const QString& path, bool readOnly = false);
+    bool openIfc(const QString& path);
+    bool openProject(const QString& folder, bool readOnly = false);
+    bool saveAsFolder(const QString& folder);
+    bool exportIfc(const QString& path);
+    bool closeDocument(); // after the unsaved-work question: releases the file's lock
+    QJsonObject documentState();
+    bool hasUnversionedWork(); // work no version holds yet (Ctrl+S saves the file, not a version)
     bool saveVersion(const QString& message);
     QJsonArray history();
     bool compareWith(const QString& revA, const QString& revB = QStringLiteral("WORKING"));
@@ -275,7 +286,17 @@ private:
     void closePlanTabs(const QStringList& keep = {});
     void closeView(const QString& key);
     void saveVersionDialog();
-    void enableVersioningDialog();
+    bool askReadOnly(const QJsonObject& refused);
+    void rememberRecent(const QString& path);
+    void fillRecentMenu();
+    void maybeAutoVersion();
+    void afterSave();
+    bool commitVersion(const QString& message);
+    void saveAsFolderDialog();
+    void exportIfcDialog();
+    void newProjectDialog();
+    void saveAsTemplateDialog();
+    void projectSettingsDialog();
     void openProjectDialog();
     void newOptionDialog();
     void milestoneDialog();
@@ -367,6 +388,10 @@ private:
     bool m_versioned = false;
     QHash<QString, double> m_timings;
     QString m_projectFolder;
+    QMenu* m_recentMenu = nullptr;
+    int m_savesSinceVersion = 0; // D72: automatic versions every N saves...
+    QElapsedTimer m_sinceVersion; // ...or N minutes
+    QJsonObject m_document;       // the last document_state
     QLineEdit* m_lengthInput = nullptr;
     QAction* m_undo = nullptr;
     QAction* m_redo = nullptr;
