@@ -61,9 +61,11 @@ def _projected(points):
 
 
 def _measure(points) -> str:
-    """Each segment of the chain, as measured along the dimension line, in metres."""
+    """Each segment of the chain, as measured along the dimension line, in the project's length unit."""
+    from .settings import format_length
+
     _, on_line = _projected(points)
-    return " ".join(f"{math.dist(p, q):.2f}" for p, q in zip(on_line, on_line[1:]))
+    return " ".join(format_length(math.dist(p, q), unit=False) for p, q in zip(on_line, on_line[1:]))
 
 
 def _dimension_lines(points):

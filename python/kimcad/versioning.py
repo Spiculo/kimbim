@@ -53,7 +53,7 @@ def _decode(branch: str) -> str:
 
 
 def _dirty() -> bool:
-    return B._current_id() != B._saved_id
+    return B._dirty()
 
 
 def project_state() -> str:

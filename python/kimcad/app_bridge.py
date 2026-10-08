@@ -217,6 +217,9 @@ def _reset_history(path: str):
     from . import layers
 
     layers.forget()
+    from . import settings
+
+    settings.load(None)
 
 
 def _geometry_now(guids) -> dict:
@@ -239,8 +242,15 @@ def _flags() -> dict:
     return {"can_undo": bool(_ids), "can_redo": bool(_future_ids)}
 
 
+def _dirty() -> bool:
+    """Unsaved work: model edits since the last save, or changed project settings."""
+    from . import settings
+
+    return _current_id() != _saved_id or settings.is_dirty()
+
+
 def state() -> str:
-    return _dump({"dirty": _current_id() != _saved_id, "path": _path, "inconsistent": _inconsistent, **_flags()})
+    return _dump({"dirty": _dirty(), "path": _path, "inconsistent": _inconsistent, **_flags()})
 
 
 # Called inside every edit's transaction with (geometry_changed, geometry_removed) GlobalIds; returns
@@ -874,3 +884,4 @@ from .editing import (  # noqa: E402,F401
 )
 from .rooms import create_room, edit_room, export_room_schedule, room_schedule, rooms  # noqa: E402,F401
 from .roofs import attach_walls_to_roof, create_roof, detach_walls_from_roof, roof_info  # noqa: E402,F401
+from .settings import project_settings, set_project_settings  # noqa: E402,F401
