@@ -1486,6 +1486,61 @@ private slots:
         QVERIFY(!w.isDirty());
         QVERIFY(w.close());
     }
+
+    // D72: an automatic version every N saves.
+    void automaticVersionsEveryNSaves()
+    {
+        QTemporaryDir tmp;
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({5, 0});
+        w.wallTool()->finish();
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QVERIFY(w.saveAs(tmp.filePath(QStringLiteral("auto.kim"))));
+        w.preferences().setValue("auto_version", "saves");
+        w.preferences().setValue("auto_version_every", 2);
+        w.setSelection(w.viewport()->guids());
+        QVERIFY(w.applyName(QStringLiteral("uno")));
+        QVERIFY(w.save());
+        QCOMPARE(w.history().size(), 1);
+        QVERIFY(w.applyName(QStringLiteral("dos")));
+        QVERIFY(w.save());
+        QCOMPARE(w.history().size(), 2);
+        QCOMPARE(w.history().first().toObject().value("message").toString(), QString("Automatic version"));
+        QVERIFY(w.close());
+    }
+
+    // D72: the recovery copy of unsaved work comes back after a "crash".
+    void recoveryCopyComesBack()
+    {
+        QString wall;
+        {
+            kimcad::MainWindow w(nullptr, /*quiet=*/true);
+            QVERIFY(w.newProject());
+            w.setTool(kimcad::MainWindow::Tool::Wall);
+            w.wallTool()->click({0, 0});
+            w.wallTool()->click({5, 0});
+            w.wallTool()->finish();
+            w.setTool(kimcad::MainWindow::Tool::None);
+            wall = w.viewport()->guids().first();
+            QVERIFY(w.writeRecovery());
+            // A crash: the model goes away without the window closing (no close_document).
+            QString error;
+            kimcad::PythonEngine::instance().callJson("new_project", {QStringLiteral("x")}, &error);
+        } // destroyed without close()
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        const QJsonArray items = w.recoveries();
+        QVERIFY(!items.isEmpty());
+        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        QVERIFY(w.recoverFrom(items.first().toObject().value("id").toString()));
+        QVERIFY(loaded.wait(60000));
+        QVERIFY(w.viewport()->guids().contains(wall));
+        QVERIFY(w.isDirty());
+        QVERIFY(w.close()); // quiet close discards: the copy is cleared
+        QVERIFY(w.recoveries().isEmpty());
+    }
 };
 
 QTEST_MAIN(TestMainWindow)

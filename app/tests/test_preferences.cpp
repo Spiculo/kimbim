@@ -3,9 +3,14 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QTemporaryDir>
+#include <QComboBox>
+#include <QLabel>
+#include <QLineEdit>
+#include <QSpinBox>
 #include <QtTest>
 
 #include "Preferences.h"
+#include "PreferencesDialog.h"
 
 class TestPreferences : public QObject {
     Q_OBJECT
@@ -79,6 +84,31 @@ private slots:
         QCOMPARE(p.newViews(), QString("tab"));
         QCOMPARE(p.recoveryMinutes(), 5);
         QCOMPARE(p.autoVersionEvery(), 10);
+    }
+
+    void theDialogWritesWhatTheUserPicked()
+    {
+        kimcad::Preferences p;
+        kimcad::PreferencesDialog d(p, nullptr);
+        QVERIFY(!d.findChild<QLabel*>("restartNote")->isVisibleTo(&d));
+        d.findChild<QComboBox*>("language")->setCurrentIndex(2); // auto, en, es
+        QVERIFY(d.findChild<QLabel*>("restartNote")->isVisibleTo(&d));
+        d.findChild<QComboBox*>("newViews")->setCurrentIndex(1);
+        d.findChild<QComboBox*>("openIfc")->setCurrentIndex(1);
+        d.findChild<QComboBox*>("autoVersion")->setCurrentIndex(1);
+        d.findChild<QSpinBox*>("autoVersionEvery")->setValue(3);
+        d.findChild<QSpinBox*>("recoveryMinutes")->setValue(0);
+        d.findChild<QLineEdit*>("authorName")->setText("Felipe");
+        d.findChild<QLineEdit*>("templatesFolder")->setText("Z:/Plantillas");
+        d.apply();
+        QCOMPARE(p.language(), QString("es"));
+        QCOMPARE(p.newViews(), QString("window"));
+        QCOMPARE(p.openIfc(), QString("edit_ifc"));
+        QCOMPARE(p.autoVersion(), QString("saves"));
+        QCOMPARE(p.autoVersionEvery(), 3);
+        QCOMPARE(p.recoveryMinutes(), 0);
+        QCOMPARE(p.authorName(), QString("Felipe"));
+        QCOMPARE(p.templatesFolder(), QString("Z:/Plantillas"));
     }
 };
 

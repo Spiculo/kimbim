@@ -77,6 +77,7 @@
 #include "MeshChunk.h"
 #include "ModelLoader.h"
 #include "ModelTreePanel.h"
+#include "PreferencesDialog.h"
 #include "ProjectSettingsDialog.h"
 #include "PropertiesPanel.h"
 #include "PythonEngine.h"
@@ -204,6 +205,11 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     bridge("set_app_paths", {QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)});
     bridge("set_author", {m_prefs.authorName(), m_prefs.authorEmail()});
     m_sinceVersion.start();
+    connect(&m_recoveryTimer, &QTimer::timeout, this, [this] {
+        if (isDirty())
+            writeRecovery();
+    });
+    restartRecoveryTimer();
     // The window layout of the last session (D71); tests and the self-test start from the default,
     // where the model view gets most of the width.
     m_dock->setSideWidths(200, 320);
@@ -326,6 +332,13 @@ void MainWindow::buildMenus()
         ->setToolTip(tr("Mirror the selection: click two points of the mirror line (hold Ctrl on the second click to mirror a copy)"));
     editAction(tr("Multi&ply..."), "actionMultiply", QKeySequence(Qt::CTRL | Qt::Key_U), [this] { multiplyDialog(); });
     editAction(tr("&Offset..."), "actionOffset", QKeySequence(), [this] { offsetDialog(); });
+
+    editMenu->addSeparator();
+    QAction* prefsAction = editMenu->addAction(tr("&Preferences..."));
+    prefsAction->setObjectName(QStringLiteral("actionPreferences"));
+    prefsAction->setShortcut(QKeySequence::Preferences);
+    prefsAction->setMenuRole(QAction::PreferencesRole);
+    connect(prefsAction, &QAction::triggered, this, &MainWindow::preferencesDialog);
 
     QMenu* view = menuBar()->addMenu(tr("&View"));
     m_viewMenu = view;
@@ -3958,6 +3971,63 @@ void MainWindow::projectSettingsDialog()
     ProjectSettingsDialog dialog(m_settings, bridge("project_settings").value("kept").toBool(), this);
     if (dialog.exec() == QDialog::Accepted && !dialog.changes().isEmpty() && setProjectSettings(dialog.changes()))
         m_status->showMessage(tr("Project settings changed"));
+}
+
+void MainWindow::preferencesDialog()
+{
+    PreferencesDialog dialog(m_prefs, this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    m_prefs.save();
+    bridge("set_author", {m_prefs.authorName(), m_prefs.authorEmail()});
+    restartRecoveryTimer();
+}
+
+void MainWindow::restartRecoveryTimer()
+{
+    m_recoveryTimer.stop();
+    if (!m_quiet && m_prefs.recoveryMinutes() > 0)
+        m_recoveryTimer.start(m_prefs.recoveryMinutes() * 60000);
+}
+
+bool MainWindow::writeRecovery()
+{
+    return bridge("write_recovery").value("ok").toBool();
+}
+
+QJsonArray MainWindow::recoveries()
+{
+    return bridge("recoveries").value("items").toArray();
+}
+
+bool MainWindow::recoverFrom(const QString& id)
+{
+    if (!closeDocument())
+        return false;
+    const QJsonObject r = bridge("recover", {id});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not recover the work"), r.value("error").toString());
+        return false;
+    }
+    openFile(r.value("path").toString());
+    return true;
+}
+
+void MainWindow::offerRecovery()
+{
+    if (m_quiet)
+        return; // never a dialog in quiet mode
+    for (const auto& v : recoveries()) {
+        const QJsonObject item = v.toObject();
+        const QString what = item.value("name").toString().isEmpty() ? tr("an untitled project") : item.value("name").toString();
+        const QString when = QLocale().toString(QDateTime::fromSecsSinceEpoch(qint64(item.value("time").toDouble())), QLocale::ShortFormat);
+        const auto answer = QMessageBox::question(this, tr("Recover unsaved work"),
+            tr("KIMCAD closed unexpectedly. Recover your work on %1 from %2?").arg(what, when),
+            QMessageBox::Yes | QMessageBox::Discard, QMessageBox::Yes);
+        if (answer == QMessageBox::Yes)
+            return void(recoverFrom(item.value("id").toString()));
+        bridge("discard_recovery", {item.value("id").toString()});
+    }
 }
 
 void MainWindow::loadProjectSettings()

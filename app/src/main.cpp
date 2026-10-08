@@ -4,6 +4,7 @@
 #include <cstdio>
 
 #include "MainWindow.h"
+#include "Preferences.h"
 #include "SelfTest.h"
 #include "SheetExport.h"
 #include "Translations.h"
@@ -85,7 +86,11 @@ int main(int argc, char* argv[])
         std::printf("KIMCAD %s\n", KIMCAD_VERSION);
         return 0;
     }
-    kimcad::installTranslator(app, kimcad::pickLanguage(parser.value(lang)));
+    kimcad::Preferences prefs(kimcad::Preferences::defaultPath()); // D72: the language preference
+    prefs.load();
+    const QString language = parser.isSet(lang) ? parser.value(lang)
+        : prefs.language() == QLatin1String("auto") ? QString() : prefs.language();
+    kimcad::installTranslator(app, kimcad::pickLanguage(language));
 
     if (parser.isSet(exportSheet)) {
         const QStringList args = parser.positionalArguments();
@@ -123,5 +128,7 @@ int main(int argc, char* argv[])
     window.show();
     if (!parser.positionalArguments().isEmpty())
         window.openPath(parser.positionalArguments().first());
+    else
+        window.offerRecovery();
     return app.exec();
 }

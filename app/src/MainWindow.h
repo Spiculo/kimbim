@@ -2,6 +2,8 @@
 #pragma once
 
 #include <QElapsedTimer>
+#include <QJsonArray>
+#include <QTimer>
 #include <QHash>
 #include <QSet>
 #include <QJsonArray>
@@ -13,7 +15,6 @@
 #include <optional>
 #include <QJsonValue>
 #include <QStringList>
-#include <QElapsedTimer>
 #include <QJsonObject>
 #include <QMainWindow>
 
@@ -137,6 +138,11 @@ public:
     QJsonObject projectSettings() const { return m_settings; }
     bool setProjectSettings(const QJsonObject& changes); // false (and nothing changes) if refused
     QString formatLength(double metres) const;            // in the project's unit and decimals
+    // D72: recovery copies of unsaved work (written every N minutes; offered after a crash).
+    bool writeRecovery();
+    QJsonArray recoveries();
+    bool recoverFrom(const QString& id);
+    void offerRecovery(); // asks about each copy (not in quiet mode)
     bool saveVersion(const QString& message);
     QJsonArray history();
     bool compareWith(const QString& revA, const QString& revB = QStringLiteral("WORKING"));
@@ -302,6 +308,8 @@ private:
     void saveAsTemplateDialog();
     void projectSettingsDialog();
     void loadProjectSettings();
+    void preferencesDialog();
+    void restartRecoveryTimer();
     void saveLayerStates();
     void openProjectDialog();
     void newOptionDialog();
@@ -399,6 +407,7 @@ private:
     QElapsedTimer m_sinceVersion; // ...or N minutes
     QJsonObject m_document;       // the last document_state
     QJsonObject m_settings;       // the project settings (D72)
+    QTimer m_recoveryTimer;       // D72: the recovery copy
     QLineEdit* m_lengthInput = nullptr;
     QAction* m_undo = nullptr;
     QAction* m_redo = nullptr;
