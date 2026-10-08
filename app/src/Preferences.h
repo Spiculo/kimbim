@@ -1,0 +1,39 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+#pragma once
+
+#include <QByteArray>
+#include <QJsonObject>
+#include <QJsonValue>
+#include <QString>
+#include <QStringList>
+
+namespace kimcad {
+// User preferences, per computer (D72): a readable preferences.json in the user's settings folder.
+class Preferences {
+public:
+    explicit Preferences(const QString& path = QString()); // empty: in memory only (tests, self-test)
+    static QString defaultPath();       // AppConfigLocation/preferences.json
+    static QJsonObject defaults();
+    bool load();                        // false if the file was garbled (kept aside as <file>.bad)
+    bool save() const;                  // false if it could not be written (or in memory only)
+    QString path() const { return m_path; }
+    QJsonValue value(const QString& key) const;  // falls back to defaults()
+    void setValue(const QString& key, const QJsonValue& value);
+    QString language() const;           // "auto", "en" or "es"
+    QString templatesFolder() const;
+    QString authorName() const;
+    QString authorEmail() const;
+    QString newViews() const;           // "tab" or "window"
+    QString openIfc() const;            // "make_kim" or "edit_ifc"
+    QString autoVersion() const;        // "off", "saves" or "minutes"
+    int autoVersionEvery() const;
+    int recoveryMinutes() const;
+    QStringList recent() const;
+    void addRecent(const QString& path); // most recent first, no duplicates, at most 10
+    QByteArray layout() const;
+    void setLayout(const QByteArray& state);
+private:
+    QString m_path;
+    QJsonObject m_data; // only what was set or loaded; unknown keys survive a save
+};
+}
