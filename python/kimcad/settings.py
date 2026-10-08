@@ -21,6 +21,15 @@ DEFAULTS = {
     "length_unit": "m",
     "length_decimals": 2,
     "pen_sets": {},
+    "line_types": {},
+    "element_styles": {},
+    "visibility_sets": {},
+    "override_sets": {},
+    "layer_combinations": {},
+    "purposes": {},
+    "purpose": "",
+    "current_pen": 23,
+    "sheet_purposes": {},
 }
 UNITS = {"m": 1.0, "cm": 100.0, "mm": 1000.0}
 
@@ -100,8 +109,10 @@ def _error(key: str, value) -> str | None:
         return "decimals must be between 0 and 4"
     if key in ("hidden_layers", "locked_layers") and not (isinstance(value, list) and all(isinstance(x, str) for x in value)):
         return f"{key} must be a list of layer names"
-    if key == "pen_sets" and not isinstance(value, dict):
-        return "pen_sets must be an object"
+    from . import graphics
+
+    if key in graphics.TABLES or key in ("purpose", "current_pen", "sheet_purposes"):
+        return graphics.validate(key, value)
     return None
 
 
