@@ -28,6 +28,7 @@ public:
     QString autoVersion() const;        // "off", "saves" or "minutes"
     int autoVersionEvery() const;
     int recoveryMinutes() const;
+    double largeIfcMb() const;          // an IFC this large asks before making a .kim; 0: never asks
     QStringList recent() const;
     void addRecent(const QString& path); // most recent first, no duplicates, at most 10
     QByteArray layout() const;

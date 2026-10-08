@@ -2044,16 +2044,47 @@ bool MainWindow::openKim(const QString& path, bool readOnly)
     return true;
 }
 
+MainWindow::LargeIfc MainWindow::askLargeIfc(const QString& path, double mb)
+{
+    const QString file = QFileInfo(path).fileName();
+    if (m_quiet)
+        return m_largeIfcAnswer ? m_largeIfcAnswer(file, mb) : LargeIfc::MakeKim;
+    QMessageBox box(QMessageBox::Question, tr("Open IFC"),
+        tr("%1 is a large model (%2 MB).").arg(file, QLocale().toString(mb, 'f', mb < 10.0 ? 1 : 0)), QMessageBox::Cancel, this);
+    box.setInformativeText(tr("Making a KIMCAD project from it can take several minutes.\n\n"
+        "Editing the IFC directly opens it at once, without version history, options, compare or "
+        "combine, and project settings (cut height, layer states, drawing scale, units) aren't kept. "
+        "You can make a .kim later with File > Save As."));
+    QPushButton* make = box.addButton(tr("Make a .kim project"), QMessageBox::AcceptRole);
+    QPushButton* direct = box.addButton(tr("Edit the IFC directly"), QMessageBox::AcceptRole);
+    box.setDefaultButton(make);
+    box.exec();
+    return box.clickedButton() == make ? LargeIfc::MakeKim
+        : box.clickedButton() == direct ? LargeIfc::EditIfc : LargeIfc::Cancel;
+}
+
 bool MainWindow::openIfc(const QString& path)
 {
+    bool direct = m_prefs.openIfc() == QLatin1String("edit_ifc");
+    QJsonObject beside;
+    if (!direct) {
+        // asked before anything changes, so Cancel leaves the open document as it was
+        beside = bridge("kim_beside", {path});
+        const double mb = QFileInfo(path).size() / 1e6, limit = m_prefs.largeIfcMb();
+        if (!beside.value("exists").toBool() && limit > 0.0 && mb > limit) {
+            const LargeIfc answer = askLargeIfc(path, mb);
+            if (answer == LargeIfc::Cancel)
+                return false;
+            direct = answer == LargeIfc::EditIfc;
+        }
+    }
     if (!prepareToOpen())
         return false;
-    if (m_prefs.openIfc() == QLatin1String("edit_ifc")) {
+    if (direct) {
         openFile(path);
         rememberRecent(path);
         return true;
     }
-    const QJsonObject beside = bridge("kim_beside", {path});
     QString kim = beside.value("kim").toString();
     if (beside.value("exists").toBool()) {
         auto answer = QMessageBox::Open;

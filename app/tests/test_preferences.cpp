@@ -26,6 +26,7 @@ private slots:
         QCOMPARE(p.autoVersion(), QString("off"));
         QCOMPARE(p.autoVersionEvery(), 10);
         QCOMPARE(p.recoveryMinutes(), 5);
+        QCOMPARE(p.largeIfcMb(), 5.0);
         QVERIFY(p.templatesFolder().endsWith(QStringLiteral("KIMCAD Templates")));
         QVERIFY(p.recent().isEmpty());
     }
@@ -81,9 +82,11 @@ private slots:
         p.setValue("new_views", "sideways");
         p.setValue("recovery_minutes", -3);
         p.setValue("auto_version_every", "lots");
+        p.setValue("large_ifc_mb", -1);
         QCOMPARE(p.newViews(), QString("tab"));
         QCOMPARE(p.recoveryMinutes(), 5);
         QCOMPARE(p.autoVersionEvery(), 10);
+        QCOMPARE(p.largeIfcMb(), 5.0);
     }
 
     void theDialogWritesWhatTheUserPicked()
@@ -98,6 +101,7 @@ private slots:
         d.findChild<QComboBox*>("autoVersion")->setCurrentIndex(1);
         d.findChild<QSpinBox*>("autoVersionEvery")->setValue(3);
         d.findChild<QSpinBox*>("recoveryMinutes")->setValue(0);
+        d.findChild<QSpinBox*>("largeIfcMb")->setValue(20);
         d.findChild<QLineEdit*>("authorName")->setText("Felipe");
         d.findChild<QLineEdit*>("templatesFolder")->setText("Z:/Plantillas");
         d.apply();
@@ -107,6 +111,7 @@ private slots:
         QCOMPARE(p.autoVersion(), QString("saves"));
         QCOMPARE(p.autoVersionEvery(), 3);
         QCOMPARE(p.recoveryMinutes(), 0);
+        QCOMPARE(p.largeIfcMb(), 20.0);
         QCOMPARE(p.authorName(), QString("Felipe"));
         QCOMPARE(p.templatesFolder(), QString("Z:/Plantillas"));
     }

@@ -39,7 +39,7 @@ Next: **step 2**, the `.kim` file (one file, or open as a folder) with project a
 |------|----------------------|--------|
 | A file format beyond plain IFC | A `.kim` holds the model, the project settings and the whole version history in one file | File › Save As… › `.kim` |
 | Saving | Ctrl+S saves the file; Save version… (Ctrl+Alt+S) adds a history entry; optional automatic versions | Edit › Preferences › Automatic versions |
-| Opening an IFC | Makes a `.kim` beside it (the IFC is left untouched); a preference edits the IFC directly | File › Open… an `.ifc` |
+| Opening an IFC | Makes a `.kim` beside it (the IFC is left untouched); a preference edits the IFC directly. An IFC over 5 MB asks first (the Clinic takes about 6 minutes to convert): make a `.kim`, edit the IFC directly, or cancel. The conversion runs behind a progress window | File › Open… an `.ifc` |
 | Open as folder | File › Open project folder… / Save as project folder… | |
 | One person at a time | A second person (or window) opens the file read-only, with who has it and since when | Open a `.kim` that's open elsewhere |
 | User preferences | Edit › Preferences: language, templates folder, your name, new views as tabs or free windows, IFC opening, automatic versions, recovery copy | |

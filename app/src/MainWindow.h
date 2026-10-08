@@ -131,6 +131,14 @@ public:
     bool openPath(const QString& path);
     bool openKim(const QString& path, bool readOnly = false);
     bool openIfc(const QString& path);
+    // An IFC over the large_ifc_mb preference asks before making a .kim (minutes with the Python
+    // decomposer): make it, edit the IFC directly, or cancel. Quiet mode (tests) asks this instead;
+    // without it, quiet mode makes the .kim.
+    enum class LargeIfc { MakeKim, EditIfc, Cancel };
+    void setLargeIfcAnswer(std::function<LargeIfc(const QString& file, double mb)> answer)
+    {
+        m_largeIfcAnswer = std::move(answer);
+    }
     bool openProject(const QString& folder, bool readOnly = false);
     bool saveAsFolder(const QString& folder);
     bool exportIfc(const QString& path);
@@ -301,6 +309,7 @@ private:
     void closePlanTabs(const QStringList& keep = {});
     void closeView(const QString& key);
     void saveVersionDialog();
+    LargeIfc askLargeIfc(const QString& path, double mb);
     bool askReadOnly(const QJsonObject& refused);
     bool prepareToOpen();
     void rememberRecent(const QString& path);
@@ -341,6 +350,7 @@ private:
     void onFailed(const QString& error);
 
     bool m_quiet;
+    std::function<LargeIfc(const QString&, double)> m_largeIfcAnswer;
     Preferences m_prefs; // D72: user preferences (in memory only in quiet mode)
     bool m_loading = false;
     int m_loadedElements = 0;

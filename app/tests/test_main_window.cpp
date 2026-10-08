@@ -1428,6 +1428,82 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // A large IFC asks first: make a .kim (minutes), edit the IFC directly, or cancel. Small files, a
+    // .kim already beside it and the "edit the IFC directly" preference don't ask.
+    void aLargeIfcAsksBeforeMakingAKim()
+    {
+        QTemporaryDir tmp;
+        const QString ifc = tmp.filePath(QStringLiteral("House.ifc"));
+        const QString kim = tmp.filePath(QStringLiteral("House.kim"));
+        {
+            kimcad::MainWindow w(nullptr, /*quiet=*/true);
+            QVERIFY(w.newProject());
+            QVERIFY(w.exportIfc(ifc));
+            QVERIFY(w.close());
+        }
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        int asked = 0;
+        auto answer = kimcad::MainWindow::LargeIfc::Cancel;
+        w.setLargeIfcAnswer([&](const QString& file, double mb) {
+            ++asked;
+            [&] { QCOMPARE(file, QString("House.ifc")); QVERIFY(mb > 0.0); }();
+            return answer;
+        });
+
+        // below the limit (default 5 MB): no question, a .kim as the preference says
+        QVERIFY(w.openPath(ifc));
+        QVERIFY(loaded.wait(60000));
+        QCOMPARE(asked, 0);
+        QVERIFY(QFile::exists(kim));
+        QVERIFY(w.closeDocument());
+        QVERIFY(QFile::remove(kim));
+
+        w.preferences().setValue("large_ifc_mb", 0.001); // House.ifc is larger than 1 kB
+        // Cancel: nothing opens, no .kim
+        QVERIFY(!w.openPath(ifc));
+        QCOMPARE(asked, 1);
+        QVERIFY(!QFile::exists(kim));
+
+        // Edit the IFC directly: opens at once as a plain IFC
+        answer = kimcad::MainWindow::LargeIfc::EditIfc;
+        QVERIFY(w.openPath(ifc));
+        QVERIFY(loaded.wait(60000));
+        QCOMPARE(asked, 2);
+        QVERIFY(!QFile::exists(kim));
+        QCOMPARE(w.documentState().value("mode").toString(), QString("plain"));
+
+        // Make a .kim
+        answer = kimcad::MainWindow::LargeIfc::MakeKim;
+        QVERIFY(w.openPath(ifc));
+        QVERIFY(loaded.wait(60000));
+        QCOMPARE(asked, 3);
+        QCOMPARE(w.documentState().value("mode").toString(), QString("kim"));
+
+        // the .kim beside it now exists: opening the IFC offers it, no conversion question
+        QVERIFY(w.openPath(ifc));
+        QVERIFY(loaded.wait(60000));
+        QCOMPARE(asked, 3);
+
+        // the "edit the IFC directly" preference doesn't ask
+        w.preferences().setValue("open_ifc", "edit_ifc");
+        QVERIFY(w.openPath(ifc));
+        QVERIFY(loaded.wait(60000));
+        QCOMPARE(asked, 3);
+        QCOMPARE(w.documentState().value("mode").toString(), QString("plain"));
+
+        // 0 turns the question off
+        QVERIFY(w.closeDocument());
+        QVERIFY(QFile::remove(kim));
+        w.preferences().setValue("open_ifc", "make_kim");
+        w.preferences().setValue("large_ifc_mb", 0);
+        QVERIFY(w.openPath(ifc));
+        QVERIFY(loaded.wait(60000));
+        QCOMPARE(asked, 3);
+        QVERIFY(QFile::exists(kim));
+        QVERIFY(w.close());
+    }
+
     // D72: someone else's lock opens the file read-only (quiet mode answers "read-only").
     void aLockedKimOpensReadOnly()
     {

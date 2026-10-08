@@ -47,6 +47,7 @@ QJsonObject Preferences::defaults()
         {"auto_version", "off"},
         {"auto_version_every", 10},
         {"recovery_minutes", 5},
+        {"large_ifc_mb", 5},
         {"recent", QJsonArray()},
     };
 }
@@ -110,6 +111,12 @@ int Preferences::autoVersionEvery() const
 {
     const QJsonValue v = value("auto_version_every");
     return v.isDouble() && v.toInt() >= 1 ? v.toInt() : 10;
+}
+
+double Preferences::largeIfcMb() const
+{
+    const QJsonValue v = value("large_ifc_mb");
+    return v.isDouble() && v.toDouble() >= 0.0 ? v.toDouble() : 5.0;
 }
 
 int Preferences::recoveryMinutes() const

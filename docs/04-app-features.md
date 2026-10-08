@@ -17,7 +17,7 @@ Each feature notes **what we reuse**. Priorities: **P0** is needed for first usa
 | Versioned project create / open | P0 | [03](03-versioning.md) |
 | Recent projects, autosave, crash recovery | P0 | Done (D72): File › Recent files; a recovery copy of unsaved work every N minutes, offered after a crash |
 | `.kim` project file (one file, or "open as folder") | P0 | Done (D72): model, settings and history in one zip; locks; read-only for a second editor |
-| User preferences | P0 | Done (D72): Edit › Preferences (language, templates folder, your name, new views as tabs or windows, IFC opening, automatic versions, recovery) |
+| User preferences | P0 | Done (D72): Edit › Preferences (language, templates folder, your name, new views as tabs or windows, IFC opening, the size above which opening an IFC asks first, automatic versions, recovery) |
 | Project settings | P0 | Done (D72): File › Project settings (plan cut height, drawing scale, sheet paper, length units); layer states kept; versioned |
 | Office templates | P0 | Done (D72): File › New project lists the templates folder; File › Save as template |
 | Units: metric and imperial | P0 | IfcOpenShell unit utils |

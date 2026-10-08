@@ -32,6 +32,7 @@ private:
     QComboBox* m_autoVersion;
     QSpinBox* m_autoEvery;
     QSpinBox* m_recovery;
+    QSpinBox* m_largeIfc;
 };
 
 } // namespace kimcad
