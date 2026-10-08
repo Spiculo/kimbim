@@ -9,6 +9,7 @@ import hashlib
 import blake3
 
 META_PATH = "kimcad.json"
+SETTINGS_PATH = "settings.json"  # project settings (step 2, D72); not a record, never composed into IFC
 _DIRS = {"objects": "o", "nodes": "n", "loose": "l"}
 _KINDS = {v: k for k, v in _DIRS.items()}
 

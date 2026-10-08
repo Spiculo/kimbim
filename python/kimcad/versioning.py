@@ -15,6 +15,7 @@ import pathlib
 import urllib.parse
 
 from . import app_bridge as B
+from . import settings as S
 from .layout import blob_oid, key_to_path
 from .project import KimcadError, NothingToCommit, NotAProject, Project
 from .records import compose, unshare
@@ -23,6 +24,20 @@ _project: Project | None = None
 _combining: dict | None = None  # a combined model is open, not saved yet: {"option", "theirs"}
 
 MAIN = "main"
+_version_id = 0      # B._current_id() when the open model last matched a version
+_versioned: dict = {}  # the project settings of that version
+
+
+def mark_versioned(unversioned: bool = False) -> None:
+    """The open model and settings match the latest version (or, `unversioned`, they don't)."""
+    global _version_id, _versioned
+    _version_id = -1 if unversioned else B._current_id()
+    _versioned = S.current()
+
+
+def _unversioned() -> bool:
+    """Work that no version holds yet (it may be saved to the file: Ctrl+S doesn't make a version)."""
+    return _project is not None and (B._current_id() != _version_id or S.current() != _versioned)
 
 
 def _fail(message: str) -> str:
@@ -58,11 +73,11 @@ def _dirty() -> bool:
 
 def project_state() -> str:
     if _project is None:
-        return B._dump({"versioned": False, "dirty": _dirty() if B._model is not None else False})
+        return B._dump({"versioned": False, "dirty": _dirty() if B._model is not None else False, "unversioned": False})
     head = _project.repo.head()
     return B._dump({"versioned": True, "folder": str(_project.path), "option": _decode(_project.current_branch()),
                     "options": sorted(_decode(b) for b in _project.branches()), "head": head, "dirty": _dirty(),
-                    "combining": _combining["option"] if _combining else ""})
+                    "unversioned": _unversioned(), "combining": _combining["option"] if _combining else ""})
 
 
 def _write_working() -> pathlib.Path:
@@ -91,6 +106,8 @@ def _open_head(project: Project) -> str:
     _project = project
     info = json.loads(B.open_model(str(working)))  # keeps _project: it's our working copy
     _project = project
+    S.load(S.from_bytes(project.settings_at("HEAD")))
+    mark_versioned()
     return B._dump({**info, "path": str(working)})
 
 
@@ -106,11 +123,13 @@ def enable_versioning(folder: str, message: str = "Initial import") -> str:
         project = Project.init(path)
         _project = project
         working = _write_working()
-        project.commit(working, message or "Initial import")
+        project.commit(working, message or "Initial import", settings=S.to_bytes())
     except KimcadError as ex:
         _project = None
         return _fail(str(ex))
     _mark_saved(working)
+    S.mark_saved()
+    mark_versioned()
     return B._dump({"ok": True, **json.loads(project_state())})
 
 
@@ -156,6 +175,8 @@ def _summary(changes) -> dict:
 
     deferred = []
     for c in changes.items:
+        if c.key == "settings":
+            continue  # reported by key, not as a record
         if not c.key.startswith("o/"):
             out["other"] += 1
             continue
@@ -188,12 +209,13 @@ def version_changes() -> str:
     if _project is None:
         return _fail("this model isn't versioned")
     try:
-        s = _summary(_project.status(_write_working()))
+        s = _summary(_project.status(_write_working(), S.to_bytes()))
+        keys = S.changed_keys(S.from_bytes(_project.settings_at("HEAD")), S.current())
     except KimcadError as ex:
         return _fail(str(ex))
     items = (s["added"] + s["modified"] + s["removed"])[:500]
     return B._dump({"ok": True, "added": len(s["added"]), "modified": len(s["modified"]),
-                    "removed": len(s["removed"]), "other": s["other"], "items": items})
+                    "removed": len(s["removed"]), "other": s["other"], "items": items, "settings": keys})
 
 
 def save_version(message: str) -> str:
@@ -204,14 +226,18 @@ def save_version(message: str) -> str:
     working = _write_working()
     try:
         merged = [_combining["theirs"]] if _combining else None
-        cid, changes = _project.commit(working, message.strip(), merged=merged)
+        cid, changes = _project.commit(working, message.strip(), merged=merged, settings=S.to_bytes())
         _end_combining()
     except NothingToCommit:
         _mark_saved(working)
+        S.mark_saved()
+        mark_versioned()
         return _fail("nothing changed since the last version")
     except KimcadError as ex:
         return _fail(str(ex))
     _mark_saved(working)
+    S.mark_saved()
+    mark_versioned()
     s = _summary(changes)
     return B._dump({"ok": True, "id": cid, "added": len(s["added"]), "modified": len(s["modified"]),
                     "removed": len(s["removed"]), "other": s["other"]})
@@ -234,13 +260,17 @@ def compare(rev_a: str, rev_b: str = "WORKING") -> str:
         return _fail("this model isn't versioned")
     try:
         rev_a = _revision(rev_a)
+        before = S.from_bytes(_project.settings_at(rev_a))
         if rev_b == "WORKING":
-            changes, _ = _project._changes(_project._entries(rev_a), _project._decompose_file(_write_working()))
+            changes, _ = _project._changes(_project._entries(rev_a), _project._decompose_file(_write_working()), S.to_bytes())
+            keys = S.changed_keys(before, S.current())
         else:
-            changes = _project.diff(rev_a, _revision(rev_b))
+            rev_b = _revision(rev_b)
+            changes = _project.diff(rev_a, rev_b)
+            keys = S.changed_keys(before, S.from_bytes(_project.settings_at(rev_b)))
     except KimcadError as ex:
         return _fail(str(ex))
-    return B._dump({"ok": True, **_summary(changes)})
+    return B._dump({"ok": True, **_summary(changes), "settings": keys})
 
 
 def options() -> str:
@@ -270,7 +300,7 @@ def create_option(name: str) -> str:
 def switch_option(name: str) -> str:
     if _project is None:
         return _fail("this model isn't versioned")
-    if _dirty():
+    if _unversioned():
         return _fail("there are unsaved changes: save a version or discard them before switching options")
     try:
         _project.switch(_encode(name))
@@ -576,7 +606,7 @@ def combine_options(option: str, resolutions_json: str = "{}") -> str:
     version. Otherwise (every conflict chosen) the combined model opens as unsaved work: review it,
     then Save version (a version with two parents) or Discard."""
     global _combining
-    if _project is not None and _dirty():
+    if _project is not None and _unversioned():
         return _fail("there are unsaved changes: save a version or discard them before combining options")
     try:
         branch = _other(option)
@@ -610,7 +640,11 @@ def combine_options(option: str, resolutions_json: str = "{}") -> str:
         return B._dump(info)
     _combining = {"option": option, "theirs": preview.theirs}
     B._saved_id = -1  # the combined model is unsaved work until Save version
+    if preview.settings:
+        S.load(S.from_bytes(preview.settings), dirty=True)
+    mark_versioned(unversioned=True)
+    warnings = list(result.warnings) + [f"Project setting {k}: kept this option's value" for k in preview.settings_conflicts]
     resolved = sorted({c.key[2:].split("~", 1)[0] for c in result.conflicts if c.key.startswith("o/")})
     return B._dump({**info, "ok": True, "status": "merge", "path": str(working), "from_theirs": _from_theirs(preview), "resolved": resolved,
-                    "conflicts": len(result.conflicts), "warnings": result.warnings})
+                    "conflicts": len(result.conflicts), "warnings": warnings})
 

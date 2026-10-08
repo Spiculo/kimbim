@@ -14,7 +14,7 @@ import ifcopenshell
 import ifcopenshell.validate
 
 from . import _core
-from .layout import META_PATH, blob_oid, key_to_path, path_to_key
+from .layout import META_PATH, SETTINGS_PATH, blob_oid, key_to_path, path_to_key
 from .nodeids import decompose_against_head
 from .records import compose, unshare
 
@@ -69,6 +69,8 @@ class MergePreview:
     ours: str
     theirs: str
     result: object = None  # kimcad.merge.MergeResult for "merge"
+    settings: bytes | None = None  # the merged project settings ("merge"; None when no side has any)
+    settings_conflicts: list = field(default_factory=list)  # keys changed differently on both sides
 
 
 @dataclass
@@ -103,6 +105,8 @@ class Changes:
 
 
 def _describe(key: str, blob: bytes) -> tuple[str, str | None]:
+    if key == "settings":
+        return "(project settings)", None
     if key == "meta":
         return "(project metadata)", None
     v = json.loads(blob)
@@ -160,10 +164,17 @@ class Project:
         return self.repo.tree_entries(self._rev(rev))
 
     def _records(self, rev: str) -> dict[str, bytes]:
-        entries = self._entries(rev)
+        entries = {p: o for p, o in self._entries(rev).items() if p != SETTINGS_PATH}
         paths = sorted(entries)
         blobs = self.repo.read_blobs([entries[p] for p in paths])
         return {path_to_key(p): b for p, b in zip(paths, blobs)}
+
+    def settings_at(self, rev: str = "HEAD") -> bytes | None:
+        """The project settings stored with a version (None for versions made before step 2)."""
+        if self.repo.head() is None:
+            return None
+        oid = self._entries(rev).get(SETTINGS_PATH)
+        return self.repo.read_blobs([oid])[0] if oid else None
 
     def _head_entries(self) -> dict[str, str]:
         head = self.repo.head()
@@ -175,7 +186,10 @@ class Project:
             return None
         return json.loads(self.repo.read_blobs([entries[META_PATH]])[0])["schema"]
 
-    def _changes(self, old_entries: dict[str, str], new: dict[str, bytes]) -> tuple[Changes, dict[str, bytes | None]]:
+    def _changes(self, old_entries: dict[str, str], new: dict[str, bytes],
+                 settings: bytes | None = None) -> tuple[Changes, dict[str, bytes | None]]:
+        old_settings = old_entries.get(SETTINGS_PATH)
+        old_entries = {p: o for p, o in old_entries.items() if p != SETTINGS_PATH}
         new_paths = {key_to_path(k): v for k, v in new.items()}
         writes: dict[str, bytes | None] = {}
         added, modified, removed = [], [], []
@@ -198,6 +212,9 @@ class Project:
                 key = path_to_key(p)
                 ifc_type, name = _describe(key, old_blobs[p] if kind == "removed" else new_paths[p])
                 items.append(Change(kind, key, ifc_type, name))
+        if settings is not None and old_settings != blob_oid(settings):
+            writes[SETTINGS_PATH] = settings
+            items.append(Change("added" if old_settings is None else "modified", "settings", "(project settings)", None))
         return Changes(items), writes
 
     def _decompose_file(self, ifc_path) -> dict[str, bytes]:
@@ -227,16 +244,16 @@ class Project:
         return records
 
     # ---- commands ----
-    def status(self, ifc_path) -> Changes:
-        changes, _ = self._changes(self._head_entries(), self._decompose_file(ifc_path))
+    def status(self, ifc_path, settings: bytes | None = None) -> Changes:
+        changes, _ = self._changes(self._head_entries(), self._decompose_file(ifc_path), settings)
         return changes
 
     def commit(self, ifc_path, message: str, *, author: tuple[str, str] | None = None, time: int | None = None,
-               merged: list[str] | None = None):
+               merged: list[str] | None = None, settings: bytes | None = None):
         """A new version from an IFC file; `merged`: other versions it combines (a merge commit, which
         is recorded even when the result equals the current version)."""
         records = self._decompose_file(ifc_path)
-        changes, writes = self._changes(self._head_entries(), records)
+        changes, writes = self._changes(self._head_entries(), records, settings)
         if not changes and not merged:
             raise NothingToCommit("nothing to commit: the file matches the current version")
         name, email = author or _author()
@@ -264,7 +281,7 @@ class Project:
             old = self.repo.tree_entries(parents[0]) if parents else {}
         else:
             old = self._entries(rev_a)
-        changes, _ = self._changes(old, self._records(b))
+        changes, _ = self._changes(old, self._records(b), self.settings_at(b))
         return changes
 
     def export(self, out_path, rev: str = "HEAD", overwrite: bool = False, one_owner: bool = False) -> pathlib.Path:
@@ -377,7 +394,14 @@ class Project:
             return MergePreview("fast_forward", base, ours, theirs)
         base_records = self._records(base) if base else {}
         result = merge_records(base_records, self._records(ours), self._records(theirs), resolutions)
-        return MergePreview("merge", base, ours, theirs, result)
+        from . import settings as S
+
+        sides = [self.settings_at(r) if r else None for r in (base, ours, theirs)]
+        merged_settings, conflicts = None, []
+        if any(s is not None for s in sides):
+            merged, conflicts = S.merge(*[S.from_bytes(s) for s in sides])
+            merged_settings = S.to_bytes(merged)
+        return MergePreview("merge", base, ours, theirs, result, merged_settings, conflicts)
 
     def merge(self, other: str, message: str, resolutions: dict | None = None, *,
               author: tuple[str, str] | None = None, time: int | None = None) -> str:
@@ -394,7 +418,7 @@ class Project:
         if not preview.result.clean:
             raise MergeConflicts(preview.result)
         compose(preview.result.records)  # the result must be writable as IFC (lossless guarantee)
-        _changes, writes = self._changes(self._head_entries(), preview.result.records)
+        _changes, writes = self._changes(self._head_entries(), preview.result.records, preview.settings)
         name, email = author or _author()
         try:
             return self.repo.commit_merge(writes, message, name, email,
