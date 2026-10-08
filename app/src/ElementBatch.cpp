@@ -19,6 +19,8 @@
 #include <gp_Pnt.hxx>
 #include <gp_Vec.hxx>
 
+#include <algorithm>
+
 namespace kimcad {
 
 namespace {
@@ -117,6 +119,10 @@ ElementBatch::ElementBatch(MeshChunk chunk)
     , m_locked(size_t(m_chunk.elementCount()), 0)
     , m_retired(size_t(m_chunk.elementCount()), 0)
     , m_override(size_t(m_chunk.elementCount()))
+    , m_graphicsHidden(size_t(m_chunk.elementCount()), 0)
+    , m_line(size_t(m_chunk.elementCount()))
+    , m_surface(size_t(m_chunk.elementCount()))
+    , m_alpha(size_t(m_chunk.elementCount()), 0.0)
     , m_visible(m_chunk.elementCount())
     , m_owners(size_t(m_chunk.elementCount()))
 {
@@ -149,6 +155,38 @@ void ElementBatch::setLayerHidden(int i, bool hidden)
     const bool was = isHidden(i);
     m_layerHidden[size_t(i)] = hidden ? 1 : 0;
     updateVisible(i, was);
+}
+
+void ElementBatch::setGraphicsHidden(int i, bool hidden)
+{
+    const bool was = isHidden(i);
+    m_graphicsHidden[size_t(i)] = hidden ? 1 : 0;
+    updateVisible(i, was);
+}
+
+Quantity_Color ElementBatch::surfaceColor(int i) const
+{
+    return m_override[size_t(i)].value_or(m_surface[size_t(i)].value_or(colorFor(m_chunk.types.at(i))));
+}
+
+std::vector<ElementBatch::LineBucket> ElementBatch::lineBuckets(const Quantity_Color& fallback) const
+{
+    std::vector<LineBucket> out;
+    for (int i = 0; i < elementCount(); ++i) {
+        if (isHidden(i))
+            continue;
+        const BatchLine line = m_line[size_t(i)].value_or(BatchLine{fallback, 1.0f, 0xFFFF});
+        auto same = [&](const LineBucket& b) {
+            return b.line.color.IsEqual(line.color) && b.line.width == line.width && b.line.pattern == line.pattern;
+        };
+        auto it = std::find_if(out.begin(), out.end(), same); // few styles per purpose: a linear search
+        if (it == out.end()) {
+            out.push_back({line, {}});
+            it = out.end() - 1;
+        }
+        it->elements.push_back(i);
+    }
+    return out;
 }
 
 void ElementBatch::updateVisible(int i, bool wasHidden)
@@ -184,7 +222,7 @@ Handle(ElementOwner) ElementBatch::owner(int i)
 
 void ElementBatch::addElement(Graphic3d_ArrayOfTriangles& out, int i, bool withColors, const Quantity_Color* fixed) const
 {
-    const Quantity_Color color = fixed ? *fixed : m_override[size_t(i)].value_or(colorFor(m_chunk.types.at(i)));
+    const Quantity_Color color = fixed ? *fixed : surfaceColor(i);
     for (uint32_t t = m_chunk.toff[size_t(i)]; t < m_chunk.toff[size_t(i) + 1]; ++t) {
         const gp_Pnt a = vertex(m_chunk, m_chunk.tris[3 * t]);
         const gp_Pnt b = vertex(m_chunk, m_chunk.tris[3 * t + 1]);
@@ -393,47 +431,62 @@ void ElementBatch::computeEdges()
 
 void ElementBatch::addTriangles(const Handle(Prs3d_Presentation)& prs, int mode)
 {
-    int tris = 0;
-    for (int i = 0; i < elementCount(); ++i)
-        if (!isHidden(i))
-            tris += int(m_chunk.toff[size_t(i) + 1] - m_chunk.toff[size_t(i)]);
-    if (tris == 0)
-        return;
-    const bool colours = mode == Shaded || mode == Ids;
-    Handle(Graphic3d_ArrayOfTriangles) arr = new Graphic3d_ArrayOfTriangles(
-        tris * 3, 0, Graphic3d_ArrayFlags_VertexNormal | (colours ? Graphic3d_ArrayFlags_VertexColor : 0));
-    for (int i = 0; i < elementCount(); ++i) {
-        if (isHidden(i))
+    // D73: in shaded mode, elements an override makes transparent go in their own blended group per
+    // transparency (few: overrides set one or two).
+    std::vector<double> alphas{0.0};
+    if (mode == Shaded)
+        for (int i = 0; i < elementCount(); ++i)
+            if (!isHidden(i) && m_alpha[size_t(i)] > 0.0
+                && std::find(alphas.begin(), alphas.end(), m_alpha[size_t(i)]) == alphas.end())
+                alphas.push_back(m_alpha[size_t(i)]);
+    for (double alpha : alphas) {
+        auto inGroup = [&](int i) { return !isHidden(i) && (mode != Shaded || m_alpha[size_t(i)] == alpha); };
+        int tris = 0;
+        for (int i = 0; i < elementCount(); ++i)
+            if (inGroup(i))
+                tris += int(m_chunk.toff[size_t(i) + 1] - m_chunk.toff[size_t(i)]);
+        if (tris == 0)
             continue;
-        if (mode == Ids) {
-            const auto rgb = idRgb(m_idBase + i + 1);
-            // Linear RGB: the offscreen buffer stores these values as they are (no sRGB encoding).
-            const Quantity_Color id(rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0, Quantity_TOC_RGB);
-            addElement(*arr, i, true, &id);
-        } else {
-            addElement(*arr, i, colours);
+        const bool colours = mode == Shaded || mode == Ids;
+        Handle(Graphic3d_ArrayOfTriangles) arr = new Graphic3d_ArrayOfTriangles(
+            tris * 3, 0, Graphic3d_ArrayFlags_VertexNormal | (colours ? Graphic3d_ArrayFlags_VertexColor : 0));
+        for (int i = 0; i < elementCount(); ++i) {
+            if (!inGroup(i))
+                continue;
+            if (mode == Ids) {
+                const auto rgb = idRgb(m_idBase + i + 1);
+                // Linear RGB: the offscreen buffer stores these values as they are (no sRGB encoding).
+                const Quantity_Color id(rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0, Quantity_TOC_RGB);
+                addElement(*arr, i, true, &id);
+            } else {
+                addElement(*arr, i, colours);
+            }
         }
+        Handle(Graphic3d_Group) group = prs->NewGroup();
+        Handle(Graphic3d_AspectFillArea3d) aspect = new Graphic3d_AspectFillArea3d(*myDrawer->ShadingAspect()->Aspect());
+        if (mode == Shaded) {
+            // A colour-driven ("aspect") material, so per-vertex palette colours are used. The AIS
+            // default (brass) is a physical material that ignores vertex colours.
+            Graphic3d_MaterialAspect material(Graphic3d_NameOfMaterial_Plastified);
+            material.SetSpecularColor(Quantity_Color(0.08, 0.08, 0.08, Quantity_TOC_RGB));
+            if (alpha > 0.0) {
+                material.SetTransparency(float(alpha));
+                aspect->SetAlphaMode(Graphic3d_AlphaMode_Blend);
+            }
+            aspect->SetFrontMaterial(material);
+            aspect->SetBackMaterial(material);
+            aspect->SetInteriorColor(Quantity_NOC_WHITE);
+        } else if (mode == Ids) { // exact flat colours: no lighting
+            aspect->SetShadingModel(Graphic3d_TypeOfShadingModel_Unlit);
+        } else { // lines only: faces just hide what is behind them
+            aspect->SetShadingModel(Graphic3d_TypeOfShadingModel_Unlit);
+            aspect->SetInteriorColor(s_background);
+        }
+        // Push faces back a little so their border lines are drawn on top, not half hidden.
+        aspect->SetPolygonOffsets(Aspect_POM_Fill, 1.0f, 1.0f);
+        group->SetGroupPrimitivesAspect(aspect);
+        group->AddPrimitiveArray(arr);
     }
-    Handle(Graphic3d_Group) group = prs->NewGroup();
-    Handle(Graphic3d_AspectFillArea3d) aspect = new Graphic3d_AspectFillArea3d(*myDrawer->ShadingAspect()->Aspect());
-    if (mode == Shaded) {
-        // A colour-driven ("aspect") material, so per-vertex palette colours are used. The AIS
-        // default (brass) is a physical material that ignores vertex colours.
-        Graphic3d_MaterialAspect material(Graphic3d_NameOfMaterial_Plastified);
-        material.SetSpecularColor(Quantity_Color(0.08, 0.08, 0.08, Quantity_TOC_RGB));
-        aspect->SetFrontMaterial(material);
-        aspect->SetBackMaterial(material);
-        aspect->SetInteriorColor(Quantity_NOC_WHITE);
-    } else if (mode == Ids) { // exact flat colours: no lighting
-        aspect->SetShadingModel(Graphic3d_TypeOfShadingModel_Unlit);
-    } else { // lines only: faces just hide what is behind them
-        aspect->SetShadingModel(Graphic3d_TypeOfShadingModel_Unlit);
-        aspect->SetInteriorColor(s_background);
-    }
-    // Push faces back a little so their border lines are drawn on top, not half hidden.
-    aspect->SetPolygonOffsets(Aspect_POM_Fill, 1.0f, 1.0f);
-    group->SetGroupPrimitivesAspect(aspect);
-    group->AddPrimitiveArray(arr);
 }
 
 void ElementBatch::addLines(const Handle(Prs3d_Presentation)& prs, const Quantity_Color& color)
@@ -441,24 +494,25 @@ void ElementBatch::addLines(const Handle(Prs3d_Presentation)& prs, const Quantit
     if (!m_showEdges)
         return;
     computeEdges();
-    int segments = 0;
-    for (int i = 0; i < elementCount(); ++i)
-        if (!isHidden(i))
+    for (const LineBucket& bucket : lineBuckets(color)) {
+        int segments = 0;
+        for (int i : bucket.elements)
             segments += int(m_edgeOffsets[size_t(i) + 1] - m_edgeOffsets[size_t(i)]);
-    if (segments == 0)
-        return;
-    Handle(Graphic3d_ArrayOfSegments) arr = new Graphic3d_ArrayOfSegments(segments * 2);
-    for (int i = 0; i < elementCount(); ++i) {
-        if (isHidden(i))
+        if (segments == 0)
             continue;
-        for (uint32_t s = m_edgeOffsets[size_t(i)]; s < m_edgeOffsets[size_t(i) + 1]; ++s) {
-            arr->AddVertex(m_edgePoints[2 * s]);
-            arr->AddVertex(m_edgePoints[2 * s + 1]);
-        }
+        Handle(Graphic3d_ArrayOfSegments) arr = new Graphic3d_ArrayOfSegments(segments * 2);
+        for (int i : bucket.elements)
+            for (uint32_t s = m_edgeOffsets[size_t(i)]; s < m_edgeOffsets[size_t(i) + 1]; ++s) {
+                arr->AddVertex(m_edgePoints[2 * s]);
+                arr->AddVertex(m_edgePoints[2 * s + 1]);
+            }
+        Handle(Graphic3d_AspectLine3d) aspect = new Graphic3d_AspectLine3d(bucket.line.color, Aspect_TOL_SOLID, bucket.line.width);
+        if (bucket.line.pattern != 0xFFFF)
+            aspect->SetLinePattern(bucket.line.pattern);
+        Handle(Graphic3d_Group) group = prs->NewGroup();
+        group->SetGroupPrimitivesAspect(aspect);
+        group->AddPrimitiveArray(arr);
     }
-    Handle(Graphic3d_Group) group = prs->NewGroup();
-    group->SetGroupPrimitivesAspect(new Graphic3d_AspectLine3d(color, Aspect_TOL_SOLID, 1.0));
-    group->AddPrimitiveArray(arr);
 }
 
 void ElementBatch::Compute(const Handle(PrsMgr_PresentationManager)&, const Handle(Prs3d_Presentation)& prs,

@@ -23,6 +23,13 @@ namespace kimcad {
 
 class ElementBatch;
 
+// A border-line style (D73): colour, width in pixels and a 16-bit screen pattern (0xFFFF = solid).
+struct BatchLine {
+    Quantity_Color color;
+    float width = 1.0f;
+    uint16_t pattern = 0xFFFF;
+};
+
 // Selection owner for ONE element inside a batch (D42): picking, highlighting and selection are per
 // element even though the batch draws ~1,000 elements as a single OCCT object.
 class ElementOwner : public SelectMgr_EntityOwner {
@@ -91,8 +98,32 @@ public:
     int indexOf(const QString& guid) const { return m_index.value(guid, -1); }
 
     void setHidden(int i, bool hidden);
-    // Hidden by the user (H / isolate) or by its layer (a view's layer state); either hides it.
-    bool isHidden(int i) const { return m_hidden[size_t(i)] != 0 || m_layerHidden[size_t(i)] != 0; }
+    // Hidden by the user (H / isolate), by its layer (a view's layer state) or by the purpose's visibility
+    // set (D73); any of them hides it, and Show all only clears the first.
+    bool isHidden(int i) const
+    {
+        return m_hidden[size_t(i)] != 0 || m_layerHidden[size_t(i)] != 0 || m_graphicsHidden[size_t(i)] != 0;
+    }
+    void setGraphicsHidden(int i, bool hidden);
+    bool isGraphicsHidden(int i) const { return m_graphicsHidden[size_t(i)] != 0; }
+    // D73: the element's border-line style (nullopt: the display mode's default line), and an override
+    // surface colour and transparency (0 = opaque). Redisplay after.
+    void setLineStyle(int i, std::optional<BatchLine> line) { m_line[size_t(i)] = line; }
+    void setSurface(int i, std::optional<Quantity_Color> color, double transparency = 0.0)
+    {
+        m_surface[size_t(i)] = color;
+        m_alpha[size_t(i)] = transparency;
+    }
+    // The colour the element is shaded with: Compare's override, then the surface override, then the
+    // calm palette by IFC class.
+    Quantity_Color surfaceColor(int i) const;
+    // The visible elements' border lines grouped by style (one OCCT group each); `fallback` colours the
+    // unstyled ones (1 px, solid).
+    struct LineBucket {
+        BatchLine line;
+        std::vector<int> elements;
+    };
+    std::vector<LineBucket> lineBuckets(const Quantity_Color& fallback) const;
     void setLayerHidden(int i, bool hidden);
     // Locked by its layer: shown, but not selectable.
     void setLocked(int i, bool locked) { m_locked[size_t(i)] = locked ? 1 : 0; }
@@ -128,6 +159,10 @@ private:
     void updateVisible(int i, bool wasHidden);
     std::vector<char> m_retired;
     std::vector<std::optional<Quantity_Color>> m_override;
+    std::vector<char> m_graphicsHidden;
+    std::vector<std::optional<BatchLine>> m_line;
+    std::vector<std::optional<Quantity_Color>> m_surface;
+    std::vector<double> m_alpha;
     int m_visible = 0;
     std::vector<Handle(ElementOwner)> m_owners;
     Handle(Graphic3d_ArrayOfTriangles) m_pickArray; // indexed positions for Select3D_SensitivePrimitiveArray

@@ -140,6 +140,55 @@ private slots:
         QVERIFY(b->isLocked(1));
     }
 
+    // D73: border lines are drawn in one group per style (colour, width, pattern).
+    void linesAreGroupedByStyle()
+    {
+        Handle(kimcad::ElementBatch) b = new kimcad::ElementBatch(threeElements());
+        const kimcad::BatchLine red{Quantity_Color(1, 0, 0, Quantity_TOC_RGB), 2.0f, 0xFFFF};
+        b->setLineStyle(0, red);
+        b->setLineStyle(1, red);
+        const Quantity_Color fallback(0.2, 0.2, 0.2, Quantity_TOC_RGB);
+        auto buckets = b->lineBuckets(fallback);
+        QCOMPARE(int(buckets.size()), 2); // red (A and B) and the default (C)
+        b->setLineStyle(1, kimcad::BatchLine{Quantity_Color(1, 0, 0, Quantity_TOC_RGB), 2.0f, 0xF0F0});
+        QCOMPARE(int(b->lineBuckets(fallback).size()), 3); // same colour, other pattern
+        b->setHidden(2, true);
+        QCOMPARE(int(b->lineBuckets(fallback).size()), 2); // hidden elements draw no lines
+        b->setLineStyle(0, std::nullopt);
+        b->setLineStyle(1, std::nullopt);
+        QCOMPARE(int(b->lineBuckets(fallback).size()), 1);
+    }
+
+    // D73: hidden by the visibility set is a third kind of hidden: Show all doesn't reveal it.
+    void graphicsHiddenSurvivesShowAll()
+    {
+        Handle(kimcad::ElementBatch) b = new kimcad::ElementBatch(threeElements());
+        b->setGraphicsHidden(1, true);
+        QVERIFY(b->isHidden(1) && b->isGraphicsHidden(1));
+        QCOMPARE(b->visibleCount(), 2);
+        b->setHidden(1, false); // Show all
+        QVERIFY(b->isHidden(1));
+        QCOMPARE(selectionEntities(b), 2);
+        b->setGraphicsHidden(1, false);
+        QVERIFY(!b->isHidden(1));
+        QCOMPARE(b->visibleCount(), 3);
+    }
+
+    // D73: an override surface colour replaces the palette; Compare's colour still wins.
+    void surfaceColoursAndCompareOverrides()
+    {
+        Handle(kimcad::ElementBatch) b = new kimcad::ElementBatch(threeElements());
+        const Quantity_Color red(1, 0, 0, Quantity_TOC_RGB), green(0, 1, 0, Quantity_TOC_RGB);
+        QVERIFY(!b->surfaceColor(0).IsEqual(red));
+        b->setSurface(0, red);
+        QVERIFY(b->surfaceColor(0).IsEqual(red));
+        b->setColorOverride(0, green);
+        QVERIFY(b->surfaceColor(0).IsEqual(green));
+        b->setColorOverride(0, std::nullopt);
+        b->setSurface(0, std::nullopt);
+        QVERIFY(!b->surfaceColor(0).IsEqual(red));
+    }
+
     void acceptsShadedIdAndLinesModes()
     {
         Handle(kimcad::ElementBatch) b = new kimcad::ElementBatch(unitCube());
