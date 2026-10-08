@@ -152,6 +152,8 @@ public:
     bool setPurpose(const QString& name);
     bool setGraphics(const QString& changesJson); // the editors' tables; false (nothing changes) if refused
     void setTrueLineWeights(bool on);
+    // The pen for new annotations (the bottom bar's); selected annotations take it too.
+    bool setCurrentPen(int pen);
     QString formatLength(double metres) const;            // in the project's unit and decimals
     // D72: recovery copies of unsaved work (written every N minutes; offered after a crash).
     bool writeRecovery();

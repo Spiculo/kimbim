@@ -32,6 +32,8 @@ public:
     const ElementStyle* styleOf(const QString& guid) const;   // null: no style (keep defaults)
     bool isHidden(const QString& guid) const { return m_hidden.contains(guid); }
     const QSet<QString>& hidden() const { return m_hidden; }
+    const QHash<int, LineStyle>& pens() const { return m_pens; }
+    const QHash<int, QString>& penNames() const { return m_penNames; }
     LineStyle pen(int n) const;                    // fallback black 0.18
     int currentPen() const { return m_currentPen; }
     int annotationPen() const { return m_annotationPen; }
@@ -46,6 +48,7 @@ private:
     QHash<QString, int> m_elements;
     QSet<QString> m_hidden;
     QHash<int, LineStyle> m_pens;
+    QHash<int, QString> m_penNames;
     int m_currentPen = 23, m_annotationPen = 23;
     QString m_purpose;
 };

@@ -27,12 +27,16 @@ public:
     QString zoomText() const { return m_zoomText; }
     QString selectionText() const;
     QString layersText() const { return m_layersText; } // "visible/all"
+    // D73: the current pen (number, colour, weight in mm).
+    void setPen(int number, const QColor& color, double weight);
 
 signals:
     void activeLayerRequested(const QString& layer);
     void layerVisibilityToggled(const QString& layer, bool visible);
+    void penRequested(); // the pen button: pick a pen
 
 private:
+    QToolButton* m_pen;
     QComboBox* m_layer;
     QToolButton* m_layers;
     QLabel* m_zoom;

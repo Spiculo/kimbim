@@ -566,6 +566,7 @@ def resolve(purpose: str | None = None, model=None, settings: dict | None = None
     ann = styles_by_kind.get("annotations") or builtin_styles["annotations"]
     out = {"purpose": name, "pen_set": set_name, "visibility": vis_name or "", "overrides": ovr_name or "",
            "pens": {str(n): pen(pens, n) for n in range(1, 256)},
+           "pen_names": {n: p["name"] for n, p in pens.items() if isinstance(p, dict) and p.get("name")},
            "current_pen": st.get("current_pen", 23), "annotation_pen": ann["projection"]["pen"],
            "styles": styles, "elements": elements, "hidden": hidden}
     if len(_cache) > 8:

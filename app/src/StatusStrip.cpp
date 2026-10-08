@@ -6,6 +6,9 @@
 #include <QLabel>
 #include <QMenu>
 #include <QTimer>
+#include <QIcon>
+#include <QLocale>
+#include <QPixmap>
 #include <QToolButton>
 
 #include <algorithm>
@@ -19,12 +22,13 @@ StatusStrip::StatusStrip(QWidget* parent)
     auto* row = new QHBoxLayout(this);
     row->setContentsMargins(6, 2, 6, 2);
     row->setSpacing(10);
-    auto* pen = new QToolButton(this);
-    pen->setObjectName(QStringLiteral("penButton"));
-    pen->setText(tr("Pen"));
-    pen->setEnabled(false);
-    pen->setToolTip(tr("Pen sets come in a later version"));
-    row->addWidget(pen);
+    m_pen = new QToolButton(this);
+    m_pen->setObjectName(QStringLiteral("penButton"));
+    m_pen->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    m_pen->setToolTip(tr("The current pen, for new text, dimensions and marks (and the selected ones). Click to pick another."));
+    setPen(23, Qt::black, 0.18);
+    connect(m_pen, &QToolButton::clicked, this, &StatusStrip::penRequested);
+    row->addWidget(m_pen);
     m_layer = new QComboBox(this);
     m_layer->setObjectName(QStringLiteral("activeLayer"));
     m_layer->setToolTip(tr("Active layer: new elements go on it"));
@@ -107,6 +111,14 @@ QString StatusStrip::message() const
 QString StatusStrip::selectionText() const
 {
     return m_selection->text();
+}
+
+void StatusStrip::setPen(int number, const QColor& color, double weight)
+{
+    QPixmap swatch(12, 12);
+    swatch.fill(color);
+    m_pen->setIcon(QIcon(swatch));
+    m_pen->setText(QStringLiteral("%1 · %2").arg(number).arg(QLocale().toString(weight, 'f', 2)));
 }
 
 } // namespace kimcad

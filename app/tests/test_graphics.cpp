@@ -4,6 +4,7 @@
 #include <QtTest>
 
 #include "Graphics.h"
+#include "PenGrid.h"
 
 class TestGraphics : public QObject {
     Q_OBJECT
@@ -50,6 +51,29 @@ private slots:
         QCOMPARE(kimcad::Graphics::pattern({}), uint16_t(0xFFFF));
         QVERIFY(kimcad::Graphics::pattern({3.0, 1.5}) != 0xFFFF);
         QVERIFY(kimcad::Graphics::pattern({3.0, 1.5}) != 0);
+    }
+    void parsesPenNames()
+    {
+        // (built in code: a raw string literal here made moc skip the whole file)
+        const QJsonObject state{{"ok", true},
+            {"pens", QJsonObject{{"23", QJsonObject{{"color", "#000000"}, {"weight", 0.18}}}}},
+            {"pen_names", QJsonObject{{"23", "Annotations"}}}};
+        const auto g = kimcad::Graphics::fromJson(state);
+        QCOMPARE(g.penNames().value(23), QString("Annotations"));
+        QCOMPARE(g.pens().value(23).weight, 0.18);
+    }
+    void penGridClicksReportThePen()
+    {
+        kimcad::PenGrid grid;
+        grid.resize(16 * 20, 16 * 20);
+        QSignalSpy clicked(&grid, &kimcad::PenGrid::penClicked);
+        QTest::mouseClick(&grid, Qt::LeftButton, {}, QPoint(20 * 7 + 10, 20 * 1 + 10)); // row 1, col 7 = pen 23
+        QCOMPARE(clicked.count(), 1);
+        QCOMPARE(clicked.at(0).at(0).toInt(), 23);
+        QCOMPARE(grid.current(), 23);
+        QTest::mouseClick(&grid, Qt::LeftButton, {}, QPoint(10, 10)); // cell 0: no pen
+        QCOMPARE(clicked.count(), 1);
+        QCOMPARE(kimcad::PenGrid::penAt(QSize(320, 320), QPoint(319, 319)), 255);
     }
 };
 

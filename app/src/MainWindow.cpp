@@ -64,6 +64,7 @@
 
 #include "CombineDialog.h"
 #include "Graphics.h"
+#include "PenGrid.h"
 #include "Cuts.h"
 #include "DrawingView.h"
 #include "DrawingsPanel.h"
@@ -123,6 +124,13 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     addToolBar(Qt::BottomToolBarArea, bottom);
     statusBar()->hide();
     connect(m_status, &StatusStrip::activeLayerRequested, this, &MainWindow::setActiveLayer);
+    connect(m_status, &StatusStrip::penRequested, this, [this] {
+        const Graphics& g = m_viewport->graphics();
+        const int pen = PenGrid::pick(m_status->findChild<QWidget*>(QStringLiteral("penButton")), g.pens(),
+            g.penNames(), g.currentPen());
+        if (pen > 0)
+            setCurrentPen(pen);
+    });
     connect(m_status, &StatusStrip::layerVisibilityToggled, this, &MainWindow::setLayerVisible);
     setWindowTitle(QStringLiteral("KIMCAD"));
     resize(1280, 800);
@@ -2679,6 +2687,27 @@ void MainWindow::refreshLayers()
 void MainWindow::refreshGraphics()
 {
     m_viewport->setGraphics(Graphics::fromJson(bridge("graphics_state")), m_prefs.trueLineWeights());
+    const Graphics& g = m_viewport->graphics();
+    const LineStyle pen = g.pen(g.currentPen());
+    m_status->setPen(g.currentPen(), pen.color, pen.weight);
+}
+
+bool MainWindow::setCurrentPen(int pen)
+{
+    const QJsonObject r = bridge("set_current_pen", {QString::number(pen)});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(r.value("error").toString());
+        return false;
+    }
+    m_settings = bridge("project_settings").value("settings").toObject();
+    const QStringList notes = m_viewport->annotationGuids();
+    for (const QString& g : m_viewport->selectedGuids())
+        if (notes.contains(g)) // the annotations' pens are model data: undoable, and the drawings follow
+            afterEdit(bridge("set_annotation_pen", {g, QString::number(pen)}));
+    refreshGraphics();
+    refreshAnnotations();
+    setWindowModified(isDirty());
+    return true;
 }
 
 void MainWindow::regenerateOpenDrawings()

@@ -58,6 +58,9 @@ Graphics Graphics::fromJson(const QJsonObject& state)
     const QJsonObject pens = state.value("pens").toObject();
     for (auto it = pens.constBegin(); it != pens.constEnd(); ++it)
         g.m_pens.insert(it.key().toInt(), line(it.value().toObject()));
+    const QJsonObject names = state.value("pen_names").toObject();
+    for (auto it = names.constBegin(); it != names.constEnd(); ++it)
+        g.m_penNames.insert(it.key().toInt(), it.value().toString());
     return g;
 }
 

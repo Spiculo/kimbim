@@ -10,6 +10,7 @@
 #include <QSlider>
 #include <QTemporaryDir>
 #include <QStandardPaths>
+#include <QToolButton>
 #include <QtTest>
 
 #include <cmath>
@@ -1570,6 +1571,27 @@ private slots:
         QVERIFY(w.viewport()->isElementHidden(wall));
         QVERIFY(w.setPurpose(QStringLiteral("Working")));
         QVERIFY(!w.viewport()->isElementHidden(wall));
+    }
+
+    // D73: the bottom bar's pen button shows the current pen; picking one sets it, and selected
+    // annotations take it.
+    void thePenButtonShowsAndSetsTheCurrentPen()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        auto* pen = w.findChild<QToolButton*>(QStringLiteral("penButton"));
+        QVERIFY(pen && pen->isEnabled());
+        QVERIFY(pen->text().startsWith(QStringLiteral("23")));
+        const QString l1 = w.levelsBar()->activeStorey();
+        QVERIFY(w.addAnnotation(QStringLiteral("text"), {QPointF(1, 1)}, QStringLiteral("Hello")));
+        const QString note = w.viewport()->annotationGuids().value(0);
+        w.viewport()->selectGuids({note});
+        QVERIFY(w.setCurrentPen(26));
+        QVERIFY(pen->text().startsWith(QStringLiteral("26")));
+        QCOMPARE(w.projectSettings().value("current_pen").toInt(), 26);
+        const QJsonObject r = kimcad::PythonEngine::instance().callJson("annotations", {l1}).object();
+        QCOMPARE(r.value("annotations").toArray().at(0).toObject().value("pen").toInt(), 26);
+        QVERIFY(!w.setCurrentPen(0));
     }
 
     void trueLineWeightsAreAPreference()

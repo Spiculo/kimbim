@@ -315,3 +315,9 @@ def test_doors_windows_and_rooms_have_no_cut_fill():
     assert r["styles"][r["elements"][wall.GlobalId]]["fill"] == "#b8a898"
     out = g.style_svg(f'<g class="IfcDoor" ifc:guid="{door.GlobalId}"><path d="M0,0"/></g>', r)
     assert 'fill="none"' in out and "fill-rule" not in out
+
+
+def test_graphics_state_names_the_pens():
+    r = call("graphics_state")
+    assert r["pen_names"]["23"] == "Annotations" and r["pen_names"]["10"] == "Walls cut"
+    assert "30" not in r["pen_names"]  # free pens have no name
