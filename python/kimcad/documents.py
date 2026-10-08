@@ -94,7 +94,8 @@ def state_fields() -> dict:
     untitled = d["mode"] == "plain" and not B._path
     source = d["source"] or ("" if untitled else B._path)
     return {"mode": d["mode"], "path": source, "name": pathlib.Path(source).name if source else "",
-            "read_only": d["read_only"], "untitled": untitled, "template": d["template"], "kept": S.kept}
+            "read_only": d["read_only"], "untitled": untitled, "template": d["template"],
+            "kept": S.kept or untitled}  # an untitled project becomes a .kim on its first save
 
 
 def document_state() -> str:

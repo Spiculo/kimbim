@@ -1470,6 +1470,22 @@ private slots:
         d.findChild<QSpinBox*>("drawingScale")->setValue(50);
         QCOMPARE(d.changes(), QJsonObject({{"sheet_paper", "A3"}, {"drawing_scale", 50}}));
     }
+
+    // D72: an IFC edited directly keeps no settings, so showing or hiding a layer isn't unsaved work.
+    void layerStatesOfAnIfcEditedDirectlyAreNotUnsavedWork()
+    {
+        QTemporaryDir tmp;
+        const QString ifc = tmp.filePath(QStringLiteral("directo.ifc"));
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        w.preferences().setValue("open_ifc", "edit_ifc");
+        QVERIFY(w.newProject());
+        QVERIFY(w.createLayer(QStringLiteral("A-WALL")));
+        QVERIFY(w.saveAs(ifc));
+        QVERIFY(!w.isDirty());
+        w.setLayerVisible(QStringLiteral("A-WALL"), false);
+        QVERIFY(!w.isDirty());
+        QVERIFY(w.close());
+    }
 };
 
 QTEST_MAIN(TestMainWindow)

@@ -114,7 +114,10 @@ def format_length(metres: float, unit: bool = True) -> str:
 # ---------------------------------------------------------------- bridge
 
 def project_settings() -> str:
-    return B._dump({"ok": True, "settings": current(), "defaults": copy.deepcopy(DEFAULTS), "kept": kept})
+    from .documents import state_fields
+
+    return B._dump({"ok": True, "settings": current(), "defaults": copy.deepcopy(DEFAULTS),
+                    "kept": state_fields()["kept"]})
 
 
 def set_project_settings(changes_json: str) -> str:

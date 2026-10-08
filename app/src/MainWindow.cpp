@@ -3998,7 +3998,7 @@ QString MainWindow::formatLength(double metres) const
 void MainWindow::saveLayerStates()
 {
     if (!bridge("document_state").value("kept").toBool())
-        return; // a plain IFC keeps no settings: showing a layer isn't unsaved work there
+        return; // an IFC edited directly keeps no settings: showing a layer isn't unsaved work there
     QStringList hidden(m_hiddenLayers.begin(), m_hiddenLayers.end()), locked(m_lockedLayers.begin(), m_lockedLayers.end());
     hidden.sort();
     locked.sort();
