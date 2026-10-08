@@ -146,9 +146,16 @@ def test_m4_exit_sheet_has_plan_section_elevation_and_title_block(house, tmp_pat
 def test_sheets_work_on_ifc2x3_models(tmp_path):
     """IFC2X3 names the sheet number DocumentId and the drawing link ItemReference, and its references
     have no Description: adding an A1 sheet to the Clinic (IFC2X3) failed outright."""
-    from kimcad.testing import build_model
+    from kimcad.testing import _reset_owner, build_model
     path = tmp_path / "x3.ifc"
-    build_model(schema="IFC2X3", walls=2).write(str(path))
+    try:
+        build_model(schema="IFC2X3", walls=2).write(str(path))
+        _check_ifc2x3_sheets(path)
+    finally:
+        _reset_owner()  # the IFC2X3 owner callbacks are global: later IFC4 models must not get them
+
+
+def _check_ifc2x3_sheets(path):
     assert call("open_model", str(path))["ok"]
     storey = b._model.by_type("IfcBuildingStorey")[0].GlobalId
     assert call("create_plan", storey)["ok"]
