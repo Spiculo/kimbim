@@ -233,3 +233,52 @@ def test_resolve_is_cached_on_the_model_state():
     assert g.resolve("Working", model=f) is a
     s.load({"current_pen": 5})
     assert g.resolve("Working", model=f) is not a
+
+
+def call(fn, *args):
+    return json.loads(getattr(b, fn)(*args))
+
+
+def test_graphics_state_and_tables_through_the_bridge():
+    b.close_model() if hasattr(b, "close_model") else None
+    r = call("graphics_state")
+    assert r["ok"] and r["purpose"] == "Working" and len(r["pens"]) == 255
+    t = call("graphics_tables")
+    assert t["ok"] and set(t["tables"]) == set(g.TABLES) and t["kinds"] == list(g.KINDS)
+    assert "Permit" in t["builtins"]["pen_sets"]
+
+
+def test_set_graphics_writes_valid_tables_only():
+    sets = g.builtin("pen_sets")
+    sets["Office"] = sets["Permit"]
+    assert call("set_graphics", json.dumps({"pen_sets": sets}))["ok"]
+    assert "Office" in s.current()["pen_sets"]
+    r = call("set_graphics", json.dumps({"line_types": {"Dashed": [1, 1]}}))
+    assert not r["ok"] and r["error"] == "the Solid line type can't be removed"
+    r = call("set_graphics", json.dumps({"colour": 1}))
+    assert not r["ok"] and r["error"] == "unknown graphics setting colour"
+
+
+def test_set_graphics_refuses_removing_the_last_set():
+    r = call("set_graphics", json.dumps({"pen_sets": {}}))  # {} means built-ins: allowed
+    assert r["ok"]
+    r = call("set_graphics", json.dumps({"purposes": {"P": {"pen_set": "Nope", "visibility": "Everything",
+                                                             "overrides": "None", "layers": None}}}))
+    assert not r["ok"] and r["error"] == "purpose P uses a pen set that doesn't exist: Nope"
+
+
+def test_set_purpose_applies_its_layer_combination():
+    s.load({"layer_combinations": {"Plans": {"hidden": ["A-Furniture"], "locked": ["A-Grid"]}},
+            "purposes": {**g.builtin("purposes"),
+                         "Plans": {"pen_set": "Permit", "visibility": "Everything", "overrides": "None", "layers": "Plans"}}})
+    r = call("set_purpose", "Plans")
+    assert r["ok"] and r["hidden_layers"] == ["A-Furniture"] and r["locked_layers"] == ["A-Grid"]
+    assert s.current()["purpose"] == "Plans" and s.current()["hidden_layers"] == ["A-Furniture"]
+    r = call("set_purpose", "Working")  # no combination: the layers stay
+    assert r["hidden_layers"] == ["A-Furniture"]
+    assert not call("set_purpose", "Nope")["ok"]
+
+
+def test_set_current_pen():
+    assert call("set_current_pen", "7")["ok"] and s.current()["current_pen"] == 7
+    assert not call("set_current_pen", "0")["ok"]

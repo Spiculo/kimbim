@@ -886,6 +886,13 @@ from .editing import (  # noqa: E402,F401
 from .rooms import create_room, edit_room, export_room_schedule, room_schedule, rooms  # noqa: E402,F401
 from .roofs import attach_walls_to_roof, create_roof, detach_walls_from_roof, roof_info  # noqa: E402,F401
 from .settings import project_settings, set_project_settings  # noqa: E402,F401
+from .graphics import (  # noqa: E402,F401
+    graphics_state,
+    graphics_tables,
+    set_current_pen,
+    set_graphics,
+    set_purpose,
+)
 from .documents import (  # noqa: E402,F401
     clear_recovery,
     close_document,

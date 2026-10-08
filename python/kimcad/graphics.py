@@ -563,3 +563,100 @@ def resolve(purpose: str | None = None, model=None, settings: dict | None = None
         _cache.clear()
     _cache[key] = out
     return out
+
+
+# ---------------------------------------------------------------- bridge
+
+def _fail(message: str) -> str:
+    from . import app_bridge as B
+
+    return B._dump({"ok": False, "error": message})
+
+
+def graphics_state() -> str:
+    from . import app_bridge as B
+    from . import settings as S
+
+    st = S.current()
+    return B._dump({"ok": True, **resolve(settings=st), "hidden_layers": st.get("hidden_layers", []),
+                    "locked_layers": st.get("locked_layers", [])})
+
+
+def graphics_tables() -> str:
+    from . import app_bridge as B
+    from . import settings as S
+
+    st = S.current()
+    return B._dump({"ok": True, "tables": {k: effective(k, st) for k in TABLES}, "purpose": current_purpose(st),
+                    "current_pen": st.get("current_pen", 23), "sheet_purposes": st.get("sheet_purposes", {}),
+                    "kinds": list(KINDS), "builtins": {k: list(_BUILTINS[k]) for k in TABLES}})
+
+
+def _references_error(st: dict) -> str | None:
+    purposes = effective("purposes", st)
+    pens, vis, ovr = effective("pen_sets", st), effective("visibility_sets", st), effective("override_sets", st)
+    combos = effective("layer_combinations", st)
+    for name, p in purposes.items():
+        if p["pen_set"] not in pens:
+            return f"purpose {name} uses a pen set that doesn't exist: {p['pen_set']}"
+        if p["visibility"] not in vis:
+            return f"purpose {name} uses a visibility set that doesn't exist: {p['visibility']}"
+        if p["overrides"] not in ovr:
+            return f"purpose {name} uses an override set that doesn't exist: {p['overrides']}"
+        if p.get("layers") is not None and p["layers"] not in combos:
+            return f"purpose {name} uses a layer combination that doesn't exist: {p['layers']}"
+    return None
+
+
+def set_graphics(changes_json: str) -> str:
+    from . import app_bridge as B
+    from . import settings as S
+
+    try:
+        changes = json.loads(changes_json)
+    except ValueError as ex:
+        return _fail(f"bad input: {ex}")
+    if not isinstance(changes, dict):
+        return _fail("bad input: expected an object")
+    for k, v in changes.items():
+        if k not in TABLES and k not in ("purpose", "current_pen", "sheet_purposes"):
+            return _fail(f"unknown graphics setting {k}")
+        if (err := validate(k, v)) is not None:
+            return _fail(err)
+    merged = {**S.current(), **changes}
+    if (err := _references_error(merged)) is not None:
+        return _fail(err)
+    r = json.loads(S.set_project_settings(json.dumps(changes)))
+    return B._dump({"ok": r["ok"], "dirty": r.get("dirty", False), **({"error": r["error"]} if not r["ok"] else {})})
+
+
+def set_purpose(name: str) -> str:
+    from . import app_bridge as B
+    from . import settings as S
+
+    st = S.current()
+    purposes = effective("purposes", st)
+    if name not in purposes:
+        return _fail(f"no purpose called {name}")
+    changes = {"purpose": name}
+    combo = purposes[name].get("layers")
+    combos = effective("layer_combinations", st)
+    if combo is not None and combo in combos:
+        changes["hidden_layers"] = list(combos[combo].get("hidden", []))
+        changes["locked_layers"] = list(combos[combo].get("locked", []))
+    r = json.loads(S.set_project_settings(json.dumps(changes)))
+    cur = S.current()
+    return B._dump({"ok": r["ok"], "dirty": r.get("dirty", False), "hidden_layers": cur["hidden_layers"],
+                    "locked_layers": cur["locked_layers"]})
+
+
+def set_current_pen(n: str) -> str:
+    from . import app_bridge as B
+    from . import settings as S
+
+    try:
+        value = int(n)
+    except (TypeError, ValueError):
+        return _fail("the current pen must be 1-255")
+    r = json.loads(S.set_project_settings(json.dumps({"current_pen": value})))
+    return B._dump({"ok": r["ok"], "dirty": r.get("dirty", False), **({"error": r["error"]} if not r["ok"] else {})})
