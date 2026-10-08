@@ -843,7 +843,7 @@ void MainWindow::typeEditDialog(const QString& pset, const QString& prop)
 
 bool MainWindow::newFromTemplate(const QString& path)
 {
-    if (!closeDocument())
+    if (!prepareToOpen())
         return false;
     const QJsonObject r = bridge("new_from_template", {path});
     if (!r.value("ok").toBool()) {
@@ -1961,6 +1961,18 @@ bool MainWindow::openPath(const QString& path)
     return openIfc(path);
 }
 
+// Before opening another file: the unsaved-work question, and the open file's recovery copy goes (the
+// user saved or discarded). The open document stays attached until the new one has opened, so a file
+// that fails to open (locked, damaged, cancelled) changes nothing.
+bool MainWindow::prepareToOpen()
+{
+    if (!maybeSave())
+        return false;
+    stopLoading();
+    bridge("clear_recovery");
+    return true;
+}
+
 bool MainWindow::closeDocument()
 {
     if (!maybeSave())
@@ -1984,7 +1996,7 @@ bool MainWindow::askReadOnly(const QJsonObject& r)
 
 bool MainWindow::openKim(const QString& path, bool readOnly)
 {
-    if (!closeDocument())
+    if (!prepareToOpen())
         return false;
     QJsonObject r = bridge("open_kim", {path, readOnly ? QStringLiteral("1") : QString()});
     if (!r.value("ok").toBool() && askReadOnly(r))
@@ -2002,7 +2014,7 @@ bool MainWindow::openKim(const QString& path, bool readOnly)
 
 bool MainWindow::openIfc(const QString& path)
 {
-    if (!closeDocument())
+    if (!prepareToOpen())
         return false;
     if (m_prefs.openIfc() == QLatin1String("edit_ifc")) {
         openFile(path);
@@ -2045,7 +2057,7 @@ bool MainWindow::openIfc(const QString& path)
 
 bool MainWindow::openProject(const QString& folder, bool readOnly)
 {
-    if (!closeDocument())
+    if (!prepareToOpen())
         return false;
     QJsonObject r = bridge("open_folder", {folder, readOnly ? QStringLiteral("1") : QString()});
     if (!r.value("ok").toBool() && askReadOnly(r))
@@ -2086,9 +2098,7 @@ void MainWindow::openProjectDialog()
 bool MainWindow::saveVersion(const QString& message)
 {
     if (!commitVersion(message))
-        return false;
-    if (documentState().value("mode").toString() == QLatin1String("kim"))
-        bridge("save_document"); // the .kim holds the new version
+        return false; // (the bridge packs a .kim when its history changes)
     refreshProject();
     return true;
 }
@@ -4064,7 +4074,7 @@ QJsonArray MainWindow::recoveries()
 
 bool MainWindow::recoverFrom(const QString& id)
 {
-    if (!closeDocument())
+    if (!prepareToOpen())
         return false;
     const QJsonObject r = bridge("recover", {id});
     if (!r.value("ok").toBool()) {

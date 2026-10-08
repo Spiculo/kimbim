@@ -28,6 +28,12 @@ _version_id = 0      # B._current_id() when the open model last matched a versio
 _versioned: dict = {}  # the project settings of that version
 
 
+def _history_changed() -> None:
+    from . import documents
+
+    documents.history_changed()
+
+
 def mark_versioned(unversioned: bool = False) -> None:
     """The open model and settings match the latest version (or, `unversioned`, they don't)."""
     global _version_id, _versioned
@@ -241,6 +247,7 @@ def save_version(message: str) -> str:
     _mark_saved(working)
     S.mark_saved()
     mark_versioned()
+    _history_changed()
     s = _summary(changes)
     return B._dump({"ok": True, "id": cid, "added": len(s["added"]), "modified": len(s["modified"]),
                     "removed": len(s["removed"]), "other": s["other"]})
@@ -297,6 +304,7 @@ def create_option(name: str) -> str:
         _project.switch(_encode(name))
     except KimcadError as ex:
         return _fail(str(ex))
+    _history_changed()
     return B._dump({"ok": True, **json.loads(project_state())})
 
 
@@ -307,7 +315,9 @@ def switch_option(name: str) -> str:
         return _fail("there are unsaved changes: save a version or discard them before switching options")
     try:
         _project.switch(_encode(name))
-        return _open_head(_project)
+        out = _open_head(_project)
+        _history_changed()
+        return out
     except KimcadError as ex:
         return _fail(str(ex))
 
@@ -317,7 +327,9 @@ def discard_changes() -> str:
     if _project is None:
         return _fail("this model isn't versioned")
     try:
-        return _open_head(_project)
+        out = _open_head(_project)
+        _history_changed()
+        return out
     except KimcadError as ex:
         return _fail(str(ex))
 
@@ -336,6 +348,7 @@ def delete_option(name: str) -> str:
         _project.delete_branch(_encode(name))
     except KimcadError as ex:
         return _fail(str(ex))
+    _history_changed()
     return B._dump({"ok": True, **json.loads(project_state())})
 
 
@@ -369,7 +382,7 @@ def create_milestone(name: str, message: str = "") -> str:
     name = (name or "").strip()
     if not name:
         return _fail("a milestone needs a name")
-    if _dirty():
+    if _dirty() or _unversioned():
         return _fail("there are unsaved changes: save a version first, then mark it as a milestone")
     if any(m["name"] == name for m in json.loads(milestones())["milestones"]):
         return _fail(f"there is already a milestone called {name}")
@@ -377,6 +390,7 @@ def create_milestone(name: str, message: str = "") -> str:
         _project.tag(_encode(name), message or name)
     except KimcadError as ex:
         return _fail(str(ex))
+    _history_changed()
     return B._dump({"ok": True, "milestones": json.loads(milestones())["milestones"]})
 
 
@@ -387,6 +401,7 @@ def delete_milestone(name: str) -> str:
         _project.delete_tag(_encode(name))
     except KimcadError as ex:
         return _fail(f"no milestone called {name}" if "unknown" in str(ex) else str(ex))
+    _history_changed()
     return B._dump({"ok": True, "milestones": json.loads(milestones())["milestones"]})
 
 
@@ -624,6 +639,7 @@ def combine_options(option: str, resolutions_json: str = "{}") -> str:
         try:
             _project.repo.fast_forward(preview.theirs)
             info = json.loads(_open_head(_project))
+            _history_changed()
         except Exception as ex:  # noqa: BLE001 (RepoError or KimcadError: report, change nothing more)
             return _fail(str(ex))
         return B._dump({**info, "ok": True, "status": "fast_forward", "from_theirs": changed})

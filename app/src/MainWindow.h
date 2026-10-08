@@ -300,6 +300,7 @@ private:
     void closeView(const QString& key);
     void saveVersionDialog();
     bool askReadOnly(const QJsonObject& refused);
+    bool prepareToOpen();
     void rememberRecent(const QString& path);
     void fillRecentMenu();
     void maybeAutoVersion();

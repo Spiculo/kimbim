@@ -67,19 +67,34 @@ def _entries(folder: pathlib.Path):
         yield p, name
 
 
-def _write_entries(z: zipfile.ZipFile, folder: pathlib.Path, kind: str) -> None:
+WORKING = (".kimcad/working.ifc", ".kimcad/settings.json", ".kimcad/working.json")
+
+
+def _write_entries(z: zipfile.ZipFile, folder: pathlib.Path, kind: str, keep=None) -> None:
+    """`keep`: an open zip whose saved work (WORKING) is carried over instead of the folder's."""
     z.writestr(MANIFEST, json.dumps({"format": "kim", "version": VERSION, "kind": kind, "app": _app_version()}, indent=1))
+    kept = set(keep.namelist()) & set(WORKING) if keep is not None else set()
+    for name in sorted(kept):
+        z.writestr(name, keep.read(name), compress_type=zipfile.ZIP_DEFLATED)
     for p, name in _entries(folder):
+        if name in kept or (keep is not None and name in WORKING):
+            continue
         stored = name.startswith(".git/objects/pack/")  # already compressed
         z.write(p, name, compress_type=zipfile.ZIP_STORED if stored else zipfile.ZIP_DEFLATED)
 
 
-def pack(folder, kim, kind: str = "project") -> None:
+def pack(folder, kim, kind: str = "project", keep_saved_work: bool = False) -> None:
+    """Zip `folder` into `kim`. keep_saved_work: the history changed but the open model has unsaved edits,
+    so the model and settings the file already holds are carried over unchanged."""
     folder, kim = pathlib.Path(folder), pathlib.Path(kim)
     tmp = kim.with_name(kim.name + ".saving")
     try:
         with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as z:
-            _write_entries(z, folder, kind)
+            if keep_saved_work and kim.exists():
+                with zipfile.ZipFile(kim) as old:
+                    _write_entries(z, folder, kind, keep=old)
+            else:
+                _write_entries(z, folder, kind)
         with open(tmp, "rb+") as f:
             os.fsync(f.fileno())
     except OSError as ex:

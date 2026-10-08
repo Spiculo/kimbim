@@ -107,6 +107,7 @@ def on_model_opened(path: str) -> None:
     global _pending, _doc
     if _pending is not None and _same(path, _pending["path"]):
         p, _pending = _pending, None
+        _close(keep=p["doc"])
         _doc = p["doc"]
         V._project = p["project"]
         S.load(p["settings"], dirty=p.get("dirty", False))
@@ -127,18 +128,26 @@ def on_model_opened(path: str) -> None:
     S.kept = False
 
 
-def _close() -> None:
-    """Leave the document: its lock and working folder go. Its recovery copy stays (only a save or an
-    explicit close_document, after the user saved or discarded, clears it)."""
+def _close(keep: dict | None = None) -> None:
+    """Leave the document: its lock and working folder go (not the ones `keep`, the document replacing
+    it, uses: reopening the same file). Its recovery copy stays (only a save or an explicit
+    close_document, after the user saved or discarded, clears it)."""
     d = _doc
-    if d["lock"]:
+    keep = keep or {}
+    if d["lock"] and not _same(d["lock"], keep.get("lock")):
         K.release(d["lock"])
-    if d["mode"] in ("kim", "template") and d["work"]:
+    if d["mode"] in ("kim", "template") and d["work"] and not _same(d["work"], keep.get("work")):
         K.remove_tree(d["work"])
 
 
 def _recovery_key() -> str:
     return _doc["source"] or B._path or _doc.get("rid", "")
+
+
+def clear_recovery() -> str:
+    """The user saved or discarded the open document's work: its recovery copy can go."""
+    _clear_recovery(_recovery_key())
+    return B._dump({"ok": True})
 
 
 def close_document() -> str:
@@ -314,6 +323,25 @@ def save_document() -> str:
     return B._dump({"ok": True, "path": d["source"]})
 
 
+def history_changed() -> None:
+    """Versioning changed the history (a version, an option, a milestone, a switch): a .kim packs it now,
+    so closing without Ctrl+S can't lose it. Unsaved model edits stay unsaved: the file keeps the model
+    it already holds. Project folders are changed in place and need nothing."""
+    d = _doc
+    if d["mode"] != "kim" or d["read_only"] or B._model is None:
+        return
+    work = pathlib.Path(d["work"])
+    try:
+        if B._dirty():
+            K.pack(work, d["source"], keep_saved_work=True)
+        else:
+            _write_files(work)
+            K.pack(work, d["source"])
+            _saved()
+    except (K.KimError, OSError):
+        pass  # the next Ctrl+S tries again; the history is safe in the working folder meanwhile
+
+
 def _first_message(message: str) -> str:
     if message:
         return message
@@ -329,6 +357,20 @@ def _make_history(work: pathlib.Path, message: str) -> None:
     project.commit(working, _first_message(message), settings=S.to_bytes())
     V._project = project
     V.mark_versioned()
+
+
+def _history_origin() -> pathlib.Path | None:
+    """Where the open document's project content is, to copy into a new .kim or folder (None: no history,
+    e.g. a plain IFC, an untitled model or a template). A read-only .kim has its private unpacked copy;
+    a read-only folder is read where it is."""
+    d = _doc
+    if d["mode"] == "kim" and d["work"]:
+        return pathlib.Path(d["work"])
+    if d["mode"] == "folder":
+        return pathlib.Path(d["work"] or d["source"])
+    if d["mode"] == "template" and d["work"]:
+        return pathlib.Path(d["work"])
+    return None
 
 
 def _switch_to(doc: dict, work: pathlib.Path) -> None:
@@ -356,13 +398,13 @@ def save_as_kim(path: str, message: str = "") -> str:
     work = data_dir() / "open" / K.path_hash(kim)
     try:
         K.remove_tree(work)
-        if _doc["work"] and not _doc["read_only"] and _doc["mode"] != "plain":
-            shutil.copytree(_doc["work"], work, ignore=_skip)
+        if (origin := _history_origin()) is not None:
+            shutil.copytree(origin, work, ignore=_skip)
         else:
             work.mkdir(parents=True)
         if not (work / ".git" / "HEAD").is_file():
             _make_history(work, message)
-        unversioned = V._unversioned()
+        unversioned = V._unversioned() or _doc["read_only"]  # read-only work was never versioned
         _switch_to({"mode": "kim", "source": str(kim), "work": str(work), "lock": str(lock), "read_only": False,
                     "template": ""}, work)
         if unversioned:
@@ -384,13 +426,13 @@ def save_as_folder(folder: str, message: str = "") -> str:
         return _fail("choose an empty or new folder for the project")
     lock = path / ".kimcad" / "lock"
     try:
-        if _doc["work"] and not _doc["read_only"] and _doc["mode"] != "plain":
-            shutil.copytree(_doc["work"], path, ignore=_skip, dirs_exist_ok=True)
+        if (origin := _history_origin()) is not None:
+            shutil.copytree(origin, path, ignore=_skip, dirs_exist_ok=True)
         else:
             path.mkdir(parents=True, exist_ok=True)
         if not (path / ".git" / "HEAD").is_file():
             _make_history(path, message)
-        unversioned = V._unversioned()
+        unversioned = V._unversioned() or _doc["read_only"]
         K.acquire(lock)
         _switch_to({"mode": "folder", "source": str(path), "work": str(path), "lock": str(lock), "read_only": False,
                     "template": ""}, path)

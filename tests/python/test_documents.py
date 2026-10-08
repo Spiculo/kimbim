@@ -272,3 +272,67 @@ def test_save_as_ifc_turns_the_document_into_that_ifc(tmp_path):
     assert not K.lock_path(kim).exists() and (tmp_path / "b.ifc").exists()
     st = call("document_state")
     assert st["mode"] == "plain" and st["name"] == "b.ifc" and call("project_state")["versioned"] is False
+
+
+# ---------------------------------------------------------------- final review fixes
+
+def test_options_and_milestones_reach_the_kim_without_ctrl_s(tmp_path):
+    """Creating an option or a milestone, or switching options, changes the history: the .kim must hold it
+    even if the user closes without saving (the model itself has nothing unsaved)."""
+    house()
+    kim = tmp_path / "a.kim"
+    assert call("save_as_kim", str(kim), "")["ok"]
+    assert call("create_milestone", "Permit", "")["ok"]
+    assert call("create_option", "B")["ok"]
+    assert call("switch_option", "main")["ok"]
+    assert call("close_document")["ok"]
+    assert open_kim(kim)["ok"]
+    assert "B" in call("options")["options"] and call("project_state")["option"] == "main"
+    assert [m["name"] for m in call("milestones")["milestones"]] == ["Permit"]
+
+
+def test_an_option_made_with_unsaved_edits_keeps_the_last_saved_model(tmp_path):
+    wall = house()
+    kim = tmp_path / "a.kim"
+    assert call("save_as_kim", str(kim), "")["ok"]
+    call("set_name", json.dumps([wall]), "Sin guardar")
+    assert call("create_option", "B")["ok"]  # carries the unsaved edit; the file keeps the saved model
+    assert call("close_document")["ok"]
+    assert open_kim(kim)["ok"]
+    assert "B" in call("options")["options"]
+    assert b._model.by_guid(wall).Name != "Sin guardar"
+
+
+def test_a_failed_open_leaves_the_open_kim_attached(tmp_path):
+    house()
+    a, other = tmp_path / "a.kim", tmp_path / "b.kim"
+    assert call("save_as_kim", str(other), "")["ok"]
+    assert call("save_as_kim", str(a), "")["ok"]
+    K.lock_path(other).write_text(json.dumps({"user": "Ana", "account": "ana", "machine": "OTHER", "pid": 4, "since": "x"}))
+    assert not call("open_kim", str(other), "")["ok"]  # locked: the app asks, the user cancels
+    assert K.lock_path(a).exists() and call("document_state")["name"] == "a.kim"
+    assert call("save_document")["ok"]
+
+
+def test_opening_another_kim_releases_the_previous_one(tmp_path):
+    house()
+    a, other = tmp_path / "a.kim", tmp_path / "b.kim"
+    assert call("save_as_kim", str(other), "")["ok"]
+    assert call("save_as_kim", str(a), "")["ok"]
+    assert open_kim(other)["ok"]
+    assert not K.lock_path(a).exists() and K.lock_path(other).exists()
+    assert call("document_state")["name"] == "b.kim"
+
+
+def test_save_as_from_a_read_only_kim_keeps_the_history(tmp_path):
+    house()
+    kim = tmp_path / "a.kim"
+    assert call("save_as_kim", str(kim), "")["ok"]
+    assert call("save_version", "nothing new")["ok"] is False  # still one version
+    assert call("set_project_settings", json.dumps({"drawing_scale": 50}))["ok"]
+    assert call("save_version", "Second")["ok"] and call("save_document")["ok"]
+    assert call("close_document")["ok"]
+    K.lock_path(kim).write_text(json.dumps({"user": "Ana", "account": "ana", "machine": "OTHER", "pid": 4, "since": "x"}))
+    assert open_kim(kim, "1")["ok"]
+    assert call("save_as_kim", str(tmp_path / "copia.kim"), "")["ok"]
+    assert [v["message"] for v in call("history", 10)["versions"]] == ["Second", "First version"]

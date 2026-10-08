@@ -1572,6 +1572,26 @@ private slots:
         QCOMPARE(w.history().first().toObject().value("message").toString(), QString("Created from Oficina"));
         QVERIFY(w.close());
     }
+
+    // Final review: a file that fails to open leaves the open .kim as it was (lock held, still saves).
+    void aFailedOpenLeavesTheOpenKimAttached()
+    {
+        QTemporaryDir tmp;
+        const QString kim = tmp.filePath(QStringLiteral("a.kim"));
+        const QString junk = tmp.filePath(QStringLiteral("junk.kim"));
+        QFile bad(junk);
+        QVERIFY(bad.open(QIODevice::WriteOnly));
+        bad.write("not a zip");
+        bad.close();
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        QVERIFY(w.saveAs(kim));
+        QVERIFY(!w.openPath(junk));
+        QVERIFY(QFile::exists(kim + ".lock"));
+        QCOMPARE(w.documentState().value("name").toString(), QString("a.kim"));
+        QVERIFY(w.save());
+        QVERIFY(w.close());
+    }
 };
 
 QTEST_MAIN(TestMainWindow)

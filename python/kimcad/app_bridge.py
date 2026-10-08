@@ -887,6 +887,7 @@ from .rooms import create_room, edit_room, export_room_schedule, room_schedule, 
 from .roofs import attach_walls_to_roof, create_roof, detach_walls_from_roof, roof_info  # noqa: E402,F401
 from .settings import project_settings, set_project_settings  # noqa: E402,F401
 from .documents import (  # noqa: E402,F401
+    clear_recovery,
     close_document,
     discard_recovery,
     document_state,
