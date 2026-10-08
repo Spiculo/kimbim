@@ -101,3 +101,51 @@ def test_path_hash_is_stable_and_case_insensitive_on_windows(tmp_path):
     assert len(a) == 16 and a == K.path_hash(str(tmp_path / "A.kim"))
     if os.name == "nt":
         assert a == K.path_hash(str(tmp_path / "a.KIM"))
+
+
+def test_a_free_file_is_locked_and_released(tmp_path):
+    lock = K.lock_path(tmp_path / "a.kim")
+    assert lock.name == "a.kim.lock"
+    assert K.acquire(lock) is None
+    held = json.loads(lock.read_text())
+    assert held["pid"] == os.getpid() and held["machine"] and held["user"]
+    K.release(lock)
+    assert not lock.exists()
+
+
+def test_someone_elses_lock_is_reported(tmp_path):
+    lock = tmp_path / "a.kim.lock"
+    lock.write_text(json.dumps({"user": "Ana", "machine": "OTHER-PC", "pid": 1, "since": "2026-10-08T10:42"}))
+    holder = K.acquire(lock)
+    assert holder["user"] == "Ana" and holder["machine"] == "OTHER-PC"
+    K.release(lock)  # not ours: left alone
+    assert lock.exists()
+
+
+def test_our_own_lock_from_a_crash_is_taken_over(tmp_path):
+    lock = tmp_path / "a.kim.lock"
+    dead = 999_999_999
+    assert not K.pid_alive(dead)
+    lock.write_text(json.dumps({**K.me(), "pid": dead}))
+    assert K.acquire(lock) is None
+    assert json.loads(lock.read_text())["pid"] == os.getpid()
+
+
+def test_a_second_window_of_ours_does_not_take_the_lock(tmp_path):
+    import subprocess
+    import sys
+
+    other = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    try:
+        lock = tmp_path / "a.kim.lock"
+        lock.write_text(json.dumps({**K.me(), "pid": other.pid}))
+        holder = K.acquire(lock)
+        assert holder is not None and holder["pid"] == other.pid
+    finally:
+        other.kill()
+
+
+def test_a_garbled_lock_counts_as_free(tmp_path):
+    lock = tmp_path / "a.kim.lock"
+    lock.write_text("{{{")
+    assert K.acquire(lock) is None

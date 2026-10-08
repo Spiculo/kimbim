@@ -7,11 +7,14 @@ antivirus holds the file for a moment). Unpacking refuses entries that would lan
 """
 from __future__ import annotations
 
+import datetime
+import getpass
 import hashlib
 import json
 import os
 import pathlib
 import shutil
+import socket
 import time
 import zipfile
 
@@ -118,3 +121,78 @@ def unpack(kim, folder) -> dict:
             with z.open(n) as src, open(target, "wb") as dst:
                 shutil.copyfileobj(src, dst)
     return manifest
+
+
+# ---------------------------------------------------------------- locks
+
+display_user = ""  # the name others see in the lock (the author name from preferences)
+
+
+def lock_path(kim) -> pathlib.Path:
+    kim = pathlib.Path(kim)
+    return kim.with_name(kim.name + ".lock")
+
+
+def pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return False
+        code = ctypes.c_ulong()
+        ok = kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
+        kernel32.CloseHandle(handle)
+        return bool(ok) and code.value == 259  # STILL_ACTIVE
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def me() -> dict:
+    try:
+        account = getpass.getuser()
+    except Exception:  # noqa: BLE001
+        account = "?"
+    return {"user": display_user or account, "account": account, "machine": socket.gethostname(),
+            "pid": os.getpid(), "since": datetime.datetime.now().isoformat(timespec="minutes")}
+
+
+def _read_lock(lock: pathlib.Path) -> dict | None:
+    try:
+        data = json.loads(lock.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _ours(held: dict) -> bool:
+    mine = me()
+    return held.get("account") == mine["account"] and held.get("machine") == mine["machine"]
+
+
+def acquire(lock) -> dict | None:
+    """Lock the file for this process. Returns None when it is ours now, else who holds it. A lock left
+    by this user on this machine by a process that is gone (a crash) is taken over."""
+    lock = pathlib.Path(lock)
+    held = _read_lock(lock) if lock.exists() else None
+    if held and held.get("pid") != os.getpid():
+        if not (_ours(held) and not pid_alive(int(held.get("pid", 0)))):
+            return held
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock.write_text(json.dumps(me()), encoding="utf-8")
+    return None
+
+
+def release(lock) -> None:
+    lock = pathlib.Path(lock)
+    held = _read_lock(lock) if lock.exists() else None
+    if held is not None and held.get("pid") == os.getpid() and _ours(held):
+        lock.unlink(missing_ok=True)
