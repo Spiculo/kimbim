@@ -263,6 +263,8 @@ private:
     void afterEdit(const QJsonObject& result = {});
     bool maybeSave();
     QJsonObject bridge(const char* fn, const QStringList& args = {});
+    // The same call on a worker thread, behind a progress dialog (slow work such as making a .kim).
+    QJsonObject bridgeInBackground(const char* fn, const QStringList& args, const QString& label);
     void saveAsDialog();
     void addPropertyDialog(const QString& pset);
     void addPropertySetDialog();

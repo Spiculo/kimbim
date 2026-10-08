@@ -1404,6 +1404,30 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // Making a .kim from a large IFC takes minutes with the Python decomposer (the Clinic: ~6 min):
+    // it runs on a worker thread so the window keeps repainting meanwhile.
+    void makingAKimKeepsTheWindowResponsive()
+    {
+        QTemporaryDir tmp;
+        const QString ifc = tmp.filePath(QStringLiteral("House.ifc"));
+        {
+            kimcad::MainWindow w(nullptr, /*quiet=*/true);
+            QVERIFY(w.newProject());
+            QVERIFY(w.exportIfc(ifc));
+            QVERIFY(w.close());
+        }
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        bool ranMeanwhile = false;
+        QTimer::singleShot(0, &w, [&] { ranMeanwhile = true; }); // runs only if openPath turns the event loop
+        QVERIFY(w.openPath(ifc));
+        QVERIFY(ranMeanwhile);
+        QVERIFY(loaded.wait(60000));
+        QVERIFY(QFile::exists(tmp.filePath(QStringLiteral("House.kim"))));
+        QCOMPARE(w.documentState().value("mode").toString(), QString("kim"));
+        QVERIFY(w.close());
+    }
+
     // D72: someone else's lock opens the file read-only (quiet mode answers "read-only").
     void aLockedKimOpensReadOnly()
     {

@@ -49,6 +49,8 @@
 #include <QMessageBox>
 #include <QStatusBar>
 #include <QPointer>
+#include <QProgressDialog>
+#include <QEventLoop>
 #include <QTabBar>
 #include <QTabWidget>
 #include <QTimer>
@@ -57,6 +59,8 @@
 #include <QCheckBox>
 #include <QDateTime>
 #include <QPushButton>
+
+#include <limits>
 
 #include "CombineDialog.h"
 #include "Cuts.h"
@@ -690,6 +694,34 @@ QJsonObject MainWindow::bridge(const char* fn, const QStringList& args)
 {
     QString error;
     QJsonObject r = PythonEngine::instance().callJson(fn, args, &error).object();
+    if (r.isEmpty() && !error.isEmpty())
+        r = QJsonObject{{"ok", false}, {"error", error}};
+    return r;
+}
+
+QJsonObject MainWindow::bridgeInBackground(const char* fn, const QStringList& args, const QString& label)
+{
+    // A worker thread runs the call; a window-modal progress dialog keeps the window repainting while
+    // blocking input, so nothing else reaches the bridge meanwhile (the recovery timer waits too).
+    m_recoveryTimer.stop();
+    QJsonObject r;
+    QString error;
+    const QByteArray name(fn);
+    QThread* worker = QThread::create([&] { r = PythonEngine::instance().callJson(name.constData(), args, &error).object(); });
+    QProgressDialog progress(label, QString(), 0, 0, this);
+    progress.setWindowTitle(QStringLiteral("KIMCAD"));
+    progress.setWindowModality(Qt::WindowModal);
+    progress.setCancelButton(nullptr); // the Python call can't be interrupted
+    progress.setMinimumDuration(m_quiet ? std::numeric_limits<int>::max() : 300);
+    QEventLoop loop;
+    connect(worker, &QThread::finished, &loop, &QEventLoop::quit);
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    worker->start();
+    loop.exec(QEventLoop::ExcludeUserInputEvents);
+    worker->wait();
+    delete worker;
+    QApplication::restoreOverrideCursor();
+    restartRecoveryTimer();
     if (r.isEmpty() && !error.isEmpty())
         r = QJsonObject{{"ok", false}, {"error", error}};
     return r;
@@ -2041,10 +2073,10 @@ bool MainWindow::openIfc(const QString& path)
             return false;
         kim = beside.value("free").toString();
     }
-    m_status->showMessage(tr("Making %1...").arg(QFileInfo(kim).fileName()));
-    QApplication::setOverrideCursor(Qt::WaitCursor);
-    const QJsonObject r = bridge("import_ifc", {path, kim});
-    QApplication::restoreOverrideCursor();
+    const QString label = tr("Making %1...").arg(QFileInfo(kim).fileName());
+    m_status->showMessage(label);
+    const QJsonObject r = bridgeInBackground("import_ifc", {path, kim},
+        label + QLatin1Char('\n') + tr("Large models can take several minutes."));
     if (!r.value("ok").toBool()) {
         showError(tr("Could not make the project file"), r.value("error").toString());
         return false;
@@ -3912,7 +3944,9 @@ void MainWindow::afterSave()
 bool MainWindow::saveAs(const QString& path)
 {
     const bool ifc = QFileInfo(path).suffix().compare(QLatin1String("ifc"), Qt::CaseInsensitive) == 0;
-    const QJsonObject r = bridge(ifc ? "save_as_ifc" : "save_as_kim", {path});
+    // Saving a model as a .kim for the first time makes its first version: minutes on large models.
+    const QJsonObject r = ifc ? bridge("save_as_ifc", {path})
+        : bridgeInBackground("save_as_kim", {path}, tr("Saving %1...").arg(QFileInfo(path).fileName()));
     if (!r.value("ok").toBool()) {
         showError(tr("Could not save"), r.value("error").toString());
         return false;
@@ -3934,7 +3968,7 @@ void MainWindow::saveAsDialog()
 
 bool MainWindow::saveAsFolder(const QString& folder)
 {
-    const QJsonObject r = bridge("save_as_folder", {folder});
+    const QJsonObject r = bridgeInBackground("save_as_folder", {folder}, tr("Saving %1...").arg(QFileInfo(folder).fileName()));
     if (!r.value("ok").toBool()) {
         showError(tr("Could not save the project folder"), r.value("error").toString());
         return false;
@@ -3946,7 +3980,8 @@ bool MainWindow::saveAsFolder(const QString& folder)
 
 bool MainWindow::enableVersioning(const QString& folder, const QString& message)
 {
-    const QJsonObject r = bridge("save_as_folder", {folder, message.isEmpty() ? tr("Initial import") : message});
+    const QJsonObject r = bridgeInBackground("save_as_folder", {folder, message.isEmpty() ? tr("Initial import") : message},
+        tr("Saving the first version..."));
     if (!r.value("ok").toBool()) {
         showError(tr("Could not enable versioning"), r.value("error").toString());
         return false;
