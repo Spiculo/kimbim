@@ -7,7 +7,10 @@ from __future__ import annotations
 
 import colorsys
 import copy
+import json
 import re
+
+import ifcopenshell.util.element
 
 KINDS = ("walls", "columns", "beams", "slabs", "roofs", "stairs", "railings", "doors", "windows",
          "coverings", "furniture", "plumbing", "hvac", "electrical", "structure_other", "rooms",
@@ -292,3 +295,271 @@ def validate(key: str, value) -> str | None:
             if v.get("layers") is not None and not isinstance(v.get("layers"), str):
                 return f"purpose {name}: layers must be a name or null"
     return None
+
+
+# ---------------------------------------------------------------- element kinds
+
+_KIND_CLASSES = (
+    ("walls", ("IfcWall", "IfcCurtainWall")), ("columns", ("IfcColumn",)), ("beams", ("IfcBeam",)),
+    ("slabs", ("IfcSlab",)), ("roofs", ("IfcRoof",)),
+    ("stairs", ("IfcStair", "IfcStairFlight", "IfcRamp", "IfcRampFlight")), ("railings", ("IfcRailing",)),
+    ("doors", ("IfcDoor",)), ("windows", ("IfcWindow",)), ("coverings", ("IfcCovering",)),
+    ("furniture", ("IfcFurnishingElement",)),
+    ("plumbing", ("IfcPipeSegment", "IfcPipeFitting", "IfcSanitaryTerminal", "IfcValve", "IfcPump", "IfcTank",
+                  "IfcWasteTerminal", "IfcFireSuppressionTerminal")),
+    ("hvac", ("IfcDuctSegment", "IfcDuctFitting", "IfcAirTerminal", "IfcFan", "IfcUnitaryEquipment", "IfcCoil",
+              "IfcBoiler", "IfcChiller", "IfcDamper")),
+    ("electrical", ("IfcCableSegment", "IfcCableCarrierSegment", "IfcCableFitting", "IfcCableCarrierFitting",
+                    "IfcLightFixture", "IfcLamp", "IfcOutlet", "IfcSwitchingDevice", "IfcElectricAppliance",
+                    "IfcElectricDistributionBoard")),
+    ("structure_other", ("IfcFooting", "IfcPile", "IfcMember", "IfcPlate")),
+    ("rooms", ("IfcSpace",)), ("annotations", ("IfcAnnotation",)), ("grids", ("IfcGrid",)),
+)
+_MEP = ("plumbing", "hvac", "electrical")
+_SKIP = ("IfcProject", "IfcSite", "IfcBuilding", "IfcBuildingStorey", "IfcOpeningElement")
+
+
+def _is(e, cls: str) -> bool:
+    try:
+        return e.is_a(cls)
+    except RuntimeError:  # a class this schema doesn't have
+        return False
+
+
+_kind_by_class: dict[str, str | None] = {}
+
+
+def _class_kind(element) -> str | None:
+    """The kind an IFC class gives (cached per schema and class); None: decided by the element's type."""
+    key = element.is_a(True)  # "IFC4.IfcWall": per schema and class
+    if key not in _kind_by_class:
+        kind = next((k for k, classes in _KIND_CLASSES if any(_is(element, c) for c in classes)), None)
+        if kind is None and not _is(element, "IfcDistributionElement"):
+            kind = "other"
+        _kind_by_class[key] = kind
+    return _kind_by_class[key]
+
+
+def kind_of(element) -> str:
+    kind = _class_kind(element)
+    if kind is not None:
+        return kind
+    t = ifcopenshell.util.element.get_type(element)  # IFC2X3 flow elements: by their type
+    if t is not None:
+        for kind, classes in _KIND_CLASSES:
+            if kind in _MEP and any(_is(t, c + "Type") for c in classes):
+                return kind
+    return "other"
+
+
+# ---------------------------------------------------------------- rules
+
+class _Facts:
+    """An element's properties, layer and materials, read once and only when a rule asks."""
+
+    def __init__(self, element, shared: dict | None = None):
+        self.element = element
+        self._shared = {} if shared is None else shared  # property indexes, shared by one resolve
+        self._layer = False
+        self._materials = None
+        self._kind = None
+
+    @property
+    def kind(self) -> str:
+        if self._kind is None:
+            self._kind = kind_of(self.element)
+        return self._kind
+
+    def prop(self, name: str):
+        key = ("property", name)
+        if key not in self._shared:
+            try:
+                self._shared[key] = _property_index(self.element.file, name)
+            except Exception:  # an IFC this reader doesn't follow: no properties
+                self._shared[key] = {}
+        return self._shared[key].get(self.element.id())
+
+    @property
+    def layer(self):
+        if self._layer is False:
+            from . import layers
+
+            layer = layers.element_layer(self.element)
+            self._layer = layer.Name if layer is not None else None
+        return self._layer
+
+    @property
+    def materials(self) -> list:
+        if self._materials is None:
+            try:
+                self._materials = [m.Name or "" for m in ifcopenshell.util.element.get_materials(self.element)]
+            except Exception:
+                self._materials = []
+        return self._materials
+
+
+def _value(v):
+    return getattr(v, "wrappedValue", v)
+
+
+def _property_index(f, name: str) -> dict:
+    """{element id: value} for one property name ("Name" or "Pset.Name") across the file: one pass over
+    its single values and quantities, then up to the elements through their psets and types. Own
+    values win over type values. Much faster than reading every element's psets (the Clinic's Revit
+    psets are large)."""
+    pset_name, prop = name.split(".", 1) if "." in name else (None, name)
+    own, typed = {}, {}
+    for cls, attr in (("IfcPropertySingleValue", "NominalValue"), ("IfcPhysicalSimpleQuantity", None)):
+        try:
+            candidates = f.by_type(cls)
+        except RuntimeError:
+            continue
+        for p in candidates:
+            if p.Name != prop:
+                continue
+            value = (_value(getattr(p, attr)) if getattr(p, attr) is not None else None) if attr else _value(p[3])
+            for owner in f.get_inverse(p):
+                if not owner.is_a("IfcPropertySetDefinition") or (pset_name and owner.Name != pset_name):
+                    continue
+                for user in f.get_inverse(owner):
+                    if user.is_a("IfcRelDefinesByProperties"):
+                        for o in user.RelatedObjects:
+                            own[o.id()] = value
+                    elif user.is_a("IfcTypeObject"):
+                        for rel in f.get_inverse(user):
+                            if rel.is_a("IfcRelDefinesByType"):
+                                for o in rel.RelatedObjects:
+                                    typed.setdefault(o.id(), value)
+    return {**typed, **own}
+
+
+def _text(v) -> str:
+    return str(v).strip().lower()
+
+
+def _float(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def matches(when: dict, element, facts: _Facts) -> bool:
+    if "kind" in when:
+        kinds = when["kind"] if isinstance(when["kind"], list) else [when["kind"]]
+        if facts.kind not in kinds:
+            return False
+    if "ifc_class" in when and not _is(element, when["ifc_class"]):
+        return False
+    if "layer" in when and _text(facts.layer or "") != _text(when["layer"]):
+        return False
+    if "material" in when and not any(_text(when["material"]) in _text(m) for m in facts.materials):
+        return False
+    if "property" in when:
+        v = facts.prop(when["property"])
+        op, want = when.get("op", "exists"), when.get("value")
+        if op == "missing":
+            return v is None
+        if v is None:
+            return False
+        if op == "exists":
+            return True
+        if op in ("true", "false"):
+            truth = v if isinstance(v, bool) else _text(v) in ("true", "yes", "1", ".t.")
+            return truth if op == "true" else not truth
+        if op in ("less", "more"):
+            a, b = _float(v), _float(want)
+            return a is not None and b is not None and (a < b if op == "less" else a > b)
+        if op == "equals":
+            return _text(v) == _text(want)
+        if op == "not_equals":
+            return _text(v) != _text(want)
+        if op == "contains":
+            return _text(want) in _text(v)
+    return True
+
+
+# ---------------------------------------------------------------- resolution
+
+_cache: dict = {}
+GRAPHICS_KEYS = TABLES + ("purpose", "current_pen")
+
+
+def _products(model):
+    for e in model.by_type("IfcProduct"):
+        if any(_is(e, c) for c in _SKIP):
+            continue
+        if _is(e, "IfcAnnotation") and getattr(e, "ObjectType", None) == "DRAWING":
+            continue
+        yield e
+
+
+def _line(pens, line_types, pen_no, line_name) -> dict:
+    p = pen(pens, pen_no)
+    return {"color": p["color"], "weight": p["weight"], "dash": dash(line_types, line_name)}
+
+
+def resolve(purpose: str | None = None, model=None, settings: dict | None = None) -> dict:
+    from . import app_bridge as B
+
+    model = B._model if model is None else model
+    st = _settings(settings)
+    purposes = effective("purposes", st)
+    name = purpose if purpose in purposes else current_purpose(st)
+    key = (id(model), B._current_id() if model is B._model else id(model), name,
+           json.dumps({k: st.get(k) for k in GRAPHICS_KEYS}, sort_keys=True))
+    if key in _cache:
+        return _cache[key]
+    p = purposes[name]
+    pen_sets, vis_sets, ovr_sets = effective("pen_sets", st), effective("visibility_sets", st), effective("override_sets", st)
+    set_name = p.get("pen_set") if p.get("pen_set") in pen_sets else next(iter(pen_sets))
+    vis_name = p.get("visibility") if p.get("visibility") in vis_sets else None
+    ovr_name = p.get("overrides") if p.get("overrides") in ovr_sets else None
+    pens = pen_sets[set_name].get("pens", {})
+    line_types = effective("line_types", st)
+    styles_by_kind = effective("element_styles", st)
+    builtin_styles = _BUILTINS["element_styles"]
+    vis = vis_sets.get(vis_name) or {"hidden_kinds": [], "rules": []}
+    hidden_kinds = set(vis.get("hidden_kinds", []))
+    vis_rules = [r for r in vis.get("rules", []) if r.get("enabled", True)]
+    rules = [r for r in (ovr_sets.get(ovr_name) or {}).get("rules", []) if r.get("enabled", True)]
+    styles, index, elements, hidden = [], {}, {}, []
+    shared: dict = {}
+    for e in _products(model) if model is not None else ():
+        facts = _Facts(e, shared)
+        if facts.kind in hidden_kinds or any(matches(r.get("when", {}), e, facts) for r in vis_rules):
+            hidden.append(e.GlobalId)
+            continue
+        base = styles_by_kind.get(facts.kind) or builtin_styles[facts.kind]
+        cut_pen, proj_pen = base["cut"]["pen"], base["projection"]["pen"]
+        cut_line, proj_line, fill_pen = base["cut"]["line"], base["projection"]["line"], base["fill"]
+        surface = transparency = None
+        rule = next((r for r in rules if matches(r.get("when", {}), e, facts)), None)  # the first match wins
+        if rule is not None:
+            then = rule.get("then", {})
+            if then.get("hide"):
+                hidden.append(e.GlobalId)
+                continue
+            cut_pen = then.get("cut_pen", then.get("pen", cut_pen))
+            proj_pen = then.get("projection_pen", then.get("pen", proj_pen))
+            if "line" in then:
+                cut_line = proj_line = then["line"]
+            fill_pen = then.get("fill", fill_pen)
+            surface, transparency = then.get("surface"), then.get("transparency")
+        style = {"cut": _line(pens, line_types, cut_pen, cut_line),
+                 "projection": _line(pens, line_types, proj_pen, proj_line),
+                 "fill": pen(pens, fill_pen)["color"], "surface": surface, "transparency": transparency}
+        k = json.dumps(style, sort_keys=True)
+        if k not in index:
+            index[k] = len(styles)
+            styles.append(style)
+        elements[e.GlobalId] = index[k]
+    ann = styles_by_kind.get("annotations") or builtin_styles["annotations"]
+    out = {"purpose": name, "pen_set": set_name, "visibility": vis_name or "", "overrides": ovr_name or "",
+           "pens": {str(n): pen(pens, n) for n in range(1, 256)},
+           "current_pen": st.get("current_pen", 23), "annotation_pen": ann["projection"]["pen"],
+           "styles": styles, "elements": elements, "hidden": hidden}
+    if len(_cache) > 8:
+        _cache.clear()
+    _cache[key] = out
+    return out
