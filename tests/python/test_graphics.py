@@ -325,3 +325,12 @@ def test_graphics_state_names_the_pens():
 
 def test_graphics_state_lists_the_purposes():
     assert call("graphics_state")["purposes"] == ["Working", "Highlight", "Permit", "Presentation", "Demo"]
+
+
+def test_elements_without_a_style_still_draw():
+    """Drawings show some elements the purposes don't style (a site's terrain): they get a plain line,
+    not the SVG default of no stroke at all."""
+    resolved = {"styles": [], "elements": {}, "hidden": [], "pens": {}, "annotation_pen": 23}
+    out = g.style_svg('<g class="IfcSite" ifc:guid="S1"><path d="M0,0 L1,1"/></g>', resolved, k=2.0)
+    tag = re.search(r'<g class="IfcSite" ifc:guid="S1"([^>]*)>', out).group(1)
+    assert 'stroke="#000000"' in tag and 'stroke-width="0.09"' in tag and 'fill="none"' in tag

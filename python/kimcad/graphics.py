@@ -727,6 +727,9 @@ def style_svg(svg: str, resolved: dict, k: float = 1.0) -> str:
             else:
                 fill = f' fill="{st["fill"]}" fill-rule="evenodd"' if st["fill"] else ' fill="none"'
                 tag = tag[:-1] + _stroke(st["cut"], k) + fill + ">"
+        else:  # drawn but not styled by the purpose (e.g. a site's terrain): a plain line
+            plain = {"color": FALLBACK_PEN["color"], "weight": FALLBACK_PEN["weight"], "dash": []}
+            tag = tag[:-1] + _stroke(plain, k) + ' fill="none">'
         out.append(tag)
         pos = m.end()
     out.append(svg[pos:])
