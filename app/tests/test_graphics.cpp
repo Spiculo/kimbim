@@ -1,10 +1,26 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QDialogButtonBox>
+#include <QDoubleSpinBox>
+#include <QPushButton>
 #include <QtTest>
 
 #include "Graphics.h"
+#include "GraphicsDialogs.h"
+#include "PythonEngine.h"
 #include "PenGrid.h"
+
+namespace {
+// The graphics_tables reply (the built-ins), as the Graphics menu passes it to the editors.
+QJsonObject tablesFromBridge()
+{
+    QString error;
+    kimcad::PythonEngine::instance().start(&error);
+    kimcad::PythonEngine::instance().callJson("set_project_settings", {QStringLiteral("{}")}, &error);
+    return kimcad::PythonEngine::instance().callJson("graphics_tables", {}, &error).object();
+}
+} // namespace
 
 class TestGraphics : public QObject {
     Q_OBJECT
@@ -74,6 +90,80 @@ private slots:
         QTest::mouseClick(&grid, Qt::LeftButton, {}, QPoint(10, 10)); // cell 0: no pen
         QCOMPARE(clicked.count(), 1);
         QCOMPARE(kimcad::PenGrid::penAt(QSize(320, 320), QPoint(319, 319)), 255);
+    }
+    void penSetsDialogReportsOnlyChangedTables()
+    {
+        kimcad::PenSetsDialog d(tablesFromBridge(), nullptr);
+        QVERIFY(d.changes().isEmpty());
+        d.selectSet(QStringLiteral("Permit"));
+        d.selectPen(10);
+        QCOMPARE(d.findChild<QDoubleSpinBox*>(QStringLiteral("penWeight"))->value(), 0.5);
+        d.setPenColor(QColor("#123456"));
+        const QJsonObject c = d.changes();
+        QCOMPARE(c.keys(), QStringList{"pen_sets"});
+        QCOMPARE(c.value("pen_sets").toObject().value("Permit").toObject().value("pens").toObject()
+                     .value("10").toObject().value("color").toString(), QString("#123456"));
+    }
+    void penSetsCanBeCopiedRenamedAndDeleted()
+    {
+        kimcad::PenSetsDialog d(tablesFromBridge(), nullptr);
+        d.selectSet(QStringLiteral("Permit"));
+        QVERIFY(d.copySetAs(QStringLiteral("Office")));
+        QVERIFY(!d.copySetAs(QStringLiteral("Office"))); // names are unique
+        QVERIFY(d.renameSetTo(QStringLiteral("Office B&W")));
+        d.selectSet(QStringLiteral("Working"));
+        QVERIFY(d.renameSetTo(QStringLiteral("Daily")));
+        const QJsonObject c = d.changes();
+        QVERIFY(c.value("pen_sets").toObject().contains("Office B&W"));
+        QVERIFY(!c.value("pen_sets").toObject().contains("Working"));
+        // the purposes that used the renamed set follow it
+        QCOMPARE(c.value("purposes").toObject().value("Working").toObject().value("pen_set").toString(), QString("Daily"));
+        d.selectSet(QStringLiteral("Daily"));
+        QVERIFY(d.deleteCurrentSet());
+        QVERIFY(c.value("purposes").toObject().contains("Working"));
+        QVERIFY(d.changes().value("purposes").toObject().value("Working").toObject().value("pen_set").toString() != "Daily");
+    }
+    void theLastPenSetCannotBeDeleted()
+    {
+        QJsonObject reply = tablesFromBridge();
+        QJsonObject tables = reply.value("tables").toObject();
+        tables.insert("pen_sets", QJsonObject{{"Only", tables.value("pen_sets").toObject().value("Permit")}});
+        QJsonObject purposes;
+        for (const QString& name : tables.value("purposes").toObject().keys()) {
+            QJsonObject p = tables.value("purposes").toObject().value(name).toObject();
+            p.insert("pen_set", "Only");
+            purposes.insert(name, p);
+        }
+        tables.insert("purposes", purposes);
+        reply.insert("tables", tables);
+        kimcad::PenSetsDialog d(reply, nullptr);
+        QVERIFY(!d.findChild<QPushButton*>(QStringLiteral("deleteSet"))->isEnabled());
+        QVERIFY(!d.deleteCurrentSet());
+    }
+    void lineTypesRefuseBadPatterns()
+    {
+        kimcad::LineTypesDialog d(tablesFromBridge(), nullptr);
+        QVERIFY(!d.setPattern(QStringLiteral("Dashed"), QStringLiteral("3 1.5 2"))); // dashes and gaps in pairs
+        QVERIFY(!d.okEnabled());
+        QVERIFY(!d.setPattern(QStringLiteral("Dashed"), QStringLiteral("3 -1")));
+        QVERIFY(d.setPattern(QStringLiteral("Dashed"), QStringLiteral("4 2")));
+        QVERIFY(d.okEnabled());
+        QCOMPARE(d.changes().value("line_types").toObject().value("Dashed").toArray(), (QJsonArray{4.0, 2.0}));
+        QVERIFY(!d.setPattern(QStringLiteral("Solid"), QStringLiteral("1 1"))); // Solid stays solid
+        QVERIFY(d.addLineType(QStringLiteral("Long dash"), QStringLiteral("10 2")));
+        QVERIFY(!d.addLineType(QStringLiteral("Long dash"), QStringLiteral("10 2")));
+        QVERIFY(d.changes().value("line_types").toObject().contains("Long dash"));
+    }
+    void elementStylesChangeAPenAndALine()
+    {
+        kimcad::ElementStylesDialog d(tablesFromBridge(), nullptr);
+        QVERIFY(d.changes().isEmpty());
+        d.setCutPen(QStringLiteral("walls"), 7);
+        d.setProjectionLine(QStringLiteral("furniture"), QStringLiteral("Dashed"));
+        const QJsonObject styles = d.changes().value("element_styles").toObject();
+        QCOMPARE(styles.value("walls").toObject().value("cut").toObject().value("pen").toInt(), 7);
+        QCOMPARE(styles.value("furniture").toObject().value("projection").toObject().value("line").toString(), QString("Dashed"));
+        QCOMPARE(styles.keys().size(), 19); // every kind stays in the table
     }
 };
 

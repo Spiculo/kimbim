@@ -393,6 +393,7 @@ private:
     HistoryPanel* m_history = nullptr;
     LayersPanel* m_layersPanel = nullptr;
     QSet<QString> m_hiddenLayers, m_lockedLayers;
+    QMenu* m_graphicsMenu = nullptr; // D73: the editors (Tasks 11-12 add to it)
     QString m_currentView;
     QHash<QString, QString> m_instanceOf; // element -> model instance it belongs to
     QHash<QString, QStringList> m_instanceMembers;

@@ -64,6 +64,7 @@
 
 #include "CombineDialog.h"
 #include "Graphics.h"
+#include "GraphicsDialogs.h"
 #include "PenGrid.h"
 #include "Cuts.h"
 #include "DrawingView.h"
@@ -435,6 +436,24 @@ void MainWindow::buildMenus()
         applyCuts();
     });
 
+    // D73: pens, line types, element styles, visibility, overrides, layer combinations and purposes.
+    QMenu* graphics = menuBar()->addMenu(tr("&Graphics"));
+    auto editor = [this, graphics](const char* name, const QString& text, auto make) {
+        QAction* a = graphics->addAction(text);
+        a->setObjectName(QLatin1String(name));
+        connect(a, &QAction::triggered, this, [this, make] {
+            std::unique_ptr<GraphicsDialog> dialog(make(bridge("graphics_tables")));
+            if (dialog->exec() != QDialog::Accepted)
+                return;
+            if (const QJsonObject c = dialog->changes(); !c.isEmpty())
+                setGraphics(QString::fromUtf8(QJsonDocument(c).toJson(QJsonDocument::Compact)));
+        });
+        return a;
+    };
+    editor("actionPenSets", tr("&Pen sets..."), [this](const QJsonObject& r) { return new PenSetsDialog(r, this); });
+    editor("actionLineTypes", tr("&Line types..."), [this](const QJsonObject& r) { return new LineTypesDialog(r, this); });
+    editor("actionElementStyles", tr("&Element styles..."), [this](const QJsonObject& r) { return new ElementStylesDialog(r, this); });
+    m_graphicsMenu = graphics;
     QMenu* help = menuBar()->addMenu(tr("&Help"));
     QAction* about = help->addAction(tr("&About KIMCAD"));
     connect(about, &QAction::triggered, this, &MainWindow::showAbout);

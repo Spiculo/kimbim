@@ -1594,6 +1594,14 @@ private slots:
         QVERIFY(!w.setCurrentPen(0));
     }
 
+    // D73: the Graphics menu opens the editors.
+    void theGraphicsMenuHasTheEditors()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        for (const char* name : {"actionPenSets", "actionLineTypes", "actionElementStyles"})
+            QVERIFY2(action(w, name) && action(w, name)->isEnabled(), name);
+    }
+
     void trueLineWeightsAreAPreference()
     {
         kimcad::MainWindow w(nullptr, /*quiet=*/true);
