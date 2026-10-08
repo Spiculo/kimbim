@@ -82,7 +82,13 @@ private slots:
         QCOMPARE(s.message(), QString("Wall: click the start point"));
         s.clearMessage();
         QVERIFY(s.message().isEmpty());
-        QVERIFY(!s.findChild<QToolButton*>(QStringLiteral("penButton"))->isEnabled()); // pen sets: step 3
+        auto* pen = s.findChild<QToolButton*>(QStringLiteral("penButton"));
+        QVERIFY(pen->isEnabled()); // D73: the current pen
+        QSignalSpy requested(&s, &kimcad::StatusStrip::penRequested);
+        s.setPen(26, Qt::red, 0.5);
+        QVERIFY(pen->text().startsWith(QStringLiteral("26")));
+        pen->click();
+        QCOMPARE(requested.count(), 1);
     }
 };
 
