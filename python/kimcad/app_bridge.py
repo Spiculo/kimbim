@@ -217,9 +217,10 @@ def _reset_history(path: str):
     from . import layers
 
     layers.forget()
-    from . import settings
+    from . import documents, settings
 
     settings.load(None)
+    documents.on_model_opened(path)
 
 
 def _geometry_now(guids) -> dict:
@@ -885,3 +886,17 @@ from .editing import (  # noqa: E402,F401
 from .rooms import create_room, edit_room, export_room_schedule, room_schedule, rooms  # noqa: E402,F401
 from .roofs import attach_walls_to_roof, create_roof, detach_walls_from_roof, roof_info  # noqa: E402,F401
 from .settings import project_settings, set_project_settings  # noqa: E402,F401
+from .documents import (  # noqa: E402,F401
+    close_document,
+    document_state,
+    export_ifc,
+    import_ifc,
+    kim_beside,
+    open_folder,
+    open_kim,
+    save_as_folder,
+    save_as_kim,
+    save_document,
+    set_app_paths,
+    set_author,
+)

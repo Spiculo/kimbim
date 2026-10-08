@@ -123,7 +123,12 @@ def _git_config(key: str) -> str | None:
     return out.stdout.strip() or None
 
 
+_AUTHOR: tuple[str, str] | None = None  # set by the app from its preferences (documents.set_author)
+
+
 def _author() -> tuple[str, str]:
+    if _AUTHOR is not None:
+        return _AUTHOR
     name = os.environ.get("KIMCAD_AUTHOR_NAME") or _git_config("user.name") or "KIMCAD User"
     email = os.environ.get("KIMCAD_AUTHOR_EMAIL") or _git_config("user.email") or "user@localhost"
     return name, email

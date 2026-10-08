@@ -15,6 +15,7 @@ import os
 import pathlib
 import shutil
 import socket
+import stat
 import time
 import zipfile
 
@@ -27,6 +28,19 @@ SKIP = (".kimcad/cache/", ".kimcad/index.db", ".kimcad/lock", ".kimcad/recovery/
 
 class KimError(Exception):
     pass
+
+
+def remove_tree(path) -> None:
+    """Delete a folder, including the read-only files Git writes (pack files, on Windows)."""
+    def retry(func, target, _exc):
+        try:
+            os.chmod(target, stat.S_IWRITE)
+            func(target)
+        except OSError:
+            pass
+
+    if os.path.exists(path):
+        shutil.rmtree(path, onexc=retry)
 
 
 def path_hash(path) -> str:
@@ -111,7 +125,9 @@ def unpack(kim, folder) -> dict:
         if bad:
             raise KimError(f"{kim.name} has unsafe entries ({bad[0]}); it was not opened")
         if folder.exists():
-            shutil.rmtree(folder)
+            remove_tree(folder)
+            if folder.exists():
+                raise KimError(f"could not clear {folder}: a file in it is in use")
         folder.mkdir(parents=True)
         for n in names:
             if n.endswith("/"):
