@@ -21,6 +21,9 @@
 #include "ToolOptionsBar.h"
 #include "ToolPalette.h"
 #include <QComboBox>
+#include <QLocale>
+#include <QSpinBox>
+#include <QLabel>
 #include <QDoubleSpinBox>
 #include <QMenu>
 #include <QStatusBar>
@@ -38,6 +41,7 @@
 #include "HostTool.h"
 #include "MainWindow.h"
 #include "PolygonTool.h"
+#include "ProjectSettingsDialog.h"
 #include "GripTool.h"
 #include "RotateTool.h"
 #include "TwoPointTool.h"
@@ -1424,6 +1428,47 @@ private slots:
         QVERIFY(!w.save());
         QVERIFY(w.close());
         QVERIFY(QFile::exists(kim + ".lock")); // Ana's lock is left alone
+    }
+
+    // D72: project settings are applied on open and saved with the .kim (layers, cut, scale, paper, units).
+    void projectSettingsTravelWithTheKim()
+    {
+        QTemporaryDir tmp;
+        const QString kim = tmp.filePath(QStringLiteral("ajustes.kim"));
+        {
+            kimcad::MainWindow w(nullptr, /*quiet=*/true);
+            QVERIFY(w.newProject());
+            QVERIFY(w.createLayer(QStringLiteral("A-WALL")));
+            QVERIFY(w.setProjectSettings({{"plan_cut_height", 1.0}, {"sheet_paper", "A3"}, {"drawing_scale", 50},
+                                          {"length_unit", "mm"}, {"length_decimals", 0}}));
+            QVERIFY(w.isDirty());
+            QCOMPARE(w.formatLength(3.5), QLocale().toString(3500.0, 'f', 0) + QStringLiteral(" mm"));
+            QVERIFY(!w.setProjectSettings({{"drawing_scale", 0}})); // refused, nothing changes
+            w.setLayerVisible(QStringLiteral("A-WALL"), false);
+            QVERIFY(w.saveAs(kim));
+            QVERIFY(w.close());
+        }
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        QVERIFY(w.openPath(kim));
+        QVERIFY(loaded.wait(60000));
+        QCOMPARE(w.planCutHeight(), 1.0);
+        QCOMPARE(w.projectSettings().value("hidden_layers").toArray(), QJsonArray({"A-WALL"}));
+        QCOMPARE(w.projectSettings().value("sheet_paper").toString(), QString("A3"));
+        QVERIFY(!w.isDirty());
+        const QString number = w.addSheet(w.projectSettings().value("sheet_paper").toString(), QStringLiteral("S"));
+        QVERIFY(!number.isEmpty());
+        QVERIFY(w.close());
+    }
+
+    void projectSettingsDialogReportsOnlyChanges()
+    {
+        kimcad::ProjectSettingsDialog d({{"plan_cut_height", 1.2}, {"drawing_scale", 100}, {"sheet_paper", "A1"},
+                                         {"length_unit", "m"}, {"length_decimals", 2}}, /*kept=*/false, nullptr);
+        QVERIFY(d.findChild<QLabel*>("notKeptNote")->isVisibleTo(&d));
+        d.findChild<QComboBox*>("sheetPaper")->setCurrentText("A3");
+        d.findChild<QSpinBox*>("drawingScale")->setValue(50);
+        QCOMPARE(d.changes(), QJsonObject({{"sheet_paper", "A3"}, {"drawing_scale", 50}}));
     }
 };
 

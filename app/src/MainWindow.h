@@ -133,6 +133,10 @@ public:
     bool closeDocument(); // after the unsaved-work question: releases the file's lock
     QJsonObject documentState();
     bool hasUnversionedWork(); // work no version holds yet (Ctrl+S saves the file, not a version)
+    // D72: project settings (kept with the .kim / folder, versioned).
+    QJsonObject projectSettings() const { return m_settings; }
+    bool setProjectSettings(const QJsonObject& changes); // false (and nothing changes) if refused
+    QString formatLength(double metres) const;            // in the project's unit and decimals
     bool saveVersion(const QString& message);
     QJsonArray history();
     bool compareWith(const QString& revA, const QString& revB = QStringLiteral("WORKING"));
@@ -297,6 +301,8 @@ private:
     void newProjectDialog();
     void saveAsTemplateDialog();
     void projectSettingsDialog();
+    void loadProjectSettings();
+    void saveLayerStates();
     void openProjectDialog();
     void newOptionDialog();
     void milestoneDialog();
@@ -392,6 +398,7 @@ private:
     int m_savesSinceVersion = 0; // D72: automatic versions every N saves...
     QElapsedTimer m_sinceVersion; // ...or N minutes
     QJsonObject m_document;       // the last document_state
+    QJsonObject m_settings;       // the project settings (D72)
     QLineEdit* m_lengthInput = nullptr;
     QAction* m_undo = nullptr;
     QAction* m_redo = nullptr;

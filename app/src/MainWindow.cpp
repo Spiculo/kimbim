@@ -77,6 +77,7 @@
 #include "MeshChunk.h"
 #include "ModelLoader.h"
 #include "ModelTreePanel.h"
+#include "ProjectSettingsDialog.h"
 #include "PropertiesPanel.h"
 #include "PythonEngine.h"
 #include "Viewport.h"
@@ -557,7 +558,7 @@ void MainWindow::buildCutsToolbar()
             const QSignalBlocker block(m_cutSlider);
             m_cutSlider->setValue(int(std::lround(metres * 100)));
         }
-        m_cutLabel->setText(QLocale().toString(metres, 'f', 2) + QStringLiteral(" m"));
+        m_cutLabel->setText(formatLength(metres));
         if (m_planCut->isChecked())
             applyCuts();
     });
@@ -566,7 +567,7 @@ void MainWindow::buildCutsToolbar()
         if (!m_planCut->isChecked())
             m_planCut->setChecked(true); // using the slider means cutting
     });
-    m_cutLabel->setText(QLocale().toString(m_cutHeight->value(), 'f', 2) + QStringLiteral(" m"));
+    m_cutLabel->setText(formatLength(m_cutHeight->value()));
     bar->addSeparator();
     bar->addAction(m_sectionBox);
 }
@@ -848,8 +849,7 @@ bool MainWindow::newProject()
     m_warnedInconsistent = false;
     afterEdit();
     refreshProject();
-    m_hiddenLayers.clear();
-    m_lockedLayers.clear();
+    loadProjectSettings();
     m_currentView.clear();
     refreshLayers();
     refreshAnnotations();
@@ -1453,7 +1453,7 @@ void MainWindow::showSnap(const Snap& snap)
     const auto preview = m_tool == Tool::Wall ? m_wallTool->preview() : m_twoPointTool->preview();
     if (preview) {
         const QPointF d = preview->second - preview->first;
-        text = tr("Length %1 m").arg(QLocale().toString(std::hypot(d.x(), d.y()), 'f', 3));
+        text = tr("Length %1").arg(formatLength(std::hypot(d.x(), d.y())));
     }
     if (snap.kind != Snap::None)
         text += QStringLiteral("  ·  ") + tr(names[snap.kind]);
@@ -1849,8 +1849,9 @@ void MainWindow::buildPalette()
     connect(newPlan, &QAction::triggered, this, [this] { openPlanTab(m_levels->activeStorey()); });
     auto* newSheet = new QAction(tr("New &sheet"), this);
     newSheet->setObjectName(QStringLiteral("actionNewSheet"));
-    newSheet->setToolTip(tr("Add an A1 sheet and open it"));
-    connect(newSheet, &QAction::triggered, this, [this] { newSheetDialog(QStringLiteral("A1")); });
+    newSheet->setToolTip(tr("Add a sheet and open it"));
+    connect(newSheet, &QAction::triggered, this,
+        [this] { newSheetDialog(m_settings.value("sheet_paper").toString(QStringLiteral("A1"))); });
     // Mirror is a tool like the others: it shows as active while it is.
     QAction* mirror = findChild<QAction*>(QStringLiteral("actionMirror"));
     mirror->setCheckable(true);
@@ -2506,8 +2507,8 @@ void MainWindow::dragMoveTo(QPointF start, QPointF current, double tolerance, Qt
     }
     boxes.push_back({start, start + delta, 0.03, m_levels->activeElevation(), m_levels->activeElevation() + 0.02});
     m_viewport->setPreviewBoxes(boxes);
-    m_status->showMessage(tr("Move %1 m (Ctrl: copy, Alt: detach joined walls, Shift: straight)")
-                                 .arg(QLocale().toString(std::hypot(delta.x(), delta.y()), 'f', 3)));
+    m_status->showMessage(tr("Move %1 (Ctrl: copy, Alt: detach joined walls, Shift: straight)")
+                                 .arg(formatLength(std::hypot(delta.x(), delta.y()))));
 }
 
 bool MainWindow::dragFinished(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers)
@@ -2789,7 +2790,7 @@ void MainWindow::activateView(const QString& key)
         m_levels->setActive(host->storey()); // a plan tab's level is the active level
     if (switched) {
         updateCutSliderRange();
-        m_cutLabel->setText(QLocale().toString(m_cutHeight->value(), 'f', 2) + QStringLiteral(" m"));
+        m_cutLabel->setText(formatLength(m_cutHeight->value()));
         m_viewport->setWorkPlaneZ(m_levels->activeElevation());
         applyCuts();
         refreshAnnotations(); // this view's level notes, grid and markers
@@ -2982,7 +2983,8 @@ QString MainWindow::addSheet(const QString& paper, const QString& title)
 bool MainWindow::placeOnSheet(const QString& number, const QString& drawingGuid)
 {
     m_status->showMessage(tr("Placing the drawing..."));
-    const QJsonObject r = bridge("place_drawing", {number, drawingGuid, QStringLiteral("-1"), QStringLiteral("-1"), QStringLiteral("100")});
+    const QJsonObject r = bridge("place_drawing", {number, drawingGuid, QStringLiteral("-1"), QStringLiteral("-1"),
+        QString::number(m_settings.value("drawing_scale").toInt(100))});
     if (!r.value("ok").toBool()) {
         m_status->showMessage(tr("Could not place it: %1").arg(r.value("error").toString()));
         return false;
@@ -3530,6 +3532,7 @@ void MainWindow::setLayerVisible(const QString& layer, bool visible)
         m_hiddenLayers.remove(layer);
     else
         m_hiddenLayers.insert(layer);
+    saveLayerStates();
     refreshLayers();
 }
 
@@ -3539,6 +3542,7 @@ void MainWindow::setLayerLocked(const QString& layer, bool locked)
         m_lockedLayers.insert(layer);
     else
         m_lockedLayers.remove(layer);
+    saveLayerStates();
     refreshLayers();
 }
 
@@ -3595,6 +3599,7 @@ bool MainWindow::applyView(const QString& name)
             setPlanView(data.value("plan").toBool());
         applyCuts();
         m_currentView = name;
+        saveLayerStates();
         refreshLayers();
         m_status->showMessage(tr("View %1").arg(name));
         return true;
@@ -3950,6 +3955,55 @@ void MainWindow::saveAsTemplateDialog()
 
 void MainWindow::projectSettingsDialog()
 {
+    ProjectSettingsDialog dialog(m_settings, bridge("project_settings").value("kept").toBool(), this);
+    if (dialog.exec() == QDialog::Accepted && !dialog.changes().isEmpty() && setProjectSettings(dialog.changes()))
+        m_status->showMessage(tr("Project settings changed"));
+}
+
+void MainWindow::loadProjectSettings()
+{
+    m_settings = bridge("project_settings").value("settings").toObject();
+    m_hiddenLayers.clear();
+    m_lockedLayers.clear();
+    for (const auto& l : m_settings.value("hidden_layers").toArray())
+        m_hiddenLayers.insert(l.toString());
+    for (const auto& l : m_settings.value("locked_layers").toArray())
+        m_lockedLayers.insert(l.toString());
+    const QSignalBlocker block(m_cutHeight);
+    m_cutHeight->setValue(m_settings.value("plan_cut_height").toDouble(1.2));
+    m_cutLabel->setText(formatLength(m_cutHeight->value()));
+}
+
+bool MainWindow::setProjectSettings(const QJsonObject& changes)
+{
+    const QJsonObject r = bridge("set_project_settings",
+        {QString::fromUtf8(QJsonDocument(changes).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(r.value("error").toString());
+        return false;
+    }
+    m_settings = r.value("settings").toObject();
+    setWindowModified(isDirty());
+    return true;
+}
+
+QString MainWindow::formatLength(double metres) const
+{
+    const QString unit = m_settings.value("length_unit").toString(QStringLiteral("m"));
+    const double factor = unit == QLatin1String("mm") ? 1000.0 : unit == QLatin1String("cm") ? 100.0 : 1.0;
+    return QLocale().toString(metres * factor, 'f', m_settings.value("length_decimals").toInt(2))
+        + QLatin1Char(' ') + unit;
+}
+
+void MainWindow::saveLayerStates()
+{
+    if (!bridge("document_state").value("kept").toBool())
+        return; // a plain IFC keeps no settings: showing a layer isn't unsaved work there
+    QStringList hidden(m_hiddenLayers.begin(), m_hiddenLayers.end()), locked(m_lockedLayers.begin(), m_lockedLayers.end());
+    hidden.sort();
+    locked.sort();
+    setProjectSettings({{"hidden_layers", QJsonArray::fromStringList(hidden)},
+                        {"locked_layers", QJsonArray::fromStringList(locked)}});
 }
 
 bool MainWindow::maybeSave()
@@ -4003,8 +4057,7 @@ void MainWindow::onOpened(const QJsonObject& info)
     QString error;
     const QJsonObject tree = PythonEngine::instance().callJson("spatial_tree", {}, &error).object();
     m_tree->setTree(tree);
-    m_hiddenLayers.clear();
-    m_lockedLayers.clear();
+    loadProjectSettings();
     m_currentView.clear();
     refreshProject();
     refreshLayers();
