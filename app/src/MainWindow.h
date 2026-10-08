@@ -97,7 +97,10 @@ public:
     bool isDirty() const;
     bool deleteSelection();
     // Slice 4: new project, levels, plan view.
-    bool newProject();
+    bool newProject(); // from KIMCAD's built-in template
+    // D72: office templates. "builtin" is KIMCAD's default; a template opens as an untitled project.
+    bool newFromTemplate(const QString& path);
+    bool saveAsTemplate(const QString& name, bool replace = false); // false if it exists and wasn't replaced
     bool addLevel(const QString& name, double elevation);
     LevelsBar* levelsBar() const { return m_levels; }
     // Modeling tools (M3): one active at a time. Exposed for tests and the self-test, which drive
@@ -308,6 +311,7 @@ private:
     void saveAsTemplateDialog();
     void projectSettingsDialog();
     void loadProjectSettings();
+    void resetForNewModel();
     void preferencesDialog();
     void restartRecoveryTimer();
     void saveLayerStates();

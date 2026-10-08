@@ -1541,6 +1541,37 @@ private slots:
         QVERIFY(w.close()); // quiet close discards: the copy is cleared
         QVERIFY(w.recoveries().isEmpty());
     }
+
+    // D72: office templates: save one, start a project from it, first save makes its history.
+    void projectsStartFromOfficeTemplates()
+    {
+        QTemporaryDir tmp;
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        w.preferences().setValue("templates_folder", tmp.filePath(QStringLiteral("Plantillas")));
+        QVERIFY(w.newProject());
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({5, 0});
+        w.wallTool()->finish();
+        w.setTool(kimcad::MainWindow::Tool::None);
+        const QString original = w.viewport()->guids().first();
+        QVERIFY(w.saveAsTemplate(QStringLiteral("Oficina")));
+        QVERIFY(!w.saveAsTemplate(QStringLiteral("Oficina"))); // exists; quiet mode doesn't replace
+        QVERIFY(w.saveAsTemplate(QStringLiteral("Oficina"), /*replace=*/true));
+        const QString path = tmp.filePath(QStringLiteral("Plantillas/Oficina.kim"));
+        QVERIFY(QFile::exists(path));
+
+        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        QVERIFY(w.newFromTemplate(path));
+        QVERIFY(loaded.wait(60000));
+        QCOMPARE(w.viewport()->elementCount(), 1);
+        QVERIFY(!w.viewport()->guids().contains(original)); // new ids
+        QVERIFY(w.windowTitle().contains(QStringLiteral("Untitled")));
+        QVERIFY(!w.save()); // untitled: quiet mode can't ask where
+        QVERIFY(w.saveAs(tmp.filePath(QStringLiteral("nuevo.kim"))));
+        QCOMPARE(w.history().first().toObject().value("message").toString(), QString("Created from Oficina"));
+        QVERIFY(w.close());
+    }
 };
 
 QTEST_MAIN(TestMainWindow)

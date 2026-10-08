@@ -841,16 +841,31 @@ void MainWindow::typeEditDialog(const QString& pset, const QString& prop)
     applyTypeEdit(pset, prop, QJsonValue(value));
 }
 
-bool MainWindow::newProject()
+bool MainWindow::newFromTemplate(const QString& path)
 {
-    if (!maybeSave())
+    if (!closeDocument())
         return false;
-    stopLoading();
-    const QJsonObject r = bridge("new_project", {tr("Untitled")});
+    const QJsonObject r = bridge("new_from_template", {path});
     if (!r.value("ok").toBool()) {
         showError(tr("Could not create the project"), r.value("error").toString());
         return false;
     }
+    if (!r.value("path").toString().isEmpty()) { // an office template: load it like a file
+        endCompare();
+        openFile(r.value("path").toString());
+        return true;
+    }
+    resetForNewModel(); // the old newProject() body after its bridge call
+    return true;
+}
+
+bool MainWindow::newProject()
+{
+    return newFromTemplate(QStringLiteral("builtin"));
+}
+
+void MainWindow::resetForNewModel()
+{
     closePlanTabs(); // the old model's levels
     m_viewport->clear();
     m_properties->clear();
@@ -869,7 +884,6 @@ bool MainWindow::newProject()
     refreshDrawings();
     refreshSheets();
     m_status->showMessage(tr("New project"));
-    return true;
 }
 
 void MainWindow::refreshLevels()
@@ -3959,11 +3973,59 @@ void MainWindow::exportIfcDialog()
 
 void MainWindow::newProjectDialog()
 {
-    newProject();
+    const QJsonObject listing = bridge("templates", {m_prefs.templatesFolder()});
+    const QJsonArray list = listing.value("templates").toArray();
+    if (list.size() <= 1 || m_quiet) {
+        newProject();
+        return;
+    }
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("New project"));
+    auto* layout = new QVBoxLayout(&dialog);
+    layout->addWidget(new QLabel(tr("Start from a template:"), &dialog));
+    auto* choices = new QListWidget(&dialog);
+    choices->setObjectName(QStringLiteral("templateList"));
+    for (const auto& v : list) {
+        const QJsonObject t = v.toObject();
+        auto* item = new QListWidgetItem(t.value("builtin").toBool() ? tr("KIMCAD default")
+            : QStringLiteral("%1  (%2)").arg(t.value("name").toString(), t.value("modified").toString()), choices);
+        item->setData(Qt::UserRole, t.value("path").toString());
+    }
+    choices->setCurrentRow(0);
+    layout->addWidget(choices);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    connect(choices, &QListWidget::itemDoubleClicked, &dialog, &QDialog::accept);
+    layout->addWidget(buttons);
+    if (dialog.exec() == QDialog::Accepted && choices->currentItem())
+        newFromTemplate(choices->currentItem()->data(Qt::UserRole).toString());
+}
+
+bool MainWindow::saveAsTemplate(const QString& name, bool replace)
+{
+    QJsonObject r = bridge("save_template", {m_prefs.templatesFolder(), name, replace ? QStringLiteral("1") : QString()});
+    if (!r.value("ok").toBool() && r.value("exists").toBool() && !m_quiet
+        && QMessageBox::question(this, tr("Save as template"), tr("A template called %1 exists. Replace it?").arg(name))
+               == QMessageBox::Yes)
+        r = bridge("save_template", {m_prefs.templatesFolder(), name, QStringLiteral("1")});
+    if (!r.value("ok").toBool()) {
+        if (!r.value("exists").toBool())
+            showError(tr("Could not save the template"), r.value("error").toString());
+        return false;
+    }
+    m_status->showMessage(tr("Template %1 saved").arg(name));
+    return true;
 }
 
 void MainWindow::saveAsTemplateDialog()
 {
+    bool ok = false;
+    const QString name = QInputDialog::getText(this, tr("Save as template"),
+        tr("Template name (saved in %1):").arg(QDir::toNativeSeparators(m_prefs.templatesFolder())),
+        QLineEdit::Normal, QString(), &ok);
+    if (ok && !name.trimmed().isEmpty())
+        saveAsTemplate(name.trimmed());
 }
 
 void MainWindow::projectSettingsDialog()
