@@ -535,57 +535,71 @@ private:
 
 namespace {
 
-// Cut sections: filled outlines (unlit, dark) plus bold borders, drawn just below the cut plane.
+// Cut sections: filled outlines (unlit) plus bold borders, drawn just below the cut plane. D73: one
+// part per style (the element's fill pen and cut line); no fill colour = outline only.
+struct SectionPart {
+    std::vector<std::vector<gp_Pnt2d>> loops;
+    std::optional<Quantity_Color> fill;
+    Quantity_Color line;
+    float width = 2.0f;
+    uint16_t pattern = 0xFFFF;
+};
+
 class SectionPrs : public AIS_InteractiveObject {
 public:
-    SectionPrs(std::vector<std::vector<gp_Pnt2d>> loops, double z)
-        : m_loops(std::move(loops))
+    SectionPrs(std::vector<SectionPart> parts, double z)
+        : m_parts(std::move(parts))
         , m_z(z)
     {
     }
     void Compute(const Handle(PrsMgr_PresentationManager)&, const Handle(Prs3d_Presentation)& prs, const int) override
     {
-        int triangles = 0, segments = 0;
-        std::vector<std::vector<uint32_t>> tris;
-        for (const auto& loop : m_loops) {
-            QVector<QPointF> poly;
-            for (const auto& p : loop)
-                poly << QPointF(p.X(), p.Y());
-            tris.push_back(PolygonTool::triangulate(poly));
-            triangles += int(tris.back().size() / 3);
-            segments += int(loop.size());
-        }
         const double z = m_z - 1e-4;
-        if (triangles > 0) {
-            Handle(Graphic3d_ArrayOfTriangles) fill = new Graphic3d_ArrayOfTriangles(triangles * 3);
-            for (size_t l = 0; l < m_loops.size(); ++l)
-                for (uint32_t i : tris[l])
-                    fill->AddVertex(gp_Pnt(m_loops[l][i].X(), m_loops[l][i].Y(), z));
-            Handle(Graphic3d_Group) g = prs->NewGroup();
-            Handle(Graphic3d_AspectFillArea3d) aspect = new Graphic3d_AspectFillArea3d();
-            aspect->SetInteriorStyle(Aspect_IS_SOLID);
-            aspect->SetInteriorColor(Quantity_Color(0.25, 0.25, 0.27, Quantity_TOC_RGB));
-            aspect->SetShadingModel(Graphic3d_TypeOfShadingModel_Unlit);
-            aspect->SetFaceCulling(Graphic3d_TypeOfBackfacingModel_DoubleSided);
-            g->SetGroupPrimitivesAspect(aspect);
-            g->AddPrimitiveArray(fill);
-        }
-        if (segments > 0) {
-            Handle(Graphic3d_ArrayOfSegments) lines = new Graphic3d_ArrayOfSegments(segments * 2);
-            for (const auto& loop : m_loops)
-                for (size_t i = 0; i < loop.size(); ++i) {
-                    lines->AddVertex(gp_Pnt(loop[i].X(), loop[i].Y(), z));
-                    lines->AddVertex(gp_Pnt(loop[(i + 1) % loop.size()].X(), loop[(i + 1) % loop.size()].Y(), z));
-                }
-            Handle(Graphic3d_Group) g = prs->NewGroup();
-            g->SetGroupPrimitivesAspect(new Graphic3d_AspectLine3d(Quantity_NOC_BLACK, Aspect_TOL_SOLID, 2.0));
-            g->AddPrimitiveArray(lines);
+        for (const SectionPart& part : m_parts) {
+            int triangles = 0, segments = 0;
+            std::vector<std::vector<uint32_t>> tris;
+            for (const auto& loop : part.loops) {
+                QVector<QPointF> poly;
+                for (const auto& p : loop)
+                    poly << QPointF(p.X(), p.Y());
+                tris.push_back(part.fill ? PolygonTool::triangulate(poly) : std::vector<uint32_t>{});
+                triangles += int(tris.back().size() / 3);
+                segments += int(loop.size());
+            }
+            if (triangles > 0) {
+                Handle(Graphic3d_ArrayOfTriangles) fill = new Graphic3d_ArrayOfTriangles(triangles * 3);
+                for (size_t l = 0; l < part.loops.size(); ++l)
+                    for (uint32_t i : tris[l])
+                        fill->AddVertex(gp_Pnt(part.loops[l][i].X(), part.loops[l][i].Y(), z));
+                Handle(Graphic3d_Group) g = prs->NewGroup();
+                Handle(Graphic3d_AspectFillArea3d) aspect = new Graphic3d_AspectFillArea3d();
+                aspect->SetInteriorStyle(Aspect_IS_SOLID);
+                aspect->SetInteriorColor(*part.fill);
+                aspect->SetShadingModel(Graphic3d_TypeOfShadingModel_Unlit);
+                aspect->SetFaceCulling(Graphic3d_TypeOfBackfacingModel_DoubleSided);
+                g->SetGroupPrimitivesAspect(aspect);
+                g->AddPrimitiveArray(fill);
+            }
+            if (segments > 0) {
+                Handle(Graphic3d_ArrayOfSegments) lines = new Graphic3d_ArrayOfSegments(segments * 2);
+                for (const auto& loop : part.loops)
+                    for (size_t i = 0; i < loop.size(); ++i) {
+                        lines->AddVertex(gp_Pnt(loop[i].X(), loop[i].Y(), z));
+                        lines->AddVertex(gp_Pnt(loop[(i + 1) % loop.size()].X(), loop[(i + 1) % loop.size()].Y(), z));
+                    }
+                Handle(Graphic3d_AspectLine3d) aspect = new Graphic3d_AspectLine3d(part.line, Aspect_TOL_SOLID, part.width);
+                if (part.pattern != 0xFFFF)
+                    aspect->SetLinePattern(part.pattern);
+                Handle(Graphic3d_Group) g = prs->NewGroup();
+                g->SetGroupPrimitivesAspect(aspect);
+                g->AddPrimitiveArray(lines);
+            }
         }
     }
     void ComputeSelection(const Handle(SelectMgr_Selection)&, const int) override {}
 
 private:
-    std::vector<std::vector<gp_Pnt2d>> m_loops;
+    std::vector<SectionPart> m_parts;
     double m_z;
 };
 
@@ -608,7 +622,12 @@ void Viewport::rebuildSection()
         update();
         return;
     }
-    std::vector<std::vector<gp_Pnt2d>> loops;
+    // One part per style: elements without a style keep the dark fill and bold black outline.
+    const Graphics& g = m_scene->graphics;
+    auto occ = [](const QColor& c) { return Quantity_Color(c.redF(), c.greenF(), c.blueF(), Quantity_TOC_sRGB); };
+    std::vector<SectionPart> parts;
+    QHash<QString, size_t> partOf; // style key -> index in parts
+    int loopCount = 0;
     for (const auto& b : m_scene->batches)
         for (int i = 0; i < b->elementCount(); ++i) {
             if (b->isHidden(i))
@@ -617,12 +636,31 @@ void Viewport::rebuildSection()
             if (element.empty())
                 continue;
             ++m_sectionElements;
-            for (auto& l : element)
-                loops.push_back(std::move(l));
+            const ElementStyle* st = g.styleOf(b->guid(i));
+            SectionPart part;
+            part.fill = Quantity_Color(0.25, 0.25, 0.27, Quantity_TOC_RGB);
+            part.line = Quantity_Color(Quantity_NOC_BLACK);
+            if (st) {
+                part.fill = st->fill.isValid() ? std::optional<Quantity_Color>(occ(st->fill)) : std::nullopt;
+                part.line = occ(st->cut.color);
+                part.width = std::max(Graphics::pixels(st->cut.weight, true), 1.0f); // plan cuts stay bold
+                part.pattern = Graphics::pattern(st->cut.dash);
+            }
+            const QString key = st ? QStringLiteral("%1|%2|%3|%4|%5").arg(st->fill.isValid() ? st->fill.name() : QString(),
+                st->cut.color.name()).arg(part.width).arg(part.pattern).arg(0) : QStringLiteral("default");
+            auto it = partOf.constFind(key);
+            if (it == partOf.constEnd()) {
+                it = partOf.insert(key, parts.size());
+                parts.push_back(part);
+            }
+            for (auto& l : element) {
+                parts[*it].loops.push_back(std::move(l));
+                ++loopCount;
+            }
         }
-    if (!loops.empty()) {
+    if (loopCount > 0) {
         // 1 mm below the cut height: the view's own cut plane keeps what is below it.
-        m_section = new SectionPrs(std::move(loops), *m_sectionZ - 0.001);
+        m_section = new SectionPrs(std::move(parts), *m_sectionZ - 0.001);
         m_context->Display(m_section, 0, -1, false);
         keepHere(m_section);
     }
@@ -648,9 +686,11 @@ private:
 // One plan annotation: lines (dimension, mark circle) and its text, on top of the model.
 class AnnotationPrs : public AIS_InteractiveObject {
 public:
-    AnnotationPrs(Viewport::Annotation a, double z)
+    // `ink`: the pen's colour and width (D73); nullopt keeps the kind's own colours (markers, rooms).
+    AnnotationPrs(Viewport::Annotation a, double z, std::optional<std::pair<Quantity_Color, float>> ink = std::nullopt)
         : m_a(std::move(a))
         , m_z(z)
+        , m_ink(std::move(ink))
     {
         SetZLayer(Graphic3d_ZLayerId_Topmost);
     }
@@ -662,7 +702,8 @@ public:
     {
         const bool marker = isMarker();
         const bool room = m_a.kind == QLatin1String("room");
-        const Quantity_Color ink = m_a.kind == QLatin1String("mark") ? Quantity_Color(0.75, 0.15, 0.1, Quantity_TOC_RGB)
+        const Quantity_Color ink = m_ink ? m_ink->first
+            : m_a.kind == QLatin1String("mark") ? Quantity_Color(0.75, 0.15, 0.1, Quantity_TOC_RGB)
             : room ? Quantity_Color(0.1, 0.45, 0.3, Quantity_TOC_RGB)
             : marker ? Quantity_Color(0.1, 0.3, 0.75, Quantity_TOC_RGB)
                      : Quantity_Color(0.1, 0.1, 0.12, Quantity_TOC_RGB);
@@ -674,7 +715,8 @@ public:
                 arr->AddVertex(s.second);
             }
             Handle(Graphic3d_Group) lines = prs->NewGroup();
-            lines->SetGroupPrimitivesAspect(new Graphic3d_AspectLine3d(ink, room ? Aspect_TOL_DOT : Aspect_TOL_SOLID, room ? 1.0 : 1.5));
+            const float width = m_ink ? std::max(m_ink->second, 1.0f) : (room ? 1.0f : 1.5f);
+            lines->SetGroupPrimitivesAspect(new Graphic3d_AspectLine3d(ink, room ? Aspect_TOL_DOT : Aspect_TOL_SOLID, width));
             lines->AddPrimitiveArray(arr);
         }
         Handle(Prs3d_TextAspect) text = new Prs3d_TextAspect();
@@ -845,6 +887,7 @@ private:
 
     Viewport::Annotation m_a;
     double m_z;
+    std::optional<std::pair<Quantity_Color, float>> m_ink;
     Handle(SelectMgr_EntityOwner) m_owner;
 };
 
@@ -866,10 +909,20 @@ void Viewport::displayAnnotations()
     for (const QVector<Annotation>* list : {&m_annotationData, &m_markerData}) {
         if (list == &m_markerData && !m_planView)
             continue;
+        const Graphics& g = m_scene->graphics;
         for (const Annotation& a : *list) {
-            if (m_scene->layerHidden.contains(a.guid))
+            if (m_scene->layerHidden.contains(a.guid) || g.isHidden(a.guid))
                 continue;
-            Handle(AnnotationPrs) prs = new AnnotationPrs(a, m_annotationZ + 0.02);
+            // D73: text, dimensions, marks and leaders take their pen (or the annotations kind's pen).
+            std::optional<std::pair<Quantity_Color, float>> ink;
+            const bool ownColours = a.kind == QLatin1String("room") || a.kind == QLatin1String("section")
+                || a.kind == QLatin1String("elevation");
+            if (!ownColours && !g.isEmpty()) {
+                const LineStyle pen = g.pen(a.pen > 0 ? a.pen : g.annotationPen());
+                ink = std::make_pair(Quantity_Color(pen.color.redF(), pen.color.greenF(), pen.color.blueF(), Quantity_TOC_sRGB),
+                    Graphics::pixels(pen.weight, m_scene->trueWeights));
+            }
+            Handle(AnnotationPrs) prs = new AnnotationPrs(a, m_annotationZ + 0.02, ink);
             m_context->Display(prs, 0, m_scene->layerLocked.contains(a.guid) ? -1 : 0, false);
             keepHere(prs);
             m_annotations.insert(a.guid, prs);
@@ -1128,6 +1181,7 @@ void Viewport::addBatch(const Handle(ElementBatch)& batch)
         m_scene->locate.insert(batch->guid(i), Scene::Loc{b, i});
     applyColors(batch);
     applyLayerState(batch);
+    applyGraphics(batch);
     batch->setIdBase(m_scene->nextIdBase);
     m_scene->idBases.push_back(m_scene->nextIdBase);
     m_scene->nextIdBase += batch->elementCount();
@@ -1218,6 +1272,68 @@ void Viewport::applyLayerState(const Handle(ElementBatch)& batch) const
         batch->setLayerHidden(i, m_scene->layerHidden.contains(batch->guid(i)));
         batch->setLocked(i, m_scene->layerLocked.contains(batch->guid(i)));
     }
+}
+
+bool Viewport::applyGraphics(const Handle(ElementBatch)& batch) const
+{
+    const Graphics& g = m_scene->graphics;
+    auto occ = [](const QColor& c) { return Quantity_Color(c.redF(), c.greenF(), c.blueF(), Quantity_TOC_sRGB); };
+    auto sameLine = [](const std::optional<BatchLine>& a, const std::optional<BatchLine>& b) {
+        return a.has_value() == b.has_value()
+            && (!a || (a->color.IsEqual(b->color) && a->width == b->width && a->pattern == b->pattern));
+    };
+    auto sameColor = [](const std::optional<Quantity_Color>& a, const std::optional<Quantity_Color>& b) {
+        return a.has_value() == b.has_value() && (!a || a->IsEqual(*b));
+    };
+    bool changed = false;
+    for (int i = 0; i < batch->elementCount(); ++i) {
+        const QString guid = batch->guid(i);
+        const bool hidden = g.isHidden(guid);
+        std::optional<BatchLine> line;
+        std::optional<Quantity_Color> surface;
+        double alpha = 0.0;
+        if (const ElementStyle* s = g.styleOf(guid)) {
+            line = BatchLine{occ(s->projection.color), Graphics::pixels(s->projection.weight, m_scene->trueWeights),
+                Graphics::pattern(s->projection.dash)};
+            if (s->surface)
+                surface = occ(*s->surface);
+            alpha = s->transparency.value_or(0.0);
+        }
+        if (batch->isGraphicsHidden(i) == hidden && sameLine(batch->lineStyle(i), line)
+            && sameColor(batch->surface(i), surface) && batch->transparency(i) == alpha)
+            continue;
+        batch->setGraphicsHidden(i, hidden);
+        batch->setLineStyle(i, line);
+        batch->setSurface(i, surface, alpha);
+        changed = true;
+    }
+    return changed;
+}
+
+void Viewport::setGraphics(const Graphics& graphics, bool trueWeights)
+{
+    m_scene->graphics = graphics;
+    m_scene->trueWeights = trueWeights;
+    for (const QString& g : selectedGuids()) // hidden elements can't stay selected
+        if (graphics.isHidden(g)) {
+            const auto it = m_scene->locate.constFind(g);
+            if (it != m_scene->locate.constEnd())
+                m_context->AddOrRemoveSelected(m_scene->batches[size_t(it->batch)]->owner(it->index), false);
+        }
+    std::vector<int> touched; // only batches whose styles changed: an edit mustn't redraw the whole model
+    for (size_t b = 0; b < m_scene->batches.size(); ++b)
+        if (applyGraphics(m_scene->batches[b]))
+            touched.push_back(int(b));
+    redisplay(touched); // also rebuilds every view's poché
+    if (touched.empty())
+        m_scene->elementsChanged(); // the poché's fills and lines may still have changed
+    displayAnnotations();
+}
+
+bool Viewport::isElementHidden(const QString& guid) const
+{
+    const auto it = m_scene->locate.constFind(guid);
+    return it != m_scene->locate.constEnd() && m_scene->batches[size_t(it->batch)]->isHidden(it->index);
 }
 
 void Viewport::setLayerState(const QSet<QString>& hiddenGuids, const QSet<QString>& lockedGuids)
@@ -1341,6 +1457,8 @@ void Viewport::selectGuids(const QStringList& guids)
         auto it = m_scene->locate.constFind(g);
         if (it == m_scene->locate.constEnd())
             continue;
+        if (m_scene->batches[size_t(it->batch)]->isGraphicsHidden(it->index))
+            continue; // hidden by the purpose (D73): selecting doesn't reveal it
         if (m_scene->batches[size_t(it->batch)]->isHidden(it->index)) { // selecting a hidden element reveals it
             m_scene->batches[size_t(it->batch)]->setHidden(it->index, false);
             unhide.push_back(it->batch);
@@ -1349,9 +1467,10 @@ void Viewport::selectGuids(const QStringList& guids)
     redisplay(unhide);
     for (const QString& g : guids) {
         auto it = m_scene->locate.constFind(g);
-        if (it != m_scene->locate.constEnd())
-            m_context->AddOrRemoveSelected(m_scene->batches[size_t(it->batch)]->owner(it->index), false);
-        else if (const auto note = m_annotations.constFind(g); note != m_annotations.constEnd()) {
+        if (it != m_scene->locate.constEnd()) {
+            if (!m_scene->batches[size_t(it->batch)]->isGraphicsHidden(it->index))
+                m_context->AddOrRemoveSelected(m_scene->batches[size_t(it->batch)]->owner(it->index), false);
+        } else if (const auto note = m_annotations.constFind(g); note != m_annotations.constEnd()) {
             const Handle(SelectMgr_EntityOwner)& owner = Handle(AnnotationPrs)::DownCast(*note)->owner();
             if (!owner.IsNull())
                 m_context->AddOrRemoveSelected(owner, false);

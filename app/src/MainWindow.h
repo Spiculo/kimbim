@@ -148,6 +148,10 @@ public:
     // D72: project settings (kept with the .kim / folder, versioned).
     QJsonObject projectSettings() const { return m_settings; }
     bool setProjectSettings(const QJsonObject& changes); // false (and nothing changes) if refused
+    // D73: the purpose (pen set, visibility, overrides, layer combination) and the graphics tables.
+    bool setPurpose(const QString& name);
+    bool setGraphics(const QString& changesJson); // the editors' tables; false (nothing changes) if refused
+    void setTrueLineWeights(bool on);
     QString formatLength(double metres) const;            // in the project's unit and decimals
     // D72: recovery copies of unsaved work (written every N minutes; offered after a crash).
     bool writeRecovery();
@@ -289,6 +293,8 @@ private:
     void buildProjectToolbar();
     void refreshProject();
     void refreshLayers();
+    void refreshGraphics();
+    void regenerateOpenDrawings();
     void refreshAnnotations();
     void annotationClick(QPointF p, Qt::KeyboardModifiers modifiers = {});
     void afterCopy(const QJsonObject& result);

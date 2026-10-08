@@ -85,6 +85,7 @@ public:
         QString guid, kind, text;
         QVector<QPointF> points; // world metres: text/mark anchor; dimension chain points + line point; leader tip..text
         double size = 2.5;       // text size in millimetres on paper (printed at 1:100)
+        int pen = 0;             // D73: its pen; 0 = the annotations kind's pen
     };
     void setAnnotations(const QVector<Annotation>& annotations, double z);
     int annotationCount() const;
@@ -120,6 +121,10 @@ public:
 
     void selectGuids(const QStringList& guids);
     QStringList selectedGuids() const;
+    // D73: the purpose's styles, visibility and pens, for every view of the scene (and its poché).
+    void setGraphics(const Graphics& graphics, bool trueWeights);
+    const Graphics& graphics() const { return m_scene->graphics; }
+    bool isElementHidden(const QString& guid) const; // hidden for any reason (user, layer, visibility)
     void setHidden(const QStringList& guids, bool hidden);
     void isolate(const QStringList& guids);
     void showAll();
@@ -209,6 +214,7 @@ private:
     bool m_planView = false;
     void applyLayerState(const Handle(ElementBatch)& batch) const;
     void applyColors(const Handle(ElementBatch)& batch) const;
+    bool applyGraphics(const Handle(ElementBatch)& batch) const; // true if any element changed
     bool m_selectThrough = false;
     void keepOnlyVisible(const QSet<QString>& before, AIS_SelectionScheme scheme, int x0, int y0, int x1, int y1);
     // Renders the view's camera into a w x h offscreen image in id colours; guids seen in the rectangle.

@@ -47,6 +47,7 @@ QJsonObject Preferences::defaults()
         {"auto_version", "off"},
         {"auto_version_every", 10},
         {"recovery_minutes", 5},
+        {"true_line_weights", false},
         {"large_ifc_mb", 5},
         {"recent", QJsonArray()},
     };
@@ -117,6 +118,11 @@ double Preferences::largeIfcMb() const
 {
     const QJsonValue v = value("large_ifc_mb");
     return v.isDouble() && v.toDouble() >= 0.0 ? v.toDouble() : 5.0;
+}
+
+bool Preferences::trueLineWeights() const
+{
+    return value("true_line_weights").toBool(false);
 }
 
 int Preferences::recoveryMinutes() const

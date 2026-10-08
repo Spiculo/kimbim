@@ -39,6 +39,7 @@
 #include "ElementBatch.h"
 #include "LevelsBar.h"
 #include "HostTool.h"
+#include "Graphics.h"
 #include "MainWindow.h"
 #include "PolygonTool.h"
 #include "ProjectSettingsDialog.h"
@@ -1502,6 +1503,87 @@ private slots:
         QCOMPARE(asked, 3);
         QVERIFY(QFile::exists(kim));
         QVERIFY(w.close());
+    }
+
+    // Draws one wall with the wall tool; returns its GlobalId.
+    static QString drawWall(kimcad::MainWindow& w, QPointF a = QPointF(0, 0), QPointF b = QPointF(4, 0))
+    {
+        const QStringList before = w.viewport()->guids();
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->setTolerance(0.05);
+        w.wallTool()->click(a);
+        w.wallTool()->click(b);
+        w.setTool(kimcad::MainWindow::Tool::None);
+        for (const QString& g : w.viewport()->guids())
+            if (!before.contains(g))
+                return g;
+        return {};
+    }
+
+    // D73: picking a purpose restyles the views.
+    void purposesRestyleTheViews()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        const QString wall = drawWall(w);
+        QVERIFY(!wall.isEmpty());
+        QVERIFY(w.setPurpose(QStringLiteral("Permit")));
+        const kimcad::ElementStyle* s = w.viewport()->graphics().styleOf(wall);
+        QVERIFY(s);
+        QCOMPARE(s->projection.color, QColor("#000000"));
+        QCOMPARE(w.viewport()->graphics().purpose(), QString("Permit"));
+        QVERIFY(w.isWindowModified()); // the purpose is a project setting: Ctrl+S saves it
+        QVERIFY(w.setPurpose(QStringLiteral("Working")));
+        QCOMPARE(w.viewport()->graphics().styleOf(wall)->projection.color, QColor("#8a6a4a"));
+        QVERIFY(!w.setPurpose(QStringLiteral("Nope")));
+    }
+
+    // D73: elements drawn after switching purpose get the purpose's style.
+    void newElementsGetThePurposeStyle()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        QVERIFY(w.setPurpose(QStringLiteral("Permit")));
+        const QString wall = drawWall(w);
+        QVERIFY(w.viewport()->graphics().styleOf(wall));
+        QCOMPARE(w.viewport()->graphics().styleOf(wall)->cut.color, QColor("#000000"));
+    }
+
+    // D73: hidden kinds can't be selected and Show all doesn't reveal them.
+    void hiddenKindsAreNotSelectableAndSurviveShowAll()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        const QString wall = drawWall(w);
+        QVERIFY(w.setGraphics(QStringLiteral(R"({"visibility_sets": {"Everything": {"hidden_kinds": [], "rules": []},
+            "No walls": {"hidden_kinds": ["walls"], "rules": []}},
+            "purposes": {"Working": {"pen_set": "Working", "visibility": "Everything", "overrides": "None", "layers": null},
+                         "NW": {"pen_set": "Working", "visibility": "No walls", "overrides": "None", "layers": null}}})")));
+        w.viewport()->selectGuids({wall});
+        QCOMPARE(w.viewport()->selectedGuids(), QStringList{wall});
+        QVERIFY(w.setPurpose(QStringLiteral("NW")));
+        QVERIFY(w.viewport()->graphics().isHidden(wall));
+        QVERIFY(w.viewport()->selectedGuids().isEmpty()); // hiding deselects
+        w.viewport()->selectGuids({wall});
+        QVERIFY(w.viewport()->selectedGuids().isEmpty());
+        w.viewport()->showAll();
+        QVERIFY(w.viewport()->isElementHidden(wall));
+        QVERIFY(w.setPurpose(QStringLiteral("Working")));
+        QVERIFY(!w.viewport()->isElementHidden(wall));
+    }
+
+    void trueLineWeightsAreAPreference()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        QVERIFY(!w.preferences().trueLineWeights());
+        auto* toggle = action(w, "actionTrueLineWeights");
+        QVERIFY(toggle && toggle->isCheckable() && !toggle->isChecked());
+        toggle->trigger();
+        QVERIFY(w.preferences().trueLineWeights());
+        QVERIFY(w.viewport()->scene()->trueWeights);
+        toggle->trigger();
+        QVERIFY(!w.preferences().trueLineWeights());
     }
 
     // D72: someone else's lock opens the file read-only (quiet mode answers "read-only").

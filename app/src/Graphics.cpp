@@ -39,9 +39,7 @@ Graphics Graphics::fromJson(const QJsonObject& state)
         ElementStyle s;
         s.cut = line(o.value("cut").toObject());
         s.projection = line(o.value("projection").toObject());
-        const QColor fill(o.value("fill").toString());
-        if (fill.isValid())
-            s.fill = fill;
+        s.fill = QColor(o.value("fill").toString()); // null (doors, windows, rooms...): invalid = no fill
         const QColor surface(o.value("surface").toString());
         if (surface.isValid())
             s.surface = surface;

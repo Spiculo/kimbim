@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "ElementBatch.h"
+#include "Graphics.h"
 
 namespace kimcad {
 
@@ -42,6 +43,8 @@ public:
     QHash<QString, QColor> colors;
     QSet<QString> layerHidden, layerLocked;
     bool linesOnly = false;
+    Graphics graphics;        // D73: the current purpose, resolved
+    bool trueWeights = false; // D73: View > True line weights
     bool quietSelection = false;
     int nextIdBase = 0;
     std::vector<int> idBases; // per batch, for decoding ids

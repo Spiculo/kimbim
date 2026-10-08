@@ -22,7 +22,7 @@ struct LineStyle {
 };
 struct ElementStyle {
     LineStyle cut, projection;
-    QColor fill = QColor(64, 64, 70);
+    QColor fill; // the cut fill; invalid = none (doors, windows, rooms)
     std::optional<QColor> surface;
     std::optional<double> transparency;
 };

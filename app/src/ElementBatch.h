@@ -109,6 +109,9 @@ public:
     // D73: the element's border-line style (nullopt: the display mode's default line), and an override
     // surface colour and transparency (0 = opaque). Redisplay after.
     void setLineStyle(int i, std::optional<BatchLine> line) { m_line[size_t(i)] = line; }
+    const std::optional<BatchLine>& lineStyle(int i) const { return m_line[size_t(i)]; }
+    const std::optional<Quantity_Color>& surface(int i) const { return m_surface[size_t(i)]; }
+    double transparency(int i) const { return m_alpha[size_t(i)]; }
     void setSurface(int i, std::optional<Quantity_Color> color, double transparency = 0.0)
     {
         m_surface[size_t(i)] = color;

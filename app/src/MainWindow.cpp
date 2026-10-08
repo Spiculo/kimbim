@@ -63,6 +63,7 @@
 #include <limits>
 
 #include "CombineDialog.h"
+#include "Graphics.h"
 #include "Cuts.h"
 #include "DrawingView.h"
 #include "DrawingsPanel.h"
@@ -380,6 +381,12 @@ void MainWindow::buildMenus()
     linesOnly->setCheckable(true);
     linesOnly->setToolTip(tr("Show the model as a line drawing (hidden lines removed), e.g. for plans"));
     connect(linesOnly, &QAction::toggled, m_viewport, &Viewport::setLinesOnly);
+    QAction* trueWeights = view->addAction(tr("&True line weights"));
+    trueWeights->setObjectName(QStringLiteral("actionTrueLineWeights"));
+    trueWeights->setCheckable(true);
+    trueWeights->setChecked(m_prefs.trueLineWeights());
+    trueWeights->setToolTip(tr("Draw lines as thick as their pens (otherwise every line is thin)"));
+    connect(trueWeights, &QAction::toggled, this, &MainWindow::setTrueLineWeights);
     view->addSeparator();
     QAction* fit = view->addAction(tr("&Fit all"));
     fit->setShortcut(Qt::Key_F);
@@ -2666,6 +2673,65 @@ void MainWindow::refreshLayers()
     for (const auto& v : bridge("views").value("views").toArray())
         names << v.toObject().value("name").toString();
     m_layersPanel->setViews(names, m_currentView);
+    refreshGraphics(); // new and changed elements get the purpose's styles
+}
+
+void MainWindow::refreshGraphics()
+{
+    m_viewport->setGraphics(Graphics::fromJson(bridge("graphics_state")), m_prefs.trueLineWeights());
+}
+
+void MainWindow::regenerateOpenDrawings()
+{
+    for (const QString& guid : m_drawingViews.keys())
+        regenerateDrawing(guid);
+}
+
+bool MainWindow::setPurpose(const QString& name)
+{
+    const QJsonObject r = bridge("set_purpose", {name});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(r.value("error").toString());
+        return false;
+    }
+    m_settings = bridge("project_settings").value("settings").toObject();
+    m_hiddenLayers.clear();
+    m_lockedLayers.clear();
+    for (const auto& v : r.value("hidden_layers").toArray())
+        m_hiddenLayers.insert(v.toString());
+    for (const auto& v : r.value("locked_layers").toArray())
+        m_lockedLayers.insert(v.toString());
+    refreshLayers(); // the purpose's layer combination; then the graphics
+    refreshAnnotations();
+    regenerateOpenDrawings();
+    setWindowModified(isDirty());
+    return true;
+}
+
+bool MainWindow::setGraphics(const QString& changesJson)
+{
+    const QJsonObject r = bridge("set_graphics", {changesJson});
+    if (!r.value("ok").toBool()) {
+        if (m_quiet)
+            m_status->showMessage(r.value("error").toString());
+        else
+            showError(tr("Could not change the graphics"), r.value("error").toString());
+        return false;
+    }
+    m_settings = bridge("project_settings").value("settings").toObject();
+    refreshGraphics();
+    refreshAnnotations();
+    regenerateOpenDrawings();
+    setWindowModified(isDirty());
+    return true;
+}
+
+void MainWindow::setTrueLineWeights(bool on)
+{
+    m_prefs.setValue(QStringLiteral("true_line_weights"), on);
+    m_prefs.save();
+    refreshGraphics();
+    refreshAnnotations();
 }
 
 void MainWindow::refreshAnnotations()
@@ -2674,7 +2740,7 @@ void MainWindow::refreshAnnotations()
     for (const auto& v : bridge("annotations", {m_levels->activeStorey()}).value("annotations").toArray()) {
         const QJsonObject o = v.toObject();
         Viewport::Annotation a{o.value("guid").toString(), o.value("kind").toString(), o.value("text").toString(), {},
-            o.value("size").toDouble(2.5)};
+            o.value("size").toDouble(2.5), o.value("pen").toInt(0)};
         for (const auto& p : o.value("points").toArray())
             a.points << QPointF(p.toArray().at(0).toDouble(), p.toArray().at(1).toDouble());
         list << a;
@@ -4192,6 +4258,7 @@ bool MainWindow::setProjectSettings(const QJsonObject& changes)
     }
     m_settings = r.value("settings").toObject();
     setWindowModified(isDirty());
+    refreshGraphics();
     return true;
 }
 
