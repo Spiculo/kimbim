@@ -1598,7 +1598,8 @@ private slots:
     void theGraphicsMenuHasTheEditors()
     {
         kimcad::MainWindow w(nullptr, /*quiet=*/true);
-        for (const char* name : {"actionPenSets", "actionLineTypes", "actionElementStyles"})
+        for (const char* name : {"actionPenSets", "actionLineTypes", "actionElementStyles", "actionVisibilitySets",
+                 "actionOverrides"})
             QVERIFY2(action(w, name) && action(w, name)->isEnabled(), name);
     }
 

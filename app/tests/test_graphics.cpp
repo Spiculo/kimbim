@@ -165,6 +165,44 @@ private slots:
         QCOMPARE(styles.value("furniture").toObject().value("projection").toObject().value("line").toString(), QString("Dashed"));
         QCOMPARE(styles.keys().size(), 19); // every kind stays in the table
     }
+    void visibilityHidesKindsAndKeepsRules()
+    {
+        kimcad::VisibilitySetsDialog d(tablesFromBridge(), nullptr);
+        d.selectSet(QStringLiteral("Everything"));
+        d.setKindHidden(QStringLiteral("furniture"), true);
+        d.addRule(QJsonObject{{"name", "Not load-bearing"},
+            {"when", QJsonObject{{"property", "LoadBearing"}, {"op", "false"}}}, {"then", QJsonObject{{"hide", true}}}});
+        const QJsonObject set = d.changes().value("visibility_sets").toObject().value("Everything").toObject();
+        QCOMPARE(set.value("hidden_kinds").toArray(), QJsonArray{"furniture"});
+        QCOMPARE(set.value("rules").toArray().size(), 1);
+        d.setKindHidden(QStringLiteral("furniture"), false);
+        QVERIFY(d.changes().value("visibility_sets").toObject().value("Everything").toObject()
+                    .value("hidden_kinds").toArray().isEmpty());
+    }
+    void overrideRulesKeepTheirOrder()
+    {
+        kimcad::OverridesDialog d(tablesFromBridge(), nullptr);
+        d.selectSet(QStringLiteral("Fire rating"));
+        d.moveRule(3, 0);
+        d.setRuleEnabled(1, false);
+        const QJsonArray rules = d.changes().value("override_sets").toObject().value("Fire rating").toObject()
+                                     .value("rules").toArray();
+        QCOMPARE(rules.at(0).toObject().value("name").toString(), QString("30 min"));
+        QCOMPARE(rules.at(1).toObject().value("enabled").toBool(true), false);
+        QCOMPARE(rules.size(), 4);
+    }
+    void ruleEditorRoundTrips()
+    {
+        kimcad::RuleEditor e(QStringList{"walls", "slabs"}, QStringList{"Solid", "Dashed"});
+        const QJsonObject rule{{"name", "x"}, {"when", QJsonObject{{"kind", "walls"}, {"property", "FireRating"},
+            {"op", "contains"}, {"value", "60"}}}, {"then", QJsonObject{{"pen", 26}, {"surface", "#e05040"}, {"line", "Dashed"}}}};
+        e.setRule(rule);
+        QCOMPARE(e.rule(), rule);
+        const QJsonObject hide{{"name", "h"}, {"when", QJsonObject{{"layer", "A-Furniture"}}}, {"then", QJsonObject{{"hide", true}}},
+            {"enabled", false}};
+        e.setRule(hide);
+        QCOMPARE(e.rule(), hide);
+    }
 };
 
 QTEST_MAIN(TestGraphics)

@@ -11,7 +11,10 @@
 
 #include <optional>
 
+class QCheckBox;
 class QComboBox;
+class QListWidget;
+class QSpinBox;
 class QDialogButtonBox;
 class QDoubleSpinBox;
 class QLineEdit;
@@ -142,6 +145,77 @@ private:
     void fill();
     QTableWidget* m_list;
     QStringList m_kinds;
+};
+
+// One rule (D73): a condition (element kind, IFC class, a property, layer, material) and an effect
+// (pens, line type, fill, 3D surface and transparency, or hide). Empty fields are left out.
+class RuleEditor : public QWidget {
+    Q_OBJECT
+public:
+    RuleEditor(const QStringList& kinds, const QStringList& lineTypes, QWidget* parent = nullptr);
+    void setRule(const QJsonObject& rule);
+    QJsonObject rule() const;
+    void setHideOnly(bool on); // visibility sets: every matching rule hides, so no effect fields
+
+signals:
+    void changed();
+
+private:
+    QLineEdit *m_name, *m_class, *m_property, *m_value, *m_layer, *m_material, *m_surface;
+    QComboBox *m_kind, *m_op, *m_line;
+    QSpinBox *m_pen, *m_cutPen, *m_projectionPen, *m_fill;
+    QDoubleSpinBox* m_transparency;
+    QCheckBox *m_hide, *m_enabled;
+    QWidget* m_effects;
+    bool m_hideOnly = false;
+    bool m_loading = false;
+};
+
+// A named set of rules (visibility sets, override sets): the rule list (ticked = enabled) and the
+// rule editor.
+class RulesDialog : public NamedSetsDialog {
+    Q_OBJECT
+public:
+    void addRule(const QJsonObject& rule);
+    bool deleteRule(int i);
+    bool moveRule(int from, int to);
+    bool setRuleEnabled(int i, bool enabled);
+
+protected:
+    RulesDialog(const QJsonObject& reply, const QString& key, const QString& reference, bool hideOnly, QWidget* parent);
+    void buildRules(); // the list, its buttons and the editor
+    void showSet(const QString& name) override;
+    QJsonArray rules() const { return currentValue().value("rules").toArray(); }
+    void setRules(const QJsonArray& rules);
+
+private:
+    void showRule(int i);
+    QListWidget* m_rules = nullptr;
+    RuleEditor* m_editor = nullptr;
+    bool m_hideOnly;
+    bool m_loading = false;
+};
+
+// Graphics > Visibility sets: the element kinds hidden, and hide rules (e.g. LoadBearing = false).
+class VisibilitySetsDialog : public RulesDialog {
+    Q_OBJECT
+public:
+    VisibilitySetsDialog(const QJsonObject& reply, QWidget* parent);
+    void setKindHidden(const QString& kind, bool hidden);
+
+protected:
+    void showSet(const QString& name) override;
+
+private:
+    QListWidget* m_kinds = nullptr;
+    bool m_loading = false;
+};
+
+// Graphics > Overrides: ordered rules; the first that matches an element wins.
+class OverridesDialog : public RulesDialog {
+    Q_OBJECT
+public:
+    OverridesDialog(const QJsonObject& reply, QWidget* parent);
 };
 
 } // namespace kimcad

@@ -453,6 +453,9 @@ void MainWindow::buildMenus()
     editor("actionPenSets", tr("&Pen sets..."), [this](const QJsonObject& r) { return new PenSetsDialog(r, this); });
     editor("actionLineTypes", tr("&Line types..."), [this](const QJsonObject& r) { return new LineTypesDialog(r, this); });
     editor("actionElementStyles", tr("&Element styles..."), [this](const QJsonObject& r) { return new ElementStylesDialog(r, this); });
+    graphics->addSeparator();
+    editor("actionVisibilitySets", tr("&Visibility sets..."), [this](const QJsonObject& r) { return new VisibilitySetsDialog(r, this); });
+    editor("actionOverrides", tr("Graphic &overrides..."), [this](const QJsonObject& r) { return new OverridesDialog(r, this); });
     m_graphicsMenu = graphics;
     QMenu* help = menuBar()->addMenu(tr("&Help"));
     QAction* about = help->addAction(tr("&About KIMCAD"));
