@@ -888,15 +888,22 @@ from .roofs import attach_walls_to_roof, create_roof, detach_walls_from_roof, ro
 from .settings import project_settings, set_project_settings  # noqa: E402,F401
 from .documents import (  # noqa: E402,F401
     close_document,
+    discard_recovery,
     document_state,
     export_ifc,
     import_ifc,
     kim_beside,
+    new_from_template,
     open_folder,
     open_kim,
+    recover,
+    recoveries,
     save_as_folder,
     save_as_kim,
     save_document,
+    save_template,
     set_app_paths,
     set_author,
+    templates,
+    write_recovery,
 )

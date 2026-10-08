@@ -13,8 +13,13 @@ from __future__ import annotations
 import json
 import os
 import pathlib
+import re
 import shutil
+import time
 import uuid
+
+import ifcopenshell
+import ifcopenshell.guid
 
 from . import app_bridge as B
 from . import kimfile as K
@@ -407,5 +412,186 @@ def export_ifc(path: str) -> str:
     return B._dump({"ok": True, "path": path})
 
 
-def _clear_recovery(key: str) -> None:  # Task 6 replaces this stub
-    pass
+# ---------------------------------------------------------------- recovery copies
+
+def _recovery_dir(key: str) -> pathlib.Path:
+    return data_dir() / "recovery" / K.path_hash(key)
+
+
+def _clear_recovery(key: str) -> None:
+    if key:
+        shutil.rmtree(_recovery_dir(key), ignore_errors=True)
+
+
+def write_recovery() -> str:
+    if B._model is None or not B._dirty():
+        return B._dump({"ok": True, "written": False})
+    source = _doc["source"] or B._path  # the file it belongs to ("" untitled)
+    folder = _recovery_dir(_recovery_key())
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        B._model.write(str(folder / "model.ifc"))
+        (folder / "settings.json").write_bytes(S.to_bytes())
+        (folder / "info.json").write_text(json.dumps({"source": source, "mode": _doc["mode"], "time": time.time()}))
+    except OSError as ex:
+        return _fail(str(ex))
+    return B._dump({"ok": True, "written": True})
+
+
+def recoveries() -> str:
+    items = []
+    root = data_dir() / "recovery"
+    own = _recovery_dir(_recovery_key()) if B._model is not None else None
+    for folder in sorted(root.glob("*")) if root.exists() else ():
+        try:
+            info = json.loads((folder / "info.json").read_text())
+        except (OSError, ValueError):
+            continue
+        if own is not None and folder == own:
+            continue  # this session's own copy
+        source = info.get("source", "")
+        if source and os.path.exists(source) and os.path.getmtime(source) >= info.get("time", 0):
+            continue  # saved after the copy was made
+        items.append({"id": folder.name, "source": source, "name": pathlib.Path(source).name if source else "",
+                      "mode": info.get("mode", "plain"), "time": info.get("time", 0)})
+    return B._dump({"items": items})
+
+
+def discard_recovery(id: str) -> str:
+    shutil.rmtree(data_dir() / "recovery" / pathlib.Path(id).name, ignore_errors=True)
+    return B._dump({"ok": True})
+
+
+def recover(id: str) -> str:
+    """Reopen a recovered copy: a .kim or folder opens normally with the copy as its unsaved work; an IFC
+    or untitled model opens the copy as unsaved work (Save writes the original IFC)."""
+    global _pending
+    folder = data_dir() / "recovery" / pathlib.Path(id).name
+    try:
+        info = json.loads((folder / "info.json").read_text())
+    except (OSError, ValueError):
+        return _fail("that recovery copy is gone")
+    source, mode = info.get("source", ""), info.get("mode", "plain")
+    settings = S.from_bytes(_read(folder / "settings.json"))
+    if mode in ("kim", "folder", "template") and source and os.path.exists(source):
+        r = json.loads(open_folder(source) if mode == "folder" else open_kim(source))
+        if not r.get("ok"):
+            return B._dump(r)
+        shutil.copyfile(folder / "model.ifc", r["path"])
+        _pending.update(settings=settings, unversioned=_pending["project"] is not None, dirty=True)
+        path = r["path"]
+    else:
+        target = data_dir() / "open" / f"recovered-{uuid.uuid4().hex[:8]}.ifc"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(folder / "model.ifc", target)
+        _pending = {"path": str(target), "doc": _plain(source if mode == "plain" else ""), "project": None,
+                    "settings": settings, "unversioned": False, "dirty": True,
+                    "source_path": source if mode == "plain" else "", "untitled": not source}
+        path = str(target)
+    shutil.rmtree(folder, ignore_errors=True)
+    return B._dump({"ok": True, "path": path})
+
+
+# ---------------------------------------------------------------- templates
+
+BUILTIN = "builtin"
+BUILTIN_NAME = "KIMCAD default"
+_GUID = re.compile(r"[0-9A-Za-z_$]{22}")
+_BAD_NAME = re.compile(r'[\\/:*?"<>|]')
+
+
+def templates(folder: str) -> str:
+    out = [{"name": BUILTIN_NAME, "path": BUILTIN, "builtin": True, "modified": ""}]
+    root = pathlib.Path(folder) if folder else None
+    ok = root is not None and root.is_dir()
+    for p in sorted(root.glob("*.kim")) if ok else ():
+        try:
+            if K.read_manifest(p).get("kind") != "template":
+                continue
+        except K.KimError:
+            continue
+        out.append({"name": p.stem, "path": str(p), "builtin": False,
+                    "modified": time.strftime("%Y-%m-%d %H:%M", time.localtime(p.stat().st_mtime))})
+    return B._dump({"templates": out, "folder_ok": ok})
+
+
+def save_template(folder: str, name: str, replace: str = "") -> str:
+    if B._model is None:
+        return _fail("no model open")
+    name = (name or "").strip()
+    if not name or _BAD_NAME.search(name):
+        return _fail('a template name can\'t be empty or use \\ / : * ? " < > |')
+    target = pathlib.Path(folder) / f"{name}.kim"
+    if target.exists() and not replace:
+        return _fail(f"a template called {name} exists", exists=True)
+    tmp = data_dir() / "tmp" / uuid.uuid4().hex
+    try:
+        (tmp / ".kimcad").mkdir(parents=True)
+        B._model.write(str(tmp / ".kimcad" / "working.ifc"))
+        (tmp / ".kimcad" / "settings.json").write_bytes(S.to_bytes())
+        target.parent.mkdir(parents=True, exist_ok=True)
+        K.pack(tmp, target, "template")
+    except (K.KimError, OSError) as ex:
+        return _fail(str(ex))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return B._dump({"ok": True, "path": str(target)})
+
+
+def regenerate_ids(f) -> dict:
+    """New GlobalIds for every rooted entity; text that holds an old id (a sheet's placed drawing, a saved
+    view) is rewritten too. Returns old -> new."""
+    mapping = {}
+    for e in f.by_type("IfcRoot"):
+        new = ifcopenshell.guid.new()
+        mapping[e.GlobalId] = new
+        e.GlobalId = new
+
+    def fix(text: str) -> str:
+        return _GUID.sub(lambda m: mapping.get(m.group(0), m.group(0)), text)
+
+    for e in list(f):
+        for name, value in e.get_info(recursive=False).items():
+            if name in ("id", "type", "GlobalId"):
+                continue
+            if isinstance(value, str) and _GUID.search(value):
+                if (new := fix(value)) != value:
+                    setattr(e, name, new)
+            elif isinstance(value, ifcopenshell.entity_instance) and not value.id() \
+                    and isinstance(value.wrappedValue, str) and _GUID.search(value.wrappedValue):
+                if (new := fix(value.wrappedValue)) != value.wrappedValue:
+                    setattr(e, name, f.create_entity(value.is_a(), new))
+    return mapping
+
+
+def new_from_template(path: str) -> str:
+    global _doc, _pending
+    if path == BUILTIN:
+        from .authoring import new_project
+
+        r = json.loads(new_project(""))
+        if not r.get("ok"):
+            return B._dump(r)
+        _doc = {**_plain(), "template": BUILTIN_NAME}
+        return B._dump({"ok": True, "path": ""})
+    kim = pathlib.Path(path)
+    tmp = data_dir() / "tmp" / uuid.uuid4().hex
+    try:
+        if K.read_manifest(kim).get("kind") != "template":
+            return _fail(f"{kim.name} is not a template")
+        K.unpack(kim, tmp)
+        f = ifcopenshell.open(str(tmp / ".kimcad" / "working.ifc"))
+        regenerate_ids(f)
+        for project in f.by_type("IfcProject"):
+            project.Name, project.LongName = None, None
+        target = data_dir() / "open" / f"new-{uuid.uuid4().hex[:8]}.ifc"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        f.write(str(target))
+        settings = S.from_bytes(_read(tmp / ".kimcad" / "settings.json"))
+    except (K.KimError, OSError, RuntimeError) as ex:
+        return _fail(str(ex))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    _pending = {"path": str(target), "doc": {**_plain(), "template": kim.stem}, "project": None,
+                "settings": settings, "unversioned": False, "untitled": True}
+    return B._dump({"ok": True, "path": str(target)})
