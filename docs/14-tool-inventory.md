@@ -76,10 +76,10 @@ release notes, so check before relying on a single cell.
 |------|-----|--------|-----|-------|
 | Click, Ctrl/Shift add and toggle | all | ✅ | P0 | |
 | Box selection (visible only; Alt goes through) | all | ✅ | P0 | D52 |
-| Crossing vs window box (direction decides) | RV VW SU | ⬜ | new | |
-| Select similar (same type or class) | AC RV VW BB | ⬜ | P0 | |
-| Find & Select / query (by property values) | AC RV VW BB | 🟡 | P0 | Tree search by name, type or GlobalId; no property query |
-| Selection sets (saved selections) | AC VW BB | ⬜ | new | |
+| Crossing vs window box (direction decides) | RV VW SU | ✅ | new | D78: right to left crosses (dashed band) |
+| Select similar (same type or class) | AC RV VW BB | ✅ | P0 | D78: Ctrl+Shift+A (type), Select all of this class |
+| Find & Select / query (by property values) | AC RV VW BB | ✅ | P0 | D78: Ctrl+F panel; class, kind, type, property, layer, level, status, material; AND/OR; saved criteria |
+| Selection sets (saved selections) | AC VW BB | ✅ | new | D78: in the project settings (versioned) |
 | Marquee (area selection for 2D export or editing) | AC | ⬜ | new | |
 | Magic wand (pick a shape from existing lines or edges) | AC VW | ⬜ | new | |
 | Tab cycling through overlapping elements | RV AC | ⬜ | new | |

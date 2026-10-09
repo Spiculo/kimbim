@@ -97,6 +97,20 @@ Built as D77 (Archicad's Interactive Schedule).
    Should schedules follow the project's length unit setting instead?
 5. Room schedules list every space of the model, KIMCAD rooms and imported spaces alike. Right?
 
+## For the architect: selection tools (asked 2026-10-09, waiting)
+
+Built per D78 (Archicad's Find & Select; Revit's direction-dependent box).
+
+1. Select similar on an element without a type takes the other untyped elements of its class and
+   predefined type, not typed ones. Would you rather it took every element of the class?
+2. Shortcuts: Ctrl+Shift+A for Select similar, Ctrl+F for Find & Select. Archicad selects all of the
+   active tool's type with Ctrl+A; should KIMCAD do that too (Ctrl+A is free today)?
+3. Box direction: right to left now takes everything the box touches (crossing), left to right only what
+   is fully inside. Archicad sets this once in its preferences (partial or entire elements) rather than
+   by direction. Keep the AutoCAD/Revit habit, or follow Archicad?
+4. Find & Select leaves out elements on hidden or locked layers and elements hidden in the view. Should
+   hidden ones be found (and shown) instead, as Revit's filters can?
+
 ## Needs a spike
 
 These are listed in [07-roadmap.md](07-roadmap.md#spikes-do-first-each-is-small-throwaway-and-documented).
