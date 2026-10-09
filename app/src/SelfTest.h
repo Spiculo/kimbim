@@ -31,6 +31,8 @@ struct SelfTestOptions {
     QString view;                 // D76: a preset view (Top, Front, SE, ..., Home) before measuring, animated
     bool cubeClick = false;       // D76: click the view cube's top face and the home button; selection must stay
     QString schedule;             // D77: open this schedule (doors, walls, ...), select its first row; with screenshot, a PNG of it
+    QString measure;              // D79: "x,y x,y ...": measure through these work-plane points, report the readout
+    bool levelsDialog = false;    // D79: open Model > Levels...; with screenshot, a PNG of it
     QString findSelect;           // D78: an IFC class: Find & Select it from the panel, report how many
 };
 

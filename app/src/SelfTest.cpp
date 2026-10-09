@@ -40,6 +40,8 @@
 #include <utility>
 
 #include "LevelsBar.h"
+#include "LevelsDialog.h"
+#include "MeasureController.h"
 #include "ModelTreePanel.h"
 #include "PythonEngine.h"
 #include "ViewCube.h"
@@ -580,6 +582,36 @@ int runSelfTest(const SelfTestOptions& options)
             QString path = options.screenshot;
             path.replace(QStringLiteral(".png"), QStringLiteral("-schedule.png"));
             result.insert(QStringLiteral("schedule_screenshot"), s->grab().save(path) ? path : QString());
+        }
+    }
+    if (!options.measure.isEmpty()) { // D79: clicks on the work plane, the last point followed by the mouse
+        if (QAction* a = window.findChild<QAction*>(QStringLiteral("actionMeasureTool")))
+            a->trigger();
+        const QStringList pts = options.measure.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+        for (int i = 0; i < pts.size(); ++i) {
+            const QStringList xy = pts[i].split(QLatin1Char(','));
+            const QPointF p(xy.value(0).toDouble(), xy.value(1).toDouble());
+            if (i + 1 < pts.size())
+                emit window.viewport()->workPointClicked(p, 0.05, Qt::NoModifier);
+            else
+                emit window.viewport()->workPointMoved(p, 0.05, Qt::NoModifier);
+        }
+        result.insert(QStringLiteral("measure"), window.measure()->text());
+        for (int i = 0; i < 5; ++i)
+            QApplication::processEvents();
+    }
+    if (options.levelsDialog) { // D79: the levels table, shown beside the window
+        QString error;
+        const QJsonObject table = PythonEngine::instance().callJson("levels_table", {}, &error).object();
+        auto* d = new LevelsDialog(table.value("levels").toArray(), QStringLiteral("m"), 1.0, 2, &window);
+        d->show();
+        for (int i = 0; i < 10; ++i)
+            QApplication::processEvents();
+        result.insert(QStringLiteral("levels_rows"), d->table().count());
+        if (!options.screenshot.isEmpty()) {
+            QString path = options.screenshot;
+            path.replace(QStringLiteral(".png"), QStringLiteral("-levels.png"));
+            result.insert(QStringLiteral("levels_screenshot"), d->grab().save(path) ? path : QString());
         }
     }
     if (!options.findSelect.isEmpty()) { // D78: the panel, one criterion, Select
