@@ -266,11 +266,11 @@ release notes, so check before relying on a single cell.
 
 | Tool | Has | KIMCAD | Pri | Notes |
 |------|-----|--------|-----|-------|
-| Element schedules (doors, windows, walls), editable | all | ⬜ | P1 | `ifccsv` |
-| Room / area schedules | all | ⬜ | P1 | Need rooms |
-| Material take-off, quantities (area, volume, length) | all | ⬜ | P1 | `ifc5d` / qto |
+| Element schedules (doors, windows, walls), editable | all | ✅ | P1 | D77: built-in and custom schemes, rows select elements, Name/Mark/property cells edit the model (one undo step) |
+| Room / area schedules | all | ✅ | P1 | D77: the Rooms schedule (every IfcSpace) |
+| Material take-off, quantities (area, volume, length) | all | 🟡 | P1 | D77: length, height, areas (net/gross side, openings), volume, count from Qto_ sets, parameters or shape; merge identical items + totals. Take-off by material layer later |
 | Schedule on a sheet | all | ⬜ | new | |
-| Export to CSV / XLSX | all | ⬜ | P1 | |
+| Export to CSV / XLSX | all | ✅ | P1 | D77 (openpyxl) |
 | Cost estimating (5D) | BB AL | ⬜ | new | Bonsai has it |
 | Construction sequencing (4D) | BB | ⬜ | new | Bonsai has it |
 

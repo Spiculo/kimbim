@@ -83,6 +83,20 @@ Built per D75; the owner may want an architect to confirm these.
 2. Save version (Ctrl+Alt+S) moved from the File menu to the new Versions menu with the design options.
    Is Versions the place you'd look for it, or should File keep a copy?
 
+## For the architect: schedules and quantities (asked 2026-10-09, waiting)
+
+Built as D77 (Archicad's Interactive Schedule).
+
+1. Wall length is measured on the reference line (axis), so corner overlaps count once per wall, as in
+   Archicad's "reference line length". Do you need the inside/outside face lengths too?
+2. Net side area takes out every opening at its full size (Archicad's default; some offices only deduct
+   openings above a size, e.g. 0.5 m² in some measurement rules). Is a minimum needed?
+3. Built-in schedules merge identical items by type (doors and windows by type, width and height). Is that
+   the grouping you'd expect, or by level too?
+4. Quantities are in metres, m² and m³ with 2 decimals (3 for volumes), whatever the project's length unit.
+   Should schedules follow the project's length unit setting instead?
+5. Room schedules list every space of the model, KIMCAD rooms and imported spaces alike. Right?
+
 ## Needs a spike
 
 These are listed in [07-roadmap.md](07-roadmap.md#spikes-do-first-each-is-small-throwaway-and-documented).
