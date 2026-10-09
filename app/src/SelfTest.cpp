@@ -21,6 +21,7 @@
 #include <Graphic3d_Camera.hxx>
 
 #include <cstdio>
+#include <tuple>
 
 #include "DockLayout.h"
 #include "FindSelectPanel.h"
@@ -541,6 +542,68 @@ int runSelfTest(const SelfTestOptions& options)
         result.insert(QStringLiteral("edit_steps_ms"), steps);
         result.insert(QStringLiteral("edit_views"), options.planTab ? 2 : 1);
         result.insert(QStringLiteral("ok"), result.value("ok").toBool() && moved);
+    }
+    if (options.benchModify) {
+        // D80: split a long straight wall in the middle, trim one piece at a quarter, undo both.
+        QApplication::processEvents();
+        auto timed = [](auto&& edit) {
+            QElapsedTimer t;
+            t.start();
+            const bool ok = edit();
+            QApplication::processEvents();
+            return std::pair<bool, double>(ok, double(t.nsecsElapsed()) / 1e6);
+        };
+        struct Candidate {
+            QString guid;
+            double x0, y0, x1, y1;
+        };
+        QVector<Candidate> candidates;
+        for (const QString& g : window.viewport()->guids()) {
+            if (!window.viewport()->typeOf(g).startsWith(QLatin1String("IfcWall")))
+                continue;
+            double x0, y0, z0, x1, y1, z1;
+            window.viewport()->boundsOf({g}).Get(x0, y0, z0, x1, y1, z1);
+            const double lx = x1 - x0, ly = y1 - y0;
+            if (std::max(lx, ly) > 4.0 && std::min(lx, ly) < 0.6) // long and axis-aligned
+                candidates.push_back({g, x0, y0, x1, y1});
+        }
+        bool split = false, trimmed = false;
+        double splitMs = 0, trimMs = 0, undoMs = 0;
+        for (const Candidate& c : candidates) {
+            const bool alongX = c.x1 - c.x0 > c.y1 - c.y0;
+            const QPointF mid((c.x0 + c.x1) / 2, (c.y0 + c.y1) / 2);
+            const QStringList before = window.viewport()->guids();
+            window.resetTimings();
+            std::tie(split, splitMs) = timed([&] { return window.splitElement(c.guid, mid); });
+            if (!split)
+                continue; // e.g. a door in the middle
+            QJsonObject steps;
+            for (auto it = window.timings().constBegin(); it != window.timings().constEnd(); ++it)
+                steps.insert(it.key(), it.value());
+            result.insert(QStringLiteral("split_steps_ms"), steps);
+            QString piece;
+            for (const QString& g : window.viewport()->guids())
+                if (!before.contains(g) && window.viewport()->typeOf(g).startsWith(QLatin1String("IfcWall")))
+                    piece = g;
+            const QPointF keep = alongX ? QPointF(c.x0 + 0.1 * (c.x1 - c.x0), mid.y()) : QPointF(mid.x(), c.y0 + 0.1 * (c.y1 - c.y0));
+            const QPointF cut = alongX ? QPointF(c.x0 + 0.25 * (c.x1 - c.x0), mid.y()) : QPointF(mid.x(), c.y0 + 0.25 * (c.y1 - c.y0));
+            const QPointF n = alongX ? QPointF(0, 1) : QPointF(1, 0);
+            for (const QString& g : {c.guid, piece}) {
+                std::tie(trimmed, trimMs) = timed([&] { return window.trimElement(g, keep, QString(), cut - n, cut + n); });
+                if (trimmed)
+                    break;
+            }
+            QAction* undo = window.findChild<QAction*>(QStringLiteral("actionUndo"));
+            std::tie(std::ignore, undoMs) = timed([&] { undo->trigger(); return true; });
+            if (trimmed)
+                undo->trigger();
+            break;
+        }
+        result.insert(QStringLiteral("modify_candidates"), int(candidates.size()));
+        result.insert(QStringLiteral("split_ms"), splitMs);
+        result.insert(QStringLiteral("trim_ms"), trimMs);
+        result.insert(QStringLiteral("modify_undo_ms"), undoMs);
+        result.insert(QStringLiteral("ok"), result.value("ok").toBool() && split && trimmed);
     }
     if (options.createDrawings) {
         window.findChild<QAction*>(QStringLiteral("actionCreateDrawings"))->trigger();

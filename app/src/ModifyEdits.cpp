@@ -113,7 +113,6 @@ bool MainWindow::modifyResult(const QJsonObject& r, const QString& failure)
         return false;
     }
     afterEdit(r);
-    refreshSnapData(); // the walls changed: picking and snapping follow
     m_status->showMessage(m_modifyTool->hint());
     return true;
 }

@@ -50,6 +50,9 @@ int main(int argc, char* argv[])
     QCommandLineOption benchEdit(QStringLiteral("bench-edit"),
         QStringLiteral("Self-test: time moving a wall of the loaded model (ms per edit and per refresh step)."));
     parser.addOption(benchEdit);
+    QCommandLineOption benchModify(QStringLiteral("bench-modify"),
+        QStringLiteral("Self-test: time splitting a wall of the loaded model, trimming it, and undoing both (D80)."));
+    parser.addOption(benchModify);
     QCommandLineOption planTab(QStringLiteral("plan-tab"), QStringLiteral("Self-test: with --bench-edit, edit in a plan tab."));
     parser.addOption(planTab);
     QCommandLineOption drawWalls(QStringLiteral("draw-walls"),
@@ -138,6 +141,7 @@ int main(int argc, char* argv[])
         options.popOut = parser.isSet(popOut);
         options.benchEdit = parser.isSet(benchEdit);
         options.planTab = parser.isSet(planTab);
+        options.benchModify = parser.isSet(benchModify);
         options.drawWalls = parser.value(drawWalls);
         options.planView = parser.isSet(planView);
         options.linesOnly = parser.isSet(linesOnly);

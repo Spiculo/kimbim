@@ -305,9 +305,12 @@ def _copy_piece(e):
 
 def _regen(walls):
     f = B._model
+    rebuilt = []
     for w in dict.fromkeys(walls):
         if w.is_a("IfcWall") and w.id() and A._axis_world(w) is not None and A._layer_set(w) is not None:
-            A._regenerate(f, w)
+            if A._regenerate(f, w) is not None:
+                rebuilt.append(w.GlobalId)
+    return rebuilt
 
 
 def _set_line(e, p1, p2, z=None):
@@ -382,6 +385,7 @@ def split_element(guid: str, x, y, join="1") -> str:
             if moves:
                 _replace_in(rel, e, piece)
             neighbours.append(_other(rel, e))
+        rebuilt = []
         if e.is_a("IfcWall"):
             A._reaxis(piece, point, p2)
             for opening, moves in fills + holes:
@@ -391,14 +395,14 @@ def split_element(guid: str, x, y, join="1") -> str:
             if join:
                 ifcopenshell.api.geometry.connect_path(
                     f, relating_element=e, related_element=piece, relating_connection="ATEND", related_connection="ATSTART")
-            _regen([e, piece, *neighbours])
+            rebuilt = _regen([e, piece, *neighbours])
         else:
             a, b = _beam_axis(e)
             mid = a + (b - a) * t
             _set_beam_axis(piece, mid, b)
             _set_beam_axis(e, a, mid)
         made["piece"] = piece.GlobalId
-        return 1, _visible([e, piece]) + [n.GlobalId for n in neighbours], []
+        return 1, _visible([e, piece]) + rebuilt, []
 
     return _finish(action, made)
 
@@ -521,11 +525,8 @@ def trim_extend(guid: str, x, y, boundary_guid: str = "", bx1=0, by1=0, bx2=0, b
         lost = _apply_end(e, line, k, p1, p2, t)
         if join:
             _join_end(e, k, boundary, p1 if k == 0 else p2)
-        _regen([e, *lost, *old_neighbours, *([boundary] if boundary is not None else [])])
-        changed = _visible([e]) + [w.GlobalId for w in [*lost, *old_neighbours]]
-        if boundary is not None:
-            changed.append(boundary.GlobalId)
-        return 1, changed, []
+        rebuilt = _regen([e, *lost, *old_neighbours, *([boundary] if boundary is not None else [])])
+        return 1, _visible([e]) + rebuilt, []
 
     return _finish(action, {})
 
@@ -574,8 +575,8 @@ def trim_corner(guid1: str, x1, y1, guid2: str, x2, y2, join="1") -> str:
             ifcopenshell.api.geometry.connect_path(
                 f, relating_element=a, related_element=b,
                 relating_connection="ATSTART" if ka == 0 else "ATEND", related_connection="ATSTART" if kb == 0 else "ATEND")
-        _regen([a, b, *touched])
-        return 2, _visible([a, b]) + [w.GlobalId for w in touched], []
+        rebuilt = _regen([a, b, *touched])
+        return 2, _visible([a, b]) + rebuilt, []
 
     return _finish(action, {})
 
@@ -708,8 +709,8 @@ def join_elements(guid1: str, guid2: str) -> str:
             _adopt(a)
             _adopt(b)
             touched, removed = _merge(a, b, lo, hi)
-            _regen(touched)
-            return 1, _visible([a]) + [w.GlobalId for w in touched if w.id()], removed
+            rebuilt = _regen(touched)
+            return 1, _visible([a]) + rebuilt, removed
 
         return _finish(merge, made)
     if not a.is_a("IfcWall"):
