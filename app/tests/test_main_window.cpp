@@ -110,6 +110,43 @@ private slots:
         QVERIFY(dock->view("3d"));
     }
 
+    // D76: View > Views turns the active view; View > Perspective toggles it; their shortcuts are
+    // used by nothing else in the window.
+    void presetViewsAndPerspectiveFromTheViewMenu()
+    {
+        kimcad::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        kimcad::Viewport* v = w.viewport();
+        action(w, "actionViewFront")->trigger();
+        QVERIFY(v->view()->Camera()->Direction().Y() > 0.999); // from the south, looking north
+        action(w, "actionViewTop")->trigger();
+        QVERIFY(v->view()->Camera()->Direction().Z() < -0.999);
+        action(w, "actionHomeView")->trigger();
+        QVERIFY(v->view()->Camera()->Direction().Z() < -0.5 && v->view()->Camera()->Direction().X() < 0);
+        QAction* perspective = action(w, "actionPerspective");
+        perspective->trigger();
+        QVERIFY(v->isPerspective());
+        QVERIFY(perspective->isChecked());
+        QVERIFY(!v->view()->Camera()->IsOrthographic());
+        perspective->trigger();
+        QVERIFY(!v->isPerspective());
+        QVERIFY(!perspective->isChecked());
+
+        QHash<QString, QStringList> owners; // shortcut -> actions using it
+        for (QAction* a : w.findChildren<QAction*>())
+            for (const QKeySequence& k : a->shortcuts())
+                owners[k.toString()] << a->objectName();
+        QStringList mine{"actionHomeView", "actionPerspective"};
+        for (const char* id : {"Top", "Bottom", "Front", "Back", "Left", "Right", "SW", "SE", "NE", "NW"})
+            mine << QStringLiteral("actionView") + QLatin1String(id);
+        for (const QString& name : mine) {
+            const QAction* a = action(w, name.toLatin1().constData());
+            QVERIFY2(!a->shortcut().isEmpty(), qPrintable(name));
+            QVERIFY2(owners.value(a->shortcut().toString()).size() == 1,
+                qPrintable(name + QLatin1String(": ") + owners.value(a->shortcut().toString()).join(QLatin1Char(','))));
+        }
+    }
+
     // The rework is for room: the model view gets most of the width; the side columns stay narrow.
     void theModelViewGetsMostOfTheWidth()
     {
