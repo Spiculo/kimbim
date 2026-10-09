@@ -73,6 +73,15 @@ Built as D76 (Revit's cube, since Archicad has none; Archicad's camera habits ot
    e.g. once the project has a true north (georeferencing)?
 5. Perspective uses a 45° vertical field of view (about 70° across a wide window). Should it be a
    setting, or a different default?
+## For the architect: window chrome (asked 2026-10-09, waiting)
+
+Built per D75; the owner may want an architect to confirm these.
+
+1. The title bar holds the level drop-down, Plan cut and Section box. Archicad keeps levels in the
+   Navigator and cuts in the View menu / 3D window. Are these the controls you want always in reach, or
+   would you rather see others there (e.g. the zoom, the pen set, the renovation filter)?
+2. Save version (Ctrl+Alt+S) moved from the File menu to the new Versions menu with the design options.
+   Is Versions the place you'd look for it, or should File keep a copy?
 
 ## Needs a spike
 
