@@ -7,10 +7,15 @@
 #include <QWidget>
 
 class QAction;
+class QComboBox;
 class QTreeWidget;
 class QTreeWidgetItem;
 
 namespace kimcad {
+
+// D74: the renovation statuses in the order shown ("existing", "demolish", "new") and their names.
+QStringList renovationKeys();
+QString renovationLabel(const QString& key);
 
 // Properties of the selection (one or many elements, M2): name, property sets and quantities.
 // Values shared by all selected elements are shown; differing ones show "(varies)". Editing a
@@ -27,6 +32,7 @@ public:
     QTreeWidget* tree() const { return m_tree; }
     QTreeWidgetItem* itemFor(const QString& pset, const QString& prop) const;
     QTreeWidgetItem* nameItem() const { return m_name; }
+    QComboBox* statusCombo() const { return m_status; } // D74: none when nothing selected has a status
     QString variesText() const { return tr("(varies)"); }
     QString fromTypeText() const { return tr("Inherited from the element's type"); }
     // The context-menu actions for an item (parented to `parent`, or to the panel).
@@ -36,6 +42,7 @@ signals:
     void propertyEdited(const QString& pset, const QString& prop, const QJsonValue& value);
     void propertyRemoved(const QString& pset, const QString& prop);
     void nameEdited(const QString& name);
+    void statusEdited(const QString& status); // D74: "existing", "demolish" or "new"
     void addPropertyRequested(const QString& pset); // empty pset: add a new property set
     void addPropertySetRequested();
     void typeEditRequested(const QString& pset, const QString& prop);   // change the value on the type (D50)
@@ -47,6 +54,7 @@ private:
 
     QTreeWidget* m_tree;
     QTreeWidgetItem* m_name = nullptr;
+    QComboBox* m_status = nullptr;
     bool m_building = false;
 };
 

@@ -29,7 +29,8 @@ public:
     int autoVersionEvery() const;
     int recoveryMinutes() const;
     bool trueLineWeights() const;       // D73: View > True line weights
-    double largeIfcMb() const;          // an IFC this large asks before making a .kim; 0: never asks
+    double largeIfcMb() const;
+    bool askImportStatus() const;       // D74: opening an IFC offers to mark elements without a renovation status          // an IFC this large asks before making a .kim; 0: never asks
     QStringList recent() const;
     void addRecent(const QString& path); // most recent first, no duplicates, at most 10
     QByteArray layout() const;

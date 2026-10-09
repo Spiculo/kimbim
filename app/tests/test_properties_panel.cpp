@@ -2,6 +2,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QAction>
+#include <QComboBox>
+#include <QJsonArray>
 #include <QSignalSpy>
 #include <QTreeWidgetItem>
 #include <QtTest>
@@ -117,6 +119,30 @@ private slots:
         panel.showMulti(sample());
         panel.showMulti(sample());
         QCOMPARE(spy.count(), 0);
+    }
+
+    // D74: the renovation status drop-down, with mixed values shown as "(varies)".
+    void statusShowsAndEmits()
+    {
+        kimcad::PropertiesPanel panel;
+        QJsonObject m = sample();
+        m.insert("status", QJsonObject{{"value", QJsonValue()}, {"varies", true}});
+        panel.showMulti(m);
+        QComboBox* c = panel.statusCombo();
+        QVERIFY(c);
+        QCOMPARE(c->currentText(), panel.variesText());
+        QSignalSpy spy(&panel, &kimcad::PropertiesPanel::statusEdited);
+        c->setCurrentIndex(c->findData(QStringLiteral("demolish")));
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(spy.first().first().toString(), QStringLiteral("demolish"));
+        m.insert("status", QJsonObject{{"value", "existing"}, {"varies", false}});
+        panel.showMulti(m); // rebuilding doesn't emit
+        QCOMPARE(spy.count(), 1);
+        QVERIFY(panel.statusCombo());
+        QCOMPARE(panel.statusCombo()->currentData().toString(), QStringLiteral("existing"));
+        QCOMPARE(panel.statusCombo()->findText(panel.variesText()), -1);
+        panel.showMulti(sample()); // no status (annotations only): no row
+        QVERIFY(!panel.statusCombo());
     }
 };
 

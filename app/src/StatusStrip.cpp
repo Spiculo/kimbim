@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "StatusStrip.h"
 
+#include "PropertiesPanel.h" // renovationKeys, renovationLabel
+
 #include <QComboBox>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -22,6 +24,16 @@ StatusStrip::StatusStrip(QWidget* parent)
     auto* row = new QHBoxLayout(this);
     row->setContentsMargins(6, 2, 6, 2);
     row->setSpacing(10);
+    m_statusForNew = new QComboBox(this);
+    m_statusForNew->setObjectName(QStringLiteral("statusForNew"));
+    m_statusForNew->setToolTip(tr("Renovation status for new elements"));
+    m_statusForNew->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    for (const QString& k : renovationKeys())
+        m_statusForNew->addItem(renovationLabel(k), k);
+    m_statusForNew->setCurrentIndex(m_statusForNew->findData(QStringLiteral("new")));
+    connect(m_statusForNew, &QComboBox::activated, this,
+        [this](int i) { emit statusForNewRequested(m_statusForNew->itemData(i).toString()); });
+    row->addWidget(m_statusForNew);
     m_purpose = new QComboBox(this);
     m_purpose->setObjectName(QStringLiteral("purpose"));
     m_purpose->setToolTip(tr("Purpose: how the views, drawings and sheets look (pen set, visibility, overrides, layers)"));
@@ -91,6 +103,12 @@ void StatusStrip::setLayers(const QStringList& all, const QString& active, const
     const auto shown = std::count_if(all.begin(), all.end(), [&](const QString& n) { return !hidden.contains(n); });
     m_layersText = QStringLiteral("%1/%2").arg(shown).arg(all.size());
     m_layers->setText(tr("Layers %1").arg(m_layersText));
+}
+
+void StatusStrip::setStatusForNew(const QString& status)
+{
+    const QSignalBlocker block(m_statusForNew);
+    m_statusForNew->setCurrentIndex(std::max(0, m_statusForNew->findData(status)));
 }
 
 void StatusStrip::setZoom(double percent)

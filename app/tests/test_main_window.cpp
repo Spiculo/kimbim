@@ -42,6 +42,7 @@
 #include "HostTool.h"
 #include "Graphics.h"
 #include "MainWindow.h"
+#include "PropertiesPanel.h"
 #include "PolygonTool.h"
 #include "ProjectSettingsDialog.h"
 #include "GripTool.h"
@@ -1537,6 +1538,70 @@ private slots:
         QVERIFY(w.setPurpose(QStringLiteral("Working")));
         QCOMPARE(w.viewport()->graphics().styleOf(wall)->projection.color, QColor("#8a6a4a"));
         QVERIFY(!w.setPurpose(QStringLiteral("Nope")));
+    }
+
+    // D74: renovation status from the Model menu and Properties; the status for new elements.
+    void renovationStatusFromMenuAndForNewElements()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        const QString wall = drawWall(w);
+        QVERIFY(!wall.isEmpty());
+        w.setSelection({wall});
+        QCOMPARE(w.propertiesPanel()->statusCombo()->currentData().toString(), QStringLiteral("new"));
+        auto* menu = w.findChild<QMenu*>(QStringLiteral("renovationMenu"));
+        QVERIFY(menu);
+        QCOMPARE(menu->actions().size(), 5); // 3 statuses, a separator, "Mark unmarked elements as"
+        menu->actions().at(1)->trigger();     // To be demolished
+        QCOMPARE(w.propertiesPanel()->statusCombo()->currentData().toString(), QStringLiteral("demolish"));
+        QVERIFY(w.setPurpose(QStringLiteral("New construction")));
+        QVERIFY(w.viewport()->graphics().isHidden(wall)); // demolished: hidden in the new plan
+        w.viewport()->showAll();
+        QVERIFY(w.viewport()->isElementHidden(wall));
+        QVERIFY(w.setPurpose(QStringLiteral("Working")));
+        QVERIFY(w.setStatusForNew(QStringLiteral("existing")));
+        auto* forNew = w.findChild<QComboBox*>(QStringLiteral("statusForNew"));
+        QVERIFY(forNew);
+        QCOMPARE(forNew->currentData().toString(), QStringLiteral("existing"));
+        const QString second = drawWall(w, QPointF(0, 3), QPointF(4, 3));
+        w.setSelection({second});
+        QCOMPARE(w.propertiesPanel()->statusCombo()->currentData().toString(), QStringLiteral("existing"));
+        QVERIFY(w.setRenovationStatus(QStringLiteral("new")));
+        QCOMPARE(w.propertiesPanel()->statusCombo()->currentData().toString(), QStringLiteral("new"));
+    }
+
+    // D74 (owner request): opening an IFC with unmarked elements offers to mark them, in one undo step.
+    void openingAnIfcOffersToMarkUnmarkedElements()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("survey.ifc"));
+        QString error;
+        QVERIFY(kimcad::PythonEngine::instance().start(&error));
+        QVERIFY(kimcad::PythonEngine::instance().callJson("_write_unmarked_model", {path}).object().value("ok").toBool());
+        {
+            kimcad::MainWindow w(nullptr, /*quiet=*/true);
+            w.preferences().setValue(QStringLiteral("open_ifc"), QStringLiteral("edit_ifc"));
+            w.setImportStatusAnswer(QStringLiteral("existing"));
+            QSignalSpy done(&w, &kimcad::MainWindow::loadFinished);
+            QVERIFY(w.openIfc(path));
+            QVERIFY(done.wait(60000));
+            auto count = [] {
+                return kimcad::PythonEngine::instance().callJson("unmarked", {}).object().value("count").toInt();
+            };
+            QTRY_COMPARE(count(), 0);
+            QVERIFY(kimcad::PythonEngine::instance().callJson("undo", {}).object().value("ok").toBool()); // one step
+            QCOMPARE(count(), 2);
+        }
+        {
+            kimcad::MainWindow w(nullptr, /*quiet=*/true);
+            w.preferences().setValue(QStringLiteral("open_ifc"), QStringLiteral("edit_ifc"));
+            w.setImportStatusAnswer(QString()); // leave them
+            QSignalSpy done(&w, &kimcad::MainWindow::loadFinished);
+            QVERIFY(w.openIfc(path));
+            QVERIFY(done.wait(60000));
+            QCoreApplication::processEvents();
+            QCOMPARE(kimcad::PythonEngine::instance().callJson("unmarked", {}).object().value("count").toInt(), 2);
+        }
     }
 
     // D73: elements drawn after switching purpose get the purpose's style.

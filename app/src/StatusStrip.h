@@ -31,6 +31,8 @@ public:
     void setPen(int number, const QColor& color, double weight);
     // D73: the purposes and the current one (the drop-down left of the pen).
     void setPurposes(const QStringList& names, const QString& current);
+    // D74: the renovation status new elements get ("existing", "demolish" or "new").
+    void setStatusForNew(const QString& status);
 
 signals:
     void activeLayerRequested(const QString& layer);
@@ -38,8 +40,10 @@ signals:
     void penRequested(); // the pen button: pick a pen
     void purposeRequested(const QString& name);
     void graphicsPopupRequested(); // the "..." button: this purpose's pen set, visibility, overrides, layers
+    void statusForNewRequested(const QString& status);
 
 private:
+    QComboBox* m_statusForNew;
     QComboBox* m_purpose;
     QToolButton* m_pen;
     QComboBox* m_layer;

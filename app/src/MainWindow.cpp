@@ -130,6 +130,7 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
             setPurpose(name);
     });
     connect(m_status, &StatusStrip::graphicsPopupRequested, this, &MainWindow::editPurposePieces);
+    connect(m_status, &StatusStrip::statusForNewRequested, this, &MainWindow::setStatusForNew);
     connect(m_status, &StatusStrip::penRequested, this, [this] {
         const Graphics& g = m_viewport->graphics();
         const int pen = PenGrid::pick(m_status->findChild<QWidget*>(QStringLiteral("penButton")), g.pens(),
@@ -193,6 +194,10 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
         setSelection(guids);
     });
     connect(m_properties, &PropertiesPanel::propertyEdited, this, &MainWindow::applyPropertyEdit);
+    connect(m_properties, &PropertiesPanel::statusEdited, this, [this](const QString& s) {
+        // after the drop-down's own signal: setRenovationStatus rebuilds the panel
+        QMetaObject::invokeMethod(this, [this, s] { setRenovationStatus(s); }, Qt::QueuedConnection);
+    });
     connect(m_properties, &PropertiesPanel::nameEdited, this, &MainWindow::applyName);
     connect(m_properties, &PropertiesPanel::propertyRemoved, this, &MainWindow::removeProperty);
     connect(m_properties, &PropertiesPanel::addPropertyRequested, this, &MainWindow::addPropertyDialog);
@@ -1127,6 +1132,16 @@ void MainWindow::buildModelingToolbar()
     QAction* releaseAction = model->addAction(tr("&Release walls from roof"));
     releaseAction->setObjectName(QStringLiteral("actionReleaseFromRoof"));
     connect(releaseAction, &QAction::triggered, this, [this] { releaseWallsFromRoof(m_selection); });
+    // D74: renovation status (Archicad keeps it under a menu; the views' right button navigates).
+    model->addSeparator();
+    QMenu* reno = model->addMenu(tr("Renovation &status"));
+    reno->setObjectName(QStringLiteral("renovationMenu"));
+    for (const QString& k : renovationKeys())
+        connect(reno->addAction(renovationLabel(k)), &QAction::triggered, this, [this, k] { setRenovationStatus(k); });
+    reno->addSeparator();
+    QMenu* unmarkedMenu = reno->addMenu(tr("Mark unmarked elements as"));
+    for (const QString& k : {QStringLiteral("existing"), QStringLiteral("demolish")})
+        connect(unmarkedMenu->addAction(renovationLabel(k)), &QAction::triggered, this, [this, k] { markUnmarked(k); });
 
     m_types = new QComboBox(bar);
     m_types->setObjectName(QStringLiteral("typeCombo"));
@@ -2133,6 +2148,7 @@ bool MainWindow::openIfc(const QString& path)
     if (direct) {
         openFile(path);
         rememberRecent(path);
+        m_askImportStatus = true; // once it has loaded
         return true;
     }
     QString kim = beside.value("kim").toString();
@@ -2165,6 +2181,7 @@ bool MainWindow::openIfc(const QString& path)
     endCompare();
     openFile(r.value("path").toString());
     rememberRecent(kim);
+    m_askImportStatus = true; // once loaded; the .kim's first version stays the IFC as it was
     return true;
 }
 
@@ -2726,6 +2743,7 @@ void MainWindow::refreshGraphics()
     const LineStyle pen = g.pen(g.currentPen());
     m_status->setPen(g.currentPen(), pen.color, pen.weight);
     m_status->setPurposes(g.purposes(), g.purpose());
+    m_status->setStatusForNew(m_settings.value("status_for_new").toString(QStringLiteral("new")));
     if (m_sheetsPanel)
         m_sheetsPanel->setPurposes(g.purposes(), m_settings.value("sheet_purposes").toObject());
 }
@@ -2795,6 +2813,82 @@ bool MainWindow::setSheetPurpose(const QString& number, const QString& purpose)
     refreshGraphics();
     setWindowModified(isDirty());
     return true;
+}
+
+bool MainWindow::setRenovationStatus(const QString& status)
+{
+    if (m_selection.isEmpty()) {
+        m_status->showMessage(tr("Select the elements first"));
+        return false;
+    }
+    const QJsonObject r = bridge("set_status", {jsonList(m_selection), status});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(r.value("error").toString());
+        return false;
+    }
+    afterEdit(r); // restyles through the graphics (a status may hide or restyle the elements)
+    refreshProperties();
+    return true;
+}
+
+bool MainWindow::setStatusForNew(const QString& status)
+{
+    const QJsonObject r = bridge("set_status_for_new", {status});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(r.value("error").toString());
+        return false;
+    }
+    m_settings = bridge("project_settings").value("settings").toObject();
+    m_status->setStatusForNew(status);
+    setWindowModified(isDirty());
+    return true;
+}
+
+bool MainWindow::markUnmarked(const QString& status)
+{
+    if (bridge("unmarked").value("count").toInt() == 0) {
+        m_status->showMessage(tr("Every element already has a renovation status"));
+        return false;
+    }
+    const QJsonObject r = bridge("mark_unmarked", {status});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
+    m_status->showMessage(tr("%n element(s) marked", nullptr, r.value("changed").toInt()));
+    return true;
+}
+
+void MainWindow::askImportStatus()
+{
+    if (!m_prefs.askImportStatus())
+        return;
+    const int count = bridge("unmarked").value("count").toInt();
+    if (count == 0)
+        return;
+    QString answer = m_importStatusAnswer;
+    if (!m_quiet) {
+        QMessageBox box(QMessageBox::Question, tr("Renovation status"),
+            tr("%n element(s) have no renovation status. Mark them as:", nullptr, count), QMessageBox::NoButton, this);
+        QPushButton* existing = box.addButton(renovationLabel(QStringLiteral("existing")), QMessageBox::AcceptRole);
+        QPushButton* demolish = box.addButton(renovationLabel(QStringLiteral("demolish")), QMessageBox::AcceptRole);
+        QPushButton* leave = box.addButton(tr("Leave them (they count as New)"), QMessageBox::RejectRole);
+        box.setDefaultButton(leave);
+        box.setEscapeButton(leave);
+        auto* again = new QCheckBox(tr("Don't ask again"), &box);
+        box.setCheckBox(again);
+        box.exec();
+        if (again->isChecked()) {
+            m_prefs.setValue(QStringLiteral("ask_import_status"), false);
+            m_prefs.save();
+        }
+        answer = box.clickedButton() == existing ? QStringLiteral("existing")
+            : box.clickedButton() == demolish    ? QStringLiteral("demolish")
+                                                 : QString();
+    }
+    if (!answer.isEmpty())
+        markUnmarked(answer);
 }
 
 bool MainWindow::setCurrentPen(int pen)
@@ -4504,6 +4598,8 @@ void MainWindow::onFinished(int elements, bool stopped)
                                      .arg(double(m_loadTimer.elapsed()) / 1000.0, 0, 'f', 1));
     }
     emit loadFinished(elements, stopped);
+    if (std::exchange(m_askImportStatus, false) && !stopped) // D74: after the other load-finished work
+        QMetaObject::invokeMethod(this, &MainWindow::askImportStatus, Qt::QueuedConnection);
 }
 
 void MainWindow::onFailed(const QString& error)

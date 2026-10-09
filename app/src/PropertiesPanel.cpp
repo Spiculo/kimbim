@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "PropertiesPanel.h"
 
+#include <QComboBox>
+#include <QCoreApplication>
 #include <QHeaderView>
 #include <QJsonArray>
 #include <QLocale>
@@ -10,6 +12,20 @@
 #include <QVBoxLayout>
 
 namespace kimcad {
+
+QStringList renovationKeys()
+{
+    return {QStringLiteral("existing"), QStringLiteral("demolish"), QStringLiteral("new")};
+}
+
+QString renovationLabel(const QString& key)
+{
+    if (key == QLatin1String("existing"))
+        return QCoreApplication::translate("Renovation", "Existing");
+    if (key == QLatin1String("demolish"))
+        return QCoreApplication::translate("Renovation", "To be demolished");
+    return QCoreApplication::translate("Renovation", "New");
+}
 
 namespace {
 
@@ -77,8 +93,9 @@ PropertiesPanel::PropertiesPanel(QWidget* parent)
 void PropertiesPanel::clear()
 {
     m_building = true;
-    m_tree->clear();
+    m_tree->clear(); // deletes the status drop-down (an item widget) too
     m_name = nullptr;
+    m_status = nullptr;
     m_building = false;
 }
 
@@ -118,6 +135,24 @@ void PropertiesPanel::showMulti(const QJsonObject& merged)
     }
     if (count == 1 && !merged.value("guids").toArray().isEmpty())
         new QTreeWidgetItem(element, {QStringLiteral("GlobalId"), merged.value("guids").toArray().first().toString()});
+    // D74: the renovation status (not for annotations, which have none).
+    const QJsonObject status = merged.value("status").toObject();
+    if (status.value("varies").toBool() || status.value("value").isString()) {
+        auto* item = new QTreeWidgetItem(element, {tr("Renovation status"), QString()});
+        m_status = new QComboBox(m_tree);
+        m_status->setObjectName(QStringLiteral("renovationStatus"));
+        if (status.value("varies").toBool())
+            m_status->addItem(variesText(), QString());
+        for (const QString& k : renovationKeys())
+            m_status->addItem(renovationLabel(k), k);
+        m_status->setCurrentIndex(std::max(0, m_status->findData(status.value("value").toString())));
+        connect(m_status, &QComboBox::currentIndexChanged, this, [this](int i) {
+            const QString key = m_status ? m_status->itemData(i).toString() : QString();
+            if (!m_building && !key.isEmpty())
+                emit statusEdited(key);
+        });
+        m_tree->setItemWidget(item, 1, m_status);
+    }
     element->setExpanded(true);
 
     const QJsonObject psets = merged.value("psets").toObject();

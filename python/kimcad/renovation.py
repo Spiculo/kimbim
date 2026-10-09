@@ -106,7 +106,7 @@ def _edit(elements, status) -> str:
     def action():
         for e in elements:
             write_status(e, status)
-        return len(elements), [e.GlobalId for e in elements], []
+        return len(elements)  # restyled, not reshaped: no re-meshing (the app restyles from graphics_state)
 
     try:
         return B._dump(B._run(action))

@@ -157,6 +157,12 @@ public:
     // Changes the current purpose's pieces (bottom bar "..."); a built-in purpose is copied first as
     // "<name> (modified)", which becomes current. Empty layers: none.
     bool customizePurpose(const QString& penSet, const QString& visibility, const QString& overrides, const QString& layers);
+    // D74: the selection's renovation status; the status for new elements; marking elements that have none.
+    bool setRenovationStatus(const QString& status);
+    bool setStatusForNew(const QString& status);
+    bool markUnmarked(const QString& status);
+    // Quiet mode: the answer the "mark unmarked elements" question gets when an IFC opens ("" = leave them).
+    void setImportStatusAnswer(const QString& status) { m_importStatusAnswer = status; }
     bool setSheetPurpose(const QString& number, const QString& purpose); // "" = the current purpose
     QStringList hiddenLayers() const { return QStringList(m_hiddenLayers.begin(), m_hiddenLayers.end()); }
     QString formatLength(double metres) const;            // in the project's unit and decimals
@@ -324,6 +330,7 @@ private:
     void closeView(const QString& key);
     void saveVersionDialog();
     LargeIfc askLargeIfc(const QString& path, double mb);
+    void askImportStatus(); // D74: after an IFC opens, offer to mark the elements without a status
     bool askReadOnly(const QJsonObject& refused);
     bool prepareToOpen();
     void rememberRecent(const QString& path);
@@ -364,6 +371,8 @@ private:
     void onFailed(const QString& error);
 
     bool m_quiet;
+    QString m_importStatusAnswer;
+    bool m_askImportStatus = false; // an IFC is loading: ask about unmarked elements when it's done
     std::function<LargeIfc(const QString&, double)> m_largeIfcAnswer;
     Preferences m_prefs; // D72: user preferences (in memory only in quiet mode)
     bool m_loading = false;

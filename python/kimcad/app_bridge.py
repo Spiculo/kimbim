@@ -760,6 +760,19 @@ def _write_occlusion_model(path: str) -> str:
     return _dump({"ok": True, "path": path})
 
 
+def _write_unmarked_model(path: str) -> str:
+    """Two walls with no renovation status, as a survey from another tool (D74 self-test). Leaves no
+    model open."""
+    import ifcopenshell.api.root
+
+    f = ifcopenshell.file(schema="IFC4")
+    ifcopenshell.api.root.create_entity(f, ifc_class="IfcProject", name="Survey")
+    for _ in range(2):
+        ifcopenshell.api.root.create_entity(f, ifc_class="IfcWall")
+    f.write(path)
+    return _dump({"ok": True, "path": path})
+
+
 def count_entities(ifc_class: str) -> str:
     """Number of entities of a class (self-test reports)."""
     return _dump({"count": len(_model.by_type(ifc_class)) if _model is not None else 0})

@@ -49,6 +49,7 @@ QJsonObject Preferences::defaults()
         {"recovery_minutes", 5},
         {"true_line_weights", false},
         {"large_ifc_mb", 5},
+        {"ask_import_status", true},
         {"recent", QJsonArray()},
     };
 }
@@ -118,6 +119,11 @@ double Preferences::largeIfcMb() const
 {
     const QJsonValue v = value("large_ifc_mb");
     return v.isDouble() && v.toDouble() >= 0.0 ? v.toDouble() : 5.0;
+}
+
+bool Preferences::askImportStatus() const
+{
+    return value("ask_import_status").toBool(true);
 }
 
 bool Preferences::trueLineWeights() const
