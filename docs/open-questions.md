@@ -124,6 +124,21 @@ Built to Archicad's model (D79); the owner will confirm these with an architect.
    existing levels without moving them (Revit)?
 5. Deleting a level with elements offers "delete them too" (Archicad) or "move them to the next level down". Is
    moving useful, or should deleting simply delete (with a warning)?
+## For the architect: split, trim, join (asked 2026-10-09, waiting)
+
+Built per D80 (Revit's tools where Archicad has none; joined walls stay connected, D54).
+
+1. A split wall's two pieces stay joined (they follow each other when one moves); Ctrl leaves them
+   apart. Would you rather they were independent by default, as in Archicad?
+2. Trimming a wall so that a door or window would fall off is refused. Should the door be deleted
+   instead (with the trim), or moved to stay inside?
+3. Merge needs the same type, level and height, and keeps the first wall's properties (the second's
+   are dropped). Is that the right rule, or should differing properties block the merge?
+4. Splitting, trimming or merging an imported wall (e.g. from Revit) replaces its exported shape with
+   KIMCAD's own, rebuilt from its axis, layers and height. Is that acceptable, or should imported
+   walls keep their shape and only be cut?
+5. Shortcuts Shift+S (split), Shift+T (trim/extend), Shift+J (join). Revit uses two-letter keys (SL,
+   TR); do you want those instead?
 
 ## Needs a spike
 

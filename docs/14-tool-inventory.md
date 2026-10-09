@@ -98,7 +98,7 @@ release notes, so check before relying on a single cell.
 | Mirror | all | ✅ | P1 | Slice 17 (Ctrl+M; Ctrl mirrors a copy) |
 | Array: linear, rectangular, polar | all | 🟡 | P1 | Slice 17: linear and polar (Ctrl+U); rectangular = two linear |
 | Offset (parallel copy) | all | ✅ | new | Slice 17: walls (parallel copy), slabs (grow/shrink) |
-| Trim, extend to boundary, split, join | all | ⬜ | new | Walls, beams, 2D lines |
+| Trim, extend to boundary, split, join | all | 🟡 | new | D80: walls and beams (split, trim/extend to an element, a grid line or a corner, join/merge, unjoin; Shift+S, Shift+T, Shift+J). Not yet: 2D lines, curved walls |
 | Align (to an edge or face) | RV VW | ⬜ | new | |
 | Elevate (change vertical position) | AC RV | 🟡 | new | Wall height; no general elevate |
 | Resize / scale | AC VW SU | ⬜ | new | |
