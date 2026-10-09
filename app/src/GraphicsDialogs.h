@@ -238,19 +238,44 @@ private:
     bool m_loading = false;
 };
 
-// Graphics > Purposes: each purpose's pen set, visibility set, override set and layer combination.
-class PurposesDialog : public NamedSetsDialog {
+// Graphics > Renovation filters (D74): per renovation status, shown as is, hidden, or overridden (line pen,
+// line type, fill pen, 3D colour; fields left out keep the element style).
+class RenovationFiltersDialog : public NamedSetsDialog {
     Q_OBJECT
 public:
-    PurposesDialog(const QJsonObject& reply, QWidget* parent);
-    // An empty layers name means none (the purpose leaves the layers as they are).
-    void setPieces(const QString& penSet, const QString& visibility, const QString& overrides, const QString& layers);
+    RenovationFiltersDialog(const QJsonObject& reply, QWidget* parent);
+    void setShow(const QString& status, const QString& show); // "as_is", "hide" or "override"
+    void setOverridePen(const QString& status, int pen);
+    void setOverrideFill(const QString& status, int pen);
+    void setOverrideLine(const QString& status, const QString& line); // "" = the element style's
+    void setOverrideSurface(const QString& status, const QColor& color); // invalid = none
 
 protected:
     void showSet(const QString& name) override;
 
 private:
-    QComboBox *m_penSet = nullptr, *m_visibility = nullptr, *m_overrides = nullptr, *m_layers = nullptr;
+    QJsonObject treatment(const QString& status) const;
+    void setTreatment(const QString& status, const QJsonObject& t);
+    void setField(const QString& status, const QString& field, const QJsonValue& value);
+    QTableWidget* m_rows = nullptr;
+};
+
+// Graphics > Purposes: each purpose's pen set, visibility set, override set and layer combination.
+class PurposesDialog : public NamedSetsDialog {
+    Q_OBJECT
+public:
+    PurposesDialog(const QJsonObject& reply, QWidget* parent);
+    // An empty layers name means none (the purpose leaves the layers as they are). An empty renovation
+    // filter keeps the purpose's (D74).
+    void setPieces(const QString& penSet, const QString& visibility, const QString& overrides, const QString& layers,
+        const QString& renovation = QString());
+
+protected:
+    void showSet(const QString& name) override;
+
+private:
+    QComboBox *m_penSet = nullptr, *m_visibility = nullptr, *m_overrides = nullptr, *m_layers = nullptr,
+              *m_renovation = nullptr;
     bool m_loading = false;
 };
 

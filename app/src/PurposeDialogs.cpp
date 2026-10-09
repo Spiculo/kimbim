@@ -127,7 +127,8 @@ PurposesDialog::PurposesDialog(const QJsonObject& reply, QWidget* parent)
         connect(c, &QComboBox::currentIndexChanged, this, [this] {
             if (!m_loading)
                 setPieces(m_penSet->currentData().toString(), m_visibility->currentData().toString(),
-                    m_overrides->currentData().toString(), m_layers->currentData().toString());
+                    m_overrides->currentData().toString(), m_layers->currentData().toString(),
+                    m_renovation->currentData().toString());
         });
         return c;
     };
@@ -135,20 +136,25 @@ PurposesDialog::PurposesDialog(const QJsonObject& reply, QWidget* parent)
     m_visibility = combo("visibilityOf", table("visibility_sets").keys(), false);
     m_overrides = combo("overridesOf", table("override_sets").keys(), false);
     m_layers = combo("layersOf", table("layer_combinations").keys(), true);
+    m_renovation = combo("renovationOf", table("renovation_filters").keys(), false);
     form->addRow(tr("Pen set:"), m_penSet);
     form->addRow(tr("Visibility set:"), m_visibility);
     form->addRow(tr("Graphic overrides:"), m_overrides);
     form->addRow(tr("Layer combination:"), m_layers);
+    form->addRow(tr("Renovation filter:"), m_renovation);
     m_layout->addLayout(form);
     m_layout->addWidget(new QLabel(tr("Pick the purpose in the bottom bar: it restyles the views, drawings and sheets."), this));
     finishLayout();
     selectSet(reply.value("purpose").toString());
 }
 
-void PurposesDialog::setPieces(const QString& penSet, const QString& visibility, const QString& overrides, const QString& layers)
+void PurposesDialog::setPieces(const QString& penSet, const QString& visibility, const QString& overrides, const QString& layers,
+    const QString& renovation)
 {
+    const QString keep = currentValue().value("renovation").toString(QStringLiteral("Everything"));
     setCurrentValue(QJsonObject{{"pen_set", penSet}, {"visibility", visibility}, {"overrides", overrides},
-        {"layers", layers.isEmpty() ? QJsonValue() : QJsonValue(layers)}});
+        {"layers", layers.isEmpty() ? QJsonValue() : QJsonValue(layers)},
+        {"renovation", renovation.isEmpty() ? keep : renovation}});
     showSet(currentSet());
 }
 
@@ -163,6 +169,7 @@ void PurposesDialog::showSet(const QString&)
     pick(m_visibility, p.value("visibility").toString());
     pick(m_overrides, p.value("overrides").toString());
     pick(m_layers, p.value("layers").toString());
+    pick(m_renovation, p.value("renovation").toString(QStringLiteral("Everything")));
     m_loading = false;
 }
 

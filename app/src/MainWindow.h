@@ -156,7 +156,9 @@ public:
     bool setCurrentPen(int pen);
     // Changes the current purpose's pieces (bottom bar "..."); a built-in purpose is copied first as
     // "<name> (modified)", which becomes current. Empty layers: none.
-    bool customizePurpose(const QString& penSet, const QString& visibility, const QString& overrides, const QString& layers);
+    // An empty renovation filter keeps the purpose's (D74).
+    bool customizePurpose(const QString& penSet, const QString& visibility, const QString& overrides, const QString& layers,
+        const QString& renovation = QString());
     // D74: the selection's renovation status; the status for new elements; marking elements that have none.
     bool setRenovationStatus(const QString& status);
     bool setStatusForNew(const QString& status);

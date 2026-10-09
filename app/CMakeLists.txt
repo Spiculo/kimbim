@@ -36,7 +36,7 @@ qt_add_library(kimcad_core STATIC
     src/StatusStrip.cpp src/StatusStrip.h
     src/Graphics.cpp src/Graphics.h
     src/PenGrid.cpp src/PenGrid.h
-    src/GraphicsDialogs.cpp src/GraphicsDialogs.h src/RuleDialogs.cpp src/PurposeDialogs.cpp
+    src/GraphicsDialogs.cpp src/GraphicsDialogs.h src/RuleDialogs.cpp src/PurposeDialogs.cpp src/RenovationDialogs.cpp
     src/Preferences.cpp src/Preferences.h
     src/ProjectSettingsDialog.cpp src/ProjectSettingsDialog.h
     src/PreferencesDialog.cpp src/PreferencesDialog.h

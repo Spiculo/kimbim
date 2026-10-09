@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QComboBox>
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
 #include <QPushButton>
@@ -215,6 +216,57 @@ private slots:
         QCOMPARE(p.value("layers").toString(), QString("All visible"));
         d.setPieces(QStringLiteral("Permit"), QStringLiteral("No furniture"), QStringLiteral("None"), QString());
         QVERIFY(d.changes().value("purposes").toObject().value("Permit").toObject().value("layers").isNull());
+    }
+    // D74: the renovation filter editor writes valid tables.
+    void renovationFilterEditorWritesValidTables()
+    {
+        kimcad::RenovationFiltersDialog d(tablesFromBridge(), nullptr);
+        d.selectSet(QStringLiteral("Demolition plan"));
+        d.setShow(QStringLiteral("new"), QStringLiteral("as_is"));
+        d.setShow(QStringLiteral("existing"), QStringLiteral("override"));
+        d.setOverridePen(QStringLiteral("existing"), 31);
+        d.setOverrideLine(QStringLiteral("existing"), QStringLiteral("Dotted"));
+        d.setOverrideFill(QStringLiteral("existing"), 33);
+        d.setOverrideSurface(QStringLiteral("existing"), QColor("#102030"));
+        const QJsonObject flt = d.changes().value("renovation_filters").toObject().value("Demolition plan").toObject();
+        QCOMPARE(flt.value("new").toObject(), (QJsonObject{{"show", "as_is"}}));
+        const QJsonObject ex = flt.value("existing").toObject();
+        QCOMPARE(ex.value("show").toString(), QString("override"));
+        QCOMPARE(ex.value("pen").toInt(), 31);
+        QCOMPARE(ex.value("line").toString(), QString("Dotted"));
+        QCOMPARE(ex.value("fill").toInt(), 33);
+        QCOMPARE(ex.value("surface").toString(), QString("#102030"));
+        d.setShow(QStringLiteral("existing"), QStringLiteral("hide")); // hiding drops the override fields
+        QCOMPARE(d.changes().value("renovation_filters").toObject().value("Demolition plan").toObject()
+                     .value("existing").toObject(), (QJsonObject{{"show", "hide"}}));
+        QString error;
+        const QJsonObject r = kimcad::PythonEngine::instance()
+                                  .callJson("set_graphics", {QString::fromUtf8(QJsonDocument(d.changes()).toJson())}, &error)
+                                  .object();
+        QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
+    }
+    void purposesHaveARenovationFilter()
+    {
+        kimcad::PurposesDialog d(tablesFromBridge(), nullptr);
+        d.selectSet(QStringLiteral("Working"));
+        auto* c = d.findChild<QComboBox*>(QStringLiteral("renovationOf"));
+        QVERIFY(c);
+        QCOMPARE(c->currentData().toString(), QString("Everything"));
+        c->setCurrentIndex(c->findData(QStringLiteral("New plan")));
+        QCOMPARE(d.changes().value("purposes").toObject().value("Working").toObject().value("renovation").toString(),
+            QString("New plan"));
+        d.setPieces(QStringLiteral("Permit"), QStringLiteral("Everything"), QStringLiteral("None"), QString());
+        QCOMPARE(d.changes().value("purposes").toObject().value("Working").toObject().value("renovation").toString(),
+            QString("New plan")); // the four-piece call keeps the filter
+    }
+    void legendParsed()
+    {
+        const auto g = kimcad::Graphics::fromJson(QJsonObject{{"ok", true}, {"styles", QJsonArray{}}, {"legend", QJsonArray{
+            QJsonObject{{"label", "To be demolished"}, {"source", "renovation"}, {"key", "demolish"}, {"style", 0}}}}});
+        QCOMPARE(g.legend().size(), 1);
+        QCOMPARE(g.legend().first().key, QString("demolish"));
+        QCOMPARE(g.legend().first().source, QString("renovation"));
+        QCOMPARE(g.legend().first().style, 0);
     }
     void layerCombinationsTakeTheCurrentLayers()
     {

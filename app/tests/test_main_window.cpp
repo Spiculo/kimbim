@@ -1604,6 +1604,23 @@ private slots:
         }
     }
 
+    // D74: the purpose popup's renovation filter; customizing keeps it unless given.
+    void purposePopupSetsTheRenovationFilter()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        QVERIFY(w.setPurpose(QStringLiteral("Demolition")));
+        QVERIFY(w.customizePurpose(QStringLiteral("Permit"), QStringLiteral("Architectural"), QStringLiteral("None"), QString()));
+        auto purposes = [] {
+            return kimcad::PythonEngine::instance().callJson("graphics_tables", {}).object()
+                .value("tables").toObject().value("purposes").toObject();
+        };
+        QCOMPARE(purposes().value("Demolition (modified)").toObject().value("renovation").toString(), QString("Demolition plan"));
+        QVERIFY(w.customizePurpose(QStringLiteral("Permit"), QStringLiteral("Architectural"), QStringLiteral("None"), QString(),
+            QStringLiteral("New plan")));
+        QCOMPARE(purposes().value("Demolition (modified)").toObject().value("renovation").toString(), QString("New plan"));
+    }
+
     // D73: elements drawn after switching purpose get the purpose's style.
     void newElementsGetThePurposeStyle()
     {

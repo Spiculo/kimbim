@@ -26,6 +26,11 @@ struct ElementStyle {
     std::optional<QColor> surface;
     std::optional<double> transparency;
 };
+// D74: one legend row: what the purpose changes (a renovation status or an override rule) and its style.
+struct LegendEntry {
+    QString label, source, key; // source: "renovation" or "override"; key: the status or the rule name
+    int style = -1;             // index into the styles
+};
 class Graphics {
 public:
     static Graphics fromJson(const QJsonObject& state); // graphics_state's reply
@@ -39,6 +44,8 @@ public:
     int annotationPen() const { return m_annotationPen; }
     QString purpose() const { return m_purpose; }
     const QStringList& purposes() const { return m_purposes; } // every purpose, for the bottom bar
+    const QVector<LegendEntry>& legend() const { return m_legend; }
+    const ElementStyle* style(int i) const { return i >= 0 && i < m_styles.size() ? &m_styles[i] : nullptr; }
     bool isEmpty() const { return m_styles.isEmpty() && m_hidden.isEmpty(); }
     // Screen width in pixels: 1, or with true weights clamp(round(weight * 4), 1, 6).
     static float pixels(double weightMm, bool trueWeights);
@@ -53,5 +60,6 @@ private:
     int m_currentPen = 23, m_annotationPen = 23;
     QString m_purpose;
     QStringList m_purposes;
+    QVector<LegendEntry> m_legend;
 };
 }

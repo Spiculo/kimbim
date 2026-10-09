@@ -57,6 +57,11 @@ Graphics Graphics::fromJson(const QJsonObject& state)
     }
     for (const auto& h : state.value("hidden").toArray())
         g.m_hidden.insert(h.toString());
+    for (const auto& v : state.value("legend").toArray()) {
+        const QJsonObject e = v.toObject();
+        g.m_legend.push_back({e.value("label").toString(), e.value("source").toString(), e.value("key").toString(),
+            e.value("style").toInt(-1)});
+    }
     const QJsonObject pens = state.value("pens").toObject();
     for (auto it = pens.constBegin(); it != pens.constEnd(); ++it)
         g.m_pens.insert(it.key().toInt(), line(it.value().toObject()));

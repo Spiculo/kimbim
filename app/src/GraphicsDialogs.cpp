@@ -29,7 +29,7 @@ namespace kimcad {
 namespace {
 
 const QStringList kTables{"pen_sets", "line_types", "element_styles", "visibility_sets", "override_sets",
-    "layer_combinations", "purposes"};
+    "layer_combinations", "purposes", "renovation_filters"};
 
 QIcon swatch(const QColor& color)
 {

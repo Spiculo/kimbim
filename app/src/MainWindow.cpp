@@ -17,6 +17,8 @@
 #include <QStandardPaths>
 #include <QDoubleSpinBox>
 #include <QLabel>
+#include <QPainter>
+#include <QPixmap>
 #include <QToolBar>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -466,6 +468,7 @@ void MainWindow::buildMenus()
     graphics->addSeparator();
     editor("actionVisibilitySets", tr("&Visibility sets..."), [this](const QJsonObject& r) { return new VisibilitySetsDialog(r, this); });
     editor("actionOverrides", tr("Graphic &overrides..."), [this](const QJsonObject& r) { return new OverridesDialog(r, this); });
+    editor("actionRenovationFilters", tr("&Renovation filters..."), [this](const QJsonObject& r) { return new RenovationFiltersDialog(r, this); });
     editor("actionLayerCombinations", tr("Layer &combinations..."), [this](const QJsonObject& r) {
         const QStringList layers = bridge("layer_members").value("layers").toObject().keys();
         return new LayerCombinationsDialog(r, layers, QStringList(m_hiddenLayers.begin(), m_hiddenLayers.end()),
@@ -2749,7 +2752,7 @@ void MainWindow::refreshGraphics()
 }
 
 bool MainWindow::customizePurpose(const QString& penSet, const QString& visibility, const QString& overrides,
-    const QString& layers)
+    const QString& layers, const QString& renovation)
 {
     const QJsonObject reply = bridge("graphics_tables");
     QString name = reply.value("purpose").toString();
@@ -2757,10 +2760,12 @@ bool MainWindow::customizePurpose(const QString& penSet, const QString& visibili
     QStringList builtins;
     for (const auto& b : reply.value("builtins").toObject().value("purposes").toArray())
         builtins << b.toString();
+    const QString keep = purposes.value(name).toObject().value("renovation").toString(QStringLiteral("Everything"));
     if (builtins.contains(name)) // the built-ins stay as they are
         name = tr("%1 (modified)").arg(name);
     purposes.insert(name, QJsonObject{{"pen_set", penSet}, {"visibility", visibility}, {"overrides", overrides},
-        {"layers", layers.isEmpty() ? QJsonValue() : QJsonValue(layers)}});
+        {"layers", layers.isEmpty() ? QJsonValue() : QJsonValue(layers)},
+        {"renovation", renovation.isEmpty() ? keep : renovation}});
     if (!setGraphics(QString::fromUtf8(QJsonDocument(QJsonObject{{"purposes", purposes}}).toJson(QJsonDocument::Compact))))
         return false;
     return setPurpose(name);
@@ -2787,17 +2792,42 @@ void MainWindow::editPurposePieces()
     QComboBox* vis = combo(QStringLiteral("visibility_sets"), current.value("visibility").toString(), false);
     QComboBox* ovr = combo(QStringLiteral("override_sets"), current.value("overrides").toString(), false);
     QComboBox* lay = combo(QStringLiteral("layer_combinations"), current.value("layers").toString(), true);
+    QComboBox* reno = combo(QStringLiteral("renovation_filters"), current.value("renovation").toString(QStringLiteral("Everything")), false);
     form->addRow(tr("Pen set:"), pens);
     form->addRow(tr("Visibility set:"), vis);
     form->addRow(tr("Graphic overrides:"), ovr);
     form->addRow(tr("Layer combination:"), lay);
+    form->addRow(tr("Renovation filter:"), reno);
+    // D74: what this purpose changes, as a key (the same rows a sheet's legend prints).
+    auto* legendTitle = new QLabel(tr("Legend"), &dialog);
+    QFont bold = legendTitle->font();
+    bold.setBold(true);
+    legendTitle->setFont(bold);
+    form->addRow(legendTitle);
+    const Graphics& g = m_viewport->graphics();
+    if (g.legend().isEmpty())
+        form->addRow(new QLabel(tr("Everything is drawn with its element styles"), &dialog));
+    for (const LegendEntry& e : g.legend()) {
+        QPixmap swatch(30, 14);
+        swatch.fill(Qt::transparent);
+        if (const ElementStyle* s = g.style(e.style)) {
+            QPainter p(&swatch);
+            p.fillRect(swatch.rect().adjusted(1, 1, -1, -1), s->fill.isValid() ? s->fill : s->surface.value_or(QColor(Qt::transparent)));
+            QPen pen(s->cut.color, 2, s->cut.dash.isEmpty() ? Qt::SolidLine : Qt::DashLine);
+            p.setPen(pen);
+            p.drawRect(swatch.rect().adjusted(1, 1, -2, -2));
+        }
+        auto* icon = new QLabel(&dialog);
+        icon->setPixmap(swatch);
+        form->addRow(icon, new QLabel(e.source == QLatin1String("renovation") ? renovationLabel(e.key) : e.label, &dialog));
+    }
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
     connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
     form->addRow(buttons);
     if (dialog.exec() == QDialog::Accepted)
         customizePurpose(pens->currentData().toString(), vis->currentData().toString(), ovr->currentData().toString(),
-            lay->currentData().toString());
+            lay->currentData().toString(), reno->currentData().toString());
 }
 
 bool MainWindow::setSheetPurpose(const QString& number, const QString& purpose)
