@@ -90,6 +90,18 @@ static bool boxSeen(Viewport* viewport) // the model's centre is on screen
     return x >= 0 && y >= 0 && x < viewport->width() * dpr && y < viewport->height() * dpr;
 }
 
+// Shows the window, at --window-size or --maximized when given (D75: the title bar at different widths).
+static void showWindow(MainWindow& window, const SelfTestOptions& options)
+{
+    if (options.windowSize.isValid())
+        window.resize(options.windowSize);
+    if (options.maximized)
+        window.showMaximized();
+    else
+        window.show();
+    QApplication::processEvents();
+}
+
 // Drives the real MainWindow (background loader thread, progressive batches), then measures.
 static void takeScreenshots(MainWindow& window, const QString& path, QJsonObject* result)
 {
@@ -110,8 +122,7 @@ static void takeScreenshots(MainWindow& window, const QString& path, QJsonObject
 static int runDrawWalls(const SelfTestOptions& options)
 {
     MainWindow window(nullptr, /*quiet=*/true, options.chunkSize);
-    window.show();
-    QApplication::processEvents();
+    showWindow(window, options);
     if (!window.newProject())
         return fail(QStringLiteral("new project failed"));
     window.setWallToolActive(true);
@@ -152,8 +163,7 @@ static int runDrawWalls(const SelfTestOptions& options)
 static int runBenchTools(const SelfTestOptions& options)
 {
     MainWindow window(nullptr, /*quiet=*/true, options.chunkSize);
-    window.show();
-    QApplication::processEvents();
+    showWindow(window, options);
     if (!window.newProject())
         return fail(QStringLiteral("new project failed"));
     window.setTool(MainWindow::Tool::Wall);
@@ -190,8 +200,7 @@ static int runBenchTools(const SelfTestOptions& options)
 static int runHouse(const SelfTestOptions& options)
 {
     MainWindow window(nullptr, /*quiet=*/true, options.chunkSize);
-    window.show();
-    QApplication::processEvents();
+    showWindow(window, options);
     if (!window.newProject())
         return fail(QStringLiteral("new project failed"));
     window.setTool(MainWindow::Tool::Wall);
@@ -276,8 +285,7 @@ int runSelfTest(const SelfTestOptions& options)
     }
 
     MainWindow window(nullptr, /*quiet=*/true, options.chunkSize);
-    window.show();
-    QApplication::processEvents();
+    showWindow(window, options);
 
     QEventLoop loop;
     QString loadError;

@@ -84,6 +84,11 @@ int main(int argc, char* argv[])
     QCommandLineOption screenshot(QStringLiteral("screenshot"), QStringLiteral("Self-test: save a PNG of the window."),
         QStringLiteral("png"));
     parser.addOption(screenshot);
+    QCommandLineOption windowSize(QStringLiteral("window-size"), QStringLiteral("Self-test: the window's size."),
+        QStringLiteral("WxH"));
+    parser.addOption(windowSize);
+    QCommandLineOption maximized(QStringLiteral("maximized"), QStringLiteral("Self-test: show the window maximized."));
+    parser.addOption(maximized);
     QCommandLineOption exportSheet(QStringLiteral("export-sheet"),
         QStringLiteral("Export sheet <number> of the IFC file to <out.pdf|out.svg> and exit (no window)."),
         QStringLiteral("number"));
@@ -131,6 +136,9 @@ int main(int argc, char* argv[])
         options.house = parser.isSet(house);
         options.benchTools = parser.isSet(benchTools);
         options.screenshot = parser.value(screenshot);
+        if (const QStringList wh = parser.value(windowSize).split(QLatin1Char('x')); wh.size() == 2)
+            options.windowSize = QSize(wh[0].toInt(), wh[1].toInt());
+        options.maximized = parser.isSet(maximized);
         options.openDrawing = parser.value(openDrawing);
         options.createDrawings = parser.isSet(createDrawings);
         return kimcad::runSelfTest(options);

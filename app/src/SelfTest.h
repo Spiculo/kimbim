@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <QSize>
 #include <QString>
 
 namespace kimcad {
@@ -14,6 +15,8 @@ struct SelfTestOptions {
     bool boxSelect = false;       // box-select the whole view and report how many got selected
     bool selectThrough = false;   // box selection includes hidden elements
     QString screenshot;           // non-empty: save a PNG of the whole window at the end
+    QSize windowSize;             // valid: the window's size (--window-size 1000x800)
+    bool maximized = false;       // show the window maximized
     bool planView = false;        // switch to the plan view of the lowest level before the screenshot
     bool linesOnly = false;       // lines-only display before measuring/screenshot
     bool benchTools = false;      // time tool previews and wall creation (ms), report them
