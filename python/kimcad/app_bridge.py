@@ -886,6 +886,9 @@ from .sheets import (  # noqa: E402,F401
     set_sheet_purpose,
     sheet_svg,
     sheets,
+    place_legend,
+    move_legend,
+    remove_legend,
 )
 from .editing import (  # noqa: E402,F401
     array_elements,

@@ -465,3 +465,13 @@ def test_legend_svg_rows_and_restriction():
     assert g.LEGEND_EMPTY in body and h == pytest.approx(8 + 7)
     body, _, _ = g.legend_svg(out, guids={w["existing"].GlobalId, w["demolish"].GlobalId})
     assert body.count('class="kimcad-legend-row"') == 2
+
+
+def test_a_lone_override_row_stays_in_the_legend():
+    from kimcad import renovation as r
+
+    f, w = _reno_model()
+    r.write_status(w["existing"], "new")  # only the demolished wall is left showing a status change
+    out = g.resolve("Demolition", model=f)
+    body, _, _ = g.legend_svg(out)
+    assert body.count('class="kimcad-legend-row"') == 1 and "To be demolished" in body

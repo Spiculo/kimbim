@@ -653,11 +653,12 @@ def resolve(purpose: str | None = None, model=None, settings: dict | None = None
     reno.sort(key=lambda kv: STATUS_KEYS.index(kv[0][1]))
     if any(flt.get(k[1], {}).get("show") == "override" for k, _ in reno):  # as-is rows only explain an override
         for (src, key), (style_no, guids) in reno:
-            legend.append({"label": _STATUS_LABELS[key], "source": src, "key": key, "style": style_no})
+            legend.append({"label": _STATUS_LABELS[key], "source": src, "key": key, "style": style_no,
+                           "override": flt.get(key, {}).get("show") == "override"})
             members.append(guids)
     for (src, key), (style_no, guids) in legend_hits.items():
         if src == "override":
-            legend.append({"label": key, "source": src, "key": key, "style": style_no})
+            legend.append({"label": key, "source": src, "key": key, "style": style_no, "override": True})
             members.append(guids)
     ann = styles_by_kind.get("annotations") or builtin_styles["annotations"]
     out = {"purpose": name, "purposes": list(purposes), "pen_set": set_name, "visibility": vis_name or "", "overrides": ovr_name or "",
@@ -856,12 +857,12 @@ def _xml(text: str) -> str:
 def legend_svg(resolved: dict, guids=None) -> tuple:
     """The legend as SVG in paper mm (top-left 0,0): a title, then a swatch and a label per entry;
     returns (body, width, height). `guids`: only entries that apply to one of these elements (a sheet's
-    drawings). A lone renovation row (shown as is) explains nothing and is left out."""
+    drawings). Renovation rows shown as is only explain an overridden one: without one they are left out."""
     styles = resolved.get("styles", [])
     rows = [e for e, members in zip(resolved.get("legend", []), resolved.get("legend_members", []))
             if guids is None or guids.intersection(members)]
-    if len(rows) <= 1 and all(e["source"] == "renovation" for e in rows):
-        rows = []
+    if not any(e.get("override") for e in rows if e["source"] == "renovation"):
+        rows = [e for e in rows if e["source"] != "renovation"]
     parts = ['<text x="0" y="5" font-size="4" font-family="sans-serif">Legend</text>']
     y = _TITLE
     if not rows:

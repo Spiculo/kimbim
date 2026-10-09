@@ -173,6 +173,12 @@ def _check_ifc2x3_sheets(path):
     ifcopenshell.validate.validate(b._model, logger, express_rules=True)
     # (the test model's own CSG wall bodies break an IFC2X3 rule; only the sheet records matter here)
     assert [x for x in logger.statements if "Document" in str(x.get("instance"))] == []
+    leg = call("place_legend", "B01")  # D74: legends use the same IFC2X3 fallback as placed drawings
+    assert leg["ok"], leg
+    assert call("move_legend", "B01", leg["id"], 200, 100)["ok"]
+    assert [(x["x"], x["y"]) for x in next(s for s in call("sheets")["sheets"] if s["number"] == "B01")["legends"]] == [(200, 100)]
+    assert 'class="kimcad-legend"' in call("sheet_svg", "B01")["svg"]
+    assert call("remove_legend", "B01", leg["id"])["ok"]
     assert call("remove_placed", "B01", plan)["ok"]
     assert call("delete_sheet", "B01")["ok"] and call("sheets")["sheets"] == []
 
@@ -192,3 +198,51 @@ def test_sheet_weights_do_not_scale(house):
     assert call("set_sheet_purpose", number, "")["ok"]
     assert not call("set_sheet_purpose", number, "Nope")["ok"]
     s.load(None)
+
+
+# ---------------------------------------------------------------- legends (D74)
+
+def _level1_wall():
+    import ifcopenshell.util.element as U
+    return next(w for w in b._model.by_type("IfcWall") if (U.get_container(w).Name or "") == "Level 1")
+
+
+def _sheet_of(number):
+    return next(s_ for s_ in call("sheets")["sheets"] if s_["number"] == number)
+
+
+def test_a_legend_is_placed_moved_drawn_and_removed(house):
+    wall = _level1_wall()
+    assert call("set_status", json.dumps([wall.GlobalId]), "demolish")["ok"]
+    number = call("add_sheet", "A3", "Demolition")["number"]
+    assert call("place_drawing", number, drawing("Level 1 Floor Plan"), 10, 10, 100)["ok"]
+    assert call("set_sheet_purpose", number, "Demolition")["ok"]
+    r = call("place_legend", number)
+    assert r["ok"], r
+    (leg,) = _sheet_of(number)["legends"]
+    assert leg["id"] == r["id"] and leg["w"] > 0 and leg["h"] > 0
+    assert call("move_legend", number, leg["id"], 300, 200)["ok"]
+    assert (_sheet_of(number)["legends"][0]["x"], _sheet_of(number)["legends"][0]["y"]) == (300, 200)
+    svg = call("sheet_svg", number)["svg"]
+    assert 'class="kimcad-legend" transform="translate(300.000 200.000)"' in svg and "To be demolished" in svg
+    assert call("undo")["ok"]  # the move is one step
+    assert _sheet_of(number)["legends"][0]["x"] == leg["x"]
+    assert call("remove_legend", number, leg["id"])["ok"]
+    assert _sheet_of(number)["legends"] == []
+    assert not call("remove_legend", number, leg["id"])["ok"]
+
+
+def test_the_legend_only_lists_what_the_sheet_shows(house):
+    number = call("add_sheet", "A3", "Demolition")["number"]  # nothing demolished
+    assert call("place_drawing", number, drawing("Level 1 Floor Plan"), 10, 10, 100)["ok"]
+    assert call("set_sheet_purpose", number, "Demolition")["ok"]
+    assert call("place_legend", number)["ok"]
+    svg = call("sheet_svg", number)["svg"]
+    assert "To be demolished" not in svg and "Everything is drawn with its element styles" in svg
+
+
+def test_legends_are_not_drawings(house):
+    number = call("add_sheet", "A3", "L")["number"]
+    assert call("place_legend", number)["ok"]
+    sheet = _sheet_of(number)
+    assert sheet["views"] == [] and len(sheet["legends"]) == 1

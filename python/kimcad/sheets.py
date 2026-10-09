@@ -53,8 +53,8 @@ def _data(ref) -> str:  # where a placed view sits, as JSON
     return ref.Description or ""
 
 
-def _data_fields(data: str) -> dict:
-    return {"Location": f"{MARKER}#{data}"} if _x3() else {"Location": MARKER, "Description": data}
+def _data_fields(data: str, marker: str = MARKER) -> dict:
+    return {"Location": f"{marker}#{data}"} if _x3() else {"Location": marker, "Description": data}
 
 
 def _number(sheet) -> str:
@@ -198,8 +198,15 @@ def sheets() -> str:
             k = 100.0 / p["scale"]
             views.append({"drawing": _link(ref), "name": _name(ref), "x": p["x"], "y": p["y"],
                           "w": round(size[0] * k, 3), "h": round(size[1] * k, 3), "scale": p["scale"]})
+        legends = []
+        refs = _legends(sheet)
+        if refs:
+            lw, lh = _legend_size(sheet)
+            for ref in refs:
+                p = _placement(ref)
+                legends.append({"id": _link(ref), "x": p["x"], "y": p["y"], "w": round(lw, 3), "h": round(lh, 3)})
         out.append({"number": _number(sheet), "title": sheet.Name or "", "paper": sheet.Scope or "A1",
-                    "width": w, "height": h, "views": views})
+                    "width": w, "height": h, "views": views, "legends": legends})
     return B._dump({"sheets": out})
 
 
@@ -308,6 +315,10 @@ def _free_spot(sheet, w, h):
         sw, sh = _cached_size(_link(ref))
         k = 100.0 / p["scale"]
         taken.append((p["x"], p["y"], sw * k, sh * k + TITLE_BAND))
+    for ref in _legends(sheet):
+        p = _placement(ref)
+        lw, lh = _legend_size(sheet)
+        taken.append((p["x"], p["y"], lw, lh))
     taken.append((width - MARGIN - TITLE_W, height - MARGIN - TITLE_H, TITLE_W, TITLE_H))
     y = MARGIN + 5
     while y + h <= height - MARGIN:
@@ -413,6 +424,102 @@ def remove_placed(number: str, drawing_guid: str) -> str:
     return B._dump(B._run(action))
 
 
+# ---------------------------------------------------------------- legends (D74)
+# A legend is a reference on the sheet like a placed drawing, with its own marker: an id (in the drawing
+# link's attribute) and {"x", "y"} (mm). It is drawn from the sheet's purpose.
+
+LEGEND = "kimcad:legend"
+
+
+def _legends(sheet):
+    refs = sheet.DocumentReferences if _x3() else getattr(sheet, "HasDocumentReferences", ())
+    return [r for r in refs or () if (r.Location or "").partition("#")[0] == LEGEND]
+
+
+def _sheet_resolved(number: str):
+    from . import graphics, settings as S
+
+    return graphics.resolve(S.current().get("sheet_purposes", {}).get(number) or None)
+
+
+def _legend_size(sheet):
+    """The legend's size for listing and placing: from the whole model, so listing sheets never
+    generates drawings (the composed legend, limited to the sheet's drawings, may have fewer rows)."""
+    from . import graphics
+
+    _, w, h = graphics.legend_svg(_sheet_resolved(_number(sheet)))
+    return w, h
+
+
+def _legend_content(sheet, resolved):
+    """(body, w, h): the sheet purpose's legend, limited to the elements its drawings show."""
+    from . import graphics
+
+    views = _views(sheet)
+    guids = set()
+    for ref in views:
+        size, svg = _drawing_size(_link(ref), resolved["hidden"])
+        if size is not None:
+            guids.update(re.findall(r'ifc:guid="([^"]+)"', svg))
+    return graphics.legend_svg(resolved, guids if views else None)
+
+
+def place_legend(number: str) -> str:
+    """A legend of the sheet's purpose, at a free spot."""
+    sheet = _sheet(number) if B._model is not None else None
+    if sheet is None:
+        return A._fail("unknown sheet")
+    x, y = _free_spot(sheet, *_legend_size(sheet))
+    legend_id = ifcopenshell.guid.new()[:8]
+
+    def action():
+        f = B._model
+        ref = ifcopenshell.api.document.add_reference(f, information=sheet)
+        ifcopenshell.api.document.edit_reference(f, reference=ref, attributes={
+            _link_attr(): legend_id, **_data_fields(json.dumps({"x": round(x, 3), "y": round(y, 3)}), LEGEND)})
+        return 1
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return A._fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "id": legend_id})
+
+
+def _legend_ref(number, legend_id):
+    sheet = _sheet(number) if B._model is not None else None
+    return next((r for r in _legends(sheet) if _link(r) == legend_id), None) if sheet else None
+
+
+def move_legend(number: str, legend_id: str, x, y) -> str:
+    try:
+        x, y = float(x), float(y)
+    except (TypeError, ValueError):
+        return A._fail("bad position")
+    ref = _legend_ref(number, legend_id)
+    if ref is None:
+        return A._fail("the legend is not on that sheet")
+
+    def action():
+        for name, value in _data_fields(json.dumps({"x": round(x, 3), "y": round(y, 3)}), LEGEND).items():
+            setattr(ref, name, value)
+        return 1
+
+    return B._dump(B._run(action))
+
+
+def remove_legend(number: str, legend_id: str) -> str:
+    ref = _legend_ref(number, legend_id)
+    if ref is None:
+        return A._fail("the legend is not on that sheet")
+
+    def action():
+        ifcopenshell.api.document.remove_reference(B._model, reference=ref)
+        return 1
+
+    return B._dump(B._run(action))
+
+
 # ---------------------------------------------------------------- composing the sheet
 
 def _esc(value: str) -> str:
@@ -488,6 +595,12 @@ def sheet_svg(number: str) -> str:
         parts.append(f'<g class="kimcad-view-title"><path d="M{tx:.3f},{ty + 1.5:.3f} L{tx + size[0] * k:.3f},{ty + 1.5:.3f}" '
                      f'stroke="#000" stroke-width="0.35"/><text x="{tx:.3f}" y="{ty:.3f}" font-size="4">{_esc(_name(ref))}</text>'
                      f'<text x="{tx:.3f}" y="{ty + 6:.3f}" font-size="3">1:{p["scale"]}</text></g>')
+    legend_refs = _legends(sheet)
+    if legend_refs:
+        body, _, _ = _legend_content(sheet, resolved)
+        for ref in legend_refs:
+            p = _placement(ref)
+            parts.append(f'<g class="kimcad-legend" transform="translate({p["x"]:.3f} {p["y"]:.3f})">\n{body}\n</g>')
     frame = [f'<rect x="{MARGIN}" y="{MARGIN}" width="{width - 2 * MARGIN}" height="{height - 2 * MARGIN}" '
              f'fill="none" stroke="#000" stroke-width="0.7"/>']
     svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}mm" height="{height}mm" viewBox="0 0 {width} {height}">\n'
