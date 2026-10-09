@@ -33,6 +33,8 @@ DEFAULTS = {
     "sheet_purposes": {},
     "status_for_new": "new",
     "schedules": {},  # schedule schemes by id: the project's own and its edited built-ins (D77)
+    "selection_criteria": {},
+    "selection_sets": {},
 }
 UNITS = {"m": 1.0, "cm": 100.0, "mm": 1000.0}
 
@@ -118,6 +120,10 @@ def _error(key: str, value) -> str | None:
         from .schedules import table_error
 
         return table_error(value)
+    if key in ("selection_criteria", "selection_sets"):
+        from . import queries
+
+        return queries.validate(key, value)
     from . import graphics
 
     if key in graphics.TABLES or key in ("purpose", "current_pen", "sheet_purposes"):
