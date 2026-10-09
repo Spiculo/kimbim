@@ -49,9 +49,9 @@ release notes, so check before relying on a single cell.
 |------|-----|--------|-----|-------|
 | Orbit, pan, zoom, fit all | all | ✅ | P0 | D48 preset |
 | Plan view and 3D view | all | ✅ | P0 | P / 3 |
-| View cube | RV VW BB | ⬜ | P0 | Backlog in 04 |
-| Preset views (front, back, sides, isometric) | all | ⬜ | P0 | Backlog in 04 |
-| Perspective camera | all | ⬜ | P0 | Orthographic only today |
+| View cube | RV VW BB | ✅ | P0 | D76: OCCT AIS_ViewCube, home button, drag to turn |
+| Preset views (front, back, sides, isometric) | all | ✅ | P0 | D76: View › Views, Alt+1…Alt+0 |
+| Perspective camera | all | ✅ | P0 | D76: View › Perspective (Shift+P), per view |
 | Touchpad navigation | all | ⬜ | P0 | Backlog in 04 |
 | Walk / fly mode | AC RV VW SU | ⬜ | P2 | |
 | Hide, isolate, show all (per element, per level) | all | ✅ | P0 | |
@@ -349,7 +349,7 @@ they would come up:
 6. **DWG import as an underlay** (§18, §12). Most projects start from a survey in DWG.
 7. **2D drafting and fills** for details (§12).
 8. **Pen sets, line types and material cut fills** (§10), so printed drawings look professional.
-9. **Navigation backlog**: view cube, preset views, perspective, touchpad (§2).
+9. **Navigation backlog**: ~~view cube, preset views, perspective~~ done (D76); touchpad (§2).
 10. ~~**Renovation status** (§9), needed for refurbishment projects.~~ Done (D74).
 
 Next step: the owner confirms or reorders this list, and gives priorities to the `new` rows. 04 is then updated to match.

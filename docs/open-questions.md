@@ -59,6 +59,21 @@ confirm these with an architect.
 5. The sheet legend lists only what the sheet's drawings actually use. Is that right, or should it list
    every rule of the purpose?
 
+## For the architect: view cube, preset views, perspective (asked 2026-10-09, waiting)
+
+Built as D76 (Revit's cube, since Archicad has none; Archicad's camera habits otherwise).
+
+1. Preset views keep your target and zoom, and fit all only when the model would be off-screen; Revit's
+   cube always zooms to fit. Which do you prefer?
+2. Shortcuts: Alt+1 to Alt+6 for Top, Bottom, Front, Back, Left, Right; Alt+7 to Alt+0 for the SW, SE,
+   NE, NW isometrics; Home for the home view; Shift+P for perspective. Would you use other keys?
+3. The home view is the south-east isometric (what a new 3D view shows). Should it be south-west, or
+   whatever view you set as home (Revit's "set current view as home")?
+4. Plan views have no cube and no north arrow (north is always up). Do you want a north arrow on plans,
+   e.g. once the project has a true north (georeferencing)?
+5. Perspective uses a 45° vertical field of view (about 70° across a wide window). Should it be a
+   setting, or a different default?
+
 ## Needs a spike
 
 These are listed in [07-roadmap.md](07-roadmap.md#spikes-do-first-each-is-small-throwaway-and-documented).

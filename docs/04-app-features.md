@@ -27,7 +27,9 @@ Each feature notes **what we reuse**. Priorities: **P0** is needed for first usa
 
 Navigation preset (D48, owner choice): middle-drag pans, Shift+middle-drag orbits around the point under the mouse, the wheel zooms toward the cursor; a drag ends when its button is released. Selection: click replaces, Ctrl+click adds (Revit), Shift+click toggles (ArchiCAD), left-drag draws a box. The box takes the elements fully inside it **that you can see** (D52); hold **Alt** while dragging (or turn on View › Select hidden elements too) to also take elements hidden behind others.
 
-Display (Slice 4b): every element has border lines (outline and creases); View › **Lines only** (L) shows a line drawing with hidden lines removed, meant for plans. Plan view (P) and 3D view (3) exist; other preset views are in the backlog below.
+Display (Slice 4b): every element has border lines (outline and creases); View › **Lines only** (L) shows a line drawing with hidden lines removed, meant for plans. Plan view (P) and 3D view (3) exist.
+
+**View cube, preset views, perspective (D76).** Each 3D view has a view cube in its top-right corner: click a face, edge or corner to turn there (a quick 250 ms turn), drag it to turn the view, and click the house beside it to go home (the default south-east isometric, fitted). **View › Views** has Top, Bottom, Front, Back, Left, Right (Alt+1 to Alt+6) and the south-west, south-east, north-east and north-west isometrics (Alt+7 to Alt+0), and Home view (Home). A preset keeps your target and zoom unless the model would be off-screen, then it fits all. **View › Perspective** (Shift+P) switches the active 3D view between parallel and perspective; navigation is the same in both. Plan views stay parallel, looking down with north up, and have no cube.
 
 **Window layout (D71).** The center holds tabs: **3D**, a **plan tab per level** (P opens the active level's, or double-click a level in the tree; View › New plan tab), sections, elevations and sheets. Any tab can be dragged out to its own window (a second monitor) and docked back, or placed beside another. The 3D and plan tabs show one loaded model: selecting in one selects in all; each has its own camera and cut (a plan tab is cut at its level). Switching tabs ends a tool in progress, like Esc.
 - **Left:** the tools, in collapsible groups **3D** (wall, slab, column, beam, door, window, stair, roof, room, slab opening, place model), **Plane** (text, dimension, leader, mark, grid line), **View** (section, elevation, new plan tab, new sheet) and **Edit** (move, rotate, stretch, mirror, copy to level). Shortcuts and the Model menu are unchanged.
@@ -42,14 +44,13 @@ Display (Slice 4b): every element has border lines (outline and creases); View �
 **Model tree:** one row for Project › Site › Building when there is only one of each; plain names ("Wall"); a level's elements grouped by category with a count ("Walls (12)"); the IFC class shows on hover and the search still matches it.
 
 **Navigation backlog** (owner, 2026-10-05: "we need those, document them for now"):
-- **View cube** (clickable faces/edges/corners to jump to a view; drag to orbit), like Revit/ArchiCAD/most CAD.
-- **Preset views**: front, back, left, right, top, bottom, plus the isometric ones, from a menu and the view cube.
+- ~~View cube, preset views~~ Done (D76).
 - **Touchpad navigation**: two-finger drag pans, pinch zooms, and a way to orbit without a middle button (e.g. Shift+two-finger drag or a modifier with left-drag), so laptops work without a mouse.
-- **Perspective** toggle (all views are orthographic today).
+- ~~Perspective toggle~~ Done (D76).
 
 | Feature | Pri | Notes / reuse |
 |---------|-----|---------------|
-| Orbit / pan / zoom, fit, standard views, perspective/ortho | P0 | |
+| Orbit / pan / zoom, fit, standard views, perspective/ortho | P0 | Done (D48, D76) |
 | Selection: click, box, add/remove, select similar (same type/class) | P0 | |
 | Hide / isolate / show all, by object, class or storey | P0 | |
 | Color by property / class / type / storey | P1 | |
