@@ -43,6 +43,7 @@ qt_add_library(kimcad_core STATIC
     src/Preferences.cpp src/Preferences.h
     src/ProjectSettingsDialog.cpp src/ProjectSettingsDialog.h
     src/PreferencesDialog.cpp src/PreferencesDialog.h
+    src/FindSelectPanel.cpp src/FindSelectPanel.h src/SelectionTools.cpp
 )
 target_include_directories(kimcad_core PUBLIC src)
 # Element icons (owner feedback: objects need an icon and a hint on hover).
@@ -81,6 +82,7 @@ kimcad_test(test_cuts)
 kimcad_test(test_model_loader)
 kimcad_test(test_navigation)
 kimcad_test(test_selection)
+kimcad_test(test_selection_tools)
 kimcad_test(test_properties_panel)
 kimcad_test(test_levels_bar)
 kimcad_test(test_snapper)
@@ -121,6 +123,8 @@ kimcad_gui_test(app_selftest_house "\"beams\":1,\"columns\":1,\"doors\":1,\"elem
 kimcad_gui_test(app_selftest_box_select_visible "\"box_selected\":1,.*\"ok\":true" :occlusion: --frames 5 --box-select)
 kimcad_gui_test(app_selftest_box_select_through "\"box_selected\":2,.*\"ok\":true" :occlusion: --frames 5 --box-select --select-through)
 kimcad_gui_test(app_selftest_box_select "\"box_selected\":2.*\"ok\":true.*\"tree_selected\":2" :fixture: --frames 5 --box-select)
+# D78: right to left is a crossing box, left to right a window box.
+kimcad_gui_test(app_selftest_box_crossing "\"box_crossing_strip\":[1-9].*\"box_window_strip\":0" :fixture: --frames 5 --box-select)
 # D76: picking and box selection in perspective; the wheel dollies; the view cube turns the view and
 # leaves the selection alone; a preset view from the menu is animated and keeps the model on screen.
 kimcad_gui_test(app_selftest_perspective

@@ -176,7 +176,10 @@ public:
     // Box selection in window pixels (what left-drag does); returns how many elements are selected.
     // Box selection: by default only elements you can see (not hidden behind others); `through`
     // also takes hidden ones (Alt while dragging, or the select-through setting).
+    // D78: dragged right to left (x1 < x0) it is a crossing box (takes what it touches), left to right
+    // a window box (only what is fully inside), as in AutoCAD and Revit.
     int selectInRectangle(int x0, int y0, int x1, int y1, AIS_SelectionScheme scheme, bool through = false);
+    static bool isCrossingBox(int startX, int endX) { return endX < startX; }
     void setSelectThrough(bool on) { m_selectThrough = on; }
     bool selectThrough() const { return m_selectThrough; }
     // Guids with at least one visible pixel in the rectangle (nullopt: cannot tell, e.g. no window).

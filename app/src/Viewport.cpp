@@ -3,6 +3,7 @@
 #include "PolygonTool.h"
 #include "ViewCube.h"
 
+#include <AIS_RubberBand.hxx>
 #include <Aspect_DisplayConnection.hxx>
 #include <Graphic3d_ClipPlane.hxx>
 #include <gp_Pln.hxx>
@@ -372,6 +373,15 @@ void Viewport::handleSelectionPoly(const Handle(AIS_InteractiveContext)& ctx, co
     const auto& points = myUI.Selection.Points;
     const bool rectangle = myUI.Selection.Tool == AIS_ViewSelectionTool_RubberBand && points.Size() == 2;
     const bool through = m_selectThrough || (LastMouseFlags() & Aspect_VKeyFlags_ALT) != 0;
+    // D78: right to left is a crossing box (dashed band), left to right a window box (solid band).
+    const bool crossing = rectangle && isCrossingBox(points.First().x(), points.Last().x());
+    if (rectangle && !myRubberBand.IsNull())
+        myRubberBand->SetLineType(crossing ? Aspect_TOL_DASH : Aspect_TOL_SOLID);
+    struct OverlapScope { // the selector takes touched elements only for this crossing box
+        const Handle(AIS_InteractiveContext)& c;
+        OverlapScope(const Handle(AIS_InteractiveContext)& ctx, bool on) : c(ctx) { c->MainSelector()->AllowOverlapDetection(on); }
+        ~OverlapScope() { c->MainSelector()->AllowOverlapDetection(false); }
+    } overlap(ctx, crossing);
     if (!rectangle || through) {
         AIS_ViewController::handleSelectionPoly(ctx, view);
         return;
@@ -394,8 +404,10 @@ int Viewport::selectInRectangle(int x0, int y0, int x1, int y1, AIS_SelectionSch
     if (!ensureWindow())
         return 0;
     const QSet<QString> before = selectedSet();
+    m_context->MainSelector()->AllowOverlapDetection(isCrossingBox(x0, x1));
     m_context->SelectRectangle(NCollection_Vec2<int>(std::min(x0, x1), std::min(y0, y1)),
         NCollection_Vec2<int>(std::max(x0, x1), std::max(y0, y1)), m_view, scheme);
+    m_context->MainSelector()->AllowOverlapDetection(false);
     m_context->UpdateCurrentViewer();
     if (!through && !m_selectThrough)
         keepOnlyVisible(before, scheme, x0, y0, x1, y1);

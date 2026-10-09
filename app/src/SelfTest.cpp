@@ -411,6 +411,17 @@ int runSelfTest(const SelfTestOptions& options)
         QApplication::processEvents();
         result.insert(QStringLiteral("box_selected"), n);
         result.insert(QStringLiteral("tree_selected"), int(window.treePanel()->selectedGuids().size()));
+        // D78: a thin strip across the middle holds nothing fully (window, left to right) but crosses
+        // the fitted model (crossing, right to left).
+        if (!options.selectThrough) {
+            const int y = h / 2;
+            result.insert(QStringLiteral("box_window_strip"),
+                viewport->selectInRectangle(1, y - 2, w - 2, y + 2, AIS_SelectionScheme_Replace));
+            result.insert(QStringLiteral("box_crossing_strip"),
+                viewport->selectInRectangle(w - 2, y - 2, 1, y + 2, AIS_SelectionScheme_Replace));
+            viewport->selectInRectangle(1, 1, w - 2, h - 2, AIS_SelectionScheme_Replace); // as before
+            QApplication::processEvents();
+        }
     }
     if (options.perspective && !viewport->isPlanView()) {
         // D76: the wheel dollies the perspective camera towards the cursor.
