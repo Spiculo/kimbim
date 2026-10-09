@@ -13,6 +13,7 @@ from __future__ import annotations
 import math
 
 import ifcopenshell.api.geometry
+import ifcopenshell.api.layer
 import ifcopenshell.api.root
 import ifcopenshell.util.element
 import ifcopenshell.util.placement
@@ -99,18 +100,21 @@ def _adopt(wall):
         return
     f = B._model
     s = A._scale()
-    p1, p2 = A._axis_world(wall)
+    p1, p2 = _wall_line(wall)
     zs = [float(p.Coordinates[2]) for r in foreign for p in f.traverse(r)
           if p.is_a("IfcCartesianPoint") and len(p.Coordinates) == 3]
     depths = [float(x.Depth) for r in foreign for x in f.traverse(r) if x.is_a("IfcExtrudedAreaSolid")]
-    bottom, height = (min(zs), max(zs) - min(zs)) if zs else (0.0, max(depths, default=3.0 / s))
-    if depths and not zs:
-        bottom = 0.0
-    keep = foreign[0]
+    if depths:  # an extrusion: its depth (from the placement up)
+        bottom, height = 0.0, max(depths)
+    elif zs and max(zs) - min(zs) > 1e-9:  # a surface model or brep: its vertices' height range
+        bottom, height = min(zs), max(zs) - min(zs)
+    else:
+        bottom, height = 0.0, 3.0 / s
+    wall_layers = [layer for r in foreign for layer in (getattr(r, "LayerAssignments", ()) or ())]
     for r in list(wall.Representation.Representations):
         if r.RepresentationIdentifier in ("Body", "Axis"):
             ifcopenshell.api.geometry.unassign_representation(f, product=wall, representation=r)
-            if r is not keep:
+            if r.id():
                 ifcopenshell.api.geometry.remove_representation(f, representation=r)
     A._reaxis(wall, p1, p2)
     if abs(bottom) > 1e-9:
@@ -119,8 +123,9 @@ def _adopt(wall):
         ifcopenshell.api.geometry.edit_object_placement(f, product=wall, matrix=m, is_si=False)
     new = A._regenerate(f, wall, length=math.dist(p1, p2), height=height * s)
     if new is not None:
-        layers.carry_layers(keep, new)
-    ifcopenshell.api.geometry.remove_representation(f, representation=keep)
+        for layer in dict.fromkeys(wall_layers):  # the wall stays on its layer
+            if layer.id():
+                ifcopenshell.api.layer.assign_layer(f, items=[new], layer=layer)
 
 
 def _beam_solid(beam):
@@ -163,10 +168,32 @@ def _set_beam_axis(beam, a, b):
     solid.Depth = float(solid.Depth) * float(np.linalg.norm(_vec(b) - _vec(a)) / np.linalg.norm(old_b - old_a))
 
 
+def _wall_line(wall):
+    """A wall's axis in world metres. KIMCAD's walls keep it on Plan/Axis/GRAPH_VIEW; exported walls
+    (e.g. Revit's) often put their Axis polyline on the plain Model context, where
+    authoring._axis_world doesn't look (it would answer a 1 m stub)."""
+    if ifcopenshell.util.representation.get_representation(wall, "Plan", "Axis", "GRAPH_VIEW") is not None:
+        return A._axis_world(wall)
+    for r in (wall.Representation.Representations if wall.Representation else ()):
+        if r.RepresentationIdentifier != "Axis":
+            continue
+        for item in r.Items:
+            if item.is_a("IfcPolyline") and len(item.Points) >= 2:
+                m = ifcopenshell.util.placement.get_local_placement(wall.ObjectPlacement)
+                s = A._scale()
+                pts = []
+                for p in (item.Points[0], item.Points[-1]):
+                    c = list(p.Coordinates) + [0.0] * (3 - len(p.Coordinates))
+                    pts.append(tuple((m @ np.array([c[0], c[1], c[2], 1.0]))[:2] * s))
+                if math.dist(*pts) > EPS:
+                    return pts[0], pts[1]
+    return A._axis_world(wall)
+
+
 def _line(e):
     """((x1, y1), (x2, y2)) plan axis of a wall or beam in metres, or None."""
     if e.is_a("IfcWall"):
-        return A._axis_world(e)
+        return _wall_line(e)
     if e.is_a("IfcBeam"):
         axis = _beam_axis(e)
         return (tuple(axis[0][:2]), tuple(axis[1][:2])) if axis is not None else None
@@ -240,7 +267,7 @@ def _hosted_fills(wall):
 def _bare_openings(wall):
     """Openings with nothing in them (plain holes), with their extent along the wall (metres)."""
     out = []
-    axis = A._axis_world(wall)
+    axis = _wall_line(wall)
     for rel in getattr(wall, "HasOpenings", ()) or ():
         opening = rel.RelatedOpeningElement
         if getattr(opening, "HasFillings", None):
@@ -439,7 +466,7 @@ def _join_end(e, k, other, point):
     """Inside an action: join wall e's end k to wall `other`: an L at other's end, else a T."""
     if not (e.is_a("IfcWall") and other is not None and other.is_a("IfcWall")):
         return
-    oline = A._axis_world(other)
+    oline = _wall_line(other)
     mine = "ATSTART" if k == 0 else "ATEND"
     if min(math.dist(point, oline[0]), math.dist(point, oline[1])) <= max(_width(other), 0.01):
         theirs = "ATSTART" if math.dist(point, oline[0]) < math.dist(point, oline[1]) else "ATEND"
@@ -639,7 +666,7 @@ def _merge(a, b, lo, hi):
 
 def _touch_plan(a, b):
     """(a's connection, b's connection) for an L or T join of two walls that meet, or an error."""
-    la, lb = A._axis_world(a), A._axis_world(b)
+    la, lb = _wall_line(a), _wall_line(b)
     wa, wb = max(_width(a), 0.01), max(_width(b), 0.01)
     ends = [(i, j, math.dist(la[i], lb[j])) for i in (0, 1) for j in (0, 1)]
     i, j, d = min(ends, key=lambda x: x[2])
