@@ -1053,6 +1053,34 @@ void Viewport::setPreviewBoxes(const QVector<PreviewBox>& boxes)
     update();
 }
 
+void Viewport::setToolOverlay(const Handle(AIS_InteractiveObject)& overlay)
+{
+    if (!m_toolOverlay.IsNull())
+        m_context->Remove(m_toolOverlay, false);
+    m_toolOverlay = overlay;
+    if (!m_toolOverlay.IsNull()) {
+        m_context->Display(m_toolOverlay, 0, -1, false); // shown, never selectable
+        keepHere(m_toolOverlay);
+    }
+    update();
+}
+
+bool Viewport::surfacePointAt(const QPointF& widgetPos, gp_Pnt* out)
+{
+    if (!ensureWindow())
+        return false;
+    const NCollection_Vec2<int> px = toPixels(widgetPos);
+    const Handle(SelectMgr_ViewerSelector)& selector = m_context->MainSelector();
+    selector->Pick(px.x(), px.y(), m_view); // no hover highlight while drawing
+    for (int i = 1; i <= selector->NbPicked(); ++i) {
+        if (Handle(ElementOwner)::DownCast(selector->Picked(i)).IsNull())
+            continue; // the view cube, notes, markers: not a surface to measure
+        *out = selector->PickedPoint(i);
+        return true;
+    }
+    return false;
+}
+
 void Viewport::keyPressEvent(QKeyEvent* e)
 {
     if (m_drawingMode) {

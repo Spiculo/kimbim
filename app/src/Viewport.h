@@ -91,6 +91,12 @@ public:
         double width = 0, z0 = 0, z1 = 0;
     };
     void setPreviewBoxes(const QVector<PreviewBox>& boxes);
+    // D79: the active tool's own drawing in this view (the measure path); null removes it.
+    void setToolOverlay(const Handle(AIS_InteractiveObject)& overlay);
+    bool hasToolOverlay() const { return !m_toolOverlay.IsNull(); }
+    // The first element surface under a widget point, world metres (false: none, or no window).
+    bool surfacePointAt(const QPointF& widgetPos, gp_Pnt* out);
+    QPointF pointerPos() const { return m_pointer; } // the mouse's last position while drawing
     // Grid axes of the active level: dashed lines with their tags at both ends (not selectable).
     struct GridLine {
         QPointF a, b;
@@ -251,6 +257,8 @@ private:
     QPointF m_hoverPos;
     double m_workZ = 0.0;
     Handle(ElementBatch) m_preview;
+    Handle(AIS_InteractiveObject) m_toolOverlay;
+    QPointF m_pointer;
     Handle(AIS_InteractiveObject) m_grid;
     QVector<Annotation> m_annotationData;
     QVector<Annotation> m_markerData;

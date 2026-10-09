@@ -23,15 +23,19 @@ LevelsBar::LevelsBar(QWidget* parent)
     , m_menu(new QToolButton(this))
     , m_add(new QAction(tr("Add level..."), this))
     , m_newModel(new QAction(tr("New model..."), this))
+    , m_levels(new QAction(tr("&Levels..."), this))
 {
     m_combo->setObjectName(QStringLiteral("levelCombo"));
     m_combo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     m_combo->setToolTip(tr("Active level"));
     m_add->setObjectName(QStringLiteral("actionAddLevel"));
     m_newModel->setObjectName(QStringLiteral("actionNewModel"));
+    m_levels->setObjectName(QStringLiteral("actionLevels"));
+    m_levels->setToolTip(tr("The levels table: names, elevations, heights; insert and delete levels"));
     m_newModel->setToolTip(tr("A model is a unit (an apartment, a core...) drawn once and placed on many levels"));
     auto* menu = new QMenu(m_menu);
     menu->addAction(m_add);
+    menu->addAction(m_levels);
     menu->addAction(m_newModel);
     m_menu->setObjectName(QStringLiteral("levelMenu"));
     m_menu->setToolTip(tr("Levels and models"));
@@ -48,6 +52,7 @@ LevelsBar::LevelsBar(QWidget* parent)
     connect(m_newModel, &QAction::triggered, this, &LevelsBar::newModelRequested);
     connect(m_combo, &QComboBox::currentIndexChanged, this, &LevelsBar::onIndexChanged);
     connect(m_add, &QAction::triggered, this, &LevelsBar::addLevelRequested);
+    connect(m_levels, &QAction::triggered, this, &LevelsBar::levelsDialogRequested);
 }
 
 void LevelsBar::setStoreys(const QJsonArray& storeys)
@@ -67,6 +72,8 @@ void LevelsBar::setStoreys(const QJsonArray& storeys)
     int keep = -1;
     bool separated = false;
     for (const auto& s : sorted) {
+        if (!s.value("show").toBool(true) && s.value("guid").toString() != m_active)
+            continue; // D79: not shown in the level list
         const double elevation = s.value("elevation").toDouble();
         const bool model = s.value("model").toBool();
         if (model && !separated) {

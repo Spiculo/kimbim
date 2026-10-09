@@ -11,8 +11,10 @@ class QToolButton;
 namespace kimcad {
 
 // The active level (IfcBuildingStorey) for drawing and plan views. D75: "Add level..." and "New
-// model..." are in the drop-down beside it (and in the Model menu), not buttons of their own.
-// Levels are listed by elevation; refreshing keeps the active one when it still exists.
+// model..." are in the drop-down beside it (and in the Model menu), not buttons of their own; D79:
+// so is "Levels..." (the levels table). Levels are listed by elevation; refreshing keeps the active
+// one when it still exists. Levels marked not to show in the level list are left out (D79), unless
+// it is the active one.
 class LevelsBar : public QWidget {
     Q_OBJECT
 public:
@@ -30,12 +32,14 @@ public:
     QComboBox* combo() const { return m_combo; }
     QAction* addLevelAction() const { return m_add; }
     QAction* newModelAction() const { return m_newModel; }
+    QAction* levelsAction() const { return m_levels; }
     QToolButton* menuButton() const { return m_menu; }
 
 signals:
     void activeStoreyChanged(const QString& guid, double elevation);
     void addLevelRequested();
     void newModelRequested();
+    void levelsDialogRequested();
 
 private:
     void onIndexChanged(int index);
@@ -44,6 +48,7 @@ private:
     QToolButton* m_menu;
     QAction* m_add;
     QAction* m_newModel;
+    QAction* m_levels;
     QString m_active;
     bool m_filling = false;
 };
