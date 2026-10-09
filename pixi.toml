@@ -2,6 +2,9 @@
 name = "kimcad"
 channels = ["conda-forge"]
 platforms = ["win-64", "linux-64"]
+# conda-forge's ifcopenshell ships no Python package metadata, so PyPI packages that need it
+# (ifctester, D81) are told the conda one is installed
+conda-pypi-map = { "conda-forge" = "tools/conda_pypi_map.json" }
 
 [dependencies]
 python = "3.12.*"
@@ -24,6 +27,20 @@ cxx-compiler = ">=2.0.0,<3"
 nodejs = ">=22"
 # Schedules exported to XLSX (D77), MIT
 openpyxl = ">=3.1"
+# IDS checks (D81): IfcTester (LGPL-3.0, PyPI below) and its dependencies, all conda-forge.
+# xmlschema/elementpath MIT, python-dateutil Apache-2.0/BSD, pystache MIT (HTML report), odfpy
+# Apache-2.0 (ODS report), bcf-client LGPL-3.0 (BCF report), flask BSD-3 (its web app; never started)
+xmlschema = "*"
+elementpath = "*"
+python-dateutil = "*"
+pystache = "*"
+odfpy = "*"
+bcf-client = "*"
+flask = "*"
+typing_extensions = "*"
+
+[pypi-dependencies]
+ifctester = "==0.9.0"
 
 [tasks]
 # M3 exit test: build the two-storey sample house through the modeling commands, then check that

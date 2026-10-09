@@ -35,6 +35,8 @@ DEFAULTS = {
     "schedules": {},  # schedule schemes by id: the project's own and its edited built-ins (D77)
     "selection_criteria": {},
     "selection_sets": {},
+    "ids_files": {},  # IDS files by name: their XML, kept in the project so it is versioned (D81)
+    "clash_sets": {},  # clash detection sets by name (D81)
 }
 UNITS = {"m": 1.0, "cm": 100.0, "mm": 1000.0}
 
@@ -124,6 +126,10 @@ def _error(key: str, value) -> str | None:
         from . import queries
 
         return queries.validate(key, value)
+    if key in ("ids_files", "clash_sets"):
+        from . import checks
+
+        return checks.validate(key, value)
     from . import graphics
 
     if key in graphics.TABLES or key in ("purpose", "current_pen", "sheet_purposes"):
