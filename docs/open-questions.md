@@ -50,7 +50,8 @@ Built to Archicad's model ([spec](superpowers/specs/2026-10-08-renovation-status
 confirm these with an architect.
 
 1. Three statuses (Existing, To be demolished, New), as in Archicad. Is a fourth, *Temporary* (Revit), needed?
-2. An element with no status counts as New. Should an imported survey model count as Existing instead?
+2. An element with no status counts as New. Opening an IFC with unmarked elements asks whether to mark
+   them Existing (default answer: leave them). Should the default be Existing instead?
 3. The built-in filters (Existing plan, Demolition plan, New plan, Planned) and their looks: demolished
    dashed yellow (black dashed in the Permit set), existing grey in the new plan. Do these match local
    permit conventions (Chile, Spain)?

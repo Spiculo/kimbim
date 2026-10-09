@@ -136,8 +136,9 @@ All edits are one undo step each, and model edits (versioned).
   value sets every selected element (bulk edit, as Name does today). Bridge:
   `properties_multi` returns `"status": {"value", "varies"}`, and
   `renovation.set_status(guids_json, status)` writes it.
-- **Context menu** in plan and 3D views, on a selection: *Renovation status ▸ Existing / To be
-  demolished / New*.
+- **Model › Renovation status ▸ Existing / To be demolished / New** sets the selection's status
+  (Archicad keeps renovation under a menu, Document › Renovation). The viewports have no context
+  menu: right-drag navigates.
 - **Status for new elements**, as in Archicad's *Renovation status for new elements*. A drop-down in
   the bottom bar sits left of the purpose drop-down and shows the three statuses; the default is
   **New**. It's stored in project settings (`status_for_new`), so it survives reopening and travels
@@ -150,7 +151,25 @@ All edits are one undo step each, and model edits (versioned).
   - **Hosted openings don't inherit their host's status.** A door or window placed in a wall to be
     demolished gets the status for new elements, as in Archicad. A door is only demolished when you
     mark it.
-- **Model › Renovation…** is skipped. The context menu and the Properties panel are enough for now.
+
+### Status on import (owner request, 2026-10-08)
+
+A survey model from another tool usually has no statuses, so it would count as New, and *Existing
+plan* would show almost nothing. So:
+
+- **After an IFC is opened** (made into a new `.kim`, or edited directly; not when a `.kim` is
+  reopened), if any building element has **no status at all**, the app asks: "*N* elements have no
+  renovation status. Mark them as: **Existing** / **To be demolished** / **Leave them (they count as
+  New)**". *Leave them* is the default button. A *Don't ask again* box sets the user preference
+  `ask_import_status` to false. Quiet mode (tests, self-test) never asks.
+- **Applied as one undoable edit** right after opening. The `.kim`'s first version stays the IFC
+  exactly as it was (D72); the marking is the first change after it.
+- **Model › Renovation status › Mark unmarked elements as… ▸ Existing / To be demolished** does the
+  same at any time.
+- **"Unmarked"** means no `Status` or `Renovation Status` value at all, own or from the type. An explicit
+  `NEW` is marked and is left alone.
+- Bridge: `renovation.unmarked()` returns `{"count", "guids"}`; `renovation.mark_unmarked(status)`
+  writes them in one step.
 
 ## Editing filters
 
@@ -201,12 +220,13 @@ changes nothing, it says "Everything is drawn with its element styles".
 | `graphics.py` | Built-in `renovation_filters`, the three new pens, the new purposes; `validate` for the table and the purposes' `renovation` field; enumerated values in `_property_index`; resolution step 2; `legend` in the output; `legend_svg(resolved, guids=None)`, the legend rows as SVG in mm. |
 | `settings.py` | `renovation_filters` and `status_for_new` in DEFAULTS (empty / "new"); validation delegated. |
 | `authoring.py`, `rooms.py`, `roofs.py` | Call `renovation.stamp_new` beside `layers.assign_active`, and `renovation.copy_status` beside `layers.copy_layer`. |
-| `app_bridge.py` | `status` in `properties_multi`. |
+| `app_bridge.py` | `status` in `properties_multi`; exports `set_status`, `set_status_for_new`, `unmarked`, `mark_unmarked`. |
 | `sheets.py` | Legend references: `place_legend`, `move_legend`, `remove_legend`; `legends` in `sheets()`; drawn in `sheet_svg` from the sheet's resolve, using the placed drawings' elements. |
 | `drawings.py` | The elements a drawing shows (for the sheet legend). The include list it already builds is reused. |
 | `PropertiesPanel` | The status drop-down. |
 | `StatusStrip` | The *status for new elements* drop-down. |
-| `MainWindow` | The context-menu submenu; Graphics › Renovation filters…; reloads graphics after a status edit, as after any model edit. |
+| `Preferences` | `ask_import_status` (default true). |
+| `MainWindow` | The Model › Renovation status submenu; Graphics › Renovation filters…; reloads graphics after a status edit, as after any model edit. |
 | `GraphicsDialogs` / `PurposeDialogs` | The filter editor; the renovation drop-down in the purpose editor and the "…" popup; the legend section. |
 | `SheetsPanel` | Place, draw, drag and remove legends. |
 | `Translations` | Spanish for every new string. |
@@ -237,6 +257,8 @@ changes nothing, it says "Everything is drawn with its element styles".
   - Status written to the Common pset (enumerated) or `KIMCAD_Renovation`, in IFC4 and IFC2X3.
   - Read back from either, from a type, from `Renovation Status`, and from odd values (as New).
   - Stamping on every creation path.
+  - `unmarked` counts only elements without any status; `mark_unmarked` is one undo step and leaves
+    explicit `NEW` alone.
   - Copies keep the status; hosted doors are New.
   - Built-in filters are valid, and validation refuses bad ones.
   - Resolution order: renovation hide, override fields, a rule on top, a rule hide.
@@ -248,7 +270,9 @@ changes nothing, it says "Everything is drawn with its element styles".
   - Settings round-trip through a version and Combine.
 - **C++:**
   - The Properties drop-down shows mixed values and sets them.
-  - The context menu sets them.
+  - The Model › Renovation status menu sets them.
+  - Opening an IFC with unmarked elements asks once (not in quiet mode, not with the preference off),
+    and *Existing* marks them in one undo step.
   - The status-for-new drop-down stamps new walls.
   - The *Demolition* purpose hides new walls (not selectable, survive Show all).
   - The filter editor writes valid tables.
@@ -262,8 +286,8 @@ changes nothing, it says "Everything is drawn with its element styles".
 
 One branch, in three parts that each work on their own:
 
-- **B1:** status (`renovation.py`, stamping, copies, the Properties drop-down, the context menu, status
-  for new elements).
+- **B1:** status (`renovation.py`, stamping, copies, the Properties drop-down, the Model menu, status
+  for new elements, status on import).
 - **B2:** renovation filters, resolution, purposes, the editor, the popup drop-down.
 - **B3:** legends on screen and on sheets; the exit check.
 
