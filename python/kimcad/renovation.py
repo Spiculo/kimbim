@@ -8,6 +8,7 @@ Same protocol as app_bridge for the bridge functions (strings in, JSON out, neve
 from __future__ import annotations
 
 import functools
+import json
 
 import ifcopenshell.api.pset
 import ifcopenshell.util.element
@@ -74,3 +75,99 @@ def write_status(element, status: str) -> None:
     else:
         ps = _own_pset(element, PSET) or ifcopenshell.api.pset.add_pset(f, product=element, name=PSET)
         ifcopenshell.api.pset.edit_pset(f, pset=ps, properties={"Status": IFC_VALUE[status]})
+
+
+# ---------------------------------------------------------------- new elements, copies, the bridge
+
+def _for_new() -> str:
+    from . import settings as S
+
+    value = S.current().get("status_for_new", "new")
+    return value if value in STATUSES else "new"
+
+
+def stamp_new(*elements) -> None:
+    """New building elements get the status for new elements (annotations and drawings are not stamped)."""
+    status = _for_new()
+    for e in elements:
+        if e is not None and not e.is_a("IfcAnnotation"):
+            write_status(e, status)
+
+
+def copy_status(source, target) -> None:
+    """Copies keep their source's status, as they keep its layer."""
+    if not source.is_a("IfcAnnotation"):
+        write_status(target, status_of(source))
+
+
+def _edit(elements, status) -> str:
+    from . import app_bridge as B
+
+    def action():
+        for e in elements:
+            write_status(e, status)
+        return len(elements), [e.GlobalId for e in elements], []
+
+    try:
+        return B._dump(B._run(action))
+    except Exception as ex:
+        return B._dump({"ok": False, "error": f"{type(ex).__name__}: {ex}"})
+
+
+def set_status(guids_json: str, status: str) -> str:
+    from . import app_bridge as B
+
+    if B._model is None:
+        return B._dump({"ok": False, "error": "no model open"})
+    if status not in STATUSES:
+        return B._dump({"ok": False, "error": f"unknown renovation status {status}"})
+    elements = [e for e in B._elements(guids_json) if not e.is_a("IfcAnnotation")]
+    if not elements:
+        return B._dump({"ok": False, "error": "no building elements selected"})
+    return _edit(elements, status)
+
+
+def set_status_for_new(status: str) -> str:
+    from . import app_bridge as B
+    from . import settings as S
+
+    if status not in STATUSES:
+        return B._dump({"ok": False, "error": f"unknown renovation status {status}"})
+    r = json.loads(S.set_project_settings(json.dumps({"status_for_new": status})))
+    return B._dump({"ok": r["ok"], "dirty": r.get("dirty", False), **({"error": r["error"]} if not r["ok"] else {})})
+
+
+def _unmarked_elements() -> list:
+    """Building elements with no status at all, own or from the type (an explicit NEW is marked)."""
+    from . import app_bridge as B
+    from . import graphics
+
+    shared: dict = {}
+    out = []
+    for e in graphics._products(B._model):
+        if e.is_a("IfcAnnotation") or e.is_a("IfcGrid"):
+            continue
+        facts = graphics._Facts(e, shared)
+        if all(facts.prop(n) is None for n in NAMES):
+            out.append(e)
+    return out
+
+
+def unmarked() -> str:
+    from . import app_bridge as B
+
+    if B._model is None:
+        return B._dump({"ok": False, "error": "no model open"})
+    els = _unmarked_elements()
+    return B._dump({"ok": True, "count": len(els), "guids": [e.GlobalId for e in els]})
+
+
+def mark_unmarked(status: str) -> str:
+    """Elements with no status at all (an imported survey) get this one, in one undo step."""
+    from . import app_bridge as B
+
+    if B._model is None:
+        return B._dump({"ok": False, "error": "no model open"})
+    if status not in ("existing", "demolish"):
+        return B._dump({"ok": False, "error": "mark unmarked elements as existing or demolish"})
+    return _edit(_unmarked_elements(), status)

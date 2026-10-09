@@ -32,6 +32,7 @@ import numpy as np
 from . import app_bridge as B
 from . import authoring as A
 from . import layers
+from . import renovation
 
 PSET = "KIMCAD_Roof"
 ATTACH = "KIMCAD_RoofAttach"
@@ -285,6 +286,7 @@ def create_roof(storey_guid: str, points_json: str, kind: str, pitch, thickness,
             "Kind": kind, "Points": json.dumps(local), "Slopes": json.dumps(slopes), "Thickness": thickness})
         _body(roof, local, slopes, thickness)
         layers.assign_active(roof)
+        renovation.stamp_new(roof)
         made["guid"] = roof.GlobalId
         return 1, [roof.GlobalId], []
 

@@ -22,6 +22,7 @@ import numpy as np
 from . import app_bridge as B
 from . import authoring as A
 from . import layers
+from . import renovation
 
 PSET = "KIMCAD_Room"
 QTO = "Qto_SpaceBaseQuantities"
@@ -261,6 +262,7 @@ def create_room(storey_guid: str, x, y, name: str = "") -> str:
         ifcopenshell.api.pset.edit_pset(f, pset=pset, properties={"SeedX": x, "SeedY": y})
         _shape(space, storey, outline)
         layers.assign_active(space)
+        renovation.stamp_new(space)
         made["guid"] = space.GlobalId
         return 1, [space.GlobalId], []
 

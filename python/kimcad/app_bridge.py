@@ -727,6 +727,10 @@ def properties_multi(guids_json: str) -> str:
             group[name] = {"value": None if varies else values[0], "varies": varies, "ifc_type": "IfcLengthMeasure",
                            "editable": all(ed for _, ed in present), "source": "dimension", "type_value": None}
         psets = {authoring.DIMENSIONS: group, **psets}
+    from . import renovation
+
+    statuses = [renovation.status_of(e) for e in elements if not e.is_a("IfcAnnotation")]
+    status = {"value": statuses[0] if statuses and len(set(statuses)) == 1 else None, "varies": len(set(statuses)) > 1}
     names = [e.Name or "" for e in elements]
     same_name = all(n == names[0] for n in names)
     return _dump({
@@ -734,6 +738,7 @@ def properties_multi(guids_json: str) -> str:
         "guids": [e.GlobalId for e in elements],
         "types": sorted({e.is_a() for e in elements}),
         "name": {"value": names[0] if same_name else None, "varies": not same_name},
+        "status": status,
         "psets": psets,
     })
 
@@ -893,6 +898,7 @@ from .editing import (  # noqa: E402,F401
 from .rooms import create_room, edit_room, export_room_schedule, room_schedule, rooms  # noqa: E402,F401
 from .roofs import attach_walls_to_roof, create_roof, detach_walls_from_roof, roof_info  # noqa: E402,F401
 from .settings import project_settings, set_project_settings  # noqa: E402,F401
+from .renovation import mark_unmarked, set_status, set_status_for_new, unmarked  # noqa: E402,F401
 from .graphics import (  # noqa: E402,F401
     graphics_state,
     graphics_tables,

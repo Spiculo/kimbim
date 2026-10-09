@@ -30,6 +30,7 @@ DEFAULTS = {
     "purpose": "",
     "current_pen": 23,
     "sheet_purposes": {},
+    "status_for_new": "new",
 }
 UNITS = {"m": 1.0, "cm": 100.0, "mm": 1000.0}
 
@@ -109,6 +110,8 @@ def _error(key: str, value) -> str | None:
         return "decimals must be between 0 and 4"
     if key in ("hidden_layers", "locked_layers") and not (isinstance(value, list) and all(isinstance(x, str) for x in value)):
         return f"{key} must be a list of layer names"
+    if key == "status_for_new" and value not in ("existing", "demolish", "new"):
+        return f"unknown renovation status {value}"
     from . import graphics
 
     if key in graphics.TABLES or key in ("purpose", "current_pen", "sheet_purposes"):

@@ -33,6 +33,7 @@ import numpy as np
 from . import app_bridge as B
 from . import drawgen
 from . import layers
+from . import renovation
 
 # Default wall types created the first time a model without layered wall types needs one.
 DEFAULT_WALL_TYPES = [
@@ -296,6 +297,7 @@ def create_wall(storey_guid: str, type_guid: str, x1, y1, x2, y2, height, join_s
         for w in [wall, *neighbours]:
             _regenerate(f, w, length=length, height=height)
         layers.assign_active(wall)
+        renovation.stamp_new(wall)
         made["wall"] = wall
         return 1, [wall.GlobalId, *(n.GlobalId for n in neighbours)], []
 
@@ -472,6 +474,7 @@ def create_slab(storey_guid: str, type_guid: str, points_json: str, offset=0.0) 
         ifcopenshell.api.geometry.edit_object_placement(f, product=slab, matrix=matrix, is_si=True)
         ifcopenshell.api.spatial.assign_container(f, products=[slab], relating_structure=storey)
         layers.assign_active(slab)
+        renovation.stamp_new(slab)
         made["slab"] = slab
         return 1, [slab.GlobalId], []
 
@@ -699,6 +702,7 @@ def insert_opening(kind: str, wall_guid: str, type_guid: str, along, width, heig
         if container is not None:
             ifcopenshell.api.spatial.assign_container(f, products=[element], relating_structure=container)
         layers.assign_active(element)
+        renovation.stamp_new(element)
         made["element"] = element
         return 1, [wall.GlobalId, element.GlobalId], []
 
@@ -809,6 +813,7 @@ def create_column(storey_guid: str, type_guid: str, x, y, height, rotation=0.0) 
         ifcopenshell.api.geometry.edit_object_placement(f, product=column, matrix=matrix, is_si=True)
         ifcopenshell.api.spatial.assign_container(f, products=[column], relating_structure=storey)
         layers.assign_active(column)
+        renovation.stamp_new(column)
         made["element"] = column
         return 1, [column.GlobalId], []
 
@@ -848,6 +853,7 @@ def create_beam(storey_guid: str, type_guid: str, x1, y1, x2, y2, top) -> str:
         ifcopenshell.api.geometry.edit_object_placement(f, product=beam, matrix=matrix, is_si=True)
         ifcopenshell.api.spatial.assign_container(f, products=[beam], relating_structure=storey)
         layers.assign_active(beam)
+        renovation.stamp_new(beam)
         made["element"] = beam
         return 1, [beam.GlobalId], []
 
@@ -1358,6 +1364,7 @@ def _copy_elements(elements, target, transform_units, *, tag=None) -> list:
         c = ifcopenshell.api.root.copy_class(f, product=e)
         _copy_shape(e, c)
         layers.copy_layer(e, c)
+        renovation.copy_status(e, c)
         _place_like(e, c, transform_units)
         ifcopenshell.api.spatial.assign_container(f, products=[c], relating_structure=target)
         copies[e] = c
@@ -1382,6 +1389,7 @@ def _copy_elements(elements, target, transform_units, *, tag=None) -> list:
                 element_copy = ifcopenshell.api.root.copy_class(f, product=element)
                 _copy_shape(element, element_copy)
                 layers.copy_layer(element, element_copy)
+                renovation.copy_status(element, element_copy)
                 ifcopenshell.api.feature.add_filling(f, opening=opening_copy, element=element_copy)
                 _place_like(element, element_copy, transform_units, parent=opening_copy)
                 ifcopenshell.api.spatial.assign_container(f, products=[element_copy], relating_structure=target)
@@ -1492,6 +1500,7 @@ def create_stair(storey_guid: str, x, y, angle, width, height) -> str:
             "NumberOfRiser": risers, "NumberOfTreads": risers - 1,
             "RiserHeight": riser / s, "TreadLength": TREAD / s})
         layers.assign_active(stair)
+        renovation.stamp_new(stair)
         made["stair"] = stair
         return 1, [stair.GlobalId], []
 
