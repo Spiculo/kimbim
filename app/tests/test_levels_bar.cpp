@@ -2,6 +2,7 @@
 #include <QComboBox>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QMenu>
 #include <QSignalSpy>
 #include <QToolButton>
 #include <QtTest>
@@ -64,7 +65,8 @@ private slots:
     {
         kimcad::LevelsBar bar;
         QSignalSpy add(&bar, &kimcad::LevelsBar::addLevelRequested);
-        bar.addButton()->click();
+        QVERIFY(bar.menuButton()->menu()->actions().contains(bar.addLevelAction())); // D75: in the drop-down
+        bar.addLevelAction()->trigger();
         QCOMPARE(add.count(), 1);
     }
 };

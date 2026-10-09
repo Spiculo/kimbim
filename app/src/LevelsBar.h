@@ -4,12 +4,14 @@
 #include <QJsonArray>
 #include <QWidget>
 
+class QAction;
 class QComboBox;
 class QToolButton;
 
 namespace kimcad {
 
-// The active level (IfcBuildingStorey) for drawing and plan views, plus "Add level...".
+// The active level (IfcBuildingStorey) for drawing and plan views. D75: "Add level..." and "New
+// model..." are in the drop-down beside it (and in the Model menu), not buttons of their own.
 // Levels are listed by elevation; refreshing keeps the active one when it still exists.
 class LevelsBar : public QWidget {
     Q_OBJECT
@@ -20,14 +22,15 @@ public:
     // then the models (owner feedback: a dedicated "model" section on the levels).
     void setStoreys(const QJsonArray& storeys);
     bool activeIsModel() const;
-    QToolButton* newModelButton() const { return m_newModel; }
     void setActive(const QString& guid);
     QString activeStorey() const;
     double activeElevation() const;
     int count() const;
 
     QComboBox* combo() const { return m_combo; }
-    QToolButton* addButton() const { return m_add; }
+    QAction* addLevelAction() const { return m_add; }
+    QAction* newModelAction() const { return m_newModel; }
+    QToolButton* menuButton() const { return m_menu; }
 
 signals:
     void activeStoreyChanged(const QString& guid, double elevation);
@@ -38,8 +41,9 @@ private:
     void onIndexChanged(int index);
 
     QComboBox* m_combo;
-    QToolButton* m_add;
-    QToolButton* m_newModel;
+    QToolButton* m_menu;
+    QAction* m_add;
+    QAction* m_newModel;
     QString m_active;
     bool m_filling = false;
 };

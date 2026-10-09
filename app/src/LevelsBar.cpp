@@ -4,7 +4,8 @@
 #include <QComboBox>
 #include <QHBoxLayout>
 #include <QJsonObject>
-#include <QLabel>
+#include <QAction>
+#include <QMenu>
 #include <QLocale>
 #include <QToolButton>
 
@@ -19,25 +20,34 @@ enum Role { GuidRole = Qt::UserRole, ElevationRole, ModelRole };
 LevelsBar::LevelsBar(QWidget* parent)
     : QWidget(parent)
     , m_combo(new QComboBox(this))
-    , m_add(new QToolButton(this))
-    , m_newModel(new QToolButton(this))
+    , m_menu(new QToolButton(this))
+    , m_add(new QAction(tr("Add level..."), this))
+    , m_newModel(new QAction(tr("New model..."), this))
 {
     m_combo->setObjectName(QStringLiteral("levelCombo"));
     m_combo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
-    m_add->setText(tr("Add level..."));
-    m_add->setObjectName(QStringLiteral("addLevel"));
-    auto* layout = new QHBoxLayout(this);
-    layout->setContentsMargins(4, 0, 4, 0);
-    layout->addWidget(new QLabel(tr("Level"), this));
-    layout->addWidget(m_combo);
-    layout->addWidget(m_add);
-    m_newModel->setText(tr("New model..."));
-    m_newModel->setObjectName(QStringLiteral("newModel"));
+    m_combo->setToolTip(tr("Active level"));
+    m_add->setObjectName(QStringLiteral("actionAddLevel"));
+    m_newModel->setObjectName(QStringLiteral("actionNewModel"));
     m_newModel->setToolTip(tr("A model is a unit (an apartment, a core...) drawn once and placed on many levels"));
-    layout->addWidget(m_newModel);
-    connect(m_newModel, &QToolButton::clicked, this, &LevelsBar::newModelRequested);
+    auto* menu = new QMenu(m_menu);
+    menu->addAction(m_add);
+    menu->addAction(m_newModel);
+    m_menu->setObjectName(QStringLiteral("levelMenu"));
+    m_menu->setToolTip(tr("Levels and models"));
+    m_menu->setAutoRaise(true);
+    m_menu->setArrowType(Qt::DownArrow);
+    m_menu->setPopupMode(QToolButton::InstantPopup);
+    m_menu->setStyleSheet(QStringLiteral("QToolButton::menu-indicator { image: none; width: 0; }"));
+    m_menu->setMenu(menu);
+    auto* layout = new QHBoxLayout(this);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+    layout->addWidget(m_combo);
+    layout->addWidget(m_menu);
+    connect(m_newModel, &QAction::triggered, this, &LevelsBar::newModelRequested);
     connect(m_combo, &QComboBox::currentIndexChanged, this, &LevelsBar::onIndexChanged);
-    connect(m_add, &QToolButton::clicked, this, &LevelsBar::addLevelRequested);
+    connect(m_add, &QAction::triggered, this, &LevelsBar::addLevelRequested);
 }
 
 void LevelsBar::setStoreys(const QJsonArray& storeys)
