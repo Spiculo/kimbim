@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "Viewport.h"
 #include "PolygonTool.h"
+#include "ViewCube.h"
 
 #include <Aspect_DisplayConnection.hxx>
 #include <Graphic3d_ClipPlane.hxx>
@@ -24,6 +25,7 @@
 #include <Select3D_SensitiveSegment.hxx>
 #include <gp_Pnt.hxx>
 #include <gp_Vec.hxx>
+#include <gp_Trsf.hxx>
 #ifdef _WIN32
 #include <WNT_Window.hxx>
 #else
@@ -105,7 +107,9 @@ Viewport::Viewport(Scene* scene, QWidget* parent)
     const Quantity_Color background(0.93, 0.94, 0.95, Quantity_TOC_RGB);
     m_view->SetBackgroundColor(background);
     ElementBatch::setBackground(background); // lines-only faces blend into it
-    m_view->SetProj(V3d_XposYnegZpos);
+    m_view->SetProj(HomeOrientation);
+    m_animation = new AIS_AnimationCamera("kimcadViewAnimation", m_view);
+    SetViewAnimation(m_animation); // played in handleViewRedraw, stopped by mouse input
     applyNavigationPreset();
     connect(m_scene, &Scene::redrawRequested, this, qOverload<>(&QWidget::update));
     connect(m_scene, &Scene::viewsChanged, this, &Viewport::keepOverlaysHere); // views opened later
@@ -120,6 +124,8 @@ void Viewport::setPlanView(double elevation)
     const bool wasPlan = m_planView;
     m_planView = true;
     m_planElevation = elevation;
+    AbortViewAnimation();
+    eraseViewCube(); // D76: plans have no cube
     m_view->Camera()->SetProjectionType(Graphic3d_Camera::Projection_Orthographic);
     m_view->SetProj(V3d_Zpos); // looking down, north (+Y) up
     applyNavigationPreset();
@@ -134,7 +140,9 @@ void Viewport::set3DView()
 {
     const bool wasPlan = m_planView;
     m_planView = false;
-    m_view->SetProj(V3d_XposYnegZpos);
+    AbortViewAnimation();
+    m_view->SetProj(HomeOrientation);
+    applyProjection(); // this view's perspective setting comes back
     applyNavigationPreset();
     if (wasPlan && !m_markerData.isEmpty())
         displayAnnotations();
@@ -213,6 +221,8 @@ std::optional<QSet<QString>> Viewport::idsInImage(int w, int h, int x0, int y0, 
     m_view->SetBackgroundColor(Quantity_Color(128 / 255.0, 128 / 255.0, 128 / 255.0, Quantity_TOC_RGB));
     if (!m_preview.IsNull())
         m_context->Erase(m_preview, false);
+    const bool cube = !m_cube.IsNull() && m_context->IsDisplayed(m_cube);
+    eraseViewCube(); // not an element: keep its colours out of the id image
     m_context->ClearDetected(false);
     m_context->UnhilightSelected(false);
     for (const auto& b : m_scene->batches)
@@ -227,9 +237,12 @@ std::optional<QSet<QString>> Viewport::idsInImage(int w, int h, int x0, int y0, 
     for (const auto& b : m_scene->batches)
         m_context->SetDisplayMode(b, mode, false);
     m_view->SetBackgroundColor(background);
-    if (!m_preview.IsNull())
+    if (!m_preview.IsNull()) {
         m_context->Display(m_preview, 0, -1, false);
         keepHere(m_preview);
+    }
+    if (cube)
+        ensureViewCube();
     m_context->HilightSelected(false);
     update();
     if (!ok)
@@ -401,7 +414,8 @@ Viewport::~Viewport()
 {
     // This view's own overlays leave the shared context; the elements stay for the other views.
     for (const Handle(AIS_InteractiveObject)& o :
-         {Handle(AIS_InteractiveObject)(m_preview), Handle(AIS_InteractiveObject)(m_grid), Handle(AIS_InteractiveObject)(m_section)})
+         {Handle(AIS_InteractiveObject)(m_preview), Handle(AIS_InteractiveObject)(m_grid), Handle(AIS_InteractiveObject)(m_section),
+             Handle(AIS_InteractiveObject)(m_cube), m_home})
         if (!o.IsNull())
             m_context->Remove(o, false);
     for (const auto& a : std::as_const(m_annotations))
@@ -443,6 +457,7 @@ void Viewport::paintEvent(QPaintEvent*)
     // One full redraw per paint (one buffer swap). Invalidating the immediate layer here as well
     // made every paint swap twice, waiting two vsyncs, so tool previews lagged behind the mouse;
     // not invalidating at all left the window blank after it was shown or uncovered.
+    ensureViewCube();
     m_view->Invalidate();
     FlushViewEvents(m_context, m_view, true);
     // Wheel zoom is applied while flushing the view events: report it after.
@@ -1055,6 +1070,11 @@ void Viewport::leaveEvent(QEvent* e)
 
 void Viewport::mouseDoubleClickEvent(QMouseEvent* e)
 {
+    if (e->button() == Qt::LeftButton && viewCubeShown()
+        && (homeButtonRect().contains(e->position().toPoint()) || viewCubeRect().contains(e->position().toPoint()))) {
+        mousePressEvent(e); // a second click on the cube is a click, never an element's double click
+        return;
+    }
     if (m_drawingMode && e->button() == Qt::LeftButton) {
         emit drawingConfirmed();
         return;
@@ -1077,6 +1097,17 @@ void Viewport::mouseDoubleClickEvent(QMouseEvent* e)
 
 void Viewport::mousePressEvent(QMouseEvent* e)
 {
+    AbortViewAnimation(); // any click stops a preset turn where it is
+    // D76: the view cube and home button take left clicks before tools and selection.
+    if (e->button() == Qt::LeftButton && viewCubeShown()) {
+        const QPoint at = e->position().toPoint();
+        if (homeButtonRect().contains(at) || viewCubeRect().contains(at)) {
+            m_cubePress = homeButtonRect().contains(at) ? CubePress::Home : CubePress::Cube;
+            m_cubePressPos = e->position();
+            m_cubeDragging = false;
+            return;
+        }
+    }
     if (m_drawingMode && (e->button() == Qt::LeftButton || e->button() == Qt::RightButton)) {
         if (e->button() == Qt::RightButton) {
             emit drawingEnded();
@@ -1109,6 +1140,16 @@ void Viewport::mousePressEvent(QMouseEvent* e)
 
 void Viewport::mouseReleaseEvent(QMouseEvent* e)
 {
+    if (m_cubePress != CubePress::None && e->button() == Qt::LeftButton) {
+        const CubePress press = std::exchange(m_cubePress, CubePress::None);
+        V3d_TypeOfOrientation orientation = HomeOrientation;
+        if (press == CubePress::Home && homeButtonRect().contains(e->position().toPoint()))
+            homeView();
+        else if (press == CubePress::Cube && !m_cubeDragging && viewCubeOrientationAt(e->position(), &orientation))
+            setStandardView(orientation);
+        m_cubeDragging = false;
+        return;
+    }
     if (m_dragCandidate && e->button() == Qt::LeftButton) {
         QPointF p;
         double tolerance = 0;
@@ -1133,6 +1174,20 @@ void Viewport::mouseReleaseEvent(QMouseEvent* e)
 
 void Viewport::mouseMoveEvent(QMouseEvent* e)
 {
+    if (m_cubePress != CubePress::None) {
+        if (!(e->buttons() & Qt::LeftButton)) {
+            m_cubePress = CubePress::None; // the release went elsewhere
+        } else {
+            // Dragging the cube orbits the view (Revit); the home button just waits for the release.
+            const QPointF d = e->position() - m_cubePressPos;
+            if (m_cubePress == CubePress::Cube && (m_cubeDragging || d.manhattanLength() >= 4)) {
+                m_cubeDragging = true;
+                m_cubePressPos = e->position();
+                orbitBy(d.x(), d.y());
+            }
+            return;
+        }
+    }
     if (m_dragCandidate) {
         if (!m_dragging && (e->position() - m_dragPressPos).manhattanLength() < 5)
             return; // not a drag yet
@@ -1163,6 +1218,7 @@ void Viewport::mouseMoveEvent(QMouseEvent* e)
 
 void Viewport::wheelEvent(QWheelEvent* e)
 {
+    AbortViewAnimation();
     if (UpdateZoom(Aspect_ScrollDelta(toPixels(e->position()), e->angleDelta().y() / 8.0)))
         update();
 }
@@ -1582,6 +1638,8 @@ void Viewport::keepOverlaysHere()
     keepHere(m_preview);
     keepHere(m_grid);
     keepHere(m_section);
+    keepHere(m_cube);
+    keepHere(m_home);
     for (const auto& a : std::as_const(m_annotations))
         keepHere(a);
 }
@@ -1647,10 +1705,15 @@ QString Viewport::pickAt(int x, int y)
     if (!ensureWindow())
         return {};
     m_context->MoveTo(x, y, m_view, false);
-    if (!m_context->HasDetected())
-        return {};
-    Handle(ElementOwner) owner = Handle(ElementOwner)::DownCast(m_context->DetectedOwner());
-    return owner.IsNull() ? QString() : owner->batch()->guid(owner->index());
+    // The first element under the point; the view cube in front of it doesn't count (D76).
+    for (m_context->InitDetected(); m_context->MoreDetected(); m_context->NextDetected()) {
+        const Handle(SelectMgr_EntityOwner) detected = m_context->DetectedCurrentOwner();
+        if (!Handle(AIS_ViewCubeOwner)::DownCast(detected).IsNull())
+            continue;
+        Handle(ElementOwner) owner = Handle(ElementOwner)::DownCast(detected);
+        return owner.IsNull() ? QString() : owner->batch()->guid(owner->index());
+    }
+    return {};
 }
 
 bool Viewport::projectCenterOf(const QString& guid, int* x, int* y) const
@@ -1668,6 +1731,215 @@ bool Viewport::projectCenterOf(const QString& guid, int* x, int* y) const
     *x = px;
     *y = py;
     return true;
+}
+
+// D76: view cube, preset views and perspective.
+
+void Viewport::ensureViewCube()
+{
+    if (m_planView || m_view->Window().IsNull())
+        return;
+    const double dpr = devicePixelRatioF();
+    if (m_cube.IsNull() || std::abs(dpr - m_cubeDpr) > 1e-3) { // first paint, or moved to another screen
+        for (const Handle(AIS_InteractiveObject)& o : {Handle(AIS_InteractiveObject)(m_cube), m_home})
+            if (!o.IsNull())
+                m_context->Remove(o, false);
+        Handle(ViewCube) cube = new ViewCube(dpr);
+        QPointer<Viewport> self(this);
+        // A click OCCT hands to the cube (inside its own selection pass): turn after it.
+        cube->onClick = [self](V3d_TypeOfOrientation o) {
+            QMetaObject::invokeMethod(self, [self, o] { if (self) self->setStandardView(o); }, Qt::QueuedConnection);
+        };
+        m_cube = cube;
+        m_home = makeHomeButton(dpr);
+        m_cubeDpr = dpr;
+    }
+    if (!m_context->IsDisplayed(m_cube)) { // also after clear(), which empties the shared context
+        m_context->Display(m_cube, 0, 0, false);
+        keepHere(m_cube);
+    }
+    if (!m_context->IsDisplayed(m_home)) {
+        m_context->Display(m_home, 0, -1, false);
+        keepHere(m_home);
+    }
+}
+
+void Viewport::eraseViewCube()
+{
+    for (const Handle(AIS_InteractiveObject)& o : {Handle(AIS_InteractiveObject)(m_cube), m_home})
+        if (!o.IsNull() && m_context->IsDisplayed(o))
+            m_context->Erase(o, false);
+}
+
+QRect Viewport::viewCubeRect() const
+{
+    return viewCubeShown() ? kimcad::viewCubeRect(size()) : QRect();
+}
+
+QRect Viewport::homeButtonRect() const
+{
+    return viewCubeShown() ? kimcad::homeButtonRect(size()) : QRect();
+}
+
+bool Viewport::viewCubeOrientationAt(const QPointF& pos, V3d_TypeOfOrientation* orientation)
+{
+    if (!viewCubeShown() || !ensureWindow() || m_cube.IsNull() || !m_context->IsDisplayed(m_cube))
+        return false;
+    const NCollection_Vec2<int> px = toPixels(pos);
+    m_context->MoveTo(px.x(), px.y(), m_view, false);
+    for (m_context->InitDetected(); m_context->MoreDetected(); m_context->NextDetected()) {
+        Handle(AIS_ViewCubeOwner) owner = Handle(AIS_ViewCubeOwner)::DownCast(m_context->DetectedCurrentOwner());
+        if (!owner.IsNull() && owner->Selectable() == m_cube) {
+            *orientation = owner->MainOrientation();
+            return true;
+        }
+    }
+    return false;
+}
+
+void Viewport::handleViewRedraw(const Handle(AIS_InteractiveContext)& ctx, const Handle(V3d_View)& view)
+{
+    AIS_ViewController::handleViewRedraw(ctx, view);
+    if (isAnimating() && m_animation->ElapsedTime() >= m_animation->OwnDuration()) {
+        // The controller keeps replaying a finished animation: end it on its last camera.
+        m_animation->Stop();
+        if (!m_animation->CameraEnd().IsNull())
+            m_view->Camera()->Copy(m_animation->CameraEnd());
+        m_view->Invalidate();
+        setAskNextFrame();
+    }
+    if (toAskNextFrame()) // a preset turn is playing: draw its next frame
+        QMetaObject::invokeMethod(this, qOverload<>(&QWidget::update), Qt::QueuedConnection);
+}
+
+bool Viewport::isAnimating() const
+{
+    return !m_animation.IsNull() && !m_animation->IsStopped();
+}
+
+void Viewport::applyProjection()
+{
+    const Handle(Graphic3d_Camera)& camera = m_view->Camera();
+    const auto type = m_perspective && !m_planView ? Graphic3d_Camera::Projection_Perspective : Graphic3d_Camera::Projection_Orthographic;
+    if (camera->ProjectionType() == type)
+        return;
+    // Keep what is seen at the target: an orthographic scale becomes a perspective distance and back.
+    const double scale = camera->Scale();
+    camera->SetProjectionType(type);
+    if (type == Graphic3d_Camera::Projection_Perspective)
+        camera->SetFOVy(45.0); // a normal lens (about 70 degrees across a wide window)
+    camera->SetScale(scale);
+    m_view->Invalidate();
+}
+
+void Viewport::setPerspective(bool on)
+{
+    AbortViewAnimation();
+    m_perspective = on;
+    applyProjection();
+    update();
+}
+
+void Viewport::setStandardView(V3d_TypeOfOrientation orientation, bool animate)
+{
+    if (!m_planView)
+        goTo(orientation, animate, false);
+}
+
+void Viewport::homeView(bool animate)
+{
+    if (!m_planView)
+        goTo(HomeOrientation, animate, true);
+}
+
+namespace {
+
+// Whether any part of the box is inside the camera's view (for perspective, a box reaching behind
+// the eye counts as seen).
+bool boxInView(const Handle(Graphic3d_Camera)& camera, const Bnd_Box& box)
+{
+    double x0, y0, z0, x1, y1, z1;
+    box.Get(x0, y0, z0, x1, y1, z1);
+    double minX = 1e300, minY = 1e300, maxX = -1e300, maxY = -1e300;
+    const gp_Vec forward(camera->Direction());
+    for (int i = 0; i < 8; ++i) {
+        const gp_Pnt p(i & 1 ? x1 : x0, i & 2 ? y1 : y0, i & 4 ? z1 : z0);
+        if (!camera->IsOrthographic() && gp_Vec(camera->Eye(), p).Dot(forward) <= 0)
+            return true;
+        const gp_Pnt n = camera->Project(p);
+        minX = std::min(minX, n.X());
+        maxX = std::max(maxX, n.X());
+        minY = std::min(minY, n.Y());
+        maxY = std::max(maxY, n.Y());
+    }
+    return maxX >= -1 && minX <= 1 && maxY >= -1 && minY <= 1;
+}
+
+} // namespace
+
+void Viewport::goTo(V3d_TypeOfOrientation orientation, bool animate, bool fit)
+{
+    AbortViewAnimation();
+    const Handle(Graphic3d_Camera)& camera = m_view->Camera();
+    // Same target, distance and zoom, seen from the preset's side.
+    Handle(Graphic3d_Camera) end = new Graphic3d_Camera();
+    end->Copy(camera);
+    const gp_Pnt center = end->Center();
+    end->SetEyeAndCenter(center.Translated(gp_Vec(viewDirection(orientation)) * end->Distance()), center);
+    end->SetUp(viewUp(orientation));
+    end->OrthogonalizeUp();
+    const Bnd_Box box = boundsOf({});
+    if (!box.IsVoid() && (fit || !boxInView(end, box))) {
+        // Fit all on the end camera, with Fit all's margin.
+        Handle(Graphic3d_Camera) saved = new Graphic3d_Camera();
+        saved->Copy(camera);
+        camera->Copy(end);
+        m_view->FitAll(box, 0.05, false);
+        end->Copy(camera);
+        camera->Copy(saved);
+        m_fitScale = end->Scale();
+    }
+    animateTo(end, animate);
+}
+
+void Viewport::animateTo(const Handle(Graphic3d_Camera)& end, bool animate)
+{
+    if (!animate || m_animationSeconds <= 0 || m_view->Window().IsNull() || !isVisible()) {
+        m_view->Camera()->Copy(end);
+        m_view->Invalidate();
+        update();
+        return;
+    }
+    Handle(Graphic3d_Camera) start = new Graphic3d_Camera();
+    start->Copy(m_view->Camera());
+    m_animation->SetView(m_view);
+    m_animation->SetCameraStart(start);
+    m_animation->SetCameraEnd(end);
+    m_animation->SetOwnDuration(m_animationSeconds);
+    m_animation->StartTimer(0.0, 1.0, true, false);
+    update();
+}
+
+void Viewport::orbitBy(double dx, double dy)
+{
+    AbortViewAnimation();
+    const Handle(Graphic3d_Camera)& camera = m_view->Camera();
+    const gp_Pnt center = camera->Center();
+    const double perPixel = 0.6 * M_PI / 180.0;
+    // Like turning the cube by hand: right turns the model to the right, down tips its top towards you.
+    gp_Trsf yaw;
+    yaw.SetRotation(gp_Ax1(center, gp::DZ()), -dx * perPixel);
+    camera->Transform(yaw);
+    const gp_Dir side = camera->Direction().Crossed(camera->Up());
+    gp_Trsf pitch;
+    pitch.SetRotation(gp_Ax1(center, side), -dy * perPixel);
+    Handle(Graphic3d_Camera) next = new Graphic3d_Camera();
+    next->Copy(camera);
+    next->Transform(pitch);
+    if (std::abs(next->Direction().Z()) < 0.995) // never past straight down or up
+        camera->Copy(next);
+    m_view->Invalidate();
+    update();
 }
 
 } // namespace kimcad

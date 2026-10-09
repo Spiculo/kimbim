@@ -7,6 +7,7 @@ qt_add_library(kimcad_core STATIC
     src/MeshChunk.cpp src/MeshChunk.h
     src/ElementBatch.cpp src/ElementBatch.h
     src/Viewport.cpp src/Viewport.h
+    src/ViewCube.cpp src/ViewCube.h
     src/SelfTest.cpp src/SelfTest.h
     src/ModelTreePanel.cpp src/ModelTreePanel.h
     src/PropertiesPanel.cpp src/PropertiesPanel.h
@@ -115,6 +116,14 @@ kimcad_gui_test(app_selftest_house "\"beams\":1,\"columns\":1,\"doors\":1,\"elem
 kimcad_gui_test(app_selftest_box_select_visible "\"box_selected\":1,.*\"ok\":true" :occlusion: --frames 5 --box-select)
 kimcad_gui_test(app_selftest_box_select_through "\"box_selected\":2,.*\"ok\":true" :occlusion: --frames 5 --box-select --select-through)
 kimcad_gui_test(app_selftest_box_select "\"box_selected\":2.*\"ok\":true.*\"tree_selected\":2" :fixture: --frames 5 --box-select)
+# D76: picking and box selection in perspective; the wheel dollies; the view cube turns the view and
+# leaves the selection alone; a preset view from the menu is animated and keeps the model on screen.
+kimcad_gui_test(app_selftest_perspective
+    "\"ok\":true,\"perspective\":true,\"perspective_dolly\":true,\"pick_matched\":2,\"pick_missed\":0" :fixture: --frames 5 --perspective)
+kimcad_gui_test(app_selftest_box_select_perspective "\"box_selected\":2,.*\"ok\":true,\"perspective\":true" :fixture: --frames 5 --box-select --perspective)
+kimcad_gui_test(app_selftest_view_cube
+    "\"cube_found_top\":true,\"cube_home\":true,\"cube_selection_kept\":true,\"cube_top\":true" :fixture: --frames 2 --cube-click)
+kimcad_gui_test(app_selftest_view_front "\"view_animated\":true,\"view_ok\":true" :fixture: --frames 2 --view Front)
 # Slice 14: an elevation sends only the elements it can see to the serializer (the short wall is hidden
 # behind the tall one from the south, in front of it from the north).
 kimcad_gui_test(app_selftest_drawing_visible_south "\"drawing_shown\":true,\"drawing_visible\":1," :occlusion: --frames 1 --open-drawing "South Elevation")

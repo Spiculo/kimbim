@@ -15,6 +15,10 @@
 #include <QTimer>
 #include <QImage>
 #include <QSet>
+#include <QMouseEvent>
+#include <QWheelEvent>
+
+#include <Graphic3d_Camera.hxx>
 
 #include <cstdio>
 
@@ -35,6 +39,7 @@
 #include "LevelsBar.h"
 #include "ModelTreePanel.h"
 #include "PythonEngine.h"
+#include "ViewCube.h"
 #include "Viewport.h"
 
 namespace kimcad {
@@ -54,6 +59,36 @@ int fail(const QString& error)
 }
 
 } // namespace
+
+// D76: plays a preset turn to its end; true if it was animated (took more than one frame) and ended.
+static bool waitForTurn(Viewport* viewport)
+{
+    const bool started = viewport->isAnimating(); // a turn starts at once (a click, a menu action)
+    QElapsedTimer t;
+    t.start();
+    while (viewport->isAnimating() && t.elapsed() < 3000)
+        QApplication::processEvents(QEventLoop::AllEvents, 10);
+    QApplication::processEvents();
+    return started && !viewport->isAnimating();
+}
+
+static gp_Dir eyeDirection(Viewport* viewport) // target -> eye
+{
+    return viewport->view()->Camera()->Direction().Reversed();
+}
+
+static bool boxSeen(Viewport* viewport) // the model's centre is on screen
+{
+    const Bnd_Box box = viewport->boundsOf({});
+    if (box.IsVoid())
+        return false;
+    double x0, y0, z0, x1, y1, z1;
+    box.Get(x0, y0, z0, x1, y1, z1);
+    int x = 0, y = 0;
+    viewport->view()->Convert((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2, x, y);
+    const double dpr = viewport->devicePixelRatioF();
+    return x >= 0 && y >= 0 && x < viewport->width() * dpr && y < viewport->height() * dpr;
+}
 
 // Drives the real MainWindow (background loader thread, progressive batches), then measures.
 static void takeScreenshots(MainWindow& window, const QString& path, QJsonObject* result)
@@ -282,6 +317,31 @@ int runSelfTest(const SelfTestOptions& options)
         window.findChild<QAction*>(QStringLiteral("actionLinesOnly"))->setChecked(true);
     if (options.planView)
         window.findChild<QAction*>(QStringLiteral("actionPlanView"))->trigger();
+    // D76: perspective and preset views through their menu actions, the turn played to its end.
+    QJsonObject navigation;
+    if (options.perspective) {
+        window.findChild<QAction*>(QStringLiteral("actionPerspective"))->trigger();
+        viewport->fitAll(); // nearer parts look bigger in perspective: bring the whole model in
+        navigation.insert(QStringLiteral("perspective"), !viewport->view()->Camera()->IsOrthographic());
+    }
+    if (!options.view.isEmpty()) {
+        QAction* a = window.findChild<QAction*>(options.view == QLatin1String("Home") ? QStringLiteral("actionHomeView")
+                                                                                       : QStringLiteral("actionView") + options.view);
+        if (!a)
+            return fail(QStringLiteral("no such view: ") + options.view);
+        QApplication::processEvents();
+        a->trigger();
+        const gp_Dir want = viewDirection(options.view == QLatin1String("Home") ? HomeOrientation : [&] {
+            for (const StandardView& sv : standardViews())
+                if (options.view == QLatin1String(sv.id))
+                    return sv.orientation;
+            return HomeOrientation;
+        }());
+        const bool animated = waitForTurn(viewport);
+        navigation.insert(QStringLiteral("view_animated"), animated);
+        navigation.insert(QStringLiteral("view_ok"), eyeDirection(viewport).IsParallel(want, 1e-3)
+            && eyeDirection(viewport).Dot(want) > 0 && boxSeen(viewport));
+    }
     QApplication::processEvents();
     const double fps = viewport->measureFps(options.frames);
 
@@ -291,6 +351,8 @@ int runSelfTest(const SelfTestOptions& options)
         {"triangles", double(viewport->triangleCount())},
         {"load_s", loadS},
         {"fps", fps}};
+    for (auto it = navigation.constBegin(); it != navigation.constEnd(); ++it)
+        result.insert(it.key(), it.value());
     const Bnd_Box bounds = viewport->boundsOf({});
     if (!bounds.IsVoid()) {
         double x0, y0, z0, x1, y1, z1;
@@ -339,6 +401,51 @@ int runSelfTest(const SelfTestOptions& options)
         QApplication::processEvents();
         result.insert(QStringLiteral("box_selected"), n);
         result.insert(QStringLiteral("tree_selected"), int(window.treePanel()->selectedGuids().size()));
+    }
+    if (options.perspective && !viewport->isPlanView()) {
+        // D76: the wheel dollies the perspective camera towards the cursor.
+        const double before = viewport->view()->Camera()->Distance();
+        const QPointF at(viewport->width() / 2.0, viewport->height() / 2.0);
+        QWheelEvent wheel(at, viewport->mapToGlobal(at), QPoint(), QPoint(0, 240), Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+        QApplication::sendEvent(viewport, &wheel);
+        for (int i = 0; i < 10; ++i)
+            QApplication::processEvents();
+        result.insert(QStringLiteral("perspective_dolly"), viewport->view()->Camera()->Distance() < before * 0.99
+            && !viewport->view()->Camera()->IsOrthographic());
+    }
+    if (options.cubeClick) {
+        // D76: click the cube's top face like a mouse does, then the home button; the selection stays.
+        const QStringList guids = viewport->guids();
+        if (!guids.isEmpty())
+            viewport->selectGuids({guids.first()});
+        const QStringList before = viewport->selectedGuids();
+        const QRect r = viewport->viewCubeRect();
+        QPointF top(-1, -1);
+        for (int y = r.top(); y <= r.bottom() && top.x() < 0; y += 2)
+            for (int x = r.left(); x <= r.right(); x += 2) {
+                V3d_TypeOfOrientation o;
+                if (viewport->viewCubeOrientationAt(QPointF(x, y), &o) && o == V3d_Zpos) {
+                    top = QPointF(x, y + 4); // a little inside the face, past its edge band
+                    break;
+                }
+            }
+        auto click = [viewport](QPointF at) {
+            QMouseEvent press(QEvent::MouseButtonPress, at, viewport->mapToGlobal(at), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+            QApplication::sendEvent(viewport, &press);
+            QMouseEvent release(QEvent::MouseButtonRelease, at, viewport->mapToGlobal(at), Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+            QApplication::sendEvent(viewport, &release);
+            return waitForTurn(viewport);
+        };
+        result.insert(QStringLiteral("cube_found_top"), top.x() >= 0);
+        QElapsedTimer turn;
+        turn.start();
+        const bool topAnimated = top.x() >= 0 && click(top);
+        result.insert(QStringLiteral("cube_turn_ms"), double(turn.elapsed()));
+        result.insert(QStringLiteral("cube_top"), topAnimated && eyeDirection(viewport).Z() > 0.999);
+        const bool homeAnimated = click(viewport->homeButtonRect().center());
+        result.insert(QStringLiteral("cube_home"), homeAnimated
+            && eyeDirection(viewport).IsParallel(viewDirection(HomeOrientation), 1e-3) && eyeDirection(viewport).Dot(viewDirection(HomeOrientation)) > 0);
+        result.insert(QStringLiteral("cube_selection_kept"), !before.isEmpty() && viewport->selectedGuids() == before);
     }
     if (options.popOut) {
         // D71: a tab dragged out moves its view to a new top-level window (a new native window).

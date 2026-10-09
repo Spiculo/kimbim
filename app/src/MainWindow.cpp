@@ -9,6 +9,7 @@
 #include "StatusStrip.h"
 #include "ToolOptionsBar.h"
 #include "ToolPalette.h"
+#include "ViewCube.h"
 #include "ViewHost.h"
 
 #include <QApplication>
@@ -412,6 +413,44 @@ void MainWindow::buildMenus()
     QAction* fit = view->addAction(tr("&Fit all"));
     fit->setShortcut(Qt::Key_F);
     connect(fit, &QAction::triggered, this, [this] { m_viewport->fitAll(); });
+    { // D76: preset views and perspective for the active view (the view cube lives in Viewport).
+        QMenu* views = view->addMenu(tr("&Views"));
+        views->setObjectName(QStringLiteral("menuViews"));
+        for (const StandardView& sv : standardViews()) {
+            QAction* a = views->addAction(standardViewLabel(sv.orientation));
+            a->setObjectName(QStringLiteral("actionView") + QLatin1String(sv.id));
+            a->setShortcut(sv.shortcut);
+            connect(a, &QAction::triggered, this, [this, o = sv.orientation] {
+                if (m_viewport)
+                    m_viewport->setStandardView(o);
+            });
+            if (sv.orientation == V3d_Xpos)
+                views->addSeparator();
+        }
+        views->addSeparator();
+        QAction* home = views->addAction(tr("&Home view"));
+        home->setObjectName(QStringLiteral("actionHomeView"));
+        home->setShortcut(Qt::Key_Home);
+        home->setToolTip(tr("The default isometric view, fitted (the house beside the view cube)"));
+        connect(home, &QAction::triggered, this, [this] {
+            if (m_viewport)
+                m_viewport->homeView();
+        });
+        QAction* perspective = view->addAction(tr("P&erspective"));
+        perspective->setObjectName(QStringLiteral("actionPerspective"));
+        perspective->setCheckable(true);
+        perspective->setShortcut(QKeySequence(Qt::SHIFT | Qt::Key_P));
+        perspective->setToolTip(tr("Show this 3D view in perspective instead of parallel projection (plans stay parallel)"));
+        connect(perspective, &QAction::triggered, this, [this, perspective] {
+            if (m_viewport && !m_viewport->isPlanView())
+                m_viewport->setPerspective(!m_viewport->isPerspective());
+            perspective->setChecked(m_viewport && m_viewport->isPerspective());
+        });
+        // Each view keeps its own camera: the check follows the active one. (Plan views ignore both.)
+        connect(view, &QMenu::aboutToShow, this, [this, perspective] {
+            perspective->setChecked(m_viewport && m_viewport->isPerspective());
+        });
+    }
     view->addSeparator();
     QAction* hide = view->addAction(tr("&Hide selected"));
     hide->setObjectName(QStringLiteral("actionHideSelected"));

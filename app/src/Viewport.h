@@ -3,7 +3,9 @@
 
 #include <QPointer>
 
+#include <AIS_AnimationCamera.hxx>
 #include <AIS_InteractiveContext.hxx>
+#include <AIS_ViewCube.hxx>
 #include <AIS_ViewController.hxx>
 #include <gp_Pnt.hxx>
 #include <QColor>
@@ -19,6 +21,7 @@
 #include <V3d_Viewer.hxx>
 
 #include <QHash>
+#include <QRect>
 #include <QStringList>
 #include <QWidget>
 
@@ -52,6 +55,21 @@ public:
     void setPlanView(double elevation);
     void set3DView();
     bool isPlanView() const { return m_planView; }
+    // Preset views (D76): the camera turns (~250 ms) to look from that side or corner, keeping its
+    // target and zoom; it fits all when the model would be off-screen. Not in plan views.
+    void setStandardView(V3d_TypeOfOrientation orientation, bool animate = true);
+    void homeView(bool animate = true); // the default south-east isometric, fitted
+    // Perspective camera (D76), per view; plan views stay orthographic (the setting comes back in 3D).
+    void setPerspective(bool on);
+    bool isPerspective() const { return m_perspective; }
+    bool isAnimating() const;
+    void setAnimationDuration(double seconds) { m_animationSeconds = seconds; }
+    // The view cube and its home button (D76), top right of 3D views; hidden in plan views.
+    bool viewCubeShown() const { return !m_planView; }
+    QRect viewCubeRect() const;   // widget pixels; clicks inside never reach selection
+    QRect homeButtonRect() const;
+    // The cube face, edge or corner under a widget point (false: none, or no window).
+    bool viewCubeOrientationAt(const QPointF& pos, V3d_TypeOfOrientation* orientation);
     // Lines only (hidden-line drawing, Slice 4b): every batch, including later ones.
     void setLinesOnly(bool on);
     bool linesOnly() const { return m_scene->linesOnly; }
@@ -199,6 +217,7 @@ protected:
     void leaveEvent(QEvent*) override;
     void OnSelectionChanged(const Handle(AIS_InteractiveContext)& ctx, const Handle(V3d_View)& view) override;
     void handleSelectionPoly(const Handle(AIS_InteractiveContext)& ctx, const Handle(V3d_View)& view) override;
+    void handleViewRedraw(const Handle(AIS_InteractiveContext)& ctx, const Handle(V3d_View)& view) override;
 
 private:
     bool ensureWindow();
@@ -247,6 +266,23 @@ private:
     double m_fitScale = 0.0; // the view's scale when fitted (100%)
     double m_lastZoom = -1.0;
     std::vector<Handle(Graphic3d_ClipPlane)> m_clipPlanes;
+    // D76: view cube, preset views, perspective.
+    void ensureViewCube();
+    void eraseViewCube();
+    void applyProjection();
+    void goTo(V3d_TypeOfOrientation orientation, bool animate, bool fit);
+    void animateTo(const Handle(Graphic3d_Camera)& end, bool animate);
+    void orbitBy(double dx, double dy); // dragging the cube: turntable around the view's target
+    enum class CubePress { None, Cube, Home };
+    Handle(AIS_ViewCube) m_cube;
+    Handle(AIS_InteractiveObject) m_home;
+    double m_cubeDpr = 0.0;
+    Handle(AIS_AnimationCamera) m_animation;
+    double m_animationSeconds = 0.25;
+    bool m_perspective = false;
+    CubePress m_cubePress = CubePress::None;
+    QPointF m_cubePressPos;
+    bool m_cubeDragging = false;
 };
 
 } // namespace kimcad

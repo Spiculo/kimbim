@@ -24,6 +24,9 @@ struct SelfTestOptions {
     bool popOut = false;          // move the 3D view to its own window and back (a tab dragged out, D71)
     bool benchEdit = false;       // time moving a wall back and forth (ms per edit, and per refresh step)
     bool planTab = false;         // with benchEdit: a plan tab of the active level open and active
+    bool perspective = false;     // D76: View > Perspective before measuring (pick, box select, fps)
+    QString view;                 // D76: a preset view (Top, Front, SE, ..., Home) before measuring, animated
+    bool cubeClick = false;       // D76: click the view cube's top face and the home button; selection must stay
 };
 
 // Opens the model in a real window, loads it, measures, prints one JSON line to stdout.

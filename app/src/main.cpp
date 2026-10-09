@@ -60,6 +60,15 @@ int main(int argc, char* argv[])
     parser.addOption(planView);
     QCommandLineOption linesOnly(QStringLiteral("lines-only"), QStringLiteral("Self-test: lines-only display."));
     parser.addOption(linesOnly);
+    QCommandLineOption perspective(QStringLiteral("perspective"), QStringLiteral("Self-test: perspective camera (D76)."));
+    parser.addOption(perspective);
+    QCommandLineOption presetView(QStringLiteral("view"),
+        QStringLiteral("Self-test: turn to a preset view: Top, Bottom, Front, Back, Left, Right, SW, SE, NE, NW or Home."),
+        QStringLiteral("name"));
+    parser.addOption(presetView);
+    QCommandLineOption cubeClick(QStringLiteral("cube-click"),
+        QStringLiteral("Self-test: click the view cube's top face, then its home button."));
+    parser.addOption(cubeClick);
     QCommandLineOption selectThrough(QStringLiteral("select-through"), QStringLiteral("Self-test: box selection includes hidden elements."));
     parser.addOption(selectThrough);
     QCommandLineOption house(QStringLiteral("house"), QStringLiteral("Self-test: model a small house with the tools."));
@@ -115,6 +124,9 @@ int main(int argc, char* argv[])
         options.drawWalls = parser.value(drawWalls);
         options.planView = parser.isSet(planView);
         options.linesOnly = parser.isSet(linesOnly);
+        options.perspective = parser.isSet(perspective);
+        options.view = parser.value(presetView);
+        options.cubeClick = parser.isSet(cubeClick);
         options.selectThrough = parser.isSet(selectThrough);
         options.house = parser.isSet(house);
         options.benchTools = parser.isSet(benchTools);
