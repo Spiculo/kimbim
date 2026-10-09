@@ -33,6 +33,9 @@ m4 = { cmd = "python tools/check_m4.py build/house.ifc build/m4", depends-on = [
 # M5 exit test: two design options of the house are created, edited separately, compared and combined
 # with one conflict resolved (the UI path is test_main_window's m5ExitCombineOptions).
 m5 = { cmd = "python tools/check_m5.py build/m5", depends-on = ["build"] }
+# Renovation exit test (D74): the house with an existing, a demolished and a new wall; one sheet per
+# purpose (Existing, Demolition, New construction) with a legend, each showing the right walls.
+renovation = { cmd = "python tools/check_renovation.py build/house.ifc build/renovation", depends-on = ["house", "build"] }
 interop-install = { cmd = "npm ci --no-audit --no-fund", cwd = "tools/interop" }
 interop = { cmd = "python tools/check_interop.py build/house.ifc", depends-on = ["interop-install", "house"] }
 build = "maturin develop --release --skip-install"

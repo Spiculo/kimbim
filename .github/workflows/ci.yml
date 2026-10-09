@@ -56,6 +56,8 @@ jobs:
         run: pixi run m4
       - name: M5 exit test - two options of the house edited, compared and combined with a conflict resolved
         run: pixi run m5
+      - name: Renovation exit test - one sheet per renovation purpose with a legend, the right walls on each
+        run: pixi run renovation
       # Informational (Slice 14): the South Elevation of Clinic through the app's own pipeline (visible-element
       # pass + serializer in a child process); read drawing_s and drawing_visible from the log.
       - name: Slice 14 - Clinic elevation in the app (informational)

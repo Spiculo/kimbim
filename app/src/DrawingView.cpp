@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "DrawingView.h"
 
+#include <QContextMenuEvent>
+#include <QMenu>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMouseEvent>
@@ -144,6 +146,20 @@ void DrawingView::mousePressEvent(QMouseEvent* event)
     }
     if (event->button() == Qt::MiddleButton || event->button() == Qt::LeftButton)
         m_panFrom = event->position();
+}
+
+void DrawingView::contextMenuEvent(QContextMenuEvent* event)
+{
+    const QPointF mm = toPaper(event->pos());
+    for (int i = int(m_placed.size()) - 1; i >= 0; --i)
+        if (m_placed[i].rect.contains(mm)) {
+            const QString guid = m_placed[i].guid;
+            QMenu menu(this);
+            QAction* remove = menu.addAction(tr("Remove from sheet"));
+            if (menu.exec(event->globalPos()) == remove)
+                emit placedRemoveRequested(guid);
+            return;
+        }
 }
 
 void DrawingView::mouseMoveEvent(QMouseEvent* event)

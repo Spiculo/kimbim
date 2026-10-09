@@ -230,6 +230,7 @@ public:
     SheetsPanel* sheetsPanel() const { return m_sheetsPanel; }
     QString addSheet(const QString& paper, const QString& title); // its number, "" on failure
     bool placeOnSheet(const QString& number, const QString& drawingGuid);
+    bool placeLegend(const QString& number); // D74: a legend of the sheet's purpose, at a free spot
     bool openSheet(const QString& number);
     DrawingView* sheetView(const QString& number) const { return m_drawingViews.value(QStringLiteral("sheet:") + number); }
     bool exportSheet(const QString& number, const QString& path); // .pdf or .svg

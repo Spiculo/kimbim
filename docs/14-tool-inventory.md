@@ -65,7 +65,7 @@ release notes, so check before relying on a single cell.
 | Visual styles: shaded, textured, sketch, X-ray | all | 🟡 | new | Shaded and lines only |
 | Shadows and sun position | AC RV VW SU | ⬜ | new | |
 | Hover info (name, type, level) | AC RV VW | ✅ | — | |
-| Colour by property, class or type | AC RV VW BB | ⬜ | P1 | Archicad Graphic Overrides, Revit filters |
+| Colour by property, class or type | AC RV VW BB | ✅ | P1 | D73 override rules (property, class, kind, layer, material) |
 | Show multiple levels at once (ghost story / underlay) | AC RV VW | ⬜ | new | Archicad Trace & Reference, Revit underlay |
 | Split views / several windows side by side | AC RV VW | ⬜ | new | |
 | Navigator / project browser (tree of views, sheets) | AC RV VW | 🟡 | new | Model tree, levels, views; no sheets |
@@ -192,7 +192,7 @@ release notes, so check before relying on a single cell.
 | Property editing, psets, bulk edit | all | ✅ | P0 | |
 | Dimensions group (length, height… edits the shape) | AC RV | ✅ | — | |
 | Expression / calculated properties | AC RV VW | ⬜ | new | Archicad expression-based properties, Revit formulas |
-| Renovation status (existing / demolish / new) and filters | AC RV VW | ⬜ | new | Revit phases. Needed for refurbishment work |
+| Renovation status (existing / demolish / new) and filters | AC RV VW | ✅ | new | D74: Archicad statuses, renovation filters in purposes, legends; Revit phases not done |
 | Design options | AC RV VW | ✅ | P0 | KIMCAD uses branches (D56); Archicad and Revit store options inside one file |
 
 ## 10. Attributes and graphics standards
@@ -350,6 +350,6 @@ they would come up:
 7. **2D drafting and fills** for details (§12).
 8. **Pen sets, line types and material cut fills** (§10), so printed drawings look professional.
 9. **Navigation backlog**: view cube, preset views, perspective, touchpad (§2).
-10. **Renovation status** (§9), needed for refurbishment projects.
+10. ~~**Renovation status** (§9), needed for refurbishment projects.~~ Done (D74).
 
 Next step: the owner confirms or reorders this list, and gives priorities to the `new` rows. 04 is then updated to match.

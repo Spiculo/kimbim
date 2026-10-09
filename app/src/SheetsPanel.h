@@ -31,6 +31,7 @@ signals:
     void newRequested(const QString& paper);
     void openRequested(const QString& number);
     void placeRequested(const QString& number);
+    void legendRequested(const QString& number); // D74: place a legend of the sheet's purpose
     void deleteRequested(const QString& number);
     void purposeRequested(const QString& number, const QString& purpose); // "" = the current purpose
 

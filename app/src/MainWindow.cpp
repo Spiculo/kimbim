@@ -518,6 +518,7 @@ void MainWindow::buildDocks()
         placeOnSheet(n, drawing);
     });
     connect(m_sheetsPanel, &SheetsPanel::purposeRequested, this, &MainWindow::setSheetPurpose);
+    connect(m_sheetsPanel, &SheetsPanel::legendRequested, this, &MainWindow::placeLegend);
     connect(m_sheetsPanel, &SheetsPanel::deleteRequested, this, [this](const QString& n) {
         const QJsonObject r = bridge("delete_sheet", {n});
         if (!r.value("ok").toBool())
@@ -3418,6 +3419,19 @@ bool MainWindow::placeOnSheet(const QString& number, const QString& drawingGuid)
     return true;
 }
 
+bool MainWindow::placeLegend(const QString& number)
+{
+    const QJsonObject r = bridge("place_legend", {number});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(tr("Could not place it: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    openSheet(number);
+    refreshSheets(true);
+    return true;
+}
+
 bool MainWindow::openSheet(const QString& number)
 {
     const QString key = QStringLiteral("sheet:") + number;
@@ -3433,10 +3447,18 @@ bool MainWindow::openSheet(const QString& number)
     auto* view = new DrawingView(key);
     connect(view, &DrawingView::regenerateRequested, this, &MainWindow::regenerateDrawing);
     connect(view, &DrawingView::placedMoved, this, [this, number](const QString& drawing, QPointF topLeft) {
-        const QJsonObject r = bridge("move_placed", {number, drawing, QString::number(topLeft.x(), 'f', 1),
-            QString::number(topLeft.y(), 'f', 1)});
+        const bool legend = drawing.startsWith(QLatin1String("legend:"));
+        const QJsonObject r = bridge(legend ? "move_legend" : "move_placed", {number, legend ? drawing.mid(7) : drawing,
+            QString::number(topLeft.x(), 'f', 1), QString::number(topLeft.y(), 'f', 1)});
         if (!r.value("ok").toBool())
             m_status->showMessage(tr("Could not move it: %1").arg(r.value("error").toString()));
+        afterEdit(r);
+    });
+    connect(view, &DrawingView::placedRemoveRequested, this, [this, number](const QString& drawing) {
+        const bool legend = drawing.startsWith(QLatin1String("legend:"));
+        const QJsonObject r = bridge(legend ? "remove_legend" : "remove_placed", {number, legend ? drawing.mid(7) : drawing});
+        if (!r.value("ok").toBool())
+            m_status->showMessage(tr("Could not remove it: %1").arg(r.value("error").toString()));
         afterEdit(r);
     });
     m_drawingViews.insert(key, view);
@@ -3469,6 +3491,11 @@ void MainWindow::refreshSheets(bool changed)
             const QJsonObject p = pv.toObject();
             placed.push_back({p.value("drawing").toString(),
                 QRectF(p.value("x").toDouble(), p.value("y").toDouble(), p.value("w").toDouble(), p.value("h").toDouble())});
+        }
+        for (const auto& lv : it->value("legends").toArray()) { // D74: dragged and removed like drawings
+            const QJsonObject l = lv.toObject();
+            placed.push_back({QStringLiteral("legend:") + l.value("id").toString(),
+                QRectF(l.value("x").toDouble(), l.value("y").toDouble(), l.value("w").toDouble(), l.value("h").toDouble())});
         }
         view->setPlaced(placed);
         m_dock->setTitle(key, tr("Sheet %1").arg(it->value("number").toString()));

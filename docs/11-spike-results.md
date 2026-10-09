@@ -267,3 +267,7 @@ The bench also found two problems, both fixed: moving a Revit wall failed (ifcop
 ## Step 3 (D73) on Clinic: graphics resolution
 
 `graphics.resolve` on Clinic_Architectural.ifc (2,889 products), Windows desktop, 2026-10-08: Working 0.16 s, Highlight (Fire rating property rules) 0.23 s, Permit (Architectural visibility) 0.17 s, Demo (External walls) 0.23 s. The first version read each element's property sets (`get_psets`): 3.6 s with Fire rating; properties are now read through a per-name index over the file's single values. An edit (`--bench-edit`, moving a wall) takes 2.0 s with the purpose re-resolved after it, as before step 3: only batches whose styles changed are redrawn.
+
+## Renovation status (D74) on Clinic
+
+`graphics.resolve` on Clinic_Architectural.ifc, Windows desktop, 2026-10-09: Working 0.15 s, Demolition 0.20 s, New construction 0.24 s (target: under 0.5 s); Demolition after marking every element Existing 0.32 s. Finding the unmarked elements takes 0.18 s (2,889); marking them all Existing, one undo step, 4.0 s.

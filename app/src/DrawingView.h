@@ -39,16 +39,19 @@ public:
         QRectF rect; // millimetres on the sheet
     };
     void setPlaced(const QVector<Placed>& placed) { m_placed = placed; }
+    const QVector<Placed>& placed() const { return m_placed; } // drawings, and legends ("legend:<id>", D74)
     QPointF toPaper(QPointF widget) const { return (widget - m_offset) / m_scale; }
 
 signals:
     void regenerateRequested(const QString& guid);
     void placedMoved(const QString& drawing, QPointF topLeftMm);
+    void placedRemoveRequested(const QString& drawing); // right-click > Remove from sheet
 
 protected:
     void paintEvent(QPaintEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
+    void contextMenuEvent(QContextMenuEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;

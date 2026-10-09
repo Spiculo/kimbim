@@ -52,9 +52,11 @@ SheetsPanel::SheetsPanel(QWidget* parent)
         if (!item)
             return;
         QMenu menu(this);
-        QMenu* purposes = purposeMenu(item->data(NumberRole).toString());
+        const QString number = item->data(NumberRole).toString();
+        QMenu* purposes = purposeMenu(number);
         purposes->setParent(&menu, purposes->windowFlags());
         menu.addMenu(purposes);
+        menu.addAction(tr("Place legend"), this, [this, number] { emit legendRequested(number); });
         menu.exec(m_list->viewport()->mapToGlobal(at));
     });
     connect(remove, &QPushButton::clicked, this, [this] {

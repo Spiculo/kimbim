@@ -34,7 +34,8 @@ Display (Slice 4b): every element has border lines (outline and creases); View �
 - **Above the active view:** the active tool's fields (type, height, roof shape and pitch, typed length), only while a tool is active.
 - **Right:** the model tree, Properties, Layers, History, Drawings and Sheets as tabs; the area can auto-hide or float. **Double-click** an element (in a view or the tree) to bring Properties forward.
 - **Bottom:** the **purpose** (D73: Working, Highlight, Permit, Presentation, Demo, or your own; "…" changes its pen set, visibility, overrides and layers), the current pen (click: a 16×16 grid), the active layer, the visible layers, the zoom, the selection ("2 Walls") and messages.
-- **Graphics menu** (D73): pen sets, line types, element styles, visibility sets, graphic overrides, layer combinations, purposes. View › True line weights draws lines as thick as their pens.
+- **Graphics menu** (D73): pen sets, line types, element styles, visibility sets, graphic overrides, renovation filters (D74), layer combinations, purposes. View › True line weights draws lines as thick as their pens.
+- **Renovation** (D74): each element is Existing, To be demolished or New (Properties panel, Model › Renovation status; new elements take the bottom bar's status for new elements). The purposes Existing, Demolition and New construction show the matching plans; the purpose popup shows their legend, and a sheet's right-click menu places one. Opening an IFC with unmarked elements offers to mark them.
 - **Top:** one bar with the design option (versioned projects), the active level and the cut controls.
 - The layout is remembered between sessions; a window left on a missing monitor comes back to the default layout.
 

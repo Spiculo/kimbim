@@ -857,6 +857,35 @@ private slots:
         QCOMPARE(moved.at(0).at(0).toString(), QStringLiteral("d2"));
     }
 
+    // D74: a legend placed on a sheet tab is drawn, dragged and removed like a placed drawing.
+    void sheetLegendPlacedDraggedRemoved()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        const QString number = w.addSheet(QStringLiteral("A3"), QStringLiteral("Legend"));
+        QVERIFY(!number.isEmpty());
+        QVERIFY(w.placeLegend(number));
+        kimcad::DrawingView* view = w.sheetView(number);
+        QVERIFY(view);
+        QString id;
+        for (const auto& p : view->placed())
+            if (p.guid.startsWith(QLatin1String("legend:")))
+                id = p.guid;
+        QVERIFY(!id.isEmpty());
+        auto legends = [number] {
+            for (const auto& v : kimcad::PythonEngine::instance().callJson("sheets", {}).object().value("sheets").toArray())
+                if (v.toObject().value("number").toString() == number)
+                    return v.toObject().value("legends").toArray();
+            return QJsonArray();
+        };
+        emit view->placedMoved(id, QPointF(200, 150));
+        QCOMPARE(legends().first().toObject().value("x").toDouble(), 200.0);
+        emit view->placedRemoveRequested(id);
+        QVERIFY(legends().isEmpty());
+        QVERIFY(std::none_of(view->placed().begin(), view->placed().end(),
+            [](const kimcad::DrawingView::Placed& p) { return p.guid.startsWith(QLatin1String("legend:")); }));
+    }
+
     void combineDialogPreviewsOncePerChoice()
     {
         // A choice queued a refresh and choose() refreshed again: the three-way merge ran twice.
