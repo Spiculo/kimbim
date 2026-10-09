@@ -42,6 +42,7 @@
 #include "DrawingsPanel.h"
 #include "SheetsPanel.h"
 #include "SchedulesDialog.h"
+#include <QCheckBox>
 #include "ElementBatch.h"
 #include "LevelsBar.h"
 #include "HostTool.h"
