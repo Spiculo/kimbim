@@ -280,7 +280,7 @@ private slots:
                        "actionSlabOpeningTool", "actionPlaceModelTool"}},
             {"plane", {"actionTextTool", "actionDimensionTool", "actionLeaderTool", "actionMarkTool", "actionGridTool"}},
             {"view", {"actionSectionTool", "actionElevationTool", "actionNewPlanTab", "actionNewSheet"}},
-            {"edit", {"actionMoveTool", "actionRotateTool", "actionStretchTool", "actionMirror", "actionCopyToLevel"}}};
+            {"edit", {"actionMoveTool", "actionRotateTool", "actionStretchTool", "actionMirror", "actionCopyToLevel", "actionMeasureTool"}}};
         QStringList seen;
         for (const QString& g : p->groups()) {
             QStringList names;
