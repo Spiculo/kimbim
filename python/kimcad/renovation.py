@@ -46,10 +46,27 @@ def common_pset(element) -> str | None:
     return _common_for(element.file.schema, element.is_a())
 
 
-def status_of(element, facts=None) -> str:
-    from . import graphics
+def _stored(element):
+    """The element's Status (or Renovation Status) value, own over its type's; None if it has none.
+    Reads only this element's psets (a resolve over the whole file uses the per-name index instead)."""
+    sources = [element]
+    element_type = ifcopenshell.util.element.get_type(element)
+    if element_type is not None:
+        sources.append(element_type)
+    for source in sources:
+        psets = ifcopenshell.util.element.get_psets(source, psets_only=True, should_inherit=False)
+        for name in NAMES:
+            for props in psets.values():
+                if props.get(name) is not None:
+                    return props[name]
+    return None
 
-    facts = facts if facts is not None else graphics._Facts(element)
+
+def status_of(element, facts=None) -> str:
+    """`facts`: a graphics._Facts sharing the file-wide index (many elements); without it, only this
+    element is read (one element: Properties, copies)."""
+    if facts is None:
+        return normalize(_stored(element))
     for name in NAMES:
         v = facts.prop(name)
         if v is not None:

@@ -200,3 +200,26 @@ def test_unmarked_and_mark_unmarked():
     assert call("undo")["ok"]  # one step
     assert call("unmarked")["count"] == 2
     assert not call("mark_unmarked", "new")["ok"]  # New is what unmarked already means
+
+
+def test_one_elements_status_reads_only_that_element(monkeypatch):
+    """Properties and copies ask one element at a time: no file-wide property index per element."""
+    f = _model()
+    w = _el(f, "IfcWall", Pset_WallCommon={"Status": ["EXISTING"]})
+    a = _el(f, "IfcWall", AC_Pset_RenovationAndPhasing={"Renovation Status": "To Be Demolished"})
+    furniture = _el(f, "IfcFurniture")
+    t = ifcopenshell.api.root.create_entity(f, ifc_class="IfcFurnitureType")
+    p = ifcopenshell.api.pset.add_pset(f, product=t, name="Pset_FurnitureTypeCommon")
+    ifcopenshell.api.pset.edit_pset(f, pset=p, properties={"Status": ["EXISTING"]})
+    ifcopenshell.api.type.assign_type(f, related_objects=[furniture], relating_type=t)
+
+    def no_scan(*args):
+        raise AssertionError("file-wide scan")
+
+    monkeypatch.setattr(g, "_property_index", no_scan)
+    assert r.status_of(w) == "existing"
+    assert r.status_of(a) == "demolish"
+    assert r.status_of(furniture) == "existing"
+    r.write_status(furniture, "demolish")  # own value over the type's
+    assert r.status_of(furniture) == "demolish"
+    assert r.status_of(_el(f, "IfcWall")) == "new"
