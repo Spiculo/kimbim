@@ -368,6 +368,17 @@ void MainWindow::buildMenus()
         ->setToolTip(tr("Mirror the selection: click two points of the mirror line (hold Ctrl on the second click to mirror a copy)"));
     editAction(tr("Multi&ply..."), "actionMultiply", QKeySequence(Qt::CTRL | Qt::Key_U), [this] { multiplyDialog(); });
     editAction(tr("&Offset..."), "actionOffset", QKeySequence(), [this] { offsetDialog(); });
+    // D78: selection tools (Archicad's Find & Select; Revit's Select All Instances).
+    editMenu->addSeparator();
+    editAction(tr("Select &similar"), "actionSelectSimilar", QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_A),
+        [this] { selectSimilar(QStringLiteral("type")); })
+        ->setToolTip(tr("Select every element of the selected elements' types (untyped: same class and predefined type)"));
+    editAction(tr("Select all of this c&lass"), "actionSelectClass", QKeySequence(), [this] { selectSimilar(QStringLiteral("class")); })
+        ->setToolTip(tr("Select every element of the selected elements' IFC classes"));
+    editAction(tr("&Find && Select..."), "actionFindSelect", QKeySequence(Qt::CTRL | Qt::Key_F), [this] {
+        findSelectPanel();
+        m_dock->raisePanel(QStringLiteral("findselect"));
+    });
 
     editMenu->addSeparator();
     QAction* prefsAction = editMenu->addAction(tr("&Preferences..."));

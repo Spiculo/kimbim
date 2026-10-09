@@ -48,6 +48,7 @@ class ToolOptionsBar;
 class Scene;
 class ViewHost;
 class DrawingsPanel;
+class FindSelectPanel;
 class SheetsPanel;
 class SchedulesDialog;
 class DrawingView;
@@ -278,6 +279,19 @@ public:
     bool treeHasGuid(const QString& guid) const;
     // Re-mesh changed elements and drop removed ones after an edit/undo/redo ({changed, removed}).
     void applyGeometry(const QJsonObject& geometry);
+    // D78: selection tools (SelectionTools.cpp). Select similar: "type" = the selected elements' IFC
+    // types (untyped: same class and predefined type), "class" = their classes. Find & Select runs a
+    // query (kimcad.queries) and changes the selection by `how`: "replace", "add" or "remove"; it
+    // returns how many elements matched (-1 if refused). Only what can be selected is taken: not on
+    // hidden or locked layers, not hidden in the view. Criteria and selection sets are project settings.
+    bool selectSimilar(const QString& mode);
+    int findAndSelect(const QJsonObject& query, const QString& how = QStringLiteral("replace"));
+    bool saveSelectionCriteria(const QString& name, const QJsonObject& criteria);
+    bool deleteSelectionCriteria(const QString& name);
+    bool saveSelectionSet(const QString& name);
+    bool recallSelectionSet(const QString& name, const QString& how = QStringLiteral("replace"));
+    bool deleteSelectionSet(const QString& name);
+    FindSelectPanel* findSelectPanel(); // created and docked on first use
     bool save();                        // to the current file; asks for a path if there is none
     bool saveAs(const QString& path);
 
@@ -379,6 +393,11 @@ private:
     void showSnap(const Snap& snap);
     void buildCutsToolbar();
     void applyCuts();
+
+    void applySelection(const QStringList& guids, const QString& how); // D78
+    QStringList unselectableLayers() const;
+    void refreshFindSelect();
+    FindSelectPanel* m_findSelect = nullptr;
 
     void onOpened(const QJsonObject& info);
     void onChunk(const MeshChunk& chunk);
