@@ -911,6 +911,14 @@ from .editing import (  # noqa: E402,F401
     offset_elements,
     slab_outline,
 )
+from .modify import (  # noqa: E402,F401
+    join_elements,
+    modify_targets,
+    split_element,
+    trim_corner,
+    trim_extend,
+    unjoin_elements,
+)
 from .rooms import create_room, edit_room, export_room_schedule, room_schedule, rooms  # noqa: E402,F401
 from .roofs import attach_walls_to_roof, create_roof, detach_walls_from_roof, roof_info  # noqa: E402,F401
 from .settings import project_settings, set_project_settings  # noqa: E402,F401
