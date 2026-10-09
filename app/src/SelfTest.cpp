@@ -27,6 +27,8 @@
 #include <DockManager.h>
 #include <DockWidget.h>
 #include "MainWindow.h"
+#include "SchedulesDialog.h"
+#include <QTableWidget>
 #include "HostTool.h"
 #include "TwoPointTool.h"
 #include "WallTool.h"
@@ -549,6 +551,24 @@ int runSelfTest(const SelfTestOptions& options)
         }
         result.insert(QStringLiteral("ok"), result.value("ok").toBool() && shown);
         QApplication::processEvents();
+    }
+    if (!options.schedule.isEmpty()) { // D77: the schedule window, its first row selected in the model
+        QElapsedTimer scheduleTimer;
+        scheduleTimer.start();
+        SchedulesDialog* s = window.openSchedules(options.schedule);
+        result.insert(QStringLiteral("schedule_s"), double(scheduleTimer.elapsed()) / 1000.0);
+        result.insert(QStringLiteral("schedule_rows"), s->dataRows());
+        if (s->dataRows() > 0)
+            s->table()->selectRow(0);
+        result.insert(QStringLiteral("schedule_selected"), int(window.selection().size()));
+        s->show();
+        for (int i = 0; i < 10; ++i)
+            QApplication::processEvents();
+        if (!options.screenshot.isEmpty()) {
+            QString path = options.screenshot;
+            path.replace(QStringLiteral(".png"), QStringLiteral("-schedule.png"));
+            result.insert(QStringLiteral("schedule_screenshot"), s->grab().save(path) ? path : QString());
+        }
     }
     if (!options.screenshot.isEmpty())
         takeScreenshots(window, options.screenshot, &result);

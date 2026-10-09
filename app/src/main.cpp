@@ -69,6 +69,10 @@ int main(int argc, char* argv[])
     QCommandLineOption cubeClick(QStringLiteral("cube-click"),
         QStringLiteral("Self-test: click the view cube's top face, then its home button."));
     parser.addOption(cubeClick);
+    QCommandLineOption scheduleOption(QStringLiteral("schedule"),
+        QStringLiteral("Self-test: open this schedule (doors, windows, walls, slabs, columns, beams, rooms) after loading."),
+        QStringLiteral("id"));
+    parser.addOption(scheduleOption);
     QCommandLineOption selectThrough(QStringLiteral("select-through"), QStringLiteral("Self-test: box selection includes hidden elements."));
     parser.addOption(selectThrough);
     QCommandLineOption house(QStringLiteral("house"), QStringLiteral("Self-test: model a small house with the tools."));
@@ -132,6 +136,7 @@ int main(int argc, char* argv[])
         options.perspective = parser.isSet(perspective);
         options.view = parser.value(presetView);
         options.cubeClick = parser.isSet(cubeClick);
+        options.schedule = parser.value(scheduleOption);
         options.selectThrough = parser.isSet(selectThrough);
         options.house = parser.isSet(house);
         options.benchTools = parser.isSet(benchTools);

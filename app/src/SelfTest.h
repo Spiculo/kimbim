@@ -30,6 +30,7 @@ struct SelfTestOptions {
     bool perspective = false;     // D76: View > Perspective before measuring (pick, box select, fps)
     QString view;                 // D76: a preset view (Top, Front, SE, ..., Home) before measuring, animated
     bool cubeClick = false;       // D76: click the view cube's top face and the home button; selection must stay
+    QString schedule;             // D77: open this schedule (doors, walls, ...), select its first row; with screenshot, a PNG of it
 };
 
 // Opens the model in a real window, loads it, measures, prints one JSON line to stdout.
