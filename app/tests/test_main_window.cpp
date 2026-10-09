@@ -18,6 +18,7 @@
 #include "CombineDialog.h"
 #include "DockLayout.h"
 #include "ModelTreePanel.h"
+#include "ModifyTool.h"
 #include "StatusStrip.h"
 #include "ToolOptionsBar.h"
 #include "ToolPalette.h"
@@ -280,7 +281,8 @@ private slots:
                        "actionSlabOpeningTool", "actionPlaceModelTool"}},
             {"plane", {"actionTextTool", "actionDimensionTool", "actionLeaderTool", "actionMarkTool", "actionGridTool"}},
             {"view", {"actionSectionTool", "actionElevationTool", "actionNewPlanTab", "actionNewSheet"}},
-            {"edit", {"actionMoveTool", "actionRotateTool", "actionStretchTool", "actionMirror", "actionCopyToLevel", "actionMeasureTool"}}};
+            {"edit", {"actionMoveTool", "actionRotateTool", "actionStretchTool", "actionSplitTool", "actionTrimTool",
+                         "actionJoinTool", "actionMirror", "actionCopyToLevel", "actionMeasureTool"}}};
         QStringList seen;
         for (const QString& g : p->groups()) {
             QStringList names;
@@ -760,6 +762,85 @@ private slots:
 
     // Slice 7: a second floor: copy the walls (with their door) up, a stair to the next level, and a
     // stair hole in the upper floor slab.
+    void splitTrimAndJoinWithTheTools()
+    {
+        // D80: split a wall with a door, merge it back, trim a crossing wall, join and unjoin; undo.
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->setTolerance(0.05);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({10, 0});
+        w.wallTool()->finish();
+        const QString wall = w.viewport()->guids().last();
+        w.setTool(kimcad::MainWindow::Tool::Door);
+        w.hostTool()->setTolerance(0.05);
+        w.hostTool()->click({2.0, 0.0});
+        auto walls = [&] {
+            QStringList out;
+            for (const QString& g : w.viewport()->guids())
+                if (w.viewport()->typeOf(g).startsWith(QLatin1String("IfcWall")))
+                    out << g;
+            return out;
+        };
+        auto lengthX = [&](const QString& g) {
+            double x0, y0, z0, x1, y1, z1;
+            w.viewport()->boundsOf({g}).Get(x0, y0, z0, x1, y1, z1);
+            return x1 - x0;
+        };
+        QCOMPARE(walls().size(), 1);
+
+        w.setTool(kimcad::MainWindow::Tool::Split);
+        QVERIFY(w.toolOptions()->findChild<QComboBox*>("modifyMode")->isHidden());
+        w.modifyTool()->setTolerance(0.05);
+        w.modifyTool()->click({6.0, 0.05});
+        QCOMPARE(walls().size(), 2);
+        QVERIFY(std::abs(lengthX(wall) - 6.0) < 0.2); // the original keeps the start (and the door)
+        QString piece;
+        for (const QString& g : walls())
+            if (g != wall)
+                piece = g;
+        QVERIFY(std::abs(lengthX(piece) - 4.0) < 0.2);
+        action(w, "actionUndo")->trigger();
+        QCOMPARE(walls().size(), 1);
+        action(w, "actionRedo")->trigger();
+        QCOMPARE(walls().size(), 2);
+
+        // Join merges the two pieces back into the first.
+        w.setTool(kimcad::MainWindow::Tool::Join);
+        w.modifyTool()->setTolerance(0.05);
+        w.modifyTool()->click({1.0, 0.0});
+        w.modifyTool()->click({9.0, 0.0});
+        QCOMPARE(walls(), QStringList{wall});
+        QVERIFY(std::abs(lengthX(wall) - 10.0) < 0.4);
+
+        // A crossing wall trimmed to it, keeping the north side.
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->click({5, -2});
+        w.wallTool()->click({5, 4});
+        w.wallTool()->finish();
+        const QString cross = w.viewport()->guids().last();
+        w.setTool(kimcad::MainWindow::Tool::Trim);
+        auto* mode = w.toolOptions()->findChild<QComboBox*>("modifyMode");
+        QCOMPARE(mode->count(), 2);
+        w.modifyTool()->setTolerance(0.05);
+        w.modifyTool()->click({3.0, 0.0}); // the boundary
+        w.modifyTool()->click({5.0, 3.0}); // the wall to trim, on the side to keep
+        double x0, y0, z0, x1, y1, z1;
+        w.viewport()->boundsOf({cross}).Get(x0, y0, z0, x1, y1, z1);
+        QVERIFY(y0 > -0.5 && y1 > 3.9);
+
+        // Unjoin (the Join tool's second mode) breaks the T the trim made.
+        w.setTool(kimcad::MainWindow::Tool::Join);
+        w.toolOptions()->findChild<QComboBox*>("modifyMode")->setCurrentIndex(1);
+        QCOMPARE(w.modifyTool()->mode(), kimcad::ModifyTool::Mode::Unjoin);
+        w.modifyTool()->click({5.0, 3.0});
+        w.modifyTool()->click({3.0, 0.0});
+        QVERIFY(!w.unjoinElements(cross, wall)); // no longer joined: refused
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QVERIFY(w.close());
+    }
+
     void secondFloorWithTheTools()
     {
         kimcad::MainWindow w(nullptr, /*quiet=*/true);
