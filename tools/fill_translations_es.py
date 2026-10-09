@@ -671,6 +671,41 @@ ES = {
     "Angle %1°": "Ángulo %1°",
     "Area %1 m²": "Área %1 m²",
     "Perimeter %1": "Perímetro %1",
+    # D80: split, trim/extend, join
+    "Spli&t": "Di&vidir",
+    "Split a wall or beam in two where you click; doors and windows stay where they are (Ctrl: pieces unjoined)":
+        "Dividir un muro o una viga en dos donde haga clic; puertas y ventanas se quedan donde están (Ctrl: piezas sin unir)",
+    "Trim/e&xtend": "Recortar/e&xtender",
+    "Trim or extend walls and beams to a boundary, or two to their corner; click the side to keep":
+        "Recortar o extender muros y vigas hasta un límite, o dos hasta su esquina; haga clic en el lado que se conserva",
+    "&Join": "&Unir",
+    "Join two walls that meet (L or T), merge two in line of the same type, or unjoin them":
+        "Unir dos muros que se encuentran (L o T), fusionar dos alineados del mismo tipo, o separarlos",
+    "What the tool does": "Qué hace la herramienta",
+    "To a boundary": "Hasta un límite",
+    "Two to their corner": "Dos hasta su esquina",
+    "Join or merge": "Unir o fusionar",
+    "Unjoin": "Separar",
+    "Could not split: %1": "No se pudo dividir: %1",
+    "Could not trim or extend: %1": "No se pudo recortar ni extender: %1",
+    "Could not make the corner: %1": "No se pudo hacer la esquina: %1",
+    "Could not join: %1": "No se pudo unir: %1",
+    "Could not unjoin: %1": "No se pudo separar: %1",
+    "Split: click a wall or beam where it splits (Ctrl: leave the pieces unjoined)":
+        "Dividir: haga clic en un muro o una viga donde se divide (Ctrl: deja las piezas sin unir)",
+    "Trim/extend: click the walls or beams to trim or extend, on the side to keep (Ctrl: don't join; Esc: new boundary)":
+        "Recortar/extender: haga clic en los muros o vigas a recortar o extender, en el lado que se conserva (Ctrl: sin unir; Esc: nuevo límite)",
+    "Trim/extend: click the boundary (a wall, beam or grid line)":
+        "Recortar/extender: haga clic en el límite (un muro, una viga o un eje)",
+    "Corner: click the second wall or beam, on the side to keep (Ctrl: don't join)":
+        "Esquina: haga clic en el segundo muro o viga, en el lado que se conserva (Ctrl: sin unir)",
+    "Corner: click the first wall or beam, on the side to keep":
+        "Esquina: haga clic en el primer muro o viga, en el lado que se conserva",
+    "Join: click the second wall (in line and of the same type: they merge)":
+        "Unir: haga clic en el segundo muro (alineados y del mismo tipo: se fusionan)",
+    "Join: click the first wall or beam": "Unir: haga clic en el primer muro o viga",
+    "Unjoin: click the second wall": "Separar: haga clic en el segundo muro",
+    "Unjoin: click the first of two joined walls": "Separar: haga clic en el primero de dos muros unidos",
 }
 
 
