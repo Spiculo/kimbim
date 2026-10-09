@@ -412,7 +412,8 @@ def _property_index(f, name: str) -> dict:
     psets are large)."""
     pset_name, prop = name.split(".", 1) if "." in name else (None, name)
     own, typed = {}, {}
-    for cls, attr in (("IfcPropertySingleValue", "NominalValue"), ("IfcPhysicalSimpleQuantity", None)):
+    for cls, attr in (("IfcPropertySingleValue", "NominalValue"), ("IfcPropertyEnumeratedValue", "EnumerationValues"),
+                      ("IfcPhysicalSimpleQuantity", None)):
         try:
             candidates = f.by_type(cls)
         except RuntimeError:
@@ -420,7 +421,11 @@ def _property_index(f, name: str) -> dict:
         for p in candidates:
             if p.Name != prop:
                 continue
-            value = (_value(getattr(p, attr)) if getattr(p, attr) is not None else None) if attr else _value(p[3])
+            if attr == "EnumerationValues":  # an enumeration (e.g. Status): its first value
+                values = p.EnumerationValues or ()
+                value = _value(values[0]) if values else None
+            else:
+                value = (_value(getattr(p, attr)) if getattr(p, attr) is not None else None) if attr else _value(p[3])
             for owner in f.get_inverse(p):
                 if not owner.is_a("IfcPropertySetDefinition") or (pset_name and owner.Name != pset_name):
                     continue
