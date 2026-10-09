@@ -156,6 +156,16 @@ void Preferences::addRecent(const QString& path)
     setValue("recent", QJsonArray::fromStringList(r));
 }
 
+QByteArray Preferences::windowGeometry() const
+{
+    return QByteArray::fromBase64(value("window_geometry").toString().toLatin1());
+}
+
+void Preferences::setWindowGeometry(const QByteArray& geometry)
+{
+    setValue("window_geometry", QString::fromLatin1(geometry.toBase64()));
+}
+
 QByteArray Preferences::layout() const
 {
     return QByteArray::fromBase64(value("layout").toString().toLatin1());

@@ -35,6 +35,8 @@ public:
     void addRecent(const QString& path); // most recent first, no duplicates, at most 10
     QByteArray layout() const;
     void setLayout(const QByteArray& state);
+    QByteArray windowGeometry() const; // D75: the main window's size, position and maximized state
+    void setWindowGeometry(const QByteArray& geometry);
 private:
     QString m_path;
     QJsonObject m_data; // only what was set or loaded; unknown keys survive a save

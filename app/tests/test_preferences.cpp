@@ -40,6 +40,7 @@ private slots:
             p.setValue("new_views", "window");
             p.setValue("from_a_newer_kimcad", 42);
             p.setLayout(QByteArray("\x01\x02layout", 8));
+            p.setWindowGeometry(QByteArray("\x03geometry", 9));
             QVERIFY(p.save());
         }
         kimcad::Preferences q(path);
@@ -47,6 +48,7 @@ private slots:
         QCOMPARE(q.newViews(), QString("window"));
         QCOMPARE(q.value("from_a_newer_kimcad").toInt(), 42);
         QCOMPARE(q.layout(), QByteArray("\x01\x02layout", 8));
+        QCOMPARE(q.windowGeometry(), QByteArray("\x03geometry", 9));
     }
 
     void aGarbledFileIsKeptAsideAndDefaultsUsed()
