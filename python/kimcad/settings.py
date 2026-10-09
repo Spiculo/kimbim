@@ -27,6 +27,7 @@ DEFAULTS = {
     "override_sets": {},
     "layer_combinations": {},
     "purposes": {},
+    "renovation_filters": {},
     "purpose": "",
     "current_pen": 23,
     "sheet_purposes": {},

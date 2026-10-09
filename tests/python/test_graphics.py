@@ -26,7 +26,8 @@ def test_builtins_are_complete_and_valid():
     assert g.builtin("pen_sets")["Permit"]["pens"]["10"] == {"color": "#000000", "weight": 0.5, "name": "Walls cut"}
     assert set(g.builtin("element_styles")) == set(g.KINDS)
     assert g.builtin("line_types")["Solid"] == []
-    assert set(g.builtin("purposes")) == {"Working", "Highlight", "Permit", "Presentation", "Demo"}
+    assert set(g.builtin("purposes")) == {"Working", "Highlight", "Permit", "Presentation", "Demo", "Existing",
+                                          "Demolition", "New construction"}
 
 
 def test_effective_is_the_stored_table_or_the_builtins():
@@ -324,7 +325,8 @@ def test_graphics_state_names_the_pens():
 
 
 def test_graphics_state_lists_the_purposes():
-    assert call("graphics_state")["purposes"] == ["Working", "Highlight", "Permit", "Presentation", "Demo"]
+    assert call("graphics_state")["purposes"] == ["Working", "Highlight", "Permit", "Presentation", "Demo", "Existing",
+                                                  "Demolition", "New construction"]
 
 
 def test_elements_without_a_style_still_draw():
@@ -334,3 +336,45 @@ def test_elements_without_a_style_still_draw():
     out = g.style_svg('<g class="IfcSite" ifc:guid="S1"><path d="M0,0 L1,1"/></g>', resolved, k=2.0)
     tag = re.search(r'<g class="IfcSite" ifc:guid="S1"([^>]*)>', out).group(1)
     assert 'stroke="#000000"' in tag and 'stroke-width="0.09"' in tag and 'fill="none"' in tag
+
+
+# ---------------------------------------------------------------- renovation filters (D74)
+
+def test_renovation_builtins():
+    f = g.builtin("renovation_filters")
+    assert list(f) == ["Everything", "Existing plan", "Demolition plan", "New plan", "Planned"]
+    assert f["Demolition plan"]["new"] == {"show": "hide"}
+    assert f["Demolition plan"]["demolish"]["show"] == "override"
+    assert g.validate("renovation_filters", f) is None
+    p = g.builtin("purposes")
+    assert p["Demolition"]["renovation"] == "Demolition plan"
+    assert p["Working"]["renovation"] == "Everything"
+    assert {"Existing", "Demolition", "New construction"} <= set(p)
+    pens = g.builtin("pen_sets")
+    assert pens["Working"]["pens"]["32"] == {"color": "#c09000", "weight": 0.25, "name": "Demolition"}
+    assert pens["Permit"]["pens"]["32"]["color"] == "#000000"
+
+
+@pytest.mark.parametrize("value,message", [
+    ({"A": {"ruined": {"show": "hide"}}}, "filter A: unknown status ruined"),
+    ({"A": {"new": {"show": "blink"}}}, "filter A: show is as_is, hide or override"),
+    ({"A": {"new": {"show": "override", "pen": 300}}}, "filter A: pens are 1-255"),
+    ({"A": {"new": {"show": "override", "surface": "red"}}}, "filter A: colour must be #rrggbb"),
+    ({"A": {"new": {"show": "override", "glow": 1}}}, "filter A: unknown field glow"),
+])
+def test_renovation_filter_validation(value, message):
+    assert g.validate("renovation_filters", value) == message
+
+
+def test_old_purposes_without_renovation_are_valid_and_mean_everything():
+    old = {"Mine": {"pen_set": "Working", "visibility": "Everything", "overrides": "None", "layers": None}}
+    assert g.validate("purposes", old) is None
+    s.load({"purposes": old})
+    assert g._references_error(s.current()) is None
+
+
+def test_a_purpose_naming_a_missing_filter_is_refused_by_set_graphics():
+    p = dict(g.builtin("purposes"))
+    p["Working"] = {**p["Working"], "renovation": "Gone"}
+    r = json.loads(g.set_graphics(json.dumps({"purposes": p})))
+    assert not r["ok"] and "renovation filter" in r["error"]

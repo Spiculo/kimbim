@@ -17,7 +17,10 @@ KINDS = ("walls", "columns", "beams", "slabs", "roofs", "stairs", "railings", "d
          "coverings", "furniture", "plumbing", "hvac", "electrical", "structure_other", "rooms",
          "annotations", "grids", "other")
 TABLES = ("pen_sets", "line_types", "element_styles", "visibility_sets", "override_sets",
-          "layer_combinations", "purposes")
+          "layer_combinations", "purposes", "renovation_filters")
+STATUS_KEYS = ("existing", "demolish", "new")  # renovation status (D74)
+FILTER_SHOW = ("as_is", "hide", "override")
+FILTER_FIELDS = ("pen", "cut_pen", "projection_pen", "line", "fill", "surface", "transparency")
 OPS = ("equals", "not_equals", "contains", "exists", "missing", "true", "false", "less", "more")
 WHEN = ("kind", "ifc_class", "property", "op", "value", "layer", "material")
 THEN = ("pen", "cut_pen", "projection_pen", "line", "fill", "surface", "transparency", "hide")
@@ -29,7 +32,10 @@ _ROLES = {10: "Walls cut", 11: "Walls projection", 12: "Walls fill", 13: "Struct
           14: "Structure projection", 15: "Structure fill", 16: "Doors and windows",
           17: "Stairs and railings", 18: "Furniture", 19: "Plumbing", 20: "HVAC", 21: "Electrical",
           22: "Rooms", 23: "Annotations", 24: "Grids", 25: "Other", 26: "Highlight",
-          27: "Highlight 2", 28: "Highlight 3"}
+          27: "Highlight 2", 28: "Highlight 3", 31: "Existing", 32: "Demolition", 33: "Demolition fill"}
+# D74: the renovation pens; black and white in the Permit set (permit drawings print in black).
+_RENOVATION_PENS = {"default": {31: ("#808080", .18), 32: ("#c09000", .25), 33: ("#f8e8a0", .18)},
+                    "Permit": {31: ("#808080", .18), 32: ("#000000", .25), 33: ("#ffffff", .18)}}
 _GENERIC = {1: 0.13, 2: 0.18, 3: 0.25, 4: 0.35, 5: 0.50, 6: 0.70, 7: 1.00}
 _HIGHLIGHT = {26: ("#e02020", 0.5), 27: ("#2050e0", 0.5), 28: ("#f08010", 0.5)}
 _SETS = {  # pen: (colour, weight) for pens 10-25 (fills use the weight only nominally)
@@ -95,7 +101,8 @@ _STYLES = {
 }
 _NOT_STRUCTURE = ["doors", "windows", "furniture", "plumbing", "hvac", "electrical", "coverings", "railings", "rooms"]
 _BUILTINS = {
-    "pen_sets": {name: _pen_set(roles) for name, roles in _SETS.items()},
+    "pen_sets": {name: _pen_set({**roles, **_RENOVATION_PENS.get(name, _RENOVATION_PENS["default"])})
+                 for name, roles in _SETS.items()},
     "line_types": {"Solid": [], "Dashed": [3.0, 1.5], "Dotted": [0.3, 1.0], "Dash-dot": [4.0, 1.0, 0.5, 1.0],
                    "Centre": [8.0, 1.5, 1.5, 1.5], "Hidden": [1.5, 1.0]},
     "element_styles": _STYLES,
@@ -124,11 +131,34 @@ _BUILTINS = {
     },
     "layer_combinations": {"All visible": {"hidden": [], "locked": []}},
     "purposes": {
-        "Working": {"pen_set": "Working", "visibility": "Everything", "overrides": "None", "layers": None},
-        "Highlight": {"pen_set": "Highlight", "visibility": "Everything", "overrides": "Fire rating", "layers": None},
-        "Permit": {"pen_set": "Permit", "visibility": "Architectural", "overrides": "None", "layers": None},
-        "Presentation": {"pen_set": "Presentation", "visibility": "No furniture", "overrides": "None", "layers": None},
-        "Demo": {"pen_set": "Demo", "visibility": "Everything", "overrides": "External walls", "layers": None},
+        "Working": {"pen_set": "Working", "visibility": "Everything", "overrides": "None", "layers": None,
+                    "renovation": "Everything"},
+        "Highlight": {"pen_set": "Highlight", "visibility": "Everything", "overrides": "Fire rating", "layers": None,
+                      "renovation": "Everything"},
+        "Permit": {"pen_set": "Permit", "visibility": "Architectural", "overrides": "None", "layers": None,
+                   "renovation": "Everything"},
+        "Presentation": {"pen_set": "Presentation", "visibility": "No furniture", "overrides": "None", "layers": None,
+                         "renovation": "Everything"},
+        "Demo": {"pen_set": "Demo", "visibility": "Everything", "overrides": "External walls", "layers": None,
+                 "renovation": "Everything"},
+        "Existing": {"pen_set": "Permit", "visibility": "Architectural", "overrides": "None", "layers": None,
+                     "renovation": "Existing plan"},
+        "Demolition": {"pen_set": "Permit", "visibility": "Architectural", "overrides": "None", "layers": None,
+                       "renovation": "Demolition plan"},
+        "New construction": {"pen_set": "Permit", "visibility": "Architectural", "overrides": "None", "layers": None,
+                             "renovation": "New plan"},
+    },
+    # D74, Archicad's built-in renovation filters: each status shown as is, hidden or overridden.
+    "renovation_filters": {
+        "Everything": {"existing": {"show": "as_is"}, "demolish": {"show": "as_is"}, "new": {"show": "as_is"}},
+        "Existing plan": {"existing": {"show": "as_is"}, "demolish": {"show": "as_is"}, "new": {"show": "hide"}},
+        "Demolition plan": {"existing": {"show": "as_is"},
+                            "demolish": {"show": "override", "pen": 32, "line": "Dashed", "fill": 33,
+                                         "surface": "#f0c020"},
+                            "new": {"show": "hide"}},
+        "New plan": {"existing": {"show": "override", "pen": 31, "fill": 31}, "demolish": {"show": "hide"},
+                     "new": {"show": "as_is"}},
+        "Planned": {"existing": {"show": "as_is"}, "demolish": {"show": "hide"}, "new": {"show": "as_is"}},
     },
 }
 
@@ -295,6 +325,30 @@ def validate(key: str, value) -> str | None:
                 return f"purpose {name}: a pen set, a visibility set and an override set"
             if v.get("layers") is not None and not isinstance(v.get("layers"), str):
                 return f"purpose {name}: layers must be a name or null"
+            if "renovation" in v and not isinstance(v["renovation"], str):
+                return f"purpose {name}: the renovation filter is a name"
+    elif key == "renovation_filters":
+        for name, flt in value.items():
+            if not isinstance(flt, dict):
+                return f"filter {name}: expected an object"
+            for status, t in flt.items():
+                if status not in STATUS_KEYS:
+                    return f"filter {name}: unknown status {status}"
+                if not isinstance(t, dict) or t.get("show") not in FILTER_SHOW:
+                    return f"filter {name}: show is as_is, hide or override"
+                for k, v in t.items():
+                    if k == "show":
+                        continue
+                    if k not in FILTER_FIELDS:
+                        return f"filter {name}: unknown field {k}"
+                    if k in ("pen", "cut_pen", "projection_pen", "fill") and not _pen_no(v):
+                        return f"filter {name}: pens are 1-255"
+                    if k == "surface" and not (isinstance(v, str) and _COLOR.match(v)):
+                        return f"filter {name}: colour must be #rrggbb"
+                    if k == "transparency" and not (_number(v) and 0 <= v <= 1):
+                        return f"filter {name}: transparency must be 0-1"
+                    if k == "line" and not isinstance(v, str):
+                        return f"filter {name}: the line type is a name"
     return None
 
 
@@ -611,6 +665,7 @@ def _references_error(st: dict) -> str | None:
     purposes = effective("purposes", st)
     pens, vis, ovr = effective("pen_sets", st), effective("visibility_sets", st), effective("override_sets", st)
     combos = effective("layer_combinations", st)
+    flts = effective("renovation_filters", st)
     for name, p in purposes.items():
         if p["pen_set"] not in pens:
             return f"purpose {name} uses a pen set that doesn't exist: {p['pen_set']}"
@@ -620,6 +675,8 @@ def _references_error(st: dict) -> str | None:
             return f"purpose {name} uses an override set that doesn't exist: {p['overrides']}"
         if p.get("layers") is not None and p["layers"] not in combos:
             return f"purpose {name} uses a layer combination that doesn't exist: {p['layers']}"
+        if p.get("renovation") is not None and p["renovation"] not in flts:
+            return f"purpose {name} uses a renovation filter that doesn't exist: {p['renovation']}"
     return None
 
 
