@@ -113,8 +113,10 @@ def _elevation(storey) -> float:
 def storeys() -> str:
     if B._model is None:
         return B._dump({"storeys": []})
-    out = [{"guid": s.GlobalId, "name": s.Name or "", "elevation": round(_elevation(s), 6), "model": _is_model(s)}
-           for s in B._model.by_type("IfcBuildingStorey")]
+    from .levels import _shown
+
+    out = [{"guid": s.GlobalId, "name": s.Name or "", "elevation": round(_elevation(s), 6), "model": _is_model(s),
+            "show": _shown(s)} for s in B._model.by_type("IfcBuildingStorey")]
     return B._dump({"storeys": sorted(out, key=lambda s: s["elevation"])})
 
 
@@ -313,6 +315,16 @@ def delete_elements(guids_json: str) -> str:
     if B._model is None:
         return _fail("no model open")
     elements = [e for e in B._elements(guids_json) if e.is_a("IfcProduct")]
+    try:
+        r = B._run(lambda: _delete_cascade(elements))
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "removed": len(elements)})
+
+
+def _delete_cascade(elements) -> tuple:
+    """Inside an action: delete products (`elements` grows with what they take along) and
+    regenerate what was joined to them. Returns (count, geometry changed, geometry removed)."""
     # Cascade: a wall takes its openings and the doors/windows in them; a door/window takes its
     # opening, and its host wall gets its hole closed (re-meshed).
     openings, hosts = [], []
@@ -366,11 +378,7 @@ def delete_elements(guids_json: str) -> str:
             _regenerate(f, w)
         return len(elements), [w.GlobalId for w in [*neighbours, *hosts]], removed
 
-    try:
-        r = B._run(action)
-    except Exception as ex:
-        return _fail(f"{type(ex).__name__}: {ex}")
-    return B._dump({**r, "removed": len(elements)})
+    return action()
 
 
 def snap_data(storey_guid: str) -> str:

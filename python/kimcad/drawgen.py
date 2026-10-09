@@ -57,16 +57,43 @@ def drawn_products(f):
             if p.Representation is not None and not any(p.is_a(c) for c in NOT_DRAWN)]
 
 
+def placement_cache():
+    """get_local_placement with memory: the same matrices (same operations, in the same order),
+    each placement and axis placement worked out once. Exporters share them (Revit: one axis
+    placement for all), so a whole model costs a fraction (Clinic: 6 s -> well under 1 s)."""
+    axes, worlds = {}, {}
+
+    def axis(a):
+        m = axes.get(a.id())
+        if m is None:
+            m = axes[a.id()] = ifcopenshell.util.placement.get_axis2placement(a)
+        return m
+
+    def world(placement):
+        if placement is None:
+            return np.eye(4)
+        if not placement.is_a("IfcLocalPlacement"):
+            return ifcopenshell.util.placement.get_local_placement(placement)
+        m = worlds.get(placement.id())
+        if m is None:
+            parent = np.eye(4) if placement.PlacementRelTo is None else world(placement.PlacementRelTo)
+            m = worlds[placement.id()] = np.dot(parent, axis(placement.RelativePlacement))
+        return m
+
+    return world
+
+
 def model_bounds(f):
     """World bounding box of the drawn elements in metres, from their placements and the points of
     their axis/footprint representations. Cheap (no tessellation); good enough for infinite ranges,
     which add a margin and get cropped to their content anyway."""
     unit = ifcopenshell.util.unit.calculate_unit_scale(f)
     points = []
+    world = placement_cache()
     for p in drawn_products(f):
         if p.ObjectPlacement is None:
             continue
-        m = ifcopenshell.util.placement.get_local_placement(p.ObjectPlacement)
+        m = world(p.ObjectPlacement)
         points.append(m[:3, 3] * unit)
         for rep in p.Representation.Representations:
             if rep.RepresentationIdentifier not in ("Axis", "FootPrint"):
