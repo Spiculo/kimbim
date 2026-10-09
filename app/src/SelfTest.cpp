@@ -23,6 +23,7 @@
 #include <cstdio>
 
 #include "DockLayout.h"
+#include "FindSelectPanel.h"
 #include "DrawingView.h"
 #include <DockManager.h>
 #include <DockWidget.h>
@@ -580,6 +581,17 @@ int runSelfTest(const SelfTestOptions& options)
             path.replace(QStringLiteral(".png"), QStringLiteral("-schedule.png"));
             result.insert(QStringLiteral("schedule_screenshot"), s->grab().save(path) ? path : QString());
         }
+    }
+    if (!options.findSelect.isEmpty()) { // D78: the panel, one criterion, Select
+        if (QAction* a = window.findChild<QAction*>(QStringLiteral("actionFindSelect")))
+            a->trigger();
+        FindSelectPanel* panel = window.findSelectPanel();
+        panel->clearRows();
+        panel->addRow(QStringLiteral("ifc_class"), QStringLiteral("equals"), options.findSelect);
+        panel->find(FindSelectPanel::How::Replace);
+        for (int i = 0; i < 5; ++i)
+            QApplication::processEvents();
+        result.insert(QStringLiteral("find_selected"), int(window.selection().size()));
     }
     if (!options.screenshot.isEmpty())
         takeScreenshots(window, options.screenshot, &result);

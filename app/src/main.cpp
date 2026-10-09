@@ -73,6 +73,9 @@ int main(int argc, char* argv[])
         QStringLiteral("Self-test: open this schedule (doors, windows, walls, slabs, columns, beams, rooms) after loading."),
         QStringLiteral("id"));
     parser.addOption(scheduleOption);
+    QCommandLineOption findSelect(QStringLiteral("find-select"),
+        QStringLiteral("Self-test: open Find & Select and select every element of this IFC class."), QStringLiteral("class"));
+    parser.addOption(findSelect);
     QCommandLineOption selectThrough(QStringLiteral("select-through"), QStringLiteral("Self-test: box selection includes hidden elements."));
     parser.addOption(selectThrough);
     QCommandLineOption house(QStringLiteral("house"), QStringLiteral("Self-test: model a small house with the tools."));
@@ -137,6 +140,7 @@ int main(int argc, char* argv[])
         options.view = parser.value(presetView);
         options.cubeClick = parser.isSet(cubeClick);
         options.schedule = parser.value(scheduleOption);
+        options.findSelect = parser.value(findSelect);
         options.selectThrough = parser.isSet(selectThrough);
         options.house = parser.isSet(house);
         options.benchTools = parser.isSet(benchTools);

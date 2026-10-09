@@ -13,7 +13,6 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
-#include <QPushButton>
 #include <QScrollArea>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -92,7 +91,8 @@ FindSelectPanel::FindSelectPanel(QWidget* parent)
 {
     setObjectName(QStringLiteral("findSelectPanel"));
     auto button = [this](const QString& text, const QString& tip, const char* name) {
-        auto* b = new QPushButton(text, this);
+        auto* b = new QToolButton(this); // compact: the panel is narrow
+        b->setText(text);
         b->setToolTip(tip);
         b->setObjectName(QLatin1String(name));
         return b;
@@ -103,16 +103,22 @@ FindSelectPanel::FindSelectPanel(QWidget* parent)
     m_saved->setEditable(true);
     m_saved->setInsertPolicy(QComboBox::NoInsert);
     m_saved->lineEdit()->setPlaceholderText(tr("Criteria set name"));
-    QPushButton* saveCriteriaButton = button(tr("Save"), tr("Save these criteria under this name (in the project)"), "saveCriteria");
-    QPushButton* deleteCriteriaButton = button(tr("Delete"), tr("Delete this saved criteria set"), "deleteCriteria");
+    QToolButton* saveCriteriaButton = button(tr("Save"), tr("Save these criteria under this name (in the project)"), "saveCriteria");
+    QToolButton* deleteCriteriaButton = button(tr("Delete"), tr("Delete this saved criteria set"), "deleteCriteria");
+    auto shrink = [](QComboBox* c) { // the panel is narrow: combos give way instead of clipping buttons
+        c->setMinimumContentsLength(6);
+        c->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    };
+    shrink(m_saved);
+    shrink(m_match);
+    shrink(m_scope);
     auto* savedRow = new QHBoxLayout;
-    savedRow->addWidget(new QLabel(tr("Criteria"), this));
     savedRow->addWidget(m_saved, 1);
     savedRow->addWidget(saveCriteriaButton);
     savedRow->addWidget(deleteCriteriaButton);
     connect(m_saved, qOverload<int>(&QComboBox::activated), this, [this](int i) { loadCriteria(m_saved->itemText(i)); });
-    connect(saveCriteriaButton, &QPushButton::clicked, this, [this] { saveCriteria(m_saved->currentText().trimmed()); });
-    connect(deleteCriteriaButton, &QPushButton::clicked, this, [this] {
+    connect(saveCriteriaButton, &QToolButton::clicked, this, [this] { saveCriteria(m_saved->currentText().trimmed()); });
+    connect(deleteCriteriaButton, &QToolButton::clicked, this, [this] {
         const QString name = m_saved->currentText().trimmed();
         if (m_savedCriteria.contains(name))
             emit deleteCriteriaRequested(name);
@@ -126,7 +132,7 @@ FindSelectPanel::FindSelectPanel(QWidget* parent)
     m_scope->addItem(tr("Active level"), QStringLiteral("level"));
     m_scope->addItem(tr("Current selection"), QStringLiteral("selection"));
     auto* matchRow = new QHBoxLayout;
-    matchRow->addWidget(new QLabel(tr("Elements matching"), this));
+    matchRow->addWidget(new QLabel(tr("Match"), this));
     matchRow->addWidget(m_match, 1);
     auto* scopeRow = new QHBoxLayout;
     scopeRow->addWidget(new QLabel(tr("In"), this));
@@ -140,27 +146,29 @@ FindSelectPanel::FindSelectPanel(QWidget* parent)
     scroll->setWidgetResizable(true);
     scroll->setWidget(rowsHost);
     scroll->setFrameShape(QFrame::NoFrame);
-    QPushButton* addRowButton = button(tr("+ Criterion"), tr("Add a criterion row"), "addCriterion");
-    connect(addRowButton, &QPushButton::clicked, this, [this] { addRow(); });
+    QToolButton* addRowButton = button(tr("+ Criterion"), tr("Add a criterion row"), "addCriterion");
+    connect(addRowButton, &QToolButton::clicked, this, [this] { addRow(); });
 
-    QPushButton* select = button(tr("Select"), tr("Select the matching elements (replaces the selection)"), "findSelect");
-    QPushButton* add = button(tr("Add"), tr("Add the matching elements to the selection"), "findAdd");
-    QPushButton* remove = button(tr("Remove"), tr("Remove the matching elements from the selection"), "findRemove");
-    connect(select, &QPushButton::clicked, this, [this] { find(How::Replace); });
-    connect(add, &QPushButton::clicked, this, [this] { find(How::Add); });
-    connect(remove, &QPushButton::clicked, this, [this] { find(How::Remove); });
+    QToolButton* select = button(tr("Select"), tr("Select the matching elements (replaces the selection)"), "findSelect");
+    QToolButton* add = button(tr("Add"), tr("Add the matching elements to the selection"), "findAdd");
+    QToolButton* remove = button(tr("Remove"), tr("Remove the matching elements from the selection"), "findRemove");
+    connect(select, &QToolButton::clicked, this, [this] { find(How::Replace); });
+    connect(add, &QToolButton::clicked, this, [this] { find(How::Add); });
+    connect(remove, &QToolButton::clicked, this, [this] { find(How::Remove); });
+    auto* addRowLine = new QHBoxLayout;
+    addRowLine->addWidget(addRowButton);
+    addRowLine->addStretch(1);
     auto* actions = new QHBoxLayout;
-    actions->addWidget(addRowButton);
-    actions->addStretch(1);
-    for (QPushButton* b : {select, add, remove})
+    for (QToolButton* b : {select, add, remove})
         actions->addWidget(b);
     m_result->setObjectName(QStringLiteral("findResult"));
 
-    auto* criteriaBox = new QGroupBox(tr("Find & Select"), this);
+    auto* criteriaBox = new QGroupBox(tr("Find && Select"), this);
     auto* criteriaLayout = new QVBoxLayout(criteriaBox);
     criteriaLayout->addLayout(savedRow);
     criteriaLayout->addLayout(matchRow);
     criteriaLayout->addWidget(scroll, 1);
+    criteriaLayout->addLayout(addRowLine);
     criteriaLayout->addLayout(scopeRow);
     criteriaLayout->addLayout(actions);
     criteriaLayout->addWidget(m_result);
@@ -169,16 +177,16 @@ FindSelectPanel::FindSelectPanel(QWidget* parent)
     m_sets->setObjectName(QStringLiteral("selectionSets"));
     m_setName->setObjectName(QStringLiteral("setName"));
     m_setName->setPlaceholderText(tr("Selection set name"));
-    QPushButton* saveSetButton = button(tr("Save selection"), tr("Save the selected elements under this name"), "saveSet");
-    QPushButton* recall = button(tr("Select"), tr("Select the elements of this set (replaces the selection)"), "recallSet");
-    QPushButton* recallAdd = button(tr("Add"), tr("Add the elements of this set to the selection"), "recallSetAdd");
-    QPushButton* deleteSet = button(tr("Delete"), tr("Delete this selection set (the elements stay)"), "deleteSet");
-    connect(saveSetButton, &QPushButton::clicked, this, [this] {
+    QToolButton* saveSetButton = button(tr("Save selection"), tr("Save the selected elements under this name"), "saveSet");
+    QToolButton* recall = button(tr("Select"), tr("Select the elements of this set (replaces the selection)"), "recallSet");
+    QToolButton* recallAdd = button(tr("Add"), tr("Add the elements of this set to the selection"), "recallSetAdd");
+    QToolButton* deleteSet = button(tr("Delete"), tr("Delete this selection set (the elements stay)"), "deleteSet");
+    connect(saveSetButton, &QToolButton::clicked, this, [this] {
         saveSet(m_setName->text().trimmed().isEmpty() ? selectedSet() : m_setName->text().trimmed());
     });
-    connect(recall, &QPushButton::clicked, this, [this] { recallSet(selectedSet(), How::Replace); });
-    connect(recallAdd, &QPushButton::clicked, this, [this] { recallSet(selectedSet(), How::Add); });
-    connect(deleteSet, &QPushButton::clicked, this, [this] {
+    connect(recall, &QToolButton::clicked, this, [this] { recallSet(selectedSet(), How::Replace); });
+    connect(recallAdd, &QToolButton::clicked, this, [this] { recallSet(selectedSet(), How::Add); });
+    connect(deleteSet, &QToolButton::clicked, this, [this] {
         if (!selectedSet().isEmpty())
             emit deleteSetRequested(selectedSet());
     });
@@ -192,7 +200,7 @@ FindSelectPanel::FindSelectPanel(QWidget* parent)
     setsLayout->addWidget(m_sets, 1);
     auto* setButtons = new QHBoxLayout;
     setButtons->addStretch(1);
-    for (QPushButton* b : {recall, recallAdd, deleteSet})
+    for (QToolButton* b : {recall, recallAdd, deleteSet})
         setButtons->addWidget(b);
     setsLayout->addLayout(setButtons);
 
@@ -259,6 +267,8 @@ void FindSelectPanel::addRow(const QString& field, const QString& op, const QStr
     Row r;
     r.widget = new QWidget(this);
     r.field = new QComboBox(r.widget);
+    r.field->setMinimumContentsLength(6);
+    r.field->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
     for (const Choice& c : kFields)
         r.field->addItem(QCoreApplication::translate("kimcad::FindSelectPanel", c.label), QString::fromLatin1(c.key));
     r.field->setCurrentIndex(std::max(0, r.field->findData(field)));
@@ -272,13 +282,19 @@ void FindSelectPanel::addRow(const QString& field, const QString& op, const QStr
     auto* remove = new QToolButton(r.widget);
     remove->setText(QStringLiteral("×"));
     remove->setToolTip(tr("Remove this criterion"));
-    auto* h = new QHBoxLayout(r.widget);
-    h->setContentsMargins(0, 0, 0, 0);
-    h->addWidget(r.field);
-    h->addWidget(r.property, 1);
-    h->addWidget(r.op);
-    h->addWidget(r.value, 1);
-    h->addWidget(remove);
+    // Two lines, as the panel is narrow: what and how, then the property name and the value.
+    auto* v = new QVBoxLayout(r.widget);
+    v->setContentsMargins(0, 0, 0, 6);
+    v->setSpacing(2);
+    auto* top = new QHBoxLayout;
+    top->addWidget(r.field, 1);
+    top->addWidget(r.op);
+    top->addWidget(remove);
+    auto* bottom = new QHBoxLayout;
+    bottom->addWidget(r.property, 1);
+    bottom->addWidget(r.value, 1);
+    v->addLayout(top);
+    v->addLayout(bottom);
     m_rowsLayout->insertWidget(m_rowsLayout->count() - 1, r.widget);
     m_rows.append(r);
     Row& row = m_rows.last();
