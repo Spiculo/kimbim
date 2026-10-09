@@ -61,6 +61,7 @@ class TwoPointTool;
 class RotateTool;
 class GripTool;
 class MeasureController;
+class ModifyTool;
 struct WallSegment;
 struct Snap;
 struct Host;
@@ -113,7 +114,7 @@ public:
     TitleBar* titleBar() const { return m_titleBar; } // D75: menus, level, cuts, title, Versions
     // Modeling tools (M3): one active at a time. Exposed for tests and the self-test, which drive
     // them with work-plane points.
-    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening, PlaceModel, Text, Dimension, Mark, Section, Elevation, Leader, Mirror, Room, Roof, Measure };
+    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening, PlaceModel, Text, Dimension, Mark, Section, Elevation, Leader, Mirror, Room, Roof, Measure, Split, Trim, Join };
     void setTool(Tool tool);
     Tool tool() const { return m_tool; }
     WallTool* wallTool() const { return m_wallTool; }
@@ -257,6 +258,14 @@ public:
     bool mirrorSelection(QPointF a, QPointF b, bool copy); // Ctrl+M tool: two clicks; Ctrl copies
     bool multiplySelection(const QString& kind, const QJsonObject& params); // Ctrl+U: linear / polar
     bool offsetSelection(double distance);
+    // D80: split, trim/extend (to a boundary or a corner), join/merge and unjoin walls and beams
+    // (ModifyEdits.cpp). Ctrl (join = false) leaves the elements unjoined.
+    ModifyTool* modifyTool() const { return m_modifyTool; }
+    bool splitElement(const QString& guid, QPointF at, bool join = true);
+    bool trimElement(const QString& guid, QPointF keep, const QString& boundary, QPointF b1, QPointF b2, bool join = true);
+    bool cornerElements(const QString& first, QPointF p1, const QString& second, QPointF p2, bool join = true);
+    bool joinElements(const QString& first, const QString& second);
+    bool unjoinElements(const QString& first, const QString& second);
     // Drag to move (owner feedback): preview while dragging, move on release (Ctrl detaches).
     void dragMoveTo(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
     bool dragFinished(QPointF start, QPointF current, double tolerance, Qt::KeyboardModifiers modifiers);
@@ -391,6 +400,10 @@ private:
     void openingSizeDialog();
     QJsonObject openingInfo(const QString& guid);
     void updateToolPreview();
+    void setupModifyTools(ToolOptionsBar* bar); // D80
+    void startModifyTool(Tool tool);
+    void updateModifyPreview();
+    bool modifyResult(const QJsonObject& r, const QString& failure);
     QJsonObject currentType() const;
     void refreshSnapData();
     void showSnap(const Snap& snap);
@@ -435,6 +448,8 @@ private:
     GripTool* m_gripTool = nullptr;
     MeasureController* m_measure = nullptr;
     QToolButton* m_measureCopy = nullptr;
+    ModifyTool* m_modifyTool = nullptr;
+    QComboBox* m_modifyMode = nullptr;
     bool m_detach = false; // Ctrl held on the click that finished a move/rotate
     std::optional<QPointF> m_columnHover;
     Tool m_tool = Tool::None;

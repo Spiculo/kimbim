@@ -27,6 +27,7 @@ qt_add_library(kimcad_core STATIC
     src/LevelsDialog.cpp src/LevelsDialog.h
     src/RotateTool.cpp src/RotateTool.h
     src/GripTool.cpp src/GripTool.h
+    src/ModifyTool.cpp src/ModifyTool.h src/ModifyEdits.cpp
     src/ModelLoader.cpp src/ModelLoader.h
     src/Cuts.cpp src/Cuts.h
     src/DrawingsPanel.cpp src/DrawingsPanel.h

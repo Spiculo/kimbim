@@ -89,6 +89,7 @@
 #include "HostTool.h"
 #include "PolygonTool.h"
 #include "GripTool.h"
+#include "ModifyTool.h"
 #include "RotateTool.h"
 #include "TwoPointTool.h"
 #include "WallTool.h"
@@ -1164,6 +1165,12 @@ void MainWindow::buildModelingToolbar()
             tr("Rotate the selection: click the centre, a reference, then the new direction (or type degrees)")},
         {Tool::Stretch, "actionStretchTool", tr("S&tretch wall"), Qt::Key_E,
             tr("Stretch a wall: click near one of its ends, then click its new position (or type the length)")},
+        {Tool::Split, "actionSplitTool", tr("Spli&t"), QKeyCombination(Qt::SHIFT, Qt::Key_S),
+            tr("Split a wall or beam in two where you click; doors and windows stay where they are (Ctrl: pieces unjoined)")},
+        {Tool::Trim, "actionTrimTool", tr("Trim/e&xtend"), QKeyCombination(Qt::SHIFT, Qt::Key_T),
+            tr("Trim or extend walls and beams to a boundary, or two to their corner; click the side to keep")},
+        {Tool::Join, "actionJoinTool", tr("&Join"), QKeyCombination(Qt::SHIFT, Qt::Key_J),
+            tr("Join two walls that meet (L or T), merge two in line of the same type, or unjoin them")},
         {Tool::Stair, "actionStairTool", tr("S&tair"), Qt::Key_T,
             tr("Draw a stair: click where it starts, then the direction it climbs; it goes up to the next level")},
         {Tool::SlabOpening, "actionSlabOpeningTool", tr("Slab &opening"), Qt::Key_O,
@@ -1299,6 +1306,7 @@ void MainWindow::buildModelingToolbar()
     m_measureCopy->setToolTip(tr("Copy the measurement to the clipboard"));
     bar->addField(m_measureCopy);
     connect(m_measureCopy, &QToolButton::clicked, this, [this] { m_measure->copyToClipboard(); });
+    setupModifyTools(bar); // D80
     m_hosts.value(QStringLiteral("3d"))->adoptChrome(m_toolOptions, nullptr);
     connect(m_lengthInput, &QLineEdit::returnPressed, this, [this] {
         bool ok = false;
@@ -1384,6 +1392,12 @@ void MainWindow::buildModelingToolbar()
             break;
         case Tool::Measure:
             m_measure->pointer(v, p, m_levels->activeElevation(), tolerance, ortho, false);
+            break;
+        case Tool::Split:
+        case Tool::Trim:
+        case Tool::Join:
+            m_modifyTool->setTolerance(tolerance);
+            m_modifyTool->move(p);
             break;
         case Tool::None:
             break;
@@ -1476,6 +1490,12 @@ void MainWindow::buildModelingToolbar()
         case Tool::Measure:
             m_measure->pointer(v, p, m_levels->activeElevation(), tolerance, ortho, true);
             break;
+        case Tool::Split:
+        case Tool::Trim:
+        case Tool::Join:
+            m_modifyTool->setTolerance(tolerance);
+            m_modifyTool->click(p, mods);
+            break;
         case Tool::None:
             break;
         }
@@ -1495,6 +1515,10 @@ void MainWindow::buildModelingToolbar()
             m_gripTool->cancel();
         else if (m_tool == Tool::Measure && m_measure->tool()->isMeasuring())
             m_measure->clear(); // D79: Esc clears the measurement; again leaves the tool
+        else if ((m_tool == Tool::Trim || m_tool == Tool::Join) && m_modifyTool->stage() > 0) {
+            m_modifyTool->cancel(); // a new boundary / first element
+            m_status->showMessage(m_modifyTool->hint());
+        }
         else
             setTool(Tool::None);
     }); });
@@ -1585,6 +1609,10 @@ void MainWindow::refreshTypes()
         break;
     case Tool::Grid:
     case Tool::Measure:
+        break;
+    case Tool::Split:
+    case Tool::Trim:
+    case Tool::Join:
     case Tool::None:
         break;
     }
@@ -1609,10 +1637,12 @@ void MainWindow::refreshSnapData()
     const QVector<SnapWall> walls = Snapper::parse(data);
     const QVector<SnapLine> lines = Snapper::parseGrid(data);
     for (Snapper* s : {&m_wallTool->snapper(), &m_polygonTool->snapper(), &m_twoPointTool->snapper(),
-             &m_rotateTool->snapper(), &m_gripTool->snapper(), &m_measure->tool()->snapper()}) {
+             &m_rotateTool->snapper(), &m_gripTool->snapper(), &m_measure->tool()->snapper(), &m_modifyTool->snapper()}) {
         s->setWalls(walls);
         s->setGridLines(lines);
     }
+    if (m_tool == Tool::Split || m_tool == Tool::Trim || m_tool == Tool::Join) // D80: beams too
+        m_modifyTool->setTargets(data, bridge("modify_targets", {m_levels->activeStorey()}));
     m_hostTool->setWalls(walls);
     QVector<Viewport::GridLine> shown;
     for (const SnapLine& l : lines)
@@ -1685,6 +1715,12 @@ void MainWindow::updateToolPreview()
         }
         break;
     case Tool::Measure: // draws its own path (MeasureController)
+        break;
+    case Tool::Split:
+    case Tool::Trim:
+    case Tool::Join:
+        updateModifyPreview();
+        return;
     case Tool::None:
         break;
     }
@@ -1727,6 +1763,7 @@ void MainWindow::setTool(Tool tool)
     m_annotationPoints.clear();
     m_tool = tool;
     m_measureCopy->setVisible(tool == Tool::Measure);
+    startModifyTool(tool); // D80: its mode list in the options bar
     m_twoPointTool->snapper().setFaceSnapping(tool == Tool::Dimension); // dimensions measure wall faces
     for (auto it = m_toolActions.constBegin(); it != m_toolActions.constEnd(); ++it) {
         const QSignalBlocker block(it.value());
@@ -1789,6 +1826,11 @@ void MainWindow::setTool(Tool tool)
         break;
     case Tool::Measure:
         m_status->showMessage(m_measure->text());
+        break;
+    case Tool::Split:
+    case Tool::Trim:
+    case Tool::Join:
+        m_status->showMessage(m_modifyTool->hint());
         break;
     case Tool::Stair:
         m_status->showMessage(tr("Stair: click where it starts, then the direction it climbs"));
@@ -2186,7 +2228,7 @@ void MainWindow::buildPalette()
     m_palette->addGroup(QStringLiteral("view"), tr("View"), {tool(Tool::Section), tool(Tool::Elevation),
         newPlan, newSheet});
     m_palette->addGroup(QStringLiteral("edit"), tr("Edit"), {tool(Tool::Move), tool(Tool::Rotate),
-        tool(Tool::Stretch), mirror, act("actionCopyToLevel"), tool(Tool::Measure)});
+        tool(Tool::Stretch), tool(Tool::Split), tool(Tool::Trim), tool(Tool::Join), mirror, act("actionCopyToLevel"), tool(Tool::Measure)});
     m_dock->addLeft(QStringLiteral("tools"), tr("Tools"), m_palette);
     // View > Panels: a panel closed with its x comes back from here (D71).
     m_viewMenu->addSeparator();
