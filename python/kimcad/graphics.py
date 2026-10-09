@@ -21,6 +21,7 @@ TABLES = ("pen_sets", "line_types", "element_styles", "visibility_sets", "overri
 STATUS_KEYS = ("existing", "demolish", "new")  # renovation status (D74)
 FILTER_SHOW = ("as_is", "hide", "override")
 FILTER_FIELDS = ("pen", "cut_pen", "projection_pen", "line", "fill", "surface", "transparency")
+_STATUS_LABELS = {"existing": "Existing", "demolish": "To be demolished", "new": "New"}
 OPS = ("equals", "not_equals", "contains", "exists", "missing", "true", "false", "less", "more")
 WHEN = ("kind", "ifc_class", "property", "op", "value", "layer", "material")
 THEN = ("pen", "cut_pen", "projection_pen", "line", "fill", "surface", "transparency", "hide")
@@ -588,11 +589,24 @@ def resolve(purpose: str | None = None, model=None, settings: dict | None = None
     hidden_kinds = set(vis.get("hidden_kinds", []))
     vis_rules = [r for r in vis.get("rules", []) if r.get("enabled", True)]
     rules = [r for r in (ovr_sets.get(ovr_name) or {}).get("rules", []) if r.get("enabled", True)]
+    # D74: the renovation filter shows, hides or overrides each status; override rules apply on top.
+    filters = effective("renovation_filters", st)
+    flt_name = p.get("renovation") if p.get("renovation") in filters else ("Everything" if "Everything" in filters else "")
+    flt = filters.get(flt_name) or {}
+    flt_active = any(t.get("show") != "as_is" for t in flt.values())
+    from . import renovation
+
     styles, index, elements, hidden = [], {}, {}, []
     shared: dict = {}
+    legend_hits: dict = {}  # (source, key) -> [style of the first element it applied to, [guids]]
     for e in _products(model) if model is not None else ():
         facts = _Facts(e, shared)
         if facts.kind in hidden_kinds or any(matches(r.get("when", {}), e, facts) for r in vis_rules):
+            hidden.append(e.GlobalId)
+            continue
+        status = renovation.status_of(e, facts) if flt_active else "new"
+        treatment = flt.get(status, {"show": "as_is"}) if flt_active else {"show": "as_is"}
+        if treatment.get("show") == "hide":
             hidden.append(e.GlobalId)
             continue
         base = styles_by_kind.get(facts.kind) or builtin_styles[facts.kind]
@@ -601,6 +615,14 @@ def resolve(purpose: str | None = None, model=None, settings: dict | None = None
         if facts.kind in NO_FILL:
             fill_pen = None
         surface = transparency = None
+        if treatment.get("show") == "override":
+            then = treatment
+            cut_pen = then.get("cut_pen", then.get("pen", cut_pen))
+            proj_pen = then.get("projection_pen", then.get("pen", proj_pen))
+            if "line" in then:
+                cut_line = proj_line = then["line"]
+            fill_pen = then.get("fill", fill_pen)
+            surface, transparency = then.get("surface", surface), then.get("transparency", transparency)
         rule = next((r for r in rules if matches(r.get("when", {}), e, facts)), None)  # the first match wins
         if rule is not None:
             then = rule.get("then", {})
@@ -612,7 +634,7 @@ def resolve(purpose: str | None = None, model=None, settings: dict | None = None
             if "line" in then:
                 cut_line = proj_line = then["line"]
             fill_pen = then.get("fill", fill_pen)
-            surface, transparency = then.get("surface"), then.get("transparency")
+            surface, transparency = then.get("surface", surface), then.get("transparency", transparency)
         style = {"cut": _line(pens, line_types, cut_pen, cut_line),
                  "projection": _line(pens, line_types, proj_pen, proj_line),
                  "fill": pen(pens, fill_pen)["color"] if fill_pen is not None else None,
@@ -622,12 +644,28 @@ def resolve(purpose: str | None = None, model=None, settings: dict | None = None
             index[k] = len(styles)
             styles.append(style)
         elements[e.GlobalId] = index[k]
+        if flt_active:
+            legend_hits.setdefault(("renovation", status), [index[k], []])[1].append(e.GlobalId)
+        if rule is not None:
+            legend_hits.setdefault(("override", rule.get("name", "")), [index[k], []])[1].append(e.GlobalId)
+    legend, members = [], []
+    reno = sorted((k, v) for k, v in legend_hits.items() if k[0] == "renovation")
+    reno.sort(key=lambda kv: STATUS_KEYS.index(kv[0][1]))
+    if any(flt.get(k[1], {}).get("show") == "override" for k, _ in reno):  # as-is rows only explain an override
+        for (src, key), (style_no, guids) in reno:
+            legend.append({"label": _STATUS_LABELS[key], "source": src, "key": key, "style": style_no})
+            members.append(guids)
+    for (src, key), (style_no, guids) in legend_hits.items():
+        if src == "override":
+            legend.append({"label": key, "source": src, "key": key, "style": style_no})
+            members.append(guids)
     ann = styles_by_kind.get("annotations") or builtin_styles["annotations"]
     out = {"purpose": name, "purposes": list(purposes), "pen_set": set_name, "visibility": vis_name or "", "overrides": ovr_name or "",
            "pens": {str(n): pen(pens, n) for n in range(1, 256)},
            "pen_names": {n: p["name"] for n, p in pens.items() if isinstance(p, dict) and p.get("name")},
            "current_pen": st.get("current_pen", 23), "annotation_pen": ann["projection"]["pen"],
-           "styles": styles, "elements": elements, "hidden": hidden}
+           "styles": styles, "elements": elements, "hidden": hidden,
+           "renovation": flt_name, "legend": legend, "legend_members": members}
     if len(_cache) > 8:
         _cache.clear()
     _cache[key] = (weakref.ref(model) if model is not None else (lambda: None), out)
@@ -647,7 +685,8 @@ def graphics_state() -> str:
     from . import settings as S
 
     st = S.current()
-    return B._dump({"ok": True, **resolve(settings=st), "hidden_layers": st.get("hidden_layers", []),
+    res = {k: v for k, v in resolve(settings=st).items() if k != "legend_members"}  # members stay in Python
+    return B._dump({"ok": True, **res, "hidden_layers": st.get("hidden_layers", []),
                     "locked_layers": st.get("locked_layers", [])})
 
 

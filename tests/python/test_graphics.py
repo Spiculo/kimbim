@@ -378,3 +378,75 @@ def test_a_purpose_naming_a_missing_filter_is_refused_by_set_graphics():
     p["Working"] = {**p["Working"], "renovation": "Gone"}
     r = json.loads(g.set_graphics(json.dumps({"purposes": p})))
     assert not r["ok"] and "renovation filter" in r["error"]
+
+
+def _reno_model():
+    from kimcad import renovation as r
+
+    f = _model()
+    walls = {}
+    for st in ("existing", "demolish", "new"):
+        w = _el(f, "IfcWall", Pset_WallCommon={"FireRating": "60" if st == "demolish" else "none"})
+        r.write_status(w, st)
+        walls[st] = w
+    return f, walls
+
+
+def test_demolition_purpose_hides_new_and_restyles_demolished():
+    f, w = _reno_model()
+    out = g.resolve("Demolition", model=f)
+    assert w["new"].GlobalId in out["hidden"]
+    demo = out["styles"][out["elements"][w["demolish"].GlobalId]]
+    assert demo["cut"]["color"] == "#000000" and demo["cut"]["dash"] == [3.0, 1.5]  # Permit pen 32, Dashed
+    assert demo["fill"] == "#ffffff"
+    assert demo["surface"] == "#f0c020"
+    assert out["renovation"] == "Demolition plan"
+
+
+def test_override_rules_apply_on_top_of_the_renovation_filter():
+    f, w = _reno_model()
+    s.load({"purposes": {**g.builtin("purposes"),
+                         "Mix": {"pen_set": "Working", "visibility": "Everything", "overrides": "Fire rating",
+                                 "layers": None, "renovation": "Demolition plan"}}})
+    out = g.resolve("Mix", model=f)
+    demo = out["styles"][out["elements"][w["demolish"].GlobalId]]
+    assert demo["cut"]["color"] == g.builtin("pen_sets")["Working"]["pens"]["27"]["color"]  # the 60 min rule's pen
+    assert demo["cut"]["dash"] == [3.0, 1.5]  # the filter's line type stays
+    assert demo["surface"] == "#4070e0"  # the rule's surface wins over the filter's
+
+
+def test_legend_lists_only_applied_entries_in_order():
+    f, w = _reno_model()
+    out = g.resolve("Demolition", model=f)
+    assert [(e["source"], e["key"]) for e in out["legend"]] == [("renovation", "existing"), ("renovation", "demolish")]
+    assert out["legend"][1]["label"] == "To be demolished"
+    assert out["legend_members"][1] == [w["demolish"].GlobalId]
+    assert g.resolve("Working", model=f)["legend"] == []  # nothing changed: no legend
+
+
+def test_legend_has_no_rows_without_an_override_applied():
+    from kimcad import renovation as r
+
+    f, w = _reno_model()
+    r.write_status(w["demolish"], "existing")
+    assert g.resolve("Demolition", model=f)["legend"] == []  # only as-is rows left: nothing to explain
+
+
+def test_pen_sets_written_before_pens_31_33_fall_back():
+    f, w = _reno_model()
+    old = g.builtin("pen_sets")
+    for p in old.values():
+        for n in ("31", "32", "33"):
+            p["pens"].pop(n)
+    s.load({"pen_sets": old, "purposes": {**g.builtin("purposes"), "Colour demolition": {
+        "pen_set": "Working", "visibility": "Everything", "overrides": "None", "layers": None,
+        "renovation": "Demolition plan"}}})
+    out = g.resolve("Colour demolition", model=f)
+    demo = out["styles"][out["elements"][w["demolish"].GlobalId]]
+    assert (demo["cut"]["color"], demo["cut"]["weight"]) == (g.FALLBACK_PEN["color"], g.FALLBACK_PEN["weight"])
+
+
+def test_graphics_state_leaves_out_the_members():
+    s.load(None)
+    state = call("graphics_state")
+    assert "legend" in state and "legend_members" not in state
