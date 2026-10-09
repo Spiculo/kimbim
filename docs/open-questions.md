@@ -44,6 +44,20 @@ Questions:
 Likely cause of the ceiling the owner saw: a new plan tab takes its cut height from the 3D tab's
 slider, so a high 3D cut gives a plan cut above the ceilings.
 
+## For the architect: renovation status (asked 2026-10-08, waiting)
+
+Built to Archicad's model ([spec](superpowers/specs/2026-10-08-renovation-status-design.md)); the owner will
+confirm these with an architect.
+
+1. Three statuses (Existing, To be demolished, New), as in Archicad. Is a fourth, *Temporary* (Revit), needed?
+2. An element with no status counts as New. Should an imported survey model count as Existing instead?
+3. The built-in filters (Existing plan, Demolition plan, New plan, Planned) and their looks: demolished
+   dashed yellow (black dashed in the Permit set), existing grey in the new plan. Do these match local
+   permit conventions (Chile, Spain)?
+4. A door placed in a wall to be demolished is New, as in Archicad. Is that what you'd expect?
+5. The sheet legend lists only what the sheet's drawings actually use. Is that right, or should it list
+   every rule of the purpose?
+
 ## Needs a spike
 
 These are listed in [07-roadmap.md](07-roadmap.md#spikes-do-first-each-is-small-throwaway-and-documented).
