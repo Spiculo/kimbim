@@ -841,3 +841,40 @@ def style_svg(svg: str, resolved: dict, k: float = 1.0) -> str:
                  svg, flags=re.S)
     return svg.replace('class="kimcad-overlay" fill="none" stroke="#000000" stroke-width="0.18"',
                        f'class="kimcad-overlay" fill="none" stroke="#000000" stroke-width="{_fmt(0.18 / k)}"', 1)
+
+
+# ---------------------------------------------------------------- legends (D74)
+
+LEGEND_EMPTY = "Everything is drawn with its element styles"
+_ROW, _TITLE, _SWATCH_W, _SWATCH_H = 7.0, 8.0, 10.0, 5.0
+
+
+def _xml(text: str) -> str:
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def legend_svg(resolved: dict, guids=None) -> tuple:
+    """The legend as SVG in paper mm (top-left 0,0): a title, then a swatch and a label per entry;
+    returns (body, width, height). `guids`: only entries that apply to one of these elements (a sheet's
+    drawings). A lone renovation row (shown as is) explains nothing and is left out."""
+    styles = resolved.get("styles", [])
+    rows = [e for e, members in zip(resolved.get("legend", []), resolved.get("legend_members", []))
+            if guids is None or guids.intersection(members)]
+    if len(rows) <= 1 and all(e["source"] == "renovation" for e in rows):
+        rows = []
+    parts = ['<text x="0" y="5" font-size="4" font-family="sans-serif">Legend</text>']
+    y = _TITLE
+    if not rows:
+        parts.append(f'<text x="0" y="{y + 4:g}" font-size="3" font-family="sans-serif">{_xml(LEGEND_EMPTY)}</text>')
+        return "\n".join(parts), 1.8 * len(LEGEND_EMPTY), y + _ROW
+    longest = 0
+    for e in rows:
+        st = styles[e["style"]]
+        fill = st.get("fill") or st.get("surface") or "none"
+        parts.append(f'<g class="kimcad-legend-row"><rect x="0" y="{y:g}" width="{_SWATCH_W:g}" height="{_SWATCH_H:g}" '
+                     f'fill="{fill}"{_stroke(st["cut"], 1.0)}/>'
+                     f'<text x="{_SWATCH_W + 3:g}" y="{y + 4:g}" font-size="3" font-family="sans-serif">'
+                     f'{_xml(e["label"])}</text></g>')
+        longest = max(longest, len(e["label"]))
+        y += _ROW
+    return "\n".join(parts), _SWATCH_W + 3 + 1.8 * longest, y

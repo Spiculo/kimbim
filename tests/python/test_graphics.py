@@ -450,3 +450,18 @@ def test_graphics_state_leaves_out_the_members():
     s.load(None)
     state = call("graphics_state")
     assert "legend" in state and "legend_members" not in state
+
+
+def test_legend_svg_rows_and_restriction():
+    f, w = _reno_model()
+    out = g.resolve("Demolition", model=f)
+    body, width, height = g.legend_svg(out)
+    assert body.count('class="kimcad-legend-row"') == 2
+    assert "To be demolished" in body and 'stroke-dasharray="3 1.5"' in body
+    assert width > 40 and height == pytest.approx(8 + 2 * 7)
+    body, _, _ = g.legend_svg(out, guids={w["existing"].GlobalId})
+    assert g.LEGEND_EMPTY in body  # the demolished wall isn't in these drawings: one as-is row explains nothing
+    body, _, h = g.legend_svg(g.resolve("Working", model=f))
+    assert g.LEGEND_EMPTY in body and h == pytest.approx(8 + 7)
+    body, _, _ = g.legend_svg(out, guids={w["existing"].GlobalId, w["demolish"].GlobalId})
+    assert body.count('class="kimcad-legend-row"') == 2
