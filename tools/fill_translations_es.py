@@ -638,6 +638,39 @@ ES = {
     "Select the elements to save first": "Seleccione primero los elementos a guardar",
     "Selection set %1 saved (%n element(s))": ("Conjunto de selección %1 guardado (%n elemento)", "Conjunto de selección %1 guardado (%n elementos)"),
     "%n element(s) of the set are no longer in the model": ("%n elemento del conjunto ya no está en el modelo", "%n elementos del conjunto ya no están en el modelo"),
+    # D79: levels table and measure tool.
+    "&Levels...": "&Niveles...",
+    "The levels table: names, elevations, heights; insert and delete levels":
+        "La tabla de niveles: nombres, cotas, alturas; insertar y eliminar niveles",
+    "Elevation (%1)": "Cota (%1)",
+    "Height to next (%1)": "Altura al siguiente (%1)",
+    "Show in level list": "Mostrar en la lista de niveles",
+    "Highest level first. A new elevation moves that level and its elements; a new height to next moves every level above. Changes apply on OK, as one undo step.":
+        "El nivel más alto primero. Una cota nueva mueve ese nivel y sus elementos; una altura al siguiente nueva mueve todos los niveles de arriba. Los cambios se aplican al Aceptar, como un solo paso de deshacer.",
+    "Insert &above": "Insertar &arriba",
+    "Insert &below": "Insertar a&bajo",
+    "new": "nuevo",
+    "Delete level": "Eliminar nivel",
+    "%1 has %n element(s) on it.": ("%1 tiene %n elemento.", "%1 tiene %n elementos."),
+    "Delete them with the level, or move them to another level where they are?":
+        "¿Eliminarlos con el nivel, o moverlos a otro nivel sin cambiar su posición?",
+    "Delete the elements too": "Eliminar también los elementos",
+    "Move them to %1": "Moverlos a %1",
+    "Could not change the levels": "No se pudieron cambiar los niveles",
+    "Levels changed": "Niveles cambiados",
+    "Mea&sure": "&Medir",
+    "Measure distances, angles and areas: click points (they snap); Enter stops, Esc clears. Changes nothing":
+        "Medir distancias, ángulos y áreas: haga clic en puntos (con referencias); Intro detiene, Esc borra. No cambia nada",
+    "Copy": "Copiar",
+    "Copy the measurement to the clipboard": "Copiar la medición al portapapeles",
+    "%1 m²": "%1 m²",
+    "Measure: click the next point (Enter: stop, Esc: clear)": "Medir: haga clic en el punto siguiente (Intro: detener, Esc: borrar)",
+    "Measure: click the first point": "Medir: haga clic en el primer punto",
+    "Distance %1 (dx %2, dy %3, dz %4)": "Distancia %1 (dx %2, dy %3, dz %4)",
+    "Total %1": "Total %1",
+    "Angle %1°": "Ángulo %1°",
+    "Area %1 m²": "Área %1 m²",
+    "Perimeter %1": "Perímetro %1",
 }
 
 

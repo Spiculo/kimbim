@@ -40,7 +40,7 @@ release notes, so check before relying on a single cell.
 | Imperial units, unit preferences | all | ⬜ | P0 | Metric only today |
 | Project info (address, client, number) used in title blocks | AC RV VW | ✅ | new | Slice 16: *File › Project info…*, in IFC fields (D63) |
 | Survey point, project base point, georeferencing | AC RV VW BB | ⬜ | P2 | `ifcopenshell.api.georeference` |
-| Story settings (levels table: edit heights, insert/delete) | AC RV | 🟡 | P0 | Add level exists; no levels table |
+| Story settings (levels table: edit heights, insert/delete) | AC RV | ✅ | P0 | D79: Model › Levels..., one undo step; elements follow |
 | Purge unused types/materials | RV VW BB | ⬜ | new | |
 
 ## 2. Viewing and navigation
@@ -315,7 +315,7 @@ release notes, so check before relying on a single cell.
 
 | Tool | Has | KIMCAD | Pri | Notes |
 |------|-----|--------|-----|-------|
-| Measure distance, angle, area | all | ⬜ | P1 | |
+| Measure distance, angle, area | all | ✅ | P1 | D79: Shift+M, snaps, 3D surfaces, copy to clipboard |
 | IFC schema validation in the app | BB | 🟡 | P1 | In CI only |
 | IDS checks | AC BB | ⬜ | P1 | IfcTester |
 | Clash detection | AC RV VW BB | ⬜ | P2 | `ifcclash` |

@@ -111,6 +111,20 @@ Built per D78 (Archicad's Find & Select; Revit's direction-dependent box).
 4. Find & Select leaves out elements on hidden or locked layers and elements hidden in the view. Should
    hidden ones be found (and shown) instead, as Revit's filters can?
 
+## For the architect: measure and levels table (asked 2026-10-09, waiting)
+
+Built to Archicad's model (D79); the owner will confirm these with an architect.
+
+1. Measure shows areas in m² even when lengths are in mm or cm. Right, or follow the length unit?
+2. Measure in 3D snaps to element surfaces and to plan snaps (wall ends, faces) at the surface's height, not to 3D
+   vertices of arbitrary geometry (furniture corners). Is that enough, or are mesh vertex snaps needed?
+3. Changing a level's elevation moves its elements; changing its height to next moves every level above. Is that
+   what you'd expect, or should an elevation change also move the levels above?
+4. Inserting a level pushes the levels above up by one level height (Archicad). Should it instead fit between
+   existing levels without moving them (Revit)?
+5. Deleting a level with elements offers "delete them too" (Archicad) or "move them to the next level down". Is
+   moving useful, or should deleting simply delete (with a warning)?
+
 ## Needs a spike
 
 These are listed in [07-roadmap.md](07-roadmap.md#spikes-do-first-each-is-small-throwaway-and-documented).
