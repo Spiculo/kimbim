@@ -922,6 +922,16 @@ from .graphics import (  # noqa: E402,F401
     set_graphics,
     set_purpose,
 )
+from .schedules import (  # noqa: E402,F401
+    delete_schedule_scheme,
+    export_schedule,
+    save_schedule_scheme,
+    schedule,
+    schedule_classes,
+    schedule_fields,
+    schedule_schemes,
+    set_schedule_value,
+)
 from .documents import (  # noqa: E402,F401
     clear_recovery,
     close_document,

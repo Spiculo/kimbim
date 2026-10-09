@@ -17,6 +17,7 @@ import ifcopenshell.api.pset
 import ifcopenshell.api.root
 import ifcopenshell.util.element
 import ifcopenshell.util.placement
+import ifcopenshell.util.unit
 import numpy as np
 
 from . import app_bridge as B
@@ -214,12 +215,14 @@ def _shape(space, storey, outline):
     representation = ifcopenshell.api.geometry.add_slab_representation(
         f, context=A._body_context(), depth=height, polyline=outline)
     A._replace_body(space, representation)
-    area = abs(_signed_area(outline))
+    # Quantities are in the project's units (D77): lengths in its length unit, areas in its area unit.
+    s, sa = A._scale(), ifcopenshell.util.unit.calculate_unit_scale(f, "AREAUNIT")
+    area = abs(_signed_area(outline)) / sa
     qto = ifcopenshell.util.element.get_pset(space, QTO)
     qto = f.by_id(qto["id"]) if qto else ifcopenshell.api.pset.add_qto(f, product=space, name=QTO)
     ifcopenshell.api.pset.edit_qto(f, qto=qto, properties={
         "NetFloorArea": round(area, 6), "GrossFloorArea": round(area, 6),
-        "NetPerimeter": round(_perimeter(outline), 6), "Height": round(height, 6)})
+        "NetPerimeter": round(_perimeter(outline) / s, 6), "Height": round(height / s, 6)})
 
 
 def _next_number(storey) -> str:
@@ -286,10 +289,9 @@ def rooms(storey_guid: str) -> str:
             pts = _outline(space)
             if not pts:
                 continue
-            qto = ifcopenshell.util.element.get_pset(space, QTO) or {}
+            # From the outline (what the stamp shows; the room is re-fitted to it), in metres.
             out.append({"guid": space.GlobalId, "number": space.Name or "", "name": space.LongName or "",
-                        "area": round(float(qto.get("NetFloorArea", abs(_signed_area(pts)))), 6),
-                        "perimeter": round(float(qto.get("NetPerimeter", _perimeter(pts))), 6),
+                        "area": round(abs(_signed_area(pts)), 6), "perimeter": round(_perimeter(pts), 6),
                         "points": [[round(px, 6), round(py, 6)] for px, py in pts], "label": _stamp_point(space, pts)})
     out.sort(key=lambda r: r["number"])
     return B._dump({"rooms": out})
@@ -392,21 +394,23 @@ B.AFTER_ACTION.append(_refit)
 # ---------------------------------------------------------------- schedule
 
 def room_schedule() -> str:
-    """Every room: number, name, level, area (m²), perimeter (m), height (m); by level then number."""
+    """Every room (space): number, name, level, area (m²), perimeter (m), height (m); by level then
+    number. The "rooms" schedule of kimcad.schedules (D77) in its original shape."""
+    from . import schedules
+
     if B._model is None:
         return B._dump({"rows": []})
+    scheme = {"name": "Rooms", "classes": ["IfcSpace"], "fields": [
+        {"source": "attribute", "name": "Name"}, {"source": "attribute", "name": "LongName"},
+        {"source": "info", "name": "level"}, {"source": "quantity", "name": "area"},
+        {"source": "quantity", "name": "perimeter"}, {"source": "quantity", "name": "height"}]}
+    data = schedules.compute(scheme)
     rows = []
-    for space in _rooms():
-        storey = ifcopenshell.util.element.get_aggregate(space)
-        qto = ifcopenshell.util.element.get_pset(space, QTO) or {}
-        rows.append({"guid": space.GlobalId, "number": space.Name or "", "name": space.LongName or "",
-                     "level": (storey.Name or "") if storey else "", "elevation": A._elevation(storey) if storey else 0.0,
-                     "area": round(float(qto.get("NetFloorArea", 0.0)), 2),
-                     "perimeter": round(float(qto.get("NetPerimeter", 0.0)), 2),
-                     "height": round(float(qto.get("Height", 0.0)), 2)})
-    rows.sort(key=lambda r: (r["elevation"], r["number"]))
-    for r in rows:
-        r.pop("elevation")
+    for r in data["rows"]:
+        number, name, level, area, perimeter, height = r["values"]
+        rows.append({"guid": r["guids"][0], "number": number or "", "name": name or "", "level": level or "",
+                     "area": round(float(area or 0.0), 2), "perimeter": round(float(perimeter or 0.0), 2),
+                     "height": round(float(height or 0.0), 2)})
     return B._dump({"rows": rows, "total_area": round(sum(r["area"] for r in rows), 2)})
 
 

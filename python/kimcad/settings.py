@@ -32,6 +32,7 @@ DEFAULTS = {
     "current_pen": 23,
     "sheet_purposes": {},
     "status_for_new": "new",
+    "schedules": {},  # schedule schemes by id: the project's own and its edited built-ins (D77)
 }
 UNITS = {"m": 1.0, "cm": 100.0, "mm": 1000.0}
 
@@ -113,6 +114,10 @@ def _error(key: str, value) -> str | None:
         return f"{key} must be a list of layer names"
     if key == "status_for_new" and value not in ("existing", "demolish", "new"):
         return f"unknown renovation status {value}"
+    if key == "schedules":  # schedule schemes by id (D77)
+        from .schedules import table_error
+
+        return table_error(value)
     from . import graphics
 
     if key in graphics.TABLES or key in ("purpose", "current_pen", "sheet_purposes"):
