@@ -30,6 +30,9 @@ class QDoubleSpinBox;
 
 class QComboBox;
 class QToolBar;
+class QToolButton;
+class QActionGroup;
+class QMenuBar;
 class QSlider;
 class QLabel;
 class QDoubleSpinBox;
@@ -38,6 +41,7 @@ class QLineEdit;
 namespace kimcad {
 
 class LevelsBar;
+class TitleBar;
 class ToolPalette;
 class StatusStrip;
 class ToolOptionsBar;
@@ -103,6 +107,7 @@ public:
     bool saveAsTemplate(const QString& name, bool replace = false); // false if it exists and wasn't replaced
     bool addLevel(const QString& name, double elevation);
     LevelsBar* levelsBar() const { return m_levels; }
+    TitleBar* titleBar() const { return m_titleBar; } // D75: menus, level, cuts, title, Versions
     // Modeling tools (M3): one active at a time. Exposed for tests and the self-test, which drive
     // them with work-plane points.
     enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening, PlaceModel, Text, Dimension, Mark, Section, Elevation, Leader, Mirror, Room, Roof };
@@ -279,6 +284,7 @@ signals:
 
 protected:
     void closeEvent(QCloseEvent* event) override;
+    bool nativeEvent(const QByteArray& eventType, void* message, qintptr* result) override;
 
 private:
     void buildMenus();
@@ -306,7 +312,9 @@ private:
     void refreshTypes();
     void wallHeightDialog();
     void copyToLevelDialog();
-    void buildProjectToolbar();
+    void buildVersions();
+    void updateVersionsButton();
+    void enableVersioningDialog();
     void refreshProject();
     void refreshLayers();
     void refreshGraphics();
@@ -439,9 +447,17 @@ private:
     QSet<QString> m_generating, m_generateAgain;
     QList<QThread*> m_drawingThreads;
     int m_lastDrawingVisible = -1;
-    QToolBar* m_topBar = nullptr;       // D71: design option, level and cuts in one bar
-    QList<QAction*> m_projectActions;  // the design-option part, shown in versioned projects
-    QComboBox* m_options = nullptr;
+    TitleBar* m_titleBar = nullptr;     // D75: the one row of chrome
+    QMenuBar* m_menuBar = nullptr;      // in the title bar (QMainWindow::menuBar() would replace it)
+    QMenu* m_helpMenu = nullptr;
+    QMenu* m_versionsMenu = nullptr;    // D75: everything about versions, also behind the Versions button
+    QToolButton* m_versionsButton = nullptr;
+    QList<QAction*> m_projectActions;   // the Versions entries shown in versioned projects
+    QList<QAction*> m_unversionedActions; // ...and the ones shown in unversioned projects
+    QList<QAction*> m_optionActions;    // the design options, current one checked
+    QActionGroup* m_optionGroup = nullptr;
+    QAction* m_newOptionAction = nullptr;
+    QString m_currentOption;
     QString m_compareA, m_compareB; // the versions being compared (empty when not comparing)
     bool m_versioned = false;
     QHash<QString, double> m_timings;

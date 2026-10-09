@@ -21,6 +21,7 @@
 #include "StatusStrip.h"
 #include "ToolOptionsBar.h"
 #include "ToolPalette.h"
+#include "TitleBar.h"
 #include <QComboBox>
 #include <QLocale>
 #include <QSpinBox>
@@ -29,6 +30,9 @@
 #include <QMenu>
 #include <QStatusBar>
 #include <QToolBar>
+#include <QMenuBar>
+#include <QToolButton>
+#include <QAbstractButton>
 #include <DockManager.h>
 #include <DockWidget.h>
 #include "DrawingView.h"
@@ -341,19 +345,67 @@ private slots:
         QVERIFY(w.statusBar()->isHidden());
     }
 
-    // D71: one slim top bar: design option, level and cuts.
-    void oneTopBar()
+    // D75: one row of chrome: the title bar holds the menus, the level and cuts, the title and the
+    // Versions button; no top toolbar and no separate menu row.
+    void oneTitleBar()
     {
         kimcad::MainWindow w(nullptr, true);
-        QStringList top;
         for (QToolBar* b : w.findChildren<QToolBar*>())
-            if (w.toolBarArea(b) == Qt::TopToolBarArea)
-                top << b->objectName();
-        QCOMPARE(top, QStringList({"topToolbar"}));
-        QToolBar* bar = w.findChild<QToolBar*>(QStringLiteral("topToolbar"));
-        QVERIFY(bar->findChild<QComboBox*>(QStringLiteral("optionCombo")));
+            QVERIFY(w.toolBarArea(b) != Qt::TopToolBarArea);
+        kimcad::TitleBar* bar = w.titleBar();
+        QCOMPARE(w.menuWidget(), static_cast<QWidget*>(bar));
+        QVERIFY(w.windowFlags() & Qt::FramelessWindowHint);
         QVERIFY(bar->findChild<kimcad::LevelsBar*>());
         QVERIFY(bar->findChild<QDoubleSpinBox*>(QStringLiteral("planCutHeight")));
+        QVERIFY(bar->findChild<QToolButton*>(QStringLiteral("versionsButton")));
+        for (const char* name : {"minimizeButton", "maximizeButton", "closeButton"})
+            QVERIFY(bar->findChild<QAbstractButton*>(QLatin1String(name)));
+        QStringList menus;
+        for (QAction* a : bar->menuBar()->actions())
+            menus << a->text().remove(QLatin1Char('&'));
+        QCOMPARE(menus, QStringList({"File", "Edit", "View", "Model", "Graphics", "Versions", "Help"}));
+        // Add level and New model are in the level drop-down and the Model menu, not buttons.
+        QVERIFY(!bar->findChild<QToolButton*>(QStringLiteral("addLevel")));
+        QVERIFY(action(w, "actionAddLevel") && action(w, "actionNewModel"));
+    }
+
+    // D75: a narrow window collapses the menus into one menu button instead of clipping them.
+    void narrowTitleBarCollapsesTheMenus()
+    {
+        kimcad::MainWindow w(nullptr, true);
+        w.resize(1600, 900);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        kimcad::TitleBar* bar = w.titleBar();
+        QVERIFY(!bar->menusCollapsed());
+        QVERIFY(bar->menuButton()->isHidden());
+        w.resize(700, 900);
+        QTRY_VERIFY(bar->menusCollapsed());
+        QVERIFY(!bar->menuButton()->isHidden());
+        bar->menuButton()->menu()->popup(QPoint()); // filled when shown: the same menus
+        QCOMPARE(bar->menuButton()->menu()->actions().size(), bar->menuBar()->actions().size());
+        bar->menuButton()->menu()->close();
+        w.resize(1600, 900);
+        QTRY_VERIFY(!bar->menusCollapsed());
+    }
+
+    // D75: the title shows the document, its design option and a modified marker; empty space drags.
+    void titleBarShowsTheDocument()
+    {
+        kimcad::MainWindow w(nullptr, true);
+        w.resize(1600, 900);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(w.newProject());
+        kimcad::TitleBar* bar = w.titleBar();
+        QVERIFY(bar->title().contains(QObject::tr("Untitled")));
+        QVERIFY(!bar->title().startsWith(QStringLiteral("KIMCAD")));
+        QVERIFY(w.addLevel(QStringLiteral("Level 2"), 3.0));
+        QVERIFY(bar->title().endsWith(QStringLiteral("•")));
+        QWidget* title = bar->findChild<QWidget*>(QStringLiteral("documentTitle"));
+        QVERIFY(bar->isDragArea(title->geometry().center()));
+        QWidget* versions = bar->findChild<QWidget*>(QStringLiteral("versionsButton"));
+        QVERIFY(!bar->isDragArea(versions->geometry().center()));
     }
 
     // D71: double-click an element for its properties; a level for its plan.
@@ -774,7 +826,16 @@ private slots:
         const QStringList walls = w.viewport()->guids();
         QCOMPARE(walls.size(), 2);
 
+        // D75: before versioning, the Versions menu offers to enable it and the button says "Versions".
+        auto* versions = w.titleBar()->findChild<QToolButton*>(QStringLiteral("versionsButton"));
+        QVERIFY(action(w, "actionEnableVersioning")->isVisible());
+        QVERIFY(!action(w, "actionNewOption")->isVisible());
+        QCOMPARE(versions->text(), QCoreApplication::translate("kimcad::MainWindow", "Versions"));
         QVERIFY(w.enableVersioning(tmp.filePath(QStringLiteral("proyecto ñ"))));
+        QVERIFY(!action(w, "actionEnableVersioning")->isVisible());
+        QVERIFY(action(w, "actionNewOption")->isVisible() && action(w, "actionShowHistory")->isVisible());
+        QCOMPARE(versions->text(), QStringLiteral("main"));
+        QCOMPARE(versions->menu(), w.findChild<QMenu*>(QStringLiteral("versionsMenu")));
         QCOMPARE(w.history().size(), 1);
         QVERIFY(!w.isDirty());
         QVERIFY(w.windowTitle().contains(QStringLiteral("proyecto ñ")));
@@ -795,6 +856,8 @@ private slots:
 
         QVERIFY(w.createOption(QStringLiteral("Option B")));
         QVERIFY(w.windowTitle().contains(QStringLiteral("Option B")));
+        QCOMPARE(versions->text(), QStringLiteral("Option B"));
+        QVERIFY(action(w, "option:Option B")->isChecked() && !action(w, "option:main")->isChecked());
         w.setSelection({walls[1]});
         QVERIFY(w.deleteSelection());
         QVERIFY(w.saveVersion(QStringLiteral("B without the north wall")));
@@ -806,6 +869,11 @@ private slots:
         QCOMPARE(w.viewport()->elementCount(), 2); // main still has both walls
         QVERIFY(w.windowTitle().contains(QStringLiteral("main")));
         QVERIFY(!w.isDirty());
+        // D75: switching from the Versions menu.
+        action(w, "option:Option B")->trigger();
+        QVERIFY(loaded.wait(60000));
+        QCOMPARE(versions->text(), QStringLiteral("Option B"));
+        QCOMPARE(w.viewport()->elementCount(), 1);
         QVERIFY(w.close());
     }
 

@@ -10,6 +10,7 @@
 #include "ToolOptionsBar.h"
 #include "ToolPalette.h"
 #include "ViewCube.h"
+#include "TitleBar.h"
 #include "ViewHost.h"
 
 #include <QApplication>
@@ -38,6 +39,10 @@
 #include <QDialogButtonBox>
 #include <QDialog>
 #include <QMenu>
+#include <QActionGroup>
+#include <QPainter>
+#include <QPainterPath>
+#include <QToolButton>
 #include <QSignalBlocker>
 #include <cmath>
 #include <memory>
@@ -168,14 +173,16 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     m_dock->addView(QStringLiteral("3d"), tr("3D"), host, false);
     connect(m_dock, &DockLayout::currentChanged, this, &MainWindow::activateView);
     connect(m_dock, &DockLayout::closeRequested, this, &MainWindow::closeView);
+    // D75: one row of chrome instead of the native title bar, a menu row and a top toolbar.
+    TitleBar::install(this);
+    m_titleBar = new TitleBar(this);
+    setMenuWidget(m_titleBar);
+    m_menuBar = m_titleBar->menuBar();
     buildMenus();
     buildDocks();
-    m_topBar = addToolBar(tr("Project"));
-    m_topBar->setObjectName(QStringLiteral("topToolbar"));
-    m_topBar->setMovable(false);
-    buildProjectToolbar(); // first: the design option (versioned projects)
-    buildCutsToolbar();    // then the level and the cuts
+    buildCutsToolbar();    // the level and the cuts, after the menus
     buildModelingToolbar();
+    buildVersions();       // the Versions menu and the title bar's Versions button
     buildPalette();
     m_status->showMessage(tr("Ready"));
 
@@ -246,6 +253,7 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
         if (state.isEmpty()) // once: the layout saved by the first D71 build
             state = QSettings().value(QStringLiteral("layout/state")).toByteArray();
         m_dock->restoreLayout(state);
+        restoreGeometry(m_prefs.windowGeometry()); // D75: size, position and maximized
     }
 }
 
@@ -266,7 +274,7 @@ MainWindow::~MainWindow()
 
 void MainWindow::buildMenus()
 {
-    QMenu* file = menuBar()->addMenu(tr("&File"));
+    QMenu* file = m_menuBar->addMenu(tr("&File"));
     QAction* newProjectAction = file->addAction(tr("&New project..."));
     newProjectAction->setObjectName(QStringLiteral("actionNewProject"));
     newProjectAction->setShortcut(QKeySequence::New);
@@ -299,10 +307,6 @@ void MainWindow::buildMenus()
     QAction* exportIfcAction = file->addAction(tr("&Export IFC..."));
     exportIfcAction->setObjectName(QStringLiteral("actionExportIfc"));
     connect(exportIfcAction, &QAction::triggered, this, &MainWindow::exportIfcDialog);
-    QAction* saveVersionAction = file->addAction(tr("Save &version..."));
-    saveVersionAction->setObjectName(QStringLiteral("actionSaveVersion"));
-    saveVersionAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_S));
-    connect(saveVersionAction, &QAction::triggered, this, &MainWindow::saveVersionDialog);
     file->addSeparator();
     QAction* settingsAction = file->addAction(tr("Project se&ttings..."));
     settingsAction->setObjectName(QStringLiteral("actionProjectSettings"));
@@ -326,7 +330,7 @@ void MainWindow::buildMenus()
     quit->setShortcut(QKeySequence::Quit);
     connect(quit, &QAction::triggered, this, &QWidget::close);
 
-    QMenu* editMenu = menuBar()->addMenu(tr("&Edit"));
+    QMenu* editMenu = m_menuBar->addMenu(tr("&Edit"));
     m_undo = editMenu->addAction(tr("&Undo"));
     m_undo->setObjectName(QStringLiteral("actionUndo"));
     m_undo->setShortcut(QKeySequence::Undo);
@@ -367,7 +371,7 @@ void MainWindow::buildMenus()
     prefsAction->setMenuRole(QAction::PreferencesRole);
     connect(prefsAction, &QAction::triggered, this, &MainWindow::preferencesDialog);
 
-    QMenu* view = menuBar()->addMenu(tr("&View"));
+    QMenu* view = m_menuBar->addMenu(tr("&View"));
     m_viewMenu = view;
     QAction* planView = view->addAction(tr("&Plan view"));
     planView->setObjectName(QStringLiteral("actionPlanView"));
@@ -488,7 +492,7 @@ void MainWindow::buildMenus()
     });
 
     // D73: pens, line types, element styles, visibility, overrides, layer combinations and purposes.
-    QMenu* graphics = menuBar()->addMenu(tr("&Graphics"));
+    QMenu* graphics = m_menuBar->addMenu(tr("&Graphics"));
     auto editor = [this, graphics](const char* name, const QString& text, auto make) {
         QAction* a = graphics->addAction(text);
         a->setObjectName(QLatin1String(name));
@@ -516,7 +520,8 @@ void MainWindow::buildMenus()
     graphics->addSeparator();
     editor("actionPurposes", tr("P&urposes..."), [this](const QJsonObject& r) { return new PurposesDialog(r, this); });
     m_graphicsMenu = graphics;
-    QMenu* help = menuBar()->addMenu(tr("&Help"));
+    QMenu* help = m_menuBar->addMenu(tr("&Help"));
+    m_helpMenu = help;
     QAction* about = help->addAction(tr("&About KIMCAD"));
     connect(about, &QAction::triggered, this, &MainWindow::showAbout);
 }
@@ -624,9 +629,9 @@ void MainWindow::buildDocks()
 
 void MainWindow::buildCutsToolbar()
 {
-    QToolBar* levels = m_topBar;
-    m_levels = new LevelsBar(levels);
-    levels->addWidget(m_levels);
+    // D75: in the title bar, after the menus.
+    m_levels = new LevelsBar(m_titleBar);
+    m_titleBar->addControl(m_levels);
     connect(m_levels, &LevelsBar::addLevelRequested, this, &MainWindow::addLevelDialog);
     connect(m_levels, &LevelsBar::newModelRequested, this, [this] {
         bool ok = false;
@@ -656,10 +661,15 @@ void MainWindow::buildCutsToolbar()
         refreshLayers(); // models show only while one is active
         refreshAnnotations(); // each level has its own
     });
-    QToolBar* bar = m_topBar;
-    bar->addSeparator();
-    bar->addAction(m_planCut);
-    m_cutHeight = new QDoubleSpinBox(bar);
+    auto cutButton = [this](QAction* action) {
+        auto* b = new QToolButton(m_titleBar);
+        b->setDefaultAction(action);
+        b->setAutoRaise(true);
+        m_titleBar->addControl(b);
+    };
+    m_titleBar->addControlSeparator();
+    cutButton(m_planCut);
+    m_cutHeight = new QDoubleSpinBox(m_titleBar);
     m_cutHeight->setObjectName(QStringLiteral("planCutHeight"));
     m_cutHeight->setRange(-1000.0, 10000.0);
     m_cutHeight->setDecimals(2);
@@ -667,7 +677,8 @@ void MainWindow::buildCutsToolbar()
     m_cutHeight->setSuffix(QStringLiteral(" m"));
     m_cutHeight->setValue(1.2); // typical plan cut height above a floor
     m_cutHeight->setToolTip(tr("Plan cut height"));
-    bar->addWidget(m_cutHeight);
+    m_cutHeight->setMaximumWidth(fontMetrics().horizontalAdvance(QStringLiteral("-000.00 m")) + 64); // not as wide as -1000..10000
+    m_titleBar->addControl(m_cutHeight);
     connect(m_cutHeight, &QDoubleSpinBox::valueChanged, this, [this](double metres) {
         {
             const QSignalBlocker block(m_cutSlider);
@@ -683,8 +694,7 @@ void MainWindow::buildCutsToolbar()
             m_planCut->setChecked(true); // using the slider means cutting
     });
     m_cutLabel->setText(formatLength(m_cutHeight->value()));
-    bar->addSeparator();
-    bar->addAction(m_sectionBox);
+    cutButton(m_sectionBox);
 }
 
 void MainWindow::setPlanCutHeight(double metres)
@@ -783,6 +793,7 @@ void MainWindow::closeEvent(QCloseEvent* event)
     bridge("close_document"); // the lock and the working folder go
     if (!m_quiet) {
         m_prefs.setLayout(m_dock->saveLayout()); // D71: the next session's layout (D72: in preferences)
+        m_prefs.setWindowGeometry(saveGeometry());
         m_prefs.save();
     }
     event->accept();
@@ -1074,7 +1085,9 @@ void MainWindow::buildModelingToolbar()
     // The tools' fields (type, heights, roof, length): a strip above the active view (D71).
     m_toolOptions = new ToolOptionsBar(this);
     ToolOptionsBar* bar = m_toolOptions;
-    QMenu* model = menuBar()->addMenu(tr("&Model"));
+    // File Edit View Model Graphics Versions Help (D75): Model goes before Graphics.
+    auto* model = new QMenu(tr("&Model"), m_menuBar);
+    m_menuBar->insertMenu(m_graphicsMenu->menuAction(), model);
     m_wallTool = new WallTool(this);
     m_polygonTool = new PolygonTool(this);
     m_hostTool = new HostTool(this);
@@ -1148,6 +1161,8 @@ void MainWindow::buildModelingToolbar()
         m_toolActions.insert(int(d.tool), a);
     }
     model->addSeparator();
+    model->addAction(m_levels->addLevelAction()); // D75: also in the level drop-down
+    model->addAction(m_levels->newModelAction());
     QAction* copyAction = model->addAction(tr("Copy to &level..."));
     copyAction->setObjectName(QStringLiteral("actionCopyToLevel"));
     connect(copyAction, &QAction::triggered, this, &MainWindow::copyToLevelDialog);
@@ -1966,45 +1981,112 @@ void MainWindow::copyToLevelDialog()
         copyToLevel(m_selection, guids.value(names.indexOf(choice)));
 }
 
-void MainWindow::buildProjectToolbar()
+void MainWindow::buildVersions()
 {
-    QToolBar* bar = m_topBar;
-    m_projectActions << bar->addWidget(new QLabel(tr("Option"), bar));
-    m_options = new QComboBox(bar);
-    m_options->setObjectName(QStringLiteral("optionCombo"));
-    m_options->setSizeAdjustPolicy(QComboBox::AdjustToContents);
-    m_projectActions << bar->addWidget(m_options);
-    QAction* newOption = bar->addAction(tr("New option..."));
+    // D75: everything about versions in one place: the Versions menu, which is also the title bar's
+    // Versions button (it shows the current design option).
+    QMenu* menu = new QMenu(tr("&Versions"), m_menuBar);
+    menu->setObjectName(QStringLiteral("versionsMenu"));
+    m_menuBar->insertMenu(m_helpMenu->menuAction(), menu);
+    m_versionsMenu = menu;
+    QAction* enable = menu->addAction(tr("&Enable versioning..."));
+    enable->setObjectName(QStringLiteral("actionEnableVersioning"));
+    enable->setToolTip(tr("Save the project as a .kim file, which keeps its versions and design options"));
+    connect(enable, &QAction::triggered, this, &MainWindow::enableVersioningDialog);
+    m_unversionedActions << enable;
+    m_projectActions << menu->addSection(tr("Design options"));
+    // refreshProject puts the options here, before New option...
+    QAction* newOption = menu->addAction(tr("&New option..."));
+    m_newOptionAction = newOption;
     m_projectActions << newOption;
     newOption->setObjectName(QStringLiteral("actionNewOption"));
     connect(newOption, &QAction::triggered, this, &MainWindow::newOptionDialog);
-    QAction* deleteOptionAction = bar->addAction(tr("Delete option..."));
+    QAction* deleteOptionAction = menu->addAction(tr("&Delete option..."));
     m_projectActions << deleteOptionAction;
     deleteOptionAction->setObjectName(QStringLiteral("actionDeleteOption"));
     connect(deleteOptionAction, &QAction::triggered, this, &MainWindow::deleteOptionDialog);
-    QAction* combineAction = bar->addAction(tr("Combine options..."));
+    QAction* combineAction = menu->addAction(tr("&Combine options..."));
     m_projectActions << combineAction;
     combineAction->setObjectName(QStringLiteral("actionCombineOptions"));
     combineAction->setToolTip(tr("Bring another design option's work into this one, choosing where both changed the same thing"));
     connect(combineAction, &QAction::triggered, this, &MainWindow::combineDialog);
-    m_projectActions << bar->addSeparator();
-    QAction* milestoneAction = bar->addAction(tr("Milestone..."));
+    m_projectActions << menu->addSeparator();
+    // Save version stays visible: in an unversioned project its shortcut says to enable versioning.
+    QAction* saveVersionAction = menu->addAction(tr("Save &version..."));
+    saveVersionAction->setObjectName(QStringLiteral("actionSaveVersion"));
+    saveVersionAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_S));
+    connect(saveVersionAction, &QAction::triggered, this, &MainWindow::saveVersionDialog);
+    QAction* milestoneAction = menu->addAction(tr("&Milestone..."));
     m_projectActions << milestoneAction;
     milestoneAction->setObjectName(QStringLiteral("actionAddMilestone"));
     milestoneAction->setToolTip(tr("Name the latest saved version (Concept, Schematic design, Tender...)"));
     connect(milestoneAction, &QAction::triggered, this, &MainWindow::milestoneDialog);
-    QAction* objectHistoryAction = bar->addAction(tr("Object history..."));
-    m_projectActions << objectHistoryAction << bar->addSeparator();
+    QAction* objectHistoryAction = menu->addAction(tr("&Object history..."));
+    m_projectActions << objectHistoryAction;
     objectHistoryAction->setObjectName(QStringLiteral("actionObjectHistory"));
     objectHistoryAction->setToolTip(tr("The versions that changed the selected element"));
     connect(objectHistoryAction, &QAction::triggered, this, &MainWindow::objectHistoryDialog);
-    connect(m_options, &QComboBox::activated, this, [this](int index) {
-        const QString wanted = m_options->itemText(index);
-        if (!switchOption(wanted))
-            refreshProject(); // put the combo back on the current option
-    });
+    QAction* historyPanel = menu->addAction(tr("&History and compare"));
+    m_projectActions << historyPanel;
+    historyPanel->setObjectName(QStringLiteral("actionShowHistory"));
+    historyPanel->setToolTip(tr("The History panel: the versions, and comparing two of them"));
+    connect(historyPanel, &QAction::triggered, this, [this] { m_dock->raisePanel(QStringLiteral("history")); });
     for (QAction* a : std::as_const(m_projectActions))
         a->setVisible(false); // shown once the project is versioned
+
+    m_optionGroup = new QActionGroup(this);
+    m_versionsButton = new QToolButton(m_titleBar);
+    m_versionsButton->setObjectName(QStringLiteral("versionsButton"));
+    m_versionsButton->setAutoRaise(true);
+    m_versionsButton->setPopupMode(QToolButton::InstantPopup);
+    m_versionsButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    m_versionsButton->setMenu(menu);
+    const QColor text = palette().color(QPalette::WindowText);
+    QIcon icon; // a branch: the design options
+    for (const qreal dpr : {1.0, 1.5, 2.0}) {
+        QPixmap branch(QSize(16, 16) * dpr);
+        branch.setDevicePixelRatio(dpr);
+        branch.fill(Qt::transparent);
+        QPainter p(&branch);
+        p.setRenderHint(QPainter::Antialiasing);
+        p.setPen(QPen(text, 1.3));
+        p.drawLine(QPointF(5, 5.1), QPointF(5, 10.9));
+        p.drawEllipse(QPointF(5, 3.5), 1.6, 1.6);
+        p.drawEllipse(QPointF(5, 12.5), 1.6, 1.6);
+        p.drawEllipse(QPointF(11.5, 4.5), 1.6, 1.6);
+        QPainterPath arc(QPointF(11.5, 6.1));
+        arc.cubicTo(QPointF(11.5, 9.5), QPointF(5, 8), QPointF(5, 10.9));
+        p.drawPath(arc);
+        p.end();
+        icon.addPixmap(branch);
+    }
+    m_versionsButton->setIcon(icon);
+    m_titleBar->setTrailing(m_versionsButton);
+    updateVersionsButton();
+}
+
+void MainWindow::updateVersionsButton()
+{
+    if (m_versioned) {
+        m_versionsButton->setText(m_currentOption);
+        m_versionsButton->setToolTip(tr("Design option %1: switch options, save versions, history").arg(m_currentOption));
+    } else {
+        m_versionsButton->setText(tr("Versions"));
+        m_versionsButton->setToolTip(tr("This project keeps no versions yet: enable versioning to save versions and design options"));
+    }
+}
+
+void MainWindow::enableVersioningDialog()
+{
+    if (m_versioned || m_quiet)
+        return;
+    QString path = QFileDialog::getSaveFileName(this, tr("Enable versioning"), m_document.value("path").toString(),
+        tr("KIMCAD project (*.kim)"));
+    if (path.isEmpty())
+        return;
+    if (QFileInfo(path).suffix().compare(QLatin1String("kim"), Qt::CaseInsensitive) != 0)
+        path += QStringLiteral(".kim");
+    saveAs(path); // a .kim keeps the history: its first version is the model as it is
 }
 
 void MainWindow::buildPalette()
@@ -2064,6 +2146,15 @@ void MainWindow::refreshProject()
     m_versioned = s.value("versioned").toBool();
     for (QAction* a : std::as_const(m_projectActions))
         a->setVisible(m_versioned);
+    for (QAction* a : std::as_const(m_unversionedActions))
+        a->setVisible(!m_versioned);
+    for (QAction* a : std::as_const(m_optionActions)) { // may be the action being triggered: later
+        m_versionsMenu->removeAction(a);
+        m_optionGroup->removeAction(a);
+        a->setParent(nullptr);
+        a->deleteLater();
+    }
+    m_optionActions.clear();
     QString option;
     if (!m_versioned) {
         m_projectFolder.clear();
@@ -2072,15 +2163,24 @@ void MainWindow::refreshProject()
     } else {
         m_projectFolder = s.value("folder").toString();
         option = s.value("option").toString();
-        {
-            const QSignalBlocker block(m_options);
-            m_options->clear();
-            for (const auto& o : s.value("options").toArray())
-                m_options->addItem(o.toString());
-            m_options->setCurrentText(option);
+        for (const auto& o : s.value("options").toArray()) {
+            const QString name = o.toString();
+            auto* a = new QAction(name, m_versionsMenu);
+            a->setObjectName(QStringLiteral("option:") + name);
+            a->setCheckable(true);
+            a->setChecked(name == option);
+            m_optionGroup->addAction(a);
+            m_versionsMenu->insertAction(m_newOptionAction, a);
+            connect(a, &QAction::triggered, this, [this, name] {
+                if (name != m_currentOption && !switchOption(name))
+                    refreshProject(); // the check goes back to the current option
+            });
+            m_optionActions << a;
         }
         m_history->setVersions(bridge("history", {QStringLiteral("200")}).value("versions").toArray());
     }
+    m_currentOption = option;
+    updateVersionsButton();
     const QJsonObject doc = documentState();
     QString name = doc.value("untitled").toBool() ? tr("Untitled") : doc.value("name").toString();
     if (m_versioned)
@@ -2296,7 +2396,7 @@ bool MainWindow::commitVersion(const QString& message)
 void MainWindow::saveVersionDialog()
 {
     if (!m_versioned) {
-        m_status->showMessage(tr("Enable versioning first (File menu)"));
+        m_status->showMessage(tr("Enable versioning first (Versions menu)"));
         return;
     }
     const QJsonObject changes = bridge("version_changes");
@@ -2465,7 +2565,7 @@ void MainWindow::combineDialog()
         return;
     QStringList others;
     for (const auto& o : bridge("options").value("options").toArray())
-        if (o.toString() != m_options->currentText())
+        if (o.toString() != m_currentOption)
             others << o.toString();
     if (others.isEmpty()) {
         m_status->showMessage(tr("There is no other option to combine with"));
@@ -2496,7 +2596,7 @@ void MainWindow::deleteOptionDialog()
 {
     QStringList others;
     for (const auto& o : bridge("options").value("options").toArray())
-        if (o.toString() != m_options->currentText() && o.toString() != QLatin1String("main"))
+        if (o.toString() != m_currentOption && o.toString() != QLatin1String("main"))
             others << o.toString();
     if (others.isEmpty()) {
         m_status->showMessage(tr("No other option to delete (the current one and main can't be deleted)"));
@@ -4309,6 +4409,13 @@ void MainWindow::afterEdit(const QJsonObject& result)
     m_tree->updateNames(bridge("spatial_tree")); // names can change through edits and undo
     // Defer the panel rebuild: this can run from inside the panel's own itemChanged handler.
     QMetaObject::invokeMethod(this, &MainWindow::refreshProperties, Qt::QueuedConnection);
+}
+
+bool MainWindow::nativeEvent(const QByteArray& eventType, void* message, qintptr* result)
+{
+    if (TitleBar::nativeEvent(this, m_titleBar, eventType, message, result)) // D75: the custom title bar
+        return true;
+    return QMainWindow::nativeEvent(eventType, message, result);
 }
 
 bool MainWindow::isDirty() const

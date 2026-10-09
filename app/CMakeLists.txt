@@ -35,6 +35,7 @@ qt_add_library(kimcad_core STATIC
     src/ToolPalette.cpp src/ToolPalette.h
     src/ToolOptionsBar.cpp src/ToolOptionsBar.h
     src/StatusStrip.cpp src/StatusStrip.h
+    src/TitleBar.cpp src/TitleBar.h
     src/Graphics.cpp src/Graphics.h
     src/PenGrid.cpp src/PenGrid.h
     src/GraphicsDialogs.cpp src/GraphicsDialogs.h src/RuleDialogs.cpp src/PurposeDialogs.cpp src/RenovationDialogs.cpp
@@ -49,6 +50,9 @@ qt_add_resources(kimcad_core "kimcad_icons" PREFIX "/icons" BASE resources/icons
 target_link_libraries(kimcad_core PUBLIC Qt6::Widgets Qt6::Svg Python3::Python
     TKernel TKMath TKService TKV3d TKOpenGl TKBRep TKG3d ads::qtadvanceddocking-qt6)
 target_include_directories(kimcad_core PUBLIC ${OpenCASCADE_INCLUDE_DIR})
+if(WIN32)
+    target_link_libraries(kimcad_core PUBLIC dwmapi) # D75: the custom title bar keeps the native frame
+endif()
 target_compile_definitions(kimcad_core PUBLIC KIMCAD_VERSION="${PROJECT_VERSION}" _USE_MATH_DEFINES)
 qt_add_translations(kimcad_core
     TS_FILES translations/kimcad_en.ts translations/kimcad_es.ts
