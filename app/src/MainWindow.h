@@ -60,6 +60,7 @@ class HostTool;
 class TwoPointTool;
 class RotateTool;
 class GripTool;
+class MeasureController;
 struct WallSegment;
 struct Snap;
 struct Host;
@@ -112,7 +113,7 @@ public:
     TitleBar* titleBar() const { return m_titleBar; } // D75: menus, level, cuts, title, Versions
     // Modeling tools (M3): one active at a time. Exposed for tests and the self-test, which drive
     // them with work-plane points.
-    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening, PlaceModel, Text, Dimension, Mark, Section, Elevation, Leader, Mirror, Room, Roof };
+    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening, PlaceModel, Text, Dimension, Mark, Section, Elevation, Leader, Mirror, Room, Roof, Measure };
     void setTool(Tool tool);
     Tool tool() const { return m_tool; }
     WallTool* wallTool() const { return m_wallTool; }
@@ -121,6 +122,7 @@ public:
     TwoPointTool* twoPointTool() const { return m_twoPointTool; }
     RotateTool* rotateTool() const { return m_rotateTool; }
     GripTool* gripTool() const { return m_gripTool; }
+    MeasureController* measure() const { return m_measure; } // D79: never edits the model
     // Editing (Slice 6). Walls joined to moved walls follow unless `detach` (Ctrl while clicking).
     bool moveSelection(QPointF delta, bool detach = false);
     bool rotateSelection(QPointF centre, double radians, bool detach = false);
@@ -323,6 +325,7 @@ private:
     void typeEditDialog(const QString& pset, const QString& prop);
     void refreshLevels();
     void addLevelDialog();
+    void levelsDialog(); // D79: Model > Levels..., the levels table
     void setPlanView(bool plan);
     void buildModelingToolbar();
     void buildPalette();
@@ -430,6 +433,8 @@ private:
     TwoPointTool* m_twoPointTool = nullptr;
     RotateTool* m_rotateTool = nullptr;
     GripTool* m_gripTool = nullptr;
+    MeasureController* m_measure = nullptr;
+    QToolButton* m_measureCopy = nullptr;
     bool m_detach = false; // Ctrl held on the click that finished a move/rotate
     std::optional<QPointF> m_columnHover;
     Tool m_tool = Tool::None;

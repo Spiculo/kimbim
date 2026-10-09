@@ -21,6 +21,10 @@ qt_add_library(kimcad_core STATIC
     src/PolygonTool.cpp src/PolygonTool.h
     src/HostTool.cpp src/HostTool.h
     src/TwoPointTool.cpp src/TwoPointTool.h
+    src/MeasureTool.cpp src/MeasureTool.h
+    src/MeasureOverlay.cpp src/MeasureOverlay.h
+    src/MeasureController.cpp src/MeasureController.h
+    src/LevelsDialog.cpp src/LevelsDialog.h
     src/RotateTool.cpp src/RotateTool.h
     src/GripTool.cpp src/GripTool.h
     src/ModelLoader.cpp src/ModelLoader.h
@@ -90,6 +94,7 @@ kimcad_test(test_wall_tool)
 kimcad_test(test_polygon_tool)
 kimcad_test(test_host_tool)
 kimcad_test(test_two_point_tool)
+kimcad_test(test_measure_and_levels)
 kimcad_test(test_rotate_tool)
 kimcad_test(test_grip_tool)
 kimcad_test(test_dock_layout)

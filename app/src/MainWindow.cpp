@@ -84,6 +84,8 @@
 #include "HistoryPanel.h"
 #include "LayersPanel.h"
 #include "LevelsBar.h"
+#include "LevelsDialog.h"
+#include "MeasureController.h"
 #include "HostTool.h"
 #include "PolygonTool.h"
 #include "GripTool.h"
@@ -649,6 +651,7 @@ void MainWindow::buildCutsToolbar()
     m_levels = new LevelsBar(m_titleBar);
     m_titleBar->addControl(m_levels);
     connect(m_levels, &LevelsBar::addLevelRequested, this, &MainWindow::addLevelDialog);
+    connect(m_levels, &LevelsBar::levelsDialogRequested, this, &MainWindow::levelsDialog);
     connect(m_levels, &LevelsBar::newModelRequested, this, [this] {
         bool ok = false;
         const QString name = QInputDialog::getText(this, tr("New model"),
@@ -1087,6 +1090,25 @@ void MainWindow::addLevelDialog()
         addLevel(name.trimmed(), elevation);
 }
 
+void MainWindow::levelsDialog()
+{
+    // D79 (Archicad's Story Settings): edited in the dialog, applied on OK as one undo step.
+    const QJsonObject table = bridge("levels_table");
+    const QString unit = m_settings.value("length_unit").toString(QStringLiteral("m"));
+    const double factor = unit == QLatin1String("mm") ? 1000.0 : unit == QLatin1String("cm") ? 100.0 : 1.0;
+    LevelsDialog dialog(table.value("levels").toArray(), unit, factor, m_settings.value("length_decimals").toInt(2), this);
+    if (dialog.exec() != QDialog::Accepted || !dialog.table().modified())
+        return;
+    const QJsonObject r = bridge("edit_storeys",
+        {QString::fromUtf8(QJsonDocument(dialog.table().changes()).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not change the levels"), r.value("error").toString());
+        return;
+    }
+    afterEdit(r);
+    m_status->showMessage(tr("Levels changed"));
+}
+
 void MainWindow::setPlanView(bool plan)
 {
     // D71: a plan is its level's tab; 3 goes back to the 3D tab.
@@ -1110,6 +1132,11 @@ void MainWindow::buildModelingToolbar()
     m_twoPointTool = new TwoPointTool(this);
     m_rotateTool = new RotateTool(this);
     m_gripTool = new GripTool(this);
+    m_measure = new MeasureController([this](double m) { return formatLength(m); }, this);
+    connect(m_measure, &MeasureController::message, this, [this](const QString& text) {
+        if (m_tool == Tool::Measure)
+            m_status->showMessage(text);
+    });
 
     struct Def {
         Tool tool;
@@ -1157,6 +1184,8 @@ void MainWindow::buildModelingToolbar()
             tr("Section: click the two ends of the section line, then the side it looks at")},
         {Tool::Elevation, "actionElevationTool", tr("&Elevation"), QKeyCombination(Qt::SHIFT, Qt::Key_V),
             tr("Elevation: click the two ends of the elevation line, then the side it looks at")},
+        {Tool::Measure, "actionMeasureTool", tr("Mea&sure"), QKeyCombination(Qt::SHIFT, Qt::Key_M),
+            tr("Measure distances, angles and areas: click points (they snap); Enter stops, Esc clears. Changes nothing")},
     };
     // The tools' icons: the IFC class each one makes (the tree's icons).
     const QHash<int, QString> iconClass = {{int(Tool::Wall), "IfcWall"}, {int(Tool::Slab), "IfcSlab"},
@@ -1178,6 +1207,7 @@ void MainWindow::buildModelingToolbar()
     }
     model->addSeparator();
     model->addAction(m_levels->addLevelAction()); // D75: also in the level drop-down
+    model->addAction(m_levels->levelsAction());   // D79: the levels table, also in the drop-down
     model->addAction(m_levels->newModelAction());
     QAction* copyAction = model->addAction(tr("Copy to &level..."));
     copyAction->setObjectName(QStringLiteral("actionCopyToLevel"));
@@ -1263,6 +1293,12 @@ void MainWindow::buildModelingToolbar()
     m_lengthInput->setPlaceholderText(tr("Length (m)"));
     m_lengthInput->setMaximumWidth(110);
     bar->addField(m_lengthInput);
+    m_measureCopy = new QToolButton(bar);
+    m_measureCopy->setObjectName(QStringLiteral("measureCopy"));
+    m_measureCopy->setText(tr("Copy"));
+    m_measureCopy->setToolTip(tr("Copy the measurement to the clipboard"));
+    bar->addField(m_measureCopy);
+    connect(m_measureCopy, &QToolButton::clicked, this, [this] { m_measure->copyToClipboard(); });
     m_hosts.value(QStringLiteral("3d"))->adoptChrome(m_toolOptions, nullptr);
     connect(m_lengthInput, &QLineEdit::returnPressed, this, [this] {
         bool ok = false;
@@ -1284,7 +1320,7 @@ void MainWindow::buildModelingToolbar()
     });
     setTool(Tool::None);
 
-    onEachView([this](Viewport* v) { connect(v, &Viewport::workPointMoved, this, [this](QPointF p, double tolerance, Qt::KeyboardModifiers mods) {
+    onEachView([this](Viewport* v) { connect(v, &Viewport::workPointMoved, this, [this, v](QPointF p, double tolerance, Qt::KeyboardModifiers mods) {
         const bool ortho = mods & Qt::ShiftModifier;
         switch (m_tool) {
         case Tool::Wall:
@@ -1346,11 +1382,14 @@ void MainWindow::buildModelingToolbar()
             m_gripTool->setOrtho(ortho);
             m_gripTool->move(p);
             break;
+        case Tool::Measure:
+            m_measure->pointer(v, p, m_levels->activeElevation(), tolerance, ortho, false);
+            break;
         case Tool::None:
             break;
         }
     }); });
-    onEachView([this](Viewport* v) { connect(v, &Viewport::workPointClicked, this, [this](QPointF p, double tolerance, Qt::KeyboardModifiers mods) {
+    onEachView([this](Viewport* v) { connect(v, &Viewport::workPointClicked, this, [this, v](QPointF p, double tolerance, Qt::KeyboardModifiers mods) {
         const bool ortho = mods & Qt::ShiftModifier;
         switch (m_tool) {
         case Tool::Wall:
@@ -1434,6 +1473,9 @@ void MainWindow::buildModelingToolbar()
             m_gripTool->setOrtho(ortho);
             m_gripTool->click(p);
             break;
+        case Tool::Measure:
+            m_measure->pointer(v, p, m_levels->activeElevation(), tolerance, ortho, true);
+            break;
         case Tool::None:
             break;
         }
@@ -1451,6 +1493,8 @@ void MainWindow::buildModelingToolbar()
             m_rotateTool->cancel();
         else if (m_tool == Tool::Stretch && m_gripTool->isDragging())
             m_gripTool->cancel();
+        else if (m_tool == Tool::Measure && m_measure->tool()->isMeasuring())
+            m_measure->clear(); // D79: Esc clears the measurement; again leaves the tool
         else
             setTool(Tool::None);
     }); });
@@ -1459,6 +1503,8 @@ void MainWindow::buildModelingToolbar()
             m_wallTool->finish();
         else if (m_tool == Tool::Slab || m_tool == Tool::SlabOpening || m_tool == Tool::Roof)
             m_polygonTool->finish();
+        else if (m_tool == Tool::Measure)
+            m_measure->finish();
     }); });
     onEachView([this](Viewport* v) { connect(v, &Viewport::lengthKeyTyped, this, [this](const QString& text) {
         if (m_lengthInput->isHidden() || m_toolOptions->isHidden())
@@ -1538,6 +1584,7 @@ void MainWindow::refreshTypes()
     case Tool::Elevation:
         break;
     case Tool::Grid:
+    case Tool::Measure:
     case Tool::None:
         break;
     }
@@ -1562,7 +1609,7 @@ void MainWindow::refreshSnapData()
     const QVector<SnapWall> walls = Snapper::parse(data);
     const QVector<SnapLine> lines = Snapper::parseGrid(data);
     for (Snapper* s : {&m_wallTool->snapper(), &m_polygonTool->snapper(), &m_twoPointTool->snapper(),
-             &m_rotateTool->snapper(), &m_gripTool->snapper()}) {
+             &m_rotateTool->snapper(), &m_gripTool->snapper(), &m_measure->tool()->snapper()}) {
         s->setWalls(walls);
         s->setGridLines(lines);
     }
@@ -1637,6 +1684,7 @@ void MainWindow::updateToolPreview()
                 z + sill, z + sill + type.value("height").toDouble(2.1)});
         }
         break;
+    case Tool::Measure: // draws its own path (MeasureController)
     case Tool::None:
         break;
     }
@@ -1674,9 +1722,11 @@ void MainWindow::setTool(Tool tool)
     m_twoPointTool->cancel();
     m_rotateTool->cancel();
     m_gripTool->cancel();
+    m_measure->stop();
     m_columnHover.reset();
     m_annotationPoints.clear();
     m_tool = tool;
+    m_measureCopy->setVisible(tool == Tool::Measure);
     m_twoPointTool->snapper().setFaceSnapping(tool == Tool::Dimension); // dimensions measure wall faces
     for (auto it = m_toolActions.constBegin(); it != m_toolActions.constEnd(); ++it) {
         const QSignalBlocker block(it.value());
@@ -1736,6 +1786,9 @@ void MainWindow::setTool(Tool tool)
         break;
     case Tool::Stretch:
         m_status->showMessage(tr("Stretch: click near a wall end, then its new position"));
+        break;
+    case Tool::Measure:
+        m_status->showMessage(m_measure->text());
         break;
     case Tool::Stair:
         m_status->showMessage(tr("Stair: click where it starts, then the direction it climbs"));
@@ -2133,7 +2186,7 @@ void MainWindow::buildPalette()
     m_palette->addGroup(QStringLiteral("view"), tr("View"), {tool(Tool::Section), tool(Tool::Elevation),
         newPlan, newSheet});
     m_palette->addGroup(QStringLiteral("edit"), tr("Edit"), {tool(Tool::Move), tool(Tool::Rotate),
-        tool(Tool::Stretch), mirror, act("actionCopyToLevel")});
+        tool(Tool::Stretch), mirror, act("actionCopyToLevel"), tool(Tool::Measure)});
     m_dock->addLeft(QStringLiteral("tools"), tr("Tools"), m_palette);
     // View > Panels: a panel closed with its x comes back from here (D71).
     m_viewMenu->addSeparator();
