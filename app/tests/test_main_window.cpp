@@ -41,6 +41,7 @@
 #include <QTableWidget>
 #include "DrawingsPanel.h"
 #include "SheetsPanel.h"
+#include "SchedulesDialog.h"
 #include "ElementBatch.h"
 #include "LevelsBar.h"
 #include "HostTool.h"
@@ -1393,6 +1394,53 @@ private slots:
         QVERIFY2(stamp.startsWith(QStringLiteral("Room\n101\n")) && stamp.endsWith(QStringLiteral(" m²")), qPrintable(stamp));
         QVERIFY(action(w, "actionRoomSchedule"));
         QCOMPARE(action(w, "actionRoomTool")->shortcut(), QKeySequence(Qt::Key_Z));
+        QVERIFY(w.close());
+    }
+
+    void schedulesSelectAndEdit()
+    {
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.wallTool()->setTolerance(0.05);
+        for (const QPointF& p : {QPointF(0, 0), QPointF(6, 0), QPointF(6, 4), QPointF(0, 4), QPointF(0, 0)})
+            w.wallTool()->click(p);
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QVERIFY(action(w, "actionSchedules"));
+        kimcad::SchedulesDialog* s = w.openSchedules(QStringLiteral("walls"));
+        QVERIFY(s && s->objectName() == QLatin1String("schedulesDialog"));
+        QCOMPARE(s->currentScheme(), QStringLiteral("walls"));
+        QTableWidget* t = s->table();
+        QCOMPARE(s->dataRows(), 4);
+        QCOMPARE(t->rowCount(), 5); // and the total row
+        // The columns: Mark, Name, Type, Level, Length (m), ...; lengths on the axes 6 + 4 + 6 + 4 = 20 m.
+        QCOMPARE(t->horizontalHeaderItem(4)->text(), kimcad::SchedulesDialog::translatedLabel(QStringLiteral("Length")) + QStringLiteral(" (m)"));
+        QCOMPARE(t->item(4, 4)->text(), QLocale().toString(20.0, 'f', 2));
+        // Clicking a row selects its wall in the model.
+        t->selectRow(1);
+        QCOMPARE(w.selection(), s->guidsOfRow(1));
+        QCOMPARE(w.viewport()->selectedGuids(), s->guidsOfRow(1));
+        // Editing the Name cell renames the wall in one undo step.
+        const QString guid = s->guidsOfRow(1).first();
+        QVERIFY(t->item(1, 1)->flags() & Qt::ItemIsEditable);
+        QVERIFY(!(t->item(1, 4)->flags() & Qt::ItemIsEditable)); // quantities are computed
+        t->item(1, 1)->setText(QStringLiteral("North wall"));
+        QString error;
+        auto name = [&] {
+            return kimcad::PythonEngine::instance().callJson("properties", {guid}, &error).object().value("name").toString();
+        };
+        QCOMPARE(name(), QStringLiteral("North wall"));
+        QTRY_VERIFY(s->dataRows() == 4);
+        action(w, "actionUndo")->trigger();
+        QVERIFY(name() != QLatin1String("North wall"));
+        // Merging identical items: one row for the four walls of one type, with a count column.
+        s->mergeBox()->setChecked(true);
+        QCOMPARE(s->dataRows(), 1);
+        QCOMPARE(s->guidsOfRow(0).size(), 4);
+        QCOMPARE(t->item(0, t->columnCount() - 1)->text(), QStringLiteral("4"));
+        // The room schedule opens the same window on the rooms scheme.
+        action(w, "actionRoomSchedule")->trigger();
+        QCOMPARE(s->currentScheme(), QStringLiteral("rooms"));
         QVERIFY(w.close());
     }
 

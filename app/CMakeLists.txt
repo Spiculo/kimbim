@@ -29,6 +29,7 @@ qt_add_library(kimcad_core STATIC
     src/DrawingView.cpp src/DrawingView.h
     src/SheetExport.cpp src/SheetExport.h
     src/SheetsPanel.cpp src/SheetsPanel.h
+    src/SchedulesDialog.cpp src/SchedulesDialog.h
     src/DockLayout.cpp src/DockLayout.h
     src/Scene.cpp src/Scene.h
     src/ViewHost.cpp src/ViewHost.h

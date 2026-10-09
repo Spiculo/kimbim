@@ -49,6 +49,7 @@ class Scene;
 class ViewHost;
 class DrawingsPanel;
 class SheetsPanel;
+class SchedulesDialog;
 class DrawingView;
 class HistoryPanel;
 class LayersPanel;
@@ -233,6 +234,9 @@ public:
     StatusStrip* statusStrip() const { return m_status; }          // the bottom bar
     // Sheets and project info (Slice 16, M4 exit).
     SheetsPanel* sheetsPanel() const { return m_sheetsPanel; }
+    // Schedules and quantities (D77): the schedule window, opened on a scheme ("doors", "rooms", ...).
+    SchedulesDialog* openSchedules(const QString& scheme = QString());
+    SchedulesDialog* schedulesDialog() const { return m_schedules; }
     QString addSheet(const QString& paper, const QString& title); // its number, "" on failure
     bool placeOnSheet(const QString& number, const QString& drawingGuid);
     bool placeLegend(const QString& number); // D74: a legend of the sheet's purpose, at a free spot
@@ -443,6 +447,7 @@ private:
     QHash<Viewport*, CutSettings> m_cuts;
     DrawingsPanel* m_drawingsPanel = nullptr;
     SheetsPanel* m_sheetsPanel = nullptr;
+    SchedulesDialog* m_schedules = nullptr;
     QHash<QString, DrawingView*> m_drawingViews;
     QSet<QString> m_generating, m_generateAgain;
     QList<QThread*> m_drawingThreads;

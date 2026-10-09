@@ -79,6 +79,7 @@
 #include "DrawingsPanel.h"
 #include "SheetExport.h"
 #include "SheetsPanel.h"
+#include "SchedulesDialog.h"
 #include "ElementBatch.h"
 #include "HistoryPanel.h"
 #include "LayersPanel.h"
@@ -324,6 +325,10 @@ void MainWindow::buildMenus()
     QAction* schedule = file->addAction(tr("&Room schedule..."));
     schedule->setObjectName(QStringLiteral("actionRoomSchedule"));
     connect(schedule, &QAction::triggered, this, &MainWindow::roomScheduleDialog);
+    QAction* schedules = file->addAction(tr("Sc&hedules..."));
+    schedules->setObjectName(QStringLiteral("actionSchedules"));
+    schedules->setToolTip(tr("Doors, windows, walls, slabs, columns, beams, rooms or your own schedules, with quantities"));
+    connect(schedules, &QAction::triggered, this, [this] { openSchedules(); });
     file->addSeparator();
     file->addSeparator();
     QAction* quit = file->addAction(tr("&Quit"));
@@ -3773,48 +3778,32 @@ bool MainWindow::roomAt(QPointF p, const QString& name)
 
 void MainWindow::roomScheduleDialog()
 {
-    QDialog dialog(this);
-    dialog.setObjectName(QStringLiteral("roomScheduleDialog"));
-    dialog.setWindowTitle(tr("Room schedule"));
-    auto* layout = new QVBoxLayout(&dialog);
-    auto* table = new QTableWidget(&dialog);
-    table->setObjectName(QStringLiteral("roomScheduleTable"));
-    const QStringList headers = {tr("Number"), tr("Name"), tr("Level"), tr("Area (m²)"), tr("Perimeter (m)"), tr("Height (m)")};
-    table->setColumnCount(int(headers.size()));
-    table->setHorizontalHeaderLabels(headers);
-    table->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    const QJsonObject data = bridge("room_schedule");
-    const QJsonArray rows = data.value("rows").toArray();
-    table->setRowCount(int(rows.size()) + 1);
-    const QLocale locale;
-    for (int i = 0; i < rows.size(); ++i) {
-        const QJsonObject r = rows[i].toObject();
-        const QStringList cells = {r.value("number").toString(), r.value("name").toString(), r.value("level").toString(),
-            locale.toString(r.value("area").toDouble(), 'f', 2), locale.toString(r.value("perimeter").toDouble(), 'f', 2),
-            locale.toString(r.value("height").toDouble(), 'f', 2)};
-        for (int c = 0; c < cells.size(); ++c)
-            table->setItem(i, c, new QTableWidgetItem(cells[c]));
+    openSchedules(QStringLiteral("rooms")); // the room schedule is one of the schedules (D77)
+}
+
+SchedulesDialog* MainWindow::openSchedules(const QString& scheme)
+{
+    if (!m_schedules) {
+        m_schedules = new SchedulesDialog(this);
+        // A row click selects its elements in every view and the tree, like a click in the model.
+        connect(m_schedules, &SchedulesDialog::selectRequested, this, [this](const QStringList& guids) {
+            m_viewport->selectGuids(guids);
+            m_tree->selectGuids(guids);
+            setSelection(guids);
+        });
+        connect(m_schedules, &SchedulesDialog::edited, this, [this](const QJsonObject& r) { afterEdit(r); });
+        connect(this, &MainWindow::loadFinished, m_schedules, [this] { m_schedules->modelChanged(); });
     }
-    table->setItem(int(rows.size()), 0, new QTableWidgetItem(tr("Total")));
-    table->setItem(int(rows.size()), 3, new QTableWidgetItem(locale.toString(data.value("total_area").toDouble(), 'f', 2)));
-    table->horizontalHeader()->setStretchLastSection(true);
-    table->resizeColumnsToContents();
-    table->setMinimumSize(560, 300);
-    layout->addWidget(table);
-    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dialog);
-    QPushButton* csv = buttons->addButton(tr("Export &CSV..."), QDialogButtonBox::ActionRole);
-    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-    connect(csv, &QPushButton::clicked, &dialog, [this, &dialog] {
-        const QString path = QFileDialog::getSaveFileName(&dialog, tr("Export room schedule"), QStringLiteral("rooms.csv"),
-            tr("CSV files (*.csv)"));
-        if (path.isEmpty())
-            return;
-        const QJsonObject r = bridge("export_room_schedule", {path});
-        m_status->showMessage(r.value("ok").toBool() ? tr("Room schedule saved to %1").arg(path)
-                                                        : tr("Could not export it: %1").arg(r.value("error").toString()));
-    });
-    layout->addWidget(buttons);
-    dialog.exec();
+    if (!scheme.isEmpty())
+        m_schedules->showScheme(scheme);
+    else
+        m_schedules->refresh();
+    if (!m_quiet) {
+        m_schedules->show();
+        m_schedules->raise();
+        m_schedules->activateWindow();
+    }
+    return m_schedules;
 }
 
 void MainWindow::projectInfoDialog()
@@ -4409,6 +4398,8 @@ void MainWindow::afterEdit(const QJsonObject& result)
     m_tree->updateNames(bridge("spatial_tree")); // names can change through edits and undo
     // Defer the panel rebuild: this can run from inside the panel's own itemChanged handler.
     QMetaObject::invokeMethod(this, &MainWindow::refreshProperties, Qt::QueuedConnection);
+    if (m_schedules)
+        m_schedules->modelChanged();
 }
 
 bool MainWindow::nativeEvent(const QByteArray& eventType, void* message, qintptr* result)
