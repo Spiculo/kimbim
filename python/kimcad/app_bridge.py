@@ -1060,6 +1060,7 @@ _EXPORTS = {
         "console_help",
         "console_run",
         "console_run_file",
+        "console_stop",
     ),
 }
 _EXPORTED = {name: module for module, names in _EXPORTS.items() for name in names}

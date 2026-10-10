@@ -2241,6 +2241,7 @@ void MainWindow::buildPalette()
     for (const char* key : {"tools", "tree", "properties", "layers", "history", "drawings", "sheets"})
         if (ads::CDockWidget* d = m_dock->manager()->findDockWidget(QLatin1String(key)))
             panels->addAction(d->toggleViewAction());
+    buildConsoleActions(); // D82
 }
 
 void MainWindow::newSheetDialog(const QString& paper)

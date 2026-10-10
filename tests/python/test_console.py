@@ -43,10 +43,10 @@ def test_namespace_persists_between_runs(opened):
 def test_traceback_is_shown_and_the_app_survives(opened):
     r = run("def f():\n    return 1 / 0\nf()")
     assert r["ok"] and r["error"]
-    assert "ZeroDivisionError" in r["output"] and "return 1 / 0" in r["output"]
-    assert "console.py" not in r["output"]
+    assert "ZeroDivisionError" in r["traceback"] and "return 1 / 0" in r["traceback"]
+    assert "console.py" not in r["traceback"]
     r = run("def broken(:")
-    assert r["error"] and "SyntaxError" in r["output"]
+    assert r["error"] and "SyntaxError" in r["traceback"]
     assert run("raise SystemExit(3)")["error"]
 
 
@@ -58,7 +58,7 @@ def test_edit_is_one_undo_step_and_redraws_what_changed(opened):
         "        ifcopenshell.api.attribute.edit_attributes(ifc, product=w, attributes={'Name': 'Scripted'})\n"
     )
     r = run(code)
-    assert r["ok"] and not r["error"], r["output"]
+    assert r["ok"] and not r["error"], r["traceback"]
     assert r["edited"]
     assert set(r["geometry"]["changed"]) == set(opened)
     assert call("state")["can_undo"]
@@ -75,7 +75,7 @@ def test_bridge_commands_inside_edit_join_its_step(opened):
         "    bridge.delete_elements(json.dumps([ifc.by_type('IfcWall')[0].GlobalId]))\n"
     )
     r = run("import json\n" + code)
-    assert not r["error"], r["output"]
+    assert not r["error"], r["traceback"]
     assert opened[0] in r["geometry"]["removed"]
     assert len(app_bridge._model.by_type("IfcWall")) == 2
     call("undo")
@@ -90,7 +90,7 @@ def test_failed_edit_rolls_back(opened):
         "    raise ValueError('nope')\n"
     )
     r = run(code)
-    assert r["error"] and "ValueError" in r["output"]
+    assert r["error"] and "ValueError" in r["traceback"]
     assert "half" not in {w.Name for w in app_bridge._model.by_type("IfcWall")}
     assert not call("state")["can_undo"] and not r["edited"]
 
@@ -132,8 +132,8 @@ def test_stop_interrupts_a_running_loop(opened):
             break
         time.sleep(0.02)
     time.sleep(0.1)
-    assert json.loads(console.request_stop())["ok"]
+    assert json.loads(console.console_stop())["ok"]
     t.join(10)
     assert not t.is_alive()
-    assert result["error"] and "KeyboardInterrupt" in result["output"]
+    assert result["error"] and "KeyboardInterrupt" in result["traceback"]
     assert run("1 + 1")["output"] == "2\n"  # the console still works, with no tracing left

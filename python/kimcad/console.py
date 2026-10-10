@@ -3,7 +3,7 @@
 in the embedded interpreter in one persistent namespace with the open model and a few helpers.
 
 The app runs `console_run` on a worker thread while a modal "Running..." dialog keeps the window painting;
-its Stop button calls `request_stop`, which makes the script raise KeyboardInterrupt at its next line of
+its Stop button calls `console_stop`, which makes the script raise KeyboardInterrupt at its next line of
 user code (never inside KIMCAD's own code, so an undo step is never left half-recorded).
 Same protocol as app_bridge for the bridge functions: strings in, JSON out, never raise.
 """
@@ -196,7 +196,7 @@ def _trace(frame, event, arg):
     return _trace
 
 
-def request_stop() -> str:
+def console_stop() -> str:
     """Stop the running script at its next line of user code (KeyboardInterrupt). Called from another thread."""
     global _stop
     if _worker is None:
@@ -249,21 +249,21 @@ def _execute_all(source: str, filename: str, selection_json: str, echo: bool, ex
         ns = namespace()
         ns.update(extra or {})
         out = io.StringIO()
-        error = False
+        error = ""
         _stop, _worker = False, threading.get_ident()
         try:
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
                 _execute(source, filename, ns, echo)
         except BaseException as ex:  # noqa: BLE001  (a script's SystemExit or Stop ends the run, not the app)
-            error = True
-            out.write(_show_error(ex))
+            error = _show_error(ex)
         finally:
             _worker = None
             if _stop:
                 threading.settrace_all_threads(None)
             _stop = False
         geometry = _geometry(before)
-        return B._dump({"ok": True, "output": out.getvalue(), "error": error, "geometry": geometry,
+        return B._dump({"ok": True, "output": out.getvalue(), "error": bool(error),
+                        "traceback": error, "geometry": geometry,
                         "edited": list(B._ids) != before or _run["refresh"], "select": _run["select"]})
     except Exception as ex:  # noqa: BLE001
         return B._dump({"ok": False, "error": f"{type(ex).__name__}: {ex}"})
@@ -285,7 +285,7 @@ def _geometry(before: list) -> dict:
 # ---------------------------------------------------------------- bridge
 
 def console_run(code: str, selection_json: str = "[]") -> str:
-    """Run console input. Returns {ok, output, error (a traceback was printed), geometry, edited, select}."""
+    """Run console input. Returns {ok, output, error, traceback, geometry, edited, select}."""
     global _count
     _count += 1
     return _execute_all(code, f"<console-{_count}>", selection_json, echo=True)

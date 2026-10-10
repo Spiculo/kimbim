@@ -50,6 +50,7 @@ class ViewHost;
 class DrawingsPanel;
 class FindSelectPanel;
 class ChecksPanel;
+class ConsolePanel;
 class SheetsPanel;
 class SchedulesDialog;
 class DrawingView;
@@ -316,6 +317,12 @@ public:
     bool saveClashSet(const QString& name, const QJsonObject& set, const QString& replaces = QString());
     bool deleteClashSet(const QString& name);
     void showIssue(const QStringList& guids);
+    // D82: the Python console (ConsoleTools.cpp). Runs code / a .py file in kimcad.console's namespace on a
+    // worker thread (Stop interrupts it), shows the output in the panel, then applies its edits (afterEdit)
+    // and selection. Returns console_run's result: {ok, output, error, traceback, geometry, edited, select}.
+    ConsolePanel* consolePanel(); // created and docked on first use
+    QJsonObject runConsole(const QString& code);
+    QJsonObject runConsoleFile(const QString& path);
     bool save();                        // to the current file; asks for a path if there is none
     bool saveAs(const QString& path);
 
@@ -429,6 +436,10 @@ private:
     FindSelectPanel* m_findSelect = nullptr;
     void refreshChecks(); // D81
     ChecksPanel* m_checks = nullptr;
+    void buildConsoleActions();
+    void runScriptDialog();
+    QJsonObject runConsoleCall(const char* fn, const QString& arg);
+    ConsolePanel* m_console = nullptr;
 
     void onOpened(const QJsonObject& info);
     void onChunk(const MeshChunk& chunk);
