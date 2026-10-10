@@ -170,8 +170,8 @@ fn merge_commits_merge_base_and_fast_forward() {
 /// A project as the app makes it: the first version is a pack (>= 100 objects), later small versions
 /// are loose objects. Each read opens a fresh object store whose pack index loads lazily, and
 /// read_blobs looks objects up from rayon's threads: gix 0.88 could then answer "not found" to a
-/// thread that lost the race to load the one index (intermittent "An object with id ... could not
-/// be found" in the Python suite, about 1 read in 500 there).
+/// thread that lost the race to load the index (intermittent "An object with id ... could not be
+/// found" in the Python suite, about 1 read in 500 there). Several readers at once make it likelier.
 #[test]
 fn parallel_reads_of_a_fresh_store_find_every_object() {
     let dir = tempfile::tempdir().unwrap();
@@ -183,17 +183,32 @@ fn parallel_reads_of_a_fresh_store_find_every_object() {
         let c = (0..3).map(|j| (format!("o/{j}"), Some(format!("record {j} v{k}").into_bytes()))).collect();
         repo.commit(&c, "small", &sig(2 + k)).unwrap();
     }
-    let rounds: usize = std::env::var("KIMCAD_STRESS_ROUNDS").ok().and_then(|v| v.parse().ok()).unwrap_or(3000);
-    let revs = ["HEAD", "HEAD~1", "HEAD~2", "HEAD~3"];
-    let oids: Vec<Vec<String>> = revs.iter().map(|r| repo.tree_entries(r).unwrap().into_values().collect()).collect();
-    let mut failures = Vec::new();
-    for round in 0..rounds {
-        let ids = &oids[round % oids.len()];
-        match repo.read_blobs(ids) {
-            Ok(blobs) => assert_eq!(blobs.len(), ids.len()),
-            Err(e) => failures.push(format!("round {round}: {e}")),
-        }
-    }
-    assert!(failures.is_empty(), "{} of {rounds} reads failed, first: {}", failures.len(), failures[0]);
+    let rounds: usize = std::env::var("KIMCAD_STRESS_ROUNDS").ok().and_then(|v| v.parse().ok()).unwrap_or(1500);
+    let readers: usize = std::env::var("KIMCAD_STRESS_READERS").ok().and_then(|v| v.parse().ok()).unwrap_or(4);
+    let oids: Vec<Vec<String>> =
+        ["HEAD", "HEAD~1", "HEAD~2", "HEAD~3"].iter().map(|r| repo.tree_entries(r).unwrap().into_values().collect()).collect();
+    let failures: Vec<String> = std::thread::scope(|s| {
+        let workers: Vec<_> = (0..readers)
+            .map(|_| {
+                s.spawn(|| {
+                    (0..rounds)
+                        .filter_map(|round| {
+                            let ids = &oids[round % oids.len()];
+                            match repo.read_blobs(ids) {
+                                Ok(blobs) => {
+                                    assert_eq!(blobs.len(), ids.len());
+                                    None
+                                }
+                                Err(e) => Some(format!("round {round}: {e}")),
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                })
+            })
+            .collect();
+        workers.into_iter().flat_map(|w| w.join().unwrap()).collect()
+    });
+    let total = rounds * readers;
+    assert!(failures.is_empty(), "{} of {total} reads failed, first: {}", failures.len(), failures[0]);
 }
 
