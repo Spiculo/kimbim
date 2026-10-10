@@ -44,7 +44,7 @@ enum { IdRole = Qt::UserRole + 1 };
     QT_TRANSLATE_NOOP("LibraryPanel", "Height"), QT_TRANSLATE_NOOP("LibraryPanel", "Seat height"),
     QT_TRANSLATE_NOOP("LibraryPanel", "Seats"), QT_TRANSLATE_NOOP("LibraryPanel", "Doors"),
     QT_TRANSLATE_NOOP("LibraryPanel", "Shelves"), QT_TRANSLATE_NOOP("LibraryPanel", "Units"),
-    QT_TRANSLATE_NOOP("LibraryPanel", "Elevation"), QT_TRANSLATE_NOOP("LibraryPanel", "Bowls"),
+    QT_TRANSLATE_NOOP("LibraryPanel", "Mounting height"), QT_TRANSLATE_NOOP("LibraryPanel", "Bowls"),
     QT_TRANSLATE_NOOP("LibraryPanel", "Burners"), QT_TRANSLATE_NOOP("LibraryPanel", "Crown diameter"),
     QT_TRANSLATE_NOOP("LibraryPanel", "Trunk diameter"),
 };

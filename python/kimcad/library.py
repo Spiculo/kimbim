@@ -430,7 +430,7 @@ KITCHEN_FURNITURE = FURNITURE("USERDEFINED", "KITCHENCABINET")
 define("base_cabinets", "Base cabinets", "kitchen", KITCHEN_FURNITURE,
        [W(2.4), D(0.6), H(0.9), Param("units", "Units", 4, "count", 1, 12)], _base_cabinets)
 define("wall_cabinets", "Wall cabinets", "kitchen", KITCHEN_FURNITURE,
-       [W(1.2), D(0.35), H(0.7), Param("elevation", "Elevation", 1.45, "length", 0.0, 3.0),
+       [W(1.2), D(0.35), H(0.7), Param("elevation", "Mounting height", 1.45, "length", 0.0, 3.0),
         Param("units", "Units", 2, "count", 1, 12)], _wall_cabinets)
 define("sink_unit", "Sink unit", "kitchen", SANITARY("SINK"),
        [W(1.2), D(0.6), H(0.9), Param("bowls", "Bowls", 1, "count", 1, 2)], _sink_unit)
