@@ -68,16 +68,26 @@ def _members(layer, owners) -> list:
 def layers() -> str:
     found = _all()
     owners = _owners() if found else {}
-    listing = sorted(({"name": l.Name or "", "count": len(_members(l, owners))} for l in found),
-                     key=lambda x: x["name"].lower())
+    listing = [{"name": l.Name or "", "count": len(_members(l, owners))} for l in found]
+    names = {x["name"] for x in listing}
+    listing += [{"name": n, "count": 0} for n in _underlay_layers() if n not in names]
+    listing.sort(key=lambda x: x["name"].lower())
     return B._dump({"layers": listing, "active": _active})
 
 
 def layer_members() -> str:
     found = _all()
     owners = _owners() if found else {}
-    return B._dump({"layers": {l.Name or "": [p.GlobalId for p in _members(l, owners)] for l in found},
-                    "active": _active})
+    members = {l.Name or "": [p.GlobalId for p in _members(l, owners)] for l in found}
+    for n in _underlay_layers():  # D85: a layer only underlays use is listed (its state hides them)
+        members.setdefault(n, [])
+    return B._dump({"layers": members, "active": _active})
+
+
+def _underlay_layers() -> list:
+    from . import underlays
+
+    return underlays.underlay_layers()
 
 
 def _unassign(element) -> None:

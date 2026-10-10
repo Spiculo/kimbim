@@ -93,6 +93,9 @@ def _write_working() -> pathlib.Path:
     working = _working()
     working.parent.mkdir(parents=True, exist_ok=True)
     B._model.write(str(working))
+    from . import underlays
+
+    underlays.write_files(_project.path)  # D85: a version keeps the underlay files its settings use
     return working
 
 

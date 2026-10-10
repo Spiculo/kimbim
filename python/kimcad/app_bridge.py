@@ -848,6 +848,7 @@ from . import schedules as _schedules  # noqa: E402
 from . import documents as _documents  # noqa: E402
 from . import console as _console  # noqa: E402
 from . import drafting as _drafting  # noqa: E402
+from . import underlays as _underlays  # noqa: E402
 
 _EXPORTS = {
     "authoring": (
@@ -1070,6 +1071,15 @@ _EXPORTS = {
         "console_run",
         "console_run_file",
         "console_stop",
+    ),
+    "underlays": (
+        "add_underlay",
+        "remove_underlay",
+        "set_underlay",
+        "underlay_lines",
+        "underlay_probe",
+        "underlay_raster",
+        "underlays",
     ),
 }
 _EXPORTED = {name: module for module, names in _EXPORTS.items() for name in names}

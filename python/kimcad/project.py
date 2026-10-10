@@ -14,7 +14,8 @@ import ifcopenshell
 import ifcopenshell.validate
 
 from . import _core
-from .layout import META_PATH, SETTINGS_PATH, blob_oid, key_to_path, path_to_key
+from .layout import (META_PATH, SETTINGS_PATH, WORK_FILES_DIR, blob_oid, is_file_path, is_record_path, key_to_path,
+                     path_to_key, referenced_files)
 from .nodeids import decompose_against_head
 from .records import compose, unshare
 
@@ -169,7 +170,7 @@ class Project:
         return self.repo.tree_entries(self._rev(rev))
 
     def _records(self, rev: str) -> dict[str, bytes]:
-        entries = {p: o for p, o in self._entries(rev).items() if p != SETTINGS_PATH}
+        entries = {p: o for p, o in self._entries(rev).items() if is_record_path(p)}
         paths = sorted(entries)
         blobs = self.repo.read_blobs([entries[p] for p in paths])
         return {path_to_key(p): b for p, b in zip(paths, blobs)}
@@ -194,7 +195,8 @@ class Project:
     def _changes(self, old_entries: dict[str, str], new: dict[str, bytes],
                  settings: bytes | None = None) -> tuple[Changes, dict[str, bytes | None]]:
         old_settings = old_entries.get(SETTINGS_PATH)
-        old_entries = {p: o for p, o in old_entries.items() if p != SETTINGS_PATH}
+        old_files = {p: o for p, o in old_entries.items() if is_file_path(p)}
+        old_entries = {p: o for p, o in old_entries.items() if is_record_path(p)}
         new_paths = {key_to_path(k): v for k, v in new.items()}
         writes: dict[str, bytes | None] = {}
         added, modified, removed = [], [], []
@@ -220,7 +222,29 @@ class Project:
         if settings is not None and old_settings != blob_oid(settings):
             writes[SETTINGS_PATH] = settings
             items.append(Change("added" if old_settings is None else "modified", "settings", "(project settings)", None))
+        if settings is not None:
+            writes.update(self._file_writes(old_files, referenced_files(settings)))
         return Changes(items), writes
+
+    def _file_writes(self, old_files: dict[str, str], wanted: set[str]) -> dict[str, bytes | None]:
+        """The files (D85: underlays) a version's settings use: new ones from the working folder (or, made
+        in another option, from the repository by their blob id, which is their name); unused ones go. A
+        file found nowhere is left out (the settings still name it; the app reports it missing)."""
+        writes: dict[str, bytes | None] = {p: None for p in old_files if p not in wanted}
+        for p in sorted(wanted - set(old_files)):
+            name = p.split("/", 1)[1]
+            local = self.path / WORK_FILES_DIR / name
+            data = None
+            if local.is_file():
+                data = local.read_bytes()
+            else:
+                try:
+                    data = self.repo.read_blobs([name.split(".")[0]])[0]
+                except _core.RepoError:
+                    data = None
+            if data is not None and blob_oid(data) == name.split(".")[0]:
+                writes[p] = data
+        return writes
 
     def _decompose_file(self, ifc_path) -> dict[str, bytes]:
         f = ifcopenshell.open(str(ifc_path))

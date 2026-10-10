@@ -25,6 +25,7 @@ from . import app_bridge as B
 from . import kimfile as K
 from . import project as P
 from . import settings as S
+from . import underlays as U
 from . import versioning as V
 from .project import KimcadError, NotAProject, Project
 
@@ -286,6 +287,7 @@ def _write_files(work: pathlib.Path) -> None:
     (work / ".kimcad").mkdir(parents=True, exist_ok=True)
     B._model.write(str(work / ".kimcad" / "working.ifc"))
     (work / ".kimcad" / "settings.json").write_bytes(S.to_bytes())
+    U.write_files(work)  # D85: the underlay files the settings use travel with the project
     project = V._project
     (work / ".kimcad" / "working.json").write_text(json.dumps({
         "head": project.repo.head() if project else None,
@@ -353,6 +355,7 @@ def _make_history(work: pathlib.Path, message: str) -> None:
     working = work / ".kimcad" / "working.ifc"
     (work / ".kimcad").mkdir(parents=True, exist_ok=True)
     B._model.write(str(working))
+    U.write_files(work)  # D85: the first version keeps the underlays already placed
     project = Project.init(work)
     project.commit(working, _first_message(message), settings=S.to_bytes())
     V._project = project

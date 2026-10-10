@@ -38,6 +38,7 @@ DEFAULTS = {
     "selection_sets": {},
     "ids_files": {},  # IDS files by name: their XML, kept in the project so it is versioned (D81)
     "clash_sets": {},  # clash detection sets by name (D81)
+    "underlays": [],  # DXF, PDF and image underlays on levels: file, placement, display (D85)
 }
 UNITS = {"m": 1.0, "cm": 100.0, "mm": 1000.0}
 
@@ -89,6 +90,14 @@ def merge(base: dict, ours: dict, theirs: dict) -> tuple[dict, list[str]]:
     merged, conflicts = {}, []
     for k in sorted(set(base) | set(ours) | set(theirs)):
         b, o, t = base.get(k), ours.get(k), theirs.get(k)
+        if k == "underlays" and o != t:  # D85: underlay by underlay, so two options can each add one
+            from .underlays import merge_entries
+
+            value, clash = merge_entries(b or [], o or [], t or [])
+            merged[k] = value
+            if clash:
+                conflicts.append(k)
+            continue
         if o == t or t == b:
             value = o
         elif o == b:
@@ -127,6 +136,10 @@ def _error(key: str, value) -> str | None:
         from . import queries
 
         return queries.validate(key, value)
+    if key == "underlays":
+        from . import underlays
+
+        return underlays.validate(value)
     if key in ("ids_files", "clash_sets"):
         from . import checks
 
