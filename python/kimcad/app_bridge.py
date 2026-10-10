@@ -257,11 +257,21 @@ def state() -> str:
 # Called inside every edit's transaction with (geometry_changed, geometry_removed) GlobalIds; returns
 # more changed GlobalIds. Modules register follow-ups that must be part of the same undo step.
 AFTER_ACTION: list = []
+# An open console edit() block (D82): (geometry_changed, geometry_removed) collected from the commands run
+# inside it, which then join its undo step instead of making their own.
+_step: tuple[list, list] | None = None
 
 
 def _run(action) -> dict:
     """Run `action()` as one undoable transaction. It returns the number of changed elements, or
     (count, geometry_changed_guids, geometry_removed_guids) when it touched shapes."""
+    if _step is not None:  # inside the console's edit() block: join its undo step
+        changed = action()
+        count, geo_changed, geo_removed = changed if isinstance(changed, tuple) else (changed, [], [])
+        _step[0].extend(geo_changed)
+        _step[1].extend(geo_removed)
+        geometry = {"changed": list(dict.fromkeys(geo_changed)), "removed": list(dict.fromkeys(geo_removed))}
+        return {"ok": True, "changed": count, "geometry": geometry}
     _begin()
     try:
         changed = action()
@@ -836,6 +846,7 @@ from . import renovation as _renovation  # noqa: E402
 from . import graphics as _graphics  # noqa: E402
 from . import schedules as _schedules  # noqa: E402
 from . import documents as _documents  # noqa: E402
+from . import console as _console  # noqa: E402
 
 _EXPORTS = {
     "authoring": (
@@ -1044,6 +1055,11 @@ _EXPORTS = {
         "set_author",
         "templates",
         "write_recovery",
+    ),
+    "console": (
+        "console_help",
+        "console_run",
+        "console_run_file",
     ),
 }
 _EXPORTED = {name: module for module, names in _EXPORTS.items() for name in names}
