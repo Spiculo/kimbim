@@ -227,3 +227,30 @@ def test_plan_drawing_and_sheet_include_the_shapes(plan):
     assert call("place_drawing", sheet["number"], plan_drawing["guid"], 20, 20)["ok"]
     sheet_svg = call("sheet_svg", sheet["number"])
     assert sheet_svg.get("ok", True) and f'ifc:guid="{fill}"' in sheet_svg["svg"]
+
+
+def test_dxf_export_has_the_lines_arcs_and_pattern_hatches(plan, tmp_path):
+    """D83 + D84: drafting reaches DXF: lines with their line type, fills as HATCH with the pattern."""
+    import ezdxf
+
+    t = call("wall_types")["types"][0]["guid"]
+    assert call("create_wall", plan["l1"], t, -1, 5, 6, 5, 3.0, "", "")["ok"]
+    call("add_drafting", plan["l1"], "fill", pts((0, 0), (4, 0), (4, 3), (0, 3)),
+         json.dumps({"pattern": "Crosshatch", "background_pen": 33}))
+    call("add_drafting", plan["l1"], "fill", pts((5, 0), (7, 0), (7, 2)), json.dumps({"pattern": "Solid"}))
+    call("add_drafting", plan["l1"], "line", pts((0, -1), (4, -1)), json.dumps({"line_type": "Dashed"}))
+    call("add_drafting", plan["l1"], "arc", pts((0, 0), (1, 1), (2, 0)), "")
+    guid = call("create_plan", plan["l1"])["guid"]
+    r = call("export_drawing_dxf", guid, str(tmp_path / "plan.dxf"), "")
+    assert r["ok"], r
+    doc = ezdxf.readfile(r["path"])
+    assert not doc.audit().has_errors
+    msp = doc.modelspace()
+    hatches = list(msp.query("HATCH"))
+    patterned = [h for h in hatches if not h.dxf.solid_fill]
+    assert patterned and patterned[0].dxf.pattern_name == "CROSSHATCH"
+    assert len(patterned[0].pattern.lines) == 2
+    assert sum(1 for h in hatches if h.dxf.solid_fill) >= 2  # the background pen and the solid fill
+    assert "DASHED" in doc.linetypes
+    assert any(e.dxf.get("linetype") == "DASHED" for e in msp.query("LINE LWPOLYLINE"))
+    assert len(msp.query("LINE")) < 200  # the hatch lines are not also written one by one

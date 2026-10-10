@@ -424,8 +424,13 @@ class Writer:
             t = _TRANSLATE.search(element.get("transform") or "")
             if t:
                 self.map = Mapping([[1, 0, float(t.group(1))], [0, 1, float(t.group(2))], [0, 0, 1]]).then(saved)
+            fill = element.get("data-drafting") == "fill"
+            if fill:  # D84: the fill as a HATCH (its pattern, or solid); its drawn hatch lines are skipped
+                self.drafting_fill(element, ctx)
             loose = []  # the group's single segments (the serializer writes one path per edge)
             for child in element:
+                if fill and (child.get("class") == "hatch" or child.get("data-fill") or child.get("data-fill-pen")):
+                    continue
                 if child.tag == SVG + "path" and set(child.attrib) <= {"d", "class"}:
                     subpaths = parse_path(child.get("d", ""))
                     lines = [sp for sp in subpaths if not sp[1] and not any(v[2] for v in sp[0])]
@@ -511,6 +516,57 @@ class Writer:
             else:
                 e = self.target.add_lwpolyline(m, format="xyb", close=closed, dxfattribs=attribs)
             _colour(e, ctx["color"])
+            self.count += 1
+
+    def drafting_fill(self, group, ctx):
+        """A drafting fill (D84): a solid HATCH for its background pen or a solid pattern, and a
+        pattern HATCH made from the fill pattern's line families (mm on paper, scaled like the drawing)."""
+        from . import annotations as N
+        from . import drafting
+
+        outline = next((c for c in group if c.tag == SVG + "path" and not c.get("class") and not c.get("data-fill")
+                        and not c.get("data-fill-pen")), None)
+        subpaths = parse_path(outline.get("d", "")) if outline is not None else []
+        if not subpaths:
+            return
+        loop = [(*self.map(x, y), 0.0) for x, y, _ in subpaths[0][0]]
+        try:
+            e = B._model.by_guid(group.get(IFC + "guid"))
+        except (RuntimeError, AttributeError):
+            e = None
+        extra = N.extra_of(e) if e is not None else {}
+        layer = {"layer": self.doc.layer(ctx.get("layer", "0") + "-PATT")}
+        pen_of = getattr(self.style, "pen", None)
+        bg = int(extra.get("BackgroundPen") or 0)
+        name = extra.get("Pattern") or "Solid"
+        pattern = drafting.patterns().get(name) or {"solid": True}
+        solids = []
+        if pattern.get("solid"):
+            solids.append(ctx["color"])
+        elif bg and pen_of is not None:
+            solids.append(pen_of(bg)["color"])
+        for colour in solids:
+            hatch = self.target.add_hatch(color=aci(colour), dxfattribs=layer)
+            hatch.set_solid_fill(color=aci(colour), rgb=_rgb(colour))
+            hatch.paths.add_polyline_path(loop, is_closed=True)
+            self.count += 1
+        families = [] if pattern.get("solid") else pattern.get("lines", []) or []
+        k = self.map.size  # model units per paper mm
+        definition = []
+        for fam in families:
+            a = math.radians(float(fam.get("angle", 0)))
+            shift, spacing = float(fam.get("shift", 0)) * k, float(fam.get("spacing", 0)) * k
+            ox, oy = (float(v) * k for v in (fam.get("origin") or (0, 0)))
+            dash = []
+            for i, v in enumerate(fam.get("dash") or []):
+                dash.append(float(v) * k if i % 2 == 0 else -float(v) * k)  # DXF: gaps are negative
+            definition.append([math.degrees(a), (ox, oy),
+                               (shift * math.cos(a) - spacing * math.sin(a), shift * math.sin(a) + spacing * math.cos(a)), dash])
+        if definition:
+            hatch = self.target.add_hatch(color=aci(ctx["color"]), dxfattribs=layer)
+            hatch.set_pattern_fill(layer_name(name).upper()[:31] or "KIMCAD", color=aci(ctx["color"]),
+                                   definition=definition, scale=1.0)
+            hatch.paths.add_polyline_path(loop, is_closed=True)
             self.count += 1
 
     def circle(self, element, ctx):
@@ -611,7 +667,8 @@ class Styler:
                     self.dimension_groups.append((guid, p))
                     return None
                 layer = self.layer_of(guid, DIMENSION_LAYER if is_dim else None)
-                return {**ctx, "layer": layer, "color": p["color"], "weight": p["weight"], "dash": [],
+                dash = [float(v) for v in (element.get("data-dash") or "").split()]  # D84: a drafting line type
+                return {**ctx, "layer": layer, "color": p["color"], "weight": p["weight"], "dash": dash,
                         "fill": None, "text_color": p["color"], "lock_text": True}
             layer = self.layer_of(guid)
             if guid in self.elements:
