@@ -12,6 +12,7 @@ Usage: python tools/make_house.py OUT.ifc   (prints a JSON summary)
 from __future__ import annotations
 
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -67,6 +68,15 @@ def build(out: str) -> dict:
     # Rooms (Slice 18): one per level, from the walls around a point.
     call("create_room", l1, 2.0, 6.0, "Living room")
     call("create_room", l2, 5.0, 6.0, "Bedroom")
+    # Library objects (D86): furniture, a kitchen run, a bathroom and a bedroom, a tree and a car outside.
+    for storey, key, x, y, angle in ((l1, "sofa", 6.5, 6.9, 0.0), (l1, "table", 2.0, 4.6, 0.0),
+                                     (l1, "chair", 3.0, 4.5, math.pi), (l1, "chair", 2.5, 5.6, 0.0),
+                                     (l1, "base_cabinets", 9.8, 0.75, math.pi), (l1, "fridge", 6.9, 0.8, math.pi),
+                                     (l1, "tree", 12.0, 3.0, 0.0), (l1, "car", -3.0, 1.0, 0.0),
+                                     (l2, "bed_double", 6.0, 5.75, 0.0), (l2, "wardrobe", 8.6, 2.5, math.pi / 2),
+                                     (l2, "wc", 1.0, 7.1, 0.0), (l2, "washbasin", 1.6, 7.35, 0.0),
+                                     (l2, "bathtub", 2.6, 7.05, 0.0)):
+        call("place_object", storey, key, "", x, y, angle)
     roof = call("add_storey", "Roof", 6.0)["guid"]
     call("copy_to_storey", json.dumps([slab1]), roof)
     # Roof (Slice 19): a 30-degree gable roof with 0.5 m eaves; the upper walls are trimmed to it.
@@ -91,6 +101,8 @@ def build(out: str) -> dict:
     return {"file": out, "storeys": count("IfcBuildingStorey"), "walls": count("IfcWall"), "slabs": count("IfcSlab"),
             "doors": count("IfcDoor"), "windows": count("IfcWindow"), "stairs": count("IfcStair"),
             "columns": count("IfcColumn"), "rooms": count("IfcSpace"), "roofs": count("IfcRoof"), "beams": count("IfcBeam"), "openings": count("IfcOpeningElement"),
+            "objects": count("IfcFurniture") + count("IfcSanitaryTerminal") + count("IfcElectricAppliance")
+            + count("IfcGeographicElement") + count("IfcBuildingElementProxy"),
             "drawings": len(call("drawings")["drawings"]), "sheets": len(call("sheets")["sheets"])}
 
 

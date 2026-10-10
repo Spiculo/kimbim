@@ -1228,12 +1228,14 @@ void MainWindow::buildModelingToolbar()
             tr("Radius or diameter: click the centre, a point on the circle, then where the text goes")},
         {Tool::LevelDimension, "actionLevelDimensionTool", tr("&Level/spot elevation"), QKeyCombination::fromCombined(0),
             tr("Level dimension or spot elevation: click the point (it measures the slab below, or the level)")},
+        {Tool::Object, "actionObjectTool", tr("O&bject"), QKeyCombination(Qt::SHIFT, Qt::Key_O),
+            tr("Place a library object (furniture, sanitary, kitchen, trees...): pick it in the Library panel, click where it goes; Tab turns it 90 degrees")},
     };
     // The tools' icons: the IFC class each one makes (the tree's icons).
     const QHash<int, QString> iconClass = {{int(Tool::Wall), "IfcWall"}, {int(Tool::Slab), "IfcSlab"},
         {int(Tool::Door), "IfcDoor"}, {int(Tool::Window), "IfcWindow"}, {int(Tool::Column), "IfcColumn"},
         {int(Tool::Beam), "IfcBeam"}, {int(Tool::Stair), "IfcStair"}, {int(Tool::Roof), "IfcRoof"},
-        {int(Tool::Room), "IfcSpace"}, {int(Tool::Grid), "IfcGrid"}};
+        {int(Tool::Room), "IfcSpace"}, {int(Tool::Grid), "IfcGrid"}, {int(Tool::Object), "IfcFurniture"}};
     for (const Def& d : defs) {
         auto* a = new QAction(d.text, this); // shown in the tool palette (D71) and the Model menu
         a->setObjectName(QLatin1String(d.name));
@@ -1356,6 +1358,7 @@ void MainWindow::buildModelingToolbar()
     setupModifyTools(bar); // D80
     setupDraftTools(bar);  // D84
     setupMarkupTools(bar); // D87
+    setupLibrary(model);   // D86
     m_hosts.value(QStringLiteral("3d"))->adoptChrome(m_toolOptions, nullptr);
     connect(m_lengthInput, &QLineEdit::returnPressed, this, [this] {
         bool ok = false;
@@ -1373,6 +1376,10 @@ void MainWindow::buildModelingToolbar()
             typed = m_wallTool->typeLength(value);
         else if (ok && m_tool == Tool::Rotate)
             typed = m_rotateTool->typeAngle(value); // degrees
+        else if (ok && m_tool == Tool::Object) {
+            setObjectAngle(value); // D86: degrees
+            typed = true;
+        }
         else if (ok && m_tool == Tool::Stretch)
             typed = m_gripTool->typeLength(value);
         else if (ok)
@@ -1479,6 +1486,11 @@ void MainWindow::buildModelingToolbar()
         case Tool::RadialDimension:
         case Tool::LevelDimension:
             markupPointer(p, tolerance, false);
+            break;
+        case Tool::Object:
+            m_twoPointTool->setTolerance(tolerance);
+            m_objectHover = m_twoPointTool->snapper().snap(p, tolerance).point;
+            updateToolPreview();
             break;
         case Tool::None:
             break;
@@ -1594,6 +1606,10 @@ void MainWindow::buildModelingToolbar()
         case Tool::RadialDimension:
         case Tool::LevelDimension:
             markupPointer(p, tolerance, true);
+            break;
+        case Tool::Object:
+            m_twoPointTool->setTolerance(tolerance);
+            placeObjectAt(m_twoPointTool->snapper().snap(p, tolerance).point, ortho);
             break;
         case Tool::None:
             break;
@@ -1736,6 +1752,7 @@ void MainWindow::refreshTypes()
     case Tool::AngleDimension:
     case Tool::RadialDimension:
     case Tool::LevelDimension:
+    case Tool::Object:
     case Tool::None:
         break;
     }
@@ -1864,6 +1881,9 @@ void MainWindow::updateToolPreview()
     case Tool::LevelDimension:
         updateMarkupPreview();
         return;
+    case Tool::Object:
+        updateObjectPreview();
+        return;
     case Tool::None:
         break;
     }
@@ -1906,6 +1926,7 @@ void MainWindow::setTool(Tool tool)
     m_gripTool->cancel();
     m_measure->stop();
     m_columnHover.reset();
+    m_objectHover.reset();
     m_annotationPoints.clear();
     m_tool = tool;
     m_measureCopy->setVisible(tool == Tool::Measure);
@@ -1921,8 +1942,10 @@ void MainWindow::setTool(Tool tool)
     m_wallHeight->setToolTip(tool == Tool::Roof ? tr("Eaves height above the level") : tr("Wall height"));
     m_roofKind->parentWidget()->setVisible(tool == Tool::Roof);
     m_lengthInput->setVisible(tool == Tool::Wall || tool == Tool::Beam || tool == Tool::Grid || tool == Tool::Move
-        || tool == Tool::Rotate || tool == Tool::Stretch || isDraftTool(tool));
-    m_lengthInput->setPlaceholderText(tool == Tool::Rotate ? tr("Angle (degrees)") : tr("Length (m)"));
+        || tool == Tool::Rotate || tool == Tool::Stretch || isDraftTool(tool) || tool == Tool::Object);
+    m_lengthInput->setPlaceholderText(tool == Tool::Rotate || tool == Tool::Object ? tr("Angle (degrees)") : tr("Length (m)"));
+    if (m_objectTurn)
+        m_objectTurn->setEnabled(tool == Tool::Object); // Tab moves the focus otherwise
     const bool typed = tool == Tool::Wall || tool == Tool::Slab || tool == Tool::Door || tool == Tool::Window
         || tool == Tool::Column || tool == Tool::Beam || tool == Tool::PlaceModel;
     m_types->setVisible(typed);
@@ -1996,6 +2019,10 @@ void MainWindow::setTool(Tool tool)
     case Tool::RadialDimension:
     case Tool::LevelDimension:
         startMarkupTool(tool); // D87: its first step's hint
+        break;
+    case Tool::Object:
+        refreshLibrary();
+        m_status->showMessage(tr("Object: click where it goes (Tab: turn 90 degrees, type an angle + Enter; Shift: turned for this click)"));
         break;
     case Tool::Stair:
         m_status->showMessage(tr("Stair: click where it starts, then the direction it climbs"));
@@ -2387,7 +2414,7 @@ void MainWindow::buildPalette()
     m_palette = new ToolPalette(this);
     m_palette->addGroup(QStringLiteral("3d"), tr("3D"), {tool(Tool::Wall), tool(Tool::Slab), tool(Tool::Column),
         tool(Tool::Beam), tool(Tool::Door), tool(Tool::Window), tool(Tool::Stair), tool(Tool::Roof), tool(Tool::Room),
-        tool(Tool::SlabOpening), tool(Tool::PlaceModel)});
+        tool(Tool::SlabOpening), tool(Tool::PlaceModel), tool(Tool::Object)});
     m_palette->addGroup(QStringLiteral("plane"), tr("Plane"), {tool(Tool::Text), tool(Tool::Dimension),
         tool(Tool::Leader), tool(Tool::Mark), tool(Tool::Grid), tool(Tool::Line), tool(Tool::Polyline),
         tool(Tool::ArcCircle), tool(Tool::Rectangle), tool(Tool::Fill), tool(Tool::Tag), tool(Tool::AngleDimension),
@@ -4900,6 +4927,7 @@ void MainWindow::preferencesDialog()
     m_prefs.save();
     bridge("set_author", {m_prefs.authorName(), m_prefs.authorEmail()});
     restartRecoveryTimer();
+    applyLibraryPaths(); // D86: the office library may have changed
 }
 
 void MainWindow::restartRecoveryTimer()

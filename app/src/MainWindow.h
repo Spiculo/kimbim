@@ -52,6 +52,7 @@ class Scene;
 class ViewHost;
 class DrawingsPanel;
 class FindSelectPanel;
+class LibraryPanel;
 class ChecksPanel;
 class ConsolePanel;
 class SheetsPanel;
@@ -138,7 +139,8 @@ public:
     // them with work-plane points.
     enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening, PlaceModel, Text, Dimension, Mark, Section, Elevation, Leader, Mirror, Room, Roof, Measure, Split, Trim, Join,
         Line, Polyline, ArcCircle, Rectangle, Fill, // 2D drafting (D84, DraftTools.cpp)
-        Tag, NorthArrow, ScaleBar, Cloud, AngleDimension, RadialDimension, LevelDimension }; // D87, MarkupTools.cpp
+        Tag, NorthArrow, ScaleBar, Cloud, AngleDimension, RadialDimension, LevelDimension, // D87, MarkupTools.cpp
+        Object }; // D86: a library object (LibraryTools.cpp)
     void setTool(Tool tool);
     Tool tool() const { return m_tool; }
     WallTool* wallTool() const { return m_wallTool; }
@@ -349,6 +351,16 @@ public:
     bool recallSelectionSet(const QString& name, const QString& how = QStringLiteral("replace"));
     bool deleteSelectionSet(const QString& name);
     FindSelectPanel* findSelectPanel(); // created and docked on first use
+    // D86: the object library (LibraryTools.cpp). The Library panel (docked on first use) picks the
+    // object and its parameters; the Object tool places it on the active level where you click,
+    // turned by the object angle (Tab: +90 degrees, a typed number: that angle; Shift+click: +90
+    // for that click). One undo step per object; the status for new elements and the active layer.
+    LibraryPanel* libraryPanel();
+    bool chooseObject(const QString& id, const QJsonObject& params = {}); // and start the Object tool
+    bool placeObjectAt(QPointF p, bool turned = false);
+    double objectAngle() const { return m_objectAngle; } // degrees
+    void setObjectAngle(double degrees);
+    void applyLibraryPaths(); // the office library from the preferences (folder and IFC files)
     // D81: checks (Checks.cpp). Runs kimcad.checks ("schema", "ids", "clash", "model") one by one on a
     // worker thread behind a progress dialog (Cancel stops them) and lists the issues in the panel;
     // false if any could not run or it was cancelled. IDS files (their XML) and clash sets are
@@ -470,6 +482,9 @@ private:
     void startModifyTool(Tool tool);
     void updateModifyPreview();
     void setupDraftTools(ToolOptionsBar* bar); // D84
+    void setupLibrary(QMenu* model); // D86
+    void updateObjectPreview();
+    void refreshLibrary();
     void startDraftTool(Tool tool);
     void draftPointer(QPointF p, double tolerance, Qt::KeyboardModifiers mods, bool click);
     void updateDraftPreview();
@@ -488,6 +503,11 @@ private:
     QStringList unselectableLayers() const;
     void refreshFindSelect();
     FindSelectPanel* m_findSelect = nullptr;
+    LibraryPanel* m_library = nullptr;
+    QAction* m_objectTurn = nullptr; // Tab while the Object tool is active
+    double m_objectAngle = 0.0;
+    std::optional<QPointF> m_objectHover;
+    bool m_libraryPathsSent = false;
     void refreshChecks(); // D81
     ChecksPanel* m_checks = nullptr;
     void buildConsoleActions();

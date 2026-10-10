@@ -17,6 +17,8 @@ QIcon iconFor(const QString& ifcClass)
         {"IfcRailing", "stair"},
         {"IfcBuildingStorey", "storey"}, {"IfcBuilding", "building"}, {"IfcSite", "site"},
         {"IfcProject", "project"}, {"IfcSpace", "space"}, {"IfcGrid", "grid"},
+        {"IfcFurniture", "object"}, {"IfcFurnishingElement", "object"}, {"IfcSanitaryTerminal", "object"}, // D86
+        {"IfcElectricAppliance", "object"}, {"IfcGeographicElement", "object"},
     };
     static QHash<QString, QIcon> cache;
     const QString kind = kinds.value(ifcClass, QStringLiteral("element"));

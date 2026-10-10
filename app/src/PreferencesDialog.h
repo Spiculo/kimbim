@@ -25,6 +25,7 @@ private:
     QComboBox* m_language;
     QLabel* m_restartNote;
     QLineEdit* m_templates;
+    QLineEdit* m_officeLibrary;
     QLineEdit* m_authorName;
     QLineEdit* m_authorEmail;
     QComboBox* m_newViews;

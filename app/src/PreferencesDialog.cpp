@@ -59,6 +59,21 @@ PreferencesDialog::PreferencesDialog(Preferences& prefs, QWidget* parent)
     templatesRow->addWidget(browse);
     form->addRow(tr("Templates folder:"), templatesRow);
 
+    // D86: the office library, another category of the Library panel (Python objects and IFC types).
+    auto* officeRow = new QHBoxLayout;
+    m_officeLibrary = new QLineEdit(prefs.value(QStringLiteral("office_library")).toString(), this);
+    m_officeLibrary->setObjectName(QStringLiteral("officeLibrary"));
+    m_officeLibrary->setPlaceholderText(tr("A shared folder of objects (.py) and IFC type libraries (.ifc)"));
+    auto* browseOffice = new QPushButton(tr("Browse..."), this);
+    connect(browseOffice, &QPushButton::clicked, this, [this] {
+        const QString folder = QFileDialog::getExistingDirectory(this, tr("Office library"), m_officeLibrary->text());
+        if (!folder.isEmpty())
+            m_officeLibrary->setText(folder);
+    });
+    officeRow->addWidget(m_officeLibrary, 1);
+    officeRow->addWidget(browseOffice);
+    form->addRow(tr("Office library:"), officeRow);
+
     m_authorName = new QLineEdit(prefs.authorName(), this);
     m_authorName->setObjectName(QStringLiteral("authorName"));
     m_authorName->setPlaceholderText(tr("Shown on versions and to others opening your files"));
@@ -115,6 +130,7 @@ void PreferencesDialog::apply()
 {
     m_prefs.setValue(QStringLiteral("language"), m_language->currentData().toString());
     m_prefs.setValue(QStringLiteral("templates_folder"), m_templates->text().trimmed());
+    m_prefs.setValue(QStringLiteral("office_library"), m_officeLibrary->text().trimmed());
     m_prefs.setValue(QStringLiteral("author_name"), m_authorName->text().trimmed());
     m_prefs.setValue(QStringLiteral("author_email"), m_authorEmail->text().trimmed());
     m_prefs.setValue(QStringLiteral("new_views"), m_newViews->currentData().toString());
