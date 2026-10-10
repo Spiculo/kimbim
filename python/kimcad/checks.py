@@ -754,3 +754,21 @@ def export_ids_report(path: str) -> str:
         return B._dump({"ok": True, "path": write_ids_report(path)})
     except Exception as ex:
         return _fail(f"{type(ex).__name__}: {ex}")
+
+
+def _write_sample_house(path: str) -> str:
+    """The M3 sample house (tools/make_house.py) saved to `path`, for the app's Qt tests (dev tree only)."""
+    import pathlib
+    import sys
+
+    tools = pathlib.Path(__file__).resolve().parents[2] / "tools"
+    if not (tools / "make_house.py").exists():
+        return _fail("tools/make_house.py is not here (not a source tree)")
+    try:
+        if str(tools) not in sys.path:
+            sys.path.insert(0, str(tools))
+        import make_house
+
+        return B._dump({"ok": True, **make_house.build(path)})
+    except BaseException as ex:  # make_house exits on failure
+        return _fail(f"{type(ex).__name__}: {ex}")

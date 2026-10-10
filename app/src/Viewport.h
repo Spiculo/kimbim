@@ -127,6 +127,7 @@ public:
     int gridLineCount() const { return m_gridLineCount; }
     void clear();
     void fitAll();
+    void fitTo(const QStringList& guids); // D81: zoom to these elements (keeps the direction)
     double zoomPercent() const; // 100 = the fitted view (D71: the bottom bar)
 
     int batchCount() const { return int(m_scene->batches.size()); }

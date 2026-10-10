@@ -49,6 +49,7 @@ class Scene;
 class ViewHost;
 class DrawingsPanel;
 class FindSelectPanel;
+class ChecksPanel;
 class SheetsPanel;
 class SchedulesDialog;
 class DrawingView;
@@ -303,6 +304,18 @@ public:
     bool recallSelectionSet(const QString& name, const QString& how = QStringLiteral("replace"));
     bool deleteSelectionSet(const QString& name);
     FindSelectPanel* findSelectPanel(); // created and docked on first use
+    // D81: checks (Checks.cpp). Runs kimcad.checks ("schema", "ids", "clash", "model") one by one on a
+    // worker thread behind a progress dialog (Cancel stops them) and lists the issues in the panel;
+    // false if any could not run or it was cancelled. IDS files (their XML) and clash sets are
+    // project settings. showIssue selects the issue's elements and fits the view to them.
+    ChecksPanel* checksPanel(); // created and docked on first use (Model > Check model...)
+    bool runChecks(const QStringList& checks, const QJsonObject& options = {});
+    bool addIdsFile(const QString& path);
+    bool removeIdsFile(const QString& name);
+    bool exportIdsReport(const QString& path);
+    bool saveClashSet(const QString& name, const QJsonObject& set, const QString& replaces = QString());
+    bool deleteClashSet(const QString& name);
+    void showIssue(const QStringList& guids);
     bool save();                        // to the current file; asks for a path if there is none
     bool saveAs(const QString& path);
 
@@ -414,6 +427,8 @@ private:
     QStringList unselectableLayers() const;
     void refreshFindSelect();
     FindSelectPanel* m_findSelect = nullptr;
+    void refreshChecks(); // D81
+    ChecksPanel* m_checks = nullptr;
 
     void onOpened(const QJsonObject& info);
     void onChunk(const MeshChunk& chunk);

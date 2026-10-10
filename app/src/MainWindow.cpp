@@ -1230,6 +1230,10 @@ void MainWindow::buildModelingToolbar()
     QAction* heightAction = model->addAction(tr("Wall &height..."));
     heightAction->setObjectName(QStringLiteral("actionWallHeight"));
     connect(heightAction, &QAction::triggered, this, &MainWindow::wallHeightDialog);
+    QAction* checkAction = model->addAction(tr("Chec&k model...")); // D81: the Checks panel (Checks.cpp)
+    checkAction->setObjectName(QStringLiteral("actionCheckModel"));
+    checkAction->setToolTip(tr("Schema validation, IDS, clash detection and model checks"));
+    connect(checkAction, &QAction::triggered, this, [this] { checksPanel(); });
     QAction* sizeAction = model->addAction(tr("Door/window si&ze..."));
     sizeAction->setObjectName(QStringLiteral("actionOpeningSize"));
     connect(sizeAction, &QAction::triggered, this, &MainWindow::openingSizeDialog);

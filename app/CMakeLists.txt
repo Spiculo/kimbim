@@ -49,6 +49,7 @@ qt_add_library(kimcad_core STATIC
     src/ProjectSettingsDialog.cpp src/ProjectSettingsDialog.h
     src/PreferencesDialog.cpp src/PreferencesDialog.h
     src/FindSelectPanel.cpp src/FindSelectPanel.h src/SelectionTools.cpp
+    src/ChecksPanel.cpp src/ChecksPanel.h src/Checks.cpp
 )
 target_include_directories(kimcad_core PUBLIC src)
 # Element icons (owner feedback: objects need an icon and a hint on hover).
@@ -88,6 +89,7 @@ kimcad_test(test_model_loader)
 kimcad_test(test_navigation)
 kimcad_test(test_selection)
 kimcad_test(test_selection_tools)
+kimcad_test(test_checks)
 kimcad_test(test_properties_panel)
 kimcad_test(test_levels_bar)
 kimcad_test(test_snapper)

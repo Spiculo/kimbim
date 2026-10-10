@@ -1326,6 +1326,17 @@ void Viewport::fitAll()
     update();
 }
 
+void Viewport::fitTo(const QStringList& guids)
+{
+    Bnd_Box box = boundsOf(guids);
+    if (box.IsVoid() || !ensureWindow())
+        return;
+    box.Enlarge(0.5); // a little of what is around (metres)
+    m_view->FitAll(box, 0.1, false);
+    m_view->ZFitAll();
+    update();
+}
+
 double Viewport::zoomPercent() const
 {
     return m_fitScale > 0 ? 100.0 * m_view->Scale() / m_fitScale : 100.0;

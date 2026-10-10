@@ -932,7 +932,7 @@ from .levels import (  # noqa: E402,F401
     set_storey_elevation,
     set_storey_shown,
 )
-from .checks import cancel_checks, export_ids_report, read_ids_file, run_check  # noqa: E402,F401
+from .checks import _write_sample_house, cancel_checks, export_ids_report, read_ids_file, run_check  # noqa: E402,F401
 from .renovation import mark_unmarked, set_status, set_status_for_new, unmarked  # noqa: E402,F401
 from .graphics import (  # noqa: E402,F401
     graphics_state,
