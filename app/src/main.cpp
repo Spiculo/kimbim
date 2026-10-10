@@ -88,6 +88,9 @@ int main(int argc, char* argv[])
         QStringLiteral("Self-test: run these checks (schema, ids, clash, model; comma separated) from the Checks panel; "
                        "clash adds a walls x slabs set. Clicks the first issue."), QStringLiteral("list"));
     parser.addOption(checksOption);
+    QCommandLineOption consoleOption(QStringLiteral("console"),
+        QStringLiteral("Self-test: open the Python console and run this code."), QStringLiteral("code"));
+    parser.addOption(consoleOption);
     QCommandLineOption selectThrough(QStringLiteral("select-through"), QStringLiteral("Self-test: box selection includes hidden elements."));
     parser.addOption(selectThrough);
     QCommandLineOption house(QStringLiteral("house"), QStringLiteral("Self-test: model a small house with the tools."));
@@ -157,6 +160,7 @@ int main(int argc, char* argv[])
         options.measure = parser.value(measureOption);
         options.levelsDialog = parser.isSet(levelsDialog);
         options.checks = parser.value(checksOption);
+        options.console = parser.value(consoleOption);
         options.selectThrough = parser.isSet(selectThrough);
         options.house = parser.isSet(house);
         options.benchTools = parser.isSet(benchTools);

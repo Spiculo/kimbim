@@ -23,6 +23,7 @@
 #include <cstdio>
 #include <tuple>
 
+#include "ConsolePanel.h"
 #include "DockLayout.h"
 #include "ChecksPanel.h"
 #include "FindSelectPanel.h"
@@ -715,6 +716,17 @@ int runSelfTest(const SelfTestOptions& options)
             path.replace(QStringLiteral(".png"), QStringLiteral("-viewport.png")); // the 3D view zoomed to the issue
             result.insert(QStringLiteral("checks_viewport_screenshot"), window.viewport()->dumpImage(path) ? path : QString());
         }
+    }
+    if (!options.console.isEmpty()) { // D82: the console panel raised, the code typed and run
+        if (QAction* a = window.findChild<QAction*>(QStringLiteral("actionConsole")))
+            a->trigger();
+        ConsolePanel* panel = window.consolePanel();
+        panel->input()->setPlainText(QString(options.console).replace(QStringLiteral("\\n"), QStringLiteral("\n"))); // "\n" typed on the command line
+        panel->run();
+        panel->input()->setPlainText(QStringLiteral("with edit():"));
+        for (int i = 0; i < 10; ++i)
+            QApplication::processEvents();
+        result.insert(QStringLiteral("console_output"), panel->outputText());
     }
     if (!options.screenshot.isEmpty())
         takeScreenshots(window, options.screenshot, &result);
