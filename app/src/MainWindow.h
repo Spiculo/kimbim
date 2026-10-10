@@ -29,6 +29,7 @@ class QMenu;
 class QDoubleSpinBox;
 
 class QComboBox;
+class QSpinBox;
 class QToolBar;
 class QToolButton;
 class QActionGroup;
@@ -64,6 +65,7 @@ class RotateTool;
 class GripTool;
 class MeasureController;
 class ModifyTool;
+class DraftTool;
 struct WallSegment;
 struct Snap;
 struct Host;
@@ -116,7 +118,8 @@ public:
     TitleBar* titleBar() const { return m_titleBar; } // D75: menus, level, cuts, title, Versions
     // Modeling tools (M3): one active at a time. Exposed for tests and the self-test, which drive
     // them with work-plane points.
-    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening, PlaceModel, Text, Dimension, Mark, Section, Elevation, Leader, Mirror, Room, Roof, Measure, Split, Trim, Join };
+    enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening, PlaceModel, Text, Dimension, Mark, Section, Elevation, Leader, Mirror, Room, Roof, Measure, Split, Trim, Join,
+        Line, Polyline, ArcCircle, Rectangle, Fill }; // the last five: 2D drafting (D84, DraftTools.cpp)
     void setTool(Tool tool);
     Tool tool() const { return m_tool; }
     WallTool* wallTool() const { return m_wallTool; }
@@ -263,6 +266,13 @@ public:
     // D80: split, trim/extend (to a boundary or a corner), join/merge and unjoin walls and beams
     // (ModifyEdits.cpp). Ctrl (join = false) leaves the elements unjoined.
     ModifyTool* modifyTool() const { return m_modifyTool; }
+    // D84: 2D drafting (DraftTools.cpp). The options bar gives the line type, the arc mode and a fill's
+    // pattern, background pen and area label; the pen is the current pen.
+    DraftTool* draftTool() const { return m_draftTool; }
+    static bool isDraftTool(Tool tool);
+    bool addDrafting(const QString& kind, const QVector<QPointF>& points, bool closed = false);
+    bool fillAt(QPointF p); // Alt+click with the Fill tool: fill the closed shape around p
+    QJsonObject draftOptions(const QString& kind) const;
     bool splitElement(const QString& guid, QPointF at, bool join = true);
     bool trimElement(const QString& guid, QPointF keep, const QString& boundary, QPointF b1, QPointF b2, bool join = true);
     bool cornerElements(const QString& first, QPointF p1, const QString& second, QPointF p2, bool join = true);
@@ -424,6 +434,10 @@ private:
     void setupModifyTools(ToolOptionsBar* bar); // D80
     void startModifyTool(Tool tool);
     void updateModifyPreview();
+    void setupDraftTools(ToolOptionsBar* bar); // D84
+    void startDraftTool(Tool tool);
+    void draftPointer(QPointF p, double tolerance, Qt::KeyboardModifiers mods, bool click);
+    void updateDraftPreview();
     bool modifyResult(const QJsonObject& r, const QString& failure);
     QJsonObject currentType() const;
     void refreshSnapData();
@@ -477,6 +491,12 @@ private:
     QToolButton* m_measureCopy = nullptr;
     ModifyTool* m_modifyTool = nullptr;
     QComboBox* m_modifyMode = nullptr;
+    DraftTool* m_draftTool = nullptr;
+    QComboBox* m_draftLineType = nullptr;
+    QComboBox* m_draftArcMode = nullptr;
+    QComboBox* m_draftPattern = nullptr;
+    QSpinBox* m_draftBackground = nullptr; // 0: no background
+    QToolButton* m_draftShowArea = nullptr;
     bool m_detach = false; // Ctrl held on the click that finished a move/rotate
     std::optional<QPointF> m_columnHover;
     Tool m_tool = Tool::None;

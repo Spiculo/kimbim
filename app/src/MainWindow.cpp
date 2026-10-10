@@ -101,8 +101,11 @@
 #include "PropertiesPanel.h"
 #include "PythonEngine.h"
 #include "Viewport.h"
+#include "DraftTool.h"
 
 namespace kimcad {
+
+void readDrafting(const QJsonObject& o, Viewport::Annotation* a); // D84, DraftTools.cpp
 
 namespace {
 // Adds the time spent in a scope to a named counter.
@@ -1197,6 +1200,16 @@ void MainWindow::buildModelingToolbar()
             tr("Elevation: click the two ends of the elevation line, then the side it looks at")},
         {Tool::Measure, "actionMeasureTool", tr("Mea&sure"), QKeyCombination(Qt::SHIFT, Qt::Key_M),
             tr("Measure distances, angles and areas: click points (they snap); Enter stops, Esc clears. Changes nothing")},
+        {Tool::Line, "actionLineTool", tr("L&ine"), QKeyCombination(Qt::SHIFT, Qt::Key_L),
+            tr("Draw a 2D line on the plan: click its two ends, or type a length (length<angle)")},
+        {Tool::Polyline, "actionPolylineTool", tr("&Polyline"), QKeyCombination(Qt::SHIFT, Qt::Key_Y),
+            tr("Draw a 2D polyline: click points; click the first point to close it, Enter or double click to end it")},
+        {Tool::ArcCircle, "actionArcTool", tr("&Arc/circle"), QKeyCombination(Qt::SHIFT, Qt::Key_C),
+            tr("Draw a 2D circle (centre and radius) or arc (three points, or centre, start and end)")},
+        {Tool::Rectangle, "actionRectangleTool", tr("Rec&tangle"), QKeyCombination(Qt::SHIFT, Qt::Key_E),
+            tr("Draw a 2D rectangle: click two opposite corners, or type width;height")},
+        {Tool::Fill, "actionFillTool", tr("&Fill"), QKeyCombination(Qt::SHIFT, Qt::Key_F),
+            tr("Draw a fill (hatch): click its outline; Alt+click inside a closed polyline, rectangle or circle to fill it")},
     };
     // The tools' icons: the IFC class each one makes (the tree's icons).
     const QHash<int, QString> iconClass = {{int(Tool::Wall), "IfcWall"}, {int(Tool::Slab), "IfcSlab"},
@@ -1315,6 +1328,7 @@ void MainWindow::buildModelingToolbar()
     bar->addField(m_measureCopy);
     connect(m_measureCopy, &QToolButton::clicked, this, [this] { m_measure->copyToClipboard(); });
     setupModifyTools(bar); // D80
+    setupDraftTools(bar);  // D84
     m_hosts.value(QStringLiteral("3d"))->adoptChrome(m_toolOptions, nullptr);
     connect(m_lengthInput, &QLineEdit::returnPressed, this, [this] {
         bool ok = false;
@@ -1322,6 +1336,12 @@ void MainWindow::buildModelingToolbar()
         if (!ok)
             value = QLocale::c().toDouble(QString(m_lengthInput->text()).replace(QLatin1Char(','), QLatin1Char('.')), &ok);
         bool typed = false;
+        if (isDraftTool(m_tool)) { // D84: lengths, length<angle, radii, width;height
+            if (m_draftTool->typeInput(m_lengthInput->text()))
+                m_lengthInput->clear();
+            m_viewport->setFocus();
+            return;
+        }
         if (m_tool == Tool::Wall)
             typed = m_wallTool->typeLength(value);
         else if (ok && m_tool == Tool::Rotate)
@@ -1406,6 +1426,13 @@ void MainWindow::buildModelingToolbar()
         case Tool::Join:
             m_modifyTool->setTolerance(tolerance);
             m_modifyTool->move(p);
+            break;
+        case Tool::Line:
+        case Tool::Polyline:
+        case Tool::ArcCircle:
+        case Tool::Rectangle:
+        case Tool::Fill:
+            draftPointer(p, tolerance, mods, false);
             break;
         case Tool::None:
             break;
@@ -1504,6 +1531,13 @@ void MainWindow::buildModelingToolbar()
             m_modifyTool->setTolerance(tolerance);
             m_modifyTool->click(p, mods);
             break;
+        case Tool::Line:
+        case Tool::Polyline:
+        case Tool::ArcCircle:
+        case Tool::Rectangle:
+        case Tool::Fill:
+            draftPointer(p, tolerance, mods, true);
+            break;
         case Tool::None:
             break;
         }
@@ -1517,6 +1551,8 @@ void MainWindow::buildModelingToolbar()
         else if ((m_tool == Tool::Beam || m_tool == Tool::Grid || m_tool == Tool::Move || m_tool == Tool::Stair)
             && m_twoPointTool->isDrawing())
             m_twoPointTool->cancel();
+        else if (isDraftTool(m_tool) && m_draftTool->isDrawing())
+            m_draftTool->escape(); // D84: a polyline ends open, anything else is dropped
         else if (m_tool == Tool::Rotate && m_rotateTool->stage() > 0)
             m_rotateTool->cancel();
         else if (m_tool == Tool::Stretch && m_gripTool->isDragging())
@@ -1537,6 +1573,8 @@ void MainWindow::buildModelingToolbar()
             m_polygonTool->finish();
         else if (m_tool == Tool::Measure)
             m_measure->finish();
+        else if (isDraftTool(m_tool))
+            m_draftTool->finish();
     }); });
     onEachView([this](Viewport* v) { connect(v, &Viewport::lengthKeyTyped, this, [this](const QString& text) {
         if (m_lengthInput->isHidden() || m_toolOptions->isHidden())
@@ -1621,6 +1659,11 @@ void MainWindow::refreshTypes()
     case Tool::Split:
     case Tool::Trim:
     case Tool::Join:
+    case Tool::Line:
+    case Tool::Polyline:
+    case Tool::ArcCircle:
+    case Tool::Rectangle:
+    case Tool::Fill:
     case Tool::None:
         break;
     }
@@ -1644,10 +1687,13 @@ void MainWindow::refreshSnapData()
     const QJsonObject data = bridge("snap_data", {m_levels->activeStorey()});
     const QVector<SnapWall> walls = Snapper::parse(data);
     const QVector<SnapLine> lines = Snapper::parseGrid(data);
+    const QVector<SnapPoint> points = Snapper::parsePoints(data); // D84: drafting shapes' points
     for (Snapper* s : {&m_wallTool->snapper(), &m_polygonTool->snapper(), &m_twoPointTool->snapper(),
-             &m_rotateTool->snapper(), &m_gripTool->snapper(), &m_measure->tool()->snapper(), &m_modifyTool->snapper()}) {
+             &m_rotateTool->snapper(), &m_gripTool->snapper(), &m_measure->tool()->snapper(), &m_modifyTool->snapper(),
+             &m_draftTool->snapper()}) {
         s->setWalls(walls);
         s->setGridLines(lines);
+        s->setPoints(points);
     }
     if (m_tool == Tool::Split || m_tool == Tool::Trim || m_tool == Tool::Join) // D80: beams too
         m_modifyTool->setTargets(data, bridge("modify_targets", {m_levels->activeStorey()}));
@@ -1729,6 +1775,13 @@ void MainWindow::updateToolPreview()
     case Tool::Join:
         updateModifyPreview();
         return;
+    case Tool::Line:
+    case Tool::Polyline:
+    case Tool::ArcCircle:
+    case Tool::Rectangle:
+    case Tool::Fill:
+        updateDraftPreview();
+        return;
     case Tool::None:
         break;
     }
@@ -1738,7 +1791,8 @@ void MainWindow::updateToolPreview()
 void MainWindow::showSnap(const Snap& snap)
 {
     static const char* const names[] = {"", QT_TR_NOOP("endpoint"), QT_TR_NOOP("midpoint"), QT_TR_NOOP("perpendicular"),
-        QT_TR_NOOP("on wall"), QT_TR_NOOP("angle"), QT_TR_NOOP("grid"), QT_TR_NOOP("grid crossing"), QT_TR_NOOP("on grid line")};
+        QT_TR_NOOP("on wall"), QT_TR_NOOP("angle"), QT_TR_NOOP("grid"), QT_TR_NOOP("grid crossing"), QT_TR_NOOP("on grid line"),
+        QT_TR_NOOP("wall face end"), QT_TR_NOOP("on wall face"), QT_TR_NOOP("centre")};
     QString text = tr("Wall: click the next point, type a length, Esc to finish");
     const auto preview = m_tool == Tool::Wall ? m_wallTool->preview() : m_twoPointTool->preview();
     if (preview) {
@@ -1764,6 +1818,7 @@ void MainWindow::setTool(Tool tool)
     m_wallTool->finish();
     m_polygonTool->cancel();
     m_twoPointTool->cancel();
+    m_draftTool->cancel();
     m_rotateTool->cancel();
     m_gripTool->cancel();
     m_measure->stop();
@@ -1772,6 +1827,7 @@ void MainWindow::setTool(Tool tool)
     m_tool = tool;
     m_measureCopy->setVisible(tool == Tool::Measure);
     startModifyTool(tool); // D80: its mode list in the options bar
+    startDraftTool(tool);  // D84: line type, arc mode, fill pattern
     m_twoPointTool->snapper().setFaceSnapping(tool == Tool::Dimension); // dimensions measure wall faces
     for (auto it = m_toolActions.constBegin(); it != m_toolActions.constEnd(); ++it) {
         const QSignalBlocker block(it.value());
@@ -1781,7 +1837,7 @@ void MainWindow::setTool(Tool tool)
     m_wallHeight->setToolTip(tool == Tool::Roof ? tr("Eaves height above the level") : tr("Wall height"));
     m_roofKind->parentWidget()->setVisible(tool == Tool::Roof);
     m_lengthInput->setVisible(tool == Tool::Wall || tool == Tool::Beam || tool == Tool::Grid || tool == Tool::Move
-        || tool == Tool::Rotate || tool == Tool::Stretch);
+        || tool == Tool::Rotate || tool == Tool::Stretch || isDraftTool(tool));
     m_lengthInput->setPlaceholderText(tool == Tool::Rotate ? tr("Angle (degrees)") : tr("Length (m)"));
     const bool typed = tool == Tool::Wall || tool == Tool::Slab || tool == Tool::Door || tool == Tool::Window
         || tool == Tool::Column || tool == Tool::Beam || tool == Tool::PlaceModel;
@@ -1839,6 +1895,13 @@ void MainWindow::setTool(Tool tool)
     case Tool::Trim:
     case Tool::Join:
         m_status->showMessage(m_modifyTool->hint());
+        break;
+    case Tool::Line:
+    case Tool::Polyline:
+    case Tool::ArcCircle:
+    case Tool::Rectangle:
+    case Tool::Fill:
+        m_status->showMessage(m_draftTool->hint());
         break;
     case Tool::Stair:
         m_status->showMessage(tr("Stair: click where it starts, then the direction it climbs"));
@@ -2232,7 +2295,8 @@ void MainWindow::buildPalette()
         tool(Tool::Beam), tool(Tool::Door), tool(Tool::Window), tool(Tool::Stair), tool(Tool::Roof), tool(Tool::Room),
         tool(Tool::SlabOpening), tool(Tool::PlaceModel)});
     m_palette->addGroup(QStringLiteral("plane"), tr("Plane"), {tool(Tool::Text), tool(Tool::Dimension),
-        tool(Tool::Leader), tool(Tool::Mark), tool(Tool::Grid)});
+        tool(Tool::Leader), tool(Tool::Mark), tool(Tool::Grid), tool(Tool::Line), tool(Tool::Polyline),
+        tool(Tool::ArcCircle), tool(Tool::Rectangle), tool(Tool::Fill)});
     m_palette->addGroup(QStringLiteral("view"), tr("View"), {tool(Tool::Section), tool(Tool::Elevation),
         newPlan, newSheet});
     m_palette->addGroup(QStringLiteral("edit"), tr("Edit"), {tool(Tool::Move), tool(Tool::Rotate),
@@ -3261,6 +3325,7 @@ void MainWindow::refreshAnnotations()
             o.value("size").toDouble(2.5), o.value("pen").toInt(0)};
         for (const auto& p : o.value("points").toArray())
             a.points << QPointF(p.toArray().at(0).toDouble(), p.toArray().at(1).toDouble());
+        readDrafting(o, &a); // D84 (DraftTools.cpp)
         list << a;
     }
     // Room stamps (Slice 18): kind "room", the stamp point first, then the outline.

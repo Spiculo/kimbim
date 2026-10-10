@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "Viewport.h"
+#include "Graphics.h"
 #include "PolygonTool.h"
 #include "ViewCube.h"
 
@@ -13,6 +14,8 @@
 #include <TCollection_ExtendedString.hxx>
 #include <Graphic3d_AspectLine3d.hxx>
 #include <Graphic3d_ArrayOfSegments.hxx>
+#include <Graphic3d_AspectFillArea3d.hxx>
+#include <Graphic3d_ArrayOfTriangles.hxx>
 #include <Prs3d_TextAspect.hxx>
 #include <Prs3d_Text.hxx>
 #include <V3d_ImageDumpOptions.hxx>
@@ -130,8 +133,8 @@ void Viewport::setPlanView(double elevation)
     m_view->Camera()->SetProjectionType(Graphic3d_Camera::Projection_Orthographic);
     m_view->SetProj(V3d_Zpos); // looking down, north (+Y) up
     applyNavigationPreset();
-    if (!wasPlan && !m_markerData.isEmpty())
-        displayAnnotations(); // section/elevation markers belong to the plan
+    if (!wasPlan && (!m_markerData.isEmpty() || !m_annotationData.isEmpty()))
+        displayAnnotations(); // section/elevation markers and drafting (D84) belong to the plan
     if (ensureWindow())
         fitAll();
     update();
@@ -145,7 +148,7 @@ void Viewport::set3DView()
     m_view->SetProj(HomeOrientation);
     applyProjection(); // this view's perspective setting comes back
     applyNavigationPreset();
-    if (wasPlan && !m_markerData.isEmpty())
+    if (wasPlan && (!m_markerData.isEmpty() || !m_annotationData.isEmpty()))
         displayAnnotations();
     if (ensureWindow())
         fitAll();
@@ -714,10 +717,12 @@ private:
 class AnnotationPrs : public AIS_InteractiveObject {
 public:
     // `ink`: the pen's colour and width (D73); nullopt keeps the kind's own colours (markers, rooms).
-    AnnotationPrs(Viewport::Annotation a, double z, std::optional<std::pair<Quantity_Color, float>> ink = std::nullopt)
+    AnnotationPrs(Viewport::Annotation a, double z, std::optional<std::pair<Quantity_Color, float>> ink = std::nullopt,
+        std::optional<Quantity_Color> background = std::nullopt)
         : m_a(std::move(a))
         , m_z(z)
         , m_ink(std::move(ink))
+        , m_background(std::move(background))
     {
         SetZLayer(Graphic3d_ZLayerId_Topmost);
     }
@@ -734,6 +739,33 @@ public:
             : room ? Quantity_Color(0.1, 0.45, 0.3, Quantity_TOC_RGB)
             : marker ? Quantity_Color(0.1, 0.3, 0.75, Quantity_TOC_RGB)
                      : Quantity_Color(0.1, 0.1, 0.12, Quantity_TOC_RGB);
+        if (m_a.isDrafting() && m_a.area.size() >= 3 && (m_a.solid || m_background)) {
+            // D84: the fill's area, just under its lines (solid: the pen's colour; else its background pen)
+            const std::vector<uint32_t> tris = PolygonTool::triangulate(m_a.area);
+            if (!tris.empty()) {
+                Handle(Graphic3d_ArrayOfTriangles) fill = new Graphic3d_ArrayOfTriangles(int(tris.size()));
+                for (uint32_t i : tris)
+                    fill->AddVertex(gp_Pnt(m_a.area[int(i)].x(), m_a.area[int(i)].y(), m_z - 0.004));
+                Handle(Graphic3d_AspectFillArea3d) aspect = new Graphic3d_AspectFillArea3d();
+                aspect->SetInteriorStyle(Aspect_IS_SOLID);
+                aspect->SetInteriorColor(m_a.solid ? ink : *m_background);
+                aspect->SetShadingModel(Graphic3d_TypeOfShadingModel_Unlit);
+                aspect->SetFaceCulling(Graphic3d_TypeOfBackfacingModel_DoubleSided);
+                Handle(Graphic3d_Group) g = prs->NewGroup();
+                g->SetGroupPrimitivesAspect(aspect);
+                g->AddPrimitiveArray(fill);
+            }
+        }
+        if (!m_a.hatch.isEmpty()) { // solid hatch lines, thin, in the pen's colour
+            Handle(Graphic3d_ArrayOfSegments) arr = new Graphic3d_ArrayOfSegments(int(m_a.hatch.size()) * 2);
+            for (const QLineF& l : m_a.hatch) {
+                arr->AddVertex(gp_Pnt(l.x1(), l.y1(), m_z - 0.002));
+                arr->AddVertex(gp_Pnt(l.x2(), l.y2(), m_z - 0.002));
+            }
+            Handle(Graphic3d_Group) g = prs->NewGroup();
+            g->SetGroupPrimitivesAspect(new Graphic3d_AspectLine3d(ink, Aspect_TOL_SOLID, 1.0f));
+            g->AddPrimitiveArray(arr);
+        }
         const std::vector<std::pair<gp_Pnt, gp_Pnt>> segs = segments();
         if (!segs.empty()) {
             Handle(Graphic3d_ArrayOfSegments) arr = new Graphic3d_ArrayOfSegments(int(segs.size()) * 2);
@@ -743,7 +775,10 @@ public:
             }
             Handle(Graphic3d_Group) lines = prs->NewGroup();
             const float width = m_ink ? std::max(m_ink->second, 1.0f) : (room ? 1.0f : 1.5f);
-            lines->SetGroupPrimitivesAspect(new Graphic3d_AspectLine3d(ink, room ? Aspect_TOL_DOT : Aspect_TOL_SOLID, width));
+            Handle(Graphic3d_AspectLine3d) aspect = new Graphic3d_AspectLine3d(ink, room ? Aspect_TOL_DOT : Aspect_TOL_SOLID, width);
+            if (!m_a.dash.isEmpty()) // D84: the drafting shape's line type
+                aspect->SetLinePattern(Graphics::pattern(m_a.dash));
+            lines->SetGroupPrimitivesAspect(aspect);
             lines->AddPrimitiveArray(arr);
         }
         Handle(Prs3d_TextAspect) text = new Prs3d_TextAspect();
@@ -759,6 +794,12 @@ public:
             text->SetHorizontalJustification(Graphic3d_HTA_CENTER); // centred on the line / in the circle
             text->SetVerticalJustification(Graphic3d_VTA_CENTER);
         } else if (m_a.kind == QLatin1String("leader")) {
+            text->SetVerticalJustification(Graphic3d_VTA_CENTER);
+        }
+        if (m_a.isDrafting() && !m_a.labelAt) // lines, arcs, circles, fills without their area: no text
+            return;
+        if (m_a.isDrafting()) {
+            text->SetHorizontalJustification(Graphic3d_HTA_CENTER);
             text->SetVerticalJustification(Graphic3d_VTA_CENTER);
         }
         Handle(Graphic3d_Group) group = prs->NewGroup();
@@ -841,6 +882,8 @@ private:
 
     gp_Pnt anchor() const
     {
+        if (m_a.isDrafting()) // the area label, or the first point
+            return m_a.labelAt ? at(*m_a.labelAt) : (m_a.points.isEmpty() ? gp_Pnt(0, 0, m_z) : at(m_a.points.first()));
         if (m_a.kind == QLatin1String("dimension")) {
             const auto l = labels();
             return l.empty() ? gp_Pnt(0, 0, m_z) : l.front().second;
@@ -858,6 +901,12 @@ private:
     std::vector<std::pair<gp_Pnt, gp_Pnt>> segments() const
     {
         std::vector<std::pair<gp_Pnt, gp_Pnt>> out;
+        if (m_a.isDrafting()) {
+            for (const auto& curve : m_a.curves)
+                for (int i = 0; i + 1 < curve.size(); ++i)
+                    out.push_back({at(curve[i]), at(curve[i + 1])});
+            return out;
+        }
         QVector<QPointF> measured, onLine;
         QPointF u, n;
         if (chain(&measured, &onLine, &u, &n)) {
@@ -915,10 +964,25 @@ private:
     Viewport::Annotation m_a;
     double m_z;
     std::optional<std::pair<Quantity_Color, float>> m_ink;
+    std::optional<Quantity_Color> m_background;
     Handle(SelectMgr_EntityOwner) m_owner;
 };
 
 } // namespace
+
+bool Viewport::Annotation::isDrafting() const
+{
+    return kind == QLatin1String("line") || kind == QLatin1String("polyline") || kind == QLatin1String("arc")
+        || kind == QLatin1String("circle") || kind == QLatin1String("fill");
+}
+
+int Viewport::draftingCount() const
+{
+    int n = 0;
+    for (const Annotation& a : m_annotationData)
+        n += a.isDrafting() && m_annotations.contains(a.guid);
+    return n;
+}
 
 void Viewport::setAnnotations(const QVector<Annotation>& annotations, double z)
 {
@@ -940,6 +1004,8 @@ void Viewport::displayAnnotations()
         for (const Annotation& a : *list) {
             if (m_scene->layerHidden.contains(a.guid) || g.isHidden(a.guid))
                 continue;
+            if (a.isDrafting() && !m_planView)
+                continue; // D84: 2D drafting belongs to the plan, as in Archicad
             // D73: text, dimensions, marks and leaders take their pen (or the annotations kind's pen).
             std::optional<std::pair<Quantity_Color, float>> ink;
             const bool ownColours = a.kind == QLatin1String("room") || a.kind == QLatin1String("section")
@@ -949,7 +1015,14 @@ void Viewport::displayAnnotations()
                 ink = std::make_pair(Quantity_Color(pen.color.redF(), pen.color.greenF(), pen.color.blueF(), Quantity_TOC_sRGB),
                     Graphics::pixels(pen.weight, m_scene->trueWeights));
             }
-            Handle(AnnotationPrs) prs = new AnnotationPrs(a, m_annotationZ + 0.02, ink);
+            std::optional<Quantity_Color> background;
+            if (a.backgroundPen > 0 && !g.isEmpty()) {
+                const QColor c = g.pen(a.backgroundPen).color;
+                background = Quantity_Color(c.redF(), c.greenF(), c.blueF(), Quantity_TOC_sRGB);
+            } else if (a.backgroundPen > 0) {
+                background = Quantity_Color(Quantity_NOC_WHITE);
+            }
+            Handle(AnnotationPrs) prs = new AnnotationPrs(a, m_annotationZ + 0.02, ink, background);
             m_context->Display(prs, 0, m_scene->layerLocked.contains(a.guid) ? -1 : 0, false);
             keepHere(prs);
             m_annotations.insert(a.guid, prs);

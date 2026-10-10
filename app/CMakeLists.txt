@@ -28,6 +28,7 @@ qt_add_library(kimcad_core STATIC
     src/RotateTool.cpp src/RotateTool.h
     src/GripTool.cpp src/GripTool.h
     src/ModifyTool.cpp src/ModifyTool.h src/ModifyEdits.cpp
+    src/DraftTool.cpp src/DraftTool.h src/DraftTools.cpp
     src/ModelLoader.cpp src/ModelLoader.h
     src/Cuts.cpp src/Cuts.h
     src/DrawingsPanel.cpp src/DrawingsPanel.h

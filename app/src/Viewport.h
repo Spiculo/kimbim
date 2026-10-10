@@ -11,6 +11,7 @@
 #include <QColor>
 #include <QHash>
 #include <QPoint>
+#include <QLineF>
 #include <QPointF>
 #include <QSet>
 #include <QVector>
@@ -110,7 +111,19 @@ public:
         QVector<QPointF> points; // world metres: text/mark anchor; dimension chain points + line point; leader tip..text
         double size = 2.5;       // text size in millimetres on paper (printed at 1:100)
         int pen = 0;             // D73: its pen; 0 = the annotations kind's pen
+        // D84 drafting shapes (line, polyline, arc, circle, fill), drawn in plan views only: the
+        // polylines to draw, the line type's dashes (mm on paper), and a fill's area, hatch,
+        // solid or background pen and area label (text, at labelAt).
+        QVector<QVector<QPointF>> curves;
+        QVector<double> dash;
+        QVector<QPointF> area;
+        QVector<QLineF> hatch;
+        bool solid = false;
+        int backgroundPen = 0;
+        std::optional<QPointF> labelAt;
+        bool isDrafting() const;
     };
+    int draftingCount() const; // drafting shapes shown
     void setAnnotations(const QVector<Annotation>& annotations, double z);
     int annotationCount() const;
     // Section and elevation markers (Slice 14): kind "section"/"elevation", text = the drawing's
