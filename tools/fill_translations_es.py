@@ -968,6 +968,76 @@ ES = {
     'Image': 'Imagen',
     'the file is missing from the project': 'falta el archivo en el proyecto',
     'None': 'Ninguno',
+    # D87: the annotation pack (Archicad ES: Etiqueta, Flecha de norte, Nube de revisión, Cota de nivel)
+    "Ta&g": "Eti&queta",
+    "Tag an element: click a door, window, wall or room; the tag shows its values and follows it":
+        "Etiquetar un elemento: haga clic en una puerta, ventana, muro o local; la etiqueta muestra sus datos y lo sigue",
+    "&North arrow": "Flecha de &norte",
+    "Place a north arrow: it points to the project's true north":
+        "Colocar una flecha de norte: apunta al norte geográfico del proyecto",
+    "Scale &bar": "Escala &gráfica",
+    "Place a scale bar of the drawing scale": "Colocar una escala gráfica de la escala del dibujo",
+    "Revision &cloud": "Nube de &revisión",
+    "Draw a revision cloud: click its outline; the revision goes in its triangle":
+        "Dibujar una nube de revisión: haga clic en su contorno; la revisión va en su triángulo",
+    "An&gle dimension": "Cota de án&gulo",
+    "Angle dimension: click the vertex, a point on each side, then where the arc goes":
+        "Cota de ángulo: haga clic en el vértice, un punto en cada lado y luego donde va el arco",
+    "&Radius/diameter": "&Radio/diámetro",
+    "Radius or diameter: click the centre, a point on the circle, then where the text goes":
+        "Radio o diámetro: haga clic en el centro, un punto de la circunferencia y luego donde va el texto",
+    "&Level/spot elevation": "Cota de &nivel/punto",
+    "Level dimension or spot elevation: click the point (it measures the slab below, or the level)":
+        "Cota de nivel o de punto: haga clic en el punto (mide el forjado de debajo, o la planta)",
+    "Tag &all untagged": "Etiquetar &todo lo no etiquetado",
+    "Tag the doors, windows and walls of this level that the view shows and have no tag":
+        "Etiquetar las puertas, ventanas y muros de esta planta que muestra la vista y no tienen etiqueta",
+    "%n element(s) marked": ("%n elemento marcado", "%n elementos marcados"),
+    "%n element(s) have no renovation status. Mark them as:":
+        ("%n elemento no tiene estado de reforma. Marcarlo como:", "%n elementos no tienen estado de reforma. Marcarlos como:"),
+    "Tag style (project settings): Automatic takes the element's kind's":
+        "Estilo de etiqueta (ajustes del proyecto): Automático toma el del tipo de elemento",
+    "The tag's frame": "El marco de la etiqueta",
+    "Style's frame": "Marco del estilo",
+    "No frame": "Sin marco",
+    "Circle": "Círculo",
+    "Box": "Rectángulo",
+    "Hexagon": "Hexágono",
+    "With a leader: click the element, then where the tag goes":
+        "Con línea de referencia: haga clic en el elemento y luego donde va la etiqueta",
+    "Revision": "Revisión",
+    "The revision the cloud marks (shown in a triangle)": "La revisión que marca la nube (en un triángulo)",
+    "Automatic": "Automático",
+    "Radius": "Radio",
+    "Diameter": "Diámetro",
+    "Level dimension": "Cota de nivel",
+    "Spot elevation": "Cota de punto",
+    "Tag: click a door, window, wall, room or other element":
+        "Etiqueta: haga clic en una puerta, ventana, muro, local u otro elemento",
+    "North arrow: click where it goes (it points to the project's true north)":
+        "Flecha de norte: haga clic donde va (apunta al norte geográfico del proyecto)",
+    "Scale bar: click where its left end goes": "Escala gráfica: haga clic donde va su extremo izquierdo",
+    "Revision cloud: click its outline; click the first point or press Enter to close":
+        "Nube de revisión: haga clic en su contorno; haga clic en el primer punto o pulse Intro para cerrarla",
+    "Angle: click the vertex": "Ángulo: haga clic en el vértice",
+    "Radius: click the centre (circle and arc centres snap)":
+        "Radio: haga clic en el centro (se ajusta a los centros de círculos y arcos)",
+    "Level: click the point to measure": "Nivel: haga clic en el punto que medir",
+    "Nothing to tag there": "No hay nada que etiquetar ahí",
+    "Tag: click where the tag goes": "Etiqueta: haga clic donde va la etiqueta",
+    "Angle: click a point on the first side": "Ángulo: haga clic en un punto del primer lado",
+    "Angle: click a point on the second side": "Ángulo: haga clic en un punto del segundo lado",
+    "Angle: click where the arc goes": "Ángulo: haga clic donde va el arco",
+    "Click a point on the circle": "Haga clic en un punto de la circunferencia",
+    "Click where the text goes": "Haga clic donde va el texto",
+    "Spot elevation: click where the text goes": "Cota de punto: haga clic donde va el texto",
+    "Could not tag it: %1": "No se pudo etiquetar: %1",
+    "Could not tag them: %1": "No se pudieron etiquetar: %1",
+    "Tagged %n element(s)": ("%n elemento etiquetado", "%n elementos etiquetados"),
+    "Everything shown is tagged already": "Todo lo que se muestra ya está etiquetado",
+    "Place north arrow": "Colocar flecha de norte",
+    "Place scale bar": "Colocar escala gráfica",
+    "Place revision cloud": "Colocar nube de revisión",
 }
 
 
