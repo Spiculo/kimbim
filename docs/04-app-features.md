@@ -138,7 +138,7 @@ Clones get **new KIMCAD IDs and GlobalIds**. They never share identity with the 
 | Generate plans, sections, elevations from the model | P1 | IfcOpenShell **SVG serializer** (hidden-line removal, cut fills), as used by Bonsai. ✅ Sections and elevations (Slice 14, D60/D61); plans: Slice 15 |
 | Annotations: dimensions, text, tags (door/window/room tags), level marks | P1 | IFC annotation entities (`IfcAnnotation`), stored in the model |
 | Sheets with title blocks; place drawings at scale | P1 | Bonsai's drawing/sheet approach (SVG-based) |
-| Export PDF / SVG; DXF later | P1 | |
+| Export PDF / SVG; DXF (D83) | P1 | |
 | Drawings update automatically when the model changes | P1 | 🟡 Slice 14: marked out of date, regenerated in the background when shown or on Regenerate |
 | Show version/milestone on the title block (from repo) | P2 | Bonsai already does this with `git describe` |
 

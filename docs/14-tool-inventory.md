@@ -259,8 +259,8 @@ release notes, so check before relying on a single cell.
 | Drawing and sheet lists (auto-numbered) | AC RV VW | ⬜ | new | |
 | Revisions / issue management | AC RV VW | ⬜ | new | Could use versions and milestones (P2 item in 04) |
 | Print, PDF export | all | ✅ | P1 | Slice 16: PDF and SVG per sheet (Qt, vector) |
-| Batch publishing (sets of sheets to PDF/DWG) | AC RV VW | ⬜ | new | Archicad Publisher |
-| DWG/DXF export | AC RV VW BB | ⬜ | P1 | |
+| Batch publishing (sets of sheets to PDF/DWG) | AC RV VW | 🟡 | new | D83: File › Export DXF... exports ticked drawings and sheets to a folder (DXF; PDF stays one sheet at a time) |
+| DWG/DXF export | AC RV VW BB | 🟡 | P1 | D83: DXF (ezdxf): drawings in model space at real size, sheets as paper-space layouts; lineweights, colours, linetypes from pens; poché hatches; real dimensions; layers by KIMCAD layer or kind. DWG not yet (open question) |
 
 ## 15. Schedules and quantities
 

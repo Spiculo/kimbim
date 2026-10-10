@@ -165,6 +165,22 @@ Built per D81 (Archicad's Model Check and Collision Detection, with Solibri-styl
    rather have a Scripting menu, or scripts that you can pin as commands (a P2 plugins feature)?
 3. Should scripts be able to run without the window (`kimcad run script.py model.ifc`) for batch jobs?
 
+## For the architect: DXF export (asked 2026-10-10, waiting)
+
+Built per D83 (Archicad's DWG/DXF translator as the reference).
+
+1. **DWG**: KIMCAD writes DXF only. Do your consultants accept DXF, or is DWG a must? (DWG means either
+   LibreDWG, whose writer is still experimental, or asking users to install the free ODA File Converter.)
+2. Layers default to the KIMCAD layer (elements without one: by kind, e.g. A-WALL). Is the US National CAD
+   Standard naming right for your offices, or do you use another standard (ISO 13567, a local one)? Do you
+   need Archicad's third option, a layer per pen?
+3. Poché goes on a separate `-PATT` layer (A-WALL-PATT) so it can be frozen. Useful, or should it share the
+   element's layer?
+4. A sheet is a paper-space layout with each drawing as a block inserted at scale (not a viewport onto
+   model space). Do the people receiving it expect viewports instead?
+5. Black pens are exported as colour 7 (black on white, white on a dark CAD background); other pens keep
+   their exact colour. Would you rather everything printed by colour (ACI only) or by lineweight only?
+
 ## Needs a spike
 
 These are listed in [07-roadmap.md](07-roadmap.md#spikes-do-first-each-is-small-throwaway-and-documented).

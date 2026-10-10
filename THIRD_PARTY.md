@@ -17,6 +17,7 @@ KIMCAD is GPL-3.0-or-later. These are the components it uses, how each is linked
 | odfpy | Apache-2.0 | IfcTester's ODS report (installed, not offered) | Dynamic |
 | bcf-client | LGPL-3.0-or-later | IfcTester's BCF report (installed, not offered yet) | Dynamic |
 | Flask | BSD-3-Clause | IfcTester's web app (installed as its dependency, never started) | Dynamic |
+| ezdxf (and pyparsing, fonttools) | MIT | Drawings and sheets exported to DXF (D83) | Dynamic |
 | Git | GPL-2.0-only (program) | `git fast-import`, repack, branch | Separate program |
 | gix (gitoxide) | MIT OR Apache-2.0 | Reading the Git object database | Static (Rust) |
 | rayon | MIT OR Apache-2.0 | Parallel reads | Static (Rust) |
