@@ -12,6 +12,8 @@
 #include <QVector>
 
 #include <functional>
+#include <memory>
+#include <QImage>
 #include <optional>
 #include <QJsonValue>
 #include <QStringList>
@@ -64,6 +66,9 @@ class TwoPointTool;
 class RotateTool;
 class GripTool;
 class MeasureController;
+class UnderlayPicker;
+class UnderlaySnapIndex;
+struct UnderlayLines;
 class ModifyTool;
 class DraftTool;
 struct WallSegment;
@@ -115,6 +120,19 @@ public:
     bool saveAsTemplate(const QString& name, bool replace = false); // false if it exists and wasn't replaced
     bool addLevel(const QString& name, double elevation);
     LevelsBar* levelsBar() const { return m_levels; }
+    // D85: underlays (Underlays.cpp). File > Place underlay... picks a DXF, PDF or image and places it on
+    // the active level; placeUnderlay does the same without dialogs (options as app_bridge.add_underlay).
+    void placeUnderlayDialog(const QString& path = {});
+    QJsonObject placeUnderlay(const QString& path, const QJsonObject& options);
+    void underlaysDialog();
+    void refreshUnderlays();
+    // Calibrate (two points, then their real distance) or move (from, to) an underlay by clicks in the
+    // plan: mode is UnderlayPicker::Mode. finishUnderlayPick applies it (distance in metres for a
+    // calibration; asked when not given).
+    void startUnderlayPick(const QString& id, int mode);
+    bool finishUnderlayPick(std::optional<double> distance = std::nullopt);
+    UnderlayPicker* underlayPicker() const { return m_underlayPicker.get(); }
+    std::shared_ptr<const UnderlaySnapIndex> underlaySnapIndex() const { return m_underlaySnap; }
     TitleBar* titleBar() const { return m_titleBar; } // D75: menus, level, cuts, title, Versions
     // Modeling tools (M3): one active at a time. Exposed for tests and the self-test, which drive
     // them with work-plane points.
@@ -395,6 +413,7 @@ private:
     void roomScheduleDialog();
     void exportSheetDialog(bool pdf);
     void exportDxfDialog(); // D83: File > Export DXF... (DxfExport.cpp)
+    void addUnderlayActions(QMenu* file); // D85 (Underlays.cpp)
     void drawingClick(QPointF p);
     void onDrawingGenerated(const QString& guid, const QJsonObject& result, const QString& error);
     void activateView(const QString& key);
@@ -573,6 +592,12 @@ private:
     QAction* m_sectionBox = nullptr;
     QDoubleSpinBox* m_cutHeight = nullptr;
     Bnd_Box m_boxBounds; // captured when the section box is switched on
+    // D85: underlays (Underlays.cpp): linework by file, page images by file/page/dpi/colour.
+    QHash<QString, std::shared_ptr<const UnderlayLines>> m_underlayLines;
+    QHash<QString, QImage> m_underlayImages;
+    std::shared_ptr<const UnderlaySnapIndex> m_underlaySnap;
+    QString m_underlaySnapKey;
+    std::shared_ptr<UnderlayPicker> m_underlayPicker;
 };
 
 } // namespace kimcad

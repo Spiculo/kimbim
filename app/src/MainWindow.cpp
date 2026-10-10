@@ -332,6 +332,7 @@ void MainWindow::buildMenus()
     dxfExport->setObjectName(QStringLiteral("actionExportDxf"));
     dxfExport->setToolTip(tr("Drawings and sheets to DXF files, several at once"));
     connect(dxfExport, &QAction::triggered, this, &MainWindow::exportDxfDialog);
+    addUnderlayActions(file); // D85: Place underlay..., Underlays... (Underlays.cpp)
     QAction* schedule = file->addAction(tr("&Room schedule..."));
     schedule->setObjectName(QStringLiteral("actionRoomSchedule"));
     connect(schedule, &QAction::triggered, this, &MainWindow::roomScheduleDialog);
@@ -1717,6 +1718,7 @@ void MainWindow::refreshSnapData()
     for (const SnapLine& l : lines)
         shown.push_back({l.a, l.b, l.tag});
     m_viewport->setGridLines(shown, m_levels->activeElevation());
+    refreshUnderlays(); // D85: and their snap points
 }
 
 void MainWindow::updateToolPreview()
@@ -3078,6 +3080,7 @@ void MainWindow::refreshLayers()
         names << v.toObject().value("name").toString();
     m_layersPanel->setViews(names, m_currentView);
     refreshGraphics(); // new and changed elements get the purpose's styles
+    refreshUnderlays(); // D85: their layers' states
 }
 
 void MainWindow::refreshGraphics()

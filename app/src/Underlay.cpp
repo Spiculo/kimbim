@@ -251,7 +251,7 @@ void UnderlaySnapIndex::build()
 }
 
 template <typename F>
-void UnderlaySnapIndex::near(QPointF p, double tolerance, F&& f) const
+void UnderlaySnapIndex::forNearby(QPointF p, double tolerance, F&& f) const
 {
     if (m_cellStart.empty())
         return;
@@ -271,7 +271,7 @@ bool UnderlaySnapIndex::endpoint(QPointF p, double tolerance, QPointF* out) cons
 {
     double best = tolerance;
     bool found = false;
-    near(p, tolerance, [&](int i) {
+    forNearby(p, tolerance, [&](int i) {
         for (const QPointF& q : {m_segments[size_t(i)].a, m_segments[size_t(i)].b})
             if (dist(p, q) <= best) {
                 best = dist(p, q);
@@ -286,7 +286,7 @@ bool UnderlaySnapIndex::midpoint(QPointF p, double tolerance, QPointF* out) cons
 {
     double best = tolerance;
     bool found = false;
-    near(p, tolerance, [&](int i) {
+    forNearby(p, tolerance, [&](int i) {
         const QPointF q = (m_segments[size_t(i)].a + m_segments[size_t(i)].b) / 2;
         if (dist(p, q) <= best) {
             best = dist(p, q);
@@ -300,7 +300,7 @@ bool UnderlaySnapIndex::midpoint(QPointF p, double tolerance, QPointF* out) cons
 bool UnderlaySnapIndex::crossing(QPointF p, double tolerance, QPointF* out) const
 {
     std::vector<int> cand;
-    near(p, tolerance, [&](int i) {
+    forNearby(p, tolerance, [&](int i) {
         if (cand.size() < 256 && std::find(cand.begin(), cand.end(), i) == cand.end())
             cand.push_back(i);
     });
@@ -332,7 +332,7 @@ bool UnderlaySnapIndex::onLine(QPointF p, double tolerance, QPointF* out) const
 {
     double best = tolerance;
     bool found = false;
-    near(p, tolerance, [&](int i) {
+    forNearby(p, tolerance, [&](int i) {
         const Segment& s = m_segments[size_t(i)];
         const QPointF d = s.b - s.a;
         const double len2 = d.x() * d.x() + d.y() * d.y();

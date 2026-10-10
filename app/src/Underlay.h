@@ -87,7 +87,7 @@ public:
 
 private:
     template <typename F>
-    void near(QPointF p, double tolerance, F&& f) const; // f(segment index) for segments in nearby cells
+    void forNearby(QPointF p, double tolerance, F&& f) const; // f(segment index) for segments in nearby cells
     std::vector<Segment> m_segments;
     double m_cell = 1.0;
     double m_minX = 0, m_minY = 0;

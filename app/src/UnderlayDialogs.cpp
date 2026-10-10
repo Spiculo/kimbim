@@ -180,6 +180,7 @@ UnderlaysDialog::UnderlaysDialog(Bridge bridge, const QHash<QString, QString>& l
     m_opacity = new QSlider(Qt::Horizontal);
     m_opacity->setObjectName(QStringLiteral("underlayOpacity"));
     m_opacity->setRange(5, 100);
+    m_opacity->setTracking(false); // one change when released, not one per step
     form->addRow(tr("Opacity:"), m_opacity);
     m_grey = new QCheckBox(tr("Greyscale"));
     m_tint = new QPushButton;
