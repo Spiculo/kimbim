@@ -406,6 +406,8 @@ def plan_annotations(storey, to_paper, size_default=TEXT_SIZE):
             continue
         data = ifcopenshell.util.element.get_pset(a, ANNOTATION_PSET) or {}
         kind = data.get("Kind")
+        if kind not in ("text", "mark", "leader", "dimension"):
+            continue  # drafting shapes (D84) are added by drafting.add_to_drawing
         try:
             local = json.loads(data.get("Points") or "[]")
         except ValueError:

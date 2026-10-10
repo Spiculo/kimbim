@@ -847,6 +847,7 @@ from . import graphics as _graphics  # noqa: E402
 from . import schedules as _schedules  # noqa: E402
 from . import documents as _documents  # noqa: E402
 from . import console as _console  # noqa: E402
+from . import drafting as _drafting  # noqa: E402
 
 _EXPORTS = {
     "authoring": (
@@ -1055,6 +1056,14 @@ _EXPORTS = {
         "set_author",
         "templates",
         "write_recovery",
+    ),
+    "drafting": (
+        "add_drafting",
+        "fill_at",
+        "fill_from_shape",
+        "fill_patterns",
+        "set_annotation_points",
+        "set_drafting_style",
     ),
     "console": (
         "console_help",

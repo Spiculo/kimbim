@@ -22,6 +22,7 @@ DEFAULTS = {
     "length_decimals": 2,
     "pen_sets": {},
     "line_types": {},
+    "fill_patterns": {},  # D84: the project's fill patterns (empty: the built-ins)
     "element_styles": {},
     "visibility_sets": {},
     "override_sets": {},

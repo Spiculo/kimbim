@@ -276,7 +276,7 @@ def raw_drawing(guid: str, include_json: str = "", hidden=()) -> dict:
     key = (*_state_key(), include_json or "")  # the state and the elements given
     hit = _cache.get(guid, {}).get(key)
     if hit is not None:
-        return {"ok": True, "svg": hit, "cached": True}
+        return {"ok": True, "svg": _drafted(hit, d), "cached": True}
     try:
         with tempfile.TemporaryDirectory(prefix="kimcad-draw-") as tmp:
             snapshot = os.path.join(tmp, "model.ifc")
@@ -297,7 +297,15 @@ def raw_drawing(guid: str, include_json: str = "", hidden=()) -> dict:
     entries[key] = result["svg"]
     while len(entries) > _CACHE_SIZE:
         entries.pop(next(iter(entries)))
-    return {"ok": True, "svg": result["svg"], "cached": False, "timing": result["timing"]}
+    return {"ok": True, "svg": _drafted(result["svg"], d), "cached": False, "timing": result["timing"]}
+
+
+def _drafted(svg: str, drawing) -> str:
+    """D84: plans get their level's lines, arcs and fills here, not in the drawing process: the
+    fill patterns and line types are project settings, so they are drawn as they are now."""
+    from . import drafting
+
+    return drafting.add_to_drawing(svg, drawing)
 
 
 def generate_drawing(guid: str, include_json: str = "") -> str:

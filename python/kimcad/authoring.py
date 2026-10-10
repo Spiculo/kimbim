@@ -1371,6 +1371,10 @@ def _copy_elements(elements, target, transform_units, *, tag=None) -> list:
     for e in elements:
         c = ifcopenshell.api.root.copy_class(f, product=e)
         _copy_shape(e, c)
+        if c.is_a("IfcAnnotation"):  # plan annotations and drafting shapes (D59, D84): from their pset
+            from . import annotations
+
+            annotations.rebuild(c)
         layers.copy_layer(e, c)
         renovation.copy_status(e, c)
         _place_like(e, c, transform_units)

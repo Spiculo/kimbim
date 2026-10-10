@@ -130,6 +130,12 @@ def array_elements(guids_json: str, kind: str, params_json: str) -> str:
 
 # ---------------------------------------------------------------- mirror
 
+def _annotations():
+    from . import annotations
+
+    return annotations
+
+
 def _reflection(x1, y1, x2, y2):
     """2D reflection across the line through (x1, y1)-(x2, y2), as a function on (x, y) metres and
     on directions."""
@@ -222,6 +228,8 @@ def _mirror(elements, point, direction):
         if e.is_a("IfcSlab") and _slab_outline_world(e):
             outline = [point(p) for p in _slab_outline_world(e)]
             _set_slab_outline(e, list(reversed(outline)))
+        elif e.is_a("IfcAnnotation") and _annotations().mirror(e, point):
+            pass  # plan annotations and drafting shapes: their points reflected (text stays readable)
         else:
             _mirror_placement(e, point, direction)
     return [h[0] for h in hosted] + released

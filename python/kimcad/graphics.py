@@ -17,7 +17,7 @@ KINDS = ("walls", "columns", "beams", "slabs", "roofs", "stairs", "railings", "d
          "coverings", "furniture", "plumbing", "hvac", "electrical", "structure_other", "rooms",
          "annotations", "grids", "other")
 TABLES = ("pen_sets", "line_types", "element_styles", "visibility_sets", "override_sets",
-          "layer_combinations", "purposes", "renovation_filters")
+          "layer_combinations", "purposes", "renovation_filters", "fill_patterns")
 STATUS_KEYS = ("existing", "demolish", "new")  # renovation status (D74)
 FILTER_SHOW = ("as_is", "hide", "override")
 FILTER_FIELDS = ("pen", "cut_pen", "projection_pen", "line", "fill", "surface", "transparency")
@@ -107,6 +107,21 @@ _BUILTINS = {
     "line_types": {"Solid": [], "Dashed": [3.0, 1.5], "Dotted": [0.3, 1.0], "Dash-dot": [4.0, 1.0, 0.5, 1.0],
                    "Centre": [8.0, 1.5, 1.5, 1.5], "Hidden": [1.5, 1.0]},
     "element_styles": _STYLES,
+    # D84: fill patterns, hatch-line families in mm on paper (AutoCAD .pat style, see drafting.py).
+    "fill_patterns": {
+        "Solid": {"solid": True, "lines": []},
+        "Empty": {"lines": []},
+        "Diagonal": {"lines": [{"angle": 45, "spacing": 2.0}]},
+        "Crosshatch": {"lines": [{"angle": 45, "spacing": 2.0}, {"angle": 135, "spacing": 2.0}]},
+        "Horizontal": {"lines": [{"angle": 0, "spacing": 2.0}]},
+        "Brick": {"lines": [{"angle": 0, "spacing": 2.0}, {"angle": 90, "spacing": 2.0, "shift": 2.0, "dash": [2.0, 2.0]}]},
+        # zigzag rows 2 mm high, 2 mm period: two families of dashes that meet at the peaks
+        "Insulation": {"lines": [
+            {"angle": 63.434949, "spacing": 0.894427, "shift": 1.788854, "dash": [2.236068, 2.236068]},
+            {"angle": 116.565051, "spacing": 0.894427, "shift": -1.788854, "dash": [2.236068, 2.236068]}]},
+        "Concrete": {"lines": [{"angle": 0, "spacing": 1.2, "shift": 0.6, "dash": [0.1, 1.1]},
+                               {"angle": 60, "spacing": 2.5, "shift": 1.0, "dash": [0.4, 2.6]}]},
+    },
     "visibility_sets": {
         "Everything": {"hidden_kinds": [], "rules": []},
         "Architectural": {"hidden_kinds": ["plumbing", "hvac", "electrical"], "rules": []},
@@ -289,6 +304,25 @@ def validate(key: str, value) -> str | None:
                 return f"line type {name}: lengths must be above 0"
             if len(d) > 12:
                 return f"line type {name}: at most 6 dash and gap pairs"
+    elif key == "fill_patterns":
+        for name, p in value.items():
+            if not isinstance(p, dict) or not isinstance(p.get("lines", []), list):
+                return f"fill pattern {name}: a list of hatch lines"
+            if "solid" in p and not isinstance(p["solid"], bool):
+                return f"fill pattern {name}: solid is true or false"
+            if len(p.get("lines", [])) > 8:
+                return f"fill pattern {name}: at most 8 hatch line families"
+            for line in p.get("lines", []):
+                if not isinstance(line, dict) or not _number(line.get("spacing")) or line["spacing"] < 0.1:
+                    return f"fill pattern {name}: each hatch line needs a spacing of at least 0.1 mm"
+                if not _number(line.get("angle", 0)) or not _number(line.get("shift", 0)):
+                    return f"fill pattern {name}: angle and shift are numbers"
+                origin = line.get("origin", [0, 0])
+                if not (isinstance(origin, list) and len(origin) == 2 and all(_number(v) for v in origin)):
+                    return f"fill pattern {name}: the origin is two numbers"
+                d = line.get("dash", [])
+                if not isinstance(d, list) or not all(_number(x) and x > 0 for x in d) or len(d) % 2 or len(d) > 12:
+                    return f"fill pattern {name}: dashes and gaps come in pairs, above 0"
     elif key == "element_styles":
         for kind, st in value.items():
             if kind not in KINDS:
@@ -821,7 +855,9 @@ def style_svg(svg: str, resolved: dict, k: float = 1.0) -> str:
         if 'data-kind="annotation"' in attrs:
             pm = re.search(r'data-pen="(\d+)"', attrs)
             p = pen(pens, int(pm.group(1)) if pm else resolved.get("annotation_pen", 23))
-            tag = tag[:-1] + _stroke({"color": p["color"], "weight": p["weight"], "dash": []}, k) + f' color="{p["color"]}">'
+            dm = re.search(r'data-dash="([^"]*)"', attrs)  # a drafting shape's line type (D84), mm on paper
+            dash = [float(v) for v in dm.group(1).split()] if dm else []
+            tag = tag[:-1] + _stroke({"color": p["color"], "weight": p["weight"], "dash": dash}, k) + f' color="{p["color"]}">'
         elif guid in elements:
             st = styles[elements[guid]]
             if re.search(r'class="projection\b', attrs):
@@ -838,10 +874,15 @@ def style_svg(svg: str, resolved: dict, k: float = 1.0) -> str:
     svg = "".join(out)
     # Annotation text is filled in its pen's colour (the overlay writes black text).
     svg = re.sub(r'(<g data-kind="annotation"[^>]*color="(#[0-9a-fA-F]{6})"[^>]*>)(.*?)(</g>)',
-                 lambda m: m.group(1) + m.group(3).replace('fill="#000000"', f'fill="{m.group(2)}"') + m.group(4),
+                 lambda m: m.group(1) + m.group(3).replace('fill="#000000"', f'fill="{m.group(2)}"')
+                 .replace('data-fill="pen"', f'fill="{m.group(2)}"') + m.group(4),
                  svg, flags=re.S)
-    return svg.replace('class="kimcad-overlay" fill="none" stroke="#000000" stroke-width="0.18"',
-                       f'class="kimcad-overlay" fill="none" stroke="#000000" stroke-width="{_fmt(0.18 / k)}"', 1)
+    # D84: a fill's background takes its background pen's colour.
+    svg = re.sub(r'data-fill-pen="(\d+)"', lambda m: f'fill="{pen(pens, int(m.group(1)))["color"]}"', svg)
+    for group in ("kimcad-overlay", "kimcad-drafting"):
+        svg = svg.replace(f'class="{group}" fill="none" stroke="#000000" stroke-width="0.18"',
+                          f'class="{group}" fill="none" stroke="#000000" stroke-width="{_fmt(0.18 / k)}"', 1)
+    return svg
 
 
 # ---------------------------------------------------------------- legends (D74)
