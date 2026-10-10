@@ -782,6 +782,27 @@ ES = {
     "IDS report saved: %1": "Informe IDS guardado: %1",
     "Could not save the IDS report: %1": "No se pudo guardar el informe IDS: %1",
     "Clash set %1 saved in the project": "Conjunto de colisión %1 guardado en el proyecto",
+    # D82: Python console
+    "Python: ifc, selection(), select(...), with edit(): ..., refresh(), help_kimcad()\nEnter runs, Shift+Enter adds a line, Up/Down recall earlier input":
+        "Python: ifc, selection(), select(...), with edit(): ..., refresh(), help_kimcad()\nIntro ejecuta, Mayús+Intro añade una línea, Arriba/Abajo recuperan entradas anteriores",
+    "Output. Type help_kimcad() below for the console's names.": "Salida. Escriba help_kimcad() abajo para ver los nombres de la consola.",
+    "Run": "Ejecutar",
+    "Run the input (Enter)": "Ejecutar la entrada (Intro)",
+    "Run script...": "Ejecutar script...",
+    "Run a Python file in the console": "Ejecutar un archivo Python en la consola",
+    "Clear": "Borrar",
+    "Python &console": "&Consola Python",
+    "Run Python on the open model (ifcopenshell and KIMCAD's commands)": "Ejecutar Python sobre el modelo abierto (ifcopenshell y los comandos de KIMCAD)",
+    "Run Python scrip&t...": "Ejecutar scrip&t Python...",
+    "Run a .py file in the Python console": "Ejecutar un archivo .py en la consola Python",
+    "Console": "Consola",
+    "Run Python script": "Ejecutar script Python",
+    "Python script (*.py)": "Script Python (*.py)",
+    "Running the script...": "Ejecutando el script...",
+    "Stop": "Detener",
+    "Interrupt the script at its next line (KeyboardInterrupt)": "Interrumpir el script en su próxima línea (KeyboardInterrupt)",
+    "Stopping: the script stops at its next line of Python...": "Deteniendo: el script se detiene en su próxima línea de Python...",
+    "The console returned nothing": "La consola no devolvió nada",
 }
 
 
