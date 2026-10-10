@@ -327,7 +327,7 @@ release notes, so check before relying on a single cell.
 
 | Tool | Has | KIMCAD | Pri | Notes |
 |------|-----|--------|-----|-------|
-| Python console with the model API | RV(pyRevit) BB | ⬜ | P1 | |
+| Python console with the model API | RV(pyRevit) BB | ✅ | P1 | D82: Console panel, `edit()` as one undo step, Stop; [15](15-scripting.md) |
 | Visual programming | AC RV VW | ⬜ | new | Grasshopper, Dynamo, Marionette |
 | Plugins / add-ons | all | ⬜ | P2 | |
 | Customisable shortcuts, toolbars and workspaces | all | ⬜ | new | |

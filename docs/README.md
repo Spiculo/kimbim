@@ -23,6 +23,7 @@ These documents guide development. They come from the original spec (`../doc.md`
 | 12 | [M3 Exit](12-m3-exit.md) | The two-storey sample house, the automatic validity and interop checks, and the manual check in Bonsai + a commercial viewer |
 | 13 | [Architect Feedback](13-architect-feedback.md) | The owner's first hands-on notes and what changed |
 | 14 | [Tool Inventory](14-tool-inventory.md) | The tools Archicad, Revit, Vectorworks and Bonsai give architects, and which ones KIMCAD still lacks |
+| 15 | [Scripting](15-scripting.md) | The Python console: the open model, selection, undoable edits, running scripts |
 | — | [Decision Log](decisions.md) | Every architectural decision and its status |
 | — | [Open Questions](open-questions.md) | What is still undecided |
 | — | [Glossary](glossary.md) | BIM / IFC / VCS terms |

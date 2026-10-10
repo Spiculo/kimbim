@@ -168,7 +168,7 @@ Clones get **new KIMCAD IDs and GlobalIds**. They never share identity with the 
 
 | Feature | Pri | Notes |
 |---------|-----|-------|
-| Python console with the model API | P1 | Embedded CPython + `ifcopenshell` |
+| Python console with the model API | P1 | Done (D82): Console panel (View › Panels, Ctrl+Alt+P), Run Python script...; see [15](15-scripting.md) |
 | Plugins (Python) that add commands and panels | P2 | |
 | C ABI for native plugins / other languages | P2 | `kimcad-ffi` |
 

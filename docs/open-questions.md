@@ -156,6 +156,13 @@ Built per D81 (Archicad's Model Check and Collision Detection, with Solibri-styl
    other case you would not want flagged?
 6. IDS files are stored inside the project (so they are versioned with it), not linked from a shared
    folder. Do offices keep one IDS for all projects and expect edits to it to reach every project?
+## For the owner: Python console (asked 2026-10-10, waiting)
+
+1. Changes made in the console outside `with edit():` are not undoable. Should the console wrap every run in one
+   undo step automatically (simpler, but a script that only reads would still add an empty step), or is `edit()` right?
+2. The console lives under View › Panels (Archicad: Window › Palettes) with File › Run Python script.... Would you
+   rather have a Scripting menu, or scripts that you can pin as commands (a P2 plugins feature)?
+3. Should scripts be able to run without the window (`kimcad run script.py model.ifc`) for batch jobs?
 
 ## Needs a spike
 
