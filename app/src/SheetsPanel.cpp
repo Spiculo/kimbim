@@ -57,6 +57,9 @@ SheetsPanel::SheetsPanel(QWidget* parent)
         purposes->setParent(&menu, purposes->windowFlags());
         menu.addMenu(purposes);
         menu.addAction(tr("Place legend"), this, [this, number] { emit legendRequested(number); });
+        menu.addAction(tr("Place north arrow"), this, [this, number] { emit symbolRequested(number, QStringLiteral("north")); });
+        menu.addAction(tr("Place scale bar"), this, [this, number] { emit symbolRequested(number, QStringLiteral("scalebar")); });
+        menu.addAction(tr("Place revision cloud"), this, [this, number] { emit symbolRequested(number, QStringLiteral("cloud")); });
         menu.exec(m_list->viewport()->mapToGlobal(at));
     });
     connect(remove, &QPushButton::clicked, this, [this] {

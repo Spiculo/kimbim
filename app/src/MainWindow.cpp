@@ -590,6 +590,7 @@ void MainWindow::buildDocks()
     });
     connect(m_sheetsPanel, &SheetsPanel::purposeRequested, this, &MainWindow::setSheetPurpose);
     connect(m_sheetsPanel, &SheetsPanel::legendRequested, this, &MainWindow::placeLegend);
+    connect(m_sheetsPanel, &SheetsPanel::symbolRequested, this, &MainWindow::placeSheetSymbol); // D87
     connect(m_sheetsPanel, &SheetsPanel::deleteRequested, this, [this](const QString& n) {
         const QJsonObject r = bridge("delete_sheet", {n});
         if (!r.value("ok").toBool())
@@ -1211,6 +1212,20 @@ void MainWindow::buildModelingToolbar()
             tr("Draw a 2D rectangle: click two opposite corners, or type width;height")},
         {Tool::Fill, "actionFillTool", tr("&Fill"), QKeyCombination(Qt::SHIFT, Qt::Key_F),
             tr("Draw a fill (hatch): click its outline; Alt+click inside a closed polyline, rectangle or circle to fill it")},
+        // D87: the annotation pack (MarkupTools.cpp)
+        {Tool::Tag, "actionTagTool", tr("Ta&g"), QKeyCombination(Qt::SHIFT, Qt::Key_G),
+            tr("Tag an element: click a door, window, wall or room; the tag shows its values and follows it")},
+        {Tool::NorthArrow, "actionNorthArrowTool", tr("&North arrow"), QKeyCombination::fromCombined(0),
+            tr("Place a north arrow: it points to the project's true north")},
+        {Tool::ScaleBar, "actionScaleBarTool", tr("Scale &bar"), QKeyCombination::fromCombined(0), tr("Place a scale bar of the drawing scale")},
+        {Tool::Cloud, "actionCloudTool", tr("Revision &cloud"), QKeyCombination::fromCombined(0),
+            tr("Draw a revision cloud: click its outline; the revision goes in its triangle")},
+        {Tool::AngleDimension, "actionAngleDimensionTool", tr("An&gle dimension"), QKeyCombination::fromCombined(0),
+            tr("Angle dimension: click the vertex, a point on each side, then where the arc goes")},
+        {Tool::RadialDimension, "actionRadialDimensionTool", tr("&Radius/diameter"), QKeyCombination::fromCombined(0),
+            tr("Radius or diameter: click the centre, a point on the circle, then where the text goes")},
+        {Tool::LevelDimension, "actionLevelDimensionTool", tr("&Level/spot elevation"), QKeyCombination::fromCombined(0),
+            tr("Level dimension or spot elevation: click the point (it measures the slab below, or the level)")},
     };
     // The tools' icons: the IFC class each one makes (the tree's icons).
     const QHash<int, QString> iconClass = {{int(Tool::Wall), "IfcWall"}, {int(Tool::Slab), "IfcSlab"},
@@ -1230,6 +1245,14 @@ void MainWindow::buildModelingToolbar()
         connect(a, &QAction::triggered, this, [this, tool](bool on) { setTool(on ? tool : Tool::None); });
         m_toolActions.insert(int(d.tool), a);
     }
+    model->addSeparator();
+    QAction* tagAllAction = model->addAction(tr("Tag &all untagged")); // D87
+    tagAllAction->setObjectName(QStringLiteral("actionTagAll"));
+    tagAllAction->setToolTip(tr("Tag the doors, windows and walls of this level that the view shows and have no tag"));
+    connect(tagAllAction, &QAction::triggered, this, [this] {
+        if (!m_levels->activeStorey().isEmpty())
+            tagAll();
+    });
     model->addSeparator();
     model->addAction(m_levels->addLevelAction()); // D75: also in the level drop-down
     model->addAction(m_levels->levelsAction());   // D79: the levels table, also in the drop-down
@@ -1330,6 +1353,7 @@ void MainWindow::buildModelingToolbar()
     connect(m_measureCopy, &QToolButton::clicked, this, [this] { m_measure->copyToClipboard(); });
     setupModifyTools(bar); // D80
     setupDraftTools(bar);  // D84
+    setupMarkupTools(bar); // D87
     m_hosts.value(QStringLiteral("3d"))->adoptChrome(m_toolOptions, nullptr);
     connect(m_lengthInput, &QLineEdit::returnPressed, this, [this] {
         bool ok = false;
@@ -1443,7 +1467,16 @@ void MainWindow::buildModelingToolbar()
         case Tool::ArcCircle:
         case Tool::Rectangle:
         case Tool::Fill:
+        case Tool::Cloud:
             draftPointer(p, tolerance, mods, false);
+            break;
+        case Tool::Tag:
+        case Tool::NorthArrow:
+        case Tool::ScaleBar:
+        case Tool::AngleDimension:
+        case Tool::RadialDimension:
+        case Tool::LevelDimension:
+            markupPointer(p, tolerance, false);
             break;
         case Tool::None:
             break;
@@ -1549,7 +1582,16 @@ void MainWindow::buildModelingToolbar()
         case Tool::ArcCircle:
         case Tool::Rectangle:
         case Tool::Fill:
+        case Tool::Cloud:
             draftPointer(p, tolerance, mods, true);
+            break;
+        case Tool::Tag:
+        case Tool::NorthArrow:
+        case Tool::ScaleBar:
+        case Tool::AngleDimension:
+        case Tool::RadialDimension:
+        case Tool::LevelDimension:
+            markupPointer(p, tolerance, true);
             break;
         case Tool::None:
             break;
@@ -1573,7 +1615,12 @@ void MainWindow::buildModelingToolbar()
             m_viewport->setPreviewBoxes({});
         } else if (m_tool == Tool::Stretch && m_gripTool->isDragging())
             m_gripTool->cancel();
-        else if (m_tool == Tool::Measure && m_measure->tool()->isMeasuring())
+        else if (isMarkupTool(m_tool) && (!m_annotationPoints.isEmpty() || !m_tagElement.isEmpty())) {
+            m_annotationPoints.clear(); // D87: start the dimension or tag again
+            m_tagElement.clear();
+            updateMarkupPreview();
+            startMarkupTool(m_tool);
+        } else if (m_tool == Tool::Measure && m_measure->tool()->isMeasuring())
             m_measure->clear(); // D79: Esc clears the measurement; again leaves the tool
         else if ((m_tool == Tool::Trim || m_tool == Tool::Join) && m_modifyTool->stage() > 0) {
             m_modifyTool->cancel(); // a new boundary / first element
@@ -1680,6 +1727,13 @@ void MainWindow::refreshTypes()
     case Tool::ArcCircle:
     case Tool::Rectangle:
     case Tool::Fill:
+    case Tool::Tag:
+    case Tool::NorthArrow:
+    case Tool::ScaleBar:
+    case Tool::Cloud:
+    case Tool::AngleDimension:
+    case Tool::RadialDimension:
+    case Tool::LevelDimension:
     case Tool::None:
         break;
     }
@@ -1797,7 +1851,16 @@ void MainWindow::updateToolPreview()
     case Tool::ArcCircle:
     case Tool::Rectangle:
     case Tool::Fill:
+    case Tool::Cloud:
         updateDraftPreview();
+        return;
+    case Tool::Tag:
+    case Tool::NorthArrow:
+    case Tool::ScaleBar:
+    case Tool::AngleDimension:
+    case Tool::RadialDimension:
+    case Tool::LevelDimension:
+        updateMarkupPreview();
         return;
     case Tool::None:
         break;
@@ -1846,6 +1909,7 @@ void MainWindow::setTool(Tool tool)
     m_measureCopy->setVisible(tool == Tool::Measure);
     startModifyTool(tool); // D80: its mode list in the options bar
     startDraftTool(tool);  // D84: line type, arc mode, fill pattern
+    startMarkupTool(tool); // D87: tag style, shape, leader; radius/diameter, level/spot; revision
     m_twoPointTool->snapper().setFaceSnapping(tool == Tool::Dimension); // dimensions measure wall faces
     for (auto it = m_toolActions.constBegin(); it != m_toolActions.constEnd(); ++it) {
         const QSignalBlocker block(it.value());
@@ -1921,6 +1985,15 @@ void MainWindow::setTool(Tool tool)
     case Tool::Rectangle:
     case Tool::Fill:
         m_status->showMessage(m_draftTool->hint());
+        break;
+    case Tool::Cloud:
+    case Tool::Tag:
+    case Tool::NorthArrow:
+    case Tool::ScaleBar:
+    case Tool::AngleDimension:
+    case Tool::RadialDimension:
+    case Tool::LevelDimension:
+        startMarkupTool(tool); // D87: its first step's hint
         break;
     case Tool::Stair:
         m_status->showMessage(tr("Stair: click where it starts, then the direction it climbs"));
@@ -2315,7 +2388,9 @@ void MainWindow::buildPalette()
         tool(Tool::SlabOpening), tool(Tool::PlaceModel)});
     m_palette->addGroup(QStringLiteral("plane"), tr("Plane"), {tool(Tool::Text), tool(Tool::Dimension),
         tool(Tool::Leader), tool(Tool::Mark), tool(Tool::Grid), tool(Tool::Line), tool(Tool::Polyline),
-        tool(Tool::ArcCircle), tool(Tool::Rectangle), tool(Tool::Fill)});
+        tool(Tool::ArcCircle), tool(Tool::Rectangle), tool(Tool::Fill), tool(Tool::Tag), tool(Tool::AngleDimension),
+        tool(Tool::RadialDimension), tool(Tool::LevelDimension), tool(Tool::NorthArrow), tool(Tool::ScaleBar),
+        tool(Tool::Cloud)});
     m_palette->addGroup(QStringLiteral("view"), tr("View"), {tool(Tool::Section), tool(Tool::Elevation),
         newPlan, newSheet});
     m_palette->addGroup(QStringLiteral("edit"), tr("Edit"), {tool(Tool::Move), tool(Tool::Rotate),
@@ -3352,9 +3427,11 @@ void MainWindow::refreshAnnotations()
     for (const auto& v : bridge("rooms", {m_levels->activeStorey()}).value("rooms").toArray()) {
         const QJsonObject o = v.toObject();
         const QJsonArray label = o.value("label").toArray();
-        Viewport::Annotation a{o.value("guid").toString(), QStringLiteral("room"),
-            o.value("name").toString() + QLatin1Char('\n') + o.value("number").toString() + QLatin1Char('\n')
-                + QLocale().toString(o.value("area").toDouble(), 'f', 2) + QStringLiteral(" m²"),
+        // D87: the stamp's text is the room stamp tag style's (name, number and area by default).
+        const QString stamp = o.contains("stamp") ? o.value("stamp").toString()
+            : o.value("name").toString() + QLatin1Char('\n') + o.value("number").toString() + QLatin1Char('\n')
+                + QLocale().toString(o.value("area").toDouble(), 'f', 2) + QStringLiteral(" m²");
+        Viewport::Annotation a{o.value("guid").toString(), QStringLiteral("room"), stamp,
             {QPointF(label.at(0).toDouble(), label.at(1).toDouble())}};
         for (const auto& p : o.value("points").toArray())
             a.points << QPointF(p.toArray().at(0).toDouble(), p.toArray().at(1).toDouble());
@@ -3792,7 +3869,9 @@ bool MainWindow::openSheet(const QString& number)
     connect(view, &DrawingView::regenerateRequested, this, &MainWindow::regenerateDrawing);
     connect(view, &DrawingView::placedMoved, this, [this, number](const QString& drawing, QPointF topLeft) {
         const bool legend = drawing.startsWith(QLatin1String("legend:"));
-        const QJsonObject r = bridge(legend ? "move_legend" : "move_placed", {number, legend ? drawing.mid(7) : drawing,
+        const bool symbol = drawing.startsWith(QLatin1String("symbol:")); // D87
+        const QJsonObject r = bridge(symbol ? "move_sheet_symbol" : legend ? "move_legend" : "move_placed",
+            {number, legend || symbol ? drawing.mid(7) : drawing,
             QString::number(topLeft.x(), 'f', 1), QString::number(topLeft.y(), 'f', 1)});
         if (!r.value("ok").toBool())
             m_status->showMessage(tr("Could not move it: %1").arg(r.value("error").toString()));
@@ -3800,7 +3879,9 @@ bool MainWindow::openSheet(const QString& number)
     });
     connect(view, &DrawingView::placedRemoveRequested, this, [this, number](const QString& drawing) {
         const bool legend = drawing.startsWith(QLatin1String("legend:"));
-        const QJsonObject r = bridge(legend ? "remove_legend" : "remove_placed", {number, legend ? drawing.mid(7) : drawing});
+        const bool symbol = drawing.startsWith(QLatin1String("symbol:")); // D87
+        const QJsonObject r = bridge(symbol ? "remove_sheet_symbol" : legend ? "remove_legend" : "remove_placed",
+            {number, legend || symbol ? drawing.mid(7) : drawing});
         if (!r.value("ok").toBool())
             m_status->showMessage(tr("Could not remove it: %1").arg(r.value("error").toString()));
         afterEdit(r);
@@ -3839,6 +3920,11 @@ void MainWindow::refreshSheets(bool changed)
         for (const auto& lv : it->value("legends").toArray()) { // D74: dragged and removed like drawings
             const QJsonObject l = lv.toObject();
             placed.push_back({QStringLiteral("legend:") + l.value("id").toString(),
+                QRectF(l.value("x").toDouble(), l.value("y").toDouble(), l.value("w").toDouble(), l.value("h").toDouble())});
+        }
+        for (const auto& sv : it->value("symbols").toArray()) { // D87: north arrows, scale bars, clouds
+            const QJsonObject l = sv.toObject();
+            placed.push_back({QStringLiteral("symbol:") + l.value("id").toString(),
                 QRectF(l.value("x").toDouble(), l.value("y").toDouble(), l.value("w").toDouble(), l.value("h").toDouble())});
         }
         view->setPlaced(placed);

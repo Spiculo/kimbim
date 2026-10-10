@@ -757,6 +757,22 @@ public:
                 g->AddPrimitiveArray(fill);
             }
         }
+        for (const QVector<QPointF>& solid : m_a.solids) { // D87: filled in the pen's colour
+            const std::vector<uint32_t> tris = PolygonTool::triangulate(solid);
+            if (tris.empty())
+                continue;
+            Handle(Graphic3d_ArrayOfTriangles) fill = new Graphic3d_ArrayOfTriangles(int(tris.size()));
+            for (uint32_t i : tris)
+                fill->AddVertex(gp_Pnt(solid[int(i)].x(), solid[int(i)].y(), m_z - 0.001));
+            Handle(Graphic3d_AspectFillArea3d) aspect = new Graphic3d_AspectFillArea3d();
+            aspect->SetInteriorStyle(Aspect_IS_SOLID);
+            aspect->SetInteriorColor(ink);
+            aspect->SetShadingModel(Graphic3d_TypeOfShadingModel_Unlit);
+            aspect->SetFaceCulling(Graphic3d_TypeOfBackfacingModel_DoubleSided);
+            Handle(Graphic3d_Group) g = prs->NewGroup();
+            g->SetGroupPrimitivesAspect(aspect);
+            g->AddPrimitiveArray(fill);
+        }
         if (!m_a.hatch.isEmpty()) { // solid hatch lines, thin, in the pen's colour
             Handle(Graphic3d_ArrayOfSegments) arr = new Graphic3d_ArrayOfSegments(int(m_a.hatch.size()) * 2);
             for (const QLineF& l : m_a.hatch) {
@@ -796,6 +812,22 @@ public:
             text->SetVerticalJustification(Graphic3d_VTA_CENTER);
         } else if (m_a.kind == QLatin1String("leader")) {
             text->SetVerticalJustification(Graphic3d_VTA_CENTER);
+        }
+        if (m_a.symbol) { // D87: each label at its place, sized like the annotations' text
+            for (const Viewport::Annotation::Label& l : m_a.labels) {
+                if (l.text.isEmpty())
+                    continue;
+                Handle(Prs3d_TextAspect) aspect = new Prs3d_TextAspect();
+                aspect->SetColor(ink);
+                aspect->SetHeight(std::clamp(l.size * 6.0, 8.0, 72.0));
+                aspect->SetHorizontalJustification(l.anchor < 0 ? Graphic3d_HTA_LEFT
+                        : l.anchor > 0                            ? Graphic3d_HTA_RIGHT
+                                                                  : Graphic3d_HTA_CENTER);
+                aspect->SetVerticalJustification(Graphic3d_VTA_CENTER);
+                Handle(Graphic3d_Group) group = prs->NewGroup();
+                Prs3d_Text::Draw(group, aspect, TCollection_ExtendedString(l.text.toUtf8().constData(), true), at(l.at));
+            }
+            return;
         }
         if (m_a.isDrafting() && !m_a.labelAt) // lines, arcs, circles, fills without their area: no text
             return;
@@ -883,6 +915,8 @@ private:
 
     gp_Pnt anchor() const
     {
+        if (m_a.symbol && !m_a.labels.isEmpty())
+            return at(m_a.labels.first().at);
         if (m_a.isDrafting()) // the area label, or the first point
             return m_a.labelAt ? at(*m_a.labelAt) : (m_a.points.isEmpty() ? gp_Pnt(0, 0, m_z) : at(m_a.points.first()));
         if (m_a.kind == QLatin1String("dimension")) {
@@ -902,7 +936,7 @@ private:
     std::vector<std::pair<gp_Pnt, gp_Pnt>> segments() const
     {
         std::vector<std::pair<gp_Pnt, gp_Pnt>> out;
-        if (m_a.isDrafting()) {
+        if (m_a.isDrafting() || m_a.symbol) {
             for (const auto& curve : m_a.curves)
                 for (int i = 0; i + 1 < curve.size(); ++i)
                     out.push_back({at(curve[i]), at(curve[i + 1])});
@@ -1013,8 +1047,8 @@ void Viewport::displayAnnotations()
         for (const Annotation& a : *list) {
             if (m_scene->layerHidden.contains(a.guid) || g.isHidden(a.guid))
                 continue;
-            if (a.isDrafting() && !m_planView)
-                continue; // D84: 2D drafting belongs to the plan, as in Archicad
+            if ((a.isDrafting() || a.symbol) && !m_planView)
+                continue; // D84, D87: 2D drafting and symbols belong to the plan, as in Archicad
             // D73: text, dimensions, marks and leaders take their pen (or the annotations kind's pen).
             std::optional<std::pair<Quantity_Color, float>> ink;
             const bool ownColours = a.kind == QLatin1String("room") || a.kind == QLatin1String("section")

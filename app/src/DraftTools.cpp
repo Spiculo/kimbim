@@ -58,12 +58,26 @@ void readDrafting(const QJsonObject& o, Viewport::Annotation* a)
         a->labelAt = point(o.value("label_at"));
         a->text = o.value("area_text").toString();
     }
+    // D87 symbols: filled polygons and text labels besides the curves.
+    a->symbol = o.value("symbol").toBool();
+    for (const auto& sv : o.value("solids").toArray()) {
+        QVector<QPointF> solid;
+        for (const auto& p : sv.toArray())
+            solid << point(p);
+        a->solids << solid;
+    }
+    for (const auto& lv : o.value("labels").toArray()) {
+        const QJsonObject l = lv.toObject();
+        const QString anchor = l.value("anchor").toString();
+        a->labels << Viewport::Annotation::Label{l.value("text").toString(), point(l.value("at")), l.value("size").toDouble(2.5),
+            anchor == QLatin1String("start") ? -1 : anchor == QLatin1String("end") ? 1 : 0};
+    }
 }
 
 bool MainWindow::isDraftTool(Tool tool)
 {
     return tool == Tool::Line || tool == Tool::Polyline || tool == Tool::ArcCircle || tool == Tool::Rectangle
-        || tool == Tool::Fill;
+        || tool == Tool::Fill || tool == Tool::Cloud; // D87: a revision cloud is drawn like a fill
 }
 
 void MainWindow::setupDraftTools(ToolOptionsBar* bar)
@@ -105,14 +119,19 @@ void MainWindow::setupDraftTools(ToolOptionsBar* bar)
     connect(m_draftTool, &DraftTool::previewChanged, this, &MainWindow::updateToolPreview);
     connect(m_draftTool, &DraftTool::rejected, this, [this](const QString& why) { m_status->showMessage(why); });
     connect(m_draftTool, &DraftTool::shapeFinished, this,
-        [this](const QString& kind, const QVector<QPointF>& points, bool closed) { addDrafting(kind, points, closed); });
+        [this](const QString& kind, const QVector<QPointF>& points, bool closed) {
+            if (m_tool == Tool::Cloud)
+                addCloud(points); // D87 (MarkupTools.cpp)
+            else
+                addDrafting(kind, points, closed);
+        });
 }
 
 void MainWindow::startDraftTool(Tool tool)
 {
     const bool draft = isDraftTool(tool);
     m_draftArcMode->setVisible(tool == Tool::ArcCircle);
-    m_draftLineType->setVisible(draft && tool != Tool::Fill);
+    m_draftLineType->setVisible(draft && tool != Tool::Fill && tool != Tool::Cloud);
     for (QWidget* w : std::initializer_list<QWidget*>{m_draftPattern, m_draftBackground, m_draftShowArea})
         w->setVisible(tool == Tool::Fill);
     if (!draft) {
@@ -138,7 +157,7 @@ void MainWindow::startDraftTool(Tool tool)
         mode = DraftTool::Mode::Polyline;
     else if (tool == Tool::Rectangle)
         mode = DraftTool::Mode::Rectangle;
-    else if (tool == Tool::Fill)
+    else if (tool == Tool::Fill || tool == Tool::Cloud)
         mode = DraftTool::Mode::Fill;
     else if (tool == Tool::ArcCircle)
         mode = DraftTool::Mode(m_draftArcMode->currentData().toInt());

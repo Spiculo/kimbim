@@ -280,7 +280,9 @@ private slots:
                        "actionWindowTool", "actionStairTool", "actionRoofTool", "actionRoomTool",
                        "actionSlabOpeningTool", "actionPlaceModelTool"}},
             {"plane", {"actionTextTool", "actionDimensionTool", "actionLeaderTool", "actionMarkTool", "actionGridTool",
-                          "actionLineTool", "actionPolylineTool", "actionArcTool", "actionRectangleTool", "actionFillTool"}},
+                          "actionLineTool", "actionPolylineTool", "actionArcTool", "actionRectangleTool", "actionFillTool",
+                          "actionTagTool", "actionAngleDimensionTool", "actionRadialDimensionTool", "actionLevelDimensionTool",
+                          "actionNorthArrowTool", "actionScaleBarTool", "actionCloudTool"}},
             {"view", {"actionSectionTool", "actionElevationTool", "actionNewPlanTab", "actionNewSheet"}},
             {"edit", {"actionMoveTool", "actionRotateTool", "actionStretchTool", "actionSplitTool", "actionTrimTool",
                          "actionJoinTool", "actionMirror", "actionCopyToLevel", "actionMeasureTool"}}};

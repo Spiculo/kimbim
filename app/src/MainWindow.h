@@ -137,7 +137,8 @@ public:
     // Modeling tools (M3): one active at a time. Exposed for tests and the self-test, which drive
     // them with work-plane points.
     enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening, PlaceModel, Text, Dimension, Mark, Section, Elevation, Leader, Mirror, Room, Roof, Measure, Split, Trim, Join,
-        Line, Polyline, ArcCircle, Rectangle, Fill }; // the last five: 2D drafting (D84, DraftTools.cpp)
+        Line, Polyline, ArcCircle, Rectangle, Fill, // 2D drafting (D84, DraftTools.cpp)
+        Tag, NorthArrow, ScaleBar, Cloud, AngleDimension, RadialDimension, LevelDimension }; // D87, MarkupTools.cpp
     void setTool(Tool tool);
     Tool tool() const { return m_tool; }
     WallTool* wallTool() const { return m_wallTool; }
@@ -295,6 +296,17 @@ public:
     // next click puts it down. False when nothing was near (the wall stretch goes on).
     bool draftGripClick(QPointF p, double tolerance, bool ortho);
     bool draftGripActive() const { return m_gripIndex >= 0; }
+    // D87: the annotation pack (MarkupTools.cpp). Tag: click an element (with the leader on, then where
+    // the text goes); north arrow, scale bar, revision cloud (drawn like a fill), angle (vertex, a point
+    // on each side, the arc), radius/diameter (centre, a point on the circle, the text), level (a
+    // point) or spot elevation (the point, the text). Tag all: the active level's untagged doors,
+    // windows and walls that the view shows.
+    static bool isMarkupTool(Tool tool);
+    bool addTag(const QString& elementGuid, std::optional<QPointF> at = std::nullopt);
+    bool addSymbol(const QString& kind, const QVector<QPointF>& points, const QString& text = QString());
+    bool addCloud(const QVector<QPointF>& points);
+    int tagAll();
+    bool placeSheetSymbol(const QString& number, const QString& kind);
     bool splitElement(const QString& guid, QPointF at, bool join = true);
     bool trimElement(const QString& guid, QPointF keep, const QString& boundary, QPointF b1, QPointF b2, bool join = true);
     bool cornerElements(const QString& first, QPointF p1, const QString& second, QPointF p2, bool join = true);
@@ -461,6 +473,10 @@ private:
     void startDraftTool(Tool tool);
     void draftPointer(QPointF p, double tolerance, Qt::KeyboardModifiers mods, bool click);
     void updateDraftPreview();
+    void setupMarkupTools(ToolOptionsBar* bar); // D87
+    void startMarkupTool(Tool tool);
+    void markupPointer(QPointF p, double tolerance, bool click);
+    void updateMarkupPreview();
     bool modifyResult(const QJsonObject& r, const QString& failure);
     QJsonObject currentType() const;
     void refreshSnapData();
@@ -523,6 +539,13 @@ private:
     QComboBox* m_draftPattern = nullptr;
     QSpinBox* m_draftBackground = nullptr; // 0: no background
     QToolButton* m_draftShowArea = nullptr;
+    QComboBox* m_tagStyle = nullptr;   // D87: Automatic (by kind) or a tag style
+    QComboBox* m_tagShape = nullptr;   // the style's, or none / circle / box / hexagon
+    QToolButton* m_tagLeader = nullptr;
+    QComboBox* m_markupMode = nullptr; // radius / diameter, level / spot
+    QLineEdit* m_markupText = nullptr; // a revision cloud's revision
+    QString m_tagElement;              // the element picked, waiting for the text's place (leader)
+    std::optional<QPointF> m_markupHover;
     bool m_detach = false; // Ctrl held on the click that finished a move/rotate
     std::optional<QPointF> m_columnHover;
     Tool m_tool = Tool::None;

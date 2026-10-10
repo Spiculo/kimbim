@@ -136,6 +136,18 @@ public:
         int backgroundPen = 0;
         std::optional<QPointF> labelAt;
         bool isDrafting() const;
+        // D87 symbols (tags, north arrows, scale bars, clouds, angle/radius/level dimensions), drawn in
+        // plan views only: `curves` as above, filled polygons in the pen's colour, and text labels
+        // (anchor: -1 start, 0 middle, 1 end).
+        struct Label {
+            QString text;
+            QPointF at;
+            double size = 2.5;
+            int anchor = 0;
+        };
+        bool symbol = false;
+        QVector<QVector<QPointF>> solids;
+        QVector<Label> labels;
     };
     int draftingCount() const; // drafting shapes shown
     QVector<QPointF> annotationPoints(const QString& guid) const; // as listed (world metres)
