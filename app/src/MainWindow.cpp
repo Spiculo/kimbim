@@ -1414,6 +1414,16 @@ void MainWindow::buildModelingToolbar()
             m_rotateTool->move(p);
             break;
         case Tool::Stretch:
+            if (draftGripActive()) { // D84: the drafting point follows the mouse
+                QVector<QPointF> pts = m_gripPoints;
+                const QPointF from = m_gripPoints[(m_gripIndex + 1) % m_gripPoints.size()];
+                pts[m_gripIndex] = m_draftTool->snapper().snap(p, tolerance, &from, ortho).point;
+                QVector<Viewport::PreviewBox> boxes;
+                for (int i = 0; i + 1 < pts.size(); ++i)
+                    boxes.push_back({pts[i], pts[i + 1], 0.02, m_levels->activeElevation(), m_levels->activeElevation() + 0.02});
+                m_viewport->setPreviewBoxes(boxes);
+                break;
+            }
             m_gripTool->setTolerance(tolerance);
             m_gripTool->setOrtho(ortho);
             m_gripTool->move(p);
@@ -1518,6 +1528,8 @@ void MainWindow::buildModelingToolbar()
             m_rotateTool->click(p);
             break;
         case Tool::Stretch:
+            if (!m_gripTool->isDragging() && draftGripClick(p, tolerance, ortho))
+                break; // D84: a drafting shape's point
             m_gripTool->setTolerance(tolerance);
             m_gripTool->setOrtho(ortho);
             m_gripTool->click(p);
@@ -1555,7 +1567,10 @@ void MainWindow::buildModelingToolbar()
             m_draftTool->escape(); // D84: a polyline ends open, anything else is dropped
         else if (m_tool == Tool::Rotate && m_rotateTool->stage() > 0)
             m_rotateTool->cancel();
-        else if (m_tool == Tool::Stretch && m_gripTool->isDragging())
+        else if (m_tool == Tool::Stretch && draftGripActive()) {
+            m_gripIndex = -1;
+            m_viewport->setPreviewBoxes({});
+        } else if (m_tool == Tool::Stretch && m_gripTool->isDragging())
             m_gripTool->cancel();
         else if (m_tool == Tool::Measure && m_measure->tool()->isMeasuring())
             m_measure->clear(); // D79: Esc clears the measurement; again leaves the tool
@@ -1886,7 +1901,8 @@ void MainWindow::setTool(Tool tool)
         m_status->showMessage(tr("Rotate: click the centre, then a reference direction, then the new direction"));
         break;
     case Tool::Stretch:
-        m_status->showMessage(tr("Stretch: click near a wall end, then its new position"));
+        m_gripIndex = -1;
+        m_status->showMessage(tr("Stretch: click near a wall end or a point of a line, arc or fill, then its new position"));
         break;
     case Tool::Measure:
         m_status->showMessage(m_measure->text());

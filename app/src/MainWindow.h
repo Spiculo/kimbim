@@ -273,6 +273,10 @@ public:
     bool addDrafting(const QString& kind, const QVector<QPointF>& points, bool closed = false);
     bool fillAt(QPointF p); // Alt+click with the Fill tool: fill the closed shape around p
     QJsonObject draftOptions(const QString& kind) const;
+    // Stretch tool on a drafting shape (D84 grips): a click near one of its points picks it up, the
+    // next click puts it down. False when nothing was near (the wall stretch goes on).
+    bool draftGripClick(QPointF p, double tolerance, bool ortho);
+    bool draftGripActive() const { return m_gripIndex >= 0; }
     bool splitElement(const QString& guid, QPointF at, bool join = true);
     bool trimElement(const QString& guid, QPointF keep, const QString& boundary, QPointF b1, QPointF b2, bool join = true);
     bool cornerElements(const QString& first, QPointF p1, const QString& second, QPointF p2, bool join = true);
@@ -492,6 +496,9 @@ private:
     ModifyTool* m_modifyTool = nullptr;
     QComboBox* m_modifyMode = nullptr;
     DraftTool* m_draftTool = nullptr;
+    QString m_gripGuid; // a drafting shape's point being moved by the Stretch tool
+    int m_gripIndex = -1;
+    QVector<QPointF> m_gripPoints;
     QComboBox* m_draftLineType = nullptr;
     QComboBox* m_draftArcMode = nullptr;
     QComboBox* m_draftPattern = nullptr;

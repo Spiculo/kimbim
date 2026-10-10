@@ -976,6 +976,14 @@ bool Viewport::Annotation::isDrafting() const
         || kind == QLatin1String("circle") || kind == QLatin1String("fill");
 }
 
+QVector<QPointF> Viewport::annotationPoints(const QString& guid) const
+{
+    for (const Annotation& a : m_annotationData)
+        if (a.guid == guid)
+            return a.points;
+    return {};
+}
+
 int Viewport::draftingCount() const
 {
     int n = 0;

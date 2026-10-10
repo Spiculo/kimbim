@@ -124,6 +124,7 @@ public:
         bool isDrafting() const;
     };
     int draftingCount() const; // drafting shapes shown
+    QVector<QPointF> annotationPoints(const QString& guid) const; // as listed (world metres)
     void setAnnotations(const QVector<Annotation>& annotations, double z);
     int annotationCount() const;
     // Section and elevation markers (Slice 14): kind "section"/"elevation", text = the drawing's

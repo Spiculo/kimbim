@@ -187,6 +187,18 @@ private slots:
         w.setTool(MainWindow::Tool::None);
         QCOMPARE(w.viewport()->draftingCount(), 7);
 
+        const QString snapped = w.viewport()->annotationGuids().last();
+        QCOMPARE(w.viewport()->annotationPoints(snapped).first(), QPointF(4, 0)); // exactly on the end
+
+        // Grips: the Stretch tool picks up that line's far end and puts it down elsewhere.
+        w.setTool(MainWindow::Tool::Stretch);
+        emit w.viewport()->workPointClicked(QPointF(8.02, 0.01), 0.1, Qt::NoModifier);
+        QVERIFY(w.draftGripActive());
+        emit w.viewport()->workPointClicked(QPointF(8, 2), 0.001, Qt::NoModifier);
+        QVERIFY(!w.draftGripActive());
+        w.setTool(MainWindow::Tool::None);
+        QCOMPARE(w.viewport()->annotationPoints(snapped).last(), QPointF(8, 2));
+
         // Drafting is selectable and deletable like any annotation; undo brings it back.
         const QStringList guids = w.viewport()->annotationGuids();
         const QString last = guids.last();

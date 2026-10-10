@@ -8,6 +8,8 @@
 #include <QSpinBox>
 #include <QToolButton>
 
+#include <cmath>
+
 #include "DraftTool.h"
 #include "LevelsBar.h"
 #include "MainWindow.h"
@@ -213,6 +215,52 @@ bool MainWindow::fillAt(QPointF p)
     afterEdit(r);
     refreshSnapData();
     return true;
+}
+
+bool MainWindow::draftGripClick(QPointF p, double tolerance, bool ortho)
+{
+    if (m_gripIndex >= 0) { // put the point down, snapped
+        QVector<QPointF> pts = m_gripPoints;
+        const QPointF from = pts[(m_gripIndex + 1) % pts.size()];
+        pts[m_gripIndex] = m_draftTool->snapper().snap(p, tolerance, &from, ortho).point;
+        m_gripIndex = -1;
+        m_viewport->setPreviewBoxes({});
+        QJsonArray arr;
+        for (const QPointF& q : pts)
+            arr.append(QJsonArray{q.x(), q.y()});
+        const QJsonObject r = bridge("set_annotation_points", {m_gripGuid, compact(arr)});
+        if (!r.value("ok").toBool()) {
+            m_status->showMessage(tr("Could not move the point: %1").arg(r.value("error").toString()));
+            return true;
+        }
+        afterEdit(r);
+        refreshSnapData();
+        return true;
+    }
+    // Pick up the nearest point of a drafting shape on the level (selected shapes first).
+    double best = tolerance;
+    for (const auto& v : bridge("annotations", {m_levels->activeStorey()}).value("annotations").toArray()) {
+        const QJsonObject o = v.toObject();
+        Viewport::Annotation a;
+        a.kind = o.value("kind").toString();
+        if (!a.isDrafting() || m_viewport->isLocked(o.value("guid").toString()))
+            continue;
+        QVector<QPointF> pts;
+        for (const auto& q : o.value("points").toArray())
+            pts << point(q);
+        for (int i = 0; i < pts.size(); ++i) {
+            const double d = std::hypot(pts[i].x() - p.x(), pts[i].y() - p.y());
+            if (d <= best) {
+                best = d;
+                m_gripGuid = o.value("guid").toString();
+                m_gripIndex = i;
+                m_gripPoints = pts;
+            }
+        }
+    }
+    if (m_gripIndex >= 0)
+        m_status->showMessage(tr("Click the point's new position (Esc: leave it)"));
+    return m_gripIndex >= 0;
 }
 
 void MainWindow::updateDraftPreview()
