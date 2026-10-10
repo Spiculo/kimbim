@@ -108,7 +108,7 @@ ChecksPanel::ChecksPanel(QWidget* parent)
 
     // IDS files: kept in the project settings (their XML, so they are versioned).
     m_idsList->setObjectName(QStringLiteral("idsFiles"));
-    m_idsList->setMaximumHeight(64);
+    m_idsList->setMaximumHeight(46);
     QToolButton* addIds = button(tr("Add..."), tr("Add an .ids file to the project"), "addIds");
     QToolButton* removeIds = button(tr("Remove"), tr("Remove the selected IDS file from the project"), "removeIds");
     QToolButton* report = button(tr("Report..."), tr("Save the last IDS results as IfcTester's HTML or JSON report"), "idsReport");
@@ -130,7 +130,7 @@ ChecksPanel::ChecksPanel(QWidget* parent)
 
     // Clash sets.
     m_clashList->setObjectName(QStringLiteral("clashSets"));
-    m_clashList->setMaximumHeight(64);
+    m_clashList->setMaximumHeight(46);
     QToolButton* newSet = button(tr("New..."), tr("A new clash set: two groups of elements and a tolerance"), "newClashSet");
     QToolButton* editSet = button(tr("Edit..."), tr("Edit the selected clash set"), "editClashSet");
     QToolButton* deleteSet = button(tr("Delete"), tr("Delete the selected clash set"), "deleteClashSet");
@@ -162,7 +162,7 @@ ChecksPanel::ChecksPanel(QWidget* parent)
     m_results->header()->setStretchLastSection(false);
     m_results->header()->setSectionResizeMode(0, QHeaderView::Stretch);
     m_results->header()->setSectionResizeMode(1, QHeaderView::Interactive);
-    m_results->header()->resizeSection(1, 110);
+    m_results->header()->resizeSection(1, 72);
     m_results->setUniformRowHeights(true);
     m_results->setWordWrap(false);
     m_results->setTextElideMode(Qt::ElideRight);
@@ -355,10 +355,10 @@ void ChecksPanel::addResult(const QJsonObject& r)
         item->setData(0, KindRole, QStringLiteral("issue"));
         item->setData(0, GuidsRole, guids);
         item->setIcon(0, severityIcon(i.value("severity").toString()));
-        QString elements = labels.mid(0, 2).join(QStringLiteral(", "));
-        if (guids.size() > 2)
-            elements += QStringLiteral(" +%1").arg(guids.size() - 2);
-        item->setText(1, elements);
+        // The message names the elements; the column says how many (the panel is narrow).
+        if (!guids.isEmpty())
+            item->setText(1, QString::number(guids.size()));
+        item->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
         item->setToolTip(0, i.value("message").toString() + (labels.isEmpty() ? QString() : QStringLiteral("\n") + labels.join(QStringLiteral("\n"))));
         item->setToolTip(1, labels.join(QStringLiteral("\n")));
         groupGuids[g] << guids;
@@ -368,8 +368,13 @@ void ChecksPanel::addResult(const QJsonObject& r)
         all.removeDuplicates();
         it.key()->setData(0, GuidsRole, all); // a group selects all of its elements
         if (it.key()->text(1).isEmpty())
-            it.key()->setText(1, tr("%n issue(s)", nullptr, it.key()->childCount()));
+            it.key()->setText(1, QString::number(it.key()->childCount()));
     }
+    const QString empty = r.value("empty").toString(); // nothing to check with yet
+    if (empty == QLatin1String("no_ids"))
+        new QTreeWidgetItem(top, {tr("No IDS files: add one above")});
+    else if (empty == QLatin1String("no_clash_sets"))
+        new QTreeWidgetItem(top, {tr("No clash sets: add one above")});
     if (r.value("truncated").toBool())
         new QTreeWidgetItem(top, {tr("%n more not shown", nullptr, total - int(r.value("issues").toArray().size()))});
     top->setExpanded(true);

@@ -24,6 +24,7 @@
 #include <tuple>
 
 #include "DockLayout.h"
+#include "ChecksPanel.h"
 #include "FindSelectPanel.h"
 #include "DrawingView.h"
 #include <DockManager.h>
@@ -687,6 +688,33 @@ int runSelfTest(const SelfTestOptions& options)
         for (int i = 0; i < 5; ++i)
             QApplication::processEvents();
         result.insert(QStringLiteral("find_selected"), int(window.selection().size()));
+    }
+    if (!options.checks.isEmpty()) { // D81: the Checks panel, the first issue clicked
+        if (QAction* a = window.findChild<QAction*>(QStringLiteral("actionCheckModel")))
+            a->trigger();
+        ChecksPanel* panel = window.checksPanel();
+        const QStringList checks = options.checks.split(QLatin1Char(','), Qt::SkipEmptyParts);
+        if (checks.contains(QStringLiteral("clash")) && panel->clashSetNames().isEmpty())
+            window.saveClashSet(QStringLiteral("Walls x slabs"),
+                {{"a", QJsonObject{{"classes", QJsonArray{"IfcWall"}}}}, {"b", QJsonObject{{"classes", QJsonArray{"IfcSlab"}}}},
+                    {"mode", "hard"}, {"tolerance", 0.002}});
+        QElapsedTimer t;
+        t.start();
+        result.insert(QStringLiteral("checks_ok"), window.runChecks(checks));
+        result.insert(QStringLiteral("checks_ms"), double(t.elapsed()));
+        result.insert(QStringLiteral("check_issues"), panel->issueCount());
+        result.insert(QStringLiteral("check_summary"), panel->summary());
+        if (panel->activateIssue(0))
+            result.insert(QStringLiteral("check_selected"), int(window.selection().size()));
+        for (int i = 0; i < 10; ++i)
+            QApplication::processEvents();
+        if (!options.screenshot.isEmpty()) { // before the general screenshots, which fit all
+            QString path = options.screenshot;
+            path.replace(QStringLiteral(".png"), QStringLiteral("-checks.png"));
+            result.insert(QStringLiteral("checks_screenshot"), window.screen()->grabWindow(window.winId()).save(path) ? path : QString());
+            path.replace(QStringLiteral(".png"), QStringLiteral("-viewport.png")); // the 3D view zoomed to the issue
+            result.insert(QStringLiteral("checks_viewport_screenshot"), window.viewport()->dumpImage(path) ? path : QString());
+        }
     }
     if (!options.screenshot.isEmpty())
         takeScreenshots(window, options.screenshot, &result);

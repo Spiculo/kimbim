@@ -266,7 +266,7 @@ def check_ids(model, options: dict) -> dict:
     _last_ids.clear()
     issues, groups = [], []
     if not files:
-        return {"issues": [], "groups": [], "detail": "no IDS files: add one in the Checks panel"}
+        return {"issues": [], "groups": [], "detail": "no IDS files: add one in the Checks panel", "empty": "no_ids"}
     for name, xml in files.items():
         _poll()
         try:
@@ -281,14 +281,14 @@ def check_ids(model, options: dict) -> dict:
             group = f"{name} · {spec.name}"
             applicable, failed = len(spec.applicable_entities), len(spec.failed_entities)
             if spec.status is None:
-                groups.append({"name": group, "status": "skip", "detail": f"not for {model.schema}"})
+                groups.append({"name": group, "status": "skip", "detail": f"not {model.schema}"})
                 continue
             usage = spec.get_usage()
             if spec.status:
-                groups.append({"name": group, "status": "pass", "detail": f"{applicable} applicable, all pass"})
+                groups.append({"name": group, "status": "pass", "detail": f"{applicable}/{applicable}"})
                 continue
             groups.append({"name": group, "status": "fail",
-                           "detail": f"{failed} of {applicable} applicable fail" if applicable else "nothing applicable"})
+                           "detail": f"{applicable - failed}/{applicable}"})
             if usage == "required" and not applicable:
                 issues.append(_issue("error", "Required, but no element is applicable: "
                                      + "; ".join(a.to_string("applicability") for a in spec.applicability), group=group))
@@ -499,7 +499,7 @@ def check_clash(model, options: dict) -> dict:
 
     sets = options.get("clash_sets") if isinstance(options.get("clash_sets"), dict) else settings.current().get("clash_sets", {})
     if not sets:
-        return {"issues": [], "groups": [], "detail": "no clash sets: add one in the Checks panel"}
+        return {"issues": [], "groups": [], "detail": "no clash sets: add one in the Checks panel", "empty": "no_clash_sets"}
     issues, groups = [], []
     for name, c in sets.items():
         _poll()
@@ -507,7 +507,7 @@ def check_clash(model, options: dict) -> dict:
             issues.append(_issue("error", f"{name}: {err}", group=name))
             continue
         found = clash(model, c, name)
-        groups.append({"name": name, "status": "fail" if found else "pass", "detail": f"{len(found)} clash(es)"})
+        groups.append({"name": name, "status": "fail" if found else "pass", "detail": str(len(found))})
         issues.extend(found)
     return {"issues": issues, "groups": groups}
 
@@ -669,7 +669,7 @@ def check_model(model, options: dict) -> dict:
         t0 = time.perf_counter()
         found = run()
         timings[name] = round(time.perf_counter() - t0, 3)
-        groups.append({"name": title, "status": "fail" if found else "pass", "detail": f"{len(found)} issue(s)"})
+        groups.append({"name": title, "status": "fail" if found else "pass", "detail": str(len(found))})
         issues.extend(found)
     return {"issues": issues, "groups": groups, "timings": timings}
 
@@ -686,7 +686,7 @@ def run(model, name: str, options: dict | None = None) -> dict:
     cut = len(issues) > MAX_ISSUES
     return {"ok": True, "check": name, "title": TITLES[name], "issues": issues[:MAX_ISSUES], "truncated": cut,
             "total": len(issues), "groups": out.get("groups", []), "counts": counts, "detail": out.get("detail", ""),
-            "timings": out.get("timings", {}), "seconds": round(time.perf_counter() - t0, 3)}
+            "timings": out.get("timings", {}), "empty": out.get("empty", ""), "seconds": round(time.perf_counter() - t0, 3)}
 
 
 # ---------------------------------------------------------------- bridge
