@@ -107,8 +107,7 @@ LibraryPanel::LibraryPanel(QWidget* parent)
     layout->addWidget(m_search);
     m_tree->setObjectName(QStringLiteral("libraryTree"));
     m_tree->setHeaderHidden(true);
-    m_tree->setIconSize(QSize(40, 40));
-    m_tree->setUniformRowHeights(true);
+    m_tree->setIconSize(QSize(36, 36));
     layout->addWidget(m_tree, 3);
     m_title = new QLabel(this);
     m_title->setObjectName(QStringLiteral("libraryTitle"));

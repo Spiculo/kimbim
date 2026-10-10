@@ -27,6 +27,7 @@
 #include "DockLayout.h"
 #include "ChecksPanel.h"
 #include "FindSelectPanel.h"
+#include "LibraryPanel.h"
 #include "DrawingView.h"
 #include <DockManager.h>
 #include <DockWidget.h>
@@ -707,6 +708,20 @@ int runSelfTest(const SelfTestOptions& options)
         for (int i = 0; i < 5; ++i)
             QApplication::processEvents();
         result.insert(QStringLiteral("find_selected"), int(window.selection().size()));
+    }
+    if (!options.library.isEmpty()) { // D86: the Library panel, the Object tool, one placement
+        if (QAction* a = window.findChild<QAction*>(QStringLiteral("actionObjectLibrary")))
+            a->trigger();
+        const bool chosen = window.chooseObject(options.library);
+        const bool placed = chosen && window.placeObjectAt(QPointF(1.0, 1.0));
+        for (int i = 0; i < 5; ++i)
+            QApplication::processEvents();
+        result.insert(QStringLiteral("library_placed"), placed);
+        if (!options.screenshot.isEmpty()) {
+            QString path = options.screenshot;
+            path.replace(QStringLiteral(".png"), QStringLiteral("-library.png"));
+            result.insert(QStringLiteral("library_screenshot"), window.libraryPanel()->grab().save(path) ? path : QString());
+        }
     }
     if (!options.checks.isEmpty()) { // D81: the Checks panel, the first issue clicked
         if (QAction* a = window.findChild<QAction*>(QStringLiteral("actionCheckModel")))

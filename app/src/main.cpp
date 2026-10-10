@@ -83,6 +83,9 @@ int main(int argc, char* argv[])
     QCommandLineOption findSelect(QStringLiteral("find-select"),
         QStringLiteral("Self-test: open Find & Select and select every element of this IFC class."), QStringLiteral("class"));
     parser.addOption(findSelect);
+    QCommandLineOption libraryOption(QStringLiteral("library"),
+        QStringLiteral("Self-test: open the Library panel on this object and place it at (1, 1) on the active level."), QStringLiteral("id"));
+    parser.addOption(libraryOption);
     QCommandLineOption measureOption(QStringLiteral("measure"),
         QStringLiteral("Self-test: measure through these plan points (\"x,y x,y ...\", metres) in the 3D view."), QStringLiteral("points"));
     parser.addOption(measureOption);
@@ -162,6 +165,7 @@ int main(int argc, char* argv[])
         options.cubeClick = parser.isSet(cubeClick);
         options.schedule = parser.value(scheduleOption);
         options.findSelect = parser.value(findSelect);
+        options.library = parser.value(libraryOption);
         options.measure = parser.value(measureOption);
         options.levelsDialog = parser.isSet(levelsDialog);
         options.checks = parser.value(checksOption);

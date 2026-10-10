@@ -37,6 +37,7 @@ struct SelfTestOptions {
     bool levelsDialog = false;    // D79: open Model > Levels...; with screenshot, a PNG of it
     QString console;              // D82: run this Python in the console panel, report its output
     QString findSelect;           // D78: an IFC class: Find & Select it from the panel, report how many
+    QString library;              // D86: open the Library panel on this object and place it at (1, 1); with screenshot, a PNG of the panel
     QString checks;               // D81: checks to run from the Checks panel ("schema,model,clash"); clicks the first issue
 };
 
