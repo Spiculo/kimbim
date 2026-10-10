@@ -229,7 +229,7 @@ release notes, so check before relying on a single cell.
 | Fills / hatches (regions) | all | ✅ | new | D84: IfcAnnotationFillArea + IfcFillAreaStyleHatching; pattern table in project settings; pens fg/bg; area label; magic wand (Alt+click) |
 | 2D symbols / blocks | AC VW | ⬜ | new | |
 | Detail components (repeating patterns such as insulation, brick) | RV VW | ⬜ | new | |
-| Image and PDF underlays (trace over a scan) | all | ⬜ | new | |
+| Image and PDF underlays (trace over a scan) | all | ✅ | new | D85: PDF page (pypdfium2) or PNG/JPEG on a level at 1:N, calibrated by two points; opacity, greyscale, tint, layer, lock, also in 3D; stored in the project and its versions |
 
 ## 13. Annotation
 
@@ -305,7 +305,7 @@ release notes, so check before relying on a single cell.
 | IFC export, valid against the schema | all | ✅ | P0 | Checked in CI |
 | IFC export settings (what to export, property mapping) | AC RV VW | ⬜ | new | |
 | Re-import with reconciliation report | — | ⬜ | P1 | |
-| DWG/DXF import (underlay and convert) | all | ⬜ | new | Architects receive most survey and consultant data as DWG |
+| DWG/DXF import (underlay and convert) | all | 🟡 | new | D85: DXF as an underlay (units, exploded blocks, snapping to ends, midpoints, crossings). No DWG yet, no convert to 2D elements. Architects receive most survey and consultant data as DWG |
 | PDF import | AC RV VW | ⬜ | new | |
 | SketchUp, Rhino, OBJ, FBX import | AC RV VW | ⬜ | new | |
 | Point clouds | AC RV VW | ⬜ | new | |

@@ -200,6 +200,25 @@ Built per D84 (Archicad's Line, Arc/Circle, Polyline and Fill tools as the refer
 6. Shortcuts: Line Shift+L, Polyline Shift+Y, Arc/circle Shift+C, Rectangle Shift+E, Fill Shift+F (single
    letters were taken). Acceptable?
 
+## For the architect: underlays (asked 2026-10-10, waiting)
+
+Built per D85 (Archicad's placed drawing and Trace & Reference as the reference).
+
+1. **DWG**: surveys mostly arrive as DWG; KIMCAD reads DXF only (save as DXF in the CAD program). Is that
+   workable for now, or is DWG the first thing you need (it needs the ODA libraries or LibreDWG)?
+2. **Text in DXF underlays** (levels, room names in a survey) is left out for now; only linework is drawn.
+   How much do you rely on reading the survey's text while tracing?
+3. A DXF far from the origin (map coordinates) is placed with its **middle on the project origin**. Do
+   you prefer to keep survey coordinates (move the project to the survey, Archicad's "Survey Point")?
+4. **Opacity, greyscale, tint**: DXF underlays keep their CAD colours at full opacity by default, PDFs
+   and images are placed at 60%. Would you rather have every underlay greyed (Archicad's Trace &
+   Reference default)?
+5. **Default layer** *Underlays* for every underlay. One layer per underlay (named after the file)?
+6. Underlays are **not undoable** (they are project settings, like layer states). Should placing,
+   moving and calibrating be undo steps?
+7. Do you need to **convert** DXF linework into KIMCAD 2D drafting lines (Archicad's *explode*), or to
+   clip an underlay to a region?
+
 ## Needs a spike
 
 These are listed in [07-roadmap.md](07-roadmap.md#spikes-do-first-each-is-small-throwaway-and-documented).
