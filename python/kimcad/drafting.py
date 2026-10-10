@@ -576,6 +576,43 @@ def fill_patterns() -> str:
     return B._dump({"ok": True, "patterns": table, "names": list(table)})
 
 
+def snap_points(storey) -> list:
+    """Snap targets of the level's drafting shapes (world metres): ends and corners, the middles of
+    straight segments and of arcs, and the centres of circles and arcs."""
+    from . import annotations as N
+
+    out = []
+
+    def add(p, kind, guid):
+        out.append({"x": round(float(p[0]), 6), "y": round(float(p[1]), 6), "kind": kind, "guid": guid})
+
+    for a in N.on_level(storey.GlobalId):
+        data = N._read(a)
+        if data is None or data[0] not in KINDS:
+            continue
+        kind, guid, world = data[0], a.GlobalId, N.world_points(a)
+        if kind in ("line", "polyline", "fill"):
+            pts = world[:2] if kind == "line" else world
+            closed = kind == "fill" or (kind == "polyline" and bool(N.extra_of(a).get("Closed")))
+            for p in pts:
+                add(p, "endpoint", guid)
+            for p, q in zip(pts, pts[1:] + (pts[:1] if closed else [])):
+                add(((p[0] + q[0]) / 2, (p[1] + q[1]) / 2), "midpoint", guid)
+        elif kind == "arc" and len(world) == 3:
+            add(world[0], "endpoint", guid)
+            add(world[2], "endpoint", guid)
+            curve = arc_points(*world)
+            add(curve[len(curve) // 2], "midpoint", guid)
+            if (cc := circumcircle(*world)) is not None:
+                add(cc[0], "centre", guid)
+        elif kind == "circle" and len(world) == 2:
+            add(world[0], "centre", guid)
+            r = math.dist(world[0], world[1])
+            for dx, dy in ((r, 0), (0, r), (-r, 0), (0, -r)):  # the quadrant points
+                add((world[0][0] + dx, world[0][1] + dy), "endpoint", guid)
+    return out
+
+
 # ---------------------------------------------------------------- drawings (plan views only)
 
 def _xml(text: str) -> str:

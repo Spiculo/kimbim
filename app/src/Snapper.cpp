@@ -60,6 +60,19 @@ QVector<SnapLine> Snapper::parseGrid(const QJsonObject& snapData)
     return out;
 }
 
+QVector<SnapPoint> Snapper::parsePoints(const QJsonObject& snapData)
+{
+    QVector<SnapPoint> out;
+    for (const auto& v : snapData.value("points").toArray()) {
+        const QJsonObject o = v.toObject();
+        const QString kind = o.value("kind").toString();
+        out.push_back({QPointF(o.value("x").toDouble(), o.value("y").toDouble()),
+            kind == QLatin1String("midpoint") ? int(Snap::Midpoint) : kind == QLatin1String("centre") ? int(Snap::Centre) : int(Snap::Endpoint),
+            o.value("guid").toString()});
+    }
+    return out;
+}
+
 QPointF Snapper::onGrid(QPointF p) const
 {
     if (m_grid <= 0)
@@ -90,10 +103,22 @@ Snap Snapper::snap(QPointF p, double tolerance, const QPointF* from, bool ortho)
         }
         return s;
     };
+    // Drafting points of one kind (D84): the closest within the tolerance, if closer than `s`.
+    auto points = [&](Snap::Kind kind, Snap s) -> Snap {
+        double bestDistance = s.kind == kind ? dist(p, s.point) : tolerance;
+        for (const SnapPoint& sp : m_points)
+            if (sp.kind == kind && dist(p, sp.p) <= bestDistance) {
+                bestDistance = dist(p, sp.p);
+                s = Snap{sp.p, kind, {}};
+            }
+        return s;
+    };
     Snap s = best(Snap::Endpoint, [&](const SnapWall& w, QPointF* q) {
         *q = dist(p, w.a) <= dist(p, w.b) ? w.a : w.b;
         return true;
     });
+    if (s.kind == Snap::None || s.kind == Snap::Endpoint)
+        s = points(Snap::Endpoint, s);
     if (s.kind == Snap::None) { // grid-axis crossings
         double bestDistance = tolerance;
         for (int i = 0; i < m_lines.size(); ++i)
@@ -133,6 +158,10 @@ Snap Snapper::snap(QPointF p, double tolerance, const QPointF* from, bool ortho)
             *q = (w.a + w.b) / 2;
             return true;
         });
+    if (s.kind == Snap::None || s.kind == Snap::Midpoint)
+        s = points(Snap::Midpoint, s);
+    if (s.kind == Snap::None)
+        s = points(Snap::Centre, s);
     if (s.kind == Snap::None && from)
         s = best(Snap::Perpendicular, [&](const SnapWall& w, QPointF* q) {
             bool inside = false;

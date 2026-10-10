@@ -406,7 +406,9 @@ def snap_data(storey_guid: str) -> str:
                 _, _, along, width, height, sill = info
                 openings.append({"guid": fill.GlobalId, "wall": e.GlobalId, "along": round(along, 6), "width": round(width, 6),
                                  "height": round(height, 6), "sill": round(sill, 6)})
-    return B._dump({"walls": walls, "openings": openings, "grid": _grid_lines(storey)})
+    from . import drafting  # D84: the drafting shapes' ends, middles and centres
+
+    return B._dump({"walls": walls, "openings": openings, "grid": _grid_lines(storey), "points": drafting.snap_points(storey)})
 
 
 # ---------------------------------------------------------------- slabs (Slice 5)

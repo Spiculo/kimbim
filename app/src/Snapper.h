@@ -21,8 +21,16 @@ struct SnapLine {
     QPointF a, b;
 };
 
+// A point of a 2D drafting shape (D84, from app_bridge.snap_data "points"): an end or corner, the
+// middle of a segment, or a circle's or arc's centre.
+struct SnapPoint {
+    QPointF p;
+    int kind = 1; // Snap::Endpoint, Snap::Midpoint or Snap::Centre
+    QString guid;
+};
+
 struct Snap {
-    enum Kind { None, Endpoint, Midpoint, Perpendicular, OnWall, Angle, Grid, GridCross, GridLine, FaceEnd, OnFace };
+    enum Kind { None, Endpoint, Midpoint, Perpendicular, OnWall, Angle, Grid, GridCross, GridLine, FaceEnd, OnFace, Centre };
     QPointF point;
     Kind kind = None;
     QString wallGuid; // the wall an object snap landed on
@@ -36,6 +44,10 @@ class Snapper {
 public:
     static QVector<SnapWall> parse(const QJsonObject& snapData);
     static QVector<SnapLine> parseGrid(const QJsonObject& snapData);
+    static QVector<SnapPoint> parsePoints(const QJsonObject& snapData);
+    // Drafting shapes' points (D84): ends with the wall ends, middles with the wall middles, centres next.
+    void setPoints(QVector<SnapPoint> points) { m_points = std::move(points); }
+    const QVector<SnapPoint>& points() const { return m_points; }
     void setGridLines(QVector<SnapLine> lines) { m_lines = std::move(lines); }
     const QVector<SnapLine>& gridLines() const { return m_lines; }
     void setWalls(QVector<SnapWall> walls) { m_walls = std::move(walls); }
@@ -56,6 +68,7 @@ private:
 
     QVector<SnapWall> m_walls;
     QVector<SnapLine> m_lines;
+    QVector<SnapPoint> m_points;
     double m_grid = 0.01; // 10 mm
     bool m_faces = false;
 };
