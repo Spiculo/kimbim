@@ -836,6 +836,66 @@ ES = {
     "Nothing to export": "Nada que exportar",
     "The model has no drawings or sheets yet.": "El modelo aún no tiene dibujos ni láminas.",
     "Exported %n DXF file(s)": ("%n archivo DXF exportado", "%n archivos DXF exportados"),
+    # D84: 2D drafting (Archicad ES: Línea, Polilínea, Arco/Círculo, Rectángulo, Relleno)
+    "The three points are in a line": "Los tres puntos están alineados",
+    "Line: click the start point": "Línea: haga clic en el punto inicial",
+    "Line: click the end point, or type a length (length<angle)":
+        "Línea: haga clic en el punto final o escriba una longitud (longitud<ángulo)",
+    "Polyline: click the first point": "Polilínea: haga clic en el primer punto",
+    "Polyline: click the next point or type a length; click the first point to close, Enter or double click to end":
+        "Polilínea: haga clic en el siguiente punto o escriba una longitud; clic en el primer punto para cerrarla, Intro o doble clic para terminar",
+    "Rectangle: click a corner": "Rectángulo: haga clic en una esquina",
+    "Rectangle: click the opposite corner, or type width;height":
+        "Rectángulo: haga clic en la esquina opuesta o escriba ancho;alto",
+    "Circle: click the centre": "Círculo: haga clic en el centro",
+    "Circle: click a point on it, or type the radius": "Círculo: haga clic en un punto del círculo o escriba el radio",
+    "Arc: click where it starts": "Arco: haga clic donde empieza",
+    "Arc: click a point it passes through": "Arco: haga clic en un punto por el que pasa",
+    "Arc: click where it ends": "Arco: haga clic donde termina",
+    "Arc: click the centre": "Arco: haga clic en el centro",
+    "Arc: click where it starts, or type the radius": "Arco: haga clic donde empieza o escriba el radio",
+    "Arc: click where it ends (counter-clockwise), or type the angle in degrees":
+        "Arco: haga clic donde termina (antihorario) o escriba el ángulo en grados",
+    "Fill: click the outline's points (Alt+click inside a closed polyline or circle to fill it)":
+        "Relleno: haga clic en los puntos del contorno (Alt+clic dentro de una polilínea cerrada o un círculo para rellenarlo)",
+    "Fill: click the next point; click the first point or press Enter to close":
+        "Relleno: haga clic en el siguiente punto; clic en el primer punto o Intro para cerrar",
+    "Stretch: click near a wall end or a point of a line, arc or fill, then its new position":
+        "Estirar: haga clic cerca del extremo de un muro o de un punto de una línea, arco o relleno, luego en su nueva posición",
+    "L&ine": "Lí&nea",
+    "Draw a 2D line on the plan: click its two ends, or type a length (length<angle)":
+        "Dibujar una línea 2D en la planta: haga clic en sus dos extremos o escriba una longitud (longitud<ángulo)",
+    "&Polyline": "&Polilínea",
+    "Draw a 2D polyline: click points; click the first point to close it, Enter or double click to end it":
+        "Dibujar una polilínea 2D: haga clic en puntos; clic en el primero para cerrarla, Intro o doble clic para terminarla",
+    "&Arc/circle": "&Arco/círculo",
+    "Draw a 2D circle (centre and radius) or arc (three points, or centre, start and end)":
+        "Dibujar un círculo 2D (centro y radio) o un arco (tres puntos, o centro, inicio y fin)",
+    "Rec&tangle": "Rec&tángulo",
+    "Draw a 2D rectangle: click two opposite corners, or type width;height":
+        "Dibujar un rectángulo 2D: haga clic en dos esquinas opuestas o escriba ancho;alto",
+    "&Fill": "&Relleno",
+    "Draw a fill (hatch): click its outline; Alt+click inside a closed polyline, rectangle or circle to fill it":
+        "Dibujar un relleno (trama): haga clic en su contorno; Alt+clic dentro de una polilínea cerrada, un rectángulo o un círculo para rellenarlo",
+    "wall face end": "extremo de cara de muro",
+    "on wall face": "sobre cara de muro",
+    "centre": "centro",
+    "How the arc or circle is drawn": "Cómo se dibuja el arco o el círculo",
+    "Circle: centre and radius": "Círculo: centro y radio",
+    "Arc: three points": "Arco: tres puntos",
+    "Arc: centre, start and end": "Arco: centro, inicio y fin",
+    "Line type": "Tipo de línea",
+    "Fill pattern (Graphics > fill patterns are project settings)":
+        "Trama del relleno (las tramas son configuración del proyecto)",
+    "No background": "Sin fondo",
+    "Background pen ": "Pluma de fondo ",
+    "The fill's background pen (0: none, the model shows through)":
+        "La pluma de fondo del relleno (0: ninguna, el modelo se ve a través)",
+    "Show the fill's area in its middle": "Mostrar la superficie del relleno en su centro",
+    "Could not draw it: %1": "No se pudo dibujar: %1",
+    "Could not fill: %1": "No se pudo rellenar: %1",
+    "Could not move the point: %1": "No se pudo mover el punto: %1",
+    "Click the point's new position (Esc: leave it)": "Haga clic en la nueva posición del punto (Esc: dejarlo)",
 }
 
 
