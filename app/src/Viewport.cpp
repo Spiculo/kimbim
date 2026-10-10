@@ -435,6 +435,7 @@ Viewport::~Viewport()
             m_context->Remove(o, false);
     for (const auto& a : std::as_const(m_annotations))
         m_context->Remove(a, false);
+    removeUnderlays();
     if (m_scene)
         m_scene->removeView(m_view);
 }
@@ -1390,6 +1391,7 @@ void Viewport::clear()
     m_scene->idBases.clear();
     m_grid.Nullify();
     m_gridLineCount = 0;
+    m_underlays.clear(); // RemoveAll above took them
     m_section.Nullify();
     m_sectionElements = 0;
     m_preview.Nullify();
@@ -1774,6 +1776,8 @@ void Viewport::keepOverlaysHere()
     keepHere(m_home);
     for (const auto& a : std::as_const(m_annotations))
         keepHere(a);
+    for (const auto& u : std::as_const(m_underlays))
+        keepHere(u.prs);
 }
 
 bool Viewport::showsOverlay(const Handle(AIS_InteractiveObject)& obj, const Handle(V3d_View)& view) const

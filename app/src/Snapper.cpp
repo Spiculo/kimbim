@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "Snapper.h"
+#include "Underlay.h"
 
 #include <array>
 
@@ -162,6 +163,15 @@ Snap Snapper::snap(QPointF p, double tolerance, const QPointF* from, bool ortho)
         s = points(Snap::Midpoint, s);
     if (s.kind == Snap::None)
         s = points(Snap::Centre, s);
+    if (s.kind == Snap::None && m_underlays) { // D85: tracing a survey
+        QPointF q;
+        if (m_underlays->endpoint(p, tolerance, &q))
+            s = Snap{q, Snap::UnderlayEnd, {}};
+        else if (m_underlays->crossing(p, tolerance, &q))
+            s = Snap{q, Snap::UnderlayCross, {}};
+        else if (m_underlays->midpoint(p, tolerance, &q))
+            s = Snap{q, Snap::UnderlayMid, {}};
+    }
     if (s.kind == Snap::None && from)
         s = best(Snap::Perpendicular, [&](const SnapWall& w, QPointF* q) {
             bool inside = false;
@@ -189,6 +199,11 @@ Snap Snapper::snap(QPointF p, double tolerance, const QPointF* from, bool ortho)
             *q = project(p, w.a, w.b, &inside);
             return inside;
         });
+    if (s.kind == Snap::None && m_underlays) {
+        QPointF q;
+        if (m_underlays->onLine(p, tolerance, &q))
+            s = Snap{q, Snap::OnUnderlay, {}};
+    }
     if (s.kind == Snap::None) { // anywhere along a grid axis
         double bestDistance = tolerance;
         for (const SnapLine& line : m_lines) {

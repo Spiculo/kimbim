@@ -6,7 +6,11 @@
 #include <QString>
 #include <QVector>
 
+#include <memory>
+
 namespace kimcad {
+
+class UnderlaySnapIndex;
 
 // A wall's axis on the active level (from app_bridge.snap_data), in metres.
 struct SnapWall {
@@ -30,7 +34,8 @@ struct SnapPoint {
 };
 
 struct Snap {
-    enum Kind { None, Endpoint, Midpoint, Perpendicular, OnWall, Angle, Grid, GridCross, GridLine, FaceEnd, OnFace, Centre };
+    enum Kind { None, Endpoint, Midpoint, Perpendicular, OnWall, Angle, Grid, GridCross, GridLine, FaceEnd, OnFace, Centre,
+        UnderlayEnd, UnderlayMid, UnderlayCross, OnUnderlay }; // D85: DXF underlay linework
     QPointF point;
     Kind kind = None;
     QString wallGuid; // the wall an object snap landed on
@@ -39,7 +44,9 @@ struct Snap {
 
 // Plan snapping for drawing tools (pure geometry, no view). Priority: wall endpoint > grid-axis
 // crossing > midpoint > perpendicular from the previous point > anywhere on a wall > anywhere on a
-// grid axis > angle (15 degree steps from the previous point; 0/90 with ortho) > grid.
+// grid axis > angle (15 degree steps from the previous point; 0/90 with ortho) > grid. D85: underlay
+// endpoints, crossings and midpoints come after wall midpoints, anywhere on an underlay line after
+// anywhere on a wall.
 class Snapper {
 public:
     static QVector<SnapWall> parse(const QJsonObject& snapData);
@@ -53,6 +60,9 @@ public:
     void setWalls(QVector<SnapWall> walls) { m_walls = std::move(walls); }
     const QVector<SnapWall>& walls() const { return m_walls; }
     void setGrid(double step) { m_grid = step; }
+    // D85: the active level's DXF underlay linework (shared by every tool's snapper); null: none.
+    void setUnderlays(std::shared_ptr<const UnderlaySnapIndex> index) { m_underlays = std::move(index); }
+    const std::shared_ptr<const UnderlaySnapIndex>& underlays() const { return m_underlays; }
     // Wall faces (axis +- half the thickness) as snap targets: their corners after the axis ends,
     // anywhere along them before "on wall". For dimensions (Slice 15), off by default.
     void setFaceSnapping(bool on) { m_faces = on; }
@@ -71,6 +81,7 @@ private:
     QVector<SnapPoint> m_points;
     double m_grid = 0.01; // 10 mm
     bool m_faces = false;
+    std::shared_ptr<const UnderlaySnapIndex> m_underlays;
 };
 
 } // namespace kimcad

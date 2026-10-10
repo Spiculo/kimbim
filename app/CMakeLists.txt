@@ -53,6 +53,8 @@ qt_add_library(kimcad_core STATIC
     src/ChecksPanel.cpp src/ChecksPanel.h src/Checks.cpp
     src/ConsolePanel.cpp src/ConsolePanel.h src/ConsoleTools.cpp
     src/DxfExportDialog.cpp src/DxfExportDialog.h src/DxfExport.cpp
+    src/Underlay.cpp src/Underlay.h src/ViewportUnderlays.cpp
+    src/UnderlayDialogs.cpp src/UnderlayDialogs.h src/Underlays.cpp
 )
 target_include_directories(kimcad_core PUBLIC src)
 # Element icons (owner feedback: objects need an icon and a hint on hover).

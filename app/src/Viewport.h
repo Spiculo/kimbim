@@ -30,6 +30,7 @@
 
 #include "ElementBatch.h"
 #include "Scene.h"
+#include "Underlay.h"
 
 class QTimer;
 
@@ -104,6 +105,19 @@ public:
         QString tag;
     };
     void setGridLines(const QVector<GridLine>& lines, double z);
+    // D85: underlays drawn in this view under the model (just above level `z`): DXF linework as one
+    // OCCT segment array per underlay (vertex colours, placement as the object's transformation, so a
+    // move or rotation re-uses the GPU buffers); PDF pages and images as a textured quad. Not
+    // selectable. An underlay whose display settings are unchanged keeps its presentation.
+    struct UnderlayView {
+        Underlay underlay;
+        std::shared_ptr<const UnderlayLines> lines; // DXF
+        QImage image;                               // PDF page or image, already greyscaled/tinted
+        double z = 0.0;
+    };
+    void setUnderlays(const QVector<UnderlayView>& underlays);
+    int underlayCount() const { return int(m_underlays.size()); }
+    qint64 underlaySegmentCount() const;
     // Plan annotations of the active level (Slice 13): text labels, dimensions, marks; drawn on
     // top, selectable (their guids join selectedGuids), hidden/locked with their layer.
     struct Annotation {
@@ -287,6 +301,13 @@ private:
     void keepHere(const Handle(AIS_InteractiveObject)& obj);
     void keepOverlaysHere();
     int m_gridLineCount = 0;
+    struct UnderlayShown {
+        Handle(AIS_InteractiveObject) prs;
+        QString key;
+        qint64 segments = 0;
+    };
+    QHash<QString, UnderlayShown> m_underlays; // by underlay id (ViewportUnderlays.cpp)
+    void removeUnderlays();
     bool workPoint(const QPointF& widgetPos, QPointF* point, double* tolerance);
     double m_planElevation = 0.0;
     double m_fitScale = 0.0; // the view's scale when fitted (100%)

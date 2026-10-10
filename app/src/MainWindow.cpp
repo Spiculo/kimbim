@@ -1807,7 +1807,8 @@ void MainWindow::showSnap(const Snap& snap)
 {
     static const char* const names[] = {"", QT_TR_NOOP("endpoint"), QT_TR_NOOP("midpoint"), QT_TR_NOOP("perpendicular"),
         QT_TR_NOOP("on wall"), QT_TR_NOOP("angle"), QT_TR_NOOP("grid"), QT_TR_NOOP("grid crossing"), QT_TR_NOOP("on grid line"),
-        QT_TR_NOOP("wall face end"), QT_TR_NOOP("on wall face"), QT_TR_NOOP("centre")};
+        QT_TR_NOOP("wall face end"), QT_TR_NOOP("on wall face"), QT_TR_NOOP("centre"), QT_TR_NOOP("underlay endpoint"),
+        QT_TR_NOOP("underlay midpoint"), QT_TR_NOOP("underlay crossing"), QT_TR_NOOP("on underlay line")};
     QString text = tr("Wall: click the next point, type a length, Esc to finish");
     const auto preview = m_tool == Tool::Wall ? m_wallTool->preview() : m_twoPointTool->preview();
     if (preview) {
