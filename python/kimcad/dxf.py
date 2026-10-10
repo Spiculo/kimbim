@@ -253,11 +253,15 @@ def parse_path(d: str):
             rel = cmd.islower()
             c = cmd.upper()
             if c == "M":
-                finish()
                 x, y = num(), num()
-                cur = start = (cur[0] + x, cur[1] + y) if rel else (x, y)
-                pts = [[cur[0], cur[1], 0.0]]
+                to = (cur[0] + x, cur[1] + y) if rel else (x, y)
                 cmd = "l" if rel else "L"  # following pairs are line-tos
+                if pts and not closed and math.dist(to, pts[-1][:2]) < 1e-9 and                         math.dist(pts[0][:2], pts[-1][:2]) >= 1e-9:
+                    cur = to  # the serializer's segments chain end to start: one polyline
+                    continue
+                finish()
+                cur = start = to
+                pts = [[cur[0], cur[1], 0.0]]
             elif c in "LHVT":
                 if c == "L" or c == "T":
                     x, y = num(), num()
@@ -290,6 +294,52 @@ def parse_path(d: str):
         except (IndexError, ValueError):
             break
     finish()
+    return out
+
+
+def chain(lines):
+    """Open, straight polylines joined end to end where they meet (either direction): an element's edges
+    become a few polylines instead of hundreds of LINEs. Returns sub-paths like parse_path."""
+    def key(p):
+        return round(p[0], 6), round(p[1], 6)
+
+    ends: dict = {}
+    for i, (pts, _) in enumerate(lines):
+        ends.setdefault(key(pts[0]), []).append(i)
+        ends.setdefault(key(pts[-1]), []).append(i)
+    used = [False] * len(lines)
+
+    def take(point):
+        for j in ends.get(key(point), ()):
+            if not used[j]:
+                used[j] = True
+                return lines[j][0]
+        return None
+
+    out = []
+    for i, (pts, _) in enumerate(lines):
+        if used[i]:
+            continue
+        used[i] = True
+        run = [list(p) for p in pts]
+        for forward in (True, False):
+            while True:
+                tip = run[-1] if forward else run[0]
+                nxt = take(tip)
+                if nxt is None:
+                    break
+                if key(nxt[0]) != key(tip):
+                    nxt = nxt[::-1]
+                if forward:
+                    run += [list(p) for p in nxt[1:]]
+                else:
+                    run[:0] = [list(p) for p in nxt[:-1]]
+                if key(run[0]) == key(run[-1]):
+                    break
+            if len(run) > 2 and key(run[0]) == key(run[-1]):
+                break
+        closed = len(run) > 3 and key(run[0]) == key(run[-1])
+        out.append((run[:-1] if closed else run, closed))
     return out
 
 
@@ -374,8 +424,17 @@ class Writer:
             t = _TRANSLATE.search(element.get("transform") or "")
             if t:
                 self.map = Mapping([[1, 0, float(t.group(1))], [0, 1, float(t.group(2))], [0, 0, 1]]).then(saved)
+            loose = []  # the group's single segments (the serializer writes one path per edge)
             for child in element:
+                if child.tag == SVG + "path" and set(child.attrib) <= {"d", "class"}:
+                    subpaths = parse_path(child.get("d", ""))
+                    lines = [sp for sp in subpaths if not sp[1] and not any(v[2] for v in sp[0])]
+                    if len(lines) == len(subpaths):
+                        loose += lines
+                        continue
                 self.walk(child, ctx)
+            if loose:
+                self.path(chain(loose), {**ctx, "fill": None})
             self.map = saved
         elif tag == "path":
             self.path(parse_path(element.get("d", "")), ctx)
@@ -648,6 +707,12 @@ def _write_drawing(doc: Doc, target, guid: str, resolved: dict, opts: dict, ltsc
     return writer, mapping, svg
 
 
+def _zoom(layout, writer: Writer):
+    """Open on what was drawn (from the writer's own extents: ezdxf's bounding box costs seconds)."""
+    if writer.lo[0] < math.inf:
+        ezdxf.zoom.window(layout, writer.lo, writer.hi)
+
+
 def drawing_document(guid: str, opts: dict):
     """(ezdxf document, stats) of one drawing in model space, or (None, error)."""
     resolved = _resolved(opts["purpose"])
@@ -657,10 +722,7 @@ def drawing_document(guid: str, opts: dict):
     if isinstance(out, str):
         return None, out
     writer = out[0]
-    try:
-        ezdxf.zoom.extents(msp)
-    except Exception:  # an empty drawing has no extents
-        pass
+    _zoom(msp, writer)
     return doc.doc, {"entities": writer.count, "layers": sorted(doc.layers)}
 
 
@@ -711,7 +773,7 @@ def sheet_document(number: str, opts: dict):
     paper = Mapping([[1, 0, 0], [0, -1, height], [0, 0, 1]])  # sheet mm, y down -> paper space, y up
     chrome = Writer(doc, layout, paper, ltscale=1.0 / doc.ltscale)
     base = {"color": "#000000", "weight": 0.18, "dash": [], "fill": None}
-    views, msp_x, stats_entities = [], 0.0, 0
+    views, msp_x, msp_h, stats_entities = [], 0.0, 0.0, 0
     msp = dxf.modelspace()
     for ref in S._views(sheet):
         guid = S._link(ref)
@@ -736,6 +798,7 @@ def sheet_document(number: str, opts: dict):
         if writer.lo[0] < math.inf:  # model space: the same drawing at real size, left to right
             msp.add_blockref(block.name, (msp_x - writer.lo[0], -writer.lo[1]), dxfattribs={"layer": doc.layer("0")})
             msp_x += writer.hi[0] - writer.lo[0] + 5.0 / doc.u
+            msp_h = max(msp_h, writer.hi[1] - writer.lo[1])
         views.append({"drawing": guid, "name": name, "block": block.name, "scale": p["scale"],
                       "insert": [round(origin[0], 3), round(origin[1], 3)], "insert_scale": round(scale, 6)})
         w, h = vw * k, vh * k
@@ -758,7 +821,8 @@ def sheet_document(number: str, opts: dict):
                 {**base, "layer": SHEET_LAYERS["frame"]})
     try:
         ezdxf.zoom.window(layout, (0, 0), (width, height))
-        ezdxf.zoom.extents(msp)
+        if msp_x > 0:
+            ezdxf.zoom.window(msp, (0, 0), (msp_x, msp_h))
     except Exception:
         pass
     dxf.layouts.set_active_layout(layout.name)
