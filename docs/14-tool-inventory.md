@@ -241,14 +241,14 @@ release notes, so check before relying on a single cell.
 | Dimension chains, overall dimensions | all | 🟡 | P1 | Slice 15: chains (Shift+click); no overall dimension yet |
 | Snap dimensions to wall faces, openings and layers | all | 🟡 | P1 | Slice 15: wall faces; openings and layer lines later |
 | Automatic dimensioning of walls and openings | AC RV VW | ⬜ | new | |
-| Angle, radius, arc-length, level and spot-elevation dimensions | all | ⬜ | P1 | |
-| Associative labels and tags (show a property, follow the element) | all | ⬜ | P1 | Door/window/room/wall tags |
+| Angle, radius, arc-length, level and spot-elevation dimensions | all | 🟡 | P1 | D87: angle, radius, diameter, level (plan: slab top or level; sections: story levels) and spot elevation; no arc length yet |
+| Associative labels and tags (show a property, follow the element) | all | ✅ | P1 | D87: Tag tool and Tag all; templates of schedule fields; styles (door/window marker, wall tag, room stamp, mark, label) in project settings; IfcRelAssignsToProduct |
 | Leaders and arrows | all | ✅ | P1 | Slice 15: Leader tool (Shift+A) |
-| Revision clouds | AC RV VW | ⬜ | new | Open in doc 13 |
+| Revision clouds | AC RV VW | ✅ | new | D87: on plans and sheets, revision in a triangle; no revision schedule yet |
 | Section, elevation and detail markers | all | 🟡 | P1 | Section and elevation markers in plan (Slice 14); detail markers later |
-| North arrow, scale bar | all | ⬜ | new | |
+| North arrow, scale bar | all | ✅ | new | D87: on plans and sheets; north follows IFC TrueNorth; the sheet's bar shows its drawing's scale |
 | Keynotes | RV VW AC | ⬜ | new | |
-| Room / zone stamps (name, number, area) | all | ⬜ | P1 | Need rooms (§6) |
+| Room / zone stamps (name, number, area) | all | ✅ | P1 | Slice 18; D87: their text is the Room stamp tag style |
 
 ## 14. Sheets and output
 

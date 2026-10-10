@@ -219,6 +219,32 @@ Built per D85 (Archicad's placed drawing and Trace & Reference as the reference)
 7. Do you need to **convert** DXF linework into KIMCAD 2D drafting lines (Archicad's *explode*), or to
    clip an underlay to a region?
 
+## For the architect: tags, north arrow, scale bar, revision clouds, more dimensions (asked 2026-10-10, waiting)
+
+Built per D87 (BIM part A; Archicad's Label tool with autotext, door/window markers and zone stamps as
+the reference, Revit's Tag by category for Tag all).
+
+1. **Door and window markers** show the Mark (ID) and the size, "D1 / 0.90×2.10" in the project's length
+   unit, without a frame, half a metre outside the wall. Archicad offers many marker styles; which do you
+   use (size in cm "90/210", sill height, a hexagon with the ID only)?
+2. **Wall tags** show the wall type in a box, inside the room. Do you tag walls by type, or by a
+   construction code (a property)?
+3. **Room stamps** stay the room's own (as Archicad's zone stamp); their text is the *Room stamp* tag
+   style (name, number, area by default). Should the stamp also show the perimeter, height or finishes?
+4. **Tag all** tags the untagged doors, windows and walls of the level that the view shows. Should it
+   also tag columns, furniture, or let you pick the categories (Revit's dialog)?
+5. A tag whose element is deleted is deleted with it (Archicad). Would you rather keep it, showing "?"?
+6. **Level dimensions** in plan measure the top of the slab under the point, else the level, from project
+   zero ("+3.00", "±0.00"). Do you need them relative to the level, or to sea level (Archicad's options)?
+7. The **north arrow** follows the project's true north (IFC TrueNorth; set from the console with
+   `set_true_north`, no dialog yet) and is a circle with a half-filled arrow. Your office's symbol?
+8. The **scale bar** is about 5 cm on paper (5 m at 1:100) in 5 alternating segments, in metres. Is that
+   your convention?
+9. **Revision clouds** carry the revision in a triangle at their first corner; there is no revision
+   schedule on the sheet yet (Revit lists revisions in the title block). Needed soon?
+10. Angle dimensions show two decimals of a degree ("45.00°"); radii "R 1.50" and diameters "Ø 3.00".
+    Acceptable?
+
 ## Needs a spike
 
 These are listed in [07-roadmap.md](07-roadmap.md#spikes-do-first-each-is-small-throwaway-and-documented).
