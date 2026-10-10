@@ -10,6 +10,13 @@ KIMCAD is GPL-3.0-or-later. These are the components it uses, how each is linked
 | NumPy | BSD-3-Clause | Required by `ifcopenshell.api` | Dynamic |
 | lark | MIT | Parser used by IfcOpenShell utilities | Dynamic |
 | openpyxl (and et_xmlfile) | MIT | Schedules exported to XLSX (D77) | Dynamic |
+| IfcTester 0.9 (PyPI) | LGPL-3.0-or-later | IDS checks and their HTML/JSON report (D81) | Dynamic (Python module) |
+| xmlschema, elementpath | MIT | IfcTester: reading .ids files | Dynamic |
+| python-dateutil | Apache-2.0 / BSD-3-Clause | IfcTester | Dynamic |
+| pystache | MIT | IfcTester's HTML report | Dynamic |
+| odfpy | Apache-2.0 | IfcTester's ODS report (installed, not offered) | Dynamic |
+| bcf-client | LGPL-3.0-or-later | IfcTester's BCF report (installed, not offered yet) | Dynamic |
+| Flask | BSD-3-Clause | IfcTester's web app (installed as its dependency, never started) | Dynamic |
 | Git | GPL-2.0-only (program) | `git fast-import`, repack, branch | Separate program |
 | gix (gitoxide) | MIT OR Apache-2.0 | Reading the Git object database | Static (Rust) |
 | rayon | MIT OR Apache-2.0 | Parallel reads | Static (Rust) |

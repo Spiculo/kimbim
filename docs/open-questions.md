@@ -140,6 +140,23 @@ Built per D80 (Revit's tools where Archicad has none; joined walls stay connecte
 5. Shortcuts Shift+S (split), Shift+T (trim/extend), Shift+J (join). Revit uses two-letter keys (SL,
    TR); do you want those instead?
 
+## For the architect: checks (asked 2026-10-09, waiting)
+
+Built per D81 (Archicad's Model Check and Collision Detection, with Solibri-style model checks).
+
+1. The sample house's floor slabs overlap the exterior walls under them by 200 mm, because walls run the
+   full storey height. Archicad would resolve it with building-material priorities. Should walls stop
+   under the slab above, the slab be cut by the walls, or is the overlap fine in your drawings?
+2. Clash tolerance 2 mm and clearance 50 mm by default. Do your offices use other defaults?
+3. A door or window never clashes with its host wall, and a stair never with its own flights. Should
+   joined walls also be ignored (they never overlap today)?
+4. Duplicates are the same class, type, place (to 1 mm) and shape. Should elements that only overlap
+   partly (same class, same level) count too, as Archicad's "duplicates" do?
+5. Doors and windows without an opening in a host are warnings. In curtain walls they are allowed. Any
+   other case you would not want flagged?
+6. IDS files are stored inside the project (so they are versioned with it), not linked from a shared
+   folder. Do offices keep one IDS for all projects and expect edits to it to reach every project?
+
 ## Needs a spike
 
 These are listed in [07-roadmap.md](07-roadmap.md#spikes-do-first-each-is-small-throwaway-and-documented).

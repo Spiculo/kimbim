@@ -316,10 +316,10 @@ release notes, so check before relying on a single cell.
 | Tool | Has | KIMCAD | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Measure distance, angle, area | all | ✅ | P1 | D79: Shift+M, snaps, 3D surfaces, copy to clipboard |
-| IFC schema validation in the app | BB | 🟡 | P1 | In CI only |
-| IDS checks | AC BB | ⬜ | P1 | IfcTester |
-| Clash detection | AC RV VW BB | ⬜ | P2 | `ifcclash` |
-| Model checks (duplicates, overlaps, rooms without a number) | AC RV | ⬜ | P2 | |
+| IFC schema validation in the app | BB | ✅ | P1 | Checks panel, EXPRESS rules included (D81) |
+| IDS checks | AC BB | ✅ | P1 | IfcTester; IDS files kept in the project; HTML/JSON report (D81) |
+| Clash detection | AC RV VW BB | ✅ | P2 | Hard and clearance between classes or Find & Select criteria (D81); no BCF yet |
+| Model checks (duplicates, overlaps, rooms without a number) | AC RV | ✅ | P2 | Duplicates, rooms, zero-length walls, not on a level, hostless openings (D81) |
 | Energy evaluation, daylight | AC RV VW | ⬜ | new | |
 | Structural analytical model | AC RV | ⬜ | new | Probably out of scope for architects |
 
