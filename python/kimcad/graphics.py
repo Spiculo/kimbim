@@ -873,7 +873,7 @@ def style_svg(svg: str, resolved: dict, k: float = 1.0) -> str:
     out.append(svg[pos:])
     svg = "".join(out)
     # Annotation text is filled in its pen's colour (the overlay writes black text).
-    svg = re.sub(r'(<g data-kind="annotation"[^>]*color="(#[0-9a-fA-F]{6})"[^>]*>)(.*?)(</g>)',
+    svg = re.sub(r'(<g data-kind="annotation"[^>]* color="(#[0-9a-fA-F]{6})"[^>]*>)(.*?)(</g>)',
                  lambda m: m.group(1) + m.group(3).replace('fill="#000000"', f'fill="{m.group(2)}"')
                  .replace('data-fill="pen"', f'fill="{m.group(2)}"') + m.group(4),
                  svg, flags=re.S)
