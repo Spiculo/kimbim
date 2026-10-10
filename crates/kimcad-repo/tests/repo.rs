@@ -166,3 +166,34 @@ fn merge_commits_merge_base_and_fast_forward() {
     repo.commit(&changes(&[("d.json", Some("6"))]), "diverged", &sig(6)).unwrap();
     assert!(repo.fast_forward(&other).is_err()); // not a fast-forward any more
 }
+
+/// A project as the app makes it: the first version is a pack (>= 100 objects), later small versions
+/// are loose objects. Each read opens a fresh object store whose pack index loads lazily, and
+/// read_blobs looks objects up from rayon's threads: gix 0.88 could then answer "not found" to a
+/// thread that lost the race to load the one index (intermittent "An object with id ... could not
+/// be found" in the Python suite, about 1 read in 500 there).
+#[test]
+fn parallel_reads_of_a_fresh_store_find_every_object() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = Repo::init(dir.path()).unwrap();
+    let first: BTreeMap<String, Option<Vec<u8>>> =
+        (0..110).map(|j| (format!("o/{j}"), Some(format!("record {j}").into_bytes()))).collect();
+    repo.commit(&first, "first", &sig(1)).unwrap();
+    for k in 0..3 {
+        let c = (0..3).map(|j| (format!("o/{j}"), Some(format!("record {j} v{k}").into_bytes()))).collect();
+        repo.commit(&c, "small", &sig(2 + k)).unwrap();
+    }
+    let rounds: usize = std::env::var("KIMCAD_STRESS_ROUNDS").ok().and_then(|v| v.parse().ok()).unwrap_or(3000);
+    let revs = ["HEAD", "HEAD~1", "HEAD~2", "HEAD~3"];
+    let oids: Vec<Vec<String>> = revs.iter().map(|r| repo.tree_entries(r).unwrap().into_values().collect()).collect();
+    let mut failures = Vec::new();
+    for round in 0..rounds {
+        let ids = &oids[round % oids.len()];
+        match repo.read_blobs(ids) {
+            Ok(blobs) => assert_eq!(blobs.len(), ids.len()),
+            Err(e) => failures.push(format!("round {round}: {e}")),
+        }
+    }
+    assert!(failures.is_empty(), "{} of {rounds} reads failed, first: {}", failures.len(), failures[0]);
+}
+

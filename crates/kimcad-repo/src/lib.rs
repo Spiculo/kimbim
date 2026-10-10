@@ -148,7 +148,12 @@ impl Repo {
 
     pub fn read_blobs(&self, oids: &[String]) -> Result<Vec<Vec<u8>>> {
         let ids = oids.iter().map(|h| oid(h)).collect::<Result<Vec<_>>>()?;
-        let sync = self.gix()?.into_sync();
+        let repo = self.gix()?;
+        // Load every pack index on this thread before the threads share the store. gix loads indices
+        // lazily, and when several threads race to load them one can be told "not found" for an object
+        // whose index another thread is loading (intermittent, ~1 read in 500 on Windows).
+        repo.objects.packed_object_count().map_err(git_err)?;
+        let sync = repo.into_sync();
         ids.par_iter()
             .map_init(
                 || sync.to_thread_local(),
