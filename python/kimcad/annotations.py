@@ -27,6 +27,7 @@ from . import drafting as D
 from . import drawgen as G
 from . import layers
 from . import settings
+from . import symbols as S
 
 PSET = "KIMCAD_Annotation"
 # Kind -> (fewest points, most points); None = no limit. A dimension is a chain: the measured points,
@@ -34,7 +35,11 @@ PSET = "KIMCAD_Annotation"
 KINDS = {"text": (1, 1), "dimension": (3, None), "mark": (1, 1), "leader": (2, None),
          # 2D drafting (D84, module drafting): a line, a polyline, an arc (start, a point on it, end), a
          # circle (centre, a point on it), a fill (its outline)
-         "line": (2, 2), "polyline": (2, None), "arc": (3, 3), "circle": (2, 2), "fill": (3, None)}
+         "line": (2, 2), "polyline": (2, None), "arc": (3, 3), "circle": (2, 2), "fill": (3, None),
+         # the annotation pack (D87, module symbols): tags, north arrows, scale bars, revision clouds,
+         # angle, radius, diameter, level and spot-elevation dimensions
+         **S.POINTS}
+EXTRA = D.EXTRA + S.EXTRA  # pset keys beside Kind/Text/Points/Size/Pen
 TEXT_SIZE = 2.5  # millimetres on paper (Slice 15: text size in paper units, doc 13)
 DRAWING_SCALE = 100  # 1:100 until drawings get a scale setting
 MARK_RADIUS = 0.4  # metres
@@ -97,7 +102,15 @@ def _representation(kind, text, points, size=TEXT_SIZE, data=None):
         return f.createIfcTextLiteralWithExtent(value, placement, "RIGHT", extent, "bottom-left")
 
     items = []
-    if kind in D.KINDS:
+    if kind in S.KINDS:
+        if kind == "tag":
+            from . import tags
+
+            data = tags.effective(data or {})
+        geom = S.geometry(kind, points, text or S.measured_text(kind, points), size, data or {},
+                          DRAWING_SCALE / 1000.0, S.true_north())
+        items += S.ifc_items(f, geom, pt, literal)
+    elif kind in D.KINDS:
         items += D.ifc_items(f, kind, points, data or {}, pt, s, DRAWING_SCALE / 1000.0, D.current_pens())
         if kind == "fill" and (data or {}).get("ShowArea"):
             items.append(literal(D.centroid(points), D.area_text(D.area(points))))
@@ -126,7 +139,7 @@ def _set(annotation, kind, text, local, size=None, pen=None, extra=None):
         size = float(old_data.get("Size") or TEXT_SIZE)
     if pen is None:
         pen = _pen(old_data)
-    extra = {**{k: old_data[k] for k in D.EXTRA if k in old_data}, **(extra or {})}
+    extra = {**{k: old_data[k] for k in EXTRA if k in old_data}, **(extra or {})}
     old = list(annotation.Representation.Representations) if annotation.Representation else []
     new = _representation(kind, text, local, size, {**extra, "Pen": pen})
     for rep in old:
@@ -166,7 +179,7 @@ def add_annotation(storey_guid: str, kind: str, points_json: str, text: str) -> 
     storey = A._by_guid(storey_guid)
     if storey is None or not storey.is_a("IfcBuildingStorey"):
         return A._fail("unknown level")
-    if kind not in KINDS or kind in D.KINDS:  # drafting shapes: drafting.add_drafting
+    if kind not in KINDS or kind in D.KINDS or kind in S.KINDS:  # drafting.add_drafting, symbols.add_symbol
         return A._fail(f"unknown annotation kind {kind}")
     try:
         points = [(float(x), float(y)) for x, y in json.loads(points_json)]
@@ -211,6 +224,7 @@ def annotations(storey_guid: str) -> str:
     out = []
     if storey is not None:
         s = A._scale()
+        north = S.true_north()
         for a in B._model.by_type("IfcAnnotation"):  # few; a level can hold 100k elements
             if a.ObjectPlacement is None or ifcopenshell.util.element.get_container(a) != storey:
                 continue
@@ -226,6 +240,10 @@ def annotations(storey_guid: str) -> str:
             item = {"guid": a.GlobalId, "kind": kind, "text": text, "points": points, "size": size, "pen": pen}
             if kind in D.KINDS:
                 item.update(D.shape_data(kind, points, extra_of(a), DRAWING_SCALE / 1000.0))
+            elif kind in S.KINDS:  # D87: what to draw, from the same description as the drawings
+                item.update(S.round_geometry(S.geometry(kind, points, text or S.measured_text(kind, points), size,
+                                                        extra_of(a, effective=True), DRAWING_SCALE / 1000.0, north)))
+                item["symbol"] = True
             out.append(item)
     return B._dump({"annotations": out})
 
@@ -239,12 +257,19 @@ def set_annotation_text(guid: str, text: str) -> str:
     text = (text or "").strip()
     if kind == "dimension" and not text:
         text = _measure(local)  # an emptied dimension text measures again
-    if not text:
+    extra = None
+    if kind in ("level", "spot"):  # D87: emptied, it measures (and keeps measuring) again
+        extra = {"Auto": not text}
+        if not text:
+            text = S.elevation_text(S.elevation_at(ifcopenshell.util.element.get_container(a), world_points(a)[0]))
+    if not text and kind not in ("angle", "radius", "diameter", "cloud", "tag"):
         return A._fail("type the text")
+    if kind == "tag":
+        return A._fail("a tag shows its element's values: change its template")
 
     def action():
-        _set(a, kind, text, local)
-        a.Name = text[:60]
+        _set(a, kind, text, local, extra=extra)
+        a.Name = (text or S.NAMES.get(kind, kind))[:60]
         return 1, [a.GlobalId], []
 
     return B._dump(B._run(action))
@@ -294,10 +319,16 @@ def set_annotation_pen(guid: str, pen) -> str:
 
 # ---------------------------------------------------------------- shared with drafting (D84) and editing
 
-def extra_of(annotation) -> dict:
-    """A drafting shape's own values (drafting.EXTRA) from its property set."""
+def extra_of(annotation, effective: bool = False) -> dict:
+    """A drafting shape's or symbol's own values (drafting.EXTRA, symbols.EXTRA) from its property set.
+    `effective`: a tag's template and shape filled in from its style (D87)."""
     data = ifcopenshell.util.element.get_pset(annotation, PSET) or {}
-    return {k: data[k] for k in D.EXTRA if k in data}
+    out = {k: data[k] for k in EXTRA if k in data}
+    if effective and data.get("Kind") == "tag":
+        from . import tags
+
+        out = tags.effective(out)
+    return out
 
 
 def on_level(storey_guid: str) -> list:
@@ -358,21 +389,23 @@ def mirror(annotation, point) -> bool:
     return True
 
 
-def add_shape(storey, kind: str, points, extra: dict, pen=None) -> str:
-    """A drafting shape (drafting.add_drafting has checked it) on a level; world metres."""
+def add_shape(storey, kind: str, points, extra: dict, pen=None, text: str = "", name: str = "") -> str:
+    """A drafting shape (drafting.add_drafting has checked it) or a symbol (symbols.add_symbol) on a
+    level; world metres."""
     origin = points[0]
     local = [(x - origin[0], y - origin[1]) for x, y in points]
     made = {}
 
     def action():
         f = B._model
-        annotation = ifcopenshell.api.root.create_entity(f, ifc_class="IfcAnnotation", name=kind.capitalize())
+        annotation = ifcopenshell.api.root.create_entity(f, ifc_class="IfcAnnotation",
+                                                         name=(name or kind.capitalize())[:60])
         annotation.ObjectType = kind.upper()
         ifcopenshell.api.spatial.assign_container(f, products=[annotation], relating_structure=storey)
         matrix = np.eye(4)
         matrix[0][3], matrix[1][3], matrix[2][3] = origin[0], origin[1], A._elevation(storey)
         ifcopenshell.api.geometry.edit_object_placement(f, product=annotation, matrix=matrix, is_si=True)
-        _set(annotation, kind, "", local, pen=pen if pen is not None else settings.current().get("current_pen"),
+        _set(annotation, kind, text, local, pen=pen if pen is not None else settings.current().get("current_pen"),
              extra=extra)
         layers.assign_active(annotation)
         made["guid"] = annotation.GlobalId

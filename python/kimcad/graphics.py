@@ -879,7 +879,7 @@ def style_svg(svg: str, resolved: dict, k: float = 1.0) -> str:
                  svg, flags=re.S)
     # D84: a fill's background takes its background pen's colour.
     svg = re.sub(r'data-fill-pen="(\d+)"', lambda m: f'fill="{pen(pens, int(m.group(1)))["color"]}"', svg)
-    for group in ("kimcad-overlay", "kimcad-drafting"):
+    for group in ("kimcad-overlay", "kimcad-drafting", "kimcad-marks"):
         svg = svg.replace(f'class="{group}" fill="none" stroke="#000000" stroke-width="0.18"',
                           f'class="{group}" fill="none" stroke="#000000" stroke-width="{_fmt(0.18 / k)}"', 1)
     return svg

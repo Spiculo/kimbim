@@ -605,7 +605,8 @@ def overlay(f, drawing, s, svg: str) -> str:
             for e in f.by_type("IfcWindow"):
                 if ifcopenshell.util.element.get_container(e) == storey and e.ObjectPlacement is not None:
                     parts += _tagged("window", window_symbol(e, to_paper))
-            parts += _tagged("room", room_stamps(storey, to_paper))
+            # Room stamps are drawn with the tags on every request (tags.add_to_drawing, D87): their text
+            # is the room stamp tag style's, a project setting this process does not see.
             parts += plan_annotations(storey, to_paper)  # tags each annotation (guid, pen) itself
             parts += _tagged("marker", markers(f, to_paper, storey_elevation(storey)))
     if not parts:

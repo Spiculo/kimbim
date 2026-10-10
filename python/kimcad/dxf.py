@@ -871,6 +871,8 @@ def sheet_document(number: str, opts: dict):
             p = S._placement(ref)
             chrome.walk(ET.fromstring(f'<g transform="translate({p["x"]:.3f} {p["y"]:.3f})">{body}</g>'),
                         {**base, "layer": SHEET_LAYERS["legend"]})
+    for symbol in S.symbols_svg(sheet):  # D87: north arrows, scale bars, revision clouds
+        chrome.walk(ET.fromstring(symbol), {**base, "layer": OVERLAY_LAYERS["marker"]})
     info = json.loads(S.project_info())
     frame = (f'<rect x="{S.MARGIN}" y="{S.MARGIN}" width="{width - 2 * S.MARGIN}" height="{height - 2 * S.MARGIN}" '
              f'fill="none" stroke="#000" stroke-width="0.7"/>')

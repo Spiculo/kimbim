@@ -555,7 +555,13 @@ def _collect(scheme, ctx: _Ctx) -> list[dict]:
             if e.id() not in seen and not e.is_a("IfcTypeObject"):
                 seen.add(e.id())
                 elements.append(e)
-    fields = scheme["fields"]
+    return collect_elements(elements, scheme["fields"], ctx)
+
+
+def collect_elements(elements, fields, ctx: _Ctx | None = None) -> list[dict]:
+    """The field values of these elements (D87's tags use it): one record per element, as _collect."""
+    ctx = ctx or _Ctx()
+    _values_cache.clear()
     wanted_q = {f["name"] for f in fields if f.get("source") == "quantity"} - {"count"}
     records, missing = [], []
     for e in elements:

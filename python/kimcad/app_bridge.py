@@ -849,6 +849,8 @@ from . import documents as _documents  # noqa: E402
 from . import console as _console  # noqa: E402
 from . import drafting as _drafting  # noqa: E402
 from . import underlays as _underlays  # noqa: E402
+from . import symbols as _symbols  # noqa: E402
+from . import tags as _tags  # noqa: E402
 
 _EXPORTS = {
     "authoring": (
@@ -956,6 +958,10 @@ _EXPORTS = {
         "place_legend",
         "move_legend",
         "remove_legend",
+        "place_sheet_symbol",
+        "move_sheet_symbol",
+        "set_sheet_symbol",
+        "remove_sheet_symbol",
     ),
     "editing": (
         "array_elements",
@@ -1065,6 +1071,20 @@ _EXPORTS = {
         "fill_patterns",
         "set_annotation_points",
         "set_drafting_style",
+    ),
+    "symbols": (
+        "add_symbol",
+        "get_true_north",
+        "set_true_north",
+    ),
+    "tags": (
+        "add_tag",
+        "delete_tag_style",
+        "save_tag_style",
+        "set_tag",
+        "tag_all",
+        "tag_styles",
+        "tag_target",
     ),
     "console": (
         "console_help",

@@ -302,10 +302,11 @@ def raw_drawing(guid: str, include_json: str = "", hidden=()) -> dict:
 
 def _drafted(svg: str, drawing) -> str:
     """D84: plans get their level's lines, arcs and fills here, not in the drawing process: the
-    fill patterns and line types are project settings, so they are drawn as they are now."""
-    from . import drafting
+    fill patterns and line types are project settings, so they are drawn as they are now. D87: and
+    their tags, room stamps and symbols (tag styles are settings too); sections their levels."""
+    from . import drafting, tags
 
-    return drafting.add_to_drawing(svg, drawing)
+    return tags.add_to_drawing(drafting.add_to_drawing(svg, drawing), drawing)  # D87: tags, symbols, stamps
 
 
 def generate_drawing(guid: str, include_json: str = "") -> str:

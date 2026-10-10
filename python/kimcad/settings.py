@@ -39,6 +39,7 @@ DEFAULTS = {
     "ids_files": {},  # IDS files by name: their XML, kept in the project so it is versioned (D81)
     "clash_sets": {},  # clash detection sets by name (D81)
     "underlays": [],  # DXF, PDF and image underlays on levels: file, placement, display (D85)
+    "tag_styles": {},  # tag styles by id: the project's own and its edited built-ins (D87)
 }
 UNITS = {"m": 1.0, "cm": 100.0, "mm": 1000.0}
 
@@ -132,6 +133,10 @@ def _error(key: str, value) -> str | None:
         from .schedules import table_error
 
         return table_error(value)
+    if key == "tag_styles":  # D87
+        from .tags import table_error as tag_table_error
+
+        return tag_table_error(value)
     if key in ("selection_criteria", "selection_sets"):
         from . import queries
 

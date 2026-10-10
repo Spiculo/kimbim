@@ -206,7 +206,8 @@ def sheets() -> str:
                 p = _placement(ref)
                 legends.append({"id": _link(ref), "x": p["x"], "y": p["y"], "w": round(lw, 3), "h": round(lh, 3)})
         out.append({"number": _number(sheet), "title": sheet.Name or "", "paper": sheet.Scope or "A1",
-                    "width": w, "height": h, "views": views, "legends": legends})
+                    "width": w, "height": h, "views": views, "legends": legends,
+                    "symbols": _symbol_listing(sheet)})
     return B._dump({"sheets": out})
 
 
@@ -298,7 +299,7 @@ def delete_sheet(number: str) -> str:
         return A._fail("unknown sheet")
 
     def action():
-        for ref in _views(sheet):
+        for ref in _views(sheet) + _legends(sheet) + _symbols(sheet):
             ifcopenshell.api.document.remove_reference(B._model, reference=ref)
         ifcopenshell.api.document.remove_information(B._model, information=sheet)
         return 1
@@ -319,6 +320,8 @@ def _free_spot(sheet, w, h):
         p = _placement(ref)
         lw, lh = _legend_size(sheet)
         taken.append((p["x"], p["y"], lw, lh))
+    for item in _symbol_listing(sheet):  # D87
+        taken.append((item["x"], item["y"], item["w"], item["h"]))
     taken.append((width - MARGIN - TITLE_W, height - MARGIN - TITLE_H, TITLE_W, TITLE_H))
     y = MARGIN + 5
     while y + h <= height - MARGIN:
@@ -520,6 +523,179 @@ def remove_legend(number: str, legend_id: str) -> str:
     return B._dump(B._run(action))
 
 
+# ---------------------------------------------------------------- symbols (D87)
+# North arrows, scale bars and revision clouds on a sheet: references like legends, with their own
+# marker: an id and {"kind", "x", "y" (top-left, mm), "w", "h" (a cloud's size), "text" (a cloud's
+# revision), "drawing" (the placed drawing a scale bar or north arrow belongs to; default the first)}.
+
+SYMBOL = "kimcad:symbol"
+SYMBOL_KINDS = ("north", "scalebar", "cloud")
+
+
+def _symbols(sheet):
+    refs = sheet.DocumentReferences if _x3() else getattr(sheet, "HasDocumentReferences", ())
+    return [r for r in refs or () if (r.Location or "").partition("#")[0] == SYMBOL]
+
+
+def _symbol_data(ref) -> dict:
+    try:
+        data = json.loads(_data(ref) or "{}")
+    except ValueError:
+        data = {}
+    return data if isinstance(data, dict) else {}
+
+
+def _symbol_scale(sheet, data) -> int:
+    views = _views(sheet)
+    ref = next((r for r in views if _link(r) == data.get("drawing")), views[0] if views else None)
+    return _placement(ref)["scale"] if ref is not None else 100
+
+
+def _symbol_geometry(sheet, data):
+    """(geometry in mm with y up from the box's bottom-left, width, height) of a sheet symbol."""
+    from . import symbols as Sy
+
+    kind = data.get("kind")
+    if kind == "north":
+        return Sy.north_arrow((8.0, 8.0), Sy.true_north(), 1.0), 16.0, 22.0
+    if kind == "scalebar":
+        scale = _symbol_scale(sheet, data)
+        geom = Sy.scale_bar((2.0, 6.0), scale, 1.0)
+        width = max(p[0] for c in geom["curves"] for p in c) + 6.0
+        return geom, width, 13.0
+    w, h = float(data.get("w", 60.0)), float(data.get("h", 40.0))
+    return Sy.revision_cloud([(0, 0), (w, 0), (w, h), (0, h)], str(data.get("text") or ""), 2.5, 1.0), w, h
+
+
+def symbols_svg(sheet) -> list:
+    """The sheet's symbols as SVG groups in sheet mm (black, as the sheet's chrome)."""
+    from . import symbols as Sy
+
+    out = []
+    for ref in _symbols(sheet):
+        data = _symbol_data(ref)
+        if data.get("kind") not in SYMBOL_KINDS:
+            continue
+        geom, _w, h = _symbol_geometry(sheet, data)
+        x, y = float(data.get("x", MARGIN)), float(data.get("y", MARGIN))
+        parts = Sy.svg_parts(geom, lambda p, x=x, y=y, h=h: (x + p[0], y + h - p[1]))
+        body = "\n".join(parts).replace('data-fill="pen"', 'fill="#000000"').replace("<text ", '<text fill="#000000" stroke="none" ')
+        out.append(f'<g class="kimcad-sheet-symbol" data-symbol="{data["kind"]}" fill="none" stroke="#000000" '
+                   f'stroke-width="0.25" font-family="sans-serif">\n{body}\n</g>')
+    return out
+
+
+def _symbol_ref(number, symbol_id):
+    sheet = _sheet(number) if B._model is not None else None
+    return (sheet, next((r for r in _symbols(sheet) if _link(r) == symbol_id), None)) if sheet else (None, None)
+
+
+def _symbol_options(options_json):
+    try:
+        o = json.loads(options_json) if options_json else {}
+    except ValueError:
+        return None
+    return o if isinstance(o, dict) else None
+
+
+def place_sheet_symbol(number: str, kind: str, options_json: str = "") -> str:
+    """A north arrow, a scale bar (the scale of the sheet's first drawing, or options.drawing's) or a
+    revision cloud (options: text, w, h in mm) on a sheet; options x, y (top-left mm) or a free spot."""
+    sheet = _sheet(number) if B._model is not None else None
+    if sheet is None:
+        return A._fail("unknown sheet")
+    if kind not in SYMBOL_KINDS:
+        return A._fail(f"unknown sheet symbol {kind}")
+    o = _symbol_options(options_json)
+    if o is None:
+        return A._fail("bad options")
+    data = {"kind": kind}
+    try:
+        if kind == "cloud":
+            data.update(w=float(o.get("w", 60.0)), h=float(o.get("h", 40.0)), text=str(o.get("text") or ""))
+            if data["w"] <= 0 or data["h"] <= 0:
+                return A._fail("bad size")
+        if o.get("drawing"):
+            data["drawing"] = str(o["drawing"])
+        _geom, w, h = _symbol_geometry(sheet, data)
+        if "x" in o and "y" in o:
+            x, y = float(o["x"]), float(o["y"])
+        else:
+            x, y = _free_spot(sheet, w, h)
+    except (TypeError, ValueError):
+        return A._fail("bad options")
+    data.update(x=round(x, 3), y=round(y, 3))
+    symbol_id = ifcopenshell.guid.new()[:8]
+
+    def action():
+        ref = ifcopenshell.api.document.add_reference(B._model, information=sheet)
+        ifcopenshell.api.document.edit_reference(B._model, reference=ref, attributes={
+            _link_attr(): symbol_id, **_data_fields(json.dumps(data), SYMBOL)})
+        return 1
+
+    return B._dump({**B._run(action), "id": symbol_id})
+
+
+def set_sheet_symbol(number: str, symbol_id: str, changes_json: str) -> str:
+    """Move or change a sheet symbol: {x, y, w, h, text, drawing}."""
+    sheet, ref = _symbol_ref(number, symbol_id)
+    if ref is None:
+        return A._fail("the symbol is not on that sheet")
+    o = _symbol_options(changes_json)
+    if o is None:
+        return A._fail("bad input")
+    data = _symbol_data(ref)
+    try:
+        for k in ("x", "y", "w", "h"):
+            if k in o:
+                data[k] = round(float(o[k]), 3)
+    except (TypeError, ValueError):
+        return A._fail("bad input")
+    if data.get("w", 1) <= 0 or data.get("h", 1) <= 0:
+        return A._fail("bad size")
+    for k in ("text", "drawing"):
+        if k in o:
+            data[k] = str(o[k] or "")
+
+    def action():
+        for name, value in _data_fields(json.dumps(data), SYMBOL).items():
+            setattr(ref, name, value)
+        return 1
+
+    return B._dump(B._run(action))
+
+
+def move_sheet_symbol(number: str, symbol_id: str, x, y) -> str:
+    try:
+        return set_sheet_symbol(number, symbol_id, json.dumps({"x": float(x), "y": float(y)}))
+    except (TypeError, ValueError):
+        return A._fail("bad position")
+
+
+def remove_sheet_symbol(number: str, symbol_id: str) -> str:
+    _sheet_, ref = _symbol_ref(number, symbol_id)
+    if ref is None:
+        return A._fail("the symbol is not on that sheet")
+
+    def action():
+        ifcopenshell.api.document.remove_reference(B._model, reference=ref)
+        return 1
+
+    return B._dump(B._run(action))
+
+
+def _symbol_listing(sheet) -> list:
+    out = []
+    for ref in _symbols(sheet):
+        data = _symbol_data(ref)
+        if data.get("kind") not in SYMBOL_KINDS:
+            continue
+        _geom, w, h = _symbol_geometry(sheet, data)
+        out.append({"id": _link(ref), "kind": data["kind"], "x": float(data.get("x", MARGIN)),
+                    "y": float(data.get("y", MARGIN)), "w": round(w, 3), "h": round(h, 3), "text": data.get("text", "")})
+    return out
+
+
 # ---------------------------------------------------------------- composing the sheet
 
 def _esc(value: str) -> str:
@@ -601,6 +777,7 @@ def sheet_svg(number: str) -> str:
         for ref in legend_refs:
             p = _placement(ref)
             parts.append(f'<g class="kimcad-legend" transform="translate({p["x"]:.3f} {p["y"]:.3f})">\n{body}\n</g>')
+    parts += symbols_svg(sheet)  # D87: north arrows, scale bars, revision clouds
     frame = [f'<rect x="{MARGIN}" y="{MARGIN}" width="{width - 2 * MARGIN}" height="{height - 2 * MARGIN}" '
              f'fill="none" stroke="#000" stroke-width="0.7"/>']
     svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}mm" height="{height}mm" viewBox="0 0 {width} {height}">\n'

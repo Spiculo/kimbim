@@ -285,14 +285,19 @@ def rooms(storey_guid: str) -> str:
     storey = A._by_guid(storey_guid) if B._model is not None else None
     out = []
     if storey is not None:
-        for space in _rooms(storey):
-            pts = _outline(space)
-            if not pts:
-                continue
-            # From the outline (what the stamp shows; the room is re-fitted to it), in metres.
+        from . import tags
+
+        spaces = [(space, _outline(space)) for space in _rooms(storey)]
+        spaces = [(space, pts) for space, pts in spaces if pts]
+        template = tags.styles()["room"].get("template", "")
+        stamps = tags.texts([(space, template) for space, _ in spaces]) if spaces else {}
+        for space, pts in spaces:
+            # From the outline (what the stamp shows; the room is re-fitted to it), in metres. The stamp's
+            # text is the room stamp tag style's (D87).
             out.append({"guid": space.GlobalId, "number": space.Name or "", "name": space.LongName or "",
                         "area": round(abs(_signed_area(pts)), 6), "perimeter": round(_perimeter(pts), 6),
-                        "points": [[round(px, 6), round(py, 6)] for px, py in pts], "label": _stamp_point(space, pts)})
+                        "points": [[round(px, 6), round(py, 6)] for px, py in pts], "label": _stamp_point(space, pts),
+                        "stamp": stamps[space.GlobalId + "|" + template]})
     out.sort(key=lambda r: r["number"])
     return B._dump({"rooms": out})
 
