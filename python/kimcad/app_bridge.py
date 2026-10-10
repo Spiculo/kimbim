@@ -262,37 +262,55 @@ AFTER_ACTION: list = []
 def _run(action) -> dict:
     """Run `action()` as one undoable transaction. It returns the number of changed elements, or
     (count, geometry_changed_guids, geometry_removed_guids) when it touched shapes."""
-    global _next_id, _base_id, _inconsistent
-    if _inconsistent:
-        raise RuntimeError(INCONSISTENT)
-    _model.begin_transaction()
+    _begin()
     try:
         changed = action()
         count, geo_changed, geo_removed = changed if isinstance(changed, tuple) else (changed, [], [])
-        # Follow-ups inside the same undo step (e.g. rooms re-fitted to walls that moved, Slice 18).
-        for hook in AFTER_ACTION:
-            geo_changed = list(geo_changed) + list(hook(list(geo_changed), list(geo_removed)) or ())
-        changed = (count, geo_changed, geo_removed)
+        changed = _follow_ups(count, geo_changed, geo_removed)
     except BaseException as failure:
-        # Roll back a half-applied action so the model and the history stay as they were.
-        _model.end_transaction()
-        try:
-            _model.undo()
-            _model.future.pop()
-        except Exception:
-            # ifcopenshell could not undo the partial transaction: say so, never carry on silently.
-            _inconsistent = True
-            _ids.clear()
-            _future_ids.clear()
-            _deltas.clear()
-            _future_deltas.clear()
-            _model.history.clear()
-            _model.future.clear()
-            _base_id = -1  # differs from any saved state: the model counts as changed
-            raise RuntimeError(INCONSISTENT) from failure
+        _abort(failure)
         raise
+    return _commit(*changed)
+
+
+def _begin() -> None:
+    """Open the transaction of one undo step (`_run`, and the console's `edit()`)."""
+    if _inconsistent:
+        raise RuntimeError(INCONSISTENT)
+    _model.begin_transaction()
+
+
+def _follow_ups(count, geo_changed, geo_removed) -> tuple:
+    # Follow-ups inside the same undo step (e.g. rooms re-fitted to walls that moved, Slice 18).
+    for hook in AFTER_ACTION:
+        geo_changed = list(geo_changed) + list(hook(list(geo_changed), list(geo_removed)) or ())
+    return (count, geo_changed, geo_removed)
+
+
+def _abort(failure: BaseException) -> None:
+    """Roll back a half-applied step so the model and the history stay as they were. The caller re-raises."""
+    global _base_id, _inconsistent
     _model.end_transaction()
-    count, geo_changed, geo_removed = changed if isinstance(changed, tuple) else (changed, [], [])
+    try:
+        _model.undo()
+        _model.future.pop()
+    except Exception:
+        # ifcopenshell could not undo the partial transaction: say so, never carry on silently.
+        _inconsistent = True
+        _ids.clear()
+        _future_ids.clear()
+        _deltas.clear()
+        _future_deltas.clear()
+        _model.history.clear()
+        _model.future.clear()
+        _base_id = -1  # differs from any saved state: the model counts as changed
+        raise RuntimeError(INCONSISTENT) from failure
+
+
+def _commit(count, geo_changed, geo_removed) -> dict:
+    """Close the step's transaction and record it in the undo history."""
+    global _next_id, _base_id
+    _model.end_transaction()
     _ids.append(_next_id)
     _deltas.append(list(dict.fromkeys([*geo_changed, *geo_removed])))
     _next_id += 1
