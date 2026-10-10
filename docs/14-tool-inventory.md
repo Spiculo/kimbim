@@ -172,11 +172,11 @@ release notes, so check before relying on a single cell.
 
 | Tool | Has | KIMCAD | Pri | Notes |
 |------|-----|--------|-----|-------|
-| Library browser (thumbnails, search, categories) | all | ⬜ | P0 | |
-| Bundled library: furniture, sanitary, kitchen, lighting, people, trees, cars | all | ⬜ | P0 | |
-| Place a library object | all | ⬜ | P0 | |
+| Library browser (thumbnails, search, categories) | all | ✅ | P0 | D86: Library panel |
+| Bundled library: furniture, sanitary, kitchen, lighting, people, trees, cars | all | 🟡 | P0 | D86: 21 parametric objects generated in code; no lighting yet |
+| Place a library object | all | ✅ | P0 | D86: Object tool (Shift+O), Tab turns |
 | Parametric object authoring | AC RV VW | ⬜ | new | Archicad GDL, Revit Family Editor, Vectorworks plug-in objects. Bonsai uses IFC types plus Python |
-| Office libraries (shared folder or repo) | AC RV VW | ⬜ | P1 | |
+| Office libraries (shared folder or repo) | AC RV VW | 🟡 | P1 | D86: a folder of Python objects and IFC type files |
 | Online object catalogues (BIMobject and others) | AC RV VW | 🔮 | new | |
 | Paste between projects (with types and materials) | all | ⬜ | P1 | |
 

@@ -245,6 +245,23 @@ the reference, Revit's Tag by category for Tag all).
 10. Angle dimensions show two decimals of a degree ("45.00°"); radii "R 1.50" and diameters "Ø 3.00".
     Acceptable?
 
+## For the architect: object library (asked 2026-10-10, waiting)
+
+Built per D86 (Archicad's Library and Object tool as the reference; objects generated in code like GDL).
+
+1. **Editing a placed object's parameter** changes only the selected objects (Archicad); if they are every
+   placement of their type, the type changes in place. Revit would instead ask whether to edit the type
+   (all placements) or duplicate it. Is changing only the selection what you expect?
+2. **Origin and front**: an object's origin is its left front corner, its front at the side you face in
+   plan (Archicad's convention). Would a centre origin suit tables and beds better?
+3. **Plan symbols** are drawn in the object's projection pen; wall cabinets (above the cut) are crossed,
+   not dashed. Which symbols does your office draw differently (WC, washbasin, wardrobe, beds)?
+4. **Live plan view**: the plan tab shows the objects' 3D bodies seen from above; floor plan drawings and
+   sheets show the 2D symbol. Do you need the symbol in the plan tab too?
+5. **Shortcut** Shift+O for the Object tool, Tab to turn 90 degrees while placing. Acceptable?
+6. Which objects are missing for a first release (lighting, doors' furniture, office desks, parking
+   spaces, plants in pots)?
+
 ## Needs a spike
 
 These are listed in [07-roadmap.md](07-roadmap.md#spikes-do-first-each-is-small-throwaway-and-documented).
