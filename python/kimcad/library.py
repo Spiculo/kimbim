@@ -28,6 +28,7 @@ import os
 import pathlib
 
 PSET = "KIMCAD_LibraryObject"
+PARAMETERS = "Parameters"  # the Properties panel group (its edits go to set_object_parameter)
 CATEGORIES = (("furniture", "Furniture"), ("sanitary", "Sanitary"), ("kitchen", "Kitchen"),
               ("site", "People, trees and cars"), ("office", "Office library"))
 CIRCLE_POINTS = 16  # ellipses and arcs in plan symbols and prism outlines

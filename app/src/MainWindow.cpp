@@ -935,8 +935,10 @@ bool MainWindow::applyPropertyEdit(const QString& pset, const QString& prop, con
         }
         return all;
     }
-    const QJsonObject r = pset == QLatin1String("Dimensions")
-        ? bridge("set_dimension", {jsonList(m_selection), prop,
+    const bool dimension = pset == QLatin1String("Dimensions");
+    const bool parameter = pset == QLatin1String("Parameters"); // D86: a library object's (its type follows)
+    const QJsonObject r = dimension || parameter
+        ? bridge(parameter ? "set_object_parameter" : "set_dimension", {jsonList(m_selection), prop,
               value.isDouble() ? QString::number(value.toDouble(), 'g', 17) : value.toString()})
         : bridge("set_property", {jsonList(m_selection), pset, prop, jsonValue(value)});
     if (!r.value("ok").toBool())

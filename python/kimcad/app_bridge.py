@@ -755,6 +755,21 @@ def properties_multi(guids_json: str) -> str:
             group[name] = {"value": None if varies else values[0], "varies": varies, "ifc_type": "IfcLengthMeasure",
                            "editable": all(ed for _, ed in present), "source": "dimension", "type_value": None}
         psets = {authoring.DIMENSIONS: group, **psets}
+    # D86: a library object's parameters, edited through set_object_parameter (its type follows).
+    from . import library
+
+    per_params = library.parameters_of(elements)
+    if all(p is not None for p in per_params):
+        group = {}
+        for label, value, kind in per_params[0]:
+            present = [next((v for n, v, _ in params if n == label), _MISSING) for params in per_params]
+            varies = any(v is _MISSING or v != present[0] for v in present)
+            group[label] = {"value": None if varies else present[0], "varies": varies,
+                            "ifc_type": "IfcLengthMeasure" if kind == "length" else "IfcInteger",
+                            "editable": True, "source": "dimension", "type_value": None}
+        if group:
+            psets = {**{k: v for k, v in psets.items() if k == authoring.DIMENSIONS}, library.PARAMETERS: group,
+                     **{k: v for k, v in psets.items() if k != authoring.DIMENSIONS}}
     from . import renovation
 
     statuses = [renovation.status_of(e) for e in elements if not e.is_a("IfcAnnotation")]

@@ -586,12 +586,92 @@ def markers(f, to_paper, z):
     return out
 
 
+LIBRARY_PSET = "KIMCAD_LibraryObject"  # D86: library objects draw their plan symbol in plans
+
+
+def _plan_symbol_map(t):
+    """The type's plan symbol (Plan context, Annotation) representation map, or None."""
+    for rep_map in getattr(t, "RepresentationMaps", None) or ():
+        rep = rep_map.MappedRepresentation
+        context = rep.ContextOfItems
+        if rep.RepresentationIdentifier == "Annotation" and getattr(context, "ContextType", None) == "Plan":
+            return rep_map
+    return None
+
+
+def symbol_objects(f) -> dict:
+    """Library objects (D86) whose type has a plan symbol: GlobalId -> (element, representation map)."""
+    out = {}
+    for t in f.by_type("IfcTypeProduct"):
+        if not any(getattr(ps, "Name", None) == LIBRARY_PSET for ps in (getattr(t, "HasPropertySets", None) or ())):
+            continue
+        rep_map = _plan_symbol_map(t)
+        if rep_map is None:
+            continue
+        for e in ifcopenshell.util.element.get_types(t):
+            if e.ObjectPlacement is not None:
+                out[e.GlobalId] = (e, rep_map)
+    return out
+
+
+def _curves(item):
+    """2D curves of a symbol item: ("poly", [(x, y)...]) or ("circle", cx, cy, r), map coordinates."""
+    if item.is_a("IfcGeometricSet"):  # and IfcGeometricCurveSet
+        for element in item.Elements:
+            yield from _curves(element)
+    elif item.is_a("IfcPolyline"):
+        yield "poly", [tuple(float(c) for c in p.Coordinates[:2]) for p in item.Points]
+    elif item.is_a("IfcIndexedPolyCurve"):
+        pts = [tuple(float(c) for c in p[:2]) for p in item.Points.CoordList]
+        yield "poly", pts
+    elif item.is_a("IfcCircle"):
+        loc = item.Position.Location.Coordinates
+        yield "circle", float(loc[0]), float(loc[1]), float(item.Radius)
+    elif item.is_a("IfcTrimmedCurve") and item.BasisCurve.is_a("IfcCircle"):
+        trims = [next((t for t in trim if getattr(t, "is_a", None) and t.is_a("IfcCartesianPoint")), None)
+                 for trim in (item.Trim1, item.Trim2)]
+        if all(trims):
+            yield "poly", [tuple(float(c) for c in t.Coordinates[:2]) for t in trims]
+
+
+def object_symbols(storey, to_paper, include=None) -> list:
+    """The plan symbols of the library objects on the story, one group per element (styled as its
+    projection lines by graphics.style_svg)."""
+    f = storey.file
+    unit = ifcopenshell.util.unit.calculate_unit_scale(f)
+    out = []
+    for guid, (e, rep_map) in symbol_objects(f).items():
+        if ifcopenshell.util.element.get_container(e) != storey or (include is not None and guid not in include):
+            continue
+        m = ifcopenshell.util.placement.get_local_placement(e.ObjectPlacement)
+        if rep_map.MappingOrigin is not None and rep_map.MappingOrigin.is_a("IfcAxis2Placement3D"):
+            m = m @ ifcopenshell.util.placement.get_axis2placement(rep_map.MappingOrigin)
+        z = m[2, 3] * unit
+
+        def paper(x, y):
+            w = m @ np.array([x, y, 0.0, 1.0])
+            return to_paper(w[0] * unit, w[1] * unit, z)
+
+        parts = []
+        for item in rep_map.MappedRepresentation.Items:
+            for c in _curves(item):
+                if c[0] == "poly" and len(c[1]) >= 2:
+                    parts.append(_path([paper(x, y) for x, y in c[1]]))
+                elif c[0] == "circle":
+                    cx, cy = paper(c[1], c[2])
+                    ex, ey = paper(c[1] + c[3], c[2])
+                    parts.append(f'<circle cx="{_f(cx)}" cy="{_f(cy)}" r="{_f(math.hypot(ex - cx, ey - cy))}" fill="none"/>')
+        if parts:
+            out += [f'<g class="projection" data-kind="object" ifc:guid="{guid}">', *parts, "</g>"]
+    return out
+
+
 def _tagged(kind: str, parts: list) -> list:
     """Overlay parts grouped by what they are, so graphics.style_svg can style them (D73)."""
     return [f'<g data-kind="{kind}">', *parts, "</g>"] if parts else []
 
 
-def overlay(f, drawing, s, svg: str) -> str:
+def overlay(f, drawing, s, svg: str, include=None) -> str:
     to_paper = paper_mapping(svg)
     if to_paper is None:
         return svg
@@ -605,6 +685,7 @@ def overlay(f, drawing, s, svg: str) -> str:
             for e in f.by_type("IfcWindow"):
                 if ifcopenshell.util.element.get_container(e) == storey and e.ObjectPlacement is not None:
                     parts += _tagged("window", window_symbol(e, to_paper))
+            parts += object_symbols(storey, to_paper, include)  # D86, tagged per element
             # Room stamps are drawn with the tags on every request (tags.add_to_drawing, D87): their text
             # is the room stamp tag style's, a project setting this process does not see.
             parts += plan_annotations(storey, to_paper)  # tags each annotation (guid, pen) itself
@@ -656,7 +737,8 @@ def generate(f, drawing, include=None) -> tuple[str, dict]:
     products = drawn_products(f)
     if s is not None and s["kind"] == "plan":
         storey = _storey(drawing, s)
-        products = [p for p in products if ifcopenshell.util.element.get_container(p) == storey]
+        symbols = symbol_objects(f)  # D86: drawn from their plan symbol (overlay), not cut
+        products = [p for p in products if ifcopenshell.util.element.get_container(p) == storey and p.GlobalId not in symbols]
     if include is not None:
         wanted = set(include)
         products = [p for p in products if p.GlobalId in wanted]
@@ -686,7 +768,7 @@ def generate(f, drawing, include=None) -> tuple[str, dict]:
     t3 = time.perf_counter()
     svg = buffer.get_value()
     if s is not None:
-        svg = overlay(f, drawing, s, svg)
+        svg = overlay(f, drawing, s, svg, set(include) if include is not None else None)
     svg = crop(svg)
     return svg, {"elements": count, "prepare_s": round(t1 - t0, 3), "geometry_s": round(t2 - t1, 3),
                  "hlr_s": round(t3 - t2, 3), "total_s": round(time.perf_counter() - t0, 3)}
