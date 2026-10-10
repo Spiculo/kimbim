@@ -278,7 +278,7 @@ private slots:
         const QHash<QString, QStringList> expected = {
             {"3d", {"actionWallTool", "actionSlabTool", "actionColumnTool", "actionBeamTool", "actionDoorTool",
                        "actionWindowTool", "actionStairTool", "actionRoofTool", "actionRoomTool",
-                       "actionSlabOpeningTool", "actionPlaceModelTool"}},
+                       "actionSlabOpeningTool", "actionPlaceModelTool", "actionObjectTool"}},
             {"plane", {"actionTextTool", "actionDimensionTool", "actionLeaderTool", "actionMarkTool", "actionGridTool",
                           "actionLineTool", "actionPolylineTool", "actionArcTool", "actionRectangleTool", "actionFillTool",
                           "actionTagTool", "actionAngleDimensionTool", "actionRadialDimensionTool", "actionLevelDimensionTool",
