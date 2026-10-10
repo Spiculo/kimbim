@@ -796,181 +796,250 @@ def _write_test_model(path: str) -> str:
     return _dump({"ok": True, "path": path})
 
 
-# Modeling (M3) lives in its own module; re-exported here because the app calls this module.
-from .authoring import (  # noqa: E402,F401
-    add_grid_axis,
-    add_slab_opening,
-    add_storey,
-    beam_types,
-    column_types,
-    copy_to_storey,
-    create_model,
-    explode_instance,
-    instance_members,
-    model_elements,
-    models,
-    place_model,
-    update_model_instances,
-    create_beam,
-    create_column,
-    create_slab,
-    create_stair,
-    create_wall,
-    delete_elements,
-    edit_opening,
-    insert_opening,
-    move_elements,
-    new_project,
-    opening_types,
-    rotate_elements,
-    set_wall_axis,
-    set_dimension,
-    set_wall_height,
-    slide_openings,
-    slab_outline_from_walls,
-    slab_types,
-    snap_data,
-    storeys,
-    wall_types,
-)
-from .versioning import (  # noqa: E402,F401
-    before_after,
-    combine_options,
-    combine_preview,
-    compare,
-    create_milestone,
-    create_option,
-    delete_milestone,
-    delete_option,
-    discard_changes,
-    element_history,
-    milestones,
-    enable_versioning,
-    history,
-    open_project,
-    options,
-    project_state,
-    save_version,
-    switch_option,
-    version_changes,
-)
-from .layers import (  # noqa: E402,F401
-    assign_layer,
-    create_layer,
-    delete_layer,
-    delete_view,
-    layer_members,
-    layers,
-    rename_layer,
-    save_view,
-    set_active_layer,
-    views,
-)
-from .annotations import (  # noqa: E402,F401
-    add_annotation,
-    annotations,
-    set_annotation_pen,
-    set_annotation_size,
-    set_annotation_text,
-)
-from .drawings import (  # noqa: E402,F401
-    create_drawings,
-    create_elevation,
-    create_elevations,
-    create_plan,
-    create_section,
-    delete_drawing,
-    drawings,
-    generate_drawing,
-    rename_drawing,
-    set_drawing_depth,
-)
-from .sheets import (  # noqa: E402,F401
-    add_sheet,
-    delete_sheet,
-    edit_sheet,
-    export_sheet_svg,
-    move_placed,
-    place_drawing,
-    project_info,
-    remove_placed,
-    set_placed_scale,
-    set_project_info,
-    set_sheet_purpose,
-    sheet_svg,
-    sheets,
-    place_legend,
-    move_legend,
-    remove_legend,
-)
-from .editing import (  # noqa: E402,F401
-    array_elements,
-    copy_elements,
-    duplicate_elements,
-    mirror_elements,
-    offset_elements,
-    slab_outline,
-)
-from .modify import (  # noqa: E402,F401
-    join_elements,
-    modify_targets,
-    split_element,
-    trim_corner,
-    trim_extend,
-    unjoin_elements,
-)
-from .rooms import create_room, edit_room, export_room_schedule, room_schedule, rooms  # noqa: E402,F401
-from .roofs import attach_walls_to_roof, create_roof, detach_walls_from_roof, roof_info  # noqa: E402,F401
-from .settings import project_settings, set_project_settings  # noqa: E402,F401
-from .queries import find_elements, query_choices, selection_set_members, similar_elements  # noqa: E402,F401
-from .levels import (  # noqa: E402,F401
-    delete_storey,
-    edit_storeys,
-    insert_storey,
-    levels_table,
-    rename_storey,
-    set_storey_elevation,
-    set_storey_shown,
-)
-from .checks import _write_sample_house, cancel_checks, export_ids_report, read_ids_file, run_check  # noqa: E402,F401
-from .renovation import mark_unmarked, set_status, set_status_for_new, unmarked  # noqa: E402,F401
-from .graphics import (  # noqa: E402,F401
-    graphics_state,
-    graphics_tables,
-    set_current_pen,
-    set_graphics,
-    set_purpose,
-)
-from .schedules import (  # noqa: E402,F401
-    delete_schedule_scheme,
-    export_schedule,
-    save_schedule_scheme,
-    schedule,
-    schedule_classes,
-    schedule_fields,
-    schedule_schemes,
-    set_schedule_value,
-)
-from .documents import (  # noqa: E402,F401
-    clear_recovery,
-    close_document,
-    discard_recovery,
-    document_state,
-    export_ifc,
-    import_ifc,
-    kim_beside,
-    new_from_template,
-    open_folder,
-    open_kim,
-    recover,
-    recoveries,
-    save_as_folder,
-    save_as_ifc,
-    save_as_kim,
-    save_document,
-    save_template,
-    set_app_paths,
-    set_author,
-    templates,
-    write_recovery,
-)
+# The app calls this module, so the feature modules' bridge functions are re-exported here. Those
+# modules import this one (their `B`), so the names resolve lazily (PEP 562 module __getattr__):
+# importing any kimcad module first never meets a half-initialized one. The modules are still
+# imported eagerly, so their AFTER_ACTION hooks register as before.
+from . import authoring as _authoring  # noqa: E402
+from . import versioning as _versioning  # noqa: E402
+from . import layers as _layers  # noqa: E402
+from . import annotations as _annotations  # noqa: E402
+from . import drawings as _drawings  # noqa: E402
+from . import sheets as _sheets  # noqa: E402
+from . import editing as _editing  # noqa: E402
+from . import modify as _modify  # noqa: E402
+from . import rooms as _rooms  # noqa: E402
+from . import roofs as _roofs  # noqa: E402
+from . import settings as _settings  # noqa: E402
+from . import queries as _queries  # noqa: E402
+from . import levels as _levels  # noqa: E402
+from . import checks as _checks  # noqa: E402
+from . import renovation as _renovation  # noqa: E402
+from . import graphics as _graphics  # noqa: E402
+from . import schedules as _schedules  # noqa: E402
+from . import documents as _documents  # noqa: E402
+
+_EXPORTS = {
+    "authoring": (
+        "add_grid_axis",
+        "add_slab_opening",
+        "add_storey",
+        "beam_types",
+        "column_types",
+        "copy_to_storey",
+        "create_model",
+        "explode_instance",
+        "instance_members",
+        "model_elements",
+        "models",
+        "place_model",
+        "update_model_instances",
+        "create_beam",
+        "create_column",
+        "create_slab",
+        "create_stair",
+        "create_wall",
+        "delete_elements",
+        "edit_opening",
+        "insert_opening",
+        "move_elements",
+        "new_project",
+        "opening_types",
+        "rotate_elements",
+        "set_wall_axis",
+        "set_dimension",
+        "set_wall_height",
+        "slide_openings",
+        "slab_outline_from_walls",
+        "slab_types",
+        "snap_data",
+        "storeys",
+        "wall_types",
+    ),
+    "versioning": (
+        "before_after",
+        "combine_options",
+        "combine_preview",
+        "compare",
+        "create_milestone",
+        "create_option",
+        "delete_milestone",
+        "delete_option",
+        "discard_changes",
+        "element_history",
+        "milestones",
+        "enable_versioning",
+        "history",
+        "open_project",
+        "options",
+        "project_state",
+        "save_version",
+        "switch_option",
+        "version_changes",
+    ),
+    "layers": (
+        "assign_layer",
+        "create_layer",
+        "delete_layer",
+        "delete_view",
+        "layer_members",
+        "layers",
+        "rename_layer",
+        "save_view",
+        "set_active_layer",
+        "views",
+    ),
+    "annotations": (
+        "add_annotation",
+        "annotations",
+        "set_annotation_pen",
+        "set_annotation_size",
+        "set_annotation_text",
+    ),
+    "drawings": (
+        "create_drawings",
+        "create_elevation",
+        "create_elevations",
+        "create_plan",
+        "create_section",
+        "delete_drawing",
+        "drawings",
+        "generate_drawing",
+        "rename_drawing",
+        "set_drawing_depth",
+    ),
+    "sheets": (
+        "add_sheet",
+        "delete_sheet",
+        "edit_sheet",
+        "export_sheet_svg",
+        "move_placed",
+        "place_drawing",
+        "project_info",
+        "remove_placed",
+        "set_placed_scale",
+        "set_project_info",
+        "set_sheet_purpose",
+        "sheet_svg",
+        "sheets",
+        "place_legend",
+        "move_legend",
+        "remove_legend",
+    ),
+    "editing": (
+        "array_elements",
+        "copy_elements",
+        "duplicate_elements",
+        "mirror_elements",
+        "offset_elements",
+        "slab_outline",
+    ),
+    "modify": (
+        "join_elements",
+        "modify_targets",
+        "split_element",
+        "trim_corner",
+        "trim_extend",
+        "unjoin_elements",
+    ),
+    "rooms": (
+        "create_room",
+        "edit_room",
+        "export_room_schedule",
+        "room_schedule",
+        "rooms",
+    ),
+    "roofs": (
+        "attach_walls_to_roof",
+        "create_roof",
+        "detach_walls_from_roof",
+        "roof_info",
+    ),
+    "settings": (
+        "project_settings",
+        "set_project_settings",
+    ),
+    "queries": (
+        "find_elements",
+        "query_choices",
+        "selection_set_members",
+        "similar_elements",
+    ),
+    "levels": (
+        "delete_storey",
+        "edit_storeys",
+        "insert_storey",
+        "levels_table",
+        "rename_storey",
+        "set_storey_elevation",
+        "set_storey_shown",
+    ),
+    "checks": (
+        "_write_sample_house",
+        "cancel_checks",
+        "export_ids_report",
+        "read_ids_file",
+        "run_check",
+    ),
+    "renovation": (
+        "mark_unmarked",
+        "set_status",
+        "set_status_for_new",
+        "unmarked",
+    ),
+    "graphics": (
+        "graphics_state",
+        "graphics_tables",
+        "set_current_pen",
+        "set_graphics",
+        "set_purpose",
+    ),
+    "schedules": (
+        "delete_schedule_scheme",
+        "export_schedule",
+        "save_schedule_scheme",
+        "schedule",
+        "schedule_classes",
+        "schedule_fields",
+        "schedule_schemes",
+        "set_schedule_value",
+    ),
+    "documents": (
+        "clear_recovery",
+        "close_document",
+        "discard_recovery",
+        "document_state",
+        "export_ifc",
+        "import_ifc",
+        "kim_beside",
+        "new_from_template",
+        "open_folder",
+        "open_kim",
+        "recover",
+        "recoveries",
+        "save_as_folder",
+        "save_as_ifc",
+        "save_as_kim",
+        "save_document",
+        "save_template",
+        "set_app_paths",
+        "set_author",
+        "templates",
+        "write_recovery",
+    ),
+}
+_EXPORTED = {name: module for module, names in _EXPORTS.items() for name in names}
+del annotations  # `from __future__ import annotations` bound it; the bridge function resolves lazily
+
+
+def __getattr__(name: str):
+    module = _EXPORTED.get(name)
+    if module is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(globals()["_" + module], name)
+    globals()[name] = value  # later lookups skip this function
+    return value
+
+
+def __dir__():
+    return sorted({*globals(), *_EXPORTED})
