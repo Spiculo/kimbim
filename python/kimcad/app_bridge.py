@@ -847,6 +847,7 @@ from . import graphics as _graphics  # noqa: E402
 from . import schedules as _schedules  # noqa: E402
 from . import documents as _documents  # noqa: E402
 from . import console as _console  # noqa: E402
+from . import library as _library  # noqa: E402
 from . import drafting as _drafting  # noqa: E402
 from . import underlays as _underlays  # noqa: E402
 from . import symbols as _symbols  # noqa: E402
@@ -1100,6 +1101,13 @@ _EXPORTS = {
         "underlay_probe",
         "underlay_raster",
         "underlays",
+    ),
+    "library": (
+        "library_objects",
+        "object_symbol",
+        "place_object",
+        "set_library_paths",
+        "set_object_parameter",
     ),
 }
 _EXPORTED = {name: module for module, names in _EXPORTS.items() for name in names}
