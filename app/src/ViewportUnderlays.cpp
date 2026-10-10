@@ -90,27 +90,37 @@ public:
     {
         if (m_image.isNull() || m_u.size.isEmpty())
             return;
+        // Faded towards the background on the CPU, as the linework is: an opaque texture needs no
+        // transparency sorting, and the model is drawn over it anyway.
         QImage img = m_image.convertToFormat(QImage::Format_RGBA8888);
+        const double a = std::clamp(m_u.opacity, 0.05, 1.0);
+        if (a < 0.999) {
+            const int br = kBackground.red(), bg = kBackground.green(), bb = kBackground.blue();
+            for (int y = 0; y < img.height(); ++y) {
+                uchar* p = img.scanLine(y);
+                for (int x = 0; x < img.width(); ++x, p += 4) {
+                    p[0] = uchar(p[0] * a + br * (1 - a));
+                    p[1] = uchar(p[1] * a + bg * (1 - a));
+                    p[2] = uchar(p[2] * a + bb * (1 - a));
+                    p[3] = 255;
+                }
+            }
+        }
         Handle(Image_PixMap) pix = new Image_PixMap();
         if (!pix->InitTrash(Image_Format_RGBA, size_t(img.width()), size_t(img.height())))
             return;
-        pix->SetTopDown(true);
+        pix->SetTopDown(false); // rows bottom-up, as OpenGL takes them
         for (int y = 0; y < img.height(); ++y)
-            std::memcpy(pix->ChangeRow(size_t(y)), img.constScanLine(y), size_t(img.width()) * 4);
+            std::memcpy(pix->ChangeData() + pix->SizeRowBytes() * size_t(img.height() - 1 - y), img.constScanLine(y), size_t(img.width()) * 4);
         Handle(Graphic3d_Texture2D) texture = new Graphic3d_Texture2D(pix);
-        texture->EnableModulate(); // the material's alpha (opacity) multiplies the texture
         texture->DisableRepeat();
-        texture->EnableSmooth();
+        texture->GetParams()->SetFilter(Graphic3d_TOTF_TRILINEAR);
+        texture->SetMipmapsGeneration(true); // a page shown smaller than its pixels stays legible
         Handle(Graphic3d_AspectFillArea3d) aspect = new Graphic3d_AspectFillArea3d();
         aspect->SetInteriorStyle(Aspect_IS_SOLID);
         aspect->SetShadingModel(Graphic3d_TypeOfShadingModel_Unlit);
         aspect->SetDistinguishOff();
-        Graphic3d_MaterialAspect material(Graphic3d_NameOfMaterial_UserDefined);
-        material.SetColor(Quantity_NOC_WHITE);
-        material.SetTransparency(float(1.0 - std::clamp(m_u.opacity, 0.05, 1.0)));
-        aspect->SetFrontMaterial(material);
-        aspect->SetBackMaterial(material);
-        aspect->SetInteriorColor(Quantity_NOC_WHITE);
+        aspect->SetInteriorColor(Quantity_NOC_WHITE); // unlit: white times the texture
         aspect->SetTextureSet(new Graphic3d_TextureSet(Handle(Graphic3d_TextureMap)(texture)));
         aspect->SetTextureMapOn();
         aspect->SetEdgeOff();

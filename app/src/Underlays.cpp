@@ -33,6 +33,7 @@
 #include <QMenu>
 
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 
 namespace kimcad {

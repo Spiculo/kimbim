@@ -333,6 +333,24 @@ int runSelfTest(const SelfTestOptions& options)
         window.findChild<QAction*>(QStringLiteral("actionLinesOnly"))->setChecked(true);
     if (options.planView)
         window.findChild<QAction*>(QStringLiteral("actionPlanView"))->trigger();
+    QJsonObject underlay;
+    if (!options.underlay.isEmpty()) { // D85
+        const QStringList parts = options.underlay.split(QLatin1Char(';'));
+        QJsonObject o;
+        if (parts.size() > 1)
+            o.insert("opacity", parts[1].toDouble());
+        if (parts.size() > 3) {
+            o.insert("x", parts[2].toDouble());
+            o.insert("y", parts[3].toDouble());
+        }
+        QElapsedTimer t;
+        t.start();
+        const QJsonObject r = window.placeUnderlay(parts[0], o);
+        underlay = QJsonObject{{"ok", r.value("ok").toBool()}, {"error", r.value("error").toString()}, {"ms", double(t.elapsed())},
+            {"shown", window.viewport()->underlayCount()}, {"segments", double(window.viewport()->underlaySegmentCount())}};
+        if (window.viewport()->isPlanView())
+            window.viewport()->fitAll();
+    }
     // D76: perspective and preset views through their menu actions, the turn played to its end.
     QJsonObject navigation;
     if (options.perspective) {
@@ -728,6 +746,8 @@ int runSelfTest(const SelfTestOptions& options)
             QApplication::processEvents();
         result.insert(QStringLiteral("console_output"), panel->outputText());
     }
+    if (!underlay.isEmpty())
+        result.insert(QStringLiteral("underlay"), underlay);
     if (!options.screenshot.isEmpty())
         takeScreenshots(window, options.screenshot, &result);
     return report(result);

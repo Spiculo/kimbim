@@ -61,6 +61,10 @@ int main(int argc, char* argv[])
     parser.addOption(drawWalls);
     QCommandLineOption planView(QStringLiteral("plan-view"), QStringLiteral("Self-test: switch to the plan view."));
     parser.addOption(planView);
+    QCommandLineOption underlayOption(QStringLiteral("underlay"),
+        QStringLiteral("Self-test: place this DXF, PDF or image on the active level (D85); \"file;opacity;x;y\" also takes those."),
+        QStringLiteral("file"));
+    parser.addOption(underlayOption);
     QCommandLineOption linesOnly(QStringLiteral("lines-only"), QStringLiteral("Self-test: lines-only display."));
     parser.addOption(linesOnly);
     QCommandLineOption perspective(QStringLiteral("perspective"), QStringLiteral("Self-test: perspective camera (D76)."));
@@ -151,6 +155,7 @@ int main(int argc, char* argv[])
         options.benchModify = parser.isSet(benchModify);
         options.drawWalls = parser.value(drawWalls);
         options.planView = parser.isSet(planView);
+        options.underlay = parser.value(underlayOption);
         options.linesOnly = parser.isSet(linesOnly);
         options.perspective = parser.isSet(perspective);
         options.view = parser.value(presetView);

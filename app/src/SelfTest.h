@@ -18,6 +18,7 @@ struct SelfTestOptions {
     QSize windowSize;             // valid: the window's size (--window-size 1000x800)
     bool maximized = false;       // show the window maximized
     bool planView = false;        // switch to the plan view of the lowest level before the screenshot
+    QString underlay;             // D85: "file[;opacity[;x;y]]" placed on the active level after loading
     bool linesOnly = false;       // lines-only display before measuring/screenshot
     bool benchTools = false;      // time tool previews and wall creation (ms), report them
     bool house = false;           // new project: walls, slab from walls, a door and a window
