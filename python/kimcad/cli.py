@@ -47,10 +47,19 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("rev_a", nargs="?")
     s.add_argument("rev_b", nargs="?", default="HEAD")
     s.add_argument("--json", action="store_true")
-    s = sub.add_parser("export", help="write a version as IFC")
-    s.add_argument("out")
+    s = sub.add_parser("export", help="write a version as IFC, or its drawings and sheets as DXF")
+    s.add_argument("out", help="IFC file; with --format dxf a folder (or a .dxf file for one drawing or sheet)")
     s.add_argument("--rev", default="HEAD")
     s.add_argument("--force", action="store_true")
+    s.add_argument("--format", choices=("ifc", "dxf"), default=None,
+                   help="default: dxf when OUT ends in .dxf, else ifc")
+    s.add_argument("--drawing", action="append", default=[], metavar="NAME",
+                   help="DXF: a drawing to export, by name (repeatable; default every drawing and sheet)")
+    s.add_argument("--sheet", action="append", default=[], metavar="NUMBER",
+                   help="DXF: a sheet to export, by number (repeatable)")
+    s.add_argument("--layers", choices=("layer", "kind"), default="layer",
+                   help="DXF layers by KIMCAD layer (default) or by element kind")
+    s.add_argument("--purpose", default="", help="DXF: the purpose (pens, visibility) to draw with")
     s = sub.add_parser("show", help="print one canonical record")
     s.add_argument("key")
     s.add_argument("--rev", default="HEAD")
@@ -105,6 +114,8 @@ def run(args) -> int:
     elif args.cmd == "diff":
         _print_changes(proj.diff(args.rev_a, args.rev_b), as_json=args.json)
     elif args.cmd == "export":
+        if (args.format or ("dxf" if args.out.lower().endswith(".dxf") else "ifc")) == "dxf":
+            return _export_dxf(proj, args)
         out = proj.export(args.out, args.rev, overwrite=args.force, one_owner=True)
         print(f"wrote {out}")
     elif args.cmd == "show":
@@ -161,6 +172,52 @@ def run(args) -> int:
             first_line = (c.message.strip().splitlines() or [""])[0]
             print(f"{SYMBOL[kind]} {kind:<8}  {c.id[:10]}  {when}  {c.author_name}  {first_line}")
     return 0
+
+
+def _export_dxf(proj: Project, args) -> int:
+    """Drawings and sheets of a version as DXF files (D83): the version is written to a temporary IFC,
+    opened the way the app opens it, and exported with the built-in graphics (or --purpose)."""
+    import tempfile
+
+    from . import app_bridge, dxf
+
+    with tempfile.TemporaryDirectory(prefix="kimcad-dxf-") as tmp:
+        ifc = proj.export(pathlib.Path(tmp) / "version.ifc", args.rev, overwrite=True, one_owner=True)
+        opened = json.loads(app_bridge.open_model(str(ifc)))
+    if not opened.get("ok"):
+        raise KimcadError(opened.get("error", "could not open the version"))
+    targets = json.loads(dxf.dxf_targets())
+    by_name = {d["name"]: d["guid"] for d in targets["drawings"]}
+    numbers = {s["number"] for s in targets["sheets"]}
+    missing = [n for n in args.drawing if n not in by_name] + [n for n in args.sheet if n not in numbers]
+    if missing:
+        raise KimcadError(f"no drawing or sheet called {', '.join(missing)} in {args.rev}")
+    items = [{"drawing": by_name[n]} for n in args.drawing] + [{"sheet": n} for n in args.sheet]
+    if not items:
+        items = [{"drawing": d["guid"]} for d in targets["drawings"]] + [{"sheet": s["number"]} for s in targets["sheets"]]
+    if not items:
+        raise KimcadError(f"{args.rev} has no drawings or sheets")
+    options = json.dumps({"layers": args.layers, "purpose": args.purpose or None})
+    out = pathlib.Path(args.out)
+    if out.suffix.lower() == ".dxf":
+        if len(items) != 1:
+            raise KimcadError("a .dxf file holds one drawing or sheet; give a folder for more")
+        if out.exists() and not args.force:
+            raise KimcadError(f"{out} already exists (use --force to overwrite)")
+        item = items[0]
+        r = json.loads(dxf.export_drawing_dxf(item["drawing"], str(out), options) if "drawing" in item
+                       else dxf.export_sheet_dxf(item["sheet"], str(out), options))
+        files, errors = ([r["path"]], []) if r.get("ok") else ([], [{"item": str(out), "error": r.get("error")}])
+    else:
+        r = json.loads(dxf.export_dxf(json.dumps(items), str(out), options))
+        if "files" not in r:
+            raise KimcadError(r.get("error", "export failed"))
+        files, errors = r["files"], r["errors"]
+    for f in files:
+        print(f"wrote {f}")
+    for e in errors:
+        print(f"kimcad: error: {e['item']}: {e['error']}", file=sys.stderr)
+    return 1 if errors else 0
 
 
 def _utf8_streams():

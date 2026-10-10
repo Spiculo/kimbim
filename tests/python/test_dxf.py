@@ -121,9 +121,12 @@ def test_house_plan_to_dxf_at_real_size_with_pens(house, tmp_path):
     assert np.allclose([walls.extmax.x, walls.extmax.y], hi, atol=2.0), (walls.extmax, hi)
     # Lineweights and colours from the purpose's pens (Working set: walls cut pen 10, fill pen 12).
     pens = graphics.resolve()["pens"]
-    cut = [e for e in msp.query('LWPOLYLINE[layer=="A-WALL"]')]
-    assert cut and all(e.dxf.lineweight == dxf.lineweight(pens["10"]["weight"]) for e in cut)
-    assert all(e.rgb == dxf._rgb(pens["10"]["color"]) for e in cut)
+    lines = [e for e in msp if e.dxf.layer == "A-WALL" and e.dxftype() in ("LINE", "LWPOLYLINE")]
+    looks = {(e.dxf.lineweight, e.rgb) for e in lines}
+    cut, projection = (dxf.lineweight(pens["10"]["weight"]), dxf._rgb(pens["10"]["color"])), \
+        (dxf.lineweight(pens["11"]["weight"]), dxf._rgb(pens["11"]["color"]))
+    assert looks == {cut, projection}, looks
+    assert cut[0] == 50 and projection[0] == 18
     hatch = msp.query('HATCH[layer=="A-WALL-PATT"]').first
     assert hatch.dxf.solid_fill == 1 and hatch.rgb == dxf._rgb(pens["12"]["color"])
     dim = msp.query("DIMENSION").first
@@ -142,7 +145,6 @@ def test_line_types_become_linetypes(house, tmp_path):
     assert doc.linetypes.get("DASHED").pattern_tags.tags  # a real pattern
     assert any(e.dxf.get("linetype") == "DASHED" for e in doc.modelspace().query('*[layer=="A-WALL"]'))
     assert doc.header["$LTSCALE"] == pytest.approx(100.0)  # paper mm at 1:100 in a millimetre model
-    assert call("undo")["ok"] or True
 
 
 def test_section_uses_true_elevations(house, tmp_path):
@@ -174,7 +176,11 @@ def test_dimensions_can_be_exploded(house, tmp_path):
 
 
 def test_hidden_elements_stay_out(house, tmp_path):
-    assert call("set_purpose", "Structure only" if "Structure only" in graphics.effective("purposes") else "Permit")["ok"]
+    def door_pen_lines(doc):  # the doors' own lines (pen 16, 0.25 mm); swings are overlay lines (0.18)
+        return [e for e in doc.modelspace() if e.dxf.layer == "A-DOOR" and e.dxf.get("lineweight") == 25]
+
+    plan = drawing("Level 1 Floor Plan")
+    assert door_pen_lines(read(call("export_drawing_dxf", plan, str(tmp_path / "v.dxf"), "")["path"]))
     vis = graphics.effective("visibility_sets")
     vis["Everything"]["hidden_kinds"] = ["doors"]
     assert call("set_graphics", json.dumps({"visibility_sets": vis}))["ok"]
@@ -182,8 +188,7 @@ def test_hidden_elements_stay_out(house, tmp_path):
     doc = read(call("export_drawing_dxf", drawing("Level 1 Floor Plan"), str(tmp_path / "h.dxf"), "")["path"])
     layers = {e.dxf.layer for e in doc.modelspace()}
     assert "A-WALL" in layers
-    # The door's own geometry is gone; its swing (overlay) stays on A-DOOR like in the PDF.
-    assert not [e for e in doc.modelspace().query('LWPOLYLINE[layer=="A-DOOR"]') if e.dxf.lineweight != 18]
+    assert not door_pen_lines(doc)  # gone; the swing (overlay) stays on A-DOOR, as in the PDF
 
 
 # ---------------------------------------------------------------- sheets
@@ -272,3 +277,25 @@ def test_clinic_plan_export_timed(tmp_path):
           f"{seconds:.2f} s (hidden-line pass included), {cached:.2f} s from the cached drawing")
     assert r["entities"] > 1000 and again["ok"]
     assert len(doc.modelspace()) > 1000
+
+
+# ---------------------------------------------------------------- command line
+
+def test_cli_exports_a_version_to_dxf(house_file, tmp_path, capsys):
+    from kimcad.cli import main
+
+    proj = tmp_path / "proj"
+    assert main(["init", str(proj)]) == 0
+    assert main(["-C", str(proj), "commit", house_file, "-m", "house"]) == 0
+    capsys.readouterr()
+    one = tmp_path / "plan.dxf"
+    assert main(["-C", str(proj), "export", str(one), "--drawing", "Level 1 Floor Plan", "--layers", "kind"]) == 0
+    assert "A-WALL" in {layer.dxf.name for layer in read(str(one)).layers}
+    assert main(["-C", str(proj), "export", str(one), "--drawing", "Level 1 Floor Plan"]) == 1
+    assert "--force" in capsys.readouterr().err
+    folder = tmp_path / "set"
+    assert main(["-C", str(proj), "export", str(folder), "--format", "dxf", "--sheet", "A01",
+                 "--drawing", "Section 1"]) == 0
+    assert sorted(p.name for p in folder.iterdir()) == ["A01 Plan, section and elevation.dxf", "Section 1.dxf"]
+    assert main(["-C", str(proj), "export", str(folder), "--format", "dxf", "--sheet", "Z9"]) == 1
+    assert "Z9" in capsys.readouterr().err
