@@ -1078,3 +1078,28 @@ def __getattr__(name: str):
 
 def __dir__():
     return sorted({*globals(), *_EXPORTED})
+
+
+# DXF export (D83): ezdxf takes most of a second to import, so kimcad.dxf loads on the first export.
+def dxf_targets() -> str:
+    from . import dxf
+
+    return dxf.dxf_targets()
+
+
+def export_drawing_dxf(guid: str, path: str, options_json: str = "") -> str:
+    from . import dxf
+
+    return dxf.export_drawing_dxf(guid, path, options_json)
+
+
+def export_sheet_dxf(number: str, path: str, options_json: str = "") -> str:
+    from . import dxf
+
+    return dxf.export_sheet_dxf(number, path, options_json)
+
+
+def export_dxf(items_json: str, folder: str, options_json: str = "") -> str:
+    from . import dxf
+
+    return dxf.export_dxf(items_json, folder, options_json)
