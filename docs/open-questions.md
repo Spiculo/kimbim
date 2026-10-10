@@ -181,6 +181,25 @@ Built per D83 (Archicad's DWG/DXF translator as the reference).
 5. Black pens are exported as colour 7 (black on white, white on a dark CAD background); other pens keep
    their exact colour. Would you rather everything printed by colour (ACI only) or by lineweight only?
 
+## For the architect: 2D drafting (asked 2026-10-10, waiting)
+
+Built per D84 (Archicad's Line, Arc/Circle, Polyline and Fill tools as the reference).
+
+1. **Rectangles** become closed polylines (Archicad's rectangle polyline). Do you need a rectangle to
+   stay a rectangle (keep its right angles when a corner is dragged)?
+2. **Fills** draw their outline in the fill's pen and are drawn under the model's lines in drawings
+   (Archicad's default stacking). Do you want fills without outline, or a separate outline pen?
+3. **Fill patterns** are in millimetres on paper (they print at the same density at any scale), anchored
+   at the project origin, like Archicad's drafting fills. Do you also need model-scale patterns (a real
+   brick size, Archicad's "link to project origin / fill orientation" options)?
+4. The built-in patterns are Solid, Empty, Diagonal, Crosshatch, Horizontal, Brick, Insulation (zigzag)
+   and Concrete (dots). Which patterns does your office use most (and what should "Insulation" look like:
+   zigzag or loops)?
+5. A fill's area label uses the length decimals and m²; Archicad also offers a placeable, styleable
+   label. Is the centred area text enough?
+6. Shortcuts: Line Shift+L, Polyline Shift+Y, Arc/circle Shift+C, Rectangle Shift+E, Fill Shift+F (single
+   letters were taken). Acceptable?
+
 ## Needs a spike
 
 These are listed in [07-roadmap.md](07-roadmap.md#spikes-do-first-each-is-small-throwaway-and-documented).

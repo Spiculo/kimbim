@@ -225,8 +225,8 @@ release notes, so check before relying on a single cell.
 
 | Tool | Has | KIMCAD | Pri | Notes |
 |------|-----|--------|-----|-------|
-| Lines, polylines, arcs, circles, splines | all | ⬜ | new | Needed for details and site plans |
-| Fills / hatches (regions) | all | ⬜ | new | |
+| Lines, polylines, arcs, circles, splines | all | 🟡 | new | D84: line, polyline, arc/circle (centre-radius, 3-point, centre-start-end), rectangle; snaps, typed lengths, grips; in plans, drawings, sheets, DXF. No splines yet |
+| Fills / hatches (regions) | all | ✅ | new | D84: IfcAnnotationFillArea + IfcFillAreaStyleHatching; pattern table in project settings; pens fg/bg; area label; magic wand (Alt+click) |
 | 2D symbols / blocks | AC VW | ⬜ | new | |
 | Detail components (repeating patterns such as insulation, brick) | RV VW | ⬜ | new | |
 | Image and PDF underlays (trace over a scan) | all | ⬜ | new | |
