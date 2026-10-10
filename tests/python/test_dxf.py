@@ -93,6 +93,17 @@ def test_svg_paths_close_and_keep_arcs():
     assert dxf.parse_path("M0,0 l10,0 v5 h-10 z")[0][1]
 
 
+def test_units_and_linetype_scale_follow_the_project_unit():
+    mm, m = dxf.Doc(0.001, {}), dxf.Doc(1.0, {})
+    assert (mm.doc.header["$INSUNITS"], mm.ltscale) == (4, pytest.approx(100.0))
+    assert (m.doc.header["$INSUNITS"], m.ltscale) == (6, pytest.approx(0.1))
+    svg = ('<svg><g class="section" ifc:plane="[[1,0,0,0],[0,1,0,0],[0,0,1,1.1],[0,0,0,1]]" '
+           'ifc:matrix3="[[10,0,15],[0,10,91.5],[0,0,1]]"></g></svg>')
+    in_m, in_mm = dxf.drawing_mapping(svg, "plan", 1.0), dxf.drawing_mapping(svg, "plan", 0.001)
+    assert in_m(25, 81.5) == pytest.approx((1.0, 1.0)) and in_mm(25, 81.5) == pytest.approx((1000.0, 1000.0))
+    assert in_m.flip and in_m.size == pytest.approx(0.1)
+
+
 def test_layer_and_file_names_are_made_safe():
     assert dxf.layer_name("Walls: <load/bearing>") == "Walls_ _load_bearing_"
     assert dxf.file_name('Plan 1/2 "draft"') == "Plan 1_2 _draft_"
