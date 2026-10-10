@@ -156,6 +156,7 @@ Built per D81 (Archicad's Model Check and Collision Detection, with Solibri-styl
    other case you would not want flagged?
 6. IDS files are stored inside the project (so they are versioned with it), not linked from a shared
    folder. Do offices keep one IDS for all projects and expect edits to it to reach every project?
+
 ## For the owner: Python console (asked 2026-10-10, waiting)
 
 1. Changes made in the console outside `with edit():` are not undoable. Should the console wrap every run in one
