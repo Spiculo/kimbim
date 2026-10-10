@@ -29,6 +29,8 @@ nodejs = ">=22"
 openpyxl = ">=3.1"
 # Drawings and sheets exported to DXF (D83), MIT
 ezdxf = ">=1.3"
+# PDF underlays rendered to images (D85): pypdfium2 Apache-2.0 / BSD-3, PDFium BSD-3 / Apache-2.0
+pypdfium2 = ">=4.30"
 # IDS checks (D81): IfcTester (LGPL-3.0, PyPI below) and its dependencies, all conda-forge.
 # xmlschema/elementpath MIT, python-dateutil Apache-2.0/BSD, pystache MIT (HTML report), odfpy
 # Apache-2.0 (ODS report), bcf-client LGPL-3.0 (BCF report), flask BSD-3 (its web app; never started)
