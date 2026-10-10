@@ -51,6 +51,7 @@ qt_add_library(kimcad_core STATIC
     src/FindSelectPanel.cpp src/FindSelectPanel.h src/SelectionTools.cpp
     src/ChecksPanel.cpp src/ChecksPanel.h src/Checks.cpp
     src/ConsolePanel.cpp src/ConsolePanel.h src/ConsoleTools.cpp
+    src/DxfExportDialog.cpp src/DxfExportDialog.h src/DxfExport.cpp
 )
 target_include_directories(kimcad_core PUBLIC src)
 # Element icons (owner feedback: objects need an icon and a hint on hover).
@@ -108,6 +109,7 @@ kimcad_test(test_scene)
 kimcad_test(test_tool_palette)
 kimcad_test(test_preferences)
 kimcad_test(test_graphics)
+kimcad_test(test_dxf_export)
 
 # GUI self-tests: need a real OpenGL window (GPU, or Mesa on the Linux CI runner). Label "gui".
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/broken.ifc "ISO-10303-21;

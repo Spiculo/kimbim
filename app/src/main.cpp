@@ -112,7 +112,7 @@ int main(int argc, char* argv[])
     QCommandLineOption maximized(QStringLiteral("maximized"), QStringLiteral("Self-test: show the window maximized."));
     parser.addOption(maximized);
     QCommandLineOption exportSheet(QStringLiteral("export-sheet"),
-        QStringLiteral("Export sheet <number> of the IFC file to <out.pdf|out.svg> and exit (no window)."),
+        QStringLiteral("Export sheet <number> of the IFC file to <out.pdf|out.svg|out.dxf> and exit (no window)."),
         QStringLiteral("number"));
     parser.addOption(exportSheet);
     parser.addPositionalArgument(QStringLiteral("file"), QStringLiteral("IFC file to open."), QStringLiteral("[file.ifc]"));

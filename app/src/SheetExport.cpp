@@ -57,6 +57,13 @@ int exportSheetCommand(const QString& ifcPath, const QString& number, const QStr
     const QJsonObject opened = py.callJson("open_model", {ifcPath}, &error).object();
     if (!opened.value("ok").toBool())
         return report({{"ok", false}, {"error", error.isEmpty() ? opened.value("error").toString() : error}});
+    if (path.endsWith(QLatin1String(".dxf"), Qt::CaseInsensitive)) { // D83: a paper-space layout
+        const QJsonObject r = py.callJson("export_sheet_dxf", {number, path, QString()}, &error).object();
+        if (!r.value("ok").toBool())
+            return report({{"ok", false}, {"error", error.isEmpty() ? r.value("error").toString() : error}});
+        return report({{"ok", true}, {"path", path}, {"sheet", number}, {"layout", r.value("layout")},
+            {"entities", r.value("entities")}});
+    }
     const QJsonObject sheet = py.callJson("sheet_svg", {number}, &error).object();
     if (!sheet.value("ok").toBool())
         return report({{"ok", false}, {"error", error.isEmpty() ? sheet.value("error").toString() : error}});

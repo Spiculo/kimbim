@@ -325,6 +325,10 @@ void MainWindow::buildMenus()
     QAction* svgExport = file->addAction(tr("Export sheet as S&VG..."));
     svgExport->setObjectName(QStringLiteral("actionExportSheetSvg"));
     connect(svgExport, &QAction::triggered, this, [this] { exportSheetDialog(false); });
+    QAction* dxfExport = file->addAction(tr("Export &DXF..."));
+    dxfExport->setObjectName(QStringLiteral("actionExportDxf"));
+    dxfExport->setToolTip(tr("Drawings and sheets to DXF files, several at once"));
+    connect(dxfExport, &QAction::triggered, this, &MainWindow::exportDxfDialog);
     QAction* schedule = file->addAction(tr("&Room schedule..."));
     schedule->setObjectName(QStringLiteral("actionRoomSchedule"));
     connect(schedule, &QAction::triggered, this, &MainWindow::roomScheduleDialog);

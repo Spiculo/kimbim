@@ -11,7 +11,7 @@ namespace kimcad {
 bool exportSvgToPdf(const QByteArray& svg, double widthMm, double heightMm, const QString& path, QString* error);
 
 // Headless export for CI and scripts: open the IFC, compose sheet `number`, write the PDF (or SVG
-// when `path` ends in .svg). Prints one JSON line; returns the process exit code.
+// when `path` ends in .svg, a DXF layout when it ends in .dxf). Prints one JSON line; returns the exit code.
 int exportSheetCommand(const QString& ifcPath, const QString& number, const QString& path);
 
 } // namespace kimcad

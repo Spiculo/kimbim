@@ -380,6 +380,7 @@ private:
     void projectInfoDialog();
     void roomScheduleDialog();
     void exportSheetDialog(bool pdf);
+    void exportDxfDialog(); // D83: File > Export DXF... (DxfExport.cpp)
     void drawingClick(QPointF p);
     void onDrawingGenerated(const QString& guid, const QJsonObject& result, const QString& error);
     void activateView(const QString& key);
