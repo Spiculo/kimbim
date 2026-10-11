@@ -27,6 +27,10 @@
 #include <Bnd_Box.hxx>
 
 class QAction;
+namespace kimcad {
+class InputAidsController;
+class Tracker;
+}
 class QMenu;
 class QDoubleSpinBox;
 
@@ -98,6 +102,7 @@ public:
                                                              : DockLayout::Placement::AfterCurrent;
     }
     Viewport* viewport() const { return m_viewport; }
+    InputAidsController* inputAids() const { return m_inputAids; } // D89: tracker and guides
     ModelTreePanel* treePanel() const { return m_tree; }
     PropertiesPanel* propertiesPanel() const { return m_properties; }
     void setPlanCutHeight(double metres);
@@ -495,6 +500,9 @@ private:
     void draftPointer(QPointF p, double tolerance, Qt::KeyboardModifiers mods, bool click);
     void updateDraftPreview();
     void setupMarkupTools(ToolOptionsBar* bar); // D87
+    void setupInputAids();                      // D89 (MainWindowInputAids.cpp)
+    bool trackerTool() const;                   // the current tool places points
+    bool trackerClassic(const Tracker& tracker); // the tool's own typed value
     void startMarkupTool(Tool tool);
     void markupPointer(QPointF p, double tolerance, bool click);
     void updateMarkupPreview();
@@ -637,6 +645,7 @@ private:
     QJsonObject m_settings;       // the project settings (D72)
     QTimer m_recoveryTimer;       // D72: the recovery copy
     QLineEdit* m_lengthInput = nullptr;
+    InputAidsController* m_inputAids = nullptr; // D89
     QAction* m_undo = nullptr;
     QAction* m_redo = nullptr;
     QAction* m_planCut = nullptr;

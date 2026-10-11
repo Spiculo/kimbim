@@ -1534,6 +1534,15 @@ void Viewport::keyPressEvent(QKeyEvent* e)
             emit lengthKeyTyped(text);
             return;
         }
+    } else if (e->key() == Qt::Key_Tab || e->key() == Qt::Key_Backtab) { // D89: Tab cycling
+        cycleNext(m_pointer, e->key() == Qt::Key_Backtab || (e->modifiers() & Qt::ShiftModifier));
+        return;
+    } else if (e->key() == Qt::Key_Escape && !m_cycleGuid.isEmpty()) {
+        m_cycleGuid.clear();
+        m_cycleList.clear();
+        m_context->ClearDetected(false);
+        update();
+        return;
     }
     QWidget::keyPressEvent(e);
 }
@@ -1585,6 +1594,8 @@ void Viewport::mousePressEvent(QMouseEvent* e)
             return;
         }
     }
+    if (cycleClick(e))
+        return; // D89: the element Tab highlighted
     if (m_drawingMode && (e->button() == Qt::LeftButton || e->button() == Qt::RightButton)) {
         if (e->button() == Qt::RightButton) {
             emit drawingEnded();
@@ -1617,6 +1628,10 @@ void Viewport::mousePressEvent(QMouseEvent* e)
 
 void Viewport::mouseReleaseEvent(QMouseEvent* e)
 {
+    if (m_cycleClick && e->button() == Qt::LeftButton) {
+        m_cycleClick = false;
+        return;
+    }
     if (m_cubePress != CubePress::None && e->button() == Qt::LeftButton) {
         const CubePress press = std::exchange(m_cubePress, CubePress::None);
         V3d_TypeOfOrientation orientation = HomeOrientation;
@@ -1651,6 +1666,11 @@ void Viewport::mouseReleaseEvent(QMouseEvent* e)
 
 void Viewport::mouseMoveEvent(QMouseEvent* e)
 {
+    m_pointer = e->position();
+    if (!m_cycleGuid.isEmpty() && (e->position() - m_cyclePos).manhattanLength() > 4) { // D89: left the spot
+        m_cycleGuid.clear();
+        m_cycleList.clear();
+    }
     if (m_cubePress != CubePress::None) {
         if (!(e->buttons() & Qt::LeftButton)) {
             m_cubePress = CubePress::None; // the release went elsewhere
@@ -1696,6 +1716,14 @@ void Viewport::mouseMoveEvent(QMouseEvent* e)
 void Viewport::wheelEvent(QWheelEvent* e)
 {
     AbortViewAnimation();
+    if (touchpadScroll(e)) // D89: two-finger scroll pans
+        return;
+    m_lastScroll = ScrollAction::Zoom;
+    if (m_view->Window().IsNull()) { // headless: no redraw would apply the controller's zoom
+        const QPoint d = e->angleDelta().isNull() ? e->pixelDelta() : e->angleDelta() / 8;
+        zoomByFactor(std::pow(1.1, (d.y() != 0 ? d.y() : d.x()) / 15.0), e->position());
+        return;
+    }
     if (UpdateZoom(Aspect_ScrollDelta(toPixels(e->position()), e->angleDelta().y() / 8.0)))
         update();
 }

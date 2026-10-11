@@ -36,6 +36,7 @@ private:
     QSpinBox* m_largeIfc;
     QSpinBox* m_drawingTimeout;
     QComboBox* m_drawingHlr;
+    QComboBox* m_scroll; // D89
 };
 
 } // namespace kimcad

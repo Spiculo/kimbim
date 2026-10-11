@@ -6,7 +6,7 @@ qt_add_library(kimcad_core STATIC
     src/PythonEngine.cpp src/PythonEngine.h
     src/MeshChunk.cpp src/MeshChunk.h
     src/ElementBatch.cpp src/ElementBatch.h
-    src/Viewport.cpp src/Viewport.h
+    src/Viewport.cpp src/Viewport.h src/ViewportInput.cpp
     src/ViewCube.cpp src/ViewCube.h
     src/SelfTest.cpp src/SelfTest.h
     src/ModelTreePanel.cpp src/ModelTreePanel.h
@@ -18,6 +18,7 @@ qt_add_library(kimcad_core STATIC
     src/Icons.cpp src/Icons.h
     src/Snapper.cpp src/Snapper.h
     src/InputAids.cpp src/InputAids.h src/Tracker.cpp src/Tracker.h
+    src/InputAidsController.cpp src/InputAidsController.h src/InputAidsOverlay.cpp src/InputAidsOverlay.h src/MainWindowInputAids.cpp
     src/WallTool.cpp src/WallTool.h
     src/PolygonTool.cpp src/PolygonTool.h
     src/HostTool.cpp src/HostTool.h

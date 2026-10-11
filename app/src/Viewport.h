@@ -30,6 +30,7 @@
 #include <QStringList>
 #include <QWidget>
 
+#include <functional>
 #include <vector>
 
 #include "ElementBatch.h"
@@ -37,6 +38,7 @@
 #include "Underlay.h"
 
 class QTimer;
+class QWheelEvent;
 
 namespace kimcad {
 
@@ -103,6 +105,28 @@ public:
     // The first element surface under a widget point, world metres (false: none, or no window).
     bool surfacePointAt(const QPointF& widgetPos, gp_Pnt* out);
     QPointF pointerPos() const { return m_pointer; } // the mouse's last position while drawing
+    // D89: the input aids' drawings in this view (temporary guides in the plan, the tracker beside
+    // the cursor); null removes one. Display only, over the model.
+    enum class AidOverlay { Guides, Tracker };
+    void setAidOverlay(AidOverlay which, const Handle(AIS_InteractiveObject)& overlay);
+    bool hasAidOverlay(AidOverlay which) const { return m_aidOverlays.contains(int(which)); }
+    // D89 Tab cycling (Revit): Tab with the mouse resting over overlapping elements highlights the
+    // next one under the cursor (Shift+Tab the previous); a click there selects the highlighted one.
+    QString cycleNext(const QPointF& widgetPos, bool backwards = false); // the highlighted guid ("" none)
+    QString cycleCandidate() const { return m_cycleGuid; }
+    QStringList elementsAt(const QPointF& widgetPos); // front to back (needs a window, or a provider)
+    void setPickProvider(std::function<QStringList(const QPointF&)> provider) { m_pickProvider = std::move(provider); }
+    // D89 touchpad: two-finger scroll pans (Shift: orbits in 3D), pinch and Ctrl+scroll zoom; with
+    // "zoom" every wheel event zooms (mouse), with "pan" every un-modified scroll pans (touchpad),
+    // "auto" tells them apart (pixel deltas, horizontal deltas or scroll phases mean a touchpad).
+    enum class ScrollMode { Auto, Zoom, Pan };
+    static void setScrollMode(ScrollMode mode);
+    static ScrollMode scrollMode();
+    static ScrollMode scrollModeFrom(const QString& preference); // "auto", "zoom", "pan"
+    enum class ScrollAction { None, Zoom, Pan, Orbit };
+    ScrollAction lastScrollAction() const { return m_lastScroll; } // for tests
+    void panByPixels(double dx, double dy);                  // the content follows (widget pixels)
+    void zoomByFactor(double factor, const QPointF& widgetPos); // > 1 zooms in, keeping widgetPos still
     // Grid axes of the active level: dashed lines with their tags at both ends (not selectable).
     struct GridLine {
         QPointF a, b;
@@ -282,6 +306,8 @@ protected:
     void wheelEvent(QWheelEvent*) override;
     void keyPressEvent(QKeyEvent*) override;
     void mouseDoubleClickEvent(QMouseEvent*) override;
+    bool event(QEvent*) override;                       // D89: native touchpad gestures
+    bool focusNextPrevChild(bool) override { return false; } // D89: Tab is the view's (cycling, tracker)
     void leaveEvent(QEvent*) override;
     void OnSelectionChanged(const Handle(AIS_InteractiveContext)& ctx, const Handle(V3d_View)& view) override;
     void handleSelectionPoly(const Handle(AIS_InteractiveContext)& ctx, const Handle(V3d_View)& view) override;
@@ -357,6 +383,18 @@ private:
     Handle(AIS_AnimationCamera) m_animation;
     double m_animationSeconds = 0.25;
     bool m_perspective = false;
+    // D89 (ViewportInput.cpp)
+    QHash<int, Handle(AIS_InteractiveObject)> m_aidOverlays;
+    QStringList m_cycleList;
+    int m_cycleIndex = 0;
+    QString m_cycleGuid;
+    QPointF m_cyclePos;
+    bool m_cycleClick = false; // the press selected the cycled element: swallow its release
+    std::function<QStringList(const QPointF&)> m_pickProvider;
+    ScrollAction m_lastScroll = ScrollAction::None;
+    bool touchpadScroll(QWheelEvent* e);
+    bool cycleClick(QMouseEvent* e);
+    void highlightCycled();
     CubePress m_cubePress = CubePress::None;
     QPointF m_cubePressPos;
     bool m_cubeDragging = false;

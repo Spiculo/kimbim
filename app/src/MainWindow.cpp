@@ -93,6 +93,7 @@
 #include "LayersPanel.h"
 #include "LevelsBar.h"
 #include "LevelsDialog.h"
+#include "InputAidsController.h"
 #include "MeasureController.h"
 #include "HostTool.h"
 #include "PolygonTool.h"
@@ -1746,6 +1747,7 @@ void MainWindow::buildModelingToolbar()
     });
     connect(m_polygonTool, &PolygonTool::rejected, this, [this](const QString& why) { m_status->showMessage(why); });
     connect(m_hostTool, &HostTool::openingRequested, this, &MainWindow::insertOpening);
+    setupInputAids(); // D89: tracker, guides (after the tool dispatch above: it reads what the tools snapped)
 }
 
 QJsonObject MainWindow::currentType() const
@@ -1951,7 +1953,9 @@ void MainWindow::showSnap(const Snap& snap)
     static const char* const names[] = {"", QT_TR_NOOP("endpoint"), QT_TR_NOOP("midpoint"), QT_TR_NOOP("perpendicular"),
         QT_TR_NOOP("on wall"), QT_TR_NOOP("angle"), QT_TR_NOOP("grid"), QT_TR_NOOP("grid crossing"), QT_TR_NOOP("on grid line"),
         QT_TR_NOOP("wall face end"), QT_TR_NOOP("on wall face"), QT_TR_NOOP("centre"), QT_TR_NOOP("underlay endpoint"),
-        QT_TR_NOOP("underlay midpoint"), QT_TR_NOOP("underlay crossing"), QT_TR_NOOP("on underlay line")};
+        QT_TR_NOOP("underlay midpoint"), QT_TR_NOOP("underlay crossing"), QT_TR_NOOP("on underlay line"),
+        QT_TR_NOOP("intersection"), QT_TR_NOOP("guide crossing"), QT_TR_NOOP("on guide"), QT_TR_NOOP("parallel"),
+        QT_TR_NOOP("tracker"), QT_TR_NOOP("typed")}; // D89
     QString text = tr("Wall: click the next point, type a length, Esc to finish");
     const auto preview = m_tool == Tool::Wall ? m_wallTool->preview() : m_twoPointTool->preview();
     if (preview) {
@@ -1970,6 +1974,8 @@ void MainWindow::setTool(Tool tool)
         MainWindow* w;
         ~ShowOptions() { w->m_toolOptions->setActive(w->m_tool != Tool::None); }
     } showOptions{this};
+    if (m_inputAids)
+        m_inputAids->reset(); // D89: typed values and guides belong to the tool
     if (tool != Tool::None && m_levels->activeStorey().isEmpty()) {
         showError(tr("Cannot model"), tr("The model has no level. Add a level first."));
         tool = Tool::None;
@@ -5067,6 +5073,7 @@ void MainWindow::preferencesDialog()
     if (dialog.exec() != QDialog::Accepted)
         return;
     m_prefs.save();
+    Viewport::setScrollMode(Viewport::scrollModeFrom(m_prefs.scrollNavigation())); // D89
     bridge("set_author", {m_prefs.authorName(), m_prefs.authorEmail()});
     applyDrawingPrefs();
     restartRecoveryTimer();

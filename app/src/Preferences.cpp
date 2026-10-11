@@ -52,6 +52,7 @@ QJsonObject Preferences::defaults()
         {"ask_import_status", true},
         {"drawing_timeout", 300},
         {"drawing_hlr", "exact"},
+        {"scroll_navigation", "auto"},
         {"recent", QJsonArray()},
     };
 }
@@ -137,6 +138,12 @@ int Preferences::drawingTimeout() const
 QString Preferences::drawingHlr() const
 {
     return oneOf(value("drawing_hlr"), {QStringLiteral("exact"), QStringLiteral("poly")});
+}
+
+QString Preferences::scrollNavigation() const
+{
+    const QString v = value("scroll_navigation").toString();
+    return v == QLatin1String("zoom") || v == QLatin1String("pan") ? v : QStringLiteral("auto");
 }
 
 bool Preferences::trueLineWeights() const

@@ -131,6 +131,12 @@ PreferencesDialog::PreferencesDialog(Preferences& prefs, QWidget* parent)
                                                   {tr("Polygon (faster on curved models)"), "poly"}}, prefs.drawingHlr());
     m_drawingHlr->setToolTip(tr("The serializer's hidden-line mode: try the other one if drawings are slow"));
     form->addRow(tr("Hidden-line mode:"), m_drawingHlr);
+    // D89: touchpad or mouse wheel.
+    m_scroll = choice(this, "scrollNavigation", {{tr("Automatic (touchpad scroll pans, mouse wheel zooms)"), "auto"},
+        {tr("Scrolling zooms (mouse wheel)"), "zoom"}, {tr("Scrolling pans, pinch or Ctrl+scroll zooms (touchpad)"), "pan"}},
+        prefs.scrollNavigation());
+    m_scroll->setToolTip(tr("Two-finger scroll with Shift orbits the 3D view"));
+    form->addRow(tr("Scroll and touchpad:"), m_scroll);
 
     layout->addLayout(form);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
@@ -154,6 +160,7 @@ void PreferencesDialog::apply()
     m_prefs.setValue(QStringLiteral("recovery_minutes"), m_recovery->value());
     m_prefs.setValue(QStringLiteral("drawing_timeout"), m_drawingTimeout->value());
     m_prefs.setValue(QStringLiteral("drawing_hlr"), m_drawingHlr->currentData().toString());
+    m_prefs.setValue(QStringLiteral("scroll_navigation"), m_scroll->currentData().toString());
 }
 
 void PreferencesDialog::accept()
