@@ -949,9 +949,10 @@ def _railing_body(f, path, height):
     s = _s()
     items = []
     bits = railing_parts(path, height)
-    post = f.createIfcRectangleProfileDef("AREA", None, None, POST / s, POST / s)
-    baluster = f.createIfcRectangleProfileDef("AREA", None, None, BALUSTER / s, BALUSTER / s)
-    rail = f.createIfcRectangleProfileDef("AREA", None, None, RAIL / s, RAIL / s)
+    centre = f.createIfcAxis2Placement2D(f.createIfcCartesianPoint((0.0, 0.0)), None)  # required in IFC2X3
+    post = f.createIfcRectangleProfileDef("AREA", None, centre, POST / s, POST / s)
+    baluster = f.createIfcRectangleProfileDef("AREA", None, centre, BALUSTER / s, BALUSTER / s)
+    rail = f.createIfcRectangleProfileDef("AREA", None, centre, RAIL / s, RAIL / s)
     up = f.createIfcDirection((0.0, 0.0, 1.0))
 
     def vertical(profile, p, length):

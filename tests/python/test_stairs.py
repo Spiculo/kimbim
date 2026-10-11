@@ -199,9 +199,8 @@ def test_the_floor_above_gets_an_opening_and_loses_it_with_the_stair(levels):
     call("undo")
     assert len(b._model.by_type("IfcOpeningElement")) == 1 and len(b._model.by_type("IfcStairFlight")) == 1
     # Without cut_slab, no hole.
-    call("undo")
-    assert call("create_stair", levels["l1"], 1.0, 1.0, 0.0, 1.0, 3.0, json.dumps({"cut_slab": False}))["ok"]
-    assert not b._model.by_type("IfcOpeningElement")
+    assert call("create_stair", levels["l1"], 1.0, 3.0, 0.0, 1.0, 3.0, json.dumps({"cut_slab": False}))["ok"]
+    assert len(b._model.by_type("IfcOpeningElement")) == 1
 
 
 def test_u_stair_opening_is_one_outline_with_the_well_closed(levels):
@@ -345,9 +344,9 @@ def test_plan_view_symbols_and_the_floor_plan_drawing(levels):
     plan = call("generate_drawing", drawings["Level 1 Floor Plan"], "")
     assert plan["ok"], plan
     assert f'data-guid="{r["guid"]}"' in plan["svg"] and ">UP<" in plan["svg"] and "stroke-dasharray" in plan["svg"]
-    flight = parts(r["guid"])[0].GlobalId
+    flight = next(p.GlobalId for p in parts(r["guid"]) if p.Name == "Flight 1")  # the one below the cut
     assert flight in plan["svg"]  # the flights are drawn on the stair's level
-    call("create_plan", levels["l2"])
+    call("create_slab", levels["l2"], levels["slab_type"], json.dumps([[0, 0], [8, 0], [8, 6], [0, 6]]), 0.0)
     drawings = {d["name"]: d["guid"] for d in call("drawings")["drawings"]}
     upper = call("generate_drawing", drawings["Level 2 Floor Plan"], "")["svg"]
     assert ">DN<" in upper
