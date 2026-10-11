@@ -2,6 +2,9 @@
 // Revit/ArchiCAD navigation preset (owner choice, D48); view cube, preset views, perspective (D76).
 #include <QApplication>
 #include <QMouseEvent>
+#include <QNativeGestureEvent>
+#include <QPointingDevice>
+#include <QWheelEvent>
 #include <QSet>
 #include <QSignalSpy>
 #include <QtTest>
@@ -241,6 +244,111 @@ private slots:
 private:
     static gp_Dir eyeDir(const kimcad::Viewport& v) { return v.view()->Camera()->Direction().Reversed(); }
     static bool sameDir(const gp_Dir& a, const gp_Dir& b) { return a.Dot(b) > 0.9999; }
+private slots:
+    // D89 Tab cycling (Revit): Tab steps through the elements under the resting cursor; the click
+    // selects the highlighted one instead of the front one.
+    void tabCyclesThroughOverlappingElements()
+    {
+        kimcad::Viewport v;
+        v.resize(300, 300);
+        v.addBatch(batch(3));
+        v.setPickProvider([](const QPointF&) { return QStringList{"g0", "g1", "g2"}; }); // front to back
+        QMouseEvent move(QEvent::MouseMove, QPointF(50, 50), v.mapToGlobal(QPointF(50, 50)), Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+        QApplication::sendEvent(&v, &move);
+        QTest::keyClick(&v, Qt::Key_Tab);
+        QCOMPARE(v.cycleCandidate(), QString("g1"));
+        QTest::keyClick(&v, Qt::Key_Tab);
+        QCOMPARE(v.cycleCandidate(), QString("g2"));
+        QTest::keyClick(&v, Qt::Key_Tab);
+        QCOMPARE(v.cycleCandidate(), QString("g0"));
+        QTest::keyClick(&v, Qt::Key_Backtab);
+        QCOMPARE(v.cycleCandidate(), QString("g2"));
+        QTest::keyClick(&v, Qt::Key_Backtab);
+        QCOMPARE(v.cycleCandidate(), QString("g1"));
+        QSignalSpy changed(&v, &kimcad::Viewport::selectionChanged);
+        QTest::mouseClick(&v, Qt::LeftButton, Qt::NoModifier, QPoint(51, 50));
+        QCOMPARE(v.selectedGuids(), QStringList({"g1"}));
+        QCOMPARE(changed.count(), 1);
+        QCOMPARE(v.pressedButtons(), Aspect_VKeyMouse(Aspect_VKeyMouse_NONE)); // no box selection started
+        QVERIFY(v.cycleCandidate().isEmpty());
+        // Ctrl adds the cycled element; moving away forgets the cycle.
+        QTest::keyClick(&v, Qt::Key_Tab);
+        QTest::keyClick(&v, Qt::Key_Tab);
+        QCOMPARE(v.cycleCandidate(), QString("g2"));
+        QTest::mouseClick(&v, Qt::LeftButton, Qt::ControlModifier, QPoint(50, 50));
+        const QStringList both = v.selectedGuids();
+        QCOMPARE(QSet<QString>(both.begin(), both.end()), QSet<QString>({"g1", "g2"}));
+        QTest::keyClick(&v, Qt::Key_Tab);
+        QMouseEvent away(QEvent::MouseMove, QPointF(120, 50), v.mapToGlobal(QPointF(120, 50)), Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+        QApplication::sendEvent(&v, &away);
+        QVERIFY(v.cycleCandidate().isEmpty());
+    }
+
+    // D89 touchpad: pixel deltas (two-finger scroll) pan, a notched wheel zooms, per the preference.
+    void touchpadScrollPansWheelZooms()
+    {
+        using kimcad::Viewport;
+        Viewport v;
+        v.resize(400, 300);
+        v.addBatch(batch(3));
+        v.fitAll();
+        Viewport::setScrollMode(Viewport::ScrollMode::Auto);
+        const Handle(Graphic3d_Camera)& cam = v.view()->Camera();
+        auto wheel = [&](QPoint pixel, QPoint angle, Qt::KeyboardModifiers mods = Qt::NoModifier) {
+            QWheelEvent e(QPointF(200, 150), v.mapToGlobal(QPointF(200, 150)), pixel, angle, Qt::NoButton, mods, Qt::NoScrollPhase, false);
+            QApplication::sendEvent(&v, &e);
+        };
+        const gp_Pnt c0 = cam->Center();
+        const double s0 = cam->Scale();
+        wheel(QPoint(20, 30), QPoint(0, 0));
+        QCOMPARE(v.lastScrollAction(), Viewport::ScrollAction::Pan);
+        QVERIFY(cam->Center().Distance(c0) > 1e-6);
+        QCOMPARE(cam->Scale(), s0);
+        QTest::qWait(350); // past the touchpad stream
+        const double s1 = cam->Scale();
+        wheel(QPoint(), QPoint(0, 120));
+        QCOMPARE(v.lastScrollAction(), Viewport::ScrollAction::Zoom);
+        QVERIFY(cam->Scale() < s1); // zoomed in
+        // "Scrolling zooms": pixel deltas zoom too; "scrolling pans": the wheel pans.
+        Viewport::setScrollMode(Viewport::ScrollMode::Zoom);
+        wheel(QPoint(0, 30), QPoint(0, 90));
+        QCOMPARE(v.lastScrollAction(), Viewport::ScrollAction::Zoom);
+        Viewport::setScrollMode(Viewport::ScrollMode::Pan);
+        wheel(QPoint(), QPoint(0, 120));
+        QCOMPARE(v.lastScrollAction(), Viewport::ScrollAction::Pan);
+        wheel(QPoint(0, 30), QPoint(0, 90), Qt::ControlModifier); // Ctrl+scroll (Windows' pinch) zooms
+        QCOMPARE(v.lastScrollAction(), Viewport::ScrollAction::Zoom);
+        const gp_Dir d0 = cam->Direction();
+        wheel(QPoint(40, 0), QPoint(0, 0), Qt::ShiftModifier); // Shift+two fingers orbits in 3D
+        QCOMPARE(v.lastScrollAction(), Viewport::ScrollAction::Orbit);
+        QVERIFY(!cam->Direction().IsEqual(d0, 1e-6));
+        v.setPlanView(0.0);
+        wheel(QPoint(40, 0), QPoint(0, 0), Qt::ShiftModifier); // plans never orbit
+        QCOMPARE(v.lastScrollAction(), Viewport::ScrollAction::Pan);
+        Viewport::setScrollMode(Viewport::ScrollMode::Auto);
+        QCOMPARE(Viewport::scrollModeFrom("pan"), Viewport::ScrollMode::Pan);
+        QCOMPARE(Viewport::scrollModeFrom("zoom"), Viewport::ScrollMode::Zoom);
+        QCOMPARE(Viewport::scrollModeFrom("whatever"), Viewport::ScrollMode::Auto);
+    }
+
+    void pinchZooms()
+    {
+        kimcad::Viewport v;
+        v.resize(400, 300);
+        v.addBatch(batch(3));
+        v.fitAll();
+        const double s0 = v.view()->Camera()->Scale();
+        QNativeGestureEvent pinch(Qt::ZoomNativeGesture, QPointingDevice::primaryPointingDevice(), 2, QPointF(200, 150),
+            QPointF(200, 150), v.mapToGlobal(QPointF(200, 150)), 0.25, QPointF());
+        QApplication::sendEvent(&v, &pinch);
+        QVERIFY(std::abs(v.view()->Camera()->Scale() - s0 / 1.25) < 1e-9 * s0);
+        QNativeGestureEvent out(Qt::ZoomNativeGesture, QPointingDevice::primaryPointingDevice(), 2, QPointF(200, 150),
+            QPointF(200, 150), v.mapToGlobal(QPointF(200, 150)), -0.2, QPointF());
+        QApplication::sendEvent(&v, &out);
+        QVERIFY(std::abs(v.view()->Camera()->Scale() - s0 / 1.25 / 0.8) < 1e-9 * s0);
+    }
+
+private:
     static Handle(kimcad::ElementBatch) batch(int n)
     {
         kimcad::MeshChunk c;
