@@ -1125,6 +1125,61 @@ ES = {
     "The serializer's hidden-line mode: try the other one if drawings are slow":
         "El modo de líneas ocultas del serializador: pruebe el otro si los dibujos son lentos",
     "Hidden-line mode:": "Modo de líneas ocultas:",
+    # D88: stairs, ramps, railings
+    "Draw a stair (straight, L, U or by sketch) or a ramp; a stair goes up to the next level":
+        "Dibujar una escalera (recta, en L, en U o por croquis) o una rampa; la escalera sube hasta el nivel siguiente",
+    "Ra&iling": "Ba&randilla",
+    "Railings on both sides of a clicked stair or ramp (they follow it), or along a clicked path":
+        "Barandillas a ambos lados de la escalera o rampa pulsada (la siguen), o a lo largo de un recorrido",
+    "Stair": "Escalera",
+    "Ramp": "Rampa",
+    "Draw a stair or a ramp": "Dibujar una escalera o una rampa",
+    "Shape: straight, L (quarter landing), U (half landing) or by sketch (click the walking line)":
+        "Forma: recta, en L (descanso en esquina), en U (descanso intermedio) o por croquis (pulse la línea de huella)",
+    "Turns left": "Gira a la izquierda",
+    "Turns right": "Gira a la derecha",
+    "Which way an L or U stair turns": "Hacia dónde gira una escalera en L o en U",
+    "Width ": "Ancho ",
+    "Stair or ramp width": "Ancho de la escalera o rampa",
+    "Tread ": "Huella ",
+    "Tread depth (going)": "Profundidad de la huella",
+    "Riser ": "Contrahuella ",
+    "Target riser height: the riser count comes from the height to the next level":
+        "Contrahuella objetivo: el número de peldaños sale de la altura hasta el nivel siguiente",
+    "Landing ": "Descanso ",
+    "Landing depth (0: the stair's width)": "Profundidad del descanso (0: el ancho de la escalera)",
+    "Landing: as wide": "Descanso: como el ancho",
+    "Slope ": "Pendiente ",
+    "Ramp slope (warning above the project's limit, 1:12)": "Pendiente de la rampa (aviso por encima del límite del proyecto, 1:12)",
+    "Rise ": "Desnivel ",
+    "How high the ramp goes": "Cuánto sube la rampa",
+    "On a stair or ramp": "Sobre una escalera o rampa",
+    "By path": "Por recorrido",
+    "Click a stair or ramp for railings on both its sides, or click a path":
+        "Pulse una escalera o rampa para poner barandillas a ambos lados, o pulse un recorrido",
+    "Height ": "Altura ",
+    "Railing height": "Altura de la barandilla",
+    "Straight": "Recta",
+    "L-shaped": "En L",
+    "U-shaped": "En U",
+    "By sketch": "Por croquis",
+    "Railing: click the path's points; Enter or double click to finish":
+        "Barandilla: pulse los puntos del recorrido; Intro o doble clic para terminar",
+    "Railing: click a stair or ramp to put railings on its sides":
+        "Barandilla: pulse una escalera o rampa para ponerle barandillas a los lados",
+    "Stair by sketch: click the walking line's points (landings at the corners); Enter to finish":
+        "Escalera por croquis: pulse los puntos de la línea de huella (descansos en las esquinas); Intro para terminar",
+    "Ramp: click where it starts, then the direction it goes up": "Rampa: pulse dónde empieza y luego hacia dónde sube",
+    "Ramp: %1 long": "Rampa: %1 de largo",
+    "Stair: %1 risers of %2, tread %3": "Escalera: %1 contrahuellas de %2, huella %3",
+    "Warning: %1": "Aviso: %1",
+    "Could not create the ramp: %1": "No se pudo crear la rampa: %1",
+    "Railing: there is no stair or ramp there": "Barandilla: no hay ninguna escalera o rampa ahí",
+    "Could not add railings: %1": "No se pudieron añadir las barandillas: %1",
+    "%n railing(s) added; they follow the stair": ("%n barandilla añadida; sigue a la escalera",
+                                                   "%n barandillas añadidas; siguen a la escalera"),
+    "Could not create the railing: %1": "No se pudo crear la barandilla: %1",
+    "Railing: %n post(s)": ("Barandilla: %n montante", "Barandilla: %n montantes"),
 }
 
 
