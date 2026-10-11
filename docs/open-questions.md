@@ -261,6 +261,7 @@ Built per D86 (Archicad's Library and Object tool as the reference; objects gene
 5. **Shortcut** Shift+O for the Object tool, Tab to turn 90 degrees while placing. Acceptable?
 6. Which objects are missing for a first release (lighting, doors' furniture, office desks, parking
    spaces, plants in pots)?
+
 ## For the architect: stairs, ramps and railings (asked 2026-10-11, waiting)
 
 Built per D88 (Archicad's Stair and Railing tools as the reference).
