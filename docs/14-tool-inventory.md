@@ -52,7 +52,7 @@ release notes, so check before relying on a single cell.
 | View cube | RV VW BB | ✅ | P0 | D76: OCCT AIS_ViewCube, home button, drag to turn |
 | Preset views (front, back, sides, isometric) | all | ✅ | P0 | D76: View › Views, Alt+1…Alt+0 |
 | Perspective camera | all | ✅ | P0 | D76: View › Perspective (Shift+P), per view |
-| Touchpad navigation | all | ⬜ | P0 | Backlog in 04 |
+| Touchpad navigation | all | ✅ | P0 | D89: two-finger scroll pans, Shift orbits, pinch zooms; scroll preference |
 | Walk / fly mode | AC RV VW SU | ⬜ | P2 | |
 | Hide, isolate, show all (per element, per level) | all | ✅ | P0 | |
 | Hide / isolate by class or type | all | ⬜ | P0 | |
@@ -82,7 +82,7 @@ release notes, so check before relying on a single cell.
 | Selection sets (saved selections) | AC VW BB | ✅ | new | D78: in the project settings (versioned) |
 | Marquee (area selection for 2D export or editing) | AC | ⬜ | new | |
 | Magic wand (pick a shape from existing lines or edges) | AC VW | ⬜ | new | |
-| Tab cycling through overlapping elements | RV AC | ⬜ | new | |
+| Tab cycling through overlapping elements | RV AC | ✅ | new | D89: Tab / Shift+Tab, the click selects the highlighted one |
 
 ## 4. Editing tools (general)
 
@@ -115,10 +115,10 @@ release notes, so check before relying on a single cell.
 | Snapping (endpoint, midpoint, on element, grid) | all | ✅ | P0 | |
 | Ortho / angle steps | all | ✅ | P0 | 15° steps, Shift = ortho |
 | Typed lengths | all | ✅ | P0 | |
-| Typed angles | all | ⬜ | P0 | |
-| Coordinate input (absolute and relative x, y; polar) | AC VW | ⬜ | new | Archicad tracker |
-| Guide lines, temporary references, inference lines | AC VW SU | ⬜ | new | Archicad guides, Vectorworks smart cursor, SketchUp inference |
-| Snap to perpendicular, tangent, intersection, wall faces | all | 🟡 | P0 | Basic set only |
+| Typed angles | all | ✅ | P0 | D89: the tracker's angle box (`<`), locks the direction |
+| Coordinate input (absolute and relative x, y; polar) | AC VW | ✅ | new | D89: tracker beside the cursor in every point tool; Tab between boxes, `a`/`#` absolute |
+| Guide lines, temporary references, inference lines | AC VW SU | 🟡 | new | D89: temporary guides (rest 0.5 s on a snap point), extensions and parallels; no dragged or permanent guide lines |
+| Snap to perpendicular, tangent, intersection, wall faces | all | 🟡 | P0 | D89: intersections and parallels added; no tangent |
 | Work planes (custom drawing planes) | AC RV VW SU | 🟡 | P0 | The active level only |
 | Tool presets / favourites (saved tool settings) | AC VW | ⬜ | new | Archicad Favourites |
 

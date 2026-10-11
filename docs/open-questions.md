@@ -262,6 +262,26 @@ Built per D86 (Archicad's Library and Object tool as the reference; objects gene
 6. Which objects are missing for a first release (lighting, doors' furniture, office desks, parking
    spaces, plants in pots)?
 
+## For the architect: tracker, guides, Tab cycling, touchpad (asked 2026-10-11, waiting)
+
+Built per D89 (Archicad's Tracker and temporary guides as the reference).
+
+1. The **tracker** shows length, angle, dx and dy beside the cursor while placing points and takes typing
+   at once (no click). Archicad can show it always or only once you type. Always shown is the current
+   choice; do you want a way to hide it?
+2. Typed **x/y are relative** to the previous point by default; `a` or `#` makes them absolute (project
+   origin). Is relative what you expect, and do you need a user origin?
+3. **Angles** are degrees counter-clockwise from east (Archicad, AutoCAD). Do you ever type bearings or
+   angles relative to the previous segment?
+4. Lengths are typed in **metres** (as the options bar's length field) whatever the project's unit. Should
+   a project in millimetres read "3500" as 3.5 m?
+5. **Temporary guides** appear after resting 0.5 s on a snap point (AutoCAD's object tracking); at most 4.
+   Archicad also has guide lines dragged out of guide handles, and permanent guides. Which do you use?
+6. **Tab cycling** steps through the elements under the cursor before clicking (Revit). Should it also
+   reach plan annotations and drafting shapes?
+7. On a laptop, two-finger scroll **pans** and pinch zooms; Shift+two-finger scroll orbits. Does that
+   match the touchpads you use (Windows precision touchpads, Mac trackpads)?
+
 ## Needs a spike
 
 These are listed in [07-roadmap.md](07-roadmap.md#spikes-do-first-each-is-small-throwaway-and-documented).

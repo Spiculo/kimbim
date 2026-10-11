@@ -45,7 +45,7 @@ Display (Slice 4b): every element has border lines (outline and creases); View �
 
 **Navigation backlog** (owner, 2026-10-05: "we need those, document them for now"):
 - ~~View cube, preset views~~ Done (D76).
-- **Touchpad navigation**: two-finger drag pans, pinch zooms, and a way to orbit without a middle button (e.g. Shift+two-finger drag or a modifier with left-drag), so laptops work without a mouse.
+- ~~**Touchpad navigation**: two-finger drag pans, pinch zooms, and a way to orbit without a middle button~~ Done (D89: Shift+two-finger scroll orbits; Edit › Preferences › Scroll and touchpad).
 - ~~Perspective toggle~~ Done (D76).
 
 | Feature | Pri | Notes / reuse |
