@@ -37,6 +37,8 @@
 #include "HostTool.h"
 #include "TwoPointTool.h"
 #include "WallTool.h"
+#include "InputAidsController.h"
+#include <QKeyEvent>
 
 #include <QRegularExpression>
 
@@ -684,6 +686,50 @@ int runSelfTest(const SelfTestOptions& options)
         result.insert(QStringLiteral("measure"), window.measure()->text());
         for (int i = 0; i < 5; ++i)
             QApplication::processEvents();
+    }
+    if (options.tracker) { // D89: a wall half drawn along a guide, the tracker beside the cursor
+        if (QAction* a = window.findChild<QAction*>(QStringLiteral("actionPlanView")))
+            a->trigger();
+        window.setTool(MainWindow::Tool::Wall);
+        Viewport* v = window.viewport();
+        const QVector<SnapWall> walls = window.wallTool()->snapper().walls();
+        const QPointF corner = walls.isEmpty() ? QPointF(0, 0) : walls.first().a;
+        const QPointF start = corner + QPointF(2.0, -2.5);
+        if (!v->view()->Window().IsNull()) { // closer, around the corner
+            int px = 0, py = 0;
+            v->view()->Convert(corner.x() + 2, corner.y() - 1, window.levelsBar()->activeElevation(), px, py);
+            const QPointF at = QPointF(px, py) / v->devicePixelRatioF();
+            v->panByPixels(v->width() / 2.0 - at.x(), v->height() / 2.0 - at.y());
+            v->zoomByFactor(1.6, QPointF(v->width() / 2.0, v->height() / 2.0));
+        }
+        emit v->workPointMoved(corner + QPointF(0.01, 0.01), 0.1, Qt::NoModifier); // rest on a wall end...
+        window.inputAids()->aids()->acquireHovered();                           // ...long enough
+        emit v->workPointClicked(start, 0.1, Qt::NoModifier);
+        emit v->workPointMoved(QPointF(corner.x() + 3.4, corner.y() + 0.04), 0.1, Qt::NoModifier); // on the guide
+        result.insert(QStringLiteral("tracker_guides"), int(window.inputAids()->aids()->guides().size()));
+        result.insert(QStringLiteral("tracker_snap"), window.inputAids()->aids()->lastKind());
+        for (int i = 0; i < 10; ++i)
+            QApplication::processEvents();
+        if (!options.screenshot.isEmpty()) {
+            QString path = options.screenshot;
+            path.replace(QStringLiteral(".png"), QStringLiteral("-tracker-viewport.png"));
+            result.insert(QStringLiteral("tracker_screenshot"), v->dumpImage(path) ? path : QString());
+        }
+        for (const QChar c : QStringLiteral("5<30")) { // typed: the length, then the angle locks the direction
+            QKeyEvent key(QEvent::KeyPress, c.isDigit() ? Qt::Key_0 + c.digitValue() : Qt::Key_Less, Qt::NoModifier, QString(c));
+            QApplication::sendEvent(v, &key);
+        }
+        for (int i = 0; i < 10; ++i)
+            QApplication::processEvents();
+        if (!options.screenshot.isEmpty()) {
+            QString path = options.screenshot;
+            path.replace(QStringLiteral(".png"), QStringLiteral("-tracker-typed-viewport.png"));
+            result.insert(QStringLiteral("tracker_typed_screenshot"), v->dumpImage(path) ? path : QString());
+        }
+        QKeyEvent enter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+        QApplication::sendEvent(v, &enter);
+        result.insert(QStringLiteral("tracker_drawing"), window.wallTool()->isDrawing());
+        window.setTool(MainWindow::Tool::None);
     }
     if (options.levelsDialog) { // D79: the levels table, shown beside the window
         QString error;

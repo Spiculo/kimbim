@@ -38,6 +38,7 @@ struct SelfTestOptions {
     QString console;              // D82: run this Python in the console panel, report its output
     QString findSelect;           // D78: an IFC class: Find & Select it from the panel, report how many
     QString library;              // D86: open the Library panel on this object and place it at (1, 1); with screenshot, a PNG of the panel
+    bool tracker = false;         // D89: draw a wall in the plan with a temporary guide and the tracker shown; PNGs of the view
     QString checks;               // D81: checks to run from the Checks panel ("schema,model,clash"); clicks the first issue
 };
 

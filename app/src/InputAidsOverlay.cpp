@@ -73,8 +73,21 @@ void TrackerOverlay::Compute(const Handle(PrsMgr_PresentationManager)&, const Ha
         const QString shown = b.typed && b.focused ? b.text + QStringLiteral("|") : b.text;
         Handle(Graphic3d_Group) g = prs->NewGroup();
         Prs3d_Text::Draw(g, text, TCollection_ExtendedString(shown.toUtf8().constData(), true), gp_Pnt(x, 0, 0));
-        x += (12 + 8.5 * shown.size()) * m_ratio;
+        x += boxWidth(shown, m_ratio);
     }
+}
+
+double TrackerOverlay::boxWidth(const QString& text, double pixelRatio)
+{
+    return (14 + 7.5 * text.size()) * pixelRatio;
+}
+
+double TrackerOverlay::width(const QVector<Box>& boxes, double pixelRatio)
+{
+    double w = 0;
+    for (const Box& b : boxes)
+        w += boxWidth(b.typed && b.focused ? b.text + QStringLiteral("|") : b.text, pixelRatio);
+    return w;
 }
 
 } // namespace kimcad

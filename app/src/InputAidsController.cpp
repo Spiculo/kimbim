@@ -167,10 +167,15 @@ void InputAidsController::refresh()
     QPoint at(int(16 * ratio), int(16 * ratio));
     if (!v->view()->Window().IsNull()) { // beside the cursor's point, below right
         int px = 0, py = 0;
-        v->view()->Convert(c.x(), c.y(), z, px, py);
+        v->view()->Convert(m_raw.x(), m_raw.y(), z, px, py); // follows the mouse, not the locked point
         int w = 0, h = 0;
         v->view()->Window()->Size(w, h);
         at = QPoint(px + int(18 * ratio), h - py - int(36 * ratio));
+        const int boxes_w = int(TrackerOverlay::width(boxes, ratio));
+        if (at.x() + boxes_w > w) // near the right edge: on the cursor's left
+            at.setX(std::max(0, px - int(18 * ratio) - boxes_w));
+        if (at.y() < int(8 * ratio)) // near the bottom: above the cursor
+            at.setY(h - py + int(24 * ratio));
     }
     v->setAidOverlay(Viewport::AidOverlay::Tracker, new TrackerOverlay(boxes, at, ratio));
     m_trackerShown = true;

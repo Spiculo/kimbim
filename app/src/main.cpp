@@ -89,6 +89,9 @@ int main(int argc, char* argv[])
     QCommandLineOption measureOption(QStringLiteral("measure"),
         QStringLiteral("Self-test: measure through these plan points (\"x,y x,y ...\", metres) in the 3D view."), QStringLiteral("points"));
     parser.addOption(measureOption);
+    QCommandLineOption trackerOption(QStringLiteral("tracker"),
+        QStringLiteral("Self-test: draw a wall in the plan with a temporary guide and the tracker (D89)."));
+    parser.addOption(trackerOption);
     QCommandLineOption levelsDialog(QStringLiteral("levels-dialog"), QStringLiteral("Self-test: open the levels table."));
     parser.addOption(levelsDialog);
     QCommandLineOption checksOption(QStringLiteral("checks"),
@@ -167,6 +170,7 @@ int main(int argc, char* argv[])
         options.findSelect = parser.value(findSelect);
         options.library = parser.value(libraryOption);
         options.measure = parser.value(measureOption);
+        options.tracker = parser.isSet(trackerOption);
         options.levelsDialog = parser.isSet(levelsDialog);
         options.checks = parser.value(checksOption);
         options.console = parser.value(consoleOption);

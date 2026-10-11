@@ -38,6 +38,8 @@ public:
     void Compute(const Handle(PrsMgr_PresentationManager)&, const Handle(Prs3d_Presentation)& prs, const int) override;
     void ComputeSelection(const Handle(SelectMgr_Selection)&, const int) override {}
     const QVector<Box>& boxes() const { return m_boxes; }
+    static double boxWidth(const QString& text, double pixelRatio);
+    static double width(const QVector<Box>& boxes, double pixelRatio); // all boxes, pixels
 
 private:
     QVector<Box> m_boxes;
