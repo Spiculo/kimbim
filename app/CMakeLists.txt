@@ -17,6 +17,7 @@ qt_add_library(kimcad_core STATIC
     src/LayersPanel.cpp src/LayersPanel.h
     src/Icons.cpp src/Icons.h
     src/Snapper.cpp src/Snapper.h
+    src/InputAids.cpp src/InputAids.h src/Tracker.cpp src/Tracker.h
     src/WallTool.cpp src/WallTool.h
     src/PolygonTool.cpp src/PolygonTool.h
     src/HostTool.cpp src/HostTool.h
@@ -101,6 +102,7 @@ kimcad_test(test_console)
 kimcad_test(test_properties_panel)
 kimcad_test(test_levels_bar)
 kimcad_test(test_snapper)
+kimcad_test(test_input_aids)
 kimcad_test(test_wall_tool)
 kimcad_test(test_polygon_tool)
 kimcad_test(test_host_tool)

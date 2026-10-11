@@ -7,9 +7,11 @@
 #include <QVector>
 
 #include <memory>
+#include <optional>
 
 namespace kimcad {
 
+class InputAids;
 class UnderlaySnapIndex;
 
 // A wall's axis on the active level (from app_bridge.snap_data), in metres.
@@ -35,7 +37,8 @@ struct SnapPoint {
 
 struct Snap {
     enum Kind { None, Endpoint, Midpoint, Perpendicular, OnWall, Angle, Grid, GridCross, GridLine, FaceEnd, OnFace, Centre,
-        UnderlayEnd, UnderlayMid, UnderlayCross, OnUnderlay }; // D85: DXF underlay linework
+        UnderlayEnd, UnderlayMid, UnderlayCross, OnUnderlay, // D85: DXF underlay linework
+        Intersection, GuideCross, GuideLine, Parallel, Tracked, Typed }; // D89: input aids
     QPointF point;
     Kind kind = None;
     QString wallGuid; // the wall an object snap landed on
@@ -46,7 +49,10 @@ struct Snap {
 // crossing > midpoint > perpendicular from the previous point > anywhere on a wall > anywhere on a
 // grid axis > angle (15 degree steps from the previous point; 0/90 with ortho) > grid. D85: underlay
 // endpoints, crossings and midpoints come after wall midpoints, anywhere on an underlay line after
-// anywhere on a wall.
+// anywhere on a wall. D89: wall/grid crossings after grid crossings; with shared InputAids, tracker
+// locks override everything, temporary-guide crossings come after the underlay points, guide lines
+// and parallels after "on wall". A negative tolerance is an exact (typed) point: no snapping, only
+// the wall it lies on (for joins).
 class Snapper {
 public:
     static QVector<SnapWall> parse(const QJsonObject& snapData);
@@ -68,11 +74,17 @@ public:
     void setFaceSnapping(bool on) { m_faces = on; }
     bool faceSnapping() const { return m_faces; }
     double grid() const { return m_grid; }
+    // D89: the window's shared input aids (guides, tracker locks, last snap); null: none.
+    void setAids(std::shared_ptr<InputAids> aids) { m_aids = std::move(aids); }
+    const std::shared_ptr<InputAids>& aids() const { return m_aids; }
 
     // `tolerance` in metres (the app converts ~10 screen pixels); `from` is the previous point.
     Snap snap(QPointF p, double tolerance, const QPointF* from = nullptr, bool ortho = false) const;
 
 private:
+    Snap compute(QPointF p, double tolerance, const QPointF* from, bool ortho) const;
+    bool guideSnap(QPointF p, double tolerance, const QPointF* from, bool lines, Snap* out) const;
+    std::optional<QPointF> wallDirection(const QString& guid) const;
     QPointF onGrid(QPointF p) const;
     double gridLength(double length) const;
 
@@ -82,6 +94,7 @@ private:
     double m_grid = 0.01; // 10 mm
     bool m_faces = false;
     std::shared_ptr<const UnderlaySnapIndex> m_underlays;
+    std::shared_ptr<InputAids> m_aids;
 };
 
 } // namespace kimcad
