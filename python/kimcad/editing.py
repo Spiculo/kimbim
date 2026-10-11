@@ -136,6 +136,12 @@ def _annotations():
     return annotations
 
 
+def _stairs():
+    from . import stairs
+
+    return stairs
+
+
 def _reflection(x1, y1, x2, y2):
     """2D reflection across the line through (x1, y1)-(x2, y2), as a function on (x, y) metres and
     on directions."""
@@ -230,6 +236,8 @@ def _mirror(elements, point, direction):
             _set_slab_outline(e, list(reversed(outline)))
         elif e.is_a("IfcAnnotation") and _annotations().mirror(e, point):
             pass  # plan annotations and drafting shapes: their points reflected (text stays readable)
+        elif _stairs().mirror(e, point, direction):
+            pass  # D88: stairs and ramps turn the other way, railings' paths are reflected
         else:
             _mirror_placement(e, point, direction)
     return [h[0] for h in hosted] + released

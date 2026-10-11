@@ -103,7 +103,9 @@ def test_stair_reaches_the_upper_level(house):
     pset = ifcopenshell.util.element.get_psets(stair)["Pset_StairCommon"]
     risers, riser = pset["NumberOfRiser"], pset["RiserHeight"]
     assert risers == 18 and riser * risers == pytest.approx(3000.0, abs=1e-6)  # mm in this project
-    lo, hi = bbox(r["guid"])
+    flight = stair.IsDecomposedBy[0].RelatedObjects[0]  # D88: the shape is the flight's
+    assert flight.is_a("IfcStairFlight")
+    lo, hi = bbox(flight.GlobalId)
     assert lo[2] == pytest.approx(0.0, abs=1e-3) and hi[2] == pytest.approx(3.0, abs=1e-3)
     assert lo[0] == pytest.approx(1.0, abs=1e-3) and hi[0] == pytest.approx(1.0 + 17 * 0.28, abs=1e-3)
     assert hi[1] - lo[1] == pytest.approx(1.0, abs=1e-3)

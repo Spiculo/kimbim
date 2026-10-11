@@ -57,7 +57,8 @@ KIND_LAYERS = {
     "electrical": "E-POWR", "structure_other": "S-MISC", "rooms": "A-AREA", "annotations": "A-ANNO-NOTE",
     "grids": "S-GRID", "other": "A-GENM",
 }
-OVERLAY_LAYERS = {"swing": "A-DOOR", "window": "A-GLAZ", "room": "A-AREA-IDEN", "marker": "A-ANNO-SYMB"}
+OVERLAY_LAYERS = {"swing": "A-DOOR", "window": "A-GLAZ", "room": "A-AREA-IDEN", "marker": "A-ANNO-SYMB",
+                  "stair": "A-FLOR-STRS"}
 DIMENSION_LAYER = "A-ANNO-DIMS"
 SHEET_LAYERS = {"frame": "A-ANNO-TTLB", "title": "A-ANNO-TITL", "legend": "A-ANNO-LGND"}
 _INSUNITS = {0.001: 4, 0.01: 5, 1.0: 6, 0.0254: 1, 0.3048: 2}  # metres per unit -> $INSUNITS

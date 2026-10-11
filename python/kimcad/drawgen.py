@@ -436,6 +436,129 @@ def window_symbol(window, to_paper):
     return out
 
 
+STAIR_PSETS = ("KIMCAD_Stair", "KIMCAD_Ramp")  # D88: stairs and ramps keep their plan data (Plan)
+
+
+def _crossing(walk, cut):
+    """Where a walking line (points x, y, z) first rises through the height `cut`: (index of the
+    segment, point, unit direction), or None."""
+    for i in range(len(walk) - 1):
+        a, b = walk[i], walk[i + 1]
+        if a[2] <= cut < b[2]:
+            t = (cut - a[2]) / (b[2] - a[2])
+            d = (b[0] - a[0], b[1] - a[1])
+            n = math.hypot(*d)
+            if n < 1e-9:  # a vertical step of the line: the next segment's direction
+                c = walk[i + 2] if i + 2 < len(walk) else b
+                d, n = (c[0] - b[0], c[1] - b[1]), math.hypot(c[0] - b[0], c[1] - b[1]) or 1.0
+            return i, (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t), (d[0] / n, d[1] / n)
+    return None
+
+
+def stair_symbol(plan: dict, cut: float, upper: bool = False):
+    """The plan symbol of a stair or ramp (D88, Archicad's): the walking line from a small circle at its
+    start to an arrow at its top, solid up to the break line at the plan cut and dashed above it, the
+    stair's lines above the cut dashed, and UP. `upper`: the level it arrives at, showing the part above
+    the cut in solid lines with DN. `plan` is the pset's data (local metres, heights above the stair's
+    base), `cut` the cut height above the base. Returns (solid, dashed, labels) as local polylines and
+    (x, y, text, angle) labels."""
+    walk = [tuple(p) for p in plan.get("walk") or []]
+    if len(walk) < 2:
+        return [], [], []
+    w = float(plan.get("w") or 1.0)
+    solid, dashed, labels = [], [], []
+    above = [[(x1, y1), (x2, y2)] for x1, y1, x2, y2, z in plan.get("lines") or [] if z > cut + 1e-6]
+    cross = _crossing(walk, cut)
+    flat = [(p[0], p[1]) for p in walk]
+    if cross is None:
+        below_walk, above_walk = (flat, []) if walk[-1][2] <= cut + 1e-6 else ([], flat)
+    else:
+        i, p, _ = cross
+        below_walk, above_walk = flat[: i + 1] + [p], [p] + flat[i + 1:]
+    if upper:
+        if cross is None and not above_walk:
+            return [], [], []
+        solid += above
+        if above_walk:
+            solid.append(above_walk)
+    else:
+        dashed += above
+        if below_walk:
+            solid.append(below_walk)
+        if above_walk:
+            dashed.append(above_walk)
+        x0, y0 = flat[0]
+        solid.append([(x0 + 0.06 * math.cos(a * math.pi / 6), y0 + 0.06 * math.sin(a * math.pi / 6)) for a in range(13)])
+    # The arrow at the top of the walking line, in the style of the part it ends.
+    (xa, ya), (xb, yb) = flat[-2], flat[-1]
+    n = math.hypot(xb - xa, yb - ya) or 1.0
+    ux, uy = (xb - xa) / n, (yb - ya) / n
+    head = [(xb - ux * 0.25 - uy * 0.12, yb - uy * 0.25 + ux * 0.12), (xb, yb), (xb - ux * 0.25 + uy * 0.12, yb - uy * 0.25 - ux * 0.12)]
+    (dashed if above_walk and not upper else solid).append(head)
+    if cross is not None:  # the break line: slanted across the flight, with a zigzag in its middle
+        _, (px, py), (dx, dy) = cross
+        nx, ny = -dy, dx
+        h, a = w / 2 + 0.05, 0.25 * w
+        A_ = (px - nx * h - dx * a, py - ny * h - dy * a)
+        B_ = (px + nx * h + dx * a, py + ny * h + dy * a)
+        m1 = (A_[0] + (B_[0] - A_[0]) * 0.45, A_[1] + (B_[1] - A_[1]) * 0.45)
+        m2 = (A_[0] + (B_[0] - A_[0]) * 0.55, A_[1] + (B_[1] - A_[1]) * 0.55)
+        z = 0.08
+        solid.append([A_, m1, (m1[0] + dx * z, m1[1] + dy * z), (m2[0] - dx * z, m2[1] - dy * z), m2, B_])
+    if upper:
+        labels.append((xb + ux * 0.35, yb + uy * 0.35, "DN", 0.0))
+    else:
+        (x1, y1) = flat[1]
+        n0 = math.hypot(x1 - flat[0][0], y1 - flat[0][1]) or 1.0
+        labels.append((flat[0][0] - (x1 - flat[0][0]) / n0 * 0.35, flat[0][1] - (y1 - flat[0][1]) / n0 * 0.35, "UP", 0.0))
+    return solid, dashed, labels
+
+
+def stair_symbols_svg(storey, to_paper, cut):
+    """The storey's stair and ramp symbols in a plan drawing (paper millimetres): those on the storey,
+    and those arriving at it from below (DN)."""
+    f = storey.file
+    unit = ifcopenshell.util.unit.calculate_unit_scale(f)
+    z = storey_elevation(storey)
+    out = []
+    for cls in ("IfcStair", "IfcRamp"):
+        for e in f.by_type(cls):
+            data = {}
+            for name in STAIR_PSETS:
+                data = ifcopenshell.util.element.get_pset(e, name) or data
+            if not data.get("Plan") or e.ObjectPlacement is None:
+                continue
+            container = ifcopenshell.util.element.get_container(e)
+            base = float(ifcopenshell.util.placement.get_local_placement(e.ObjectPlacement)[2][3]) * unit
+            top = base + float(data.get("Height") or 0.0)
+            if container == storey:
+                upper = False
+            elif abs(top - z) < 0.05 and container is not None:
+                upper = True
+                cut_here = PLAN_CUT  # the part above the lower level's plan cut
+            else:
+                continue
+            try:
+                plan = json.loads(data["Plan"])
+            except ValueError:
+                continue
+            solid, dashed, labels = stair_symbol(plan, (cut - (base - z)) if not upper else cut_here, upper)
+            m = ifcopenshell.util.placement.get_local_placement(e.ObjectPlacement)
+
+            def P(x, y):
+                q = m @ np.array([x / unit, y / unit, 0.0, 1.0])
+                return to_paper(q[0] * unit, q[1] * unit, z)
+
+            parts = [_path([P(*p) for p in line]) for line in solid]
+            parts += [_path([P(*p) for p in line]).replace("<path ", '<path stroke-dasharray="1.2,0.8" ')
+                      for line in dashed]
+            for x, y, text, angle in labels:
+                px, py = P(x, y)
+                parts.append(_text(px, py, text, TEXT_SIZE, baseline="central"))
+            out += [f'<g data-guid="{e.GlobalId}">', *parts, "</g>"]
+    return out
+
+
 def plan_annotations(storey, to_paper, size_default=TEXT_SIZE):
     """The story's plan annotations (KIMCAD_Annotation): text, dimension chains, marks, leaders."""
     f = storey.file
@@ -728,6 +851,7 @@ def overlay(f, drawing, s, svg: str, include=None) -> str:
             parts += object_symbols(storey, to_paper, include)  # D86, tagged per element
             # Room stamps are drawn with the tags on every request (tags.add_to_drawing, D87): their text
             # is the room stamp tag style's, a project setting this process does not see.
+            parts += _tagged("stair", stair_symbols_svg(storey, to_paper, s.get("cut", PLAN_CUT)))  # D88
             parts += plan_annotations(storey, to_paper)  # tags each annotation (guid, pen) itself
             parts += _tagged("marker", markers(f, to_paper, storey_elevation(storey)))
     if not parts:
@@ -780,7 +904,11 @@ def generate(f, drawing, include=None, bounds=None) -> tuple[str, dict]:
     if s is not None and s["kind"] == "plan":
         storey = _storey(drawing, s)
         symbols = symbol_objects(f)  # D86: drawn from their plan symbol (overlay), not cut
-        products = [p for p in products if ifcopenshell.util.element.get_container(p) == storey and p.GlobalId not in symbols]
+        # a stair's flights and landings are on its level (D88: they are its parts, not contained)
+        products = [p for p in products if (ifcopenshell.util.element.get_container(p)
+                                            or ifcopenshell.util.element.get_container(
+                                                ifcopenshell.util.element.get_aggregate(p) or p)) == storey
+                    and p.GlobalId not in symbols]
     if include is not None:
         wanted = set(include)
         products = [p for p in products if p.GlobalId in wanted]

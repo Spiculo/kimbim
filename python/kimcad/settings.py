@@ -40,6 +40,7 @@ DEFAULTS = {
     "clash_sets": {},  # clash detection sets by name (D81)
     "underlays": [],  # DXF, PDF and image underlays on levels: file, placement, display (D85)
     "tag_styles": {},  # tag styles by id: the project's own and its edited built-ins (D87)
+    "stair_rules": {},  # building-code limits for stair and ramp warnings (D88; empty: the defaults)
 }
 UNITS = {"m": 1.0, "cm": 100.0, "mm": 1000.0}
 
@@ -145,6 +146,10 @@ def _error(key: str, value) -> str | None:
         from . import underlays
 
         return underlays.validate(value)
+    if key == "stair_rules":
+        from . import stairs
+
+        return stairs.validate_rules(value)
     if key in ("ids_files", "clash_sets"):
         from . import checks
 

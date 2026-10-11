@@ -745,7 +745,9 @@ def _shared_type_value(present: list, total: int):
 def properties_multi(guids_json: str) -> str:
     if _model is None:
         return _dump({"error": "no model open"})
-    elements = _elements(guids_json)
+    from . import stairs
+
+    elements = stairs.drop_parts(_elements(guids_json))  # D88: a stair stands for its flights and landings
     if not elements:
         return _dump({"error": "no known elements selected"})
     per = [_element_values(e) for e in elements]
@@ -894,6 +896,7 @@ from . import drafting as _drafting  # noqa: E402
 from . import underlays as _underlays  # noqa: E402
 from . import symbols as _symbols  # noqa: E402
 from . import tags as _tags  # noqa: E402
+from . import stairs as _stairs  # noqa: E402
 
 _EXPORTS = {
     "authoring": (
@@ -913,7 +916,6 @@ _EXPORTS = {
         "create_beam",
         "create_column",
         "create_slab",
-        "create_stair",
         "create_wall",
         "delete_elements",
         "edit_opening",
@@ -1139,6 +1141,18 @@ _EXPORTS = {
         "console_run",
         "console_run_file",
         "console_stop",
+    ),
+    "stairs": (
+        "add_stair_railings",
+        "assembly_members",
+        "create_railing",
+        "create_ramp",
+        "create_stair",
+        "set_stair_params",
+        "stair_at",
+        "stair_info",
+        "stair_preview",
+        "stair_symbols",
     ),
     "underlays": (
         "add_underlay",

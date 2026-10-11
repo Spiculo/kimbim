@@ -327,7 +327,9 @@ def _delete_cascade(elements) -> tuple:
     regenerate what was joined to them. Returns (count, geometry changed, geometry removed)."""
     # Cascade: a wall takes its openings and the doors/windows in them; a door/window takes its
     # opening, and its host wall gets its hole closed (re-meshed).
-    openings, hosts = [], []
+    from . import stairs
+
+    openings, hosts = stairs.cascade(elements)  # D88: a stair's parts, railings and floor opening
     for e in list(elements):
         for rel in getattr(e, "HasOpenings", ()) or ():
             opening = rel.RelatedOpeningElement
@@ -1417,6 +1419,9 @@ def _copy_elements(elements, target, transform_units, *, tag=None) -> list:
     for c in copies.values():
         if c.is_a("IfcWall") and _axis_world(c) is not None and _layer_set(c) is not None:
             _regenerate(f, c)
+    from . import stairs
+
+    stairs.after_copy(pairs)  # D88: copied stairs get their own flights; railings follow their copy
     if tag is not None:
         for source, copy in pairs:
             tag(source, copy)
@@ -1424,8 +1429,11 @@ def _copy_elements(elements, target, transform_units, *, tag=None) -> list:
 
 
 def _copyable(guids_json: str) -> list:
-    return [e for e in B._elements(guids_json) if e.is_a("IfcProduct") and not getattr(e, "FillsVoids", None)
-            and not e.is_a("IfcOpeningElement")]
+    from . import stairs
+
+    return [e for e in stairs.drop_parts(B._elements(guids_json)) if e.is_a("IfcProduct")
+            and not getattr(e, "FillsVoids", None) and not e.is_a("IfcOpeningElement")
+            and stairs.whole_of(e) is None]  # a flight or landing comes with its stair (D88)
 
 
 def copy_to_storey(guids_json: str, storey_guid: str) -> str:
@@ -1465,64 +1473,11 @@ def copy_to_storey(guids_json: str, storey_guid: str) -> str:
     return B._dump({**r, "guids": made["copies"]})
 
 
-MAX_RISER = 0.175  # metres
-TREAD = 0.28       # metres (going)
-STAIR_WAIST = 0.2  # metres, vertical thickness under the top step
+def create_stair(storey_guid: str, x, y, angle, width, height, options_json: str = "") -> str:
+    """A stair (D88: kimcad.stairs, which has the shapes, landings and railings)."""
+    from . import stairs
 
-
-def create_stair(storey_guid: str, x, y, angle, width, height) -> str:
-    """A straight-flight stair going up `height` metres from the level, starting at (x, y) and
-    climbing in direction `angle` (radians); risers <= 175 mm, goings 280 mm."""
-    if B._model is None:
-        return _fail("no model open")
-    storey = _by_guid(storey_guid)
-    if storey is None or not storey.is_a("IfcBuildingStorey"):
-        return _fail("unknown level")
-    try:
-        x, y, angle, width, height = float(x), float(y), float(angle), float(width), float(height)
-    except (TypeError, ValueError) as ex:
-        return _fail(str(ex))
-    if width <= 0 or height <= 0:
-        return _fail("the stair needs a width and a height")
-    risers = math.ceil(height / MAX_RISER - 1e-9)
-    riser = height / risers
-    run = (risers - 1) * TREAD
-    made = {}
-
-    def action():
-        f = B._model
-        s = _scale()
-        # Side profile (x along the run, y up), saw-tooth on top, straight underside.
-        pts = [(0.0, 0.0)]
-        for i in range(1, risers):
-            pts += [((i - 1) * TREAD, i * riser), (i * TREAD, i * riser)]
-        pts += [(run, height), (run, max(height - STAIR_WAIST, 0.0)), (min(TREAD, run), 0.0)]
-        curve = f.createIfcPolyline([f.createIfcCartesianPoint((px / s, py / s)) for px, py in pts + [pts[0]]])
-        profile = f.createIfcArbitraryClosedProfileDef("AREA", None, curve)
-        position = f.createIfcAxis2Placement3D(f.createIfcCartesianPoint((0.0, width / 2 / s, 0.0)),
-                                               f.createIfcDirection((0.0, -1.0, 0.0)), f.createIfcDirection((1.0, 0.0, 0.0)))
-        solid = f.createIfcExtrudedAreaSolid(profile, position, f.createIfcDirection((0.0, 0.0, 1.0)), width / s)
-        representation = f.createIfcShapeRepresentation(_body_context(), "Body", "SweptSolid", [solid])
-        stair = ifcopenshell.api.root.create_entity(f, ifc_class="IfcStair", name="Stair", predefined_type="STRAIGHT_RUN_STAIR")
-        ifcopenshell.api.geometry.assign_representation(f, product=stair, representation=representation)
-        c, sn = math.cos(angle), math.sin(angle)
-        matrix = np.array([[c, -sn, 0, x], [sn, c, 0, y], [0, 0, 1, _elevation(storey)], [0, 0, 0, 1]], dtype=float)
-        ifcopenshell.api.geometry.edit_object_placement(f, product=stair, matrix=matrix, is_si=True)
-        ifcopenshell.api.spatial.assign_container(f, products=[stair], relating_structure=storey)
-        pset = ifcopenshell.api.pset.add_pset(f, product=stair, name="Pset_StairCommon")
-        ifcopenshell.api.pset.edit_pset(f, pset=pset, properties={
-            "NumberOfRiser": risers, "NumberOfTreads": risers - 1,
-            "RiserHeight": riser / s, "TreadLength": TREAD / s})
-        layers.assign_active(stair)
-        renovation.stamp_new(stair)
-        made["stair"] = stair
-        return 1, [stair.GlobalId], []
-
-    try:
-        r = B._run(action)
-    except Exception as ex:
-        return _fail(f"{type(ex).__name__}: {ex}")
-    return B._dump({**r, "guid": made["stair"].GlobalId, "risers": risers, "riser": round(riser, 6), "run": round(run, 6)})
+    return stairs.create_stair(storey_guid, x, y, angle, width, height, options_json)
 
 
 def add_slab_opening(slab_guid: str, points_json: str) -> str:
@@ -1538,20 +1493,9 @@ def add_slab_opening(slab_guid: str, points_json: str) -> str:
         return _fail(str(ex))
     if outline is None:
         return _fail("the outline needs at least 3 points and must not cross itself")
-    layer_set = _layer_set(ifcopenshell.util.element.get_type(slab)) if ifcopenshell.util.element.get_type(slab) else None
-    thickness = _thickness(layer_set) if layer_set else 0.3
-    bottom = float(ifcopenshell.util.placement.get_local_placement(slab.ObjectPlacement)[2][3]) * _scale()
 
     def action():
-        f = B._model
-        opening = ifcopenshell.api.root.create_entity(f, ifc_class="IfcOpeningElement", name="Slab opening")
-        representation = ifcopenshell.api.geometry.add_slab_representation(
-            f, context=_body_context(), depth=thickness + 0.02, polyline=outline)
-        ifcopenshell.api.geometry.assign_representation(f, product=opening, representation=representation)
-        matrix = np.eye(4)
-        matrix[2][3] = bottom - 0.01
-        ifcopenshell.api.geometry.edit_object_placement(f, product=opening, matrix=matrix, is_si=True)
-        ifcopenshell.api.feature.add_feature(f, feature=opening, element=slab)
+        _cut_slab(slab, outline)
         return 1, [slab.GlobalId], []
 
     try:
@@ -1559,6 +1503,24 @@ def add_slab_opening(slab_guid: str, points_json: str) -> str:
     except Exception as ex:
         return _fail(f"{type(ex).__name__}: {ex}")
     return B._dump(r)
+
+
+def _cut_slab(slab, outline, name="Slab opening"):
+    """Inside an action: an opening through a slab with this outline (plan metres). Returns it."""
+    f = B._model
+    slab_type = ifcopenshell.util.element.get_type(slab)
+    layer_set = _layer_set(slab_type) if slab_type else None
+    thickness = _thickness(layer_set) if layer_set else _extrusion_depth(slab) or 0.3
+    bottom = float(ifcopenshell.util.placement.get_local_placement(slab.ObjectPlacement)[2][3]) * _scale()
+    opening = ifcopenshell.api.root.create_entity(f, ifc_class="IfcOpeningElement", name=name)
+    representation = ifcopenshell.api.geometry.add_slab_representation(
+        f, context=_body_context(), depth=thickness + 0.02, polyline=outline)
+    ifcopenshell.api.geometry.assign_representation(f, product=opening, representation=representation)
+    matrix = np.eye(4)
+    matrix[2][3] = bottom - 0.01
+    ifcopenshell.api.geometry.edit_object_placement(f, product=opening, matrix=matrix, is_si=True)
+    ifcopenshell.api.feature.add_feature(f, feature=opening, element=slab)
+    return opening
 
 
 # ---------------------------------------------------------------- dimensions in the Properties panel
@@ -1592,6 +1554,10 @@ def element_dimensions(e) -> list[tuple[str, float, bool]]:
         t = ifcopenshell.util.element.get_type(e)
         layer_set = _layer_set(t) if t is not None else None
         return [("Thickness", _thickness(layer_set) if layer_set else _extrusion_depth(e), False)]
+    if e.is_a("IfcStair") or e.is_a("IfcRamp") or e.is_a("IfcRailing"):
+        from . import stairs
+
+        return stairs.dimensions(e)  # D88: their parameters, rebuilt when edited
     return []
 
 
@@ -1620,8 +1586,16 @@ def set_dimension(guids_json: str, name: str, value) -> str:
         return _fail(f"not a number: {value}")
     if name != "Sill height" and metres <= 0:
         return _fail(f"{name} must be more than 0")
+    from . import stairs
+
+    elements = stairs.drop_parts(B._elements(guids_json))
+    parametric = stairs.set_dimension(elements, name, metres)  # D88: stairs, ramps, railings
+    if isinstance(parametric, str):
+        return _fail(parametric)
     plan = []
-    for e in B._elements(guids_json):
+    for e in elements:
+        if stairs.kind_of(e) is not None:
+            continue
         current = {n: (v, editable) for n, v, editable in element_dimensions(e)}
         if name not in current:
             continue
@@ -1646,12 +1620,14 @@ def set_dimension(guids_json: str, name: str, value) -> str:
             if element_type is None or _profile(element_type) is None:
                 return _fail(f"{e.Name or e.GlobalId} has no profile type")
             plan.append(("profile", e, (_profile(element_type), metres, e.is_a("IfcBeam"))))
-    if not plan:
+    if not plan and parametric is None:
         return _fail(f"no selected element has a {name}")
 
     def action():
         f = B._model
         changed = []
+        if parametric is not None:
+            changed += parametric[1]()
         for kind, e, data in plan:
             if kind == "opening":
                 opening, wall, along, width, height, sill = data
@@ -1682,7 +1658,7 @@ def set_dimension(guids_json: str, name: str, value) -> str:
                     f, context=_body_context(), profile=profile, depth=metres_, cardinal_point=8 if beam else 5)
                 _replace_body(e, representation)
                 changed.append(e.GlobalId)
-        return len(plan), changed, []
+        return len(plan) + (parametric[0] if parametric else 0), changed, []
 
     try:
         r = B._run(action)
