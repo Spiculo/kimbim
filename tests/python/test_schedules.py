@@ -84,9 +84,10 @@ def test_slab_column_beam_and_room_quantities(house):
     assert len(slabs) == 3 and all(s["quantity:thickness"] == pytest.approx(0.2) for s in slabs)
     assert all(s["quantity:gross_area"] == pytest.approx(10.3 * 8.3) for s in slabs)  # to the outer faces
     l2 = next(s for s in slabs if s["info:level"] == "Level 2")
-    assert l2["quantity:opening_area"] == pytest.approx(5.1 * 1.2)  # the stair hole
-    assert l2["quantity:area"] == pytest.approx(10.3 * 8.3 - 5.1 * 1.2)
-    assert totals["quantity:volume"] == pytest.approx((3 * 10.3 * 8.3 - 5.1 * 1.2) * 0.2)
+    hole = (8 * 0.28 + 1.0) * (2 * 1.0 + 0.1)  # the U stair's automatic hole (D88)
+    assert l2["quantity:opening_area"] == pytest.approx(hole, abs=1e-3)
+    assert l2["quantity:area"] == pytest.approx(10.3 * 8.3 - hole, abs=1e-3)
+    assert totals["quantity:volume"] == pytest.approx((3 * 10.3 * 8.3 - hole) * 0.2, abs=1e-3)
     _, (column,), _ = table("columns")
     assert (column["quantity:height"], column["quantity:area"], column["quantity:volume"]) == pytest.approx((3.0, 0.09, 0.27))
     _, (beam,), _ = table("beams")

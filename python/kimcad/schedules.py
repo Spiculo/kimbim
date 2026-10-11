@@ -554,8 +554,15 @@ def _collect(scheme, ctx: _Ctx) -> list[dict]:
         for e in found:
             if e.id() not in seen and not e.is_a("IfcTypeObject"):
                 seen.add(e.id())
+                if e.is_a("IfcSlab") and _stair_part(e):
+                    continue  # a stair's or ramp's landing is the stair's, not a floor slab (D88)
                 elements.append(e)
     return collect_elements(elements, scheme["fields"], ctx)
+
+
+def _stair_part(e) -> bool:
+    whole = ifcopenshell.util.element.get_aggregate(e)
+    return whole is not None and (whole.is_a("IfcStair") or whole.is_a("IfcRamp"))
 
 
 def collect_elements(elements, fields, ctx: _Ctx | None = None) -> list[dict]:
