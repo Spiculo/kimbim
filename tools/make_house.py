@@ -2,8 +2,8 @@
 """Build the M3 exit-test house through the app's modeling commands and save it as IFC.
 
 Two storeys (Level 1 at 0, Level 2 at 3 m, Roof at 6 m): a 10 x 8 m loop of exterior walls per
-floor, a front door and windows, floor slabs, a roof slab, a stair from Level 1 to Level 2 with its
-hole in the Level 2 floor, columns and a beam. Plus the M4 exit: floor plans, a section, elevations
+floor, a front door and windows, floor slabs, a roof slab, a U stair from Level 1 to Level 2 with its
+railings and its automatic hole in the Level 2 floor, a ramp with a railing (D88), columns and a beam. Plus the M4 exit: floor plans, a section, elevations
 and sheet A01 holding the ground floor plan, the section and the south elevation. This is the same modeling path the GUI uses
 (app_bridge), without the GUI, so CI can produce the file on any machine.
 
@@ -58,8 +58,12 @@ def build(out: str) -> dict:
     l2 = call("add_storey", "Level 2", 3.0)["guid"]
     upper = call("copy_to_storey", json.dumps(walls + [slab1]), l2)["guids"]
     slab2 = upper[-1]
-    call("create_stair", l1, 1.0, 1.2, 0.0, 1.0, 3.0)
-    call("add_slab_opening", slab2, json.dumps([[0.9, 0.6], [6.0, 0.6], [6.0, 1.8], [0.9, 1.8]]))
+    # D88: a U stair with its half landing and railings; its hole in the Level 2 floor is automatic.
+    stair = call("create_stair", l1, 1.0, 1.2, 0.0, 1.0, 3.0, json.dumps({"shape": "U"}))["guid"]
+    call("add_stair_railings", stair, "0.9", "both")
+    # and a ramp outside the east wall with a guard railing by path
+    call("create_ramp", l1, 10.5, 2.0, 0.0, 1.2, 0.3, json.dumps({"slope": 8}))
+    call("create_railing", l1, json.dumps([[10.5, 1.35], [14.25, 1.35]]), "1.1")
 
     # Plan annotations (Slice 13): a label, a dimension and a mark on Level 1.
     call("add_annotation", l1, "text", json.dumps([[3.0, 2.0]]), "Living room")
@@ -99,7 +103,7 @@ def build(out: str) -> dict:
         raise SystemExit(f"save failed: {saved.get('error')}")
     count = lambda cls: len(b._model.by_type(cls))  # noqa: E731
     return {"file": out, "storeys": count("IfcBuildingStorey"), "walls": count("IfcWall"), "slabs": count("IfcSlab"),
-            "doors": count("IfcDoor"), "windows": count("IfcWindow"), "stairs": count("IfcStair"),
+            "doors": count("IfcDoor"), "windows": count("IfcWindow"), "stairs": count("IfcStair"), "ramps": count("IfcRamp"), "railings": count("IfcRailing"),
             "columns": count("IfcColumn"), "rooms": count("IfcSpace"), "roofs": count("IfcRoof"), "beams": count("IfcBeam"), "openings": count("IfcOpeningElement"),
             "objects": count("IfcFurniture") + count("IfcSanitaryTerminal") + count("IfcElectricAppliance")
             + count("IfcGeographicElement") + count("IfcBuildingElementProxy"),

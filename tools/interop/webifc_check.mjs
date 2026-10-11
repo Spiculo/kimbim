@@ -11,8 +11,9 @@ if (!path) {
   process.exit(2);
 }
 
-const CLASSES = ["IFCWALL", "IFCSLAB", "IFCDOOR", "IFCWINDOW", "IFCSTAIR", "IFCCOLUMN", "IFCBEAM", "IFCFURNITURE",
-  "IFCSANITARYTERMINAL", "IFCELECTRICAPPLIANCE", "IFCGEOGRAPHICELEMENT", "IFCBUILDINGELEMENTPROXY", "IFCBUILDINGSTOREY"];
+const CLASSES = ["IFCWALL", "IFCSLAB", "IFCDOOR", "IFCWINDOW", "IFCSTAIR", "IFCSTAIRFLIGHT", "IFCRAMP", "IFCRAMPFLIGHT",
+  "IFCRAILING", "IFCCOLUMN", "IFCBEAM", "IFCFURNITURE", "IFCSANITARYTERMINAL", "IFCELECTRICAPPLIANCE",
+  "IFCGEOGRAPHICELEMENT", "IFCBUILDINGELEMENTPROXY", "IFCBUILDINGSTOREY"];
 const api = new WebIFC.IfcAPI();
 await api.Init();
 const model = api.OpenModel(new Uint8Array(fs.readFileSync(path)));
@@ -38,6 +39,16 @@ api.StreamAllMeshes(model, (mesh) => {
   }
   if (triangles > 0) meshed.add(mesh.expressID);
 });
+// A whole made of parts (a stair of flights and landings, D88) has no shape of its own (IFC): it is
+// meshed when all its parts are.
+const parts = new Map(); // whole -> [part ids]
+const rels = api.GetLineIDsWithType(model, WebIFC.IFCRELAGGREGATES);
+for (let i = 0; i < rels.size(); i++) {
+  const rel = api.GetLine(model, rels.get(i));
+  const whole = rel.RelatingObject.value;
+  if (elements.has(whole)) parts.set(whole, rel.RelatedObjects.map((o) => o.value));
+}
+for (const [whole, ids] of parts) if (ids.length && ids.every((id) => meshed.has(id))) meshed.add(whole);
 for (const [id, name] of elements) if (!meshed.has(id)) report.missing.push({ id, class: name });
 report.meshed = elements.size - report.missing.length;
 api.CloseModel(model);
