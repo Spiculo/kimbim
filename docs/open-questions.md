@@ -261,6 +261,26 @@ Built per D86 (Archicad's Library and Object tool as the reference; objects gene
 5. **Shortcut** Shift+O for the Object tool, Tab to turn 90 degrees while placing. Acceptable?
 6. Which objects are missing for a first release (lighting, doors' furniture, office desks, parking
    spaces, plants in pots)?
+## For the architect: stairs, ramps and railings (asked 2026-10-11, waiting)
+
+Built per D88 (Archicad's Stair and Railing tools as the reference).
+
+1. **Riser count**: rounded up from the height and a target riser of 175 mm (3.00 m: 18 risers of 167 mm), tread 280 mm.
+   Your office's defaults? Should the tread instead follow from 2R+G = 630 mm?
+2. **Code checks** are warnings (riser over 180 mm, tread under 250 mm, 2R+G outside 600–650 mm, ramp over 1:12),
+   editable in the project settings (`stair_rules`). Which code do you work to (headroom, maximum flight length,
+   landings every N risers, handrail extensions)?
+3. An **L or U stair** splits the risers half and half; the U's well is 100 mm. Do you want to choose the landing's
+   position (risers per flight) and the well width?
+4. The **opening in the floor above** is the stair's whole outline. Archicad can also cut only where headroom needs it;
+   which do you draw?
+5. **Railings** are 0.9 m on stairs and 1.1 m along paths, posts at most 1.2 m apart, balusters 120 mm apart; the inner
+   railing of a U crosses the well at the landing. Your usual railing? Do you want a handrail on walls instead
+   (Archicad's wall handrail)?
+6. The **plan symbol** breaks at the plan cut, dashes the part above and writes UP at the start; the upper level shows the
+   part above the cut with DN (drawings). Do you draw the arrow at the top (Archicad) or the bottom, and the riser
+   numbers?
+7. **Winders and spiral stairs** are not there yet. How often do you use them?
 
 ## For the architect: tracker, guides, Tab cycling, touchpad (asked 2026-10-11, waiting)
 

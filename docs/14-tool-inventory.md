@@ -143,9 +143,9 @@ release notes, so check before relying on a single cell.
 | Slanted, tapered, segmented columns and beams | AC RV | ⬜ | new | |
 | Grids | all | ✅ | P0 | |
 | Stairs: straight flight | all | ✅ | P1 | |
-| Stairs: landings, L/U shapes, spiral, by sketch | all | ⬜ | P1 | |
-| Railings | all | ⬜ | P1 | |
-| Ramps | AC RV VW | ⬜ | new | |
+| Stairs: landings, L/U shapes, spiral, by sketch | all | 🟡 | P1 | D88: L, U, by sketch with landings, risers from the height, code warnings, floor opening, plan symbol; no winders or spiral yet |
+| Railings | all | ✅ | P1 | D88: on a stair or ramp's sides (they follow it) or by path; posts, top rail, balusters |
+| Ramps | AC RV VW | ✅ | new | D88: straight and L, slope with a 1:12 warning, plan arrow |
 | Roofs: flat | all | ⬜ | P1 | |
 | Roofs: pitched, hip, gable, multi-plane, by footprint | all | ⬜ | P1 | |
 | Shell / free-form roof | AC RV | ⬜ | new | |
