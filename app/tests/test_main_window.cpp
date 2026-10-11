@@ -844,6 +844,55 @@ private slots:
         QVERIFY(w.close());
     }
 
+    void lStairRailingAndRampWithTheTools()
+    {
+        // D88: an L stair drawn with the Stair tool, railings on it with the Railing tool, a ramp.
+        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        const QString l1 = w.levelsBar()->activeStorey();
+        QVERIFY(w.addLevel(QStringLiteral("Level 2"), 3.0));
+        w.levelsBar()->setActive(l1);
+        QVERIFY(w.openPlanTab(l1)); // the plan symbol shows in plan views
+        w.setTool(kimcad::MainWindow::Tool::Stair);
+        w.setStairShape(QStringLiteral("stair"), QStringLiteral("L"), QStringLiteral("left"));
+        w.twoPointTool()->click({1, 1});
+        w.twoPointTool()->click({5, 1});
+        QCOMPARE(w.viewport()->elementCount(), 3); // two flights and a landing
+        QStringList flights;
+        for (const QString& g : w.viewport()->guids())
+            if (w.viewport()->typeOf(g) == QLatin1String("IfcStairFlight"))
+                flights << g;
+        QCOMPARE(flights.size(), 2);
+        double x0, y0, z0, x1, y1, z1;
+        w.viewport()->boundsOf(w.viewport()->guids()).Get(x0, y0, z0, x1, y1, z1);
+        QVERIFY(std::abs(z1 - 3.0) < 0.01);                 // up to Level 2
+        QVERIFY(std::abs(x1 - (1.0 + 8 * 0.28 + 1.0)) < 0.01); // the quarter landing's far side
+        QVERIFY(y1 > 1.0 + 0.5 + 8 * 0.28 - 0.01);            // the second flight turns left
+        // A click on a flight selects the stair with its parts; Properties show the stair.
+        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setSelection({flights.first()});
+        QCOMPARE(w.selection().size(), 4); // the stair, two flights, the landing
+        // The plan symbol is drawn as plan annotations named after the stair.
+        bool symbol = false;
+        for (const QString& g : w.viewport()->annotationGuids())
+            symbol = symbol || g.endsWith(QStringLiteral("~symbol"));
+        QVERIFY(symbol);
+        // Railings on both sides: one click on the stair.
+        w.setTool(kimcad::MainWindow::Tool::Railing);
+        QVERIFY(action(w, "actionRailingTool")->isChecked());
+        QVERIFY(w.railStairAt({2.0, 1.0}));
+        QCOMPARE(w.viewport()->elementCount(), 5);
+        QVERIFY(!w.railStairAt({20.0, 20.0})); // nothing there
+        // A ramp: Stair tool, ramp kind.
+        w.setTool(kimcad::MainWindow::Tool::Stair);
+        w.setStairShape(QStringLiteral("ramp"), QStringLiteral("straight"));
+        w.twoPointTool()->click({1, -3});
+        w.twoPointTool()->click({5, -3});
+        QCOMPARE(w.viewport()->elementCount(), 6);
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QVERIFY(w.close());
+    }
+
     void secondFloorWithTheTools()
     {
         kimcad::MainWindow w(nullptr, /*quiet=*/true);

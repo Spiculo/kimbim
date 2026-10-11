@@ -145,7 +145,8 @@ public:
     enum class Tool { None, Wall, Slab, Door, Window, Column, Beam, Grid, Move, Rotate, Stretch, Stair, SlabOpening, PlaceModel, Text, Dimension, Mark, Section, Elevation, Leader, Mirror, Room, Roof, Measure, Split, Trim, Join,
         Line, Polyline, ArcCircle, Rectangle, Fill, // 2D drafting (D84, DraftTools.cpp)
         Tag, NorthArrow, ScaleBar, Cloud, AngleDimension, RadialDimension, LevelDimension, // D87, MarkupTools.cpp
-        Object }; // D86: a library object (LibraryTools.cpp)
+        Object, // D86: a library object (LibraryTools.cpp)
+        Railing }; // D88, StairTools.cpp
     void setTool(Tool tool);
     Tool tool() const { return m_tool; }
     WallTool* wallTool() const { return m_wallTool; }
@@ -164,6 +165,13 @@ public:
     // Two-storey houses (Slice 7).
     bool copyToLevel(const QStringList& guids, const QString& storey);
     bool createStair(QPointF start, QPointF towards);
+    // D88 (StairTools.cpp): the Stair tool's options choose stair or ramp, its shape (straight, L, U,
+    // by sketch: a clicked walking line) and sizes; the Railing tool puts railings on a clicked stair or
+    // ramp, or along a clicked path.
+    bool createStairSketch(const QVector<QPointF>& walkingLine);
+    bool railStairAt(QPointF p);
+    bool createRailing(const QVector<QPointF>& path);
+    void setStairShape(const QString& kind, const QString& shape, const QString& turn = QStringLiteral("left"));
     bool addSlabOpening(const QVector<QPointF>& outline);
     double heightToNextLevel();
     // Versioned projects (Slice 8, docs/03).
@@ -499,6 +507,13 @@ private:
     void startDraftTool(Tool tool);
     void draftPointer(QPointF p, double tolerance, Qt::KeyboardModifiers mods, bool click);
     void updateDraftPreview();
+    void setupStairTools(ToolOptionsBar* bar); // D88
+    void startStairTool(Tool tool);
+    bool stairPointer(QPointF p, double tolerance, Qt::KeyboardModifiers mods, bool click);
+    void updateStairPreview();
+    QJsonObject stairOptions() const;
+    QJsonObject stairSymbolData(); // the level's stair symbols; refreshes the stair/part map
+    void expandAssemblies(QStringList& guids) const;
     void setupMarkupTools(ToolOptionsBar* bar); // D87
     void setupInputAids();                      // D89 (MainWindowInputAids.cpp)
     bool trackerTool() const;                   // the current tool places points
@@ -580,6 +595,21 @@ private:
     QLineEdit* m_markupText = nullptr; // a revision cloud's revision
     QString m_tagElement;              // the element picked, waiting for the text's place (leader)
     std::optional<QPointF> m_markupHover;
+    DraftTool* m_pathTool = nullptr;      // D88: a stair's walking line, a railing's path
+    QComboBox* m_stairKind = nullptr;     // stair / ramp
+    QComboBox* m_stairShape = nullptr;    // straight, L, U, sketch
+    QComboBox* m_stairTurn = nullptr;     // left / right
+    QDoubleSpinBox* m_stairWidth = nullptr;
+    QDoubleSpinBox* m_stairTread = nullptr;
+    QDoubleSpinBox* m_stairRiser = nullptr;   // target riser
+    QDoubleSpinBox* m_stairLanding = nullptr; // 0: the width
+    QDoubleSpinBox* m_rampSlope = nullptr;    // percent
+    QDoubleSpinBox* m_rampRise = nullptr;
+    QComboBox* m_railingMode = nullptr;   // on a stair / by path
+    QDoubleSpinBox* m_railingHeight = nullptr;
+    QHash<QString, QString> m_assemblyOf;          // a stair's part or symbol -> the stair
+    QHash<QString, QStringList> m_assemblyMembers; // stair -> its parts
+    QHash<QString, QString> m_assemblyType;        // stair -> IfcStair / IfcRamp
     bool m_detach = false; // Ctrl held on the click that finished a move/rotate
     std::optional<QPointF> m_columnHover;
     Tool m_tool = Tool::None;

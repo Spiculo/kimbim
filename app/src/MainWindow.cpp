@@ -115,6 +115,7 @@
 namespace kimcad {
 
 void readDrafting(const QJsonObject& o, Viewport::Annotation* a); // D84, DraftTools.cpp
+void readStairSymbols(const QJsonObject& data, QVector<Viewport::Annotation>* list); // D88, StairTools.cpp
 
 namespace {
 // Adds the time spent in a scope to a named counter.
@@ -773,6 +774,8 @@ void MainWindow::buildCutsToolbar()
         m_cutLabel->setText(formatLength(metres));
         if (m_planCut->isChecked())
             applyCuts();
+        if (!m_assemblyType.isEmpty())
+            refreshAnnotations(); // D88: the stairs' break lines are at the cut
     });
     connect(m_cutSlider, &QSlider::valueChanged, this, [this](int centimetres) {
         m_cutHeight->setValue(centimetres / 100.0); // updates the label and the cut
@@ -940,27 +943,38 @@ QString jsonValue(const QJsonValue& v)
 void MainWindow::setSelection(const QStringList& guids)
 {
     QStringList expanded = guids;
-    for (const QString& g : guids)
+    expandAssemblies(expanded); // D88: a flight, landing or plan symbol selects its stair
+    for (const QString& g : QStringList(expanded))
         if (const auto it = m_instanceOf.constFind(g); it != m_instanceOf.constEnd())
             for (const QString& m : m_instanceMembers.value(*it))
                 if (!expanded.contains(m))
                     expanded << m;
     if (expanded.size() != guids.size()) { // a click on an instance takes the whole instance
-        m_viewport->selectGuids(expanded);
+        QStringList shown = expanded;
+        for (const QString& g : expanded)
+            if (m_assemblyType.contains(g))
+                shown << g + QStringLiteral("~symbol") << g + QStringLiteral("~above");
+        m_viewport->selectGuids(shown);
         m_tree->selectGuids(expanded);
     }
+    expanded.removeIf([](const QString& g) { return g.contains(QLatin1Char('~')); });
     m_selection = expanded;
     // The bottom bar's summary: "1 Wall", "2 Walls", or "5 element(s)" for several kinds.
     QSet<QString> kinds;
-    for (const QString& g : expanded)
-        kinds.insert(m_viewport->typeOf(g));
-    if (expanded.isEmpty())
+    QStringList counted; // a stair counts once, not with its flights and landings (D88)
+    for (const QString& g : expanded) {
+        if (m_assemblyOf.contains(g))
+            continue;
+        counted << g;
+        kinds.insert(m_assemblyType.value(g, m_viewport->typeOf(g)));
+    }
+    if (counted.isEmpty())
         m_status->setSelection(QString());
     else if (kinds.size() == 1)
-        m_status->setSelection(QStringLiteral("%1 %2").arg(expanded.size()).arg(expanded.size() == 1
+        m_status->setSelection(QStringLiteral("%1 %2").arg(counted.size()).arg(counted.size() == 1
             ? ModelTreePanel::plainName(*kinds.constBegin()) : ModelTreePanel::plainPlural(*kinds.constBegin())));
     else
-        m_status->setSelection(tr("%n element(s)", nullptr, int(expanded.size())));
+        m_status->setSelection(tr("%n element(s)", nullptr, int(counted.size())));
     refreshProperties();
     if (!guids.isEmpty())
         m_status->showMessage(tr("%n element(s) selected", nullptr, int(guids.size())));
@@ -1240,7 +1254,9 @@ void MainWindow::buildModelingToolbar()
         {Tool::Join, "actionJoinTool", tr("&Join"), QKeyCombination(Qt::SHIFT, Qt::Key_J),
             tr("Join two walls that meet (L or T), merge two in line of the same type, or unjoin them")},
         {Tool::Stair, "actionStairTool", tr("S&tair"), Qt::Key_T,
-            tr("Draw a stair: click where it starts, then the direction it climbs; it goes up to the next level")},
+            tr("Draw a stair (straight, L, U or by sketch) or a ramp; a stair goes up to the next level")},
+        {Tool::Railing, "actionRailingTool", tr("Ra&iling"), QKeyCombination::fromCombined(0),
+            tr("Railings on both sides of a clicked stair or ramp (they follow it), or along a clicked path")},
         {Tool::SlabOpening, "actionSlabOpeningTool", tr("Slab &opening"), Qt::Key_O,
             tr("Cut a hole in the selected slab: draw its outline like a slab")},
         {Tool::PlaceModel, "actionPlaceModelTool", tr("Place mo&del"), Qt::Key_U,
@@ -1291,7 +1307,7 @@ void MainWindow::buildModelingToolbar()
     // The tools' icons: the IFC class each one makes (the tree's icons).
     const QHash<int, QString> iconClass = {{int(Tool::Wall), "IfcWall"}, {int(Tool::Slab), "IfcSlab"},
         {int(Tool::Door), "IfcDoor"}, {int(Tool::Window), "IfcWindow"}, {int(Tool::Column), "IfcColumn"},
-        {int(Tool::Beam), "IfcBeam"}, {int(Tool::Stair), "IfcStair"}, {int(Tool::Roof), "IfcRoof"},
+        {int(Tool::Beam), "IfcBeam"}, {int(Tool::Stair), "IfcStair"}, {int(Tool::Railing), "IfcRailing"}, {int(Tool::Roof), "IfcRoof"},
         {int(Tool::Room), "IfcSpace"}, {int(Tool::Grid), "IfcGrid"}, {int(Tool::Object), "IfcFurniture"}};
     for (const Def& d : defs) {
         auto* a = new QAction(d.text, this); // shown in the tool palette (D71) and the Model menu
@@ -1416,6 +1432,7 @@ void MainWindow::buildModelingToolbar()
     setupDraftTools(bar);  // D84
     setupMarkupTools(bar); // D87
     setupLibrary(model);   // D86
+    setupStairTools(bar);  // D88
     m_hosts.value(QStringLiteral("3d"))->adoptChrome(m_toolOptions, nullptr);
     connect(m_lengthInput, &QLineEdit::returnPressed, this, [this] {
         bool ok = false;
@@ -1466,9 +1483,15 @@ void MainWindow::buildModelingToolbar()
             m_hostTool->setTolerance(tolerance);
             m_hostTool->move(p);
             break;
+        case Tool::Railing:
+            stairPointer(p, tolerance, mods, false); // D88
+            break;
+        case Tool::Stair:
+            if (stairPointer(p, tolerance, mods, false)) // D88: a stair by sketch
+                break;
+            [[fallthrough]];
         case Tool::Beam:
         case Tool::Grid:
-        case Tool::Stair:
             m_twoPointTool->setTolerance(tolerance);
             m_twoPointTool->setOrtho(ortho);
             showSnap(m_twoPointTool->move(p));
@@ -1572,9 +1595,15 @@ void MainWindow::buildModelingToolbar()
             m_hostTool->setTolerance(tolerance);
             m_hostTool->click(p);
             break;
+        case Tool::Railing:
+            stairPointer(p, tolerance, mods, true); // D88
+            break;
+        case Tool::Stair:
+            if (stairPointer(p, tolerance, mods, true)) // D88: a stair by sketch
+                break;
+            [[fallthrough]];
         case Tool::Beam:
         case Tool::Grid:
-        case Tool::Stair:
             m_twoPointTool->setTolerance(tolerance);
             m_twoPointTool->setOrtho(ortho);
             m_twoPointTool->click(p);
@@ -1683,6 +1712,8 @@ void MainWindow::buildModelingToolbar()
             m_twoPointTool->cancel();
         else if (isDraftTool(m_tool) && m_draftTool->isDrawing())
             m_draftTool->escape(); // D84: a polyline ends open, anything else is dropped
+        else if ((m_tool == Tool::Stair || m_tool == Tool::Railing) && m_pathTool->isDrawing())
+            m_pathTool->escape(); // D88: a walking line or a path of two points or more is used
         else if (m_tool == Tool::Rotate && m_rotateTool->stage() > 0)
             m_rotateTool->cancel();
         else if (m_tool == Tool::Stretch && draftGripActive()) {
@@ -1713,6 +1744,8 @@ void MainWindow::buildModelingToolbar()
             m_measure->finish();
         else if (isDraftTool(m_tool))
             m_draftTool->finish();
+        else if (m_tool == Tool::Stair || m_tool == Tool::Railing)
+            m_pathTool->finish(); // D88
     }); });
     onEachView([this](Viewport* v) { connect(v, &Viewport::lengthKeyTyped, this, [this](const QString& text) {
         if (m_lengthInput->isHidden() || m_toolOptions->isHidden())
@@ -1794,6 +1827,7 @@ void MainWindow::refreshTypes()
         break;
     case Tool::Grid:
     case Tool::Measure:
+    case Tool::Railing:
         break;
     case Tool::Split:
     case Tool::Trim:
@@ -1862,9 +1896,9 @@ void MainWindow::updateToolPreview()
         m_viewport->setWallPreview(m_wallTool->preview(), type.value("thickness").toDouble(), m_wallHeight->value());
         return;
     case Tool::Stair:
-        if (const auto seg = m_twoPointTool->preview())
-            boxes.push_back({seg->first, seg->second, 1.0, z, z + heightToNextLevel()});
-        break;
+    case Tool::Railing:
+        updateStairPreview(); // D88 (StairTools.cpp)
+        return;
     case Tool::SlabOpening:
     case Tool::Roof:
     case Tool::Slab: {
@@ -1994,6 +2028,7 @@ void MainWindow::setTool(Tool tool)
     m_measureCopy->setVisible(tool == Tool::Measure);
     startModifyTool(tool); // D80: its mode list in the options bar
     startDraftTool(tool);  // D84: line type, arc mode, fill pattern
+    startStairTool(tool);  // D88: stair or ramp, shape, sizes; railing mode
     startMarkupTool(tool); // D87: tag style, shape, leader; radius/diameter, level/spot; revision
     m_twoPointTool->snapper().setFaceSnapping(tool == Tool::Dimension); // dimensions measure wall faces
     for (auto it = m_toolActions.constBegin(); it != m_toolActions.constEnd(); ++it) {
@@ -2087,7 +2122,8 @@ void MainWindow::setTool(Tool tool)
         m_status->showMessage(tr("Object: click where it goes (Tab: turn 90 degrees, type an angle + Enter; Shift: turned for this click)"));
         break;
     case Tool::Stair:
-        m_status->showMessage(tr("Stair: click where it starts, then the direction it climbs"));
+    case Tool::Railing:
+        startStairTool(tool); // D88: its hint
         break;
     case Tool::SlabOpening:
         m_status->showMessage(tr("Slab opening: draw the hole's outline; click the first point or press Enter to close"));
@@ -2281,24 +2317,6 @@ double MainWindow::heightToNextLevel()
     return found ? next - here : m_wallHeight->value();
 }
 
-bool MainWindow::createStair(QPointF start, QPointF towards)
-{
-    const QPointF d = towards - start;
-    if (std::hypot(d.x(), d.y()) < 1e-6)
-        return false;
-    auto num = [](double v) { return QString::number(v, 'g', 17); };
-    const QJsonObject r = bridge("create_stair", {m_levels->activeStorey(), num(start.x()), num(start.y()),
-        num(std::atan2(d.y(), d.x())), num(1.0), num(heightToNextLevel())});
-    if (!r.value("ok").toBool()) {
-        m_status->showMessage(tr("Could not create the stair: %1").arg(r.value("error").toString()));
-        return false;
-    }
-    afterEdit(r);
-    m_status->showMessage(tr("Stair: %1 risers of %2 m").arg(r.value("risers").toInt())
-                                 .arg(QLocale().toString(r.value("riser").toDouble(), 'f', 3)));
-    return true;
-}
-
 bool MainWindow::addSlabOpening(const QVector<QPointF>& outline)
 {
     if (m_selection.size() != 1)
@@ -2475,7 +2493,7 @@ void MainWindow::buildPalette()
     auto tool = [this](Tool t) { return m_toolActions.value(int(t)); };
     m_palette = new ToolPalette(this);
     m_palette->addGroup(QStringLiteral("3d"), tr("3D"), {tool(Tool::Wall), tool(Tool::Slab), tool(Tool::Column),
-        tool(Tool::Beam), tool(Tool::Door), tool(Tool::Window), tool(Tool::Stair), tool(Tool::Roof), tool(Tool::Room),
+        tool(Tool::Beam), tool(Tool::Door), tool(Tool::Window), tool(Tool::Stair), tool(Tool::Railing), tool(Tool::Roof), tool(Tool::Room),
         tool(Tool::SlabOpening), tool(Tool::PlaceModel), tool(Tool::Object)});
     m_palette->addGroup(QStringLiteral("plane"), tr("Plane"), {tool(Tool::Text), tool(Tool::Dimension),
         tool(Tool::Leader), tool(Tool::Mark), tool(Tool::Grid), tool(Tool::Line), tool(Tool::Polyline),
@@ -3528,6 +3546,7 @@ void MainWindow::refreshAnnotations()
             a.points << QPointF(p.toArray().at(0).toDouble(), p.toArray().at(1).toDouble());
         list << a;
     }
+    readStairSymbols(stairSymbolData(), &list); // D88: plan symbols of the level's stairs and ramps
     m_viewport->setAnnotations(list, m_levels->activeElevation());
     if (!m_selection.isEmpty())
         m_viewport->selectGuids(m_selection);
