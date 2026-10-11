@@ -1096,6 +1096,24 @@ ES = {
     'Pick an object in the Library panel first': 'Elija primero un objeto en el panel Biblioteca',
     '%1 placed': '%1 colocado',
     'A shared folder of objects (.py) and IFC type libraries (.ifc)': 'Una carpeta compartida de objetos (.py) y bibliotecas de tipos IFC (.ifc)',
+    # D89: input aids
+    "intersection": "intersección",
+    "guide crossing": "cruce de guías",
+    "on guide": "en guía",
+    "parallel": "paralela",
+    "tracker": "rastreador",
+    "typed": "tecleado",
+    "Temporary &guides": "&Guías temporales",
+    "Rest the cursor on a snap point to draw guide lines through it (again: remove it)":
+        "Deje el cursor sobre un punto de referencia para trazar guías por él (otra vez: quitarlo)",
+    "&Clear guides": "&Borrar guías",
+    "Automatic (touchpad scroll pans, mouse wheel zooms)":
+        "Automático (el panel táctil desplaza, la rueda del ratón hace zoom)",
+    "Scrolling zooms (mouse wheel)": "Desplazar hace zoom (rueda del ratón)",
+    "Scrolling pans, pinch or Ctrl+scroll zooms (touchpad)":
+        "Desplazar mueve la vista; pellizcar o Ctrl+desplazar hace zoom (panel táctil)",
+    "Two-finger scroll with Shift orbits the 3D view": "Desplazar con dos dedos y Mayús orbita la vista 3D",
+    "Scroll and touchpad:": "Desplazamiento y panel táctil:",
 }
 
 
