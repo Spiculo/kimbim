@@ -51,6 +51,9 @@ public:
     QByteArray saveLayout() const;
     void captureDefault();                       // the layout to fall back to
     bool restoreLayout(const QByteArray& state); // false (and the default applied) if unusable
+    // True when the current layout fits real screens (a corrupt state can ask for a multi-gigabyte
+    // window: the Qt backing store then fails to allocate and the app crashes).
+    bool layoutIsSane() const;
 
 signals:
     void currentChanged(const QString& key);

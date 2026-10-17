@@ -119,6 +119,19 @@ PreferencesDialog::PreferencesDialog(Preferences& prefs, QWidget* parent)
     m_recovery->setValue(prefs.recoveryMinutes());
     form->addRow(tr("Recovery copy every:"), m_recovery);
 
+    m_drawingTimeout = new QSpinBox(this);
+    m_drawingTimeout->setObjectName(QStringLiteral("drawingTimeout"));
+    m_drawingTimeout->setRange(0, 3600);
+    m_drawingTimeout->setSuffix(tr(" s"));
+    m_drawingTimeout->setSpecialValueText(tr("No limit"));
+    m_drawingTimeout->setValue(prefs.drawingTimeout());
+    m_drawingTimeout->setToolTip(tr("Give up on a drawing that takes longer: the hidden-line pass can be slow on a large model"));
+    form->addRow(tr("Drawing generation timeout:"), m_drawingTimeout);
+    m_drawingHlr = choice(this, "drawingHlr", {{tr("Exact (faster on detailed models)"), "exact"},
+                                                  {tr("Polygon (faster on curved models)"), "poly"}}, prefs.drawingHlr());
+    m_drawingHlr->setToolTip(tr("The serializer's hidden-line mode: try the other one if drawings are slow"));
+    form->addRow(tr("Hidden-line mode:"), m_drawingHlr);
+
     layout->addLayout(form);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
@@ -139,6 +152,8 @@ void PreferencesDialog::apply()
     m_prefs.setValue(QStringLiteral("auto_version"), m_autoVersion->currentData().toString());
     m_prefs.setValue(QStringLiteral("auto_version_every"), m_autoEvery->value());
     m_prefs.setValue(QStringLiteral("recovery_minutes"), m_recovery->value());
+    m_prefs.setValue(QStringLiteral("drawing_timeout"), m_drawingTimeout->value());
+    m_prefs.setValue(QStringLiteral("drawing_hlr"), m_drawingHlr->currentData().toString());
 }
 
 void PreferencesDialog::accept()

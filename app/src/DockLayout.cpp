@@ -11,10 +11,22 @@
 #include <QGuiApplication>
 #include <QMainWindow>
 #include <QScreen>
+#include <QFile>
+#include <QStandardPaths>
 
 #include <algorithm>
 
 namespace kimcad {
+
+namespace {
+// Temporary diagnostic (removed once the huge-window crash is fixed).
+void diag(const QString& message)
+{
+    QFile f(QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QStringLiteral("/kimcad-diag.txt"));
+    if (f.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
+        f.write((message + QLatin1Char('\n')).toUtf8());
+}
+} // namespace
 
 DockLayout::DockLayout(QMainWindow* window)
     : QObject(window)
@@ -221,12 +233,50 @@ bool DockLayout::onSomeScreen() const
     return true;
 }
 
+bool DockLayout::layoutIsSane() const
+{
+    // A corrupt layout can ask for a window of tens of thousands of pixels: Qt then fails to allocate
+    // the ~4 GB backing store (createDIB) and the app dies. Anything past a few screens is not real.
+    int screenW = 0, screenH = 0;
+    for (QScreen* s : QGuiApplication::screens()) {
+        screenW = std::max(screenW, s->availableGeometry().width());
+        screenH = std::max(screenH, s->availableGeometry().height());
+    }
+    const int capW = std::max(screenW, 1024) * 4, capH = std::max(screenH, 768) * 4;
+    for (ads::CFloatingDockContainer* f : m_manager->floatingWidgets()) {
+        const QRect g = f->geometry();
+        if (g.width() > capW || g.height() > capH || g.width() <= 0 || g.height() <= 0)
+            return false;
+    }
+    const QSize hint = m_manager->minimumSizeHint();
+    if (hint.width() > capW || hint.height() > capH)
+        return false;
+    if (QWidget* w = m_manager->window()) {
+        const QSize windowHint = w->minimumSizeHint();
+        if (windowHint.width() > capW || windowHint.height() > capH)
+            return false;
+    }
+    return true;
+}
+
 bool DockLayout::restoreLayout(const QByteArray& state)
 {
-    // ADS skips docks it no longer has (a drawing deleted since); a garbled state or a floating
-    // window left on an unplugged monitor falls back to the default layout.
-    if (!state.isEmpty() && m_manager->restoreState(state) && onSomeScreen())
+    // ADS skips docks it no longer has (a drawing deleted since); a garbled state, a huge size or a
+    // floating window left on an unplugged monitor falls back to the default layout.
+    if (state.isEmpty()) {
+        if (!m_default.isEmpty())
+            m_manager->restoreState(m_default);
+        return false;
+    }
+    const bool restored = m_manager->restoreState(state);
+    if (restored && onSomeScreen() && layoutIsSane())
         return true;
+    QString sizes;
+    for (int s : m_manager->splitterSizes(m_center))
+        sizes += QString::number(s) + QLatin1Char(' ');
+    diag(QStringLiteral("restoreLayout REJECTED: restored=%1 sane=%2 onScreen=%3 splits=[%4] floats=%5")
+        .arg(restored).arg(layoutIsSane()).arg(onSomeScreen()).arg(sizes.trimmed())
+        .arg(m_manager->floatingWidgets().size()));
     if (!m_default.isEmpty())
         m_manager->restoreState(m_default);
     return false;

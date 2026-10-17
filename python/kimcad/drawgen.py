@@ -21,6 +21,7 @@ import math
 import multiprocessing
 import re
 import sys
+import threading
 import time
 
 import ifcopenshell
@@ -45,6 +46,21 @@ SCALE = 100  # 1:100 until drawings get a scale setting
 MARGIN = 1.0  # metres added around the model for infinite ranges
 EMPTY_BOUNDS = (np.array([0.0, 0.0, 0.0]), np.array([10.0, 10.0, 3.0]))  # a new project has no elements yet
 NOT_DRAWN = ("IfcOpeningElement", "IfcSpace", "IfcAnnotation", "IfcGrid", "IfcVirtualElement")
+
+
+def _svg_overrides() -> dict:
+    """Serializer settings from the KIMCAD_SVG_OPTS environment (a JSON object), for tuning the
+    hidden-line pass without a code change (e.g. {"svg-poly": false}). Empty when unset."""
+    import os
+
+    raw = os.environ.get("KIMCAD_SVG_OPTS")
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
 def is_drawing(e) -> bool:
@@ -725,15 +741,17 @@ def crop(svg: str, margin: float = 5.0) -> str:
                   svg, count=1)
 
 
-def generate(f, drawing, include=None) -> tuple[str, dict]:
+def generate(f, drawing, include=None, bounds=None) -> tuple[str, dict]:
     """SVG of `drawing` (paper millimetres). `f` may be changed (a snapshot): infinite ranges and
     template elevations are re-fitted to the model first. `include`: GlobalIds of the elements to
-    draw (the visible ones); default all drawn elements."""
+    draw (the visible ones); default all drawn elements. `bounds`: the model's (lo, hi) in metres,
+    already computed by the caller; when None it is worked out here (the child sizes a subset file,
+    where the full model is not present, so the caller passes the bounds)."""
     t0 = time.perf_counter()
     s = settings_of(drawing)
     if s is not None:
         if s["auto"] or s["depth"] is None:
-            place(f, drawing, s, model_bounds(f))
+            place(f, drawing, s, bounds if bounds is not None else model_bounds(f))
     products = drawn_products(f)
     if s is not None and s["kind"] == "plan":
         storey = _storey(drawing, s)
@@ -743,13 +761,17 @@ def generate(f, drawing, include=None) -> tuple[str, dict]:
         wanted = set(include)
         products = [p for p in products if p.GlobalId in wanted]
     gs = ifcopenshell.geom.settings(ELEMENT_HIERARCHY=True)
-    for key, value in (("dimensionality", W.CURVES_SURFACES_AND_SOLIDS), ("iterator-output", W.NATIVE),
-                       ("apply-default-materials", True), ("elevation-ref-guid", drawing.GlobalId),
-                       ("svg-without-storeys", True), ("svg-write-poly", True), ("svg-xmlns", True),
-                       ("svg-project", True), ("bounds", "1189x841"), ("scale", str(1 / SCALE)),
-                       ("door-arcs", True), ("svg-poly", True), ("svg-prefilter", True), ("svg-unify-inputs", False),
-                       # D73: projection lines grouped per element (styled by graphics.style_svg), no CSS
-                       ("svg-segment-projection", True), ("svg-no-css", True)):
+    opts = {
+        "dimensionality": W.CURVES_SURFACES_AND_SOLIDS, "iterator-output": W.NATIVE,
+        "apply-default-materials": True, "elevation-ref-guid": drawing.GlobalId,
+        "svg-without-storeys": True, "svg-write-poly": True, "svg-xmlns": True,
+        "svg-project": True, "bounds": "1189x841", "scale": str(1 / SCALE),
+        "door-arcs": True, "svg-poly": False, "svg-prefilter": True, "svg-unify-inputs": False,
+        # D73: projection lines grouped per element (styled by graphics.style_svg), no CSS
+        "svg-segment-projection": True, "svg-no-css": True,
+    }
+    opts.update(_svg_overrides())  # KIMCAD_SVG_OPTS (JSON) for tuning the serializer's hidden-line pass
+    for key, value in opts.items():
         gs.set(key, value)
     buffer = W.buffer()
     serializer = ifcopenshell.geom.serializers.svg(buffer, gs)
@@ -774,19 +796,92 @@ def generate(f, drawing, include=None) -> tuple[str, dict]:
                  "hlr_s": round(t3 - t2, 3), "total_s": round(time.perf_counter() - t0, 3)}
 
 
+def _bounds_of(job) -> tuple | None:
+    b = job.get("bounds") if isinstance(job, dict) else None
+    return None if b is None else (np.array(b[0], dtype=float), np.array(b[1], dtype=float))
+
+
+def _job(data) -> dict:
+    """A generate request: {"drawing", "include", "bounds"}; a bare list is an older include-only job."""
+    return data if isinstance(data, dict) else {"include": data}
+
+
+def _one(f, job) -> dict:
+    """Generate one drawing on the already-open model `f`; {ok, svg, timing} or {ok: false, error}."""
+    try:
+        drawing = f.by_guid(job["drawing"])
+        svg, timing = _with_big_stack(lambda: generate(f, drawing, job.get("include"), _bounds_of(job)))
+        return {"ok": True, "svg": svg, "timing": timing}
+    except Exception as ex:  # report, never a traceback on the app's console
+        return {"ok": False, "error": f"{type(ex).__name__}: {ex}"}
+
+
+# The SVG serializer recurses through the hidden-line pass; on a large storey it overflows the ~1 MB
+# stack of the main thread (0xC00000FD: the child dies with no output). A thread with a large stack
+# fixes it; the C++ geometry threads are unaffected (only Python threads take threading.stack_size).
+_STACK = 64 * 1024 * 1024
+
+
+def _with_big_stack(fn):
+    try:
+        threading.stack_size(_STACK)
+    except (ValueError, RuntimeError):
+        return fn()  # the platform refuses: run inline and hope the drawing is small
+    box: dict = {}
+
+    def run():
+        try:
+            box["v"] = fn()
+        except BaseException as ex:  # noqa: BLE001 - re-raised on the caller's thread
+            box["e"] = ex
+
+    worker = threading.Thread(target=run)
+    worker.start()
+    worker.join()
+    if "e" in box:
+        raise box["e"]
+    return box["v"]
+
+
 def main(argv) -> int:
+    if len(argv) > 1 and argv[1] == "--worker":  # one process, one open model, a request per line
+        return worker(argv[2])
     try:
         f = ifcopenshell.open(argv[1])
-        drawing = f.by_guid(argv[2])
-        include = None
+        job = {"drawing": argv[2]}
         if len(argv) > 3:
             with open(argv[3], encoding="utf-8") as fh:
-                include = json.load(fh)
-        svg, timing = generate(f, drawing, include)
-        out = {"ok": True, "svg": svg, "timing": timing}
+                job.update(_job(json.load(fh)))
+        out = _one(f, job)
     except Exception as ex:  # report, never a traceback on the app's console
         out = {"ok": False, "error": f"{type(ex).__name__}: {ex}"}
     sys.stdout.write(json.dumps(out))
+    return 0
+
+
+def worker(path: str) -> int:
+    """Long-lived generator (D60): open the snapshot once, then one drawing request per input line.
+    Re-opening the model for every drawing cost seconds on real files; the process and the model stay."""
+    try:
+        f = ifcopenshell.open(path)
+    except Exception as ex:
+        sys.stdout.write(json.dumps({"ok": False, "error": f"{type(ex).__name__}: {ex}"}) + "\n")
+        sys.stdout.flush()
+        return 1
+    sys.stdout.write(json.dumps({"ok": True, "ready": True}) + "\n")  # ack: the model is open
+    sys.stdout.flush()
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            job = json.loads(line)
+        except ValueError:
+            continue
+        if job.get("op") == "stop":
+            break
+        sys.stdout.write(json.dumps(_one(f, job)) + "\n")
+        sys.stdout.flush()
     return 0
 
 

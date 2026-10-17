@@ -45,6 +45,20 @@
 #include <QWheelEvent>
 
 #include <algorithm>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <HLRAlgo_Projector.hxx>
+#include <HLRBRep_PolyAlgo.hxx>
+#include <HLRBRep_PolyHLRToShape.hxx>
+#include <TopExp_Explorer.hxx>
+#include <TopoDS.hxx>
+#include <TopoDS_Edge.hxx>
+#include <BRepAdaptor_Curve.hxx>
+#include <BRep_Tool.hxx>
+#include <TopLoc_Location.hxx>
+#include <GCPnts_QuasiUniformDeflection.hxx>
+#include <gp_Ax3.hxx>
+#include <gp_Vec.hxx>
 #include <cmath>
 #include <set>
 
@@ -350,6 +364,152 @@ std::optional<QSet<QString>> Viewport::visibleFrom(QPointF p1, QPointF p2, QPoin
     m_view->Invalidate();
     update();
     return ids;
+}
+
+std::optional<QSet<QString>> Viewport::visibleFromPlan(const Bnd_Box& bounds, double elevation, double cut, double floor)
+{
+    if (!ensureWindow() || m_scene->batches.empty() || m_scene->nextIdBase > ElementBatch::maxId() || bounds.IsVoid())
+        return std::nullopt;
+    double x0, y0, z0, x1, y1, z1;
+    bounds.Get(x0, y0, z0, x1, y1, z1);
+    const double cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    const double cutZ = elevation + cut, floorZ = elevation - floor;
+    // Keep what the plan cuts and projects: below the cut plane, down to the floor.
+    std::vector<Handle(Graphic3d_ClipPlane)> planes;
+    planes.push_back(new Graphic3d_ClipPlane(gp_Pln(gp_Pnt(0, 0, cutZ), gp_Dir(0, 0, -1))));
+    planes.push_back(new Graphic3d_ClipPlane(gp_Pln(gp_Pnt(0, 0, floorZ), gp_Dir(0, 0, 1))));
+    for (const auto& plane : m_clipPlanes)
+        m_view->RemoveClipPlane(plane);
+    for (const auto& b : m_scene->batches)
+        for (const auto& plane : planes)
+            b->AddClipPlane(plane);
+    Handle(Graphic3d_Camera) saved = new Graphic3d_Camera();
+    saved->Copy(m_view->Camera());
+    const Handle(Graphic3d_Camera)& camera = m_view->Camera();
+    const double w = std::max(x1 - x0, 1e-3), h = std::max(y1 - y0, 1e-3);
+    camera->SetProjectionType(Graphic3d_Camera::Projection_Orthographic);
+    camera->SetUp(gp_Dir(0, 1, 0)); // north up, looking straight down
+    camera->SetCenter(gp_Pnt(cx, cy, elevation));
+    camera->SetEye(gp_Pnt(cx, cy, cutZ + 10.0));
+    camera->SetScale(std::max(w, h) * 1.02);
+    const int px = w >= h ? 2048 : std::max(64, int(std::lround(2048 * w / h)));
+    const int py = w >= h ? std::max(64, int(std::lround(2048 * h / w))) : 2048;
+    camera->SetAspect(double(px) / py);
+    m_view->ZFitAll();
+    const auto ids = idsInImage(px, py, 0, 0, px - 1, py - 1);
+    for (const auto& b : m_scene->batches)
+        for (const auto& plane : planes)
+            b->RemoveClipPlane(plane);
+    for (const auto& plane : m_clipPlanes)
+        m_view->AddClipPlane(plane);
+    m_view->Camera()->Copy(saved);
+    m_view->Invalidate();
+    update();
+    return ids;
+}
+
+QJsonObject Viewport::planGeometry(const QStringList& guids, double cutZ, double floorZ) const
+{
+    const QSet<QString> wanted(guids.begin(), guids.end());
+    QJsonArray cut, proj;
+    bool any = false;
+    double x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+    auto loops_json = [&](const std::vector<std::vector<gp_Pnt2d>>& loops) {
+        QJsonArray out;
+        for (const auto& loop : loops) {
+            QJsonArray pts;
+            for (const auto& p : loop) {
+                pts.append(QJsonArray{p.X(), p.Y()});
+                if (!any) {
+                    x0 = x1 = p.X();
+                    y0 = y1 = p.Y();
+                    any = true;
+                } else {
+                    x0 = std::min(x0, p.X());
+                    x1 = std::max(x1, p.X());
+                    y0 = std::min(y0, p.Y());
+                    y1 = std::max(y1, p.Y());
+                }
+            }
+            out.append(pts);
+        }
+        return out;
+    };
+    for (const auto& b : m_scene->batches) {
+        for (int i = 0; i < b->elementCount(); ++i) {
+            if (b->isHidden(i))
+                continue;
+            const QString g = b->guid(i);
+            if (!wanted.contains(g))
+                continue;
+            const auto c = b->sectionLoops(i, cutZ); // the element crosses the cut: draw it as cut
+            if (!c.empty()) {
+                cut.append(QJsonObject{{"guid", g}, {"loops", loops_json(c)}});
+                continue;
+            }
+            const Bnd_Box bb = b->elementBounds(i); // below the cut: draw its top outline in projection
+            if (bb.IsVoid())
+                continue;
+            double bx0, by0, bz0, bx1, by1, bz1;
+            bb.Get(bx0, by0, bz0, bx1, by1, bz1);
+            const double zTop = std::min(bz1, cutZ) - 1e-3;
+            if (zTop <= floorZ)
+                continue;
+            const auto p = b->sectionLoops(i, zTop);
+            if (p.empty())
+                continue;
+            proj.append(QJsonObject{{"guid", g}, {"loops", loops_json(p)}});
+        }
+    }
+    return QJsonObject{{"cut", cut}, {"proj", proj}, {"bounds", QJsonArray{x0, y0, x1, y1}}};
+}
+
+QJsonObject Viewport::viewGeometry(const QStringList& guids, const gp_Ax2& view, const gp_Pln* section) const
+{
+    const QSet<QString> wanted(guids.begin(), guids.end());
+    const gp_Ax3 ax3(view);
+    auto to_view = [&](const gp_Pnt& p) {
+        const gp_Vec d(ax3.Location(), p);
+        return QPointF(d.Dot(gp_Vec(ax3.XDirection())), d.Dot(gp_Vec(ax3.YDirection())));
+    };
+    QJsonArray proj, cut;
+    for (const auto& b : m_scene->batches) {
+        for (int i = 0; i < b->elementCount(); ++i) {
+            if (b->isHidden(i))
+                continue;
+            const QString g = b->guid(i);
+            if (!wanted.contains(g))
+                continue;
+            QJsonArray lines;
+            for (const auto& [a, e] : ElementBatch::featureEdgesFacing(b->chunk(), i, gp_Dir(ax3.Direction()))) {
+                const QPointF pa = to_view(a), pb = to_view(e);
+                lines.append(QJsonArray{pa.x(), pa.y(), pb.x(), pb.y()});
+            }
+            if (!lines.isEmpty())
+                proj.append(QJsonObject{{"guid", g}, {"lines", lines}});
+            if (section != nullptr) { // the cut plane: filled poché per element
+                const auto loops = ElementBatch::sectionLoopsPlane(b->chunk(), i, *section);
+                if (!loops.empty()) {
+                    QJsonArray jloops;
+                    for (const auto& loop : loops) {
+                        QJsonArray pts;
+                        for (const auto& p : loop) {
+                            const QPointF v = to_view(p);
+                            pts.append(QJsonArray{v.x(), v.y()});
+                        }
+                        jloops.append(pts);
+                    }
+                    cut.append(QJsonObject{{"guid", g}, {"loops", jloops}});
+                }
+            }
+        }
+    }
+    const gp_Dir xd = ax3.XDirection(), yd = ax3.YDirection(), zd = ax3.Direction();
+    const gp_Pnt o = ax3.Location();
+    // Row-major view->world matrix (the `plane` the SVG overlays read): columns x, y, z, origin.
+    const QJsonArray vm = {xd.X(), yd.X(), zd.X(), o.X(), xd.Y(), yd.Y(), zd.Y(), o.Y(),
+        xd.Z(), yd.Z(), zd.Z(), o.Z(), 0, 0, 0, 1};
+    return QJsonObject{{"proj", proj}, {"cut", cut}, {"view", vm}};
 }
 
 void Viewport::keepOnlyVisible(const QSet<QString>& before, AIS_SelectionScheme scheme, int x0, int y0, int x1, int y1)
@@ -1490,12 +1650,19 @@ void Viewport::setElementColors(const QHash<QString, QColor>& colors)
     redisplay(touched);
 }
 
-void Viewport::applyLayerState(const Handle(ElementBatch)& batch) const
+bool Viewport::applyLayerState(const Handle(ElementBatch)& batch) const
 {
+    bool changed = false;
     for (int i = 0; i < batch->elementCount(); ++i) {
-        batch->setLayerHidden(i, m_scene->layerHidden.contains(batch->guid(i)));
-        batch->setLocked(i, m_scene->layerLocked.contains(batch->guid(i)));
+        const bool hidden = m_scene->layerHidden.contains(batch->guid(i));
+        const bool locked = m_scene->layerLocked.contains(batch->guid(i));
+        if (batch->isLayerHidden(i) == hidden && batch->isLocked(i) == locked)
+            continue;
+        batch->setLayerHidden(i, hidden);
+        batch->setLocked(i, locked);
+        changed = true;
     }
+    return changed;
 }
 
 bool Viewport::applyGraphics(const Handle(ElementBatch)& batch) const
@@ -1572,10 +1739,9 @@ void Viewport::setLayerState(const QSet<QString>& hiddenGuids, const QSet<QStrin
                 m_context->AddOrRemoveSelected(m_scene->batches[size_t(it->batch)]->owner(it->index), false);
         }
     std::vector<int> touched;
-    for (size_t b = 0; b < m_scene->batches.size(); ++b) {
-        applyLayerState(m_scene->batches[b]);
-        touched.push_back(int(b));
-    }
+    for (size_t b = 0; b < m_scene->batches.size(); ++b)
+        if (applyLayerState(m_scene->batches[b])) // only batches whose layer state actually changed
+            touched.push_back(int(b));
     redisplay(touched);
     displayAnnotations();
 }

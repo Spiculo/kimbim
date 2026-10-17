@@ -642,6 +642,7 @@ int runSelfTest(const SelfTestOptions& options)
         shown = view && view->hasDrawing();
         result.insert(QStringLiteral("drawing_shown"), shown);
         result.insert(QStringLiteral("drawing_visible"), window.lastDrawingVisibleCount());
+        result.insert(QStringLiteral("drawing_include_ms"), window.lastDrawingIncludeMs());
         result.insert(QStringLiteral("drawing_s"), double(drawingTimer.elapsed()) / 1000.0);
         if (shown) {
             result.insert(QStringLiteral("drawing_paper_mm"), QJsonArray{view->paperSize().width(), view->paperSize().height()});

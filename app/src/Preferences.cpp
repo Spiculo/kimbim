@@ -50,6 +50,8 @@ QJsonObject Preferences::defaults()
         {"true_line_weights", false},
         {"large_ifc_mb", 5},
         {"ask_import_status", true},
+        {"drawing_timeout", 300},
+        {"drawing_hlr", "exact"},
         {"recent", QJsonArray()},
     };
 }
@@ -124,6 +126,17 @@ double Preferences::largeIfcMb() const
 bool Preferences::askImportStatus() const
 {
     return value("ask_import_status").toBool(true);
+}
+
+int Preferences::drawingTimeout() const
+{
+    const QJsonValue v = value("drawing_timeout");
+    return v.isDouble() && v.toInt() >= 0 ? v.toInt() : 300;
+}
+
+QString Preferences::drawingHlr() const
+{
+    return oneOf(value("drawing_hlr"), {QStringLiteral("exact"), QStringLiteral("poly")});
 }
 
 bool Preferences::trueLineWeights() const

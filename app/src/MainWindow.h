@@ -276,6 +276,8 @@ public:
     bool setProjectInfo(const QJsonObject& info);
     // How many elements the last generation sent to the serializer (-1: all, no visible pass).
     int lastDrawingVisibleCount() const { return m_lastDrawingVisible; }
+    // Milliseconds the last drawing's visible-element pass spent on the GUI thread (before the worker).
+    double lastDrawingIncludeMs() const { return m_lastIncludeMs; }
     // Everyday editing (Slice 17, Archicad's Edit menu). Copies are selected afterwards.
     bool copySelection(QPointF delta);          // a moved copy (Ctrl+drag)
     void copyToClipboard();                     // Ctrl+C
@@ -389,11 +391,15 @@ signals:
 
 protected:
     void closeEvent(QCloseEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
     bool nativeEvent(const QByteArray& eventType, void* message, qintptr* result) override;
 
 private:
     void buildMenus();
     void buildDocks();
+    // A corrupt saved layout/geometry can ask for a multi-gigabyte window; reset it after show.
+    void clampWindowSize();
+    void applyDrawingPrefs(); // the drawing timeout and hidden-line mode, from the preferences
     void showAbout();
     void openDialog();
     void stopLoading();
@@ -607,6 +613,8 @@ private:
     QSet<QString> m_generating, m_generateAgain;
     QList<QThread*> m_drawingThreads;
     int m_lastDrawingVisible = -1;
+    double m_lastIncludeMs = 0;
+    bool m_clamping = false; // guards against recursion while resetting a corrupt window size
     TitleBar* m_titleBar = nullptr;     // D75: the one row of chrome
     QMenuBar* m_menuBar = nullptr;      // in the title bar (QMainWindow::menuBar() would replace it)
     QMenu* m_helpMenu = nullptr;

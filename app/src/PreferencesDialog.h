@@ -34,6 +34,8 @@ private:
     QSpinBox* m_autoEvery;
     QSpinBox* m_recovery;
     QSpinBox* m_largeIfc;
+    QSpinBox* m_drawingTimeout;
+    QComboBox* m_drawingHlr;
 };
 
 } // namespace kimcad

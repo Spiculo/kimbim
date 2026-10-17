@@ -31,6 +31,10 @@ public:
     bool trueLineWeights() const;       // D73: View > True line weights
     double largeIfcMb() const;
     bool askImportStatus() const;       // D74: opening an IFC offers to mark elements without a renovation status          // an IFC this large asks before making a .kim; 0: never asks
+    // Drawing generation: how long to wait before giving up (seconds; 0 = no limit) and the
+    // hidden-line mode ("exact" is faster on BREP-heavy models, "poly" on curved ones).
+    int drawingTimeout() const;
+    QString drawingHlr() const;
     QStringList recent() const;
     void addRecent(const QString& path); // most recent first, no duplicates, at most 10
     QByteArray layout() const;

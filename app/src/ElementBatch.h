@@ -4,8 +4,11 @@
 #include <array>
 #include <optional>
 #include <utility>
+#include <gp_Dir.hxx>
+#include <gp_Pln.hxx>
 #include <gp_Pnt.hxx>
 #include <gp_Pnt2d.hxx>
+#include <TopoDS_Shape.hxx>
 #include <Quantity_Color.hxx>
 #include <AIS_InteractiveObject.hxx>
 #include <Bnd_Box.hxx>
@@ -64,9 +67,17 @@ public:
     // Border lines of one element: boundary edges and creases sharper than angleDeg. Triangulation
     // diagonals and coplanar seams are skipped; unwelded meshes pair up by vertex position.
     static std::vector<std::pair<gp_Pnt, gp_Pnt>> featureEdges(const MeshChunk& chunk, int element, double angleDeg = 30.0);
+    // The same, minus the edges whose faces all face away from `toward`: a section/elevation projection
+    // does not show a solid's back edges through it.
+    static std::vector<std::pair<gp_Pnt, gp_Pnt>> featureEdgesFacing(const MeshChunk& chunk, int element,
+        const gp_Dir& toward, double angleDeg = 30.0);
     // The element's section by the horizontal plane at z: closed outlines in plan (x, y).
     static std::vector<std::vector<gp_Pnt2d>> sectionLoops(const MeshChunk& chunk, int element, double z);
     std::vector<std::vector<gp_Pnt2d>> sectionLoops(int element, double z) const { return sectionLoops(m_chunk, element, z); }
+    // The element's section by an arbitrary plane: closed 3D outlines (used to draw a section drawing).
+    static std::vector<std::vector<gp_Pnt>> sectionLoopsPlane(const MeshChunk& chunk, int element, const gp_Pln& plane);
+    // A triangulated face for one element, for OCCT's polygon hidden-line removal (section drawings).
+    static TopoDS_Shape meshFace(const MeshChunk& chunk, int element);
     static void setBackground(const Quantity_Color& color) { s_background = color; }
     // Previews skip border lines (computing them on every mouse move made drawing lag).
     void setShowEdges(bool show) { m_showEdges = show; }
@@ -93,6 +104,7 @@ public:
 
     int elementCount() const { return m_chunk.elementCount(); }
     int triangleCount() const { return m_chunk.triangleCount(); }
+    const MeshChunk& chunk() const { return m_chunk; }
     QString guid(int i) const { return m_chunk.guids.at(i); }
     QString type(int i) const { return m_chunk.types.at(i); }
     int indexOf(const QString& guid) const { return m_index.value(guid, -1); }
@@ -128,6 +140,7 @@ public:
     };
     std::vector<LineBucket> lineBuckets(const Quantity_Color& fallback) const;
     void setLayerHidden(int i, bool hidden);
+    bool isLayerHidden(int i) const { return m_layerHidden[size_t(i)] != 0; }
     // Locked by its layer: shown, but not selectable.
     void setLocked(int i, bool locked) { m_locked[size_t(i)] = locked ? 1 : 0; }
     bool isLocked(int i) const { return m_locked[size_t(i)] != 0; }

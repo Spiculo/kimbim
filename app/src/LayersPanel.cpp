@@ -92,22 +92,31 @@ void LayersPanel::setLayers(const QJsonArray& layers, const QString& active, con
 {
     const QString keep = selectedLayer();
     m_filling = true;
-    m_list->clear();
-    for (const auto& v : layers) {
-        const QJsonObject o = v.toObject();
+    // Rebuild only when the layer set changed (a new or deleted layer): toggling a layer's visibility
+    // must not clear the list, so the user can tick several in a row (owner feedback).
+    bool same = m_list->topLevelItemCount() == layers.size();
+    for (int i = 0; same && i < layers.size(); ++i)
+        same = m_list->topLevelItem(i)->data(NameCol, NameRole).toString()
+            == layers.at(i).toObject().value("name").toString();
+    if (!same) {
+        m_list->clear();
+        for (const auto& v : layers) {
+            auto* item = new QTreeWidgetItem(m_list);
+            item->setData(NameCol, NameRole, v.toObject().value("name").toString());
+            item->setFlags(item->flags() | Qt::ItemIsUserCheckable | Qt::ItemIsEditable);
+        }
+    }
+    for (int i = 0; i < layers.size(); ++i) {
+        const QJsonObject o = layers.at(i).toObject();
         const QString name = o.value("name").toString();
-        auto* item = new QTreeWidgetItem(m_list);
+        QTreeWidgetItem* item = m_list->topLevelItem(i);
         item->setText(NameCol, name == active ? tr("%1 (active)").arg(name) : name);
-        item->setData(NameCol, NameRole, name);
-        item->setFlags(item->flags() | Qt::ItemIsUserCheckable | Qt::ItemIsEditable);
         item->setCheckState(ShownCol, hidden.contains(name) ? Qt::Unchecked : Qt::Checked);
         item->setCheckState(LockedCol, locked.contains(name) ? Qt::Checked : Qt::Unchecked);
         item->setText(CountCol, QString::number(o.value("count").toInt()));
-        if (name == active) {
-            QFont bold = item->font(NameCol);
-            bold.setBold(true);
-            item->setFont(NameCol, bold);
-        }
+        QFont font = item->font(NameCol);
+        font.setBold(name == active);
+        item->setFont(NameCol, font);
         if (name == keep)
             m_list->setCurrentItem(item);
     }

@@ -88,17 +88,35 @@ void StatusStrip::setLayers(const QStringList& all, const QString& active, const
 {
     {
         const QSignalBlocker block(m_layer);
-        m_layer->clear();
-        m_layer->addItems(all);
+        // Rebuild the combo only when the layer set changed: a rebuild steals the current selection.
+        bool same = m_layer->count() == all.size();
+        for (int i = 0; same && i < all.size(); ++i)
+            same = m_layer->itemText(i) == all[i];
+        if (!same) {
+            m_layer->clear();
+            m_layer->addItems(all);
+        }
         m_layer->setCurrentText(active);
     }
     QMenu* menu = m_layers->menu();
-    menu->clear();
-    for (const QString& name : all) {
-        QAction* a = menu->addAction(name);
-        a->setCheckable(true);
-        a->setChecked(!hidden.contains(name));
-        connect(a, &QAction::toggled, this, [this, name](bool on) { emit layerVisibilityToggled(name, on); });
+    // The menu stays open while the user ticks layers one by one (owner feedback): update the existing
+    // actions in place instead of clearing and rebuilding them (which closes the popup).
+    const QList<QAction*> acts = menu->actions();
+    bool same = acts.size() == all.size();
+    for (int i = 0; same && i < all.size(); ++i)
+        same = acts[i]->text() == all[i];
+    if (!same) {
+        menu->clear();
+        for (const QString& name : all) {
+            QAction* a = menu->addAction(name);
+            a->setCheckable(true);
+            connect(a, &QAction::toggled, this, [this, name](bool on) { emit layerVisibilityToggled(name, on); });
+        }
+    }
+    const QList<QAction*> current = menu->actions();
+    for (int i = 0; i < all.size() && i < current.size(); ++i) {
+        const QSignalBlocker block(current[i]); // reflect the state without re-emitting toggled
+        current[i]->setChecked(!hidden.contains(all[i]));
     }
     const auto shown = std::count_if(all.begin(), all.end(), [&](const QString& n) { return !hidden.contains(n); });
     m_layersText = QStringLiteral("%1/%2").arg(shown).arg(all.size());

@@ -143,7 +143,7 @@ def set_project_info(info_json: str) -> str:
                                              RelatingActor=actor, ActingRole=role)
         return 1
 
-    return B._dump(B._run(action))
+    return B._dump(B._run(action, affects_drawings=False))
 
 
 # ---------------------------------------------------------------- sheets
@@ -262,7 +262,7 @@ def add_sheet(paper: str, title: str) -> str:
             "Purpose": PURPOSE, "Scope": paper})
         return 1
 
-    return B._dump({**B._run(action), "number": number})
+    return B._dump({**B._run(action, affects_drawings=False), "number": number})
 
 
 def edit_sheet(number: str, changes_json: str) -> str:
@@ -290,7 +290,7 @@ def edit_sheet(number: str, changes_json: str) -> str:
         ifcopenshell.api.document.edit_information(B._model, information=sheet, attributes=attributes)
         return 1
 
-    return B._dump(B._run(action))
+    return B._dump(B._run(action, affects_drawings=False))
 
 
 def delete_sheet(number: str) -> str:
@@ -304,7 +304,7 @@ def delete_sheet(number: str) -> str:
         ifcopenshell.api.document.remove_information(B._model, information=sheet)
         return 1
 
-    return B._dump(B._run(action))
+    return B._dump(B._run(action, affects_drawings=False))
 
 
 def _free_spot(sheet, w, h):
@@ -376,7 +376,7 @@ def place_drawing(number: str, drawing_guid: str, x=-1, y=-1, scale=100) -> str:
             **_data_fields(json.dumps({"x": round(x, 3), "y": round(y, 3), "scale": scale}))})
         return 1
 
-    return B._dump(B._run(action))
+    return B._dump(B._run(action, affects_drawings=False))
 
 
 def _edit_placed(number, drawing_guid, change):
@@ -393,7 +393,7 @@ def _edit_placed(number, drawing_guid, change):
             setattr(ref, name, value)
         return 1
 
-    return B._dump(B._run(action))
+    return B._dump(B._run(action, affects_drawings=False))
 
 
 def move_placed(number: str, drawing_guid: str, x, y) -> str:
@@ -424,7 +424,7 @@ def remove_placed(number: str, drawing_guid: str) -> str:
         ifcopenshell.api.document.remove_reference(B._model, reference=ref)
         return 1
 
-    return B._dump(B._run(action))
+    return B._dump(B._run(action, affects_drawings=False))
 
 
 # ---------------------------------------------------------------- legends (D74)
@@ -483,7 +483,7 @@ def place_legend(number: str) -> str:
         return 1
 
     try:
-        r = B._run(action)
+        r = B._run(action, affects_drawings=False)
     except Exception as ex:
         return A._fail(f"{type(ex).__name__}: {ex}")
     return B._dump({**r, "id": legend_id})
@@ -508,7 +508,7 @@ def move_legend(number: str, legend_id: str, x, y) -> str:
             setattr(ref, name, value)
         return 1
 
-    return B._dump(B._run(action))
+    return B._dump(B._run(action, affects_drawings=False))
 
 
 def remove_legend(number: str, legend_id: str) -> str:
@@ -520,7 +520,7 @@ def remove_legend(number: str, legend_id: str) -> str:
         ifcopenshell.api.document.remove_reference(B._model, reference=ref)
         return 1
 
-    return B._dump(B._run(action))
+    return B._dump(B._run(action, affects_drawings=False))
 
 
 # ---------------------------------------------------------------- symbols (D87)
@@ -633,7 +633,7 @@ def place_sheet_symbol(number: str, kind: str, options_json: str = "") -> str:
             _link_attr(): symbol_id, **_data_fields(json.dumps(data), SYMBOL)})
         return 1
 
-    return B._dump({**B._run(action), "id": symbol_id})
+    return B._dump({**B._run(action, affects_drawings=False), "id": symbol_id})
 
 
 def set_sheet_symbol(number: str, symbol_id: str, changes_json: str) -> str:
@@ -662,7 +662,7 @@ def set_sheet_symbol(number: str, symbol_id: str, changes_json: str) -> str:
             setattr(ref, name, value)
         return 1
 
-    return B._dump(B._run(action))
+    return B._dump(B._run(action, affects_drawings=False))
 
 
 def move_sheet_symbol(number: str, symbol_id: str, x, y) -> str:
@@ -681,7 +681,7 @@ def remove_sheet_symbol(number: str, symbol_id: str) -> str:
         ifcopenshell.api.document.remove_reference(B._model, reference=ref)
         return 1
 
-    return B._dump(B._run(action))
+    return B._dump(B._run(action, affects_drawings=False))
 
 
 def _symbol_listing(sheet) -> list:

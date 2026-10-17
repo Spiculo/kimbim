@@ -14,9 +14,12 @@
 #include "ViewHost.h"
 
 #include <QApplication>
+#include <QScreen>
 #include <QCloseEvent>
+#include <QShowEvent>
 #include <QSettings>
 #include <QStandardPaths>
+#include <QFile>
 #include <QDoubleSpinBox>
 #include <QLabel>
 #include <QPainter>
@@ -45,6 +48,11 @@
 #include <QToolButton>
 #include <QSignalBlocker>
 #include <cmath>
+#include <optional>
+#include <gp_Ax2.hxx>
+#include <gp_Dir.hxx>
+#include <gp_Pln.hxx>
+#include <gp_Pnt.hxx>
 #include <memory>
 #include <QLocale>
 #include <QComboBox>
@@ -116,6 +124,14 @@ struct StepTimer {
     StepTimer(QHash<QString, double>& h, const char* n) : into(h), name(n) { t.start(); }
     ~StepTimer() { into[QLatin1String(name)] += double(t.nsecsElapsed()) / 1e6; }
 };
+
+// Temporary diagnostic: writes window sizes to %TEMP%/kimcad-diag.txt (removed once the crash is fixed).
+void diag(const QString& message)
+{
+    QFile f(QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QStringLiteral("/kimcad-diag.txt"));
+    if (f.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
+        f.write((message + QLatin1Char('\n')).toUtf8());
+}
 } // namespace
 
 MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
@@ -245,6 +261,7 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
         showError(tr("KIMCAD cannot start"), error);
     bridge("set_app_paths", {QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)});
     bridge("set_author", {m_prefs.authorName(), m_prefs.authorEmail()});
+    applyDrawingPrefs();
     m_sinceVersion.start();
     connect(&m_recoveryTimer, &QTimer::timeout, this, [this] {
         if (isDirty())
@@ -262,6 +279,45 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
         m_dock->restoreLayout(state);
         restoreGeometry(m_prefs.windowGeometry()); // D75: size, position and maximized
     }
+    // A corrupt layout or saved geometry (tens of thousands of pixels wide) would make Qt allocate a
+    // ~4 GB backing store and die; catch it once the window is shown and fall back to a sane size.
+    clampWindowSize();
+    QTimer::singleShot(0, this, &MainWindow::clampWindowSize);
+}
+
+void MainWindow::clampWindowSize()
+{
+    QScreen* s = screen();
+    const QRect avail = s ? s->availableGeometry() : QRect(0, 0, 1920, 1080);
+    const int capW = avail.width() * 4, capH = avail.height() * 4;
+    if (m_clamping || (width() <= capW && height() <= capH && minimumWidth() <= capW && minimumHeight() <= capH))
+        return;
+    diag(QStringLiteral("clamp: RESETTING size=%1x%2 min=%3x%4 minHint=%5x%6 cap=%7x%8")
+        .arg(width()).arg(height()).arg(minimumWidth()).arg(minimumHeight())
+        .arg(minimumSizeHint().width()).arg(minimumSizeHint().height()).arg(capW).arg(capH));
+    m_clamping = true;
+    m_dock->restoreLayout(QByteArray()); // the default layout: resets the splitter sizes
+    setMinimumSize(0, 0);
+    resize(1280, 800);
+    move(std::max(0, avail.x() + (avail.width() - width()) / 2), std::max(0, avail.y() + (avail.height() - height()) / 2));
+    m_clamping = false;
+}
+
+void MainWindow::applyDrawingPrefs()
+{
+    bridge("set_drawing_timeout", {QString::number(m_prefs.drawingTimeout())});
+    bridge("set_drawing_hlr", {m_prefs.drawingHlr()});
+}
+
+void MainWindow::resizeEvent(QResizeEvent* event)
+{
+    // A corrupt layout asks for a window of tens of thousands of pixels during layout, before the first
+    // paint; catch it here (the ~4 GB backing store would otherwise fail in createDIB and crash).
+    QMainWindow::resizeEvent(event);
+    QScreen* s = screen();
+    const QRect avail = s ? s->availableGeometry() : QRect(0, 0, 1920, 1080);
+    if (event->size().width() > avail.width() * 4 || event->size().height() > avail.height() * 4)
+        clampWindowSize();
 }
 
 MainWindow::~MainWindow()
@@ -3773,37 +3829,94 @@ void MainWindow::regenerateDrawing(const QString& guid)
     // visible ones). The 3D view renders that set here, on the GUI thread; without a view (tests,
     // headless) every element goes.
     QString include;
+    QStringList planGuids, viewGuids;
+    double planCutZ = 0, planFloorZ = 0;
+    gp_Ax2 viewAxes;
+    std::optional<gp_Pln> sectionPlane;
+    QElapsedTimer includeTimer;
+    includeTimer.start();
     for (const auto& v : bridge("drawings").value("drawings").toArray()) {
         const QJsonObject d = v.toObject();
         if (d.value("guid").toString() != guid)
             continue;
-        const QJsonArray pts = d.value("points").toArray(), look = d.value("look").toArray();
         const Bnd_Box bounds = m_viewport->boundsOf({});
-        if (pts.size() != 2 || look.size() != 2 || bounds.IsVoid())
+        if (bounds.IsVoid())
+            break;
+        if (d.value("kind").toString() == QLatin1String("plan")) {
+            // A floor plan: everything the top-down camera sees below its cut. The plan is drawn from
+            // the meshes (planGeometry) instead of the serializer's hidden-line pass, which is far too
+            // slow on a detailed storey (measured ~0.5-1.5 s per element).
+            const double elevation = d.value("elevation").toDouble();
+            const double cut = d.value("cut").toDouble(1.10);
+            const auto seen = m_viewport->visibleFromPlan(bounds, elevation, cut, 0.5);
+            if (seen) {
+                planGuids = QStringList(seen->begin(), seen->end());
+                planGuids.sort();
+                include = QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(planGuids)).toJson(QJsonDocument::Compact));
+            }
+            planCutZ = elevation + cut;
+            planFloorZ = elevation - 0.5;
+            break;
+        }
+        const QJsonArray pts = d.value("points").toArray(), look = d.value("look").toArray();
+        if (pts.size() != 2 || look.size() != 2)
             break;
         double x0, y0, z0, x1, y1, z1;
         bounds.Get(x0, y0, z0, x1, y1, z1);
         auto pt = [](const QJsonValue& p) { return QPointF(p.toArray().at(0).toDouble(), p.toArray().at(1).toDouble()); };
         const double depth = d.value("depth").isNull() ? -1.0 : d.value("depth").toDouble();
-        const auto seen = m_viewport->visibleFrom(pt(pts.at(0)), pt(pts.at(1)),
-            QPointF(look.at(0).toDouble(), look.at(1).toDouble()), z0 - 1.0, z1 + 1.0, depth);
+        // The drawing camera (drawgen.camera): X is the drawing's right, Y is up, it looks along -Z.
+        const QPointF a = pt(pts.at(0)), b = pt(pts.at(1)), lk = QPointF(look.at(0).toDouble(), look.at(1).toDouble());
+        const double dx = b.x() - a.x(), dy = b.y() - a.y(), len = std::hypot(dx, dy);
+        if (len > 1e-6) {
+            double nx = -dy / len, ny = dx / len;
+            if ((lk.x() - a.x()) * nx + (lk.y() - a.y()) * ny < 0) {
+                nx = -nx;
+                ny = -ny;
+            }
+            const double zc0 = z0 - 1.0, zc1 = z1 + 1.0;
+            viewAxes = gp_Ax2(gp_Pnt((a.x() + b.x()) / 2, (a.y() + b.y()) / 2, (zc0 + zc1) / 2),
+                gp_Dir(-nx, -ny, 0), gp_Dir(ny, -nx, 0));
+            if (d.value("kind").toString() == QLatin1String("section"))
+                sectionPlane = gp_Pln(gp_Pnt(a.x(), a.y(), 0), gp_Dir(nx, ny, 0));
+        }
+        const auto seen = m_viewport->visibleFrom(a, b, lk, z0 - 1.0, z1 + 1.0, depth);
         if (seen) {
-            QStringList sorted(seen->begin(), seen->end());
-            sorted.sort(); // a stable list keeps the drawing cache useful
-            include = QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(sorted)).toJson(QJsonDocument::Compact));
+            viewGuids = QStringList(seen->begin(), seen->end());
+            viewGuids.sort(); // a stable list keeps the drawing cache useful
+            include = QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(viewGuids)).toJson(QJsonDocument::Compact));
         }
         break;
     }
+    m_lastIncludeMs = double(includeTimer.nsecsElapsed()) / 1e6;
     m_lastDrawingVisible = include.isEmpty() ? -1 : int(QJsonDocument::fromJson(include.toUtf8()).array().size());
+    // Plans and views (sections/elevations) are drawn from the meshes here; only an empty visible set
+    // falls back to the serializer.
+    QString geometry;
+    QString mode;
+    if (!planGuids.isEmpty()) {
+        mode = QStringLiteral("plan");
+        geometry = QString::fromUtf8(QJsonDocument(m_viewport->planGeometry(planGuids, planCutZ, planFloorZ))
+                                         .toJson(QJsonDocument::Compact));
+    } else if (!viewGuids.isEmpty()) {
+        mode = QStringLiteral("view");
+        geometry = QString::fromUtf8(QJsonDocument(m_viewport->viewGeometry(viewGuids, viewAxes,
+                                         sectionPlane ? &*sectionPlane : nullptr)).toJson(QJsonDocument::Compact));
+    }
     // The bridge snapshots the model and runs IfcOpenShell's serializer in a child process, which
     // can take seconds on real files (spike S6); waiting for it here would freeze the window.
     QPointer<MainWindow> self(this);
-    QThread* worker = QThread::create([self, guid, include] {
+    QThread* worker = QThread::create([self, guid, include, geometry, mode] {
         QString error;
         const bool sheet = guid.startsWith(QLatin1String("sheet:"));
+        const QString fn = mode == QLatin1String("plan") ? QStringLiteral("generate_plan_drawing")
+            : mode == QLatin1String("view")               ? QStringLiteral("generate_view_drawing")
+                                                          : QStringLiteral("generate_drawing");
         const QJsonObject result = sheet
             ? PythonEngine::instance().callJson("sheet_svg", {guid.mid(6)}, &error).object()
-            : PythonEngine::instance().callJson("generate_drawing", {guid, include}, &error).object();
+            : !geometry.isEmpty()
+                  ? PythonEngine::instance().callJson(fn.toUtf8().constData(), {guid, geometry}, &error).object()
+                  : PythonEngine::instance().callJson("generate_drawing", {guid, include}, &error).object();
         if (self)
             QMetaObject::invokeMethod(self, [self, guid, result, error] {
                 if (self)
@@ -4926,6 +5039,7 @@ void MainWindow::preferencesDialog()
         return;
     m_prefs.save();
     bridge("set_author", {m_prefs.authorName(), m_prefs.authorEmail()});
+    applyDrawingPrefs();
     restartRecoveryTimer();
     applyLibraryPaths(); // D86: the office library may have changed
 }

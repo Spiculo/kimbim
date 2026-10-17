@@ -243,3 +243,31 @@ def test_hidden_kinds_are_left_out_of_drawings(house):
     assert call("set_purpose", "NW")["ok"]
     assert "IfcWall" not in call("generate_drawing", guid, "")["svg"]
     s.load(None)
+
+
+def test_plan_drawing_from_mesh_geometry():
+    """The plan is built from the app's meshes (cut + projection loops), not the serializer's slow
+    hidden-line pass: the base SVG carries the elements and the plane/matrix3 the overlays need."""
+    assert call("new_project", "Casa")["ok"]
+    plan = drawings()["Level 1 Floor Plan"]
+    geom = {"cut": [{"guid": plan["guid"], "loops": [[[0, 0], [4, 0], [4, 3], [0, 3]]]}],
+            "proj": [{"guid": plan["guid"], "loops": [[[5, 0], [7, 0], [7, 2], [5, 2]]]}],
+            "bounds": [0, 0, 7, 3]}
+    r = call("generate_plan_drawing", plan["guid"], json.dumps(geom))
+    assert r["ok"] and r["svg"].count("<path") >= 2
+    assert f'ifc:guid="{plan["guid"]}"' in r["svg"]
+    assert 'class="section"' in r["svg"] and "ifc:matrix3" in r["svg"]
+    # the second call is served from the cache (the geometry is unchanged)
+    assert call("generate_plan_drawing", plan["guid"], json.dumps(geom))["ok"]
+
+
+def test_section_drawing_from_mesh_geometry():
+    """A section is built from the app's meshes (projected edges + the cut), not the serializer."""
+    assert call("new_project", "Casa")["ok"]
+    guid = call("create_section", "0", "0", "5", "0", "0", "5", "-1")["guid"]
+    geom = {"proj": [{"guid": guid, "lines": [[0, 0, 3, 0], [3, 0, 3, 2]]}],
+            "cut": [{"guid": guid, "loops": [[[0, 0], [1, 0], [1, 1], [0, 1]]]}],
+            "view": [1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 1]}
+    r = call("generate_view_drawing", guid, json.dumps(geom))
+    assert r["ok"] and r["svg"].count("<path") >= 2
+    assert f'ifc:guid="{guid}"' in r["svg"] and "ifc:matrix3" in r["svg"]

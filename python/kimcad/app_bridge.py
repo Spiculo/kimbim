@@ -197,6 +197,13 @@ _next_id = 1
 # parallel to _ids/_future_ids, so undo/redo can tell the 3D view what to re-mesh (Slice 4).
 _deltas: list[list[str]] = []
 _future_deltas: list[list[str]] = []
+# Drawing revision, parallel to _ids/_future_ids: it only advances for transactions that can change
+# what a drawing shows. Sheet-placement edits (moving a view, legend or symbol on a sheet, D72/D74)
+# touch an IfcDocumentReference and leave the drawings untouched, so they keep the revision and the
+# generated drawing cache stays valid (moving a drawing on a sheet must not regenerate it).
+_base_drawing_id = 0
+_drawing_ids: list[int] = []
+_future_drawing_ids: list[int] = []
 
 
 # Set when a failed edit could not be rolled back: the model may be half-changed, so edits and
@@ -208,8 +215,10 @@ INCONSISTENT = ("The edit failed and could not be undone, so the model may be in
 
 def _reset_history(path: str):
     global _path, _base_id, _ids, _future_ids, _saved_id, _next_id, _deltas, _future_deltas, _inconsistent
+    global _base_drawing_id, _drawing_ids, _future_drawing_ids
     _path, _base_id, _ids, _future_ids, _saved_id, _next_id = path, 0, [], [], 0, 1
     _deltas, _future_deltas = [], []
+    _base_drawing_id, _drawing_ids, _future_drawing_ids = 0, [], []
     _inconsistent = False
     from . import versioning  # a different model leaves versioned mode (not the project's own working copy)
 
@@ -221,6 +230,9 @@ def _reset_history(path: str):
 
     settings.load(None)
     documents.on_model_opened(path)
+    from . import drawings  # the cached drawing snapshots belong to the old model
+
+    drawings.forget_snapshots()
 
 
 def _geometry_now(guids) -> dict:
@@ -237,6 +249,11 @@ def _geometry_now(guids) -> dict:
 
 def _current_id() -> int:
     return _ids[-1] if _ids else _base_id
+
+
+def _drawing_rev() -> int:
+    """Model state as drawings see it: unchanged by sheet-placement edits (see _drawing_ids)."""
+    return _drawing_ids[-1] if _drawing_ids else _base_drawing_id
 
 
 def _flags() -> dict:
@@ -262,9 +279,11 @@ AFTER_ACTION: list = []
 _step: tuple[list, list] | None = None
 
 
-def _run(action) -> dict:
+def _run(action, affects_drawings: bool = True) -> dict:
     """Run `action()` as one undoable transaction. It returns the number of changed elements, or
-    (count, geometry_changed_guids, geometry_removed_guids) when it touched shapes."""
+    (count, geometry_changed_guids, geometry_removed_guids) when it touched shapes.
+    `affects_drawings=False` for edits that only move things on a sheet: the generated drawing cache
+    stays valid (moving a placed view must not regenerate its drawing)."""
     if _step is not None:  # inside the console's edit() block: join its undo step
         changed = action()
         count, geo_changed, geo_removed = changed if isinstance(changed, tuple) else (changed, [], [])
@@ -280,7 +299,7 @@ def _run(action) -> dict:
     except BaseException as failure:
         _abort(failure)
         raise
-    return _commit(*changed)
+    return _commit(*changed, affects_drawings=affects_drawings)
 
 
 def _begin() -> None:
@@ -299,7 +318,7 @@ def _follow_ups(count, geo_changed, geo_removed) -> tuple:
 
 def _abort(failure: BaseException) -> None:
     """Roll back a half-applied step so the model and the history stay as they were. The caller re-raises."""
-    global _base_id, _inconsistent
+    global _base_id, _base_drawing_id, _inconsistent
     _model.end_transaction()
     try:
         _model.undo()
@@ -311,24 +330,30 @@ def _abort(failure: BaseException) -> None:
         _future_ids.clear()
         _deltas.clear()
         _future_deltas.clear()
+        _drawing_ids.clear()
+        _future_drawing_ids.clear()
         _model.history.clear()
         _model.future.clear()
         _base_id = -1  # differs from any saved state: the model counts as changed
+        _base_drawing_id = -1
         raise RuntimeError(INCONSISTENT) from failure
 
 
-def _commit(count, geo_changed, geo_removed) -> dict:
+def _commit(count, geo_changed, geo_removed, affects_drawings: bool = True) -> dict:
     """Close the step's transaction and record it in the undo history."""
-    global _next_id, _base_id
+    global _next_id, _base_id, _base_drawing_id
     _model.end_transaction()
     _ids.append(_next_id)
     _deltas.append(list(dict.fromkeys([*geo_changed, *geo_removed])))
+    _drawing_ids.append(_drawing_rev() + (1 if affects_drawings else 0))
     _next_id += 1
     _future_ids.clear()
     _future_deltas.clear()
+    _future_drawing_ids.clear()
     while len(_ids) > len(_model.history):  # ifcopenshell dropped its oldest transaction
         _base_id = _ids.pop(0)
         _deltas.pop(0)
+        _base_drawing_id = _drawing_ids.pop(0)
     geometry = {"changed": list(dict.fromkeys(geo_changed)), "removed": list(dict.fromkeys(geo_removed))}
     return {"ok": True, "changed": count, "geometry": geometry}
 
@@ -633,6 +658,7 @@ def undo() -> str:
     _model.undo()
     _future_ids.append(_ids.pop())
     _future_deltas.append(_deltas.pop())
+    _future_drawing_ids.append(_drawing_ids.pop())
     return _dump({"ok": True, **_flags(), "geometry": _geometry_now(_future_deltas[-1])})
 
 
@@ -642,6 +668,7 @@ def redo() -> str:
     _model.redo()
     _ids.append(_future_ids.pop())
     _deltas.append(_future_deltas.pop())
+    _drawing_ids.append(_future_drawing_ids.pop())
     return _dump({"ok": True, **_flags(), "geometry": _geometry_now(_deltas[-1])})
 
 
@@ -954,8 +981,12 @@ _EXPORTS = {
         "delete_drawing",
         "drawings",
         "generate_drawing",
+        "generate_plan_drawing",
+        "generate_view_drawing",
         "rename_drawing",
         "set_drawing_depth",
+        "set_drawing_hlr",
+        "set_drawing_timeout",
     ),
     "sheets": (
         "add_sheet",

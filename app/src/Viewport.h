@@ -20,8 +20,11 @@
 #include <V3d_View.hxx>
 #include <NCollection_Vec2.hxx>
 #include <V3d_Viewer.hxx>
+#include <gp_Ax2.hxx>
+#include <gp_Pln.hxx>
 
 #include <QHash>
+#include <QJsonObject>
 #include <QRect>
 #include <QStringList>
 #include <QWidget>
@@ -235,6 +238,19 @@ public:
     // orthographic camera on the line p1-p2 looking towards `look`, between heights z0 and z1,
     // up to `depth` metres beyond the line (< 0: no limit). Rendered offscreen in id colours.
     std::optional<QSet<QString>> visibleFrom(QPointF p1, QPointF p2, QPointF look, double z0, double z1, double depth);
+    // Elements a floor plan can see (Slice 14 pass, for plan drawings): a top-down orthographic camera
+    // over the model's `bounds` at `elevation`, cut `cut` metres above it, keeping what is below the
+    // cut down to `floor` metres below the level. Rendered offscreen in id colours.
+    std::optional<QSet<QString>> visibleFromPlan(const Bnd_Box& bounds, double elevation, double cut, double floor);
+    // Mesh-based plan geometry for a drawing (no hidden-line pass): per element, its cut outline at
+    // `cutZ` when it crosses that plane, else the outline of its top below it (projection). World x,y.
+    // {cut: [{guid, loops}], proj: [{guid, loops}], bounds: [x0, y0, x1, y1]}.
+    QJsonObject planGeometry(const QStringList& guids, double cutZ, double floorZ) const;
+    // Mesh-based section/elevation geometry (OCCT polygon hidden-line removal, fast): the visible
+    // edges of each element in the view plane and, for a section (`section` not null), the cut
+    // outlines. View-plane metres (x right, y up), plus the view->world matrix for the SVG.
+    // {proj: [{guid, lines: [x1,y1,x2,y2, ...]}], cut: [{guid, loops}], view: [16 numbers]}.
+    QJsonObject viewGeometry(const QStringList& guids, const gp_Ax2& view, const gp_Pln* section) const;
 
 signals:
     void selectionChanged(const QStringList& guids);
@@ -281,7 +297,7 @@ private:
     Handle(AIS_InteractiveContext) m_context; // == m_scene->context()
     Handle(V3d_View) m_view;
     bool m_planView = false;
-    void applyLayerState(const Handle(ElementBatch)& batch) const;
+    bool applyLayerState(const Handle(ElementBatch)& batch) const; // true if any element changed
     void applyColors(const Handle(ElementBatch)& batch) const;
     bool applyGraphics(const Handle(ElementBatch)& batch) const; // true if any element changed
     bool m_selectThrough = false;

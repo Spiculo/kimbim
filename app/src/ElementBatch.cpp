@@ -16,8 +16,13 @@
 #include <SelectMgr_Selection.hxx>
 #include <TopLoc_Location.hxx>
 #include <gp_Dir.hxx>
+#include <gp_Pln.hxx>
 #include <gp_Pnt.hxx>
 #include <gp_Vec.hxx>
+#include <BRep_Builder.hxx>
+#include <Poly_Triangle.hxx>
+#include <Poly_Triangulation.hxx>
+#include <TopoDS_Face.hxx>
 
 #include <algorithm>
 
@@ -281,6 +286,8 @@ struct EdgeHash {
 struct EdgeInfo {
     gp_Pnt a, b;
     gp_Dir firstNormal;
+    gp_Dir secondNormal;
+    bool hasSecond = false;
     int faces = 0;
     bool crease = false;
 };
@@ -318,6 +325,10 @@ std::vector<std::pair<gp_Pnt, gp_Pnt>> ElementBatch::featureEdges(const MeshChun
             } else if (std::abs(e.firstNormal.Dot(normal)) < cosLimit) {
                 e.crease = true; // |dot|: inconsistently wound neighbours are still coplanar
             }
+            if (!inserted) {
+                e.secondNormal = normal;
+                e.hasSecond = true;
+            }
             ++e.faces;
         }
     }
@@ -330,9 +341,59 @@ std::vector<std::pair<gp_Pnt, gp_Pnt>> ElementBatch::featureEdges(const MeshChun
     return out;
 }
 
-std::vector<std::vector<gp_Pnt2d>> ElementBatch::sectionLoops(const MeshChunk& c, int element, double z)
+std::vector<std::pair<gp_Pnt, gp_Pnt>> ElementBatch::featureEdgesFacing(const MeshChunk& c, int element,
+    const gp_Dir& toward, double angleDeg)
 {
-    // 1. Every triangle crossing the plane gives one segment.
+    // Like featureEdges, but drops the edges whose faces all face away from `toward` (the viewer): a
+    // solid's back edges no longer show through in a section/elevation projection.
+    const double cosLimit = std::cos(angleDeg * M_PI / 180.0);
+    std::unordered_map<EdgeKey, EdgeInfo, EdgeHash> edges;
+    std::vector<EdgeKey> order;
+    for (uint32_t t = c.toff[size_t(element)]; t < c.toff[size_t(element) + 1]; ++t) {
+        const gp_Pnt p[3] = {vertex(c, c.tris[3 * t]), vertex(c, c.tris[3 * t + 1]), vertex(c, c.tris[3 * t + 2])};
+        const gp_Vec n = gp_Vec(p[0], p[1]).Crossed(gp_Vec(p[0], p[2]));
+        if (n.Magnitude() < 1e-14)
+            continue;
+        const gp_Dir normal(n);
+        for (int k = 0; k < 3; ++k) {
+            gp_Pnt a = p[k], b = p[(k + 1) % 3];
+            Key ka = keyOf(a), kb = keyOf(b);
+            if (ka == kb)
+                continue;
+            if (kb < ka) {
+                std::swap(ka, kb);
+                std::swap(a, b);
+            }
+            const EdgeKey key{ka, kb};
+            auto [it, inserted] = edges.try_emplace(key);
+            EdgeInfo& e = it->second;
+            if (inserted) {
+                e.a = a;
+                e.b = b;
+                e.firstNormal = normal;
+                order.push_back(key);
+            } else {
+                if (std::abs(e.firstNormal.Dot(normal)) < cosLimit)
+                    e.crease = true;
+                e.secondNormal = normal;
+                e.hasSecond = true;
+            }
+            ++e.faces;
+        }
+    }
+    std::vector<std::pair<gp_Pnt, gp_Pnt>> out;
+    for (const EdgeKey& k : order) {
+        const EdgeInfo& e = edges.at(k);
+        if (!(e.faces == 1 || e.faces > 2 || e.crease))
+            continue;
+        if (e.firstNormal.Dot(toward) > 0.0 || (e.hasSecond && e.secondNormal.Dot(toward) > 0.0))
+            out.emplace_back(e.a, e.b);
+    }
+    return out;
+}
+
+std::vector<std::vector<gp_Pnt2d>> ElementBatch::sectionLoops(const MeshChunk& c, int element, double z)
+{    // 1. Every triangle crossing the plane gives one segment.
     struct P {
         long long x, y;
         bool operator==(const P& o) const { return x == o.x && y == o.y; }
@@ -412,6 +473,113 @@ std::vector<std::vector<gp_Pnt2d>> ElementBatch::sectionLoops(const MeshChunk& c
             loops.push_back(std::move(clean));
     }
     return loops;
+}
+
+std::vector<std::vector<gp_Pnt>> ElementBatch::sectionLoopsPlane(const MeshChunk& c, int element, const gp_Pln& plane)
+{
+    // The same chaining as sectionLoops, on an arbitrary plane (3D points on it).
+    struct P {
+        long long x, y, z;
+        bool operator==(const P& o) const { return x == o.x && y == o.y && z == o.z; }
+    };
+    struct PH {
+        size_t operator()(const P& p) const { return size_t(p.x * 73856093LL ^ p.y * 19349663LL ^ p.z * 83492791LL); }
+    };
+    constexpr double q = 1e-5;
+    auto key = [&](const gp_Pnt& p) { return P{std::llround(p.X() / q), std::llround(p.Y() / q), std::llround(p.Z() / q)}; };
+    const gp_Pnt org = plane.Location();
+    const gp_Dir nrm = plane.Axis().Direction();
+    auto dist = [&](const gp_Pnt& p) { return gp_Vec(org, p).Dot(gp_Vec(nrm)); }; // signed
+    std::vector<std::pair<gp_Pnt, gp_Pnt>> segments;
+    for (uint32_t t = c.toff[size_t(element)]; t < c.toff[size_t(element) + 1]; ++t) {
+        const gp_Pnt v[3] = {vertex(c, c.tris[3 * t]), vertex(c, c.tris[3 * t + 1]), vertex(c, c.tris[3 * t + 2])};
+        std::vector<gp_Pnt> hits;
+        for (int k = 0; k < 3; ++k) {
+            const gp_Pnt& a = v[k];
+            const gp_Pnt& b = v[(k + 1) % 3];
+            const double da = dist(a), db = dist(b);
+            if ((da < 0 && db > 0) || (da > 0 && db < 0)) {
+                const double s = da / (da - db);
+                hits.emplace_back(a.X() + s * (b.X() - a.X()), a.Y() + s * (b.Y() - a.Y()), a.Z() + s * (b.Z() - a.Z()));
+            } else if (da == 0 && db != 0) {
+                hits.push_back(a);
+            }
+        }
+        if (hits.size() == 2 && !(key(hits[0]) == key(hits[1])))
+            segments.emplace_back(hits[0], hits[1]);
+    }
+    std::unordered_multimap<P, size_t, PH> byEnd;
+    for (size_t i = 0; i < segments.size(); ++i) {
+        byEnd.emplace(key(segments[i].first), i);
+        byEnd.emplace(key(segments[i].second), i);
+    }
+    std::vector<char> used(segments.size(), 0);
+    std::vector<std::vector<gp_Pnt>> loops;
+    for (size_t start = 0; start < segments.size(); ++start) {
+        if (used[start])
+            continue;
+        used[start] = 1;
+        std::vector<gp_Pnt> loop{segments[start].first, segments[start].second};
+        const P first = key(loop.front());
+        bool closed = false;
+        while (true) {
+            const P end = key(loop.back());
+            if (end == first) {
+                loop.pop_back();
+                closed = true;
+                break;
+            }
+            bool extended = false;
+            auto range = byEnd.equal_range(end);
+            for (auto it = range.first; it != range.second; ++it) {
+                if (used[it->second])
+                    continue;
+                used[it->second] = 1;
+                const auto& sg = segments[it->second];
+                loop.push_back(key(sg.first) == end ? sg.second : sg.first);
+                extended = true;
+                break;
+            }
+            if (!extended)
+                break;
+        }
+        if (!closed || loop.size() < 3)
+            continue;
+        std::vector<gp_Pnt> clean;
+        for (size_t i = 0; i < loop.size(); ++i) {
+            const gp_Pnt& a = loop[(i + loop.size() - 1) % loop.size()];
+            const gp_Pnt& b = loop[i];
+            const gp_Pnt& d = loop[(i + 1) % loop.size()];
+            if (gp_Vec(a, b).Crossed(gp_Vec(b, d)).Magnitude() > 1e-10)
+                clean.push_back(b);
+        }
+        if (clean.size() >= 3)
+            loops.push_back(std::move(clean));
+    }
+    return loops;
+}
+
+TopoDS_Shape ElementBatch::meshFace(const MeshChunk& c, int element)
+{
+    const uint32_t v0 = c.voff[size_t(element)], v1 = c.voff[size_t(element) + 1];
+    const uint32_t t0 = c.toff[size_t(element)], t1 = c.toff[size_t(element) + 1];
+    const int nv = int(v1 - v0), nt = int(t1 - t0);
+    if (nv < 3 || nt < 1)
+        return TopoDS_Shape();
+    Handle(Poly_Triangulation) tri = new Poly_Triangulation(nv, nt, false);
+    for (int v = 0; v < nv; ++v)
+        tri->SetNode(v + 1, vertex(c, v0 + uint32_t(v)));
+    for (int t = 0; t < nt; ++t) {
+        const uint32_t* idx = &c.tris[3 * size_t(t0 + uint32_t(t))];
+        tri->SetTriangle(t + 1, Poly_Triangle(int(idx[0] - v0) + 1, int(idx[1] - v0) + 1, int(idx[2] - v0) + 1));
+    }
+    tri->ComputeNormals();
+    tri->Deflection(0.01);
+    TopoDS_Face face;
+    BRep_Builder builder;
+    builder.MakeFace(face, tri);
+    builder.UpdateFace(face, tri);
+    return face;
 }
 
 void ElementBatch::computeEdges()
