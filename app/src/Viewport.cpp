@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+﻿// SPDX-License-Identifier: GPL-3.0-or-later
 #include "Viewport.h"
 #include "Graphics.h"
 #include "PolygonTool.h"
@@ -45,6 +45,8 @@
 #include <QWheelEvent>
 
 #include <algorithm>
+#include <array>
+#include <cmath>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <HLRAlgo_Projector.hxx>
@@ -464,15 +466,163 @@ QJsonObject Viewport::planGeometry(const QStringList& guids, double cutZ, double
     return QJsonObject{{"cut", cut}, {"proj", proj}, {"bounds", QJsonArray{x0, y0, x1, y1}}};
 }
 
-QJsonObject Viewport::viewGeometry(const QStringList& guids, const gp_Ax2& view, const gp_Pln* section) const
+QJsonObject Viewport::viewGeometry(const QStringList& guids, const gp_Ax2& view, const gp_Pln* section)
 {
     const QSet<QString> wanted(guids.begin(), guids.end());
     const gp_Ax3 ax3(view);
+    const gp_Dir toward(ax3.Direction());
     auto to_view = [&](const gp_Pnt& p) {
         const gp_Vec d(ax3.Location(), p);
         return QPointF(d.Dot(gp_Vec(ax3.XDirection())), d.Dot(gp_Vec(ax3.YDirection())));
     };
-    QJsonArray proj, cut;
+    // Hidden-line removal by depth: render the front-most element per pixel from the drawing camera (id
+    // colours), then keep only the parts of each projected edge whose pixel belongs to that element.
+    // Without a window (headless) every facing edge is kept.
+    Image_PixMap image;
+    int iw = 0, ih = 0, winW = 0, winH = 0;
+    bool bgr = false, haveImage = false;
+    std::array<int, 256> toLinear{};
+    const Bnd_Box bounds = boundsOf({});
+    if (ensureWindow() && !m_scene->batches.empty() && m_scene->nextIdBase <= ElementBatch::maxId()
+        && !bounds.IsVoid()) {
+        m_view->Window()->Size(winW, winH);
+        double x0, y0, z0, x1, y1, z1;
+        bounds.Get(x0, y0, z0, x1, y1, z1);
+        double vx0 = 1e30, vy0 = 1e30, vx1 = -1e30, vy1 = -1e30;
+        for (double xx : {x0, x1})
+            for (double yy : {y0, y1})
+                for (double zz : {z0, z1}) {
+                    const QPointF v = to_view(gp_Pnt(xx, yy, zz));
+                    vx0 = std::min(vx0, v.x());
+                    vx1 = std::max(vx1, v.x());
+                    vy0 = std::min(vy0, v.y());
+                    vy1 = std::max(vy1, v.y());
+                }
+        const double vw = std::max(vx1 - vx0, 1e-3), vh = std::max(vy1 - vy0, 1e-3);
+        iw = vw >= vh ? 2048 : std::max(64, int(std::lround(2048 * vw / vh)));
+        ih = vw >= vh ? std::max(64, int(std::lround(2048 * vh / vw))) : 2048;
+        if (winW > 0 && winH > 0) {
+            Handle(Graphic3d_Camera) saved = new Graphic3d_Camera();
+            saved->Copy(m_view->Camera());
+            const Handle(Graphic3d_Camera)& cam = m_view->Camera();
+            const gp_Pnt o = ax3.Location();
+            cam->SetProjectionType(Graphic3d_Camera::Projection_Orthographic);
+            cam->SetUp(gp_Dir(ax3.YDirection()));
+            cam->SetCenter(o);
+            cam->SetEye(gp_Pnt(o.XYZ() + toward.XYZ() * 10.0));
+            cam->SetScale(std::max(vw, vh) * 1.02);
+            cam->SetAspect(double(iw) / ih);
+            std::vector<Handle(Graphic3d_ClipPlane)> planes;
+            if (section != nullptr)
+                planes.push_back(new Graphic3d_ClipPlane(*section));
+            for (const auto& plane : m_clipPlanes)
+                m_view->RemoveClipPlane(plane);
+            for (const auto& b : m_scene->batches)
+                for (const auto& plane : planes)
+                    b->AddClipPlane(plane);
+            const Quantity_Color background = m_view->BackgroundColor();
+            m_view->SetBackgroundColor(Quantity_Color(128 / 255.0, 128 / 255.0, 128 / 255.0, Quantity_TOC_RGB));
+            m_context->ClearDetected(false);
+            m_context->UnhilightSelected(false);
+            for (const auto& b : m_scene->batches)
+                m_context->SetDisplayMode(b, ElementBatch::Ids, false);
+            V3d_ImageDumpOptions options;
+            options.Width = iw;
+            options.Height = ih;
+            options.BufferType = Graphic3d_BT_RGB;
+            haveImage = m_view->ToPixMap(image, options);
+            const int mode = m_scene->linesOnly ? ElementBatch::LinesOnly : ElementBatch::Shaded;
+            for (const auto& b : m_scene->batches)
+                m_context->SetDisplayMode(b, mode, false);
+            m_view->SetBackgroundColor(background);
+            m_context->HilightSelected(false);
+            for (const auto& b : m_scene->batches)
+                for (const auto& plane : planes)
+                    b->RemoveClipPlane(plane);
+            for (const auto& plane : m_clipPlanes)
+                m_view->AddClipPlane(plane);
+            if (haveImage) {
+                bgr = image.Format() == Image_Format_BGR || image.Format() == Image_Format_BGR32;
+                auto pix = [&](int x, int y) {
+                    const uint8_t* p = image.RawValue(image.IsTopDown() ? size_t(y) : size_t(ih - 1 - y), size_t(x));
+                    return bgr ? std::array<int, 3>{p[2], p[1], p[0]} : std::array<int, 3>{p[0], p[1], p[2]};
+                };
+                int lin = 0, srgb = 0;
+                for (int y = 0; y < ih; y += 7)
+                    for (int x = 0; x < iw; x += 7) {
+                        const auto c = pix(x, y);
+                        if (std::abs(c[0] - 128) <= 2 && c[0] == c[1] && c[1] == c[2])
+                            ++lin;
+                        else if (std::abs(c[0] - 188) <= 2 && c[0] == c[1] && c[1] == c[2])
+                            ++srgb;
+                    }
+                for (int i = 0; i < 256; ++i) {
+                    const double c = i / 255.0;
+                    const double l = srgb > lin ? (c <= 0.04045 ? c / 12.92 : std::pow((c + 0.055) / 1.055, 2.4)) : c;
+                    toLinear[size_t(i)] = int(std::lround(l * 255.0));
+                }
+            }
+            // Emit each element's facing edges, cut where the id image shows another element in front.
+            QJsonArray proj;
+            for (const auto& b : m_scene->batches) {
+                for (int i = 0; i < b->elementCount(); ++i) {
+                    if (b->isHidden(i))
+                        continue;
+                    const QString g = b->guid(i);
+                    if (!wanted.contains(g))
+                        continue;
+                    const int myId = b->idBase() + i + 1;
+                    QJsonArray lines;
+                    for (const auto& [a, e] : ElementBatch::featureEdgesFacing(b->chunk(), i, toward)) {
+                        if (!haveImage) {
+                            const QPointF pa = to_view(a), pb = to_view(e);
+                            lines.append(QJsonArray{pa.x(), pa.y(), pb.x(), pb.y()});
+                            continue;
+                        }
+                        int ax, ay, bx, by;
+                        m_view->Convert(a.X(), a.Y(), a.Z(), ax, ay);
+                        m_view->Convert(e.X(), e.Y(), e.Z(), bx, by);
+                        const int iax = int(std::lround(double(ax) * iw / winW)), iay = int(std::lround(double(ay) * ih / winH));
+                        const int ibx = int(std::lround(double(bx) * iw / winW)), iby = int(std::lround(double(by) * ih / winH));
+                        const int n = std::max(2, int(std::hypot(double(iax - ibx), double(iay - iby))));
+                        auto seen = [&](int k) {
+                            const int px = iax + (ibx - iax) * k / n, py = iay + (iby - iay) * k / n;
+                            if (px < 0 || py < 0 || px >= iw || py >= ih)
+                                return false;
+                            const uint8_t* p = image.RawValue(image.IsTopDown() ? size_t(py) : size_t(ih - 1 - py), size_t(px));
+                            const int r = bgr ? p[2] : p[0], gg = p[1], bl = bgr ? p[0] : p[2];
+                            return ElementBatch::idFromRgb(toLinear[size_t(r)], toLinear[size_t(gg)], toLinear[size_t(bl)]) == myId;
+                        };
+                        int run = -1;
+                        for (int k = 0; k <= n; ++k) {
+                            const bool v = seen(k);
+                            if (v && run < 0)
+                                run = k;
+                            if ((!v || k == n) && run >= 0) {
+                                const int end = v ? k : k - 1;
+                                if (end > run) {
+                                    const double t0 = double(run) / n, t1 = double(end) / n;
+                                    const gp_Pnt p0(a.XYZ() + (e.XYZ() - a.XYZ()) * t0);
+                                    const gp_Pnt p1(a.XYZ() + (e.XYZ() - a.XYZ()) * t1);
+                                    const QPointF q0 = to_view(p0), q1 = to_view(p1);
+                                    lines.append(QJsonArray{q0.x(), q0.y(), q1.x(), q1.y()});
+                                }
+                                run = -1;
+                            }
+                        }
+                    }
+                    if (!lines.isEmpty())
+                        proj.append(QJsonObject{{"guid", g}, {"lines", lines}});
+                }
+            }
+            m_view->Camera()->Copy(saved);
+            m_view->Invalidate();
+            update();
+            return finishViewGeometry(ax3, proj, section);
+        }
+    }
+    // No window: keep every facing edge (no hidden-line removal).
+    QJsonArray proj;
     for (const auto& b : m_scene->batches) {
         for (int i = 0; i < b->elementCount(); ++i) {
             if (b->isHidden(i))
@@ -481,26 +631,38 @@ QJsonObject Viewport::viewGeometry(const QStringList& guids, const gp_Ax2& view,
             if (!wanted.contains(g))
                 continue;
             QJsonArray lines;
-            for (const auto& [a, e] : ElementBatch::featureEdgesFacing(b->chunk(), i, gp_Dir(ax3.Direction()))) {
+            for (const auto& [a, e] : ElementBatch::featureEdgesFacing(b->chunk(), i, toward)) {
                 const QPointF pa = to_view(a), pb = to_view(e);
                 lines.append(QJsonArray{pa.x(), pa.y(), pb.x(), pb.y()});
             }
             if (!lines.isEmpty())
                 proj.append(QJsonObject{{"guid", g}, {"lines", lines}});
-            if (section != nullptr) { // the cut plane: filled poché per element
+        }
+    }
+    return finishViewGeometry(ax3, proj, section);
+}
+
+QJsonObject Viewport::finishViewGeometry(const gp_Ax3& ax3, const QJsonArray& proj, const gp_Pln* section) const
+{
+    QJsonArray cut;
+    if (section != nullptr) { // the cut plane: filled poché per element (always visible)
+        for (const auto& b : m_scene->batches) {
+            for (int i = 0; i < b->elementCount(); ++i) {
+                if (b->isHidden(i))
+                    continue;
                 const auto loops = ElementBatch::sectionLoopsPlane(b->chunk(), i, *section);
-                if (!loops.empty()) {
-                    QJsonArray jloops;
-                    for (const auto& loop : loops) {
-                        QJsonArray pts;
-                        for (const auto& p : loop) {
-                            const QPointF v = to_view(p);
-                            pts.append(QJsonArray{v.x(), v.y()});
-                        }
-                        jloops.append(pts);
+                if (loops.empty())
+                    continue;
+                QJsonArray jloops;
+                for (const auto& loop : loops) {
+                    QJsonArray pts;
+                    for (const auto& p : loop) {
+                        const gp_Vec d(ax3.Location(), p);
+                        pts.append(QJsonArray{d.Dot(gp_Vec(ax3.XDirection())), d.Dot(gp_Vec(ax3.YDirection()))});
                     }
-                    cut.append(QJsonObject{{"guid", g}, {"loops", jloops}});
+                    jloops.append(pts);
                 }
+                cut.append(QJsonObject{{"guid", b->guid(i)}, {"loops", jloops}});
             }
         }
     }

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+﻿// SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
 #include <QPointer>
@@ -24,6 +24,7 @@
 #include <gp_Pln.hxx>
 
 #include <QHash>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QRect>
 #include <QStringList>
@@ -250,7 +251,8 @@ public:
     // edges of each element in the view plane and, for a section (`section` not null), the cut
     // outlines. View-plane metres (x right, y up), plus the view->world matrix for the SVG.
     // {proj: [{guid, lines: [x1,y1,x2,y2, ...]}], cut: [{guid, loops}], view: [16 numbers]}.
-    QJsonObject viewGeometry(const QStringList& guids, const gp_Ax2& view, const gp_Pln* section) const;
+    QJsonObject viewGeometry(const QStringList& guids, const gp_Ax2& view, const gp_Pln* section);
+    QJsonObject finishViewGeometry(const gp_Ax3& ax3, const QJsonArray& proj, const gp_Pln* section) const;
 
 signals:
     void selectionChanged(const QStringList& guids);
