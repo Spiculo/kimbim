@@ -277,7 +277,7 @@ private slots:
         QCOMPARE(p->groups(), QStringList({"3d", "plane", "view", "edit"}));
         const QHash<QString, QStringList> expected = {
             {"3d", {"actionWallTool", "actionSlabTool", "actionColumnTool", "actionBeamTool", "actionDoorTool",
-                       "actionWindowTool", "actionStairTool", "actionRoofTool", "actionRoomTool",
+                       "actionWindowTool", "actionStairTool", "actionRailingTool", "actionRoofTool", "actionRoomTool",
                        "actionSlabOpeningTool", "actionPlaceModelTool", "actionObjectTool"}},
             {"plane", {"actionTextTool", "actionDimensionTool", "actionLeaderTool", "actionMarkTool", "actionGridTool",
                           "actionLineTool", "actionPolylineTool", "actionArcTool", "actionRectangleTool", "actionFillTool",
