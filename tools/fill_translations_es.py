@@ -1114,6 +1114,17 @@ ES = {
         "Desplazar mueve la vista; pellizcar o Ctrl+desplazar hace zoom (panel táctil)",
     "Two-finger scroll with Shift orbits the 3D view": "Desplazar con dos dedos y Mayús orbita la vista 3D",
     "Scroll and touchpad:": "Desplazamiento y panel táctil:",
+    # Drawing generation preferences (owner's drawings commits)
+    " s": " s",
+    "No limit": "Sin límite",
+    "Give up on a drawing that takes longer: the hidden-line pass can be slow on a large model":
+        "Abandonar un dibujo que tarde más: el cálculo de líneas ocultas puede ser lento en un modelo grande",
+    "Drawing generation timeout:": "Tiempo límite para generar dibujos:",
+    "Exact (faster on detailed models)": "Exacto (más rápido en modelos detallados)",
+    "Polygon (faster on curved models)": "Poligonal (más rápido en modelos curvos)",
+    "The serializer's hidden-line mode: try the other one if drawings are slow":
+        "El modo de líneas ocultas del serializador: pruebe el otro si los dibujos son lentos",
+    "Hidden-line mode:": "Modo de líneas ocultas:",
 }
 
 
