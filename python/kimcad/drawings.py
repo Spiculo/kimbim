@@ -78,7 +78,7 @@ def drawings() -> str:
             if s["kind"] == "plan" and storey is None:
                 continue  # its level was deleted
             out.append({"guid": d.GlobalId, "name": d.Name or "", "kind": s["kind"], "depth": s["depth"],
-                        "auto": s["auto"], "points": s["points"], "look": s["look"],
+                        "auto": s["auto"], "side": s.get("side") or "", "points": s["points"], "look": s["look"],
                         **({"storey": s["storey"], "elevation": round(G.storey_elevation(storey), 6),
                             "cut": float(s.get("cut", G.PLAN_CUT))} if storey else {}),
                         "stale": not any(k[:2] == key for k in _cache.get(d.GlobalId, {}))})
@@ -86,6 +86,15 @@ def drawings() -> str:
         order = {"plan": 0, "section": 1, "elevation": 2}
         out.sort(key=lambda d: (order[d["kind"]], d.get("elevation", 0.0), d["name"]))
     return B._dump({"drawings": out})
+
+
+def drawing_bounds() -> str:
+    """The building's bounding box in metres ({lo, hi}): the app frames the drawings and runs its
+    visible-element pass on this, not on the whole georeferenced site."""
+    if B._model is None:
+        return A._fail("no model open")
+    lo, hi = G.model_bounds(B._model)
+    return B._dump({"ok": True, "lo": [float(v) for v in lo], "hi": [float(v) for v in hi]})
 
 
 def _new(name: str, s: dict, bounds=None):

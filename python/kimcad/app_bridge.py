@@ -980,6 +980,7 @@ _EXPORTS = {
         "create_section",
         "delete_drawing",
         "drawings",
+        "drawing_bounds",
         "generate_drawing",
         "generate_plan_drawing",
         "generate_view_drawing",

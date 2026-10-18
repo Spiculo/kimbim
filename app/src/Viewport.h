@@ -251,7 +251,7 @@ public:
     // edges of each element in the view plane and, for a section (`section` not null), the cut
     // outlines. View-plane metres (x right, y up), plus the view->world matrix for the SVG.
     // {proj: [{guid, lines: [x1,y1,x2,y2, ...]}], cut: [{guid, loops}], view: [16 numbers]}.
-    QJsonObject viewGeometry(const QStringList& guids, const gp_Ax2& view, const gp_Pln* section);
+    QJsonObject viewGeometry(const QStringList& guids, const gp_Ax2& view, const gp_Pln* section, const Bnd_Box& bounds);
     QJsonObject finishViewGeometry(const gp_Ax3& ax3, const QJsonArray& proj, const gp_Pln* section) const;
 
 signals:

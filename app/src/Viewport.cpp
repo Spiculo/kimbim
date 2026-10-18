@@ -466,7 +466,7 @@ QJsonObject Viewport::planGeometry(const QStringList& guids, double cutZ, double
     return QJsonObject{{"cut", cut}, {"proj", proj}, {"bounds", QJsonArray{x0, y0, x1, y1}}};
 }
 
-QJsonObject Viewport::viewGeometry(const QStringList& guids, const gp_Ax2& view, const gp_Pln* section)
+QJsonObject Viewport::viewGeometry(const QStringList& guids, const gp_Ax2& view, const gp_Pln* section, const Bnd_Box& bounds)
 {
     const QSet<QString> wanted(guids.begin(), guids.end());
     const gp_Ax3 ax3(view);
@@ -482,7 +482,6 @@ QJsonObject Viewport::viewGeometry(const QStringList& guids, const gp_Ax2& view,
     int iw = 0, ih = 0, winW = 0, winH = 0;
     bool bgr = false, haveImage = false;
     std::array<int, 256> toLinear{};
-    const Bnd_Box bounds = boundsOf({});
     if (ensureWindow() && !m_scene->batches.empty() && m_scene->nextIdBase <= ElementBatch::maxId()
         && !bounds.IsVoid()) {
         m_view->Window()->Size(winW, winH);

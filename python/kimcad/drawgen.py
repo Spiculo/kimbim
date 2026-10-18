@@ -99,14 +99,33 @@ def placement_cache():
     return world
 
 
+def building_products(f):
+    """The drawn products inside the building (its storeys and the building itself), not the whole
+    site. An imported model is georeferenced across the whole plot (terrain, roads, utilities), so the
+    site's extent would make every drawing frame the plot instead of the building."""
+    products = drawn_products(f)
+    containers = {s.id() for s in f.by_type("IfcBuildingStorey")}
+    containers |= {b.id() for b in f.by_type("IfcBuilding")}
+    if not containers:
+        return products
+    contained = set()
+    for rel in f.by_type("IfcRelContainedInSpatialStructure"):
+        structure = rel.RelatingStructure
+        if structure is not None and structure.id() in containers:
+            for e in rel.RelatedElements:
+                contained.add(e.id())
+    inside = [p for p in products if p.id() in contained]
+    return inside or products  # a model without containment falls back to every drawn element
+
+
 def model_bounds(f):
-    """World bounding box of the drawn elements in metres, from their placements and the points of
-    their axis/footprint representations. Cheap (no tessellation); good enough for infinite ranges,
-    which add a margin and get cropped to their content anyway."""
+    """World bounding box of the building's drawn elements in metres, from their placements and the
+    points of their axis/footprint representations. Cheap (no tessellation); good enough for infinite
+    ranges, which add a margin and get cropped to their content anyway."""
     unit = ifcopenshell.util.unit.calculate_unit_scale(f)
     points = []
     world = placement_cache()
-    for p in drawn_products(f):
+    for p in building_products(f):
         if p.ObjectPlacement is None:
             continue
         m = world(p.ObjectPlacement)
@@ -121,7 +140,12 @@ def model_bounds(f):
     if not points:
         return EMPTY_BOUNDS
     points = np.array(points)
-    lo, hi = points.min(axis=0), points.max(axis=0)
+    if len(points) >= 20:
+        # A georeferenced model has a few far-flung elements (site furniture, markers): the 1st/99th
+        # percentile ignores them so the drawing frames the building, not a stray element.
+        lo, hi = np.percentile(points, 1, axis=0), np.percentile(points, 99, axis=0)
+    else:
+        lo, hi = points.min(axis=0), points.max(axis=0)
     hi[2] = max(hi[2], lo[2] + 3.0)  # placements sit at the bottom of elements: allow one storey up
     return lo, hi
 

@@ -3833,13 +3833,26 @@ void MainWindow::regenerateDrawing(const QString& guid)
     double planCutZ = 0, planFloorZ = 0;
     gp_Ax2 viewAxes;
     std::optional<gp_Pln> sectionPlane;
+    // Frame the building, not the whole georeferenced site (hundreds of metres across): the site's
+    // extent would make every drawing a speck on a huge sheet and its visible pass select nothing.
+    Bnd_Box bounds = m_viewport->boundsOf({});
+    {
+        const QJsonObject b = bridge("drawing_bounds");
+        const QJsonArray lo = b.value("lo").toArray(), hi = b.value("hi").toArray();
+        if (lo.size() == 3 && hi.size() == 3) {
+            Bnd_Box box;
+            box.Add(gp_Pnt(lo.at(0).toDouble(), lo.at(1).toDouble(), lo.at(2).toDouble()));
+            box.Add(gp_Pnt(hi.at(0).toDouble(), hi.at(1).toDouble(), hi.at(2).toDouble()));
+            if (!box.IsVoid())
+                bounds = box;
+        }
+    }
     QElapsedTimer includeTimer;
     includeTimer.start();
     for (const auto& v : bridge("drawings").value("drawings").toArray()) {
         const QJsonObject d = v.toObject();
         if (d.value("guid").toString() != guid)
             continue;
-        const Bnd_Box bounds = m_viewport->boundsOf({});
         if (bounds.IsVoid())
             break;
         if (d.value("kind").toString() == QLatin1String("plan")) {
@@ -3858,15 +3871,31 @@ void MainWindow::regenerateDrawing(const QString& guid)
             planFloorZ = elevation - 0.5;
             break;
         }
-        const QJsonArray pts = d.value("points").toArray(), look = d.value("look").toArray();
-        if (pts.size() != 2 || look.size() != 2)
-            break;
         double x0, y0, z0, x1, y1, z1;
         bounds.Get(x0, y0, z0, x1, y1, z1);
         auto pt = [](const QJsonValue& p) { return QPointF(p.toArray().at(0).toDouble(), p.toArray().at(1).toDouble()); };
         const double depth = d.value("depth").isNull() ? -1.0 : d.value("depth").toDouble();
+        QPointF a, b, lk;
+        const QString side = d.value("side").toString();
+        if (d.value("auto").toBool() && !side.isEmpty()) {
+            // A template elevation follows the building's bounds (D61): place its line outside them.
+            const double gap = 3.0;
+            if (side == QLatin1String("north")) {
+                a = QPointF(x1 + gap, y1 + gap); b = QPointF(x0 - gap, y1 + gap); lk = QPointF((x0 + x1) / 2, y0);
+            } else if (side == QLatin1String("south")) {
+                a = QPointF(x0 - gap, y0 - gap); b = QPointF(x1 + gap, y0 - gap); lk = QPointF((x0 + x1) / 2, y1);
+            } else if (side == QLatin1String("east")) {
+                a = QPointF(x1 + gap, y0 - gap); b = QPointF(x1 + gap, y1 + gap); lk = QPointF(x0, (y0 + y1) / 2);
+            } else { // west
+                a = QPointF(x0 - gap, y1 + gap); b = QPointF(x0 - gap, y0 - gap); lk = QPointF(x1, (y0 + y1) / 2);
+            }
+        } else {
+            const QJsonArray pts = d.value("points").toArray(), look = d.value("look").toArray();
+            if (pts.size() != 2 || look.size() != 2)
+                break;
+            a = pt(pts.at(0)); b = pt(pts.at(1)); lk = QPointF(look.at(0).toDouble(), look.at(1).toDouble());
+        }
         // The drawing camera (drawgen.camera): X is the drawing's right, Y is up, it looks along -Z.
-        const QPointF a = pt(pts.at(0)), b = pt(pts.at(1)), lk = QPointF(look.at(0).toDouble(), look.at(1).toDouble());
         const double dx = b.x() - a.x(), dy = b.y() - a.y(), len = std::hypot(dx, dy);
         if (len > 1e-6) {
             double nx = -dy / len, ny = dx / len;
@@ -3901,7 +3930,7 @@ void MainWindow::regenerateDrawing(const QString& guid)
     } else if (!viewGuids.isEmpty()) {
         mode = QStringLiteral("view");
         geometry = QString::fromUtf8(QJsonDocument(m_viewport->viewGeometry(viewGuids, viewAxes,
-                                         sectionPlane ? &*sectionPlane : nullptr)).toJson(QJsonDocument::Compact));
+                                         sectionPlane ? &*sectionPlane : nullptr, bounds)).toJson(QJsonDocument::Compact));
     }
     // The bridge snapshots the model and runs IfcOpenShell's serializer in a child process, which
     // can take seconds on real files (spike S6); waiting for it here would freeze the window.
