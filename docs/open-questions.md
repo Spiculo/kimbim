@@ -303,6 +303,24 @@ Built per D89 (Archicad's Tracker and temporary guides as the reference).
 7. On a laptop, two-finger scroll **pans** and pinch zooms; Shift+two-finger scroll orbits. Does that
    match the touchpads you use (Windows precision touchpads, Mac trackpads)?
 
+## For the owner: tool palette and panels (asked 2026-10-17, waiting)
+
+Built per D90 (Archicad's Toolbox as the reference).
+
+1. The palette opens as **icons and labels in two columns** (216 px). Archicad users often run it icons
+   only in one or two narrow columns: right-click the palette for *Icons only* or *List*. Which should be
+   the default?
+2. **Flyouts**: Dimension (linear, angle, radius/diameter, level), Line (line, polyline, arc/circle,
+   rectangle), North arrow (scale bar, revision cloud) and Section (elevation). Others worth folding, e.g.
+   Text with Leader, Slab with Slab opening, Split / Trim / Join?
+3. Panel tabs on the right are **icons only**; the current panel shows its title when there is room.
+   Is the icon alone enough, or would you rather have a vertical icon strip at the window's right edge
+   (VS Code style) with full panel titles?
+4. Find & Select, Checks, Library, Schedules and the Python console have **no tab until opened** (Panels
+   button, View › Panels, their own commands). Should any of them be a permanent tab?
+5. When the window is resized the tool palette and the panels keep their width and the view takes the
+   change. On a small laptop screen, would you prefer the panels to shrink first?
+
 ## Needs a spike
 
 These are listed in [07-roadmap.md](07-roadmap.md#spikes-do-first-each-is-small-throwaway-and-documented).
