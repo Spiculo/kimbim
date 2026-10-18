@@ -36,6 +36,9 @@
 #include <QAbstractButton>
 #include <DockManager.h>
 #include <DockWidget.h>
+#include <DockAreaWidget.h>
+#include <DockAreaTitleBar.h>
+#include <QScrollArea>
 #include "DrawingView.h"
 #include "PythonEngine.h"
 #include <QPushButton>
@@ -299,6 +302,50 @@ private slots:
         QVERIFY(w.dockLayout()->manager()->findDockWidget("tools"));
         action(w, "actionMirror")->trigger();
         QCOMPARE(w.tool(), kimcad::MainWindow::Tool::None); // nothing selected: refused, as before
+    }
+
+    // D90: an icon for every tool, flyouts for related tools, a palette that fits 800 px; icon panel
+    // tabs; the rarely used panels in View > Panels (and the panel area's Panels button).
+    void paletteFlyoutsAndPanelTabs()
+    {
+        kimcad::MainWindow w(nullptr, true);
+        w.resize(1500, 860);
+        w.show();
+        QVERIFY(w.newProject());
+        QCoreApplication::processEvents();
+        kimcad::ToolPalette* p = w.toolPalette();
+        for (const QString& g : p->groups())
+            for (QAction* a : p->actions(g)) {
+                QVERIFY2(!a->icon().isNull(), qPrintable(a->objectName()));
+                QVERIFY2(p->buttonFor(a), qPrintable(a->objectName()));
+            }
+        QToolButton* dims = p->buttonFor(action(w, "actionDimensionTool"));
+        QCOMPARE(p->buttonFor(action(w, "actionAngleDimensionTool")), dims);
+        QCOMPARE(p->buttonFor(action(w, "actionLevelDimensionTool")), dims);
+        QCOMPARE(p->buttonFor(action(w, "actionArcTool")), p->buttonFor(action(w, "actionLineTool")));
+        QCOMPARE(p->buttonFor(action(w, "actionCloudTool")), p->buttonFor(action(w, "actionNorthArrowTool")));
+        QCOMPARE(p->buttonFor(action(w, "actionElevationTool")), p->buttonFor(action(w, "actionSectionTool")));
+        action(w, "actionRadialDimensionTool")->trigger(); // the last one used shows on the flyout
+        QCOMPARE(dims->defaultAction(), action(w, "actionRadialDimensionTool"));
+        w.setTool(kimcad::MainWindow::Tool::None);
+        QCOMPARE(p->columns(), 2);
+        QWidget* inner = p->findChild<QScrollArea*>()->widget();
+        QVERIFY2(inner->sizeHint().height() <= 800, qPrintable(QString::number(inner->sizeHint().height())));
+
+        ads::CDockWidget* tree = w.dockLayout()->manager()->findDockWidget("tree");
+        QVERIFY(!tree->icon().isNull());
+        auto* panelsButton = tree->dockAreaWidget()->titleBar()->findChild<QToolButton*>(QStringLiteral("panelsButton"));
+        QVERIFY(panelsButton && panelsButton->isVisibleTo(w.dockLayout()->manager()));
+        QMenu* panels = w.findChild<QMenu*>(QStringLiteral("panelsMenu"));
+        QCOMPARE(panelsButton->menu(), panels);
+        for (const char* name : {"actionFindSelect", "actionCheckModel", "actionObjectLibrary", "actionSchedules", "actionConsole"})
+            QVERIFY2(panels->actions().contains(action(w, name)), name);
+        QVERIFY(!w.dockLayout()->manager()->findDockWidget("findselect")); // no tab until opened
+        action(w, "actionFindSelect")->trigger();
+        QVERIFY(w.dockLayout()->isPanelShown(QStringLiteral("findselect")));
+        QCOMPARE(w.dockLayout()->manager()->findDockWidget("findselect")->dockAreaWidget(), tree->dockAreaWidget());
+        // The lone tool palette has no title row.
+        QVERIFY(!w.dockLayout()->manager()->findDockWidget("tools")->dockAreaWidget()->titleBar()->isVisible());
     }
 
     void newPlanTabAndNewSheetFromThePalette()
