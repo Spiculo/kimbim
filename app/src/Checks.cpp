@@ -63,9 +63,7 @@ ChecksPanel* MainWindow::checksPanel()
         return m_checks;
     }
     m_checks = new ChecksPanel(this);
-    ads::CDockWidget* dock = m_dock->addPanel(QStringLiteral("checks"), tr("Checks"), m_checks);
-    if (QMenu* panels = findChild<QMenu*>(QStringLiteral("panelsMenu")))
-        panels->addAction(dock->toggleViewAction()); // View > Panels brings it back once closed
+    m_dock->addPanel(QStringLiteral("checks"), tr("Checks"), m_checks); // View > Panels: Check model... (D90)
     connect(m_checks, &ChecksPanel::refreshRequested, this, &MainWindow::refreshChecks);
     connect(m_checks, &ChecksPanel::runRequested, this,
         [this](const QStringList& checks, const QJsonObject& options) { runChecks(checks, options); });

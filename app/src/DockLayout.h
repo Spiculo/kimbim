@@ -7,6 +7,7 @@
 #include <QStringList>
 
 class QMainWindow;
+class QMenu;
 class QWidget;
 namespace ads {
 class CDockManager;
@@ -42,6 +43,10 @@ public:
     // Side areas: panels on the right (tabbed), the tool palette on the left.
     ads::CDockWidget* addPanel(const QString& key, const QString& title, QWidget* widget);
     ads::CDockWidget* addLeft(const QString& key, const QString& title, QWidget* widget);
+    // D90: panel tabs show their icon (:/icons/panel-<key>.svg) and, only when current, their title; the
+    // panel area's title bar has a Panels button with this menu (every panel, the rare ones included).
+    void setPanelsMenu(QMenu* menu);
+    static void styleArea(ads::CDockAreaWidget* area); // that button, and no title row for the lone palette
     void raisePanel(const QString& key);         // shows it even when auto-hidden or floating
     bool isPanelShown(const QString& key) const;
     // The side columns' widths (pixels); the center views get the rest (the point of D71: room).
@@ -61,11 +66,14 @@ signals:
 
 private:
     ads::CDockWidget* makeDock(const QString& key, const QString& title, QWidget* widget);
+    static void tightenTab(ads::CDockWidget* dock);
     bool onSomeScreen() const;
 
     ads::CDockManager* m_manager;
     QPointer<ads::CDockAreaWidget> m_center, m_panels, m_left;
     QStringList m_views;
+    QStringList m_panelKeys;
+    QPointer<QMenu> m_panelsMenu;
     QString m_current;
     QByteArray m_default;
 };

@@ -272,7 +272,7 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     restartRecoveryTimer();
     // The window layout of the last session (D71); tests and the self-test start from the default,
     // where the model view gets most of the width.
-    m_dock->setSideWidths(200, 320);
+    m_dock->setSideWidths(216, 280); // D90: two columns of tools on the left; icon tabs need less on the right
     m_dock->captureDefault();
     if (!m_quiet) {
         QByteArray state = m_prefs.layout();
@@ -1304,16 +1304,10 @@ void MainWindow::buildModelingToolbar()
         {Tool::Object, "actionObjectTool", tr("O&bject"), QKeyCombination(Qt::SHIFT, Qt::Key_O),
             tr("Place a library object (furniture, sanitary, kitchen, trees...): pick it in the Library panel, click where it goes; Tab turns it 90 degrees")},
     };
-    // The tools' icons: the IFC class each one makes (the tree's icons).
-    const QHash<int, QString> iconClass = {{int(Tool::Wall), "IfcWall"}, {int(Tool::Slab), "IfcSlab"},
-        {int(Tool::Door), "IfcDoor"}, {int(Tool::Window), "IfcWindow"}, {int(Tool::Column), "IfcColumn"},
-        {int(Tool::Beam), "IfcBeam"}, {int(Tool::Stair), "IfcStair"}, {int(Tool::Railing), "IfcRailing"}, {int(Tool::Roof), "IfcRoof"},
-        {int(Tool::Room), "IfcSpace"}, {int(Tool::Grid), "IfcGrid"}, {int(Tool::Object), "IfcFurniture"}};
     for (const Def& d : defs) {
-        auto* a = new QAction(d.text, this); // shown in the tool palette (D71) and the Model menu
+        // shown in the tool palette (D71) and the Model menu; the palette gives it its icon (D90)
+        auto* a = new QAction(d.text, this);
         a->setObjectName(QLatin1String(d.name));
-        if (iconClass.contains(int(d.tool)))
-            a->setIcon(iconFor(iconClass.value(int(d.tool))));
         a->setShortcut(d.key);
         a->setCheckable(true);
         a->setToolTip(d.tip);
@@ -2504,7 +2498,27 @@ void MainWindow::buildPalette()
         newPlan, newSheet});
     m_palette->addGroup(QStringLiteral("edit"), tr("Edit"), {tool(Tool::Move), tool(Tool::Rotate),
         tool(Tool::Stretch), tool(Tool::Split), tool(Tool::Trim), tool(Tool::Join), mirror, act("actionCopyToLevel"), tool(Tool::Measure)});
-    m_dock->addLeft(QStringLiteral("tools"), tr("Tools"), m_palette);
+    // D90: related tools share one flyout button (the last one used shows on it).
+    m_palette->addFlyout(QStringLiteral("plane"), {tool(Tool::Dimension), tool(Tool::AngleDimension),
+        tool(Tool::RadialDimension), tool(Tool::LevelDimension)});
+    m_palette->addFlyout(QStringLiteral("plane"), {tool(Tool::Line), tool(Tool::Polyline), tool(Tool::ArcCircle),
+        tool(Tool::Rectangle)});
+    m_palette->addFlyout(QStringLiteral("plane"), {tool(Tool::NorthArrow), tool(Tool::ScaleBar), tool(Tool::Cloud)});
+    m_palette->addFlyout(QStringLiteral("view"), {tool(Tool::Section), tool(Tool::Elevation)});
+    m_palette->setMode(ToolPalette::modeFromKey(m_prefs.value(QStringLiteral("palette_mode")).toString()));
+    connect(m_palette, &ToolPalette::modeChanged, this, [this](ToolPalette::Mode mode) {
+        m_prefs.setValue(QStringLiteral("palette_mode"), ToolPalette::modeKey(mode));
+        if (!m_quiet)
+            m_prefs.save();
+    });
+    ads::CDockWidget* toolsDock = m_dock->addLeft(QStringLiteral("tools"), tr("Tools"), m_palette);
+    m_palette->contextMenu()->addSeparator();
+    QAction* floatTools = m_palette->contextMenu()->addAction(tr("&Float"));
+    floatTools->setObjectName(QStringLiteral("actionFloatTools"));
+    connect(floatTools, &QAction::triggered, toolsDock, [toolsDock] { toolsDock->setFloating(); });
+    QAction* hideTools = m_palette->contextMenu()->addAction(tr("&Auto-hide"));
+    hideTools->setObjectName(QStringLiteral("actionAutoHideTools"));
+    connect(hideTools, &QAction::triggered, toolsDock, [toolsDock] { toolsDock->setAutoHide(!toolsDock->isAutoHide()); });
     // View > Panels: a panel closed with its x comes back from here (D71).
     m_viewMenu->addSeparator();
     QMenu* panels = m_viewMenu->addMenu(tr("&Panels"));
@@ -2512,7 +2526,20 @@ void MainWindow::buildPalette()
     for (const char* key : {"tools", "tree", "properties", "layers", "history", "drawings", "sheets"})
         if (ads::CDockWidget* d = m_dock->manager()->findDockWidget(QLatin1String(key)))
             panels->addAction(d->toggleViewAction());
+    // D90: the panels used now and then cost no tab until opened (then closable): from here, the
+    // Panels button of the panel area and their own commands.
+    panels->addSeparator();
+    const std::pair<const char*, const char*> rare[] = {{"actionFindSelect", "panel-findselect"},
+        {"actionCheckModel", "panel-checks"}, {"actionObjectLibrary", "panel-library"}, {"actionSchedules", "panel-schedules"}};
+    for (const auto& [name, icon] : rare)
+        if (QAction* a = act(name)) {
+            a->setIcon(themedIcon(QLatin1String(icon)));
+            panels->addAction(a);
+        }
     buildConsoleActions(); // D82
+    if (QAction* console = act("actionConsole"))
+        console->setIcon(themedIcon(QStringLiteral("panel-console")));
+    m_dock->setPanelsMenu(panels);
 }
 
 void MainWindow::newSheetDialog(const QString& paper)

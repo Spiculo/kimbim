@@ -43,10 +43,8 @@ void MainWindow::buildConsoleActions()
         m_dock->raisePanel(QStringLiteral("console"));
         m_console->input()->setFocus();
     });
-    if (auto* panels = findChild<QMenu*>(QStringLiteral("panelsMenu"))) {
-        panels->addSeparator();
-        panels->addAction(show);
-    }
+    if (auto* panels = findChild<QMenu*>(QStringLiteral("panelsMenu")))
+        panels->addAction(show); // with the other panels opened on demand (D90)
     addAction(show); // the shortcut works before the menu was ever opened
     auto* script = new QAction(tr("Run Python scrip&t..."), this);
     script->setObjectName(QStringLiteral("actionRunScript"));
