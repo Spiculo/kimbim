@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include "Viewport.h"
 #include "Graphics.h"
 #include "PolygonTool.h"
@@ -234,85 +234,135 @@ std::optional<QSet<QString>> Viewport::visibleIn(int x0, int y0, int x1, int y1)
 
 std::optional<QSet<QString>> Viewport::idsInImage(int w, int h, int x0, int y0, int x1, int y1)
 {
-    // Draw every element in its id colour on black, without highlights or lines, into an
-    // offscreen image of the view; clip planes still apply, hidden elements are not drawn.
+    const auto ids = renderIds(w, h);
+    if (!ids)
+        return std::nullopt;
+    QSet<int> seen;
+    const int xa = std::clamp(std::min(x0, x1), 0, w - 1), xb = std::clamp(std::max(x0, x1), 0, w - 1);
+    const int ya = std::clamp(std::min(y0, y1), 0, h - 1), yb = std::clamp(std::max(y0, y1), 0, h - 1);
+    for (int y = ya; y <= yb; ++y)
+        for (int x = xa; x <= xb; ++x) {
+            const int id = ids->at(x, y);
+            if (id > 0)
+                seen.insert(id);
+        }
+    QSet<QString> out;
+    for (int id : std::as_const(seen)) {
+        const QString g = guidOfId(id);
+        if (!g.isEmpty())
+            out.insert(g);
+    }
+    return out;
+}
+
+int Viewport::IdImage::at(int x, int y) const
+{
+    if (x < 0 || y < 0 || x >= width || y >= height)
+        return 0;
+    // Image_PixMap's RawValue already counts rows from the top whatever the memory order (it walks
+    // TopToDown): flipping the row again here read the image upside down.
+    const uint8_t* p = image->RawValue(size_t(y), size_t(x));
+    const int r = bgr ? p[2] : p[0], g = p[1], b = bgr ? p[0] : p[2];
+    return ElementBatch::idFromRgb(toLinear[size_t(r)], toLinear[size_t(g)], toLinear[size_t(b)]);
+}
+
+std::optional<Viewport::IdImage> Viewport::renderIds(int w, int h)
+{
+    // Draw every element in its id colour on grey, without highlights or lines, into an offscreen
+    // image of the view; clip planes still apply, hidden elements are not drawn. Everything that is
+    // not an element (annotations and room labels, the grid, the view cube, previews, underlays) is
+    // left out of this view meanwhile: it would cover the elements behind it.
     const Quantity_Color background = m_view->BackgroundColor();
     // A mid grey that is never a valid id; how it comes back tells whether the buffer sRGB-encodes.
     m_view->SetBackgroundColor(Quantity_Color(128 / 255.0, 128 / 255.0, 128 / 255.0, Quantity_TOC_RGB));
-    if (!m_preview.IsNull())
-        m_context->Erase(m_preview, false);
-    const bool cube = !m_cube.IsNull() && m_context->IsDisplayed(m_cube);
-    eraseViewCube(); // not an element: keep its colours out of the id image
+    const int viewId = m_view->View()->Identification();
+    NCollection_List<Handle(AIS_InteractiveObject)> shown;
+    m_context->DisplayedObjects(shown);
+    std::vector<Handle(AIS_InteractiveObject)> setAside;
+    for (const Handle(AIS_InteractiveObject)& o : shown) {
+        if (!Handle(ElementBatch)::DownCast(o).IsNull())
+            continue;
+        if (!o->ViewAffinity().IsNull() && !o->ViewAffinity()->IsVisible(viewId))
+            continue; // not shown in this view anyway
+        m_context->SetViewAffinity(o, m_view, false);
+        setAside.push_back(o);
+    }
     m_context->ClearDetected(false);
     m_context->UnhilightSelected(false);
     for (const auto& b : m_scene->batches)
         m_context->SetDisplayMode(b, ElementBatch::Ids, false);
-    Image_PixMap image;
+    IdImage out;
+    out.image = std::make_shared<Image_PixMap>();
+    out.width = w;
+    out.height = h;
     V3d_ImageDumpOptions options;
     options.Width = w;
     options.Height = h;
     options.BufferType = Graphic3d_BT_RGB;
-    const bool ok = m_view->ToPixMap(image, options);
+    const bool ok = m_view->ToPixMap(*out.image, options);
     const int mode = m_scene->linesOnly ? ElementBatch::LinesOnly : ElementBatch::Shaded;
     for (const auto& b : m_scene->batches)
         m_context->SetDisplayMode(b, mode, false);
     m_view->SetBackgroundColor(background);
-    if (!m_preview.IsNull()) {
-        m_context->Display(m_preview, 0, -1, false);
-        keepHere(m_preview);
-    }
-    if (cube)
-        ensureViewCube();
+    for (const auto& o : setAside)
+        m_context->SetViewAffinity(o, m_view, true);
     m_context->HilightSelected(false);
     update();
     if (!ok)
         return std::nullopt;
 
-    const bool bgr = image.Format() == Image_Format_BGR || image.Format() == Image_Format_BGR32;
+    const Image_PixMap& image = *out.image;
+    out.bgr = image.Format() == Image_Format_BGR || image.Format() == Image_Format_BGR32;
     // Calibrate: background pixels read ~128 (stored as is) or ~188 (sRGB-encoded on output).
-    auto pixel = [&](int x, int y) {
-        const uint8_t* p = image.RawValue(image.IsTopDown() ? size_t(y) : size_t(h - 1 - y), size_t(x));
-        return bgr ? std::array<int, 3>{p[2], p[1], p[0]} : std::array<int, 3>{p[0], p[1], p[2]};
-    };
     int linearHits = 0, srgbHits = 0;
     for (int y = 0; y < h; y += 7)
         for (int x = 0; x < w; x += 7) {
-            const auto c = pixel(x, y);
-            if (std::abs(c[0] - 128) <= 2 && c[0] == c[1] && c[1] == c[2])
+            const uint8_t* p = image.RawValue(size_t(y), size_t(x));
+            if (std::abs(p[0] - 128) <= 2 && p[0] == p[1] && p[1] == p[2])
                 ++linearHits;
-            else if (std::abs(c[0] - 188) <= 2 && c[0] == c[1] && c[1] == c[2])
+            else if (std::abs(p[0] - 188) <= 2 && p[0] == p[1] && p[1] == p[2])
                 ++srgbHits;
         }
-    std::array<int, 256> toLinear{};
     for (int i = 0; i < 256; ++i) {
         const double c = i / 255.0;
         const double l = srgbHits > linearHits ? (c <= 0.04045 ? c / 12.92 : std::pow((c + 0.055) / 1.055, 2.4)) : c;
-        toLinear[size_t(i)] = int(std::lround(l * 255.0));
-    }
-    QSet<int> ids;
-    const int xa = std::clamp(std::min(x0, x1), 0, w - 1), xb = std::clamp(std::max(x0, x1), 0, w - 1);
-    const int ya = std::clamp(std::min(y0, y1), 0, h - 1), yb = std::clamp(std::max(y0, y1), 0, h - 1);
-    for (int y = ya; y <= yb; ++y) {
-        const size_t row = image.IsTopDown() ? size_t(y) : size_t(h - 1 - y);
-        for (int x = xa; x <= xb; ++x) {
-            const uint8_t* p = image.RawValue(row, size_t(x));
-            const int r = bgr ? p[2] : p[0], g = p[1], b = bgr ? p[0] : p[2];
-            const int id = ElementBatch::idFromRgb(toLinear[size_t(r)], toLinear[size_t(g)], toLinear[size_t(b)]);
-            if (id > 0)
-                ids.insert(id);
-        }
-    }
-    QSet<QString> out;
-    for (int id : std::as_const(ids)) {
-        const auto it = std::upper_bound(m_scene->idBases.begin(), m_scene->idBases.end(), id - 1);
-        if (it == m_scene->idBases.begin())
-            continue;
-        const size_t b = size_t(std::distance(m_scene->idBases.begin(), it) - 1);
-        const int index = id - 1 - m_scene->idBases[b];
-        if (index < m_scene->batches[b]->elementCount() && !m_scene->batches[b]->isRetired(index))
-            out.insert(m_scene->batches[b]->guid(index));
+        out.toLinear[size_t(i)] = int(std::lround(l * 255.0));
     }
     return out;
+}
+
+QString Viewport::guidOfId(int id) const
+{
+    if (id <= 0)
+        return QString();
+    const auto it = std::upper_bound(m_scene->idBases.begin(), m_scene->idBases.end(), id - 1);
+    if (it == m_scene->idBases.begin())
+        return QString();
+    const size_t b = size_t(std::distance(m_scene->idBases.begin(), it) - 1);
+    const int index = id - 1 - m_scene->idBases[b];
+    if (index < m_scene->batches[b]->elementCount() && !m_scene->batches[b]->isRetired(index))
+        return m_scene->batches[b]->guid(index);
+    return QString();
+}
+
+// The id image for a width x height span (metres): 2048 pixels on its long side, more for a long or
+// wide drawing (a site elevation is hundreds of metres by a dozen: 2048 x 64 pixels would merge
+// every element), aiming at 3 cm a pixel, at most 8192 pixels a side and 16 Mpixels in all.
+static std::pair<int, int> idImageSize(double width, double height)
+{
+    width = std::max(width, 1e-3);
+    height = std::max(height, 1e-3);
+    const double longest = std::max(width, height);
+    double ppm = std::max(2048.0 / longest, std::min(1.0 / 0.03, 8192.0 / longest));
+    ppm = std::min(ppm, std::sqrt(16.0e6 / (width * height)));
+    return {std::clamp(int(std::lround(width * ppm)), 64, 8192), std::clamp(int(std::lround(height * ppm)), 64, 8192)};
+}
+
+// An orthographic Graphic3d_Camera's scale is the image's smaller side: its height for a wide image,
+// its width for a tall one. The scale that shows a width x height span (metres) at this aspect.
+static double orthoScale(double width, double height, double aspect)
+{
+    return aspect >= 1.0 ? std::max(height, width / aspect) : std::max(width, height * aspect);
 }
 
 std::optional<QSet<QString>> Viewport::visibleFrom(QPointF p1, QPointF p2, QPointF look, double z0, double z1, double depth)
@@ -350,10 +400,9 @@ std::optional<QSet<QString>> Viewport::visibleFrom(QPointF p1, QPointF p2, QPoin
     camera->SetUp(gp_Dir(0, 0, 1));
     camera->SetCenter(gp_Pnt(mid.x(), mid.y(), zm));
     camera->SetEye(gp_Pnt(mid.x() - n.x() * 10, mid.y() - n.y() * 10, zm));
-    // An ortho camera's scale is its larger side; the image has the drawing's proportions.
-    camera->SetScale(std::max(len, height) * 1.02);
-    const int w = len >= height ? 2048 : std::max(64, int(std::lround(2048 * len / height)));
-    const int h = len >= height ? std::max(64, int(std::lround(2048 * height / len))) : 2048;
+    // The image has the drawing's proportions.
+    const auto [w, h] = idImageSize(len, height);
+    camera->SetScale(orthoScale(len * 1.02, height * 1.02, double(w) / h));
     camera->SetAspect(double(w) / h);
     m_view->ZFitAll();
     const auto ids = idsInImage(w, h, 0, 0, w - 1, h - 1);
@@ -393,9 +442,8 @@ std::optional<QSet<QString>> Viewport::visibleFromPlan(const Bnd_Box& bounds, do
     camera->SetUp(gp_Dir(0, 1, 0)); // north up, looking straight down
     camera->SetCenter(gp_Pnt(cx, cy, elevation));
     camera->SetEye(gp_Pnt(cx, cy, cutZ + 10.0));
-    camera->SetScale(std::max(w, h) * 1.02);
-    const int px = w >= h ? 2048 : std::max(64, int(std::lround(2048 * w / h)));
-    const int py = w >= h ? std::max(64, int(std::lround(2048 * h / w))) : 2048;
+    const auto [px, py] = idImageSize(w, h);
+    camera->SetScale(orthoScale(w * 1.02, h * 1.02, double(px) / py));
     camera->SetAspect(double(px) / py);
     m_view->ZFitAll();
     const auto ids = idsInImage(px, py, 0, 0, px - 1, py - 1);
@@ -478,13 +526,10 @@ QJsonObject Viewport::viewGeometry(const QStringList& guids, const gp_Ax2& view,
     // Hidden-line removal by depth: render the front-most element per pixel from the drawing camera (id
     // colours), then keep only the parts of each projected edge whose pixel belongs to that element.
     // Without a window (headless) every facing edge is kept.
-    Image_PixMap image;
-    int iw = 0, ih = 0, winW = 0, winH = 0;
-    bool bgr = false, haveImage = false;
-    std::array<int, 256> toLinear{};
+    std::optional<IdImage> ids;
+    double cx = 0, cy = 0, spanX = 1, spanY = 1; // the image's centre and size in view metres
     if (ensureWindow() && !m_scene->batches.empty() && m_scene->nextIdBase <= ElementBatch::maxId()
         && !bounds.IsVoid()) {
-        m_view->Window()->Size(winW, winH);
         double x0, y0, z0, x1, y1, z1;
         bounds.Get(x0, y0, z0, x1, y1, z1);
         double vx0 = 1e30, vy0 = 1e30, vx1 = -1e30, vy1 = -1e30;
@@ -497,130 +542,60 @@ QJsonObject Viewport::viewGeometry(const QStringList& guids, const gp_Ax2& view,
                     vy0 = std::min(vy0, v.y());
                     vy1 = std::max(vy1, v.y());
                 }
-        const double vw = std::max(vx1 - vx0, 1e-3), vh = std::max(vy1 - vy0, 1e-3);
-        iw = vw >= vh ? 2048 : std::max(64, int(std::lround(2048 * vw / vh)));
-        ih = vw >= vh ? std::max(64, int(std::lround(2048 * vh / vw))) : 2048;
-        if (winW > 0 && winH > 0) {
-            Handle(Graphic3d_Camera) saved = new Graphic3d_Camera();
-            saved->Copy(m_view->Camera());
-            const Handle(Graphic3d_Camera)& cam = m_view->Camera();
-            const gp_Pnt o = ax3.Location();
-            cam->SetProjectionType(Graphic3d_Camera::Projection_Orthographic);
-            cam->SetUp(gp_Dir(ax3.YDirection()));
-            cam->SetCenter(o);
-            cam->SetEye(gp_Pnt(o.XYZ() + toward.XYZ() * 10.0));
-            cam->SetScale(std::max(vw, vh) * 1.02);
-            cam->SetAspect(double(iw) / ih);
-            std::vector<Handle(Graphic3d_ClipPlane)> planes;
-            if (section != nullptr)
-                planes.push_back(new Graphic3d_ClipPlane(*section));
-            for (const auto& plane : m_clipPlanes)
-                m_view->RemoveClipPlane(plane);
-            for (const auto& b : m_scene->batches)
-                for (const auto& plane : planes)
-                    b->AddClipPlane(plane);
-            const Quantity_Color background = m_view->BackgroundColor();
-            m_view->SetBackgroundColor(Quantity_Color(128 / 255.0, 128 / 255.0, 128 / 255.0, Quantity_TOC_RGB));
-            m_context->ClearDetected(false);
-            m_context->UnhilightSelected(false);
-            for (const auto& b : m_scene->batches)
-                m_context->SetDisplayMode(b, ElementBatch::Ids, false);
-            V3d_ImageDumpOptions options;
-            options.Width = iw;
-            options.Height = ih;
-            options.BufferType = Graphic3d_BT_RGB;
-            haveImage = m_view->ToPixMap(image, options);
-            const int mode = m_scene->linesOnly ? ElementBatch::LinesOnly : ElementBatch::Shaded;
-            for (const auto& b : m_scene->batches)
-                m_context->SetDisplayMode(b, mode, false);
-            m_view->SetBackgroundColor(background);
-            m_context->HilightSelected(false);
-            for (const auto& b : m_scene->batches)
-                for (const auto& plane : planes)
-                    b->RemoveClipPlane(plane);
-            for (const auto& plane : m_clipPlanes)
-                m_view->AddClipPlane(plane);
-            if (haveImage) {
-                bgr = image.Format() == Image_Format_BGR || image.Format() == Image_Format_BGR32;
-                auto pix = [&](int x, int y) {
-                    const uint8_t* p = image.RawValue(image.IsTopDown() ? size_t(y) : size_t(ih - 1 - y), size_t(x));
-                    return bgr ? std::array<int, 3>{p[2], p[1], p[0]} : std::array<int, 3>{p[0], p[1], p[2]};
-                };
-                int lin = 0, srgb = 0;
-                for (int y = 0; y < ih; y += 7)
-                    for (int x = 0; x < iw; x += 7) {
-                        const auto c = pix(x, y);
-                        if (std::abs(c[0] - 128) <= 2 && c[0] == c[1] && c[1] == c[2])
-                            ++lin;
-                        else if (std::abs(c[0] - 188) <= 2 && c[0] == c[1] && c[1] == c[2])
-                            ++srgb;
-                    }
-                for (int i = 0; i < 256; ++i) {
-                    const double c = i / 255.0;
-                    const double l = srgb > lin ? (c <= 0.04045 ? c / 12.92 : std::pow((c + 0.055) / 1.055, 2.4)) : c;
-                    toLinear[size_t(i)] = int(std::lround(l * 255.0));
-                }
-            }
-            // Emit each element's facing edges, cut where the id image shows another element in front.
-            QJsonArray proj;
-            for (const auto& b : m_scene->batches) {
-                for (int i = 0; i < b->elementCount(); ++i) {
-                    if (b->isHidden(i))
-                        continue;
-                    const QString g = b->guid(i);
-                    if (!wanted.contains(g))
-                        continue;
-                    const int myId = b->idBase() + i + 1;
-                    QJsonArray lines;
-                    for (const auto& [a, e] : ElementBatch::featureEdgesFacing(b->chunk(), i, toward)) {
-                        if (!haveImage) {
-                            const QPointF pa = to_view(a), pb = to_view(e);
-                            lines.append(QJsonArray{pa.x(), pa.y(), pb.x(), pb.y()});
-                            continue;
-                        }
-                        int ax, ay, bx, by;
-                        m_view->Convert(a.X(), a.Y(), a.Z(), ax, ay);
-                        m_view->Convert(e.X(), e.Y(), e.Z(), bx, by);
-                        const int iax = int(std::lround(double(ax) * iw / winW)), iay = int(std::lround(double(ay) * ih / winH));
-                        const int ibx = int(std::lround(double(bx) * iw / winW)), iby = int(std::lround(double(by) * ih / winH));
-                        const int n = std::max(2, int(std::hypot(double(iax - ibx), double(iay - iby))));
-                        auto seen = [&](int k) {
-                            const int px = iax + (ibx - iax) * k / n, py = iay + (iby - iay) * k / n;
-                            if (px < 0 || py < 0 || px >= iw || py >= ih)
-                                return false;
-                            const uint8_t* p = image.RawValue(image.IsTopDown() ? size_t(py) : size_t(ih - 1 - py), size_t(px));
-                            const int r = bgr ? p[2] : p[0], gg = p[1], bl = bgr ? p[0] : p[2];
-                            return ElementBatch::idFromRgb(toLinear[size_t(r)], toLinear[size_t(gg)], toLinear[size_t(bl)]) == myId;
-                        };
-                        int run = -1;
-                        for (int k = 0; k <= n; ++k) {
-                            const bool v = seen(k);
-                            if (v && run < 0)
-                                run = k;
-                            if ((!v || k == n) && run >= 0) {
-                                const int end = v ? k : k - 1;
-                                if (end > run) {
-                                    const double t0 = double(run) / n, t1 = double(end) / n;
-                                    const gp_Pnt p0(a.XYZ() + (e.XYZ() - a.XYZ()) * t0);
-                                    const gp_Pnt p1(a.XYZ() + (e.XYZ() - a.XYZ()) * t1);
-                                    const QPointF q0 = to_view(p0), q1 = to_view(p1);
-                                    lines.append(QJsonArray{q0.x(), q0.y(), q1.x(), q1.y()});
-                                }
-                                run = -1;
-                            }
-                        }
-                    }
-                    if (!lines.isEmpty())
-                        proj.append(QJsonObject{{"guid", g}, {"lines", lines}});
-                }
-            }
-            m_view->Camera()->Copy(saved);
-            m_view->Invalidate();
-            update();
-            return finishViewGeometry(ax3, proj, section);
-        }
+        // A margin: the edges on the bounds' rim still land inside the image.
+        const double vw = std::max(vx1 - vx0, 1e-3) * 1.04, vh = std::max(vy1 - vy0, 1e-3) * 1.04;
+        const auto [iw, ih] = idImageSize(vw, vh);
+        const double aspect = double(iw) / ih;
+        const double scale = orthoScale(vw, vh, aspect);
+        spanX = aspect >= 1.0 ? scale * aspect : scale;
+        spanY = aspect >= 1.0 ? scale : scale / aspect;
+        cx = (vx0 + vx1) / 2;
+        cy = (vy0 + vy1) / 2;
+        Handle(Graphic3d_Camera) saved = new Graphic3d_Camera();
+        saved->Copy(m_view->Camera());
+        const Handle(Graphic3d_Camera)& cam = m_view->Camera();
+        // Centred on the bounds (a section line need not be): right is the view's X, up its Y.
+        const gp_Pnt centre(ax3.Location().XYZ() + gp_XYZ(ax3.XDirection().XYZ()) * cx + gp_XYZ(ax3.YDirection().XYZ()) * cy);
+        cam->SetProjectionType(Graphic3d_Camera::Projection_Orthographic);
+        cam->SetUp(gp_Dir(ax3.YDirection()));
+        cam->SetCenter(centre);
+        cam->SetEye(gp_Pnt(centre.XYZ() + toward.XYZ() * 10.0));
+        cam->SetScale(scale);
+        cam->SetAspect(aspect);
+        std::vector<Handle(Graphic3d_ClipPlane)> planes;
+        if (section != nullptr)
+            planes.push_back(new Graphic3d_ClipPlane(*section));
+        for (const auto& plane : m_clipPlanes)
+            m_view->RemoveClipPlane(plane);
+        for (const auto& b : m_scene->batches)
+            for (const auto& plane : planes)
+                b->AddClipPlane(plane);
+        m_view->ZFitAll(); // the depth range of this camera, not the 3D view's
+        ids = renderIds(iw, ih);
+        for (const auto& b : m_scene->batches)
+            for (const auto& plane : planes)
+                b->RemoveClipPlane(plane);
+        for (const auto& plane : m_clipPlanes)
+            m_view->AddClipPlane(plane);
+        m_view->Camera()->Copy(saved);
+        m_view->Invalidate();
+        update();
     }
-    // No window: keep every facing edge (no hidden-line removal).
+    // A view point -> image pixel, from the camera set above (no window round trip: the window is a
+    // different size, and its integer pixels lose precision).
+    auto to_pixel = [&](const QPointF& v) {
+        return QPointF((((v.x() - cx) / spanX) + 0.5) * ids->width, (0.5 - (v.y() - cy) / spanY) * ids->height);
+    };
+    // An edge lies on its element's rim, where half the pixels belong to what is beside or behind it:
+    // the element is seen at a point when it owns a pixel within one pixel of it.
+    auto owns = [&](double px, double py, int id) {
+        const int x = int(std::floor(px)), y = int(std::floor(py));
+        for (int dy = -1; dy <= 1; ++dy)
+            for (int dx = -1; dx <= 1; ++dx)
+                if (ids->at(x + dx, y + dy) == id)
+                    return true;
+        return false;
+    };
     QJsonArray proj;
     for (const auto& b : m_scene->batches) {
         for (int i = 0; i < b->elementCount(); ++i) {
@@ -629,10 +604,32 @@ QJsonObject Viewport::viewGeometry(const QStringList& guids, const gp_Ax2& view,
             const QString g = b->guid(i);
             if (!wanted.contains(g))
                 continue;
+            const int myId = b->idBase() + i + 1;
             QJsonArray lines;
             for (const auto& [a, e] : ElementBatch::featureEdgesFacing(b->chunk(), i, toward)) {
                 const QPointF pa = to_view(a), pb = to_view(e);
-                lines.append(QJsonArray{pa.x(), pa.y(), pb.x(), pb.y()});
+                if (!ids) {
+                    lines.append(QJsonArray{pa.x(), pa.y(), pb.x(), pb.y()});
+                    continue;
+                }
+                const QPointF ia = to_pixel(pa), ib = to_pixel(pb);
+                const int n = std::max(2, int(std::ceil(std::hypot(ia.x() - ib.x(), ia.y() - ib.y()))));
+                int run = -1;
+                for (int k = 0; k <= n; ++k) {
+                    const double t = double(k) / n;
+                    const bool v = owns(ia.x() + (ib.x() - ia.x()) * t, ia.y() + (ib.y() - ia.y()) * t, myId);
+                    if (v && run < 0)
+                        run = k;
+                    if ((!v || k == n) && run >= 0) {
+                        const int end = v ? k : k - 1;
+                        if (end > run) {
+                            const double t0 = double(run) / n, t1 = double(end) / n;
+                            const QPointF q0 = pa + (pb - pa) * t0, q1 = pa + (pb - pa) * t1;
+                            lines.append(QJsonArray{q0.x(), q0.y(), q1.x(), q1.y()});
+                        }
+                        run = -1;
+                    }
+                }
             }
             if (!lines.isEmpty())
                 proj.append(QJsonObject{{"guid", g}, {"lines", lines}});
@@ -2187,6 +2184,47 @@ Bnd_Box Viewport::boundsOf(const QStringList& guids) const
         if (it != m_scene->locate.constEnd())
             box.Add(m_scene->batches[size_t(it->batch)]->elementBounds(it->index));
     }
+    return box;
+}
+
+Bnd_Box Viewport::buildingBounds(const QStringList& guids) const
+{
+    // The elements' mesh boxes (exact: roofs and gables included, unlike the placements), less the
+    // few far-flung ones a georeferenced model carries (site furniture, survey markers, an element
+    // left at the project origin): keep the elements whose centre lies near the core of the others.
+    std::vector<Bnd_Box> boxes;
+    boxes.reserve(size_t(guids.size()));
+    for (const QString& g : guids) {
+        auto it = m_scene->locate.constFind(g);
+        if (it == m_scene->locate.constEnd())
+            continue;
+        const Bnd_Box b = m_scene->batches[size_t(it->batch)]->elementBounds(it->index);
+        if (!b.IsVoid())
+            boxes.push_back(b);
+    }
+    Bnd_Box box;
+    if (boxes.empty())
+        return box;
+    std::vector<double> cx, cy;
+    cx.reserve(boxes.size());
+    cy.reserve(boxes.size());
+    for (const auto& b : boxes) {
+        double x0, y0, z0, x1, y1, z1;
+        b.Get(x0, y0, z0, x1, y1, z1);
+        cx.push_back((x0 + x1) / 2);
+        cy.push_back((y0 + y1) / 2);
+    }
+    auto quantile = [](std::vector<double> v, double q) {
+        const size_t k = std::min(v.size() - 1, size_t(q * double(v.size() - 1) + 0.5));
+        std::nth_element(v.begin(), v.begin() + std::ptrdiff_t(k), v.end());
+        return v[k];
+    };
+    const double qx0 = quantile(cx, 0.05), qx1 = quantile(cx, 0.95);
+    const double qy0 = quantile(cy, 0.05), qy1 = quantile(cy, 0.95);
+    const double margin = std::max(15.0, 0.5 * std::max(qx1 - qx0, qy1 - qy0));
+    for (size_t i = 0; i < boxes.size(); ++i)
+        if (cx[i] >= qx0 - margin && cx[i] <= qx1 + margin && cy[i] >= qy0 - margin && cy[i] <= qy1 + margin)
+            box.Add(boxes[i]);
     return box;
 }
 

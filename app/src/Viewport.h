@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
 #include <QPointer>
@@ -30,8 +30,12 @@
 #include <QStringList>
 #include <QWidget>
 
+#include <array>
 #include <functional>
+#include <memory>
 #include <vector>
+
+#include <Image_PixMap.hxx>
 
 #include "ElementBatch.h"
 #include "Scene.h"
@@ -229,6 +233,9 @@ public:
     bool showsOverlay(const Handle(AIS_InteractiveObject)& obj, const Handle(V3d_View)& view) const;
     Handle(AIS_InteractiveObject) gridObject() const { return m_grid; }
     Bnd_Box boundsOf(const QStringList& guids) const; // all visible elements when empty
+    // The box of these elements' meshes (the building's), less the far outliers of a georeferenced
+    // site: what a drawing frames. Void if none of them is shown.
+    Bnd_Box buildingBounds(const QStringList& guids) const;
 
     // Measurement helpers used by --self-test.
     double measureFps(int frames);
@@ -332,6 +339,17 @@ private:
     void keepOnlyVisible(const QSet<QString>& before, AIS_SelectionScheme scheme, int x0, int y0, int x1, int y1);
     // Renders the view's camera into a w x h offscreen image in id colours; guids seen in the rectangle.
     std::optional<QSet<QString>> idsInImage(int w, int h, int x0, int y0, int x1, int y1);
+    // The id image from the current camera: every shown element in its id colour, nothing else (the
+    // annotations, grid, cube, previews and underlays are left out). Rows from the top.
+    struct IdImage {
+        std::shared_ptr<Image_PixMap> image;
+        std::array<int, 256> toLinear{};
+        bool bgr = false;
+        int width = 0, height = 0;
+        int at(int x, int y) const; // the element id at a pixel (0: none); x right, y down
+    };
+    std::optional<IdImage> renderIds(int w, int h);
+    QString guidOfId(int id) const; // empty if not a live element
     QSet<QString> selectedSet() const;
     bool m_drawingMode = false;
     QTimer* m_hoverTimer = nullptr;

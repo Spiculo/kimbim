@@ -3887,11 +3887,20 @@ void MainWindow::regenerateDrawing(const QString& guid)
     std::optional<gp_Pln> sectionPlane;
     // Frame the building, not the whole georeferenced site (hundreds of metres across): the site's
     // extent would make every drawing a speck on a huge sheet and its visible pass select nothing.
+    // The box comes from the meshes of the building's elements: exact, where the placements Python
+    // has stop at the highest storey's floor (a roof and the gables were cut off the drawing). The
+    // placement box and then the whole model are the fallbacks.
     Bnd_Box bounds = m_viewport->boundsOf({});
     {
         const QJsonObject b = bridge("drawing_bounds");
+        QStringList inside;
+        for (const auto& g : b.value("guids").toArray())
+            inside << g.toString();
+        const Bnd_Box meshes = m_viewport->buildingBounds(inside);
         const QJsonArray lo = b.value("lo").toArray(), hi = b.value("hi").toArray();
-        if (lo.size() == 3 && hi.size() == 3) {
+        if (!meshes.IsVoid()) {
+            bounds = meshes;
+        } else if (lo.size() == 3 && hi.size() == 3) {
             Bnd_Box box;
             box.Add(gp_Pnt(lo.at(0).toDouble(), lo.at(1).toDouble(), lo.at(2).toDouble()));
             box.Add(gp_Pnt(hi.at(0).toDouble(), hi.at(1).toDouble(), hi.at(2).toDouble()));

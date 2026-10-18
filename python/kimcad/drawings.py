@@ -88,13 +88,24 @@ def drawings() -> str:
     return B._dump({"drawings": out})
 
 
+_building_cache: dict[tuple, list] = {}  # state -> GlobalIds of the building's drawn products
+
+
 def drawing_bounds() -> str:
-    """The building's bounding box in metres ({lo, hi}): the app frames the drawings and runs its
-    visible-element pass on this, not on the whole georeferenced site."""
+    """The building's bounding box in metres ({lo, hi}, from placements) and its drawn products
+    (`guids`): the app frames the drawings on those elements' meshes (exact, roofs included) and runs
+    its visible-element pass there, not on the whole georeferenced site. Once per model state: the
+    app asks for every drawing it generates, and walking a large model is seconds."""
     if B._model is None:
         return A._fail("no model open")
-    lo, hi = G.model_bounds(B._model)
-    return B._dump({"ok": True, "lo": [float(v) for v in lo], "hi": [float(v) for v in hi]})
+    lo, hi = _bounds_json()
+    state = _state_key()
+    guids = _building_cache.get(state)
+    if guids is None:
+        guids = [p.GlobalId for p in G.building_products(B._model)]
+        _building_cache.clear()
+        _building_cache[state] = guids
+    return B._dump({"ok": True, "lo": lo, "hi": hi, "guids": guids})
 
 
 def _new(name: str, s: dict, bounds=None):
@@ -326,6 +337,7 @@ def forget_snapshots() -> None:
         shutil.rmtree(folder, ignore_errors=True)
     _snapshots.clear()
     _bounds_cache.clear()
+    _building_cache.clear()
 
 
 def _snapshot() -> str:
