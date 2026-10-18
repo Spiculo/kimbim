@@ -271,3 +271,18 @@ def test_section_drawing_from_mesh_geometry():
     r = call("generate_view_drawing", guid, json.dumps(geom))
     assert r["ok"] and r["svg"].count("<path") >= 2
     assert f'ifc:guid="{guid}"' in r["svg"] and "ifc:matrix3" in r["svg"]
+
+
+def test_drawing_bounds_lists_the_buildings_elements(house):
+    """The app frames sections and elevations on the meshes of the building's elements, so the bounds
+    carry their GlobalIds: the walls, the roof and the D86 tree inside the building, not the drawing
+    markers. Cached per model state (the app asks for every drawing it generates)."""
+    from kimcad import drawings as D
+
+    r = call("drawing_bounds")
+    assert r["ok"] and len(r["lo"]) == 3 and len(r["hi"]) == 3
+    classes = {b._model.by_guid(g).is_a() for g in r["guids"]}
+    assert {"IfcWall", "IfcRoof", "IfcSlab", "IfcGeographicElement"} <= classes
+    assert "IfcAnnotation" not in classes
+    assert D._building_cache, "cached for this model state"
+    assert call("drawing_bounds")["guids"] == r["guids"]
