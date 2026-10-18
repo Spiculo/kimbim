@@ -61,9 +61,9 @@ def build(out: str) -> dict:
     # D88: a U stair with its half landing and railings; its hole in the Level 2 floor is automatic.
     stair = call("create_stair", l1, 1.0, 1.2, 0.0, 1.0, 3.0, json.dumps({"shape": "U"}))["guid"]
     call("add_stair_railings", stair, "0.9", "both")
-    # and a ramp outside the east wall with a guard railing by path
-    call("create_ramp", l1, 10.5, 5.5, 0.0, 1.2, 0.3, json.dumps({"slope": 8}))
-    call("create_railing", l1, json.dumps([[10.5, 4.85], [14.25, 4.85]]), "1.1")
+    # and a ramp up to a raised floor in the living room, with a railing by path
+    call("create_ramp", l1, 6.0, 2.7, 0.0, 1.0, 0.2, json.dumps({"slope": 8}))
+    call("create_railing", l1, json.dumps([[6.0, 2.1], [8.5, 2.1]]), "1.1")
 
     # Plan annotations (Slice 13): a label, a dimension and a mark on Level 1.
     call("add_annotation", l1, "text", json.dumps([[3.0, 2.0]]), "Living room")
