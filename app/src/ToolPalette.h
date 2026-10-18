@@ -46,6 +46,8 @@ public:
 
     static QString modeKey(Mode mode);               // "icons", "labels", "list"
     static Mode modeFromKey(const QString& key);     // anything else: icons and labels
+    // The icon a tool without one gets: "actionSlabOpeningTool" -> "tool-slab-opening" (:/icons/<name>.svg).
+    static QString iconName(const QAction* action);
 
 signals:
     void modeChanged(kimcad::ToolPalette::Mode mode);

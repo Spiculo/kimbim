@@ -56,9 +56,10 @@ public:
         return scaledPixmap(size, mode, state, 1.0);
     }
 
+    // `size` is logical (Qt 6.8+ passes the scale separately), the pixmap in device pixels.
     QPixmap scaledPixmap(const QSize& size, QIcon::Mode mode, QIcon::State state, qreal scale) override
     {
-        const QSize px = size * scale;
+        const QSize px = (QSizeF(size) * scale).toSize();
         const QString key = QStringLiteral("%1x%2/%3/%4").arg(px.width()).arg(px.height()).arg(int(mode))
             .arg(colorFor(mode).rgba());
         auto it = m_cache.constFind(key);
