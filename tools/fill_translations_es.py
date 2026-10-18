@@ -1180,6 +1180,14 @@ ES = {
                                                    "%n barandillas añadidas; siguen a la escalera"),
     "Could not create the railing: %1": "No se pudo crear la barandilla: %1",
     "Railing: %n post(s)": ("Barandilla: %n montante", "Barandilla: %n montantes"),
+    # D90: tool palette and panels
+    "Panels": "Paneles",
+    "&Float": "&Flotante",
+    "&Auto-hide": "&Ocultar automáticamente",
+    "Press and hold, or click the corner, for: %1": "Mantenga pulsado, o haga clic en la esquina, para: %1",
+    "&Icons only": "Solo &iconos",
+    "Icons and &labels": "Iconos y &nombres",
+    "&List": "&Lista",
 }
 
 
