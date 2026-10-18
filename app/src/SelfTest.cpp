@@ -8,6 +8,7 @@
 #include <QScreen>
 #include <QDir>
 #include <QElapsedTimer>
+#include <QFile>
 #include <QEventLoop>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -648,6 +649,13 @@ int runSelfTest(const SelfTestOptions& options)
         result.insert(QStringLiteral("drawing_s"), double(drawingTimer.elapsed()) / 1000.0);
         if (shown) {
             result.insert(QStringLiteral("drawing_paper_mm"), QJsonArray{view->paperSize().width(), view->paperSize().height()});
+            if (!options.screenshot.isEmpty()) { // the drawing's SVG beside the screenshot, for checks
+                QString path = options.screenshot;
+                path.replace(QStringLiteral(".png"), QStringLiteral("-drawing.svg"));
+                QFile out(path);
+                const bool saved = out.open(QIODevice::WriteOnly) && out.write(view->svg()) == view->svg().size();
+                result.insert(QStringLiteral("drawing_svg"), saved ? path : QString());
+            }
             view->fit();
         }
         result.insert(QStringLiteral("ok"), result.value("ok").toBool() && shown);

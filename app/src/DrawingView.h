@@ -26,6 +26,7 @@ public:
     // Show this SVG (paper millimetres); the old one stays until a new one arrives.
     bool setSvg(const QByteArray& svg);
     bool hasDrawing() const;
+    const QByteArray& svg() const { return m_svg; } // the SVG shown (self-test dumps it)
     QSizeF paperSize() const; // millimetres
     void setStale(bool stale);
     bool isStale() const { return m_stale; }
@@ -62,6 +63,7 @@ private:
 
     QString m_guid;
     QSvgRenderer* m_renderer;
+    QByteArray m_svg;
     QWidget* m_bar;
     QLabel* m_barText;
     QPushButton* m_regenerate;

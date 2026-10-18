@@ -50,6 +50,7 @@ bool DrawingView::setSvg(const QByteArray& svg)
 {
     if (!m_renderer->load(svg))
         return false;
+    m_svg = svg;
     if (!m_fitted)
         fit();
     update();
