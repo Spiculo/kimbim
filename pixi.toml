@@ -53,6 +53,9 @@ house = "python tools/make_house.py build/house.ifc"
 # M4 exit test: the house's sheet A01 (plan, section, elevation, title block) exported to PDF by the app
 # (no window) and checked: one A3 page, vector content, fonts; the sheet holds the three drawings.
 m4 = { cmd = "python tools/check_m4.py build/house.ifc build/m4", depends-on = ["house", "app-build", "build"] }
+# Sections and elevations drawn from the meshes: walls, roof and poche (not only the objects), hidden lines
+# removed, a stair section, and a georeferenced copy of the house framed on its building (real window)
+drawings = { cmd = "python tools/check_drawings.py build/house.ifc build/drawings-check", depends-on = ["house", "app-build", "build"] }
 # M5 exit test: two design options of the house are created, edited separately, compared and combined
 # with one conflict resolved (the UI path is test_main_window's m5ExitCombineOptions).
 m5 = { cmd = "python tools/check_m5.py build/m5", depends-on = ["build"] }
