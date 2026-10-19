@@ -24,22 +24,10 @@
 #include <QLabel>
 #include <QLayout>
 #include <QToolButton>
-#include <QFile>
-#include <QStandardPaths>
 
 #include <algorithm>
 
 namespace kimcad {
-
-namespace {
-// Temporary diagnostic (removed once the huge-window crash is fixed).
-void diag(const QString& message)
-{
-    QFile f(QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QStringLiteral("/kimcad-diag.txt"));
-    if (f.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
-        f.write((message + QLatin1Char('\n')).toUtf8());
-}
-} // namespace
 
 namespace {
 
@@ -441,12 +429,6 @@ bool DockLayout::restoreLayout(const QByteArray& state)
     const bool restored = m_manager->restoreState(state);
     if (restored && onSomeScreen() && layoutIsSane())
         return true;
-    QString sizes;
-    for (int s : m_manager->splitterSizes(m_center))
-        sizes += QString::number(s) + QLatin1Char(' ');
-    diag(QStringLiteral("restoreLayout REJECTED: restored=%1 sane=%2 onScreen=%3 splits=[%4] floats=%5")
-        .arg(restored).arg(layoutIsSane()).arg(onSomeScreen()).arg(sizes.trimmed())
-        .arg(m_manager->floatingWidgets().size()));
     if (!m_default.isEmpty())
         m_manager->restoreState(m_default);
     return false;

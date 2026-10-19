@@ -126,14 +126,6 @@ struct StepTimer {
     StepTimer(QHash<QString, double>& h, const char* n) : into(h), name(n) { t.start(); }
     ~StepTimer() { into[QLatin1String(name)] += double(t.nsecsElapsed()) / 1e6; }
 };
-
-// Temporary diagnostic: writes window sizes to %TEMP%/kimcad-diag.txt (removed once the crash is fixed).
-void diag(const QString& message)
-{
-    QFile f(QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QStringLiteral("/kimcad-diag.txt"));
-    if (f.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
-        f.write((message + QLatin1Char('\n')).toUtf8());
-}
 } // namespace
 
 MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
@@ -294,11 +286,11 @@ void MainWindow::clampWindowSize()
     const int capW = avail.width() * 4, capH = avail.height() * 4;
     if (m_clamping || (width() <= capW && height() <= capH && minimumWidth() <= capW && minimumHeight() <= capH))
         return;
-    diag(QStringLiteral("clamp: RESETTING size=%1x%2 min=%3x%4 minHint=%5x%6 cap=%7x%8")
-        .arg(width()).arg(height()).arg(minimumWidth()).arg(minimumHeight())
-        .arg(minimumSizeHint().width()).arg(minimumSizeHint().height()).arg(capW).arg(capH));
+    qWarning("KIMCAD: the window asked for %dx%d (minimum %dx%d); back to 1280x800", width(), height(),
+        minimumWidth(), minimumHeight());
     m_clamping = true;
     m_dock->restoreLayout(QByteArray()); // the default layout: resets the splitter sizes
+    setContentsMargins(0, 0, 0, 0);      // a maximized window's frame margins (TitleBar) count in its minimum
     setMinimumSize(0, 0);
     resize(1280, 800);
     move(std::max(0, avail.x() + (avail.width() - width()) / 2), std::max(0, avail.y() + (avail.height() - height()) / 2));
