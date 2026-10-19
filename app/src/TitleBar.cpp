@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "TitleBar.h"
 
+#include <algorithm>
+
 #include <QApplication>
 #include <QEvent>
 #include <QFrame>
@@ -95,20 +97,27 @@ void applyNativeFrame(QWidget* window)
 }
 
 // A maximized window may reach past its monitor's work area by the (invisible) frame: keep the
-// content inside it.
+// content inside it. Not while minimized: a minimized window sits at (-32000, -32000), and taking
+// that for the overhang made margins of 25600 px, which the layout turned into the window's minimum
+// size, so the window grew to ~32800 x 32000 pixels and died allocating its backing store.
 void fitMaximized(QWidget* window)
 {
     QMargins m;
+    if (window->isMinimized())
+        return; // keep the margins it had; it is restored as it was
     if (window->isMaximized() && window->internalWinId()) {
         const HWND hwnd = reinterpret_cast<HWND>(window->winId());
+        if (IsIconic(hwnd))
+            return;
         RECT wr;
         MONITORINFO mi{};
         mi.cbSize = sizeof(mi);
         if (GetWindowRect(hwnd, &wr) && GetMonitorInfoW(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &mi)) {
-            const qreal dpr = window->devicePixelRatioF();
-            auto px = [dpr](long v) { return qMax(0, qRound(v / dpr)); };
-            m = QMargins(px(mi.rcWork.left - wr.left), px(mi.rcWork.top - wr.top), px(wr.right - mi.rcWork.right),
-                px(wr.bottom - mi.rcWork.bottom));
+            const UINT dpi = GetDpiForWindow(hwnd);
+            const int frame = GetSystemMetricsForDpi(SM_CXSIZEFRAME, dpi) + GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
+            m = TitleBar::maximizedMargins(QRect(QPoint(wr.left, wr.top), QPoint(wr.right - 1, wr.bottom - 1)),
+                QRect(QPoint(mi.rcWork.left, mi.rcWork.top), QPoint(mi.rcWork.right - 1, mi.rcWork.bottom - 1)), frame,
+                window->devicePixelRatioF());
         }
     }
     if (window->contentsMargins() != m)
@@ -390,6 +399,22 @@ bool TitleBar::isDragArea(const QPoint& pos) const
     // labels and plain containers between the controls
     return qobject_cast<const QLabel*>(c) || c->metaObject() == &QFrame::staticMetaObject
         || c->metaObject() == &QWidget::staticMetaObject;
+}
+
+QMargins TitleBar::maximizedMargins(const QRect& window, const QRect& workArea, int frame, qreal dpr)
+{
+    // Only the frame's overhang: anything larger is not a maximized window over this work area (a
+    // minimized one, one moving between monitors), and margins taken from the window's own size would
+    // grow it without end (the margins raise the minimum size, which grows the window, which grows
+    // the margins).
+    if (!window.intersects(workArea) || dpr <= 0)
+        return {};
+    const int cap = 2 * std::max(frame, 8);
+    auto side = [cap, dpr](int overhang) {
+        return overhang <= 0 || overhang > cap ? 0 : qRound(overhang / dpr);
+    };
+    return QMargins(side(workArea.left() - window.left()), side(workArea.top() - window.top()),
+        side(window.right() - workArea.right()), side(window.bottom() - workArea.bottom()));
 }
 
 void TitleBar::install(QWidget* window)

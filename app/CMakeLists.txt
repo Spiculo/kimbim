@@ -142,6 +142,10 @@ kimcad_gui_test(app_selftest_pop_out "\"ok\":true.*\"pop_out\":true" :fixture: -
 # D71: a plan tab open while the window closes: no OpenGL errors from views torn down after their window.
 kimcad_gui_test(app_selftest_plan_tab_exit "\"ok\":true" :fixture: --frames 2 --bench-edit --plan-tab)
 set_tests_properties(app_selftest_plan_tab_exit PROPERTIES FAIL_REGULAR_EXPRESSION "MakeCurrent\(\) has failed|Type: Error")
+# A maximized window minimized while a model loads (the person switches away) and restored: it keeps
+# to the screen (it grew to 32800 x 32164 px and crashed). --real-open: preferences, layout, questions.
+kimcad_gui_test(app_selftest_minimize_maximized "\"ok\":true" :fixture: --real-open --maximized --minimize)
+set_tests_properties(app_selftest_minimize_maximized PROPERTIES TIMEOUT 180) # the broken window resized forever
 kimcad_gui_test(app_selftest_plan_cut "\"ok\":true.*\"planes\":1" :fixture: --frames 5 --plan-cut 1.5)
 kimcad_gui_test(app_selftest_draw_walls "\"elements\":4,\"joins\":4,\"ok\":true,\"walls\":4" :new: --draw-walls "0,0 5,0 5,4 0,4 0,0")
 kimcad_gui_test(app_selftest_house "\"beams\":1,\"columns\":1,\"doors\":1,\"elements\":9,\"grid\":4,\"joins\":4,\"ok\":true,\"openings\":2,\"slabs\":1,\"walls\":4,\"windows\":1" :new: --house)

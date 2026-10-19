@@ -462,6 +462,24 @@ private slots:
         QVERIFY(!bar->isDragArea(versions->geometry().center()));
     }
 
+    // A maximized window's content keeps out of the frame's overhang, and only that: a minimized one
+    // (Windows puts it at -32000, -32000) took the 25600 px "overhang" as margins, the layout made them
+    // the window's minimum and the window grew to 32800 x 32164 pixels and crashed (createDIB failed).
+    void maximizedMarginsAreOnlyTheFrame()
+    {
+        const QRect work(0, 0, 1920, 1020); // 1920 x 1080 at 125 %, the taskbar below
+        // maximized: the frame (10 px at 120 dpi) reaches past every side
+        QCOMPARE(kimcad::TitleBar::maximizedMargins(work.adjusted(-10, -10, 10, 10), work, 10, 1.25), QMargins(8, 8, 8, 8));
+        QCOMPARE(kimcad::TitleBar::maximizedMargins(work, work, 10, 1.25), QMargins());
+        // minimized: the iconic rect, nowhere near the work area
+        const QRect iconic(-32000, -32000, 200, 40);
+        QCOMPARE(kimcad::TitleBar::maximizedMargins(iconic, work, 10, 1.25), QMargins());
+        // a window larger than the screen (growing), or across monitors: never more than a frame
+        const QMargins grown = kimcad::TitleBar::maximizedMargins(QRect(-7, -7, 32800, 32164), work, 10, 1.25);
+        QVERIFY(grown.left() <= 16 && grown.top() <= 16 && grown.right() <= 16 && grown.bottom() <= 16);
+        QCOMPARE(kimcad::TitleBar::maximizedMargins(QRect(-1930, -10, 1940, 1040), work, 10, 1.25), QMargins(0, 8, 0, 8));
+    }
+
     // D71: double-click an element for its properties; a level for its plan.
     void doubleClickShowsPropertiesOrOpensThePlan()
     {

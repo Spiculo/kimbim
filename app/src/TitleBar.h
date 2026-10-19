@@ -2,6 +2,8 @@
 #pragma once
 
 #include <QAbstractButton>
+#include <QMargins>
+#include <QRect>
 #include <QWidget>
 
 class QHBoxLayout;
@@ -53,6 +55,10 @@ public:
     static void install(QWidget* window);
     // For QWidget::nativeEvent of the window: WM_NCCALCSIZE and WM_NCHITTEST (Windows only).
     static bool nativeEvent(QWidget* window, TitleBar* bar, const QByteArray& type, void* message, qintptr* result);
+    // The content margins (logical pixels) that keep a maximized window's content inside the work
+    // area: how far its frame (`frame` px thick) reaches past each side (physical rects). None when the
+    // overhang is more than a frame (a minimized window at -32000, -32000).
+    static QMargins maximizedMargins(const QRect& window, const QRect& workArea, int frame, qreal dpr);
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
