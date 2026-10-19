@@ -296,6 +296,9 @@ int runSelfTest(const SelfTestOptions& options)
             return fail(error);
     }
 
+    if (options.realOpen)
+        return runRealOpen(options, path);
+
     MainWindow window(nullptr, /*quiet=*/true, options.chunkSize);
     showWindow(window, options);
 

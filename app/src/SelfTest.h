@@ -3,6 +3,7 @@
 
 #include <QSize>
 #include <QString>
+#include <QStringList>
 
 namespace kimcad {
 
@@ -40,10 +41,14 @@ struct SelfTestOptions {
     QString library;              // D86: open the Library panel on this object and place it at (1, 1); with screenshot, a PNG of the panel
     bool tracker = false;         // D89: draw a wall in the plan with a temporary guide and the tracker shown; PNGs of the view
     QString checks;               // D81: checks to run from the Checks panel ("schema,model,clash"); clicks the first issue
+    bool realOpen = false;        // open the file as a person does (preferences, saved layout, questions); log the window's size
+    bool minimize = false;        // with realOpen: minimize the window while the model loads, restore it after
+    QStringList answers;          // with realOpen: the questions' buttons to click (text contains), else each default
 };
 
 // Opens the model in a real window, loads it, measures, prints one JSON line to stdout.
 // Returns the process exit code (0 = ok). Used by CI and by people reporting performance.
 int runSelfTest(const SelfTestOptions& options);
+int runRealOpen(const SelfTestOptions& options, const QString& path); // SelfTestRealOpen.cpp
 
 } // namespace kimcad

@@ -121,6 +121,15 @@ int main(int argc, char* argv[])
     parser.addOption(windowSize);
     QCommandLineOption maximized(QStringLiteral("maximized"), QStringLiteral("Self-test: show the window maximized."));
     parser.addOption(maximized);
+    QCommandLineOption realOpen(QStringLiteral("real-open"),
+        QStringLiteral("Self-test: open the file as a person does (preferences, saved layout, questions) and check the window's size."));
+    parser.addOption(realOpen);
+    QCommandLineOption answer(QStringLiteral("answer"),
+        QStringLiteral("Self-test: with --real-open, click the button containing this text when asked (repeatable)."), QStringLiteral("text"));
+    parser.addOption(answer);
+    QCommandLineOption minimizeOption(QStringLiteral("minimize"),
+        QStringLiteral("Self-test: with --real-open, minimize the window while the model loads and restore it after."));
+    parser.addOption(minimizeOption);
     QCommandLineOption exportSheet(QStringLiteral("export-sheet"),
         QStringLiteral("Export sheet <number> of the IFC file to <out.pdf|out.svg|out.dxf> and exit (no window)."),
         QStringLiteral("number"));
@@ -181,6 +190,9 @@ int main(int argc, char* argv[])
         if (const QStringList wh = parser.value(windowSize).split(QLatin1Char('x')); wh.size() == 2)
             options.windowSize = QSize(wh[0].toInt(), wh[1].toInt());
         options.maximized = parser.isSet(maximized);
+        options.realOpen = parser.isSet(realOpen);
+        options.answers = parser.values(answer);
+        options.minimize = parser.isSet(minimizeOption);
         options.openDrawing = parser.value(openDrawing);
         options.createDrawings = parser.isSet(createDrawings);
         return kimcad::runSelfTest(options);

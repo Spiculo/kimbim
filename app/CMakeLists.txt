@@ -8,7 +8,7 @@ qt_add_library(kimcad_core STATIC
     src/ElementBatch.cpp src/ElementBatch.h
     src/Viewport.cpp src/Viewport.h src/ViewportInput.cpp
     src/ViewCube.cpp src/ViewCube.h
-    src/SelfTest.cpp src/SelfTest.h
+    src/SelfTest.cpp src/SelfTest.h src/SelfTestRealOpen.cpp
     src/ModelTreePanel.cpp src/ModelTreePanel.h
     src/PropertiesPanel.cpp src/PropertiesPanel.h
     src/LevelsBar.cpp src/LevelsBar.h
