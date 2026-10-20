@@ -3,11 +3,17 @@
 // cloud, Angle, Radius/diameter and Level/spot dimensions in the Plane group, and Tag all. The tags
 // and symbols are python/kimbim/tags.py's and symbols.py's (IfcAnnotation on the level), one undo
 // step each.
+#include <QCheckBox>
 #include <QComboBox>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QLabel>
 #include <QLineEdit>
+#include <QPushButton>
 #include <QToolButton>
+#include <QVBoxLayout>
 
 #include "DraftTool.h"
 #include "LevelsBar.h"
@@ -264,7 +270,48 @@ int MainWindow::tagAll()
     for (const QString& g : m_viewport->guids())
         if (!m_viewport->isElementHidden(g))
             shown.append(g);
-    const QJsonObject r = bridge("tag_all", {m_levels->activeStorey(), compactJson(shown), QString()});
+    QString categories; // D92: Tag all asks which categories to tag (quiet/self-test: the defaults)
+    if (!m_quiet) {
+        const QJsonObject styles = bridge("tag_styles").value("styles").toObject();
+        static const QStringList defaults{QStringLiteral("door"), QStringLiteral("window"), QStringLiteral("wall")};
+        QDialog dialog(this);
+        dialog.setObjectName(QStringLiteral("tagAllDialog"));
+        dialog.setWindowTitle(tr("Tag all"));
+        auto* form = new QVBoxLayout(&dialog);
+        form->addWidget(new QLabel(tr("Tag every untagged element of these categories on the level:"), &dialog));
+        QHash<QString, QCheckBox*> boxes;
+        for (auto it = styles.constBegin(); it != styles.constEnd(); ++it) {
+            const QJsonObject st = it.value().toObject();
+            if (st.value("classes").toArray().isEmpty())
+                continue; // a style with no classes (a plain Label) is placed by hand, not by Tag all
+            auto* box = new QCheckBox(st.value("name").toString(it.key()), &dialog);
+            box->setObjectName(QStringLiteral("tagCategory_") + it.key());
+            box->setChecked(defaults.contains(it.key()));
+            form->addWidget(box);
+            boxes.insert(it.key(), box);
+        }
+        auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+        connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+        connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+        const auto keepOne = [&boxes, buttons] {
+            bool any = false;
+            for (const QCheckBox* box : boxes)
+                any = any || box->isChecked();
+            buttons->button(QDialogButtonBox::Ok)->setEnabled(any);
+        };
+        for (QCheckBox* box : boxes)
+            connect(box, &QCheckBox::toggled, &dialog, keepOne);
+        keepOne();
+        form->addWidget(buttons);
+        if (dialog.exec() != QDialog::Accepted)
+            return 0;
+        QStringList chosen;
+        for (auto it = boxes.constBegin(); it != boxes.constEnd(); ++it)
+            if (it.value()->isChecked())
+                chosen << it.key();
+        categories = chosen.join(QLatin1Char(','));
+    }
+    const QJsonObject r = bridge("tag_all", {m_levels->activeStorey(), compactJson(shown), QString(), categories});
     if (!r.value("ok").toBool()) {
         m_status->showMessage(tr("Could not tag them: %1").arg(r.value("error").toString()));
         return -1;

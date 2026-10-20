@@ -442,10 +442,11 @@ def add_tag(element_guid: str, options_json: str = "") -> str:
     return B._dump({**r, "guid": made["guid"]})
 
 
-def tag_all(storey_guid: str, guids_json: str = "", style: str = "") -> str:
+def tag_all(storey_guid: str, guids_json: str = "", style: str = "", categories: str = "") -> str:
     """Tag every untagged element on a level (Archicad: Label all; Revit: Tag all not tagged) with its
     kind's style: doors, windows and walls (rooms have their stamps), or the elements of one `style`.
-    `guids_json`: only these elements (the ones the view shows). One undo step."""
+    `guids_json`: only these elements (the ones the view shows). `categories` (D92): a comma-separated
+    list of tag-style ids to tag (Tag all asks which categories). One undo step."""
     from . import authoring as A
     from . import schedules
 
@@ -462,7 +463,14 @@ def tag_all(storey_guid: str, guids_json: str = "", style: str = "") -> str:
     except ValueError as ex:
         return A._fail(f"bad input: {ex}")
     done = tagged_elements()
-    wanted = [style] if style else list(AUTO_STYLES)
+    if style:
+        wanted = [style]
+    elif categories:
+        wanted = [c for c in (c.strip() for c in categories.split(",")) if c in table]
+        if not wanted:
+            return A._fail("choose at least one category")
+    else:
+        wanted = list(AUTO_STYLES)
     todo = []
     for sid in wanted:
         classes = table[sid].get("classes") or []

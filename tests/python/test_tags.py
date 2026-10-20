@@ -182,6 +182,15 @@ def test_tag_all_tags_each_untagged_door_window_and_wall_once(flat):
     assert valid() == []
 
 
+def test_tag_all_can_ask_for_categories(flat):
+    """D92: Tag all tags only the categories it is asked for."""
+    doors = call("tag_all", flat["l1"], "", "", "door")
+    assert doors["ok"] and doors["tagged"] == 1  # the door; the walls are left
+    assert call("tag_all", flat["l1"], "", "", "wall")["tagged"] == 4
+    assert call("tag_all", flat["l1"], "", "", "nope")["ok"] is False
+    assert valid() == []
+
+
 def test_tag_styles_are_project_settings_and_restyle_their_tags(flat):
     t = call("add_tag", flat["door"], "")["guid"]
     styles = call("tag_styles")
