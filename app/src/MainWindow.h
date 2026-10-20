@@ -124,7 +124,7 @@ public:
     // D72: office templates. "builtin" is KimBim's default; a template opens as an untitled project.
     bool newFromTemplate(const QString& path);
     bool saveAsTemplate(const QString& name, bool replace = false); // false if it exists and wasn't replaced
-    bool addLevel(const QString& name, double elevation);
+    bool addLevel(const QString& name, double elevation, bool fitBetween = false); // D92: push above or fit between
     LevelsBar* levelsBar() const { return m_levels; }
     // D85: underlays (Underlays.cpp). File > Place underlay... picks a DXF, PDF or image and places it on
     // the active level; placeUnderlay does the same without dialogs (options as app_bridge.add_underlay).
@@ -217,6 +217,7 @@ public:
     bool setSheetPurpose(const QString& number, const QString& purpose); // "" = the current purpose
     QStringList hiddenLayers() const { return QStringList(m_hiddenLayers.begin(), m_hiddenLayers.end()); }
     QString formatLength(double metres) const;            // in the project's unit and decimals
+    QString formatArea(double squareMetres) const;        // D92: in the project's area unit and decimals
     // D72: recovery copies of unsaved work (written every N minutes; offered after a crash).
     bool writeRecovery();
     QJsonArray recoveries();

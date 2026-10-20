@@ -58,8 +58,10 @@ public:
     QVector<MeasurePoint> path() const; // the points plus the hover point while measuring
 
     static MeasureReadout compute(const QVector<MeasurePoint>& path);
-    // One line for the bottom bar and the clipboard; `length` formats metres in the project's unit.
-    static QString describe(const MeasureReadout& r, const std::function<QString(double)>& length);
+    // One line for the bottom bar and the clipboard; `length` formats metres in the project's unit and
+    // `area` square metres in the project's area unit (D92; empty: m²).
+    static QString describe(const MeasureReadout& r, const std::function<QString(double)>& length,
+        const std::function<QString(double)>& area = {});
     MeasureReadout readout() const { return compute(path()); }
 
 signals:

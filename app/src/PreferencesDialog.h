@@ -46,6 +46,7 @@ private:
     QComboBox* m_selectSimilar; // D92
     QComboBox* m_boxSelection;
     QCheckBox* m_splitJoin; // D92
+    QCheckBox* m_meshVertexSnaps; // D92
 };
 
 } // namespace kimbim

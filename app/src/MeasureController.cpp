@@ -9,9 +9,10 @@
 
 namespace kimbim {
 
-MeasureController::MeasureController(std::function<QString(double)> length, QObject* parent)
+MeasureController::MeasureController(std::function<QString(double)> length, std::function<QString(double)> area, QObject* parent)
     : QObject(parent)
     , m_length(std::move(length))
+    , m_area(std::move(area))
 {
     connect(&m_tool, &MeasureTool::changed, this, &MeasureController::redraw);
 }
@@ -46,7 +47,7 @@ void MeasureController::stop()
 
 QString MeasureController::text() const
 {
-    return MeasureTool::describe(m_tool.readout(), m_length);
+    return MeasureTool::describe(m_tool.readout(), m_length, m_area);
 }
 
 void MeasureController::copyToClipboard() const
@@ -69,8 +70,9 @@ void MeasureController::redraw()
     QString label;
     if (r.points >= 2) {
         label = m_length(r.distance);
-        if (r.area)
-            label += QStringLiteral("  ") + tr("%1 m²").arg(QLocale().toString(*r.area, 'f', 2));
+        if (r.area) // D92: the project's area unit when the app supplies one
+            label += QStringLiteral("  ") + (m_area ? m_area(*r.area)
+                                                    : tr("%1 m²").arg(QLocale().toString(*r.area, 'f', 2)));
     }
     m_view->setToolOverlay(new MeasureOverlay(path, label));
 }

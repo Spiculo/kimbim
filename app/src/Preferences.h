@@ -32,6 +32,7 @@ public:
     QString scrollNavigation() const;   // D89: "auto", "zoom" (mouse wheel zooms) or "pan" (touchpad scroll pans)       // D73: View > True line weights
     double fieldOfView() const;         // D92: the perspective camera's vertical field of view, degrees (default 45)
     bool northArrowPlans() const;       // D92: show the plan north indicator (on once true north is set)
+    bool meshVertexSnaps() const;       // D92: snap to element mesh vertices while drawing (off)
     // D92: which controls the title bar holds (all on by default).
     bool titleBarLevels() const;
     bool titleBarCut() const;

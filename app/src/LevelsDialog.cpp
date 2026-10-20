@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "LevelsDialog.h"
 
+#include <QCheckBox>
 #include <QDialogButtonBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -162,7 +163,7 @@ QJsonObject LevelsTable::changes() const
             o.insert("move_to", d.moveTo);
         deleted.append(o);
     }
-    return {{"levels", levels}, {"deleted", deleted}};
+    return {{"levels", levels}, {"deleted", deleted}, {"move_above", m_moveAbove}};
 }
 
 // ---------------------------------------------------------------- LevelsDialog
@@ -193,6 +194,12 @@ LevelsDialog::LevelsDialog(const QJsonArray& levels, const QString& unit, double
                                "height to next moves every level above. Changes apply on OK, as one undo step."), this);
     note->setWordWrap(true);
     layout->addWidget(note);
+    // D92: by default an elevation change moves only that level (Archicad); this moves the levels above too.
+    m_moveAboveChk = new QCheckBox(tr("Moving a level's elevation also moves the levels above it"), this);
+    m_moveAboveChk->setObjectName(QStringLiteral("moveAbove"));
+    m_moveAboveChk->setChecked(m_table.moveAbove());
+    connect(m_moveAboveChk, &QCheckBox::toggled, this, [this](bool on) { m_table.setMoveAbove(on); });
+    layout->addWidget(m_moveAboveChk);
     auto* row = new QHBoxLayout;
     auto* above = new QPushButton(tr("Insert &above"), this);
     above->setObjectName(QStringLiteral("insertAbove"));

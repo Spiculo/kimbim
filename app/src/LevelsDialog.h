@@ -9,6 +9,7 @@
 
 class QTableWidget;
 class QPushButton;
+class QCheckBox;
 
 namespace kimbim {
 
@@ -53,12 +54,17 @@ public:
 
     bool modified() const;
     QJsonObject changes() const; // app_bridge.edit_storeys' argument
+    // D92: a level's elevation change also moves the levels above it (off by default, Archicad's
+    // behaviour is to move only that level and its elements).
+    void setMoveAbove(bool on) { m_moveAbove = on; }
+    bool moveAbove() const { return m_moveAbove; }
 
 private:
     void sort();
     int m_nextKey = 0;
     QVector<Row> m_rows, m_original;
     QVector<Deleted> m_deleted;
+    bool m_moveAbove = false;
 };
 
 // Model > Levels... (and the level drop-down's menu): the table, edited in place.
@@ -86,6 +92,7 @@ private:
     LevelsTable m_table;
     QTableWidget* m_grid;
     QPushButton* m_delete;
+    QCheckBox* m_moveAboveChk; // D92
     QString m_unit;
     double m_factor;
     int m_decimals;

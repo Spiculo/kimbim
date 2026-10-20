@@ -55,6 +55,7 @@ QJsonObject Preferences::defaults()
         {"scroll_navigation", "auto"},
         {"field_of_view", 45.0},
         {"north_arrow", true},
+        {"mesh_vertex_snaps", false},
         {"title_bar_levels", true},
         {"title_bar_cut", true},
         {"title_bar_versions", true},
@@ -161,6 +162,7 @@ double Preferences::fieldOfView() const
 }
 
 bool Preferences::northArrowPlans() const { return value("north_arrow").toBool(true); }
+bool Preferences::meshVertexSnaps() const { return value("mesh_vertex_snaps").toBool(false); }
 
 bool Preferences::titleBarLevels() const { return value("title_bar_levels").toBool(true); }
 bool Preferences::titleBarCut() const { return value("title_bar_cut").toBool(true); }

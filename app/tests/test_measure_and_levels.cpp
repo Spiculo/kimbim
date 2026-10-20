@@ -100,6 +100,26 @@ private slots:
         QVERIFY2(text.contains(QStringLiteral("15")) && text.contains(QStringLiteral("16.00 m")), qPrintable(text));
     }
 
+    // D92: the readout and the label use the project's area unit when the app supplies one.
+    void areaUsesTheProjectsUnit()
+    {
+        const auto r = MeasureTool::compute({{0, 0, 0}, {4, 0, 0}, {4, 3, 0}, {0, 3, 0}});
+        const QString text = MeasureTool::describe(r, metres, [](double a) { return QString::number(a, 'f', 2) + QStringLiteral(" cm²"); });
+        QVERIFY2(text.contains(QStringLiteral("12.00 cm²")), qPrintable(text));
+        QVERIFY(MeasureTool::describe(r, metres).contains(QStringLiteral("12.00 m²"))); // default unchanged
+    }
+
+    // D92: a level's elevation change can move the levels above it.
+    void levelsTableMoveAbove()
+    {
+        LevelsTable t(levels({{"L1", 0.0, 0}, {"L2", 3.0, 0}, {"L3", 6.0, 0}}));
+        QVERIFY(!t.moveAbove());
+        QVERIFY(!t.changes().value("move_above").toBool());
+        t.setMoveAbove(true);
+        QVERIFY(t.moveAbove());
+        QVERIFY(t.changes().value("move_above").toBool());
+    }
+
     void clicksSnapAndEscClears()
     {
         MeasureTool tool;

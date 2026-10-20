@@ -170,6 +170,16 @@ def test_snap_data_lists_wall_axes_per_level(project):
     assert [w["x1"], w["y1"], w["x2"], w["y2"]] == pytest.approx([1, 1, 4, 1], abs=1e-6)
 
 
+def test_snap_data_mesh_vertices_are_optional(project):
+    """D92: mesh-vertex snaps are off unless asked for; then the wall mesh corners become snap points."""
+    a = wall(project, 0, 0, 4, 0)
+    plain = call("snap_data", project["level"])["points"]
+    assert not any(abs(p["x"]) < 1e-6 and abs(p["y"]) < 1e-6 for p in plain)
+    with_verts = call("snap_data", project["level"], "1")["points"]
+    corners = [(round(p["x"], 6), round(p["y"], 6)) for p in with_verts if p["guid"] == a["guid"]]
+    assert (0.0, 0.15) in corners and (4.0, -0.15) in corners
+
+
 def test_mesh_elements_matches_the_chunk_format(project):
     a = wall(project, 0, 0, 5, 0)
     meta, verts, tris = b.mesh_elements(json.dumps([a["guid"], "not-a-guid"]))

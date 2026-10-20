@@ -1160,9 +1160,12 @@ void MainWindow::refreshLevels()
         m_tree->refreshTree(bridge("spatial_tree")); // a level was added or undone
 }
 
-bool MainWindow::addLevel(const QString& name, double elevation)
+bool MainWindow::addLevel(const QString& name, double elevation, bool fitBetween)
 {
-    const QJsonObject r = bridge("add_storey", {name, QString::number(elevation, 'g', 17)});
+    // D92: insert level, push above (Archicad, default) or fit between the levels around it (Revit).
+    const QJsonObject r = fitBetween
+        ? bridge("insert_storey", {name, QString::number(elevation, 'g', 17), QStringLiteral("1")})
+        : bridge("add_storey", {name, QString::number(elevation, 'g', 17)});
     if (!r.value("ok").toBool()) {
         showError(tr("Could not add the level"), r.value("error").toString());
         return false;
@@ -1180,15 +1183,30 @@ void MainWindow::addLevelDialog()
         highest = any ? std::max(highest, s.toObject().value("elevation").toDouble()) : s.toObject().value("elevation").toDouble();
         any = true;
     }
-    bool ok = false;
-    const QString name = QInputDialog::getText(this, tr("Add level"), tr("Name:"), QLineEdit::Normal,
-        tr("Level %1").arg(m_levels->count() + 1), &ok);
-    if (!ok || name.trimmed().isEmpty())
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Add level"));
+    auto* form = new QFormLayout(&dialog);
+    auto* nameEdit = new QLineEdit(tr("Level %1").arg(m_levels->count() + 1), &dialog);
+    nameEdit->setObjectName(QStringLiteral("levelName"));
+    form->addRow(tr("Name:"), nameEdit);
+    auto* elev = new QDoubleSpinBox(&dialog);
+    elev->setObjectName(QStringLiteral("levelElevation"));
+    elev->setDecimals(m_settings.value("length_decimals").toInt(2));
+    elev->setRange(-1000.0, 10000.0);
+    elev->setValue(any ? highest + 3.0 : 0.0);
+    elev->setSuffix(QStringLiteral(" m"));
+    form->addRow(tr("Elevation (m):"), elev);
+    // D92: push above (default, Archicad) or fit in the middle of the gap (Revit).
+    auto* fit = new QCheckBox(tr("Fit between the levels around this elevation (Revit)"), &dialog);
+    fit->setObjectName(QStringLiteral("levelFitBetween"));
+    form->addRow(QString(), fit);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    form->addRow(buttons);
+    if (dialog.exec() != QDialog::Accepted || nameEdit->text().trimmed().isEmpty())
         return;
-    const double elevation = QInputDialog::getDouble(this, tr("Add level"), tr("Elevation (m):"),
-        any ? highest + 3.0 : 0.0, -1000.0, 10000.0, 2, &ok);
-    if (ok)
-        addLevel(name.trimmed(), elevation);
+    addLevel(nameEdit->text().trimmed(), elev->value(), fit->isChecked());
 }
 
 void MainWindow::levelsDialog()
@@ -1233,7 +1251,8 @@ void MainWindow::buildModelingToolbar()
     m_twoPointTool = new TwoPointTool(this);
     m_rotateTool = new RotateTool(this);
     m_gripTool = new GripTool(this);
-    m_measure = new MeasureController([this](double m) { return formatLength(m); }, this);
+    m_measure = new MeasureController([this](double m) { return formatLength(m); },
+        [this](double a) { return formatArea(a); }, this);
     connect(m_measure, &MeasureController::message, this, [this](const QString& text) {
         if (m_tool == Tool::Measure)
             m_status->showMessage(text);
@@ -1877,7 +1896,8 @@ void MainWindow::refreshTypes()
 
 void MainWindow::refreshSnapData()
 {
-    const QJsonObject data = bridge("snap_data", {m_levels->activeStorey()});
+    const QJsonObject data = bridge("snap_data",
+        {m_levels->activeStorey(), m_prefs.meshVertexSnaps() ? QStringLiteral("1") : QStringLiteral("0")}); // D92
     const QVector<SnapWall> walls = Snapper::parse(data);
     const QVector<SnapLine> lines = Snapper::parseGrid(data);
     const QVector<SnapPoint> points = Snapper::parsePoints(data); // D84: drafting shapes' points
@@ -5278,6 +5298,15 @@ QString MainWindow::formatLength(double metres) const
     const QString unit = m_settings.value("length_unit").toString(QStringLiteral("m"));
     const double factor = unit == QLatin1String("mm") ? 1000.0 : unit == QLatin1String("cm") ? 100.0 : 1.0;
     return QLocale().toString(metres * factor, 'f', m_settings.value("length_decimals").toInt(2))
+        + QLatin1Char(' ') + unit;
+}
+
+QString MainWindow::formatArea(double squareMetres) const
+{
+    // D92: the project's area unit (m²/cm²/mm²).
+    const QString unit = m_settings.value("area_unit").toString(QStringLiteral("m²"));
+    const double factor = unit == QLatin1String("mm²") ? 1000000.0 : unit == QLatin1String("cm²") ? 10000.0 : 1.0;
+    return QLocale().toString(squareMetres * factor, 'f', m_settings.value("length_decimals").toInt(2))
         + QLatin1Char(' ') + unit;
 }
 

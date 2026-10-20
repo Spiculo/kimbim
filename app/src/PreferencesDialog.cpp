@@ -186,6 +186,13 @@ PreferencesDialog::PreferencesDialog(Preferences& prefs, QWidget* parent)
     m_splitJoin->setChecked(prefs.splitJoin());
     form->addRow(QString(), m_splitJoin);
 
+    // D92: snapping to element mesh vertices (slabs, roofs, ...), off by default.
+    m_meshVertexSnaps = new QCheckBox(tr("Snap to element mesh vertices while drawing"), this);
+    m_meshVertexSnaps->setObjectName(QStringLiteral("meshVertexSnaps"));
+    m_meshVertexSnaps->setChecked(prefs.meshVertexSnaps());
+    m_meshVertexSnaps->setToolTip(tr("Adds the corners of slabs, roofs and other elements to the snap points"));
+    form->addRow(QString(), m_meshVertexSnaps);
+
     layout->addLayout(form);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
@@ -217,6 +224,7 @@ void PreferencesDialog::apply()
     m_prefs.setValue(QStringLiteral("select_similar_scope"), m_selectSimilar->currentData().toString());
     m_prefs.setValue(QStringLiteral("box_selection"), m_boxSelection->currentData().toString());
     m_prefs.setValue(QStringLiteral("split_join"), m_splitJoin->isChecked());
+    m_prefs.setValue(QStringLiteral("mesh_vertex_snaps"), m_meshVertexSnaps->isChecked());
 }
 
 void PreferencesDialog::accept()

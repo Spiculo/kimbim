@@ -19,7 +19,7 @@ class Viewport;
 class MeasureController : public QObject {
     Q_OBJECT
 public:
-    MeasureController(std::function<QString(double)> length, QObject* parent = nullptr);
+    MeasureController(std::function<QString(double)> length, std::function<QString(double)> area = {}, QObject* parent = nullptr);
     MeasureTool* tool() { return &m_tool; }
 
     void pointer(Viewport* view, QPointF p, double z, double tolerance, bool ortho, bool click);
@@ -37,6 +37,7 @@ private:
 
     MeasureTool m_tool;
     std::function<QString(double)> m_length;
+    std::function<QString(double)> m_area; // D92: the project's area unit for the readout
     QPointer<Viewport> m_view;
 };
 
