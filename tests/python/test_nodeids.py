@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 from conftest import build_model
 
-from kimcad.layout import blob_oid, key_to_path
-from kimcad.nodeids import decompose_against_head
-from kimcad.records import decompose
+from kimbim.layout import blob_oid, key_to_path
+from kimbim.nodeids import decompose_against_head
+from kimbim.records import decompose
 
 
 def as_head(records):

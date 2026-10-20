@@ -7,7 +7,7 @@ import ifcopenshell.util.element
 import ifcopenshell.validate
 import pytest
 
-from kimcad import app_bridge as b
+from kimbim import app_bridge as b
 
 
 def call(fn, *args):
@@ -94,5 +94,5 @@ def test_room_stamps_on_the_floor_plan(flat):
     call("create_room", flat["l1"], 2.0, 3.0, "Living room")
     plan = next(d for d in call("drawings")["drawings"] if d["name"] == "Level 1 Floor Plan")
     svg = call("generate_drawing", plan["guid"], "")["svg"]
-    overlay = svg.split('class="kimcad-overlay"', 1)[1]
+    overlay = svg.split('class="kimbim-overlay"', 1)[1]
     assert ">Living room</text>" in overlay and ">101</text>" in overlay and " m²</text>" in overlay

@@ -7,8 +7,8 @@ import pathlib
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "python"))
-from kimcad import app_bridge as b  # noqa: E402
-from kimcad import drawings as D  # noqa: E402
+from kimbim import app_bridge as b  # noqa: E402
+from kimbim import drawings as D  # noqa: E402
 
 
 def call(fn, *args):
@@ -42,7 +42,7 @@ def main(house: str, out: str) -> int:
         for guid in walls:
             if (guid in svg) != (guid in shown):
                 failures.append(f"{purpose}: wall {guid} {'missing' if guid in shown else 'shown'}")
-        if 'class="kimcad-legend"' not in svg:
+        if 'class="kimbim-legend"' not in svg:
             failures.append(f"{purpose}: no legend")
     if "To be demolished" not in (outdir / "Demolition.svg").read_text(encoding="utf-8"):
         failures.append("Demolition: the legend has no demolition row")

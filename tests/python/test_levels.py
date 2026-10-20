@@ -12,8 +12,8 @@ import ifcopenshell.util.placement
 import numpy as np
 import pytest
 
-from kimcad import app_bridge as b
-from kimcad import authoring, levels
+from kimbim import app_bridge as b
+from kimbim import authoring, levels
 
 CLINIC = (pathlib.Path(__file__).resolve().parents[1] / "corpus" / "files" / "community" / "IFC 2.3.0.1 (IFC 2x3)"
           / "Medical-Dental Clinic" / "Clinic_Architectural.ifc")

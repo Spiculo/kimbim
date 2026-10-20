@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 LineStyle line(const QJsonObject& o)
@@ -106,4 +106,4 @@ uint16_t Graphics::pattern(const QVector<double>& dashMm)
     return bits == 0 ? 0xFFFF : bits;
 }
 
-} // namespace kimcad
+} // namespace kimbim

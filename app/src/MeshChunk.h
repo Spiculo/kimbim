@@ -10,7 +10,7 @@
 #include <optional>
 #include <vector>
 
-namespace kimcad {
+namespace kimbim {
 
 class PythonEngine;
 
@@ -38,6 +38,6 @@ bool fetchMeshChunk(PythonEngine& py, int maxElements, MeshChunk* out, bool* don
 // Meshes of specific elements after an edit (app_bridge.mesh_elements). *none: nothing to draw.
 bool fetchElementMeshes(PythonEngine& py, const QStringList& guids, MeshChunk* out, bool* none, QString* error);
 
-} // namespace kimcad
+} // namespace kimbim
 
-Q_DECLARE_METATYPE(kimcad::MeshChunk)
+Q_DECLARE_METATYPE(kimbim::MeshChunk)

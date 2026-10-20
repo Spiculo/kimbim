@@ -23,15 +23,15 @@ A3 = (420.0, 297.0)
 
 
 def app() -> Path:
-    for name in ("kimcad-app.exe", "kimcad-app"):
+    for name in ("kimbim-app.exe", "kimbim-app"):
         for base in (ROOT / "build" / "app" / "app", ROOT / "build" / "app"):
             if (base / name).exists():
                 return base / name
-    raise SystemExit("kimcad-app not built (pixi run app-build)")
+    raise SystemExit("kimbim-app not built (pixi run app-build)")
 
 
 def export(ifc: Path, out: Path) -> dict:
-    env = {**os.environ, "KIMCAD_PYTHON_PATH": str(ROOT / "python")}
+    env = {**os.environ, "KIMBIM_PYTHON_PATH": str(ROOT / "python")}
     if sys.platform == "win32":
         # Qt's offscreen platform on Windows sees no system fonts, so the PDF's text came out as outlines
         # (no fonts embedded). The native platform needs no visible window for an export.
@@ -85,11 +85,11 @@ def main(argv) -> int:
             problems.append("no fonts: the text is missing")
     if svg.exists():
         text = svg.read_text(encoding="utf-8")
-        wanted = ["Level 1 Floor Plan", "Section 1", "South Elevation", "KIMCAD two-storey house",
-                  "Client: KIMCAD test client", "A01", "1:100"]
+        wanted = ["Level 1 Floor Plan", "Section 1", "South Elevation", "KimBim two-storey house",
+                  "Client: KimBim test client", "A01", "1:100"]
         report["svg_texts"] = {w: f">{w}<" in text for w in wanted}
         problems += [f"the sheet lacks '{w}'" for w, ok in report["svg_texts"].items() if not ok]
-        if text.count('class="kimcad-view"') != 3:
+        if text.count('class="kimbim-view"') != 3:
             problems.append("the sheet should hold 3 drawings")
     report["ok"] = not problems
     report["problems"] = problems

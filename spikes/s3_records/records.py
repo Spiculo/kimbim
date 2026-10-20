@@ -1,4 +1,4 @@
-"""Spike S3: decompose an IFC model into KIMCAD canonical records and compose it back.
+"""Spike S3: decompose an IFC model into KimBim canonical records and compose it back.
 
 See docs/02-data-model-and-format.md. Record kinds:
 
@@ -35,7 +35,7 @@ import blake3
 import ifcopenshell
 import ifcopenshell.ifcopenshell_wrapper as W
 
-FORMAT = "kimcad-spike/1"
+FORMAT = "kimbim-spike/1"
 INLINE, ANCHORED, NODE = "inline", "anchored", "node"
 
 

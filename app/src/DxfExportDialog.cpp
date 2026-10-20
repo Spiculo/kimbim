@@ -20,7 +20,7 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 enum Role { KeyRole = Qt::UserRole, KindRole, FileRole };
@@ -79,9 +79,9 @@ DxfExportDialog::DxfExportDialog(const QJsonObject& targets, Bridge run, QWidget
     m_folder->setObjectName(QStringLiteral("dxfFolder"));
     m_folder->setPlaceholderText(tr("Folder for the DXF files"));
     m_layers->setObjectName(QStringLiteral("dxfLayers"));
-    m_layers->addItem(tr("By KIMCAD layer"), QStringLiteral("layer"));
+    m_layers->addItem(tr("By KimBim layer"), QStringLiteral("layer"));
     m_layers->addItem(tr("By element kind (A-WALL, A-DOOR...)"), QStringLiteral("kind"));
-    m_layers->setToolTip(tr("Elements without a KIMCAD layer go on the layer of their kind"));
+    m_layers->setToolTip(tr("Elements without a KimBim layer go on the layer of their kind"));
     m_dimensions->setObjectName(QStringLiteral("dxfDimensions"));
     m_dimensions->setChecked(true);
     m_dimensions->setToolTip(tr("Off: dimensions as lines and text"));
@@ -300,4 +300,4 @@ void DxfExportDialog::reject()
     QDialog::reject();
 }
 
-} // namespace kimcad
+} // namespace kimbim

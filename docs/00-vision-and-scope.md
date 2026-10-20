@@ -2,7 +2,7 @@
 
 ## One sentence
 
-**KIMCAD is a native, open-source BIM authoring application for architects. It treats a building model like a source-code repository: you can edit locally, commit, branch, compare and merge, all at the level of BIM objects instead of files.**
+**KimBim is a native, open-source BIM authoring application for architects. It treats a building model like a source-code repository: you can edit locally, commit, branch, compare and merge, all at the level of BIM objects instead of files.**
 
 ## Audience
 
@@ -12,7 +12,7 @@
 
 Architects are not software engineers. Git concepts must show up in architect language:
 
-| Git concept | KIMCAD UI term |
+| Git concept | KimBim UI term |
 |-------------|----------------|
 | commit | **Save version** |
 | branch | **Design option** / **Variant** |
@@ -47,7 +47,7 @@ Detailed in [04-app-features.md](04-app-features.md).
 - Libraries: reusable type libraries (walls, doors, windows, furniture…) shared between projects.
 - 2D drawings: plans, sections, elevations, with annotation and PDF/SVG export.
 - **Local versioning**: save version, history, compare, design options (branches), combine options (merge), object history. Versioning is **optional per project**.
-- `kimcad` CLI for everything the versioning engine does.
+- `kimbim` CLI for everything the versioning engine does.
 - UI in **English and Spanish** (i18n from the start).
 
 ### Future: designed for, not built now
@@ -69,10 +69,10 @@ Summarized in [08-future.md](08-future.md).
 - macOS in the first releases. It is not excluded, just not targeted.
 - Rewriting IFC parsing, geometry kernels or drawing generation that already exist.
 - A CDE replacement.
-- Reproducing Revit/ArchiCAD feature-for-feature. KIMCAD covers the core architectural workflow well.
+- Reproducing Revit/ArchiCAD feature-for-feature. KimBim covers the core architectural workflow well.
 
 ## Project identity
 
-- **Name:** KIMCAD
+- **Name:** KimBim
 - **Model:** community open-source project, no fixed timeline
-- **License:** strong copyleft, GPL-3.0-or-later (Decided, see [06](06-reuse-and-licensing.md#kimcad-license))
+- **License:** strong copyleft, GPL-3.0-or-later (Decided, see [06](06-reuse-and-licensing.md#kimbim-license))

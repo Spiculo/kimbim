@@ -24,7 +24,7 @@
 
 #include "PenGrid.h"
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -51,28 +51,28 @@ QString askName(QWidget* parent, const QString& title, const QString& current = 
 QString kindLabel(const QString& kind)
 {
     static const QHash<QString, const char*> labels{
-        {"walls", QT_TRANSLATE_NOOP("kimcad::GraphicsDialog", "Walls")},
-        {"columns", QT_TRANSLATE_NOOP("kimcad::GraphicsDialog", "Columns")},
-        {"beams", QT_TRANSLATE_NOOP("kimcad::GraphicsDialog", "Beams")},
-        {"slabs", QT_TRANSLATE_NOOP("kimcad::GraphicsDialog", "Slabs")},
-        {"roofs", QT_TRANSLATE_NOOP("kimcad::GraphicsDialog", "Roofs")},
-        {"stairs", QT_TRANSLATE_NOOP("kimcad::GraphicsDialog", "Stairs and ramps")},
-        {"railings", QT_TRANSLATE_NOOP("kimcad::GraphicsDialog", "Railings")},
-        {"doors", QT_TRANSLATE_NOOP("kimcad::GraphicsDialog", "Doors")},
-        {"windows", QT_TRANSLATE_NOOP("kimcad::GraphicsDialog", "Windows")},
-        {"coverings", QT_TRANSLATE_NOOP("kimcad::GraphicsDialog", "Coverings")},
-        {"furniture", QT_TRANSLATE_NOOP("kimcad::GraphicsDialog", "Furniture")},
-        {"plumbing", QT_TRANSLATE_NOOP("kimcad::GraphicsDialog", "Plumbing and piping")},
-        {"hvac", QT_TRANSLATE_NOOP("kimcad::GraphicsDialog", "HVAC")},
-        {"electrical", QT_TRANSLATE_NOOP("kimcad::GraphicsDialog", "Electrical")},
-        {"structure_other", QT_TRANSLATE_NOOP("kimcad::GraphicsDialog", "Other structure (footings, piles, members)")},
-        {"rooms", QT_TRANSLATE_NOOP("kimcad::GraphicsDialog", "Rooms")},
-        {"annotations", QT_TRANSLATE_NOOP("kimcad::GraphicsDialog", "Annotations")},
-        {"grids", QT_TRANSLATE_NOOP("kimcad::GraphicsDialog", "Grids")},
-        {"other", QT_TRANSLATE_NOOP("kimcad::GraphicsDialog", "Other elements")},
+        {"walls", QT_TRANSLATE_NOOP("kimbim::GraphicsDialog", "Walls")},
+        {"columns", QT_TRANSLATE_NOOP("kimbim::GraphicsDialog", "Columns")},
+        {"beams", QT_TRANSLATE_NOOP("kimbim::GraphicsDialog", "Beams")},
+        {"slabs", QT_TRANSLATE_NOOP("kimbim::GraphicsDialog", "Slabs")},
+        {"roofs", QT_TRANSLATE_NOOP("kimbim::GraphicsDialog", "Roofs")},
+        {"stairs", QT_TRANSLATE_NOOP("kimbim::GraphicsDialog", "Stairs and ramps")},
+        {"railings", QT_TRANSLATE_NOOP("kimbim::GraphicsDialog", "Railings")},
+        {"doors", QT_TRANSLATE_NOOP("kimbim::GraphicsDialog", "Doors")},
+        {"windows", QT_TRANSLATE_NOOP("kimbim::GraphicsDialog", "Windows")},
+        {"coverings", QT_TRANSLATE_NOOP("kimbim::GraphicsDialog", "Coverings")},
+        {"furniture", QT_TRANSLATE_NOOP("kimbim::GraphicsDialog", "Furniture")},
+        {"plumbing", QT_TRANSLATE_NOOP("kimbim::GraphicsDialog", "Plumbing and piping")},
+        {"hvac", QT_TRANSLATE_NOOP("kimbim::GraphicsDialog", "HVAC")},
+        {"electrical", QT_TRANSLATE_NOOP("kimbim::GraphicsDialog", "Electrical")},
+        {"structure_other", QT_TRANSLATE_NOOP("kimbim::GraphicsDialog", "Other structure (footings, piles, members)")},
+        {"rooms", QT_TRANSLATE_NOOP("kimbim::GraphicsDialog", "Rooms")},
+        {"annotations", QT_TRANSLATE_NOOP("kimbim::GraphicsDialog", "Annotations")},
+        {"grids", QT_TRANSLATE_NOOP("kimbim::GraphicsDialog", "Grids")},
+        {"other", QT_TRANSLATE_NOOP("kimbim::GraphicsDialog", "Other elements")},
     };
     const auto it = labels.constFind(kind);
-    return it == labels.constEnd() ? kind : QCoreApplication::translate("kimcad::GraphicsDialog", *it);
+    return it == labels.constEnd() ? kind : QCoreApplication::translate("kimbim::GraphicsDialog", *it);
 }
 
 QHash<int, LineStyle> pensOf(const QJsonObject& penSet)
@@ -631,4 +631,4 @@ void ElementStylesDialog::fill()
     }
 }
 
-} // namespace kimcad
+} // namespace kimbim

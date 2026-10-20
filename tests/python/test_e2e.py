@@ -9,8 +9,8 @@ import ifcopenshell.api.pset
 import ifcopenshell.util.element
 import pytest
 
-from kimcad.project import Project
-from kimcad.records import body_text
+from kimbim.project import Project
+from kimbim.records import body_text
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 REL = "community/IFC 2.3.0.1 (IFC 2x3)/Duplex Apartment/Duplex_A_20110907.ifc"
@@ -31,7 +31,7 @@ def test_duplex_property_edit_roundtrip(tmp_path):
     walls = f.by_type("IfcWall")
     wall = walls[len(walls) // 2]
     pset = ifcopenshell.util.element.get_pset(wall, "Pset_WallCommon")
-    ifcopenshell.api.pset.edit_pset(f, pset=f.by_id(pset["id"]), properties={"FireRating": "EI60-KIMCAD"})
+    ifcopenshell.api.pset.edit_pset(f, pset=f.by_id(pset["id"]), properties={"FireRating": "EI60-KimBim"})
     edited = tmp_path / "edited.ifc"
     f.write(str(edited))
     _, changes = proj.commit(edited, "FireRating EI60", author=("T", "t@e.org"), time=2)
@@ -40,5 +40,5 @@ def test_duplex_property_edit_roundtrip(tmp_path):
     assert not changes.removed
 
     v2 = proj.export(tmp_path / "v2.ifc")
-    assert "EI60-KIMCAD" in body_text(v2)
+    assert "EI60-KimBim" in body_text(v2)
     assert not proj.status(v2)

@@ -35,7 +35,7 @@ purpose}`, the purpose a sheet prints with; missing means the current purpose).
 Each key starts empty in the settings, which means **the built-ins**. The first edit writes the whole
 table (built-ins included) into the settings, so a project or a template carries its own complete
 standard from then on. `graphics.effective(key)` returns the stored table, or the built-ins when it is
-empty. Unknown fields inside entries are kept (an older KIMCAD never drops a newer one's data).
+empty. Unknown fields inside entries are kept (an older KimBim never drops a newer one's data).
 
 The settings stay JSON (`settings.json`, D72). The current purpose, current pen and the sets travel with
 each version like the other settings, and Combine merges them key by key (D72).
@@ -303,14 +303,14 @@ the effect fields, with pen pickers and a colour button.
 
 ### Annotations
 
-`KIMCAD_Annotation` gains an optional `Pen` (integer). New annotations take `current_pen`. The
+`KIMBIM_Annotation` gains an optional `Pen` (integer). New annotations take `current_pen`. The
 annotations kind's style is used when `Pen` is missing (older files, other tools).
 
 ## How it is built
 
 | Unit | Responsibility |
 |---|---|
-| `python/kimcad/graphics.py` (new) | Built-ins; `effective(key)`; validation of the graphics keys; `kind_of(element)`; rule matching; `resolve(purpose=None, model=None)` → `{"styles": [...], "elements": {guid: style index}, "hidden": [guids]}`, cached by model state and settings; `style_svg(svg, resolved, k)`; bridge functions `graphics_state()`, `set_purpose(name)`, `set_current_pen(n)`, `graphics_tables()` and `set_graphics(json)` (editor writes, validated). |
+| `python/kimbim/graphics.py` (new) | Built-ins; `effective(key)`; validation of the graphics keys; `kind_of(element)`; rule matching; `resolve(purpose=None, model=None)` → `{"styles": [...], "elements": {guid: style index}, "hidden": [guids]}`, cached by model state and settings; `style_svg(svg, resolved, k)`; bridge functions `graphics_state()`, `set_purpose(name)`, `set_current_pen(n)`, `graphics_tables()` and `set_graphics(json)` (editor writes, validated). |
 | `settings.py` | DEFAULTS gains the new keys (empty means built-in); `_error` delegates the graphics keys to `graphics.validate`. |
 | `drawgen.py` | Segment projection, no CSS, overlay tags. |
 | `drawings.py`, `sheets.py` | Apply `style_svg` (k = 1 in a drawing tab, `100 / scale` on a sheet); the sheet purpose; regenerate when visibility changes (the include list already does this: hidden elements are not in it). |

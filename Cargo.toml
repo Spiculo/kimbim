@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/kimcad-repo", "crates/kimcad-py"]
+members = ["crates/kimbim-repo", "crates/kimbim-py"]
 exclude = ["spikes"]
 
 [workspace.package]

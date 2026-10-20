@@ -36,10 +36,10 @@ def main(path):
     # 1. change one property value
     pset = ifcopenshell.util.element.get_pset(wall, "Pset_WallCommon")
     if pset:
-        ifcopenshell.api.pset.edit_pset(f, pset=f.by_id(pset["id"]), properties={"FireRating": "EI60-KIMCAD"})
+        ifcopenshell.api.pset.edit_pset(f, pset=f.by_id(pset["id"]), properties={"FireRating": "EI60-KimBim"})
     else:
         p = ifcopenshell.api.pset.add_pset(f, product=wall, name="Pset_WallCommon")
-        ifcopenshell.api.pset.edit_pset(f, pset=p, properties={"FireRating": "EI60-KIMCAD"})
+        ifcopenshell.api.pset.edit_pset(f, pset=p, properties={"FireRating": "EI60-KimBim"})
     r1, d = decompose(f, d)
     print("  set one property on one wall      ->", *changed(base, r1))
 

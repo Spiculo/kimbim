@@ -25,7 +25,7 @@
 #include <dwmapi.h>
 #endif
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 constexpr int kHeight = 34;
@@ -83,7 +83,7 @@ QPixmap appIcon(const QPalette& pal, qreal dpr)
 // minimize/maximize animations, the shadow and (Windows 11) rounded corners.
 void applyNativeFrame(QWidget* window)
 {
-    if (window->property("kimcadNativeFrame").toULongLong() == quint64(window->winId()))
+    if (window->property("kimbimNativeFrame").toULongLong() == quint64(window->winId()))
         return;
     const HWND hwnd = reinterpret_cast<HWND>(window->winId());
     const LONG_PTR style = GetWindowLongPtrW(hwnd, GWL_STYLE);
@@ -93,7 +93,7 @@ void applyNativeFrame(QWidget* window)
     DwmExtendFrameIntoClientArea(hwnd, &shadow);
     SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
         SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOACTIVATE);
-    window->setProperty("kimcadNativeFrame", quint64(window->winId()));
+    window->setProperty("kimbimNativeFrame", quint64(window->winId()));
 }
 
 // A maximized window may reach past its monitor's work area by the (invisible) frame: keep the
@@ -516,9 +516,9 @@ bool TitleBar::eventFilter(QObject* watched, QEvent* event)
 void TitleBar::updateTitle()
 {
     QString t = m_window->windowTitle();
-    const QString prefix = QStringLiteral("KIMCAD — "); // as MainWindow titles the window
+    const QString prefix = QStringLiteral("KimBim — "); // as MainWindow titles the window
     if (t.startsWith(prefix))
-        t = t.mid(prefix.size()); // the icon already says KIMCAD
+        t = t.mid(prefix.size()); // the icon already says KimBim
     t.replace(QStringLiteral("[*]"), m_window->isWindowModified() ? QStringLiteral(" •") : QString());
     m_title->setProperty("fullTitle", t);
     m_title->setToolTip(t);
@@ -585,4 +585,4 @@ void TitleBar::paintEvent(QPaintEvent*)
     p.fillRect(QRect(0, height() - 1, width(), 1), line);
 }
 
-} // namespace kimcad
+} // namespace kimbim

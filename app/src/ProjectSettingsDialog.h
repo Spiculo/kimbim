@@ -8,7 +8,7 @@ class QComboBox;
 class QDoubleSpinBox;
 class QSpinBox;
 
-namespace kimcad {
+namespace kimbim {
 
 // File > Project settings (D72): the settings kept with the project (.kim or folder) and versioned.
 class ProjectSettingsDialog : public QDialog {
@@ -27,4 +27,4 @@ private:
     QSpinBox* m_decimals;
 };
 
-} // namespace kimcad
+} // namespace kimbim

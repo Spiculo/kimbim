@@ -3,7 +3,7 @@
 
 #include "PythonEngine.h"
 
-namespace kimcad {
+namespace kimbim {
 
 void ModelLoader::load(const QString& path)
 {
@@ -46,4 +46,4 @@ void ModelLoader::load(const QString& path)
     emit finished(elements, false);
 }
 
-} // namespace kimcad
+} // namespace kimbim

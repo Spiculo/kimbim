@@ -26,8 +26,8 @@ import ifcopenshell.util.placement  # noqa: E402
 import ifcopenshell.validate  # noqa: E402
 
 import make_house  # noqa: E402
-from kimcad import app_bridge as b  # noqa: E402
-from kimcad import authoring  # noqa: E402
+from kimbim import app_bridge as b  # noqa: E402
+from kimbim import authoring  # noqa: E402
 
 
 def call(fn, *args):

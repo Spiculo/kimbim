@@ -4,9 +4,9 @@
 The owner's ten notes from the first hands-on session, and where each one landed
 ([plan](superpowers/plans/2026-10-06-architect-feedback.md)).
 
-| # | Note | What KIMCAD does now | Try it |
+| # | Note | What KimBim does now | Try it |
 |---|------|----------------------|--------|
-| 1 | Placing walls/objects is slow | The 3D view no longer waits for the display's refresh (vsync) on every redraw; a wall now lands in ~50 ms and the mouse preview in ~2 ms (measured with `--bench-tools`). `KIMCAD_VSYNC=1` brings vsync back | Draw walls (W) quickly |
+| 1 | Placing walls/objects is slow | The 3D view no longer waits for the display's refresh (vsync) on every redraw; a wall now lands in ~50 ms and the mouse preview in ~2 ms (measured with `--bench-tools`). `KIMBIM_VSYNC=1` brings vsync back | Draw walls (W) quickly |
 | 2 | Plan cut as a slider on the right | A vertical slider beside the 3D view sets the cut height for the active level | Drag the slider |
 | 3 | Editing length in the panel does nothing | Properties shows a **Dimensions** group (length, height, width, thickness, depth...) that really changes the shape | Select a wall, edit Length |
 | 4 | Layers as boundaries, views as collections of layers | **Layers** tab (next to Model): new, rename, delete, shown, locked, active layer, "Move selection here". **Views**: save the layer states + level + plan/3D + cut as a named view and switch between them. Stored in the IFC ([D57](decisions.md)) | Layers tab |
@@ -21,7 +21,7 @@ The owner's ten notes from the first hands-on session, and where each one landed
 
 The owner's UI notes after Slices 14–22 ([spec](superpowers/specs/2026-10-07-main-window-rework-design.md), D71):
 
-| Note | What KIMCAD does now | Try it |
+| Note | What KimBim does now | Try it |
 |------|----------------------|--------|
 | Tools on the left, by category | Left column with **3D / Plane / View / Edit** groups (collapsible); the tool's fields appear above the view only while it's active | Pick Wall in the 3D group |
 | Properties on double-click | Double-click an element (view or tree): Properties comes forward in the right panels; a level opens its plan | Double-click a wall |
@@ -35,7 +35,7 @@ Next: **step 2**, the `.kim` file (one file, or open as a folder) with project a
 
 ([spec](superpowers/specs/2026-10-08-kim-file-and-preferences-design.md), D72)
 
-| Note | What KIMCAD does now | Try it |
+| Note | What KimBim does now | Try it |
 |------|----------------------|--------|
 | A file format beyond plain IFC | A `.kim` holds the model, the project settings and the whole version history in one file | File › Save As… › `.kim` |
 | Saving | Ctrl+S saves the file; Save version… (Ctrl+Alt+S) adds a history entry; optional automatic versions | Edit › Preferences › Automatic versions |
@@ -55,7 +55,7 @@ Plan tabs (a standard floor plan without the cut slider) are on hold for the arc
 
 ([spec](superpowers/specs/2026-10-08-pen-sets-and-graphics-design.md), D73)
 
-| Note | What KIMCAD does now | Try it |
+| Note | What KimBim does now | Try it |
 |------|----------------------|--------|
 | The pen button was greyed out | It shows the current pen; click it for a 16×16 grid of pens. New text, dimensions and marks take it, and so do the selected ones | Bottom bar |
 | A colour palette like Archicad's, switched per use | **Purposes**: Working (colours by kind), Highlight (pale grey, fire ratings in colour), Permit (black, printed weights), Presentation (greys, no furniture), Demo. One drop-down restyles the 3D view, plans, drawings and sheets | Bottom bar, left |

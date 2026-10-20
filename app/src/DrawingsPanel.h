@@ -8,7 +8,7 @@ class QListWidget;
 class QListWidgetItem;
 class QPushButton;
 
-namespace kimcad {
+namespace kimbim {
 
 // Sections and elevations of the model (Slice 14, D60): open one in a drawing tab, rename, delete.
 class DrawingsPanel : public QWidget {
@@ -35,4 +35,4 @@ private:
     bool m_filling = false;
 };
 
-} // namespace kimcad
+} // namespace kimbim

@@ -3,7 +3,7 @@
 
 #include <QHBoxLayout>
 
-namespace kimcad {
+namespace kimbim {
 
 ToolOptionsBar::ToolOptionsBar(QWidget* parent)
     : QWidget(parent)
@@ -32,4 +32,4 @@ void ToolOptionsBar::setActive(bool toolActive)
     setVisible(toolActive && any);
 }
 
-} // namespace kimcad
+} // namespace kimbim

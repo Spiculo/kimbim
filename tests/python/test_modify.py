@@ -6,8 +6,8 @@ import ifcopenshell.util.element
 import ifcopenshell.validate
 import pytest
 
-from kimcad import app_bridge as b
-from kimcad import authoring, layers, renovation
+from kimbim import app_bridge as b
+from kimbim import authoring, layers, renovation
 
 
 def call(fn, *args):
@@ -95,7 +95,7 @@ def test_split_a_beam(model):
     beam = call("create_beam", model["l1"], beam_type, 0, 3, 6, 3, 3.0)["guid"]
     r = call("split_element", beam, 2.0, 3.0, "1")
     assert r["ok"], r
-    from kimcad import modify
+    from kimbim import modify
     a = modify._beam_axis(b._model.by_guid(beam))
     c = modify._beam_axis(b._model.by_guid(r["piece"]))
     z = round(a[0][2], 6)  # the extrusion axis (mid-depth, below the top at 3 m)
@@ -188,7 +188,7 @@ def test_split_moves_a_t_join_to_the_piece_it_meets(model):
     assert valid() == []
 
 
-def test_an_imported_wall_gets_kimcad_shape_when_split(model):
+def test_an_imported_wall_gets_kimbim_shape_when_split(model):
     """A wall whose body sits on the plain Model context (as Revit exports it) is rebuilt from its axis,
     layers and height, then split (D80)."""
     import ifcopenshell.util.representation as R

@@ -2,11 +2,11 @@
 # Re-run S3 on Linux for files matching a filter and merge into out-linux/ results.
 set -euo pipefail
 SRC="$(cd "$(dirname "$0")/.." && pwd)"  # the spikes/ folder of this checkout
-DST=~/kimcad-spikes
+DST=~/kimbim-spikes
 cp "$SRC"/s3_records/*.py "$DST/s3_records/"
 cd "$DST/s3_records"
 cp out-linux/results-linux.json out-linux/results-linux.full.json
-KIMCAD_SPIKE_OUT=out-linux-one PYTHONPATH=~/kimcad-spike-pkgs python3 run.py "$1" 2>&1 | grep -v "^No stream"
+KIMBIM_SPIKE_OUT=out-linux-one PYTHONPATH=~/kimbim-spike-pkgs python3 run.py "$1" 2>&1 | grep -v "^No stream"
 python3 - <<'EOF'
 import json
 full = json.load(open("out-linux/results-linux.full.json"))

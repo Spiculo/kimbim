@@ -9,7 +9,7 @@
 #include <cstring>
 #include <limits>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 constexpr double kPi = 3.14159265358979323846;
@@ -349,4 +349,4 @@ bool UnderlaySnapIndex::onLine(QPointF p, double tolerance, QPointF* out) const
     return found;
 }
 
-} // namespace kimcad
+} // namespace kimbim

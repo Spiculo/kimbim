@@ -26,7 +26,7 @@
 
 #include <algorithm>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -718,4 +718,4 @@ void ElementBatch::ComputeSelection(const Handle(SelectMgr_Selection)& selection
     }
 }
 
-} // namespace kimcad
+} // namespace kimbim

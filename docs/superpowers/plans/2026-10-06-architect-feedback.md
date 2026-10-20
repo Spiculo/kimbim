@@ -21,7 +21,7 @@ M5's remaining slices (milestones, object history, combine options) follow this 
 
 ## Global Constraints
 
-- IFC4 standard concepts first: layers = `IfcPresentationLayerAssignment` (+ `IfcPresentationLayerWithStyle` for on/off/frozen); annotations = `IfcAnnotation`; reused "models" stay standard IFC for other tools (each placed instance is real geometry), with KIMCAD's link kept in a pset.
+- IFC4 standard concepts first: layers = `IfcPresentationLayerAssignment` (+ `IfcPresentationLayerWithStyle` for on/off/frozen); annotations = `IfcAnnotation`; reused "models" stay standard IFC for other tools (each placed instance is real geometry), with KimBim's link kept in a pset.
 - Every edit is one undo step with a geometry delta; GlobalIds are kept by edits.
 - EN/ES UI, SPDX, DCO; CI on GitHub (the owner allows pushing branches to run it).
 
@@ -40,10 +40,10 @@ M5's remaining slices (milestones, object history, combine options) follow this 
 
 ## Slice 11 — Layers and views
 - Layers (`IfcPresentationLayerAssignment`): a Layers panel (create, rename, delete, show/hide, lock); the active layer receives new elements; "Move selection to layer"; locked layers can't be selected or edited.
-- Views = named collections of visible layers (+ the level, plan/3D and cut height): create from the current state, switch, update, delete. Stored in the project as a KIMCAD pset on IfcProject (JSON), so they travel with the file and the versions.
+- Views = named collections of visible layers (+ the level, plan/3D and cut height): create from the current state, switch, update, delete. Stored in the project as a KimBim pset on IfcProject (JSON), so they travel with the file and the versions.
 
 ## Slice 12 — Models (reused units)
-- A "Models" section next to the levels: a model is a storey-like container (an `IfcBuildingStorey` marked as a KIMCAD model, below the building's levels, e.g. "Apartment A" at −5) where a unit is drawn once.
+- A "Models" section next to the levels: a model is a storey-like container (an `IfcBuildingStorey` marked as a KimBim model, below the building's levels, e.g. "Apartment A" at −5) where a unit is drawn once.
 - "Place model…" on a level at an offset/rotation creates an instance: real elements (other IFC tools see the full building), each with a pset linking it to its model element and instance. "Update instances" re-applies the model's current content to every instance, keeping the instance elements' GlobalIds (identity for versioning). Instances can't be edited directly (edit the model instead); "Explode instance" unlinks.
 
 ## Slice 13 — Plan annotations

@@ -3,7 +3,7 @@
 
 #include <cmath>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 bool same(QPointF a, QPointF b)
@@ -65,4 +65,4 @@ void InputAids::record(const std::optional<QPointF>& from, QPointF point, int ki
     m_kind = kind;
 }
 
-} // namespace kimcad
+} // namespace kimbim

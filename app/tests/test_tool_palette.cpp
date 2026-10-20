@@ -18,7 +18,7 @@ class TestToolPalette : public QObject {
 private slots:
     void groupsHoldButtonsForTheirActions()
     {
-        kimcad::ToolPalette p;
+        kimbim::ToolPalette p;
         QAction wall("Wall"), slab("Slab"), text("Text");
         p.addGroup("3d", "3D", {&wall, &slab});
         p.addGroup("plane", "Plane", {&text});
@@ -42,7 +42,7 @@ private slots:
     // D90: an icon grid whose columns follow the width; flyouts; every tool gets an icon; three looks.
     void gridFlyoutsAndLooks()
     {
-        kimcad::ToolPalette p;
+        kimbim::ToolPalette p;
         QAction dim("Dimension"), angle("Angle dimension"), radius("Radius"), text("Text"), odd("Odd");
         dim.setObjectName("actionDimensionTool");
         angle.setObjectName("actionAngleDimensionTool");
@@ -59,7 +59,7 @@ private slots:
         QCOMPARE(buttons.at(0)->defaultAction(), &dim);
         QVERIFY(buttons.at(0)->menu() && buttons.at(0)->menu()->actions().size() == 3);
         QCOMPARE(p.buttonFor(&angle), buttons.at(0));
-        QCOMPARE(kimcad::ToolPalette::iconName(&angle), QString("tool-angle-dimension"));
+        QCOMPARE(kimbim::ToolPalette::iconName(&angle), QString("tool-angle-dimension"));
         QVERIFY(!dim.icon().isNull() && !text.icon().isNull()); // from :/icons/tool-*.svg
         for (qreal dpr : {1.0, 1.25, 2.0}) {
             const QPixmap pm = text.icon().pixmap(QSize(16, 16), dpr);
@@ -81,17 +81,17 @@ private slots:
         p.show();
         QCoreApplication::processEvents();
         QCOMPARE(p.columns(), 2); // icons and labels: two columns at 200 px
-        p.setMode(kimcad::ToolPalette::Mode::Icons);
+        p.setMode(kimbim::ToolPalette::Mode::Icons);
         QVERIFY(p.columns() >= 5);
-        p.setMode(kimcad::ToolPalette::Mode::List);
+        p.setMode(kimbim::ToolPalette::Mode::List);
         QCOMPARE(p.columns(), 1);
-        QCOMPARE(kimcad::ToolPalette::modeFromKey(kimcad::ToolPalette::modeKey(p.mode())), p.mode());
+        QCOMPARE(kimbim::ToolPalette::modeFromKey(kimbim::ToolPalette::modeKey(p.mode())), p.mode());
         QVERIFY(p.contextMenu()->findChild<QAction*>() || !p.contextMenu()->actions().isEmpty());
     }
 
     void optionsStripShowsOnlyWithAToolAndAField()
     {
-        kimcad::ToolOptionsBar bar;
+        kimbim::ToolOptionsBar bar;
         auto* height = new QLineEdit;
         bar.addField(height);
         bar.show();
@@ -106,9 +106,9 @@ private slots:
 
     void statusStripShowsLayersZoomSelectionAndMessages()
     {
-        kimcad::StatusStrip s;
-        QSignalSpy active(&s, &kimcad::StatusStrip::activeLayerRequested);
-        QSignalSpy visible(&s, &kimcad::StatusStrip::layerVisibilityToggled);
+        kimbim::StatusStrip s;
+        QSignalSpy active(&s, &kimbim::StatusStrip::activeLayerRequested);
+        QSignalSpy visible(&s, &kimbim::StatusStrip::layerVisibilityToggled);
         s.setLayers({"A-WALL", "A-DOOR", "A-ANNO"}, "A-WALL", {"A-ANNO"});
         QCOMPARE(s.layersText(), QString("2/3"));
         auto* combo = s.findChild<QComboBox*>(QStringLiteral("activeLayer"));
@@ -132,7 +132,7 @@ private slots:
         QVERIFY(s.message().isEmpty());
         auto* pen = s.findChild<QToolButton*>(QStringLiteral("penButton"));
         QVERIFY(pen->isEnabled()); // D73: the current pen
-        QSignalSpy requested(&s, &kimcad::StatusStrip::penRequested);
+        QSignalSpy requested(&s, &kimbim::StatusStrip::penRequested);
         s.setPen(26, Qt::red, 0.5);
         QVERIFY(pen->text().startsWith(QStringLiteral("26")));
         pen->click();

@@ -19,8 +19,8 @@ __pycache__/
 # pixi / conda environments
 .pixi/
 
-# KIMCAD local project data (caches, oplog, index) — never committed
-.kimcad/
+# KimBim local project data (caches, oplog, index) — never committed
+.kimbim/
 
 # Qt
 *.qm
@@ -48,10 +48,10 @@ desktop.ini
 # pixi / build
 /.pixi/
 /tests/corpus/files/
-/python/kimcad/_core*.pyd
-/python/kimcad/_core*.so
+/python/kimbim/_core*.pyd
+/python/kimbim/_core*.so
 /target/
-/python/kimcad/_core*.pdb
+/python/kimbim/_core*.pdb
 
 # interop check (npm)
 node_modules/

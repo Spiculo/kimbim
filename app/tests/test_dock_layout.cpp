@@ -22,14 +22,14 @@ private slots:
     void viewsAreKeyedTabsInTheCenter()
     {
         QMainWindow w;
-        kimcad::DockLayout layout(&w);
+        kimbim::DockLayout layout(&w);
         auto* model = new QLabel("3D");
         layout.addView("3d", "3D", model, false);
         layout.addView("plan:L1", "Level 1 plan", new QLabel("plan"), true);
         QCOMPARE(layout.viewKeys(), QStringList({"3d", "plan:L1"}));
         QCOMPARE(layout.view("3d"), model);
         QCOMPARE(layout.keyOf(model), QString("3d"));
-        QSignalSpy current(&layout, &kimcad::DockLayout::currentChanged);
+        QSignalSpy current(&layout, &kimbim::DockLayout::currentChanged);
         layout.raise("plan:L1");
         QCOMPARE(layout.current(), QString("plan:L1"));
         QCOMPARE(current.count(), 1);
@@ -40,11 +40,11 @@ private slots:
     void the3DViewCannotBeClosedOthersAsk()
     {
         QMainWindow w;
-        kimcad::DockLayout layout(&w);
+        kimbim::DockLayout layout(&w);
         layout.addView("3d", "3D", new QLabel, false);
         layout.addView("D1", "Section 1", new QLabel, true);
         QVERIFY(!layout.manager()->findDockWidget("3d")->features().testFlag(ads::CDockWidget::DockWidgetClosable));
-        QSignalSpy close(&layout, &kimcad::DockLayout::closeRequested);
+        QSignalSpy close(&layout, &kimbim::DockLayout::closeRequested);
         layout.manager()->findDockWidget("D1")->requestCloseDockWidget(); // what the tab's x does
         QCOMPARE(close.count(), 1);
         QCOMPARE(close.first().first().toString(), QString("D1"));
@@ -57,7 +57,7 @@ private slots:
     void panelsAreTabbedOnTheRightAndCanBeRaised()
     {
         QMainWindow w;
-        kimcad::DockLayout layout(&w);
+        kimbim::DockLayout layout(&w);
         layout.addView("3d", "3D", new QLabel, false);
         layout.addPanel("tree", "Model", new QLabel);
         layout.addPanel("properties", "Properties", new QLabel);
@@ -82,7 +82,7 @@ private slots:
         QApplication::setPalette(dark);
         {
             QMainWindow w;
-            kimcad::DockLayout layout(&w);
+            kimbim::DockLayout layout(&w);
             layout.addView("3d", "3D", new QLabel, false);
             layout.addPanel("tree", "Model", new QLabel);
             layout.addPanel("properties", "Properties", new QLabel);
@@ -101,7 +101,7 @@ private slots:
     void layoutRoundTripsAndFallsBack()
     {
         QMainWindow w;
-        kimcad::DockLayout layout(&w);
+        kimbim::DockLayout layout(&w);
         layout.addView("3d", "3D", new QLabel, false);
         layout.addPanel("tree", "Model", new QLabel);
         layout.captureDefault();
@@ -115,7 +115,7 @@ private slots:
     void aNewViewOpensRightAfterTheCurrentTab()
     {
         QMainWindow w;
-        kimcad::DockLayout layout(&w);
+        kimbim::DockLayout layout(&w);
         layout.addView("3d", "3D", new QLabel, false);
         layout.addView("plan:A", "A", new QLabel, true); // after 3D (current): 3d, plan:A
         layout.addView("D1", "Section", new QLabel, true); // after 3D still: 3d, D1, plan:A
@@ -132,9 +132,9 @@ private slots:
     {
         QMainWindow w;
         w.resize(1000, 800);
-        kimcad::DockLayout layout(&w);
+        kimbim::DockLayout layout(&w);
         layout.addView("3d", "3D", new QLabel, false);
-        ads::CDockWidget* dock = layout.addView("S1", "Sheet", new QLabel, true, kimcad::DockLayout::Placement::Floating);
+        ads::CDockWidget* dock = layout.addView("S1", "Sheet", new QLabel, true, kimbim::DockLayout::Placement::Floating);
         QVERIFY(dock->isFloating());
         QCOMPARE(layout.view("S1") != nullptr, true);
         QVERIFY(std::abs(dock->dockContainer()->window()->width() - 700) <= 50);

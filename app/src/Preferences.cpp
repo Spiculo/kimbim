@@ -9,7 +9,7 @@
 #include <QSaveFile>
 #include <QStandardPaths>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 const QStringList kViews{QStringLiteral("tab"), QStringLiteral("window")};
@@ -39,7 +39,7 @@ QJsonObject Preferences::defaults()
     const QString docs = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
     return {
         {"language", "auto"},
-        {"templates_folder", QDir(docs).filePath(QStringLiteral("KIMCAD Templates"))},
+        {"templates_folder", QDir(docs).filePath(QStringLiteral("KimBim Templates"))},
         {"author_name", ""},
         {"author_email", ""},
         {"new_views", "tab"},
@@ -196,4 +196,4 @@ void Preferences::setLayout(const QByteArray& state)
     setValue("layout", QString::fromLatin1(state.toBase64()));
 }
 
-} // namespace kimcad
+} // namespace kimbim

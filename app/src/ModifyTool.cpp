@@ -7,7 +7,7 @@
 #include <cmath>
 #include <limits>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -158,4 +158,4 @@ QString ModifyTool::hint() const
     return {};
 }
 
-} // namespace kimcad
+} // namespace kimbim

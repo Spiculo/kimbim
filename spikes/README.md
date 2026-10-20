@@ -12,7 +12,7 @@ This code is not production code. It exists to measure and to fail fast.
 | S3 | `s3_records/` | Does IFC → canonical records → IFC round-trip losslessly and deterministically? Do edits stay local? |
 | S4 | `s3_records/` (run on 2 OSs) | Do Windows and Linux produce identical record hashes? |
 | S5 | `s5_git_store/` | Can a Git object database (gitoxide) hold a 1M-record model? |
-| S6 | `s6_drawings/` | Can IfcOpenShell's SVG serializer make plans, sections and elevations of KIMCAD files, and how fast? |
+| S6 | `s6_drawings/` | Can IfcOpenShell's SVG serializer make plans, sections and elevations of KimBim files, and how fast? |
 
 ## Setup
 
@@ -30,8 +30,8 @@ cd spikes/s3_records && ../.venv/Scripts/python run.py [filter]
 ../.venv/Scripts/python edits.py <file.ifc>          # edit locality
 
 # S4 on Linux (WSL), isolated packages, separate output dir
-python3 -m pip install --target ~/kimcad-spike-pkgs ifcopenshell==0.9.0 blake3
-KIMCAD_SPIKE_OUT=out-linux PYTHONPATH=~/kimcad-spike-pkgs python3 run.py
+python3 -m pip install --target ~/kimbim-spike-pkgs ifcopenshell==0.9.0 blake3
+KIMBIM_SPIKE_OUT=out-linux PYTHONPATH=~/kimbim-spike-pkgs python3 run.py
 python compare_manifests.py out/manifest-windows.json out-linux/manifest-linux.json
 
 # S6 (drawings): writes plan.svg, section.svg, elevation.svg and prints timings
@@ -40,7 +40,7 @@ pixi run drawing-bench                                                       # C
 
 # S2
 cd spikes/s2_geometry && ../.venv/Scripts/python geom_bench.py synth 100000
-KIMCAD_KERNEL=opencascade ../.venv/Scripts/python geom_bench.py <file.ifc>
+KIMBIM_KERNEL=opencascade ../.venv/Scripts/python geom_bench.py <file.ifc>
 
 # S5 (put the repo outside OneDrive / synced folders)
 cd spikes/s5_git_store && cargo build --release
@@ -53,6 +53,6 @@ pixi run python spikes/s2_viewer/prepare_meshes.py <model.ifc> spikes/s2_viewer/
 pixi run -e s2 python spikes/s2_viewer/view_bench.py spikes/s2_viewer/out/model.npz batched 1000000000 1000 offscreen
 
 # S1 (Linux/WSL; needs conda-forge ifcopenshell, NOT the pip wheel)
-micromamba create -p ~/kimcad-s1/env -c conda-forge python=3.12 ifcopenshell=0.9.0 cxx-compiler cmake make
+micromamba create -p ~/kimbim-s1/env -c conda-forge python=3.12 ifcopenshell=0.9.0 cxx-compiler cmake make
 bash spikes/s1_shared_model/build_and_run.sh
 ```

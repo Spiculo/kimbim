@@ -7,9 +7,9 @@ import math
 import ifcopenshell.validate
 import pytest
 
-from kimcad import app_bridge as b
-from kimcad import drafting
-from kimcad import settings as s
+from kimbim import app_bridge as b
+from kimbim import drafting
+from kimbim import settings as s
 
 
 def call(fn, *args):
@@ -205,7 +205,7 @@ def test_saved_versions_round_trip_and_compare(plan, tmp_path):
 
 
 def test_plan_drawing_and_sheet_include_the_shapes(plan):
-    from kimcad import graphics
+    from kimbim import graphics
 
     t = call("wall_types")["types"][0]["guid"]
     assert call("create_wall", plan["l1"], t, -1, 5, 6, 5, 3.0, "", "")["ok"]  # an empty plan has no drawing

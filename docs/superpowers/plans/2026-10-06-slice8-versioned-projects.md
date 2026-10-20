@@ -9,12 +9,12 @@
 - **Compare** any version with the current model or with another version: changed elements are coloured in the 3D view (added green, modified orange) with a change list (removed elements listed);
 - create and switch **design options** (branches).
 
-**Architecture:** A new bridge module `python/kimcad/versioning.py` (re-exported by `app_bridge`) wraps `kimcad.project.Project`.
-- **Working copy:** the open model is the working state. "Save version" writes it to `<project>/.kimcad/working.ifc` and commits it; opening a project or switching option exports HEAD to that file and opens it (doc 03: Plain vs Versioned modes; `.kimcad/` is local only).
+**Architecture:** A new bridge module `python/kimbim/versioning.py` (re-exported by `app_bridge`) wraps `kimbim.project.Project`.
+- **Working copy:** the open model is the working state. "Save version" writes it to `<project>/.kimbim/working.ifc` and commits it; opening a project or switching option exports HEAD to that file and opens it (doc 03: Plain vs Versioned modes; `.kimbim/` is local only).
 - **Compare:** project diffs. Working vs a version uses the project's change computation on the written working copy.
 - **C++:** `Viewport` gets per-element colour overrides (`ElementBatch` fixed colours); `MainWindow` gets the File-menu entries, a Save-version dialog, a History dock (versions list + change list), and an Options combo in a Project toolbar.
 
-**Tech Stack:** existing Rust store (`kimcad._core`) + `kimcad.project`, ifcopenshell, Qt 6, OCCT, pytest, Qt Test.
+**Tech Stack:** existing Rust store (`kimbim._core`) + `kimbim.project`, ifcopenshell, Qt 6, OCCT, pytest, Qt Test.
 
 **Spec:** docs/03-versioning.md (modes, working state, diff categories), docs/04-app-features.md §9 (Save version dialog, History, Compare with viewport colouring, Design options P0), docs/07-roadmap.md M5. Milestones (tags), object history and before/after are Slice 9; Combine options (merge) is Slice 10 (M5 exit).
 

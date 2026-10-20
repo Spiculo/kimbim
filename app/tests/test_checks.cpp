@@ -39,26 +39,26 @@ private slots:
     {
         QStandardPaths::setTestModeEnabled(true);
         QString error;
-        QVERIFY2(kimcad::PythonEngine::instance().start(&error), qPrintable(error));
+        QVERIFY2(kimbim::PythonEngine::instance().start(&error), qPrintable(error));
         QVERIFY(m_tmp.isValid());
         m_house = m_tmp.filePath(QStringLiteral("house.ifc"));
-        const QJsonObject made = kimcad::PythonEngine::instance().callJson("_write_sample_house", {m_house}, &error).object();
+        const QJsonObject made = kimbim::PythonEngine::instance().callJson("_write_sample_house", {m_house}, &error).object();
         QVERIFY2(made.value("ok").toBool(), qPrintable(made.value("error").toString() + error));
     }
 
     void checksOnTheHouseAndClickingAnIssue()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         w.resize(1300, 800);
         w.show();
-        QSignalSpy done(&w, &kimcad::MainWindow::loadFinished);
+        QSignalSpy done(&w, &kimbim::MainWindow::loadFinished);
         w.openFile(m_house);
         QVERIFY(done.wait(60000));
 
         QAction* check = w.findChild<QAction*>(QStringLiteral("actionCheckModel"));
         QVERIFY(check);
         check->trigger(); // Model > Check model... opens the panel
-        kimcad::ChecksPanel* panel = w.findChild<kimcad::ChecksPanel*>();
+        kimbim::ChecksPanel* panel = w.findChild<kimbim::ChecksPanel*>();
         QVERIFY(panel);
         QVERIFY(w.findChild<QMenu*>(QStringLiteral("panelsMenu"))->actions().size() >= 1);
 
@@ -71,7 +71,7 @@ private slots:
 
         panel->setChecked(QStringLiteral("ids"), false); // no IDS files yet
         QCOMPARE(panel->checkedChecks(), (QStringList{"schema", "clash", "model"}));
-        QSignalSpy asked(panel, &kimcad::ChecksPanel::runRequested);
+        QSignalSpy asked(panel, &kimbim::ChecksPanel::runRequested);
         panel->findChild<QPushButton*>(QStringLiteral("runChecks"))->click(); // runs them, one worker each
         QCOMPARE(asked.count(), 1);
         QTreeWidget* results = panel->results();
@@ -116,7 +116,7 @@ private slots:
 
     void clashSetSides()
     {
-        using kimcad::ClashSetDialog;
+        using kimbim::ClashSetDialog;
         QCOMPARE(ClashSetDialog::parseSide(QStringLiteral("IfcWall, ifcSlab")),
             (QJsonObject{{"classes", QJsonArray{"IfcWall", "IfcSlab"}}}));
         const QJsonObject criteria{{"criteria", "Fire walls"}};

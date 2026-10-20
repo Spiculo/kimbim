@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 constexpr double kSamePoint = 1e-6; // metres: a click on the last point adds nothing
@@ -147,4 +147,4 @@ QString MeasureTool::describe(const MeasureReadout& r, const std::function<QStri
     return parts.join(QStringLiteral("  ·  "));
 }
 
-} // namespace kimcad
+} // namespace kimbim

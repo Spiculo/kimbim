@@ -10,7 +10,7 @@ import ifcopenshell.validate
 import numpy as np
 import pytest
 
-from kimcad import app_bridge as b
+from kimbim import app_bridge as b
 
 RECT = [[0, 0], [10, 0], [10, 8], [0, 8]]
 PITCH = 30.0
@@ -129,7 +129,7 @@ def test_walls_trimmed_to_the_roof(box):
     assert "BBIM_Boolean" not in ifcopenshell.util.element.get_psets(b._model.by_guid(eave_wall))
     assert call("delete_elements", json.dumps([box["roof"]]))["ok"]
     w = b._model.by_guid(gable_wall)
-    assert "KIMCAD_RoofAttach" not in ifcopenshell.util.element.get_psets(w)
+    assert "KIMBIM_RoofAttach" not in ifcopenshell.util.element.get_psets(w)
     assert valid() == []
 
 
@@ -143,8 +143,8 @@ def test_attached_walls_are_found_in_ifc2x3_models():
     """IFC2X3 names the pset->relationship inverse PropertyDefinitionOf (IFC4: DefinesOccurrence);
     reading the IFC4 name raised AttributeError in every after-edit hook of an imported Revit model."""
     import ifcopenshell.api
-    from kimcad import roofs
-    from kimcad.testing import _reset_owner, build_model
+    from kimbim import roofs
+    from kimbim.testing import _reset_owner, build_model
 
     try:
         f = build_model(schema="IFC2X3", walls=1)

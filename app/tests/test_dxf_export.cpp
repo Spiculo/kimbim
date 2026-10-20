@@ -41,7 +41,7 @@ class TestDxfExport : public QObject {
 private slots:
     void listsDrawingsAndSheetsAllTicked()
     {
-        kimcad::DxfExportDialog dialog(targets(), [](const char*, const QStringList&) { return QJsonObject(); });
+        kimbim::DxfExportDialog dialog(targets(), [](const char*, const QStringList&) { return QJsonObject(); });
         QCOMPARE(dialog.tree()->topLevelItemCount(), 2);
         QCOMPARE(dialog.tree()->topLevelItem(0)->childCount(), 2);
         QCOMPARE(dialog.tree()->topLevelItem(1)->childCount(), 1);
@@ -70,7 +70,7 @@ private slots:
         QMutex mutex;
         QList<Call> calls;
         QThread* gui = QThread::currentThread();
-        kimcad::DxfExportDialog dialog(targets(), [&](const char* fn, const QStringList& args) {
+        kimbim::DxfExportDialog dialog(targets(), [&](const char* fn, const QStringList& args) {
             QMutexLocker lock(&mutex);
             calls.append({fn, args, QThread::currentThread() == gui});
             if (args.value(0) == "G2")
@@ -79,8 +79,8 @@ private slots:
         });
         dialog.setFolder(dir.filePath("out")); // made by the dialog
         dialog.setLayerMode("kind");
-        QSignalSpy progress(&dialog, &kimcad::DxfExportDialog::progressed);
-        QSignalSpy finished(&dialog, &kimcad::DxfExportDialog::finished);
+        QSignalSpy progress(&dialog, &kimbim::DxfExportDialog::progressed);
+        QSignalSpy finished(&dialog, &kimbim::DxfExportDialog::finished);
         dialog.start();
         QVERIFY(dialog.isRunning());
         QVERIFY(!dialog.exportButton()->isEnabled());
@@ -108,14 +108,14 @@ private slots:
         QTemporaryDir dir;
         QSemaphore entered, release;
         std::atomic<int> count{0};
-        kimcad::DxfExportDialog dialog(targets(), [&](const char*, const QStringList& args) {
+        kimbim::DxfExportDialog dialog(targets(), [&](const char*, const QStringList& args) {
             ++count;
             entered.release();
             release.acquire(); // the first file is "being written" until the test lets it go
             return QJsonObject{{"ok", true}, {"path", args.value(1)}};
         });
         dialog.setFolder(dir.path());
-        QSignalSpy finished(&dialog, &kimcad::DxfExportDialog::finished);
+        QSignalSpy finished(&dialog, &kimbim::DxfExportDialog::finished);
         dialog.start();
         QVERIFY(entered.tryAcquire(1, 5000));
         dialog.reject(); // Escape while exporting cancels instead of closing
@@ -130,16 +130,16 @@ private slots:
     void realExportThroughPython()
     {
         QString error;
-        auto& py = kimcad::PythonEngine::instance();
+        auto& py = kimbim::PythonEngine::instance();
         QVERIFY2(py.start(&error), qPrintable(error));
         QVERIFY(py.callJson("new_project", {"DXF test"}, &error).object().value("ok").toBool());
         QVERIFY(py.callJson("create_drawings", {}, &error).object().value("ok").toBool());
         const QJsonObject t = py.callJson("dxf_targets", {}, &error).object();
         QVERIFY(!t.value("drawings").toArray().isEmpty());
         QTemporaryDir dir;
-        kimcad::DxfExportDialog dialog(t, [](const char* fn, const QStringList& args) {
+        kimbim::DxfExportDialog dialog(t, [](const char* fn, const QStringList& args) {
             QString e;
-            return kimcad::PythonEngine::instance().callJson(fn, args, &e).object();
+            return kimbim::PythonEngine::instance().callJson(fn, args, &e).object();
         });
         dialog.setAllChecked(false);
         QString south;
@@ -149,7 +149,7 @@ private slots:
         QVERIFY(!south.isEmpty());
         dialog.setChecked(south, true);
         dialog.setFolder(dir.path());
-        QSignalSpy finished(&dialog, &kimcad::DxfExportDialog::finished);
+        QSignalSpy finished(&dialog, &kimbim::DxfExportDialog::finished);
         dialog.start();
         QVERIFY(finished.wait(60000));
         QVERIFY2(dialog.errors().isEmpty(), qPrintable(dialog.errors().join("; ")));

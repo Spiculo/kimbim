@@ -4,9 +4,9 @@ import json
 
 import pytest
 
-from kimcad import app_bridge as b
-from kimcad import documents as D
-from kimcad import kimfile as K
+from kimbim import app_bridge as b
+from kimbim import documents as D
+from kimbim import kimfile as K
 
 
 def call(fn, *args):
@@ -112,14 +112,14 @@ def test_save_as_folder_and_back_to_a_kim(tmp_path):
     folder = tmp_path / "carpeta"
     r = call("save_as_folder", str(folder), "")
     assert r["ok"], r
-    assert (folder / ".git").is_dir() and (folder / ".kimcad" / "lock").exists()
+    assert (folder / ".git").is_dir() and (folder / ".kimbim" / "lock").exists()
     assert not K.lock_path(tmp_path / "a.kim").exists()
     assert call("document_state")["mode"] == "folder"
     assert call("set_project_settings", json.dumps({"sheet_paper": "A3"}))["ok"]
     assert call("save_document")["ok"]
-    assert json.loads((folder / ".kimcad" / "settings.json").read_text())["sheet_paper"] == "A3"
+    assert json.loads((folder / ".kimbim" / "settings.json").read_text())["sheet_paper"] == "A3"
     assert call("save_as_kim", str(tmp_path / "b.kim"), "")["ok"]
-    assert not (folder / ".kimcad" / "lock").exists()
+    assert not (folder / ".kimbim" / "lock").exists()
     assert call("close_document")["ok"]
     assert open_kim(tmp_path / "b.kim")["ok"]
     assert len(call("history", 10)["versions"]) == 1
@@ -136,13 +136,13 @@ def test_export_ifc_leaves_the_document_as_it_is(tmp_path):
 
 
 def test_existing_project_folders_open_with_default_settings(tmp_path):
-    from kimcad.project import Project
+    from kimbim.project import Project
 
     house()
     plain = tmp_path / "old.ifc"
     assert call("save", str(plain))["ok"]
     project = Project.init(tmp_path / "old")
-    project.commit(plain, "Made by an older KIMCAD")  # no settings.json in its tree
+    project.commit(plain, "Made by an older KimBim")  # no settings.json in its tree
     r = call("open_folder", str(tmp_path / "old"), "")
     assert r["ok"], r
     assert call("open_model", r["path"])["ok"]
@@ -215,7 +215,7 @@ def test_nothing_is_written_without_unsaved_work(tmp_path):
 def test_templates_list_save_and_make_new_projects(tmp_path):
     folder = tmp_path / "Plantillas"
     assert call("templates", str(folder)) == {"templates": [
-        {"name": "KIMCAD default", "path": "builtin", "builtin": True, "modified": ""}], "folder_ok": False}
+        {"name": "KimBim default", "path": "builtin", "builtin": True, "modified": ""}], "folder_ok": False}
     house()
     assert call("set_project_info", json.dumps({"number": "2026-001", "name": "Casa"}))["ok"]
     sheet = call("add_sheet", "A1", "Plantas")["number"]
@@ -230,7 +230,7 @@ def test_templates_list_save_and_make_new_projects(tmp_path):
     assert call("save_template", str(folder), "Oficina", "1")["ok"]
     assert not call("save_template", str(folder), "a/b")["ok"]
     listed = call("templates", str(folder))
-    assert listed["folder_ok"] and [t["name"] for t in listed["templates"]] == ["KIMCAD default", "Oficina"]
+    assert listed["folder_ok"] and [t["name"] for t in listed["templates"]] == ["KimBim default", "Oficina"]
 
     r = call("new_from_template", str(folder / "Oficina.kim"))
     assert r["ok"], r
@@ -249,7 +249,7 @@ def test_templates_list_save_and_make_new_projects(tmp_path):
 def test_the_built_in_template_is_a_new_project():
     r = call("new_from_template", "builtin")
     assert r["ok"] and r["path"] == ""
-    assert call("storeys")["storeys"] and call("document_state")["template"] == "KIMCAD default"
+    assert call("storeys")["storeys"] and call("document_state")["template"] == "KimBim default"
 
 
 def test_an_opened_template_saves_back_as_a_template(tmp_path):

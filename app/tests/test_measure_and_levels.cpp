@@ -25,16 +25,16 @@
 #include "StatusStrip.h"
 #include "Viewport.h"
 
-using kimcad::LevelsTable;
-using kimcad::MeasurePoint;
-using kimcad::MeasureTool;
+using kimbim::LevelsTable;
+using kimbim::MeasurePoint;
+using kimbim::MeasureTool;
 
 namespace {
 
 QJsonObject engine(const char* fn, const QStringList& args = {})
 {
     QString error;
-    return kimcad::PythonEngine::instance().callJson(fn, args, &error).object();
+    return kimbim::PythonEngine::instance().callJson(fn, args, &error).object();
 }
 
 QString metres(double m)
@@ -130,15 +130,15 @@ private slots:
     // The tool in the app: values in the bottom bar and on the clipboard, the model untouched.
     void measuringLeavesTheModelUnchanged()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         QVERIFY(w.newProject());
         const QJsonObject before = engine("state");
         QAction* a = w.findChild<QAction*>(QStringLiteral("actionMeasureTool"));
         QVERIFY(a);
         QCOMPARE(a->shortcut(), QKeySequence(Qt::SHIFT | Qt::Key_M));
         a->trigger();
-        QCOMPARE(w.tool(), kimcad::MainWindow::Tool::Measure);
-        kimcad::Viewport* v = w.viewport();
+        QCOMPARE(w.tool(), kimbim::MainWindow::Tool::Measure);
+        kimbim::Viewport* v = w.viewport();
         emit v->workPointClicked(QPointF(0, 0), 0.01, Qt::NoModifier);
         emit v->workPointMoved(QPointF(3, 4), 0.01, Qt::NoModifier);
         QCOMPARE(w.measure()->tool()->readout().distance, 5.0);
@@ -147,7 +147,7 @@ private slots:
         emit v->workPointClicked(QPointF(0, 4), 0.01, Qt::NoModifier);
         const auto r = w.measure()->tool()->readout();
         QVERIFY(std::abs(*r.area - 6.0) < 1e-9 && std::abs(*r.angle - std::atan2(4.0, 3.0) * 180 / M_PI) < 1e-9);
-        auto* status = w.findChild<kimcad::StatusStrip*>();
+        auto* status = w.findChild<kimbim::StatusStrip*>();
         QVERIFY(status && status->message().contains(QStringLiteral("Area")));
         auto* copy = w.findChild<QToolButton*>(QStringLiteral("measureCopy"));
         QVERIFY(copy && !copy->isHidden());
@@ -155,9 +155,9 @@ private slots:
         QCOMPARE(QGuiApplication::clipboard()->text(), w.measure()->text());
         emit v->drawingEnded(); // Esc clears the path, the tool stays
         QVERIFY(!w.measure()->tool()->isMeasuring());
-        QCOMPARE(w.tool(), kimcad::MainWindow::Tool::Measure);
+        QCOMPARE(w.tool(), kimbim::MainWindow::Tool::Measure);
         emit v->drawingEnded(); // again: leaves it
-        QCOMPARE(w.tool(), kimcad::MainWindow::Tool::None);
+        QCOMPARE(w.tool(), kimbim::MainWindow::Tool::None);
         QVERIFY(!v->hasToolOverlay());
         const QJsonObject after = engine("state");
         QCOMPARE(after.value("dirty").toBool(), before.value("dirty").toBool());
@@ -206,14 +206,14 @@ private slots:
     // Model > Levels... opens the table; OK applies it as one undo step.
     void theDialogEditsTheLevels()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         QVERIFY(w.newProject());
         QVERIFY(w.addLevel(QStringLiteral("Level 2"), 3.0));
         QAction* a = w.findChild<QAction*>(QStringLiteral("actionLevels"));
         QVERIFY(a);
         bool seen = false;
         QTimer::singleShot(0, &w, [&] {
-            auto* d = qobject_cast<kimcad::LevelsDialog*>(QApplication::activeModalWidget());
+            auto* d = qobject_cast<kimbim::LevelsDialog*>(QApplication::activeModalWidget());
             if (!d)
                 return;
             seen = true;

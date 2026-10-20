@@ -10,7 +10,7 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 constexpr int IdRole = Qt::UserRole;
@@ -150,4 +150,4 @@ void HistoryPanel::updateButtons()
     m_compareTwo->setEnabled(selected == 2);
 }
 
-} // namespace kimcad
+} // namespace kimbim

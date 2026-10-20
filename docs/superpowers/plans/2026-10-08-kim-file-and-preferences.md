@@ -19,22 +19,22 @@ C++17 / Qt 6 (`QJsonDocument`, `QStandardPaths`); Qt Advanced Docking System 4.5
 ## Global Constraints
 
 - Bridge functions: strings in, JSON string out, never raise (`B._dump`, `_fail`).
-- A `.kim` is a zip: `kimcad-file.json` `{"format": "kim", "version": 1, "kind": "project"|"template", "app": ...}`, `.git/` (absent in a template), `.kimcad/working.ifc`, `.kimcad/settings.json`.
-- Git pack files stored (`ZIP_STORED`), everything else deflated; `.kimcad/cache`, `.kimcad/index.db`, `.kimcad/lock`, `.kimcad/recovery` left out.
+- A `.kim` is a zip: `kimbim-file.json` `{"format": "kim", "version": 1, "kind": "project"|"template", "app": ...}`, `.git/` (absent in a template), `.kimbim/working.ifc`, `.kimbim/settings.json`.
+- Git pack files stored (`ZIP_STORED`), everything else deflated; `.kimbim/cache`, `.kimbim/index.db`, `.kimbim/lock`, `.kimbim/recovery` left out.
 - Saving: zip to `<file>.kim.saving` beside the target, then `os.replace`. The old `.kim` is never touched before that.
 - Working folder: `<data dir>/open/<16-hex hash of the .kim's full path>/`; recovery: `<data dir>/recovery/<hash>/`.
-- Lock: `<file>.kim.lock` beside the file (folder mode: `.kimcad/lock`), `{"user", "machine", "pid", "since"}`.
+- Lock: `<file>.kim.lock` beside the file (folder mode: `.kimbim/lock`), `{"user", "machine", "pid", "since"}`.
 - Project settings defaults: `plan_cut_height` 1.2, `hidden_layers` [], `locked_layers` [], `drawing_scale` 100, `sheet_paper` "A1", `length_unit` "m", `length_decimals` 2, `pen_sets` {}. Unknown keys kept.
-- Preferences defaults: `language` "auto", `templates_folder` Documents/KIMCAD Templates, `new_views` "tab", `open_ifc` "make_kim", `auto_version` "off", `auto_version_every` 10, `recovery_minutes` 5, `recent` [] (max 10). Unknown keys kept; a garbled file is kept as `preferences.json.bad`.
+- Preferences defaults: `language` "auto", `templates_folder` Documents/KimBim Templates, `new_views` "tab", `open_ifc` "make_kim", `auto_version` "off", `auto_version_every` 10, `recovery_minutes` 5, `recent` [] (max 10). Unknown keys kept; a garbled file is kept as `preferences.json.bad`.
 - Ctrl+S saves the file; Save version… stays Ctrl+Alt+S; Save As… Ctrl+Shift+S.
-- Every new UI string in English and Spanish (`app/translations/kimcad_es.ts`); SPDX header on every new file.
+- Every new UI string in English and Spanish (`app/translations/kimbim_es.ts`); SPDX header on every new file.
 - C++17; Python files written with LF line endings.
 
 ## Review Focus
 
 1. **OneDrive holds the `.kim` for a moment during sync** (`os.replace` gets PermissionError) → the save retries a few times, then fails with a clear message and the old file intact. Test in Task 3.
 2. **A zip entry that escapes the folder** (`../x`, absolute path) in a hand-made or malicious `.kim` → refused, nothing written outside the working folder. Test in Task 3.
-3. **Two KIMCAD windows on one machine open the same `.kim`** (same user, live pid) → the second opens read-only, it does not take the lock over. Test in Task 4.
+3. **Two KimBim windows on one machine open the same `.kim`** (same user, live pid) → the second opens read-only, it does not take the lock over. Test in Task 4.
 4. **Unsaved-but-not-versioned work and design options**: after Ctrl+S (file saved, no version), switching options must still ask to save a version, and reopening the `.kim` must keep that work and still know it isn't versioned. Test in Task 5.
 5. **Template GlobalIds referenced as text** (a sheet's placed drawing, saved views) → after regenerating ids, the new project's sheets still show their drawings. Test in Task 6.
 
@@ -43,13 +43,13 @@ C++17 / Qt 6 (`QJsonDocument`, `QStandardPaths`); Qt Advanced Docking System 4.5
 ### Task 1: Project settings in memory
 
 **Files:**
-- Create: `python/kimcad/settings.py`
-- Modify: `python/kimcad/app_bridge.py` (state() dirty; re-export; reset on open)
-- Modify: `python/kimcad/annotations.py:64-67` (`_measure` uses the unit)
+- Create: `python/kimbim/settings.py`
+- Modify: `python/kimbim/app_bridge.py` (state() dirty; re-export; reset on open)
+- Modify: `python/kimbim/annotations.py:64-67` (`_measure` uses the unit)
 - Test: `tests/python/test_settings.py`
 
 **Interfaces:**
-- Produces (Python, `kimcad.settings` as `S`): `DEFAULTS: dict`, `current() -> dict`, `load(data: dict | None, dirty: bool = False)`, `mark_saved()`, `is_dirty() -> bool`, `to_bytes(d: dict | None = None) -> bytes`, `from_bytes(b: bytes | None) -> dict`, `changed_keys(a: dict, b: dict) -> list[str]`, `merge(base: dict, ours: dict, theirs: dict) -> tuple[dict, list[str]]`, `format_length(metres: float, unit: bool = True) -> str`, `kept: bool` (module flag set by documents: settings are saved with the document).
+- Produces (Python, `kimbim.settings` as `S`): `DEFAULTS: dict`, `current() -> dict`, `load(data: dict | None, dirty: bool = False)`, `mark_saved()`, `is_dirty() -> bool`, `to_bytes(d: dict | None = None) -> bytes`, `from_bytes(b: bytes | None) -> dict`, `changed_keys(a: dict, b: dict) -> list[str]`, `merge(base: dict, ours: dict, theirs: dict) -> tuple[dict, list[str]]`, `format_length(metres: float, unit: bool = True) -> str`, `kept: bool` (module flag set by documents: settings are saved with the document).
 - Produces (bridge): `project_settings() -> {"ok", "settings", "defaults", "kept"}`, `set_project_settings(changes_json) -> {"ok", "settings", "dirty"}`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -59,8 +59,8 @@ C++17 / Qt 6 (`QJsonDocument`, `QStandardPaths`); Qt Advanced Docking System 4.5
 """Step 2: project settings (defaults, validation, dirty, merge, units)."""
 import json
 
-from kimcad import app_bridge as b
-from kimcad import settings as S
+from kimbim import app_bridge as b
+from kimbim import settings as S
 
 
 def call(fn, *args):
@@ -141,7 +141,7 @@ Expected: FAIL — `ImportError: cannot import name 'settings'` (and `project_se
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Project settings (step 2, D72): values that belong to the project, not the computer. They live in
 the `.kim` / project folder and in every version's tree (settings.json), so going back to a version
-brings back its settings. Unknown keys are kept, so an older KIMCAD never drops a newer one's settings.
+brings back its settings. Unknown keys are kept, so an older KimBim never drops a newer one's settings.
 
 Same protocol as app_bridge for the bridge functions (strings in, JSON out, never raise).
 """
@@ -274,7 +274,7 @@ def set_project_settings(changes_json: str) -> str:
 
 - [ ] **Step 4: Wire it into the bridge**
 
-In `python/kimcad/app_bridge.py`:
+In `python/kimbim/app_bridge.py`:
 
 ```python
 def _dirty() -> bool:
@@ -303,7 +303,7 @@ And next to the other re-exports at the bottom:
 from .settings import project_settings, set_project_settings  # noqa: E402,F401
 ```
 
-In `python/kimcad/annotations.py`, `_measure`:
+In `python/kimbim/annotations.py`, `_measure`:
 
 ```python
 def _measure(points) -> str:
@@ -314,7 +314,7 @@ def _measure(points) -> str:
     return " ".join(format_length(math.dist(p, q), unit=False) for p, q in zip(on_line, on_line[1:]))
 ```
 
-Also, in `python/kimcad/versioning.py`, `_dirty()` becomes `return B._dirty()`.
+Also, in `python/kimbim/versioning.py`, `_dirty()` becomes `return B._dirty()`.
 
 - [ ] **Step 5: Run the tests**
 
@@ -324,7 +324,7 @@ Expected: all pass. (If `add_annotation`/`annotations` take different arguments,
 - [ ] **Step 6: Commit**
 
 ```bash
-git add python/kimcad/settings.py python/kimcad/app_bridge.py python/kimcad/annotations.py python/kimcad/versioning.py tests/python/test_settings.py
+git add python/kimbim/settings.py python/kimbim/app_bridge.py python/kimbim/annotations.py python/kimbim/versioning.py tests/python/test_settings.py
 git commit -m "feat(settings): project settings with defaults, validation, merge and length units (step 2)"
 ```
 
@@ -333,9 +333,9 @@ git commit -m "feat(settings): project settings with defaults, validation, merge
 ### Task 2: Settings travel in the history
 
 **Files:**
-- Modify: `python/kimcad/layout.py` (`SETTINGS_PATH`)
-- Modify: `python/kimcad/project.py` (`_records`, `_changes`, `commit`, `status`, `diff`, `settings_at`, `merge_preview`, `merge`, `MergePreview`)
-- Modify: `python/kimcad/versioning.py` (`_version_id`, `_unversioned`, `save_version`, `version_changes`, `compare`, `_open_head`, `enable_versioning`, `switch_option`, `combine_options`, `project_state`, `_summary`)
+- Modify: `python/kimbim/layout.py` (`SETTINGS_PATH`)
+- Modify: `python/kimbim/project.py` (`_records`, `_changes`, `commit`, `status`, `diff`, `settings_at`, `merge_preview`, `merge`, `MergePreview`)
+- Modify: `python/kimbim/versioning.py` (`_version_id`, `_unversioned`, `save_version`, `version_changes`, `compare`, `_open_head`, `enable_versioning`, `switch_option`, `combine_options`, `project_state`, `_summary`)
 - Test: `tests/python/test_settings_history.py`
 
 **Interfaces:**
@@ -351,7 +351,7 @@ import json
 
 import pytest
 
-from kimcad import app_bridge as b
+from kimbim import app_bridge as b
 
 
 def call(fn, *args):
@@ -420,8 +420,8 @@ def test_combining_options_merges_settings_by_key(versioned):
 
 
 def test_old_projects_without_settings_open_with_the_defaults(versioned):
-    from kimcad import versioning
-    from kimcad.layout import SETTINGS_PATH
+    from kimbim import versioning
+    from kimbim.layout import SETTINGS_PATH
 
     project = versioning._project
     assert SETTINGS_PATH in project._head_entries()  # enable_versioning stores them
@@ -435,13 +435,13 @@ Expected: FAIL — `KeyError: 'unversioned'` / `ImportError: SETTINGS_PATH`.
 
 - [ ] **Step 3: Layout and Project**
 
-`python/kimcad/layout.py`, under `META_PATH`:
+`python/kimbim/layout.py`, under `META_PATH`:
 
 ```python
 SETTINGS_PATH = "settings.json"  # project settings (step 2, D72); not a record, never composed into IFC
 ```
 
-`python/kimcad/project.py`:
+`python/kimbim/project.py`:
 
 ```python
 from .layout import META_PATH, SETTINGS_PATH, blob_oid, key_to_path, path_to_key
@@ -503,7 +503,7 @@ and `merge` passes `preview.settings` to `_changes(self._head_entries(), preview
 
 - [ ] **Step 4: Versioning**
 
-`python/kimcad/versioning.py`:
+`python/kimbim/versioning.py`:
 
 ```python
 from . import settings as S
@@ -557,7 +557,7 @@ Expected: all pass.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add python/kimcad/layout.py python/kimcad/project.py python/kimcad/versioning.py tests/python/test_settings_history.py
+git add python/kimbim/layout.py python/kimbim/project.py python/kimbim/versioning.py tests/python/test_settings_history.py
 git commit -m "feat(versioning): project settings travel in the history (settings.json per version, merged by key)"
 ```
 
@@ -566,11 +566,11 @@ git commit -m "feat(versioning): project settings travel in the history (setting
 ### Task 3: The `.kim` container
 
 **Files:**
-- Create: `python/kimcad/kimfile.py`
+- Create: `python/kimbim/kimfile.py`
 - Test: `tests/python/test_kimfile.py`
 
 **Interfaces:**
-- Produces: `KimError(Exception)`, `MANIFEST = "kimcad-file.json"`, `VERSION = 1`, `pack(folder: Path, kim: Path, kind: str = "project") -> None`, `read_manifest(kim: Path) -> dict`, `unpack(kim: Path, folder: Path) -> dict` (returns the manifest), `path_hash(path) -> str` (16 hex), `REPLACE_TRIES = 5`.
+- Produces: `KimError(Exception)`, `MANIFEST = "kimbim-file.json"`, `VERSION = 1`, `pack(folder: Path, kim: Path, kind: str = "project") -> None`, `read_manifest(kim: Path) -> dict`, `unpack(kim: Path, folder: Path) -> dict` (returns the manifest), `path_hash(path) -> str` (16 hex), `REPLACE_TRIES = 5`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -583,18 +583,18 @@ import zipfile
 
 import pytest
 
-from kimcad import kimfile as K
+from kimbim import kimfile as K
 
 
 def project_folder(root):
     (root / ".git" / "objects" / "pack").mkdir(parents=True)
     (root / ".git" / "HEAD").write_text("ref: refs/heads/main\n")
     (root / ".git" / "objects" / "pack" / "pack-1.pack").write_bytes(b"PACK" + bytes(100))
-    (root / ".kimcad" / "cache").mkdir(parents=True)
-    (root / ".kimcad" / "cache" / "big.bin").write_bytes(bytes(1000))
-    (root / ".kimcad" / "working.ifc").write_text("ISO-10303-21;\n")
-    (root / ".kimcad" / "settings.json").write_text("{}\n")
-    (root / ".kimcad" / "lock").write_text("{}")
+    (root / ".kimbim" / "cache").mkdir(parents=True)
+    (root / ".kimbim" / "cache" / "big.bin").write_bytes(bytes(1000))
+    (root / ".kimbim" / "working.ifc").write_text("ISO-10303-21;\n")
+    (root / ".kimbim" / "settings.json").write_text("{}\n")
+    (root / ".kimbim" / "lock").write_text("{}")
     return root
 
 
@@ -605,11 +605,11 @@ def test_pack_and_unpack_round_trip(tmp_path):
     with zipfile.ZipFile(kim) as z:
         names = set(z.namelist())
         assert z.getinfo(".git/objects/pack/pack-1.pack").compress_type == zipfile.ZIP_STORED
-        assert z.getinfo(".kimcad/working.ifc").compress_type == zipfile.ZIP_DEFLATED
-    assert ".kimcad/cache/big.bin" not in names and ".kimcad/lock" not in names
+        assert z.getinfo(".kimbim/working.ifc").compress_type == zipfile.ZIP_DEFLATED
+    assert ".kimbim/cache/big.bin" not in names and ".kimbim/lock" not in names
     manifest = K.unpack(kim, tmp_path / "out")
     assert manifest["format"] == "kim" and manifest["version"] == 1 and manifest["kind"] == "project"
-    assert (tmp_path / "out" / ".kimcad" / "working.ifc").read_text() == "ISO-10303-21;\n"
+    assert (tmp_path / "out" / ".kimbim" / "working.ifc").read_text() == "ISO-10303-21;\n"
     assert (tmp_path / "out" / ".git" / "HEAD").exists()
     assert not (tmp_path / "out" / K.MANIFEST).exists()  # the manifest describes the file, not the folder
 
@@ -619,7 +619,7 @@ def test_a_failed_save_leaves_the_old_file(tmp_path, monkeypatch):
     kim = tmp_path / "a.kim"
     K.pack(src, kim)
     before = kim.read_bytes()
-    (src / ".kimcad" / "working.ifc").write_text("changed")
+    (src / ".kimbim" / "working.ifc").write_text("changed")
     monkeypatch.setattr(K, "_write_entries", lambda *a, **k: (_ for _ in ()).throw(OSError(28, "No space left")))
     with pytest.raises(K.KimError, match="No space"):
         K.pack(src, kim)
@@ -644,7 +644,7 @@ def test_a_busy_target_is_retried_then_reported(tmp_path, monkeypatch):
     assert len(calls) == K.REPLACE_TRIES and kim.read_bytes() == before
 
 
-@pytest.mark.parametrize("name", ["../evil.txt", "/abs.txt", "C:/x.txt", ".kimcad/../../evil.txt"])
+@pytest.mark.parametrize("name", ["../evil.txt", "/abs.txt", "C:/x.txt", ".kimbim/../../evil.txt"])
 def test_entries_outside_the_folder_are_refused(tmp_path, name):
     kim = tmp_path / "bad.kim"
     with zipfile.ZipFile(kim, "w") as z:
@@ -658,17 +658,17 @@ def test_entries_outside_the_folder_are_refused(tmp_path, name):
 def test_damaged_unknown_and_newer_files_are_refused_untouched(tmp_path):
     junk = tmp_path / "junk.kim"
     junk.write_bytes(b"not a zip")
-    with pytest.raises(K.KimError, match="not a KIMCAD file"):
+    with pytest.raises(K.KimError, match="not a KimBim file"):
         K.read_manifest(junk)
     nomani = tmp_path / "nomani.kim"
     with zipfile.ZipFile(nomani, "w") as z:
         z.writestr("x", "y")
-    with pytest.raises(K.KimError, match="not a KIMCAD file"):
+    with pytest.raises(K.KimError, match="not a KimBim file"):
         K.read_manifest(nomani)
     newer = tmp_path / "newer.kim"
     with zipfile.ZipFile(newer, "w") as z:
         z.writestr(K.MANIFEST, json.dumps({"format": "kim", "version": 99, "kind": "project"}))
-    with pytest.raises(K.KimError, match="newer KIMCAD"):
+    with pytest.raises(K.KimError, match="newer KimBim"):
         K.unpack(newer, tmp_path / "o")
     assert junk.read_bytes() == b"not a zip"
 
@@ -705,11 +705,11 @@ import shutil
 import time
 import zipfile
 
-MANIFEST = "kimcad-file.json"
+MANIFEST = "kimbim-file.json"
 VERSION = 1
 REPLACE_TRIES = 5
 REPLACE_WAIT = 0.2  # seconds between tries
-SKIP = (".kimcad/cache/", ".kimcad/index.db", ".kimcad/lock", ".kimcad/recovery/")
+SKIP = (".kimbim/cache/", ".kimbim/index.db", ".kimbim/lock", ".kimbim/recovery/")
 
 
 class KimError(Exception):
@@ -725,7 +725,7 @@ def _app_version() -> str:
     try:
         from importlib.metadata import version
 
-        return version("kimcad")
+        return version("kimbim")
     except Exception:  # noqa: BLE001 (not installed as a package: a dev checkout)
         return "dev"
 
@@ -774,11 +774,11 @@ def read_manifest(kim) -> dict:
         with zipfile.ZipFile(kim) as z:
             manifest = json.loads(z.read(MANIFEST))
     except (zipfile.BadZipFile, KeyError, ValueError, OSError):
-        raise KimError(f"{kim.name} is not a KIMCAD file, or it is damaged") from None
+        raise KimError(f"{kim.name} is not a KimBim file, or it is damaged") from None
     if not isinstance(manifest, dict) or manifest.get("format") != "kim":
-        raise KimError(f"{kim.name} is not a KIMCAD file, or it is damaged")
+        raise KimError(f"{kim.name} is not a KimBim file, or it is damaged")
     if int(manifest.get("version", 0)) > VERSION:
-        raise KimError(f"{kim.name} was made by a newer KIMCAD; update KIMCAD to open it")
+        raise KimError(f"{kim.name} was made by a newer KimBim; update KimBim to open it")
     return manifest
 
 
@@ -827,7 +827,7 @@ Expected: all pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add python/kimcad/kimfile.py tests/python/test_kimfile.py
+git add python/kimbim/kimfile.py tests/python/test_kimfile.py
 git commit -m "feat(kimfile): the .kim container: atomic save, safe unpack, manifest with format version"
 ```
 
@@ -836,7 +836,7 @@ git commit -m "feat(kimfile): the .kim container: atomic save, safe unpack, mani
 ### Task 4: Locks
 
 **Files:**
-- Modify: `python/kimcad/kimfile.py`
+- Modify: `python/kimbim/kimfile.py`
 - Test: `tests/python/test_kimfile.py` (append)
 
 **Interfaces:**
@@ -896,7 +896,7 @@ def test_a_garbled_lock_counts_as_free(tmp_path):
 - [ ] **Step 2: Run them to see them fail**
 
 Run: `pixi run pytest tests/python/test_kimfile.py -q -k lock`
-Expected: FAIL — `AttributeError: module 'kimcad.kimfile' has no attribute 'lock_path'`.
+Expected: FAIL — `AttributeError: module 'kimbim.kimfile' has no attribute 'lock_path'`.
 
 - [ ] **Step 3: Implement**
 
@@ -989,7 +989,7 @@ Expected: all pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add python/kimcad/kimfile.py tests/python/test_kimfile.py
+git add python/kimbim/kimfile.py tests/python/test_kimfile.py
 git commit -m "feat(kimfile): locks: one editor at a time, crash leftovers taken over, others read-only"
 ```
 
@@ -998,10 +998,10 @@ git commit -m "feat(kimfile): locks: one editor at a time, crash leftovers taken
 ### Task 5: Documents — open, save and close a `.kim`, a folder or an IFC
 
 **Files:**
-- Create: `python/kimcad/documents.py`
-- Modify: `python/kimcad/app_bridge.py` (`_reset_history` calls `documents.on_model_opened(path)`; re-exports)
-- Modify: `python/kimcad/project.py` (`_AUTHOR` override in `_author()`)
-- Modify: `python/kimcad/versioning.py` (`project_state()` adds `documents.state_fields()`)
+- Create: `python/kimbim/documents.py`
+- Modify: `python/kimbim/app_bridge.py` (`_reset_history` calls `documents.on_model_opened(path)`; re-exports)
+- Modify: `python/kimbim/project.py` (`_AUTHOR` override in `_author()`)
+- Modify: `python/kimbim/versioning.py` (`project_state()` adds `documents.state_fields()`)
 - Test: `tests/python/test_documents.py`
 
 **Interfaces:**
@@ -1025,9 +1025,9 @@ import json
 
 import pytest
 
-from kimcad import app_bridge as b
-from kimcad import documents as D
-from kimcad import kimfile as K
+from kimbim import app_bridge as b
+from kimbim import documents as D
+from kimbim import kimfile as K
 
 
 def call(fn, *args):
@@ -1133,14 +1133,14 @@ def test_save_as_folder_and_back_to_a_kim(tmp_path):
     folder = tmp_path / "carpeta"
     r = call("save_as_folder", str(folder), "")
     assert r["ok"], r
-    assert (folder / ".git").is_dir() and (folder / ".kimcad" / "lock").exists()
+    assert (folder / ".git").is_dir() and (folder / ".kimbim" / "lock").exists()
     assert not K.lock_path(tmp_path / "a.kim").exists()
     assert call("document_state")["mode"] == "folder"
     assert call("set_project_settings", json.dumps({"sheet_paper": "A3"}))["ok"]
     assert call("save_document")["ok"]
-    assert json.loads((folder / ".kimcad" / "settings.json").read_text())["sheet_paper"] == "A3"
+    assert json.loads((folder / ".kimbim" / "settings.json").read_text())["sheet_paper"] == "A3"
     assert call("save_as_kim", str(tmp_path / "b.kim"), "")["ok"]
-    assert not (folder / ".kimcad" / "lock").exists()
+    assert not (folder / ".kimbim" / "lock").exists()
     assert call("close_document")["ok"]
     assert open_kim(tmp_path / "b.kim")["ok"]
     assert len(call("history", 10)["versions"]) == 1
@@ -1157,13 +1157,13 @@ def test_export_ifc_leaves_the_document_as_it_is(tmp_path):
 
 
 def test_existing_project_folders_open_with_default_settings(tmp_path):
-    from kimcad.project import Project
+    from kimbim.project import Project
 
     house()
     plain = tmp_path / "old.ifc"
     assert call("save", str(plain))["ok"]
     project = Project.init(tmp_path / "old")
-    project.commit(plain, "Made by an older KIMCAD")  # no settings.json in its tree
+    project.commit(plain, "Made by an older KimBim")  # no settings.json in its tree
     r = call("open_folder", str(tmp_path / "old"), "")
     assert r["ok"], r
     assert call("open_model", r["path"])["ok"]
@@ -1197,7 +1197,7 @@ def test_the_author_from_preferences_signs_versions_and_the_lock(tmp_path):
 Run: `pixi run pytest tests/python/test_documents.py -q`
 Expected: FAIL — `ImportError: cannot import name 'documents'`.
 
-- [ ] **Step 3: Author override** — `python/kimcad/project.py`:
+- [ ] **Step 3: Author override** — `python/kimbim/project.py`:
 
 ```python
 _AUTHOR: tuple[str, str] | None = None  # set by the app from its preferences (documents.set_author)
@@ -1206,12 +1206,12 @@ _AUTHOR: tuple[str, str] | None = None  # set by the app from its preferences (d
 def _author() -> tuple[str, str]:
     if _AUTHOR is not None:
         return _AUTHOR
-    name = os.environ.get("KIMCAD_AUTHOR_NAME") or _git_config("user.name") or "KIMCAD User"
-    email = os.environ.get("KIMCAD_AUTHOR_EMAIL") or _git_config("user.email") or "user@localhost"
+    name = os.environ.get("KIMBIM_AUTHOR_NAME") or _git_config("user.name") or "KimBim User"
+    email = os.environ.get("KIMBIM_AUTHOR_EMAIL") or _git_config("user.email") or "user@localhost"
     return name, email
 ```
 
-- [ ] **Step 4: Write `python/kimcad/documents.py`**
+- [ ] **Step 4: Write `python/kimbim/documents.py`**
 
 ```python
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -1237,7 +1237,7 @@ from . import kimfile as K
 from . import project as P
 from . import settings as S
 from . import versioning as V
-from .project import KimcadError, NotAProject, Project
+from .project import KimbimError, NotAProject, Project
 
 _data_dir: pathlib.Path | None = None
 _pending: dict | None = None
@@ -1259,11 +1259,11 @@ def _fail(message: str, **extra) -> str:
 def data_dir() -> pathlib.Path:
     if _data_dir is not None:
         return _data_dir
-    if os.environ.get("KIMCAD_DATA_DIR"):
-        return pathlib.Path(os.environ["KIMCAD_DATA_DIR"])
+    if os.environ.get("KIMBIM_DATA_DIR"):
+        return pathlib.Path(os.environ["KIMBIM_DATA_DIR"])
     if os.name == "nt" and os.environ.get("LOCALAPPDATA"):
-        return pathlib.Path(os.environ["LOCALAPPDATA"]) / "KIMCAD"
-    return pathlib.Path.home() / ".local" / "share" / "KIMCAD"
+        return pathlib.Path(os.environ["LOCALAPPDATA"]) / "KimBim"
+    return pathlib.Path.home() / ".local" / "share" / "KimBim"
 
 
 def _same(a, b) -> bool:
@@ -1330,7 +1330,7 @@ def on_model_opened(path: str) -> None:
         if p.get("dirty"):
             B._saved_id = -1
         return
-    if _doc["work"] and _same(path, pathlib.Path(_doc["work"]) / ".kimcad" / "working.ifc"):
+    if _doc["work"] and _same(path, pathlib.Path(_doc["work"]) / ".kimbim" / "working.ifc"):
         return  # the document's own working copy reopened (an option switch, discard, combine)
     _close()
     _doc = _plain(path)
@@ -1364,26 +1364,26 @@ def close_document() -> str:
 # ---------------------------------------------------------------- opening
 
 def _prepare(project_dir: pathlib.Path, files_dir: pathlib.Path, doc: dict, attach: bool) -> pathlib.Path:
-    """Make files_dir/.kimcad/working.ifc the document's current work and leave the pending note."""
+    """Make files_dir/.kimbim/working.ifc the document's current work and leave the pending note."""
     global _pending
     project = Project.open(project_dir) if (project_dir / ".git" / "HEAD").is_file() else None
     head = project.repo.head() if project else None
     try:
-        state = json.loads(_read(project_dir / ".kimcad" / "working.json") or b"{}")
+        state = json.loads(_read(project_dir / ".kimbim" / "working.json") or b"{}")
     except ValueError:
         state = {}
-    src = project_dir / ".kimcad" / "working.ifc"
-    working = files_dir / ".kimcad" / "working.ifc"
+    src = project_dir / ".kimbim" / "working.ifc"
+    working = files_dir / ".kimbim" / "working.ifc"
     working.parent.mkdir(parents=True, exist_ok=True)
     if head and not (src.exists() and state.get("head") == head):
         project.export(working, overwrite=True, one_owner=True)
         settings, unversioned = S.from_bytes(project.settings_at("HEAD")), False
     else:
         if not src.exists():
-            raise KimcadError("the file has no model in it")
+            raise KimbimError("the file has no model in it")
         if not _same(src, working):
             shutil.copyfile(src, working)
-        settings = S.from_bytes(_read(project_dir / ".kimcad" / "settings.json"))
+        settings = S.from_bytes(_read(project_dir / ".kimbim" / "settings.json"))
         unversioned = bool(state.get("unversioned")) and head is not None
     _pending = {"path": str(working), "doc": doc, "project": project if attach else None,
                 "settings": settings, "unversioned": unversioned}
@@ -1407,7 +1407,7 @@ def open_kim(path: str, read_only: str = "") -> str:
     try:
         K.unpack(kim, work)
         working = _prepare(work, work, doc, attach=not ro and mode == "kim")
-    except (K.KimError, KimcadError, OSError) as ex:
+    except (K.KimError, KimbimError, OSError) as ex:
         if not ro:
             K.release(lock)
         shutil.rmtree(work, ignore_errors=True)
@@ -1419,12 +1419,12 @@ def open_folder(folder: str, read_only: str = "") -> str:
     path = pathlib.Path(folder)
     try:
         project = Project.open(path)
-    except (NotAProject, KimcadError) as ex:
-        return _fail(f"not a KIMCAD project: {ex}")
+    except (NotAProject, KimbimError) as ex:
+        return _fail(f"not a KimBim project: {ex}")
     if project.repo.head() is None:
         return _fail("the project has no versions yet")
     ro = bool(read_only)
-    lock = path / ".kimcad" / "lock"
+    lock = path / ".kimbim" / "lock"
     if not ro and (holder := K.acquire(lock)) is not None:
         return _locked(path.name, holder)
     files = data_dir() / "open" / f"{K.path_hash(path)}-ro-{os.getpid()}" if ro else path
@@ -1432,7 +1432,7 @@ def open_folder(folder: str, read_only: str = "") -> str:
            "read_only": ro, "template": ""}
     try:
         working = _prepare(path, files, doc, attach=not ro)
-    except (KimcadError, OSError) as ex:
+    except (KimbimError, OSError) as ex:
         if not ro:
             K.release(lock)
         return _fail(str(ex))
@@ -1462,16 +1462,16 @@ def import_ifc(ifc_path: str, kim_path: str) -> str:
     defaults = S.from_bytes(None)
     try:
         shutil.rmtree(work, ignore_errors=True)
-        (work / ".kimcad").mkdir(parents=True)
-        working = work / ".kimcad" / "working.ifc"
+        (work / ".kimbim").mkdir(parents=True)
+        working = work / ".kimbim" / "working.ifc"
         shutil.copyfile(ifc, working)
         project = Project.init(work)
         project.commit(working, f"Imported from {ifc.name}", settings=S.to_bytes(defaults))
-        (work / ".kimcad" / "settings.json").write_bytes(S.to_bytes(defaults))
-        (work / ".kimcad" / "working.json").write_text(
+        (work / ".kimbim" / "settings.json").write_bytes(S.to_bytes(defaults))
+        (work / ".kimbim" / "working.json").write_text(
             json.dumps({"head": project.repo.head(), "option": project.current_branch(), "unversioned": False}))
         K.pack(work, kim)
-    except (KimcadError, K.KimError, OSError) as ex:
+    except (KimbimError, K.KimError, OSError) as ex:
         K.release(lock)
         shutil.rmtree(work, ignore_errors=True)
         return _fail(str(ex))
@@ -1484,11 +1484,11 @@ def import_ifc(ifc_path: str, kim_path: str) -> str:
 
 def _write_files(work: pathlib.Path) -> None:
     """The model, the settings and where they stand against the history, into a project folder."""
-    (work / ".kimcad").mkdir(parents=True, exist_ok=True)
-    B._model.write(str(work / ".kimcad" / "working.ifc"))
-    (work / ".kimcad" / "settings.json").write_bytes(S.to_bytes())
+    (work / ".kimbim").mkdir(parents=True, exist_ok=True)
+    B._model.write(str(work / ".kimbim" / "working.ifc"))
+    (work / ".kimbim" / "settings.json").write_bytes(S.to_bytes())
     project = V._project
-    (work / ".kimcad" / "working.json").write_text(json.dumps({
+    (work / ".kimbim" / "working.json").write_text(json.dumps({
         "head": project.repo.head() if project else None,
         "option": project.current_branch() if project else "",
         "unversioned": V._unversioned()}))
@@ -1532,8 +1532,8 @@ def _first_message(message: str) -> str:
 
 def _make_history(work: pathlib.Path, message: str) -> None:
     """A history for a model that has none (plain, untitled, a template): one first version."""
-    working = work / ".kimcad" / "working.ifc"
-    (work / ".kimcad").mkdir(parents=True, exist_ok=True)
+    working = work / ".kimbim" / "working.ifc"
+    (work / ".kimbim").mkdir(parents=True, exist_ok=True)
     B._model.write(str(working))
     project = Project.init(work)
     project.commit(working, _first_message(message), settings=S.to_bytes())
@@ -1550,7 +1550,7 @@ def _switch_to(doc: dict, work: pathlib.Path) -> None:
         shutil.rmtree(old["work"], ignore_errors=True)
     _doc = doc
     V._project = Project.open(work) if (work / ".git" / "HEAD").is_file() else None
-    B._path = str(work / ".kimcad" / "working.ifc")
+    B._path = str(work / ".kimbim" / "working.ifc")
     S.kept = True
 
 
@@ -1579,7 +1579,7 @@ def save_as_kim(path: str, message: str = "") -> str:
             V.mark_versioned(unversioned=True)
         _write_files(work)
         K.pack(work, kim)
-    except (KimcadError, K.KimError, OSError) as ex:
+    except (KimbimError, K.KimError, OSError) as ex:
         K.release(lock)
         return _fail(str(ex))
     _saved()
@@ -1592,7 +1592,7 @@ def save_as_folder(folder: str, message: str = "") -> str:
     path = pathlib.Path(folder)
     if path.exists() and any(path.iterdir()):
         return _fail("choose an empty or new folder for the project")
-    lock = path / ".kimcad" / "lock"
+    lock = path / ".kimbim" / "lock"
     try:
         if _doc["work"] and not _doc["read_only"] and _doc["mode"] != "plain":
             shutil.copytree(_doc["work"], path, ignore=_skip, dirs_exist_ok=True)
@@ -1607,7 +1607,7 @@ def save_as_folder(folder: str, message: str = "") -> str:
         if unversioned:
             V.mark_versioned(unversioned=True)
         _write_files(path)
-    except (KimcadError, OSError) as ex:
+    except (KimbimError, OSError) as ex:
         return _fail(str(ex))
     _saved()
     return B._dump({"ok": True, "path": str(path)})
@@ -1632,7 +1632,7 @@ restore it: a project carried over keeps its "not versioned yet" state.
 
 - [ ] **Step 5: Hook it into the bridge and versioning**
 
-`python/kimcad/app_bridge.py`, end of `_reset_history` (replacing Task 1's settings reset):
+`python/kimbim/app_bridge.py`, end of `_reset_history` (replacing Task 1's settings reset):
 
 ```python
     from . import documents, settings
@@ -1660,7 +1660,7 @@ from .documents import (  # noqa: E402,F401
 )
 ```
 
-`python/kimcad/versioning.py` `project_state()`: add `**documents.state_fields()` to both results
+`python/kimbim/versioning.py` `project_state()`: add `**documents.state_fields()` to both results
 (`from . import documents` inside the function, to avoid an import cycle).
 
 - [ ] **Step 6: Run the tests**
@@ -1671,7 +1671,7 @@ Expected: all pass.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add python/kimcad/documents.py python/kimcad/app_bridge.py python/kimcad/project.py python/kimcad/versioning.py tests/python/test_documents.py
+git add python/kimbim/documents.py python/kimbim/app_bridge.py python/kimbim/project.py python/kimbim/versioning.py tests/python/test_documents.py
 git commit -m "feat(documents): open, save and close .kim files, project folders and IFC (locks, read-only, import beside)"
 ```
 
@@ -1680,13 +1680,13 @@ git commit -m "feat(documents): open, save and close .kim files, project folders
 ### Task 6: Recovery copies and templates
 
 **Files:**
-- Modify: `python/kimcad/documents.py`, `python/kimcad/app_bridge.py` (re-exports)
+- Modify: `python/kimbim/documents.py`, `python/kimbim/app_bridge.py` (re-exports)
 - Test: `tests/python/test_documents.py` (append)
 
 **Interfaces:**
 - Consumes: Task 5 `data_dir`, `_doc`, `_pending`, `open_kim`, `open_folder`, `on_model_opened`, `_read`, `_plain`, `_same`; Task 3 `K.pack/K.unpack/K.read_manifest`.
 - Produces (bridge): `write_recovery() -> {"ok", "written": bool}`, `recoveries() -> {"items": [{"id", "source", "name", "mode", "time"}]}`, `recover(id) -> {"ok", "path"}`, `discard_recovery(id) -> {"ok"}`, `templates(folder) -> {"templates": [{"name", "path", "builtin", "modified"}], "folder_ok": bool}`, `new_from_template(path) -> {"ok", "path"}` (`path` "" for the built-in: the model is already open), `save_template(folder, name, replace="") -> {"ok", "path"} | {"ok": False, "exists": True}`.
-- Produces (Python): `documents.BUILTIN = "builtin"`, `documents.BUILTIN_NAME = "KIMCAD default"`, `documents.regenerate_ids(f) -> dict[str, str]`.
+- Produces (Python): `documents.BUILTIN = "builtin"`, `documents.BUILTIN_NAME = "KimBim default"`, `documents.regenerate_ids(f) -> dict[str, str]`.
 
 Rulings carried by this task:
 - The recovery copy is written on the GUI thread (a full IFC write: about 1 s on the Clinic, every 5
@@ -1741,7 +1741,7 @@ def test_nothing_is_written_without_unsaved_work(tmp_path):
 def test_templates_list_save_and_make_new_projects(tmp_path):
     folder = tmp_path / "Plantillas"
     assert call("templates", str(folder)) == {"templates": [
-        {"name": "KIMCAD default", "path": "builtin", "builtin": True, "modified": ""}], "folder_ok": False}
+        {"name": "KimBim default", "path": "builtin", "builtin": True, "modified": ""}], "folder_ok": False}
     house()
     assert call("set_project_info", json.dumps({"number": "2026-001", "name": "Casa"}))["ok"]
     sheet = call("add_sheet", "A1", "Plantas")["number"]
@@ -1756,7 +1756,7 @@ def test_templates_list_save_and_make_new_projects(tmp_path):
     assert call("save_template", str(folder), "Oficina", "1")["ok"]
     assert not call("save_template", str(folder), "a/b")["ok"]
     listed = call("templates", str(folder))
-    assert listed["folder_ok"] and [t["name"] for t in listed["templates"]] == ["KIMCAD default", "Oficina"]
+    assert listed["folder_ok"] and [t["name"] for t in listed["templates"]] == ["KimBim default", "Oficina"]
 
     r = call("new_from_template", str(folder / "Oficina.kim"))
     assert r["ok"], r
@@ -1775,7 +1775,7 @@ def test_templates_list_save_and_make_new_projects(tmp_path):
 def test_the_built_in_template_is_a_new_project():
     r = call("new_from_template", "builtin")
     assert r["ok"] and r["path"] == ""
-    assert call("storeys")["storeys"] and call("document_state")["template"] == "KIMCAD default"
+    assert call("storeys")["storeys"] and call("document_state")["template"] == "KimBim default"
 
 
 def test_an_opened_template_saves_back_as_a_template(tmp_path):
@@ -1792,7 +1792,7 @@ def test_an_opened_template_saves_back_as_a_template(tmp_path):
 - [ ] **Step 2: Run them to see them fail**
 
 Run: `pixi run pytest tests/python/test_documents.py -q -k "recover or template or nothing_is_written"`
-Expected: FAIL — `AttributeError: module 'kimcad.app_bridge' has no attribute 'write_recovery'`.
+Expected: FAIL — `AttributeError: module 'kimbim.app_bridge' has no attribute 'write_recovery'`.
 
 - [ ] **Step 3: Implement recovery** — replace the `_clear_recovery` stub in `documents.py`; add the
 imports `re`, `time`, `uuid`, `ifcopenshell`, `ifcopenshell.guid` at the top:
@@ -1880,7 +1880,7 @@ def recover(id: str) -> str:
 
 ```python
 BUILTIN = "builtin"
-BUILTIN_NAME = "KIMCAD default"
+BUILTIN_NAME = "KimBim default"
 _GUID = re.compile(r"[0-9A-Za-z_$]{22}")
 _BAD_NAME = re.compile(r'[\\/:*?"<>|]')
 
@@ -1911,9 +1911,9 @@ def save_template(folder: str, name: str, replace: str = "") -> str:
         return _fail(f"a template called {name} exists", exists=True)
     tmp = data_dir() / "tmp" / uuid.uuid4().hex
     try:
-        (tmp / ".kimcad").mkdir(parents=True)
-        B._model.write(str(tmp / ".kimcad" / "working.ifc"))
-        (tmp / ".kimcad" / "settings.json").write_bytes(S.to_bytes())
+        (tmp / ".kimbim").mkdir(parents=True)
+        B._model.write(str(tmp / ".kimbim" / "working.ifc"))
+        (tmp / ".kimbim" / "settings.json").write_bytes(S.to_bytes())
         target.parent.mkdir(parents=True, exist_ok=True)
         K.pack(tmp, target, "template")
     except (K.KimError, OSError) as ex:
@@ -1965,14 +1965,14 @@ def new_from_template(path: str) -> str:
         if K.read_manifest(kim).get("kind") != "template":
             return _fail(f"{kim.name} is not a template")
         K.unpack(kim, tmp)
-        f = ifcopenshell.open(str(tmp / ".kimcad" / "working.ifc"))
+        f = ifcopenshell.open(str(tmp / ".kimbim" / "working.ifc"))
         regenerate_ids(f)
         for project in f.by_type("IfcProject"):
             project.Name, project.LongName = None, None
         target = data_dir() / "open" / f"new-{uuid.uuid4().hex[:8]}.ifc"
         target.parent.mkdir(parents=True, exist_ok=True)
         f.write(str(target))
-        settings = S.from_bytes(_read(tmp / ".kimcad" / "settings.json"))
+        settings = S.from_bytes(_read(tmp / ".kimbim" / "settings.json"))
     except (K.KimError, OSError, RuntimeError) as ex:
         return _fail(str(ex))
     finally:
@@ -1994,7 +1994,7 @@ Expected: all pass.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add python/kimcad/documents.py python/kimcad/app_bridge.py python/kimcad/sheets.py tests/python/test_documents.py
+git add python/kimbim/documents.py python/kimbim/app_bridge.py python/kimbim/sheets.py tests/python/test_documents.py
 git commit -m "feat(documents): recovery copies and office templates (new ids, built-in default, save as template)"
 ```
 
@@ -2004,14 +2004,14 @@ git commit -m "feat(documents): recovery copies and office templates (new ids, b
 
 **Files:**
 - Create: `app/src/Preferences.h`, `app/src/Preferences.cpp`
-- Modify: `app/CMakeLists.txt` (sources; `kimcad_test(test_preferences)`)
+- Modify: `app/CMakeLists.txt` (sources; `kimbim_test(test_preferences)`)
 - Test: `app/tests/test_preferences.cpp`
 
 **Interfaces:**
 - Produces:
 
 ```cpp
-namespace kimcad {
+namespace kimbim {
 // User preferences, per computer (D72): a readable preferences.json in the user's settings folder.
 class Preferences {
 public:
@@ -2061,7 +2061,7 @@ private slots:
     void defaultsWhenThereIsNoFile()
     {
         QTemporaryDir tmp;
-        kimcad::Preferences p(tmp.filePath("preferences.json"));
+        kimbim::Preferences p(tmp.filePath("preferences.json"));
         QVERIFY(p.load());
         QCOMPARE(p.language(), QString("auto"));
         QCOMPARE(p.newViews(), QString("tab"));
@@ -2069,7 +2069,7 @@ private slots:
         QCOMPARE(p.autoVersion(), QString("off"));
         QCOMPARE(p.autoVersionEvery(), 10);
         QCOMPARE(p.recoveryMinutes(), 5);
-        QVERIFY(p.templatesFolder().endsWith(QStringLiteral("KIMCAD Templates")));
+        QVERIFY(p.templatesFolder().endsWith(QStringLiteral("KimBim Templates")));
         QVERIFY(p.recent().isEmpty());
     }
 
@@ -2078,16 +2078,16 @@ private slots:
         QTemporaryDir tmp;
         const QString path = tmp.filePath("sub/preferences.json");
         {
-            kimcad::Preferences p(path);
+            kimbim::Preferences p(path);
             p.setValue("new_views", "window");
-            p.setValue("from_a_newer_kimcad", 42);
+            p.setValue("from_a_newer_kimbim", 42);
             p.setLayout(QByteArray("\x01\x02layout", 8));
             QVERIFY(p.save());
         }
-        kimcad::Preferences q(path);
+        kimbim::Preferences q(path);
         QVERIFY(q.load());
         QCOMPARE(q.newViews(), QString("window"));
-        QCOMPARE(q.value("from_a_newer_kimcad").toInt(), 42);
+        QCOMPARE(q.value("from_a_newer_kimbim").toInt(), 42);
         QCOMPARE(q.layout(), QByteArray("\x01\x02layout", 8));
         QVERIFY(QFile(path).readAll().isEmpty() || true);
     }
@@ -2100,7 +2100,7 @@ private slots:
         QVERIFY(f.open(QIODevice::WriteOnly));
         f.write("{ not json");
         f.close();
-        kimcad::Preferences p(path);
+        kimbim::Preferences p(path);
         QVERIFY(!p.load());
         QCOMPARE(p.newViews(), QString("tab"));
         QVERIFY(QFile::exists(path + ".bad"));
@@ -2108,7 +2108,7 @@ private slots:
 
     void recentFilesAreMostRecentFirstWithoutDuplicates()
     {
-        kimcad::Preferences p;
+        kimbim::Preferences p;
         for (int i = 0; i < 12; ++i)
             p.addRecent(QStringLiteral("C:/p/%1.kim").arg(i));
         p.addRecent("C:/p/5.kim");
@@ -2121,7 +2121,7 @@ private slots:
 
     void badValuesFallBackToDefaults()
     {
-        kimcad::Preferences p;
+        kimbim::Preferences p;
         p.setValue("new_views", "sideways");
         p.setValue("recovery_minutes", -3);
         p.setValue("auto_version_every", "lots");
@@ -2137,8 +2137,8 @@ QTEST_MAIN(TestPreferences)
 
 - [ ] **Step 2: Add the test target and see it fail**
 
-In `app/CMakeLists.txt`: add `src/Preferences.cpp src/Preferences.h` to `kimcad_core` and
-`kimcad_test(test_preferences)` after `kimcad_test(test_tool_palette)`.
+In `app/CMakeLists.txt`: add `src/Preferences.cpp src/Preferences.h` to `kimbim_core` and
+`kimbim_test(test_preferences)` after `kimbim_test(test_tool_palette)`.
 
 Run: `pixi run app-build` (then `ctest --test-dir build/app -R test_preferences --output-on-failure`)
 Expected: build FAIL — `Preferences.h: No such file or directory`.
@@ -2158,7 +2158,7 @@ Expected: build FAIL — `Preferences.h: No such file or directory`.
 #include <QSaveFile>
 #include <QStandardPaths>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 const QStringList kViews{QStringLiteral("tab"), QStringLiteral("window")};
@@ -2188,7 +2188,7 @@ QJsonObject Preferences::defaults()
     const QString docs = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
     return {
         {"language", "auto"},
-        {"templates_folder", QDir(docs).filePath(QStringLiteral("KIMCAD Templates"))},
+        {"templates_folder", QDir(docs).filePath(QStringLiteral("KimBim Templates"))},
         {"author_name", ""},
         {"author_email", ""},
         {"new_views", "tab"},
@@ -2296,7 +2296,7 @@ void Preferences::setLayout(const QByteArray& state)
     setValue("layout", QString::fromLatin1(state.toBase64()));
 }
 
-} // namespace kimcad
+} // namespace kimbim
 ```
 
 - [ ] **Step 4: Run it**
@@ -2332,7 +2332,7 @@ git commit -m "feat(app): user preferences in preferences.json (defaults, unknow
     void aNewViewOpensRightAfterTheCurrentTab()
     {
         QMainWindow w;
-        kimcad::DockLayout layout(&w);
+        kimbim::DockLayout layout(&w);
         layout.addView("3d", "3D", new QLabel, false);
         layout.addView("plan:A", "A", new QLabel, true);
         layout.addView("D1", "Section", new QLabel, true);
@@ -2349,9 +2349,9 @@ git commit -m "feat(app): user preferences in preferences.json (defaults, unknow
     {
         QMainWindow w;
         w.resize(1000, 800);
-        kimcad::DockLayout layout(&w);
+        kimbim::DockLayout layout(&w);
         layout.addView("3d", "3D", new QLabel, false);
-        ads::CDockWidget* dock = layout.addView("S1", "Sheet", new QLabel, true, kimcad::DockLayout::Placement::Floating);
+        ads::CDockWidget* dock = layout.addView("S1", "Sheet", new QLabel, true, kimbim::DockLayout::Placement::Floating);
         QVERIFY(dock->isFloating());
         QCOMPARE(layout.view("S1") != nullptr, true);
         QVERIFY(std::abs(dock->dockContainer()->window()->width() - 700) <= 50);
@@ -2365,11 +2365,11 @@ git commit -m "feat(app): user preferences in preferences.json (defaults, unknow
     // D72: new views follow the "new_views" preference.
     void newViewsFollowThePreference()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
-        QCOMPARE(w.newViewPlacement(), kimcad::DockLayout::Placement::AfterCurrent);
+        QCOMPARE(w.newViewPlacement(), kimbim::DockLayout::Placement::AfterCurrent);
         w.preferences().setValue("new_views", "window");
-        QCOMPARE(w.newViewPlacement(), kimcad::DockLayout::Placement::Floating);
+        QCOMPARE(w.newViewPlacement(), kimbim::DockLayout::Placement::Floating);
         w.openPlanTab(w.levelsBar()->activeStorey());
         const QString key = QStringLiteral("plan:") + w.levelsBar()->activeStorey();
         QVERIFY(w.dockLayout()->manager()->findDockWidget(key)->isFloating());
@@ -2380,7 +2380,7 @@ git commit -m "feat(app): user preferences in preferences.json (defaults, unknow
 - [ ] **Step 2: Run them to see them fail**
 
 Run: `pixi run app-build`
-Expected: build FAIL — `'Placement' is not a member of 'kimcad::DockLayout'`.
+Expected: build FAIL — `'Placement' is not a member of 'kimbim::DockLayout'`.
 
 - [ ] **Step 3: Implement**
 
@@ -2450,7 +2450,7 @@ git commit -m "feat(app): new views open right after the current tab, or as a fr
 ### Task 9: The File menu works on `.kim` files
 
 **Files:**
-- Modify: `python/kimcad/documents.py` (`save_as_ifc`), `python/kimcad/app_bridge.py` (re-export)
+- Modify: `python/kimbim/documents.py` (`save_as_ifc`), `python/kimbim/app_bridge.py` (re-export)
 - Modify: `app/src/MainWindow.h/.cpp` (menu, open/save/close, recent files, read-only, title, guards, layout in preferences)
 - Modify: `app/src/main.cpp` (`openFile` of a command-line argument goes through `openPath`)
 - Test: `tests/python/test_documents.py`, `app/tests/test_main_window.cpp`
@@ -2493,13 +2493,13 @@ C++ (`test_main_window.cpp`; add `#include <QStandardPaths>` and in an `initTest
         QTemporaryDir tmp;
         const QString kim = tmp.filePath(QStringLiteral("Casa ñ.kim"));
         {
-            kimcad::MainWindow w(nullptr, /*quiet=*/true);
+            kimbim::MainWindow w(nullptr, /*quiet=*/true);
             QVERIFY(w.newProject());
-            w.setTool(kimcad::MainWindow::Tool::Wall);
+            w.setTool(kimbim::MainWindow::Tool::Wall);
             w.wallTool()->click({0, 0});
             w.wallTool()->click({5, 0});
             w.wallTool()->finish();
-            w.setTool(kimcad::MainWindow::Tool::None);
+            w.setTool(kimbim::MainWindow::Tool::None);
             QVERIFY(w.saveAs(kim));
             QVERIFY(QFile::exists(kim) && QFile::exists(kim + ".lock"));
             QVERIFY(w.windowTitle().contains(QStringLiteral("Casa ñ.kim")));
@@ -2514,8 +2514,8 @@ C++ (`test_main_window.cpp`; add `#include <QStandardPaths>` and in an `initTest
             QVERIFY(w.close());
         }
         QVERIFY(!QFile::exists(kim + ".lock"));
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
-        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
+        QSignalSpy loaded(&w, &kimbim::MainWindow::loadFinished);
         QVERIFY(w.openPath(kim));
         QVERIFY(loaded.wait(60000));
         QCOMPARE(w.viewport()->elementCount(), 1);
@@ -2530,13 +2530,13 @@ C++ (`test_main_window.cpp`; add `#include <QStandardPaths>` and in an `initTest
         QTemporaryDir tmp;
         const QString ifc = tmp.filePath(QStringLiteral("House.ifc"));
         {
-            kimcad::MainWindow w(nullptr, /*quiet=*/true);
+            kimbim::MainWindow w(nullptr, /*quiet=*/true);
             QVERIFY(w.newProject());
             QVERIFY(w.exportIfc(ifc));
             QVERIFY(w.close());
         }
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
-        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
+        QSignalSpy loaded(&w, &kimbim::MainWindow::loadFinished);
         QVERIFY(w.openPath(ifc));
         QVERIFY(loaded.wait(60000));
         QVERIFY(QFile::exists(tmp.filePath(QStringLiteral("House.kim"))));
@@ -2555,7 +2555,7 @@ C++ (`test_main_window.cpp`; add `#include <QStandardPaths>` and in an `initTest
         QTemporaryDir tmp;
         const QString kim = tmp.filePath(QStringLiteral("a.kim"));
         {
-            kimcad::MainWindow w(nullptr, /*quiet=*/true);
+            kimbim::MainWindow w(nullptr, /*quiet=*/true);
             QVERIFY(w.newProject());
             QVERIFY(w.saveAs(kim));
             QVERIFY(w.close());
@@ -2564,8 +2564,8 @@ C++ (`test_main_window.cpp`; add `#include <QStandardPaths>` and in an `initTest
         QVERIFY(lock.open(QIODevice::WriteOnly));
         lock.write(R"({"user": "Ana", "account": "ana", "machine": "OTHER-PC", "pid": 4, "since": "2026-10-08T10:42"})");
         lock.close();
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
-        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
+        QSignalSpy loaded(&w, &kimbim::MainWindow::loadFinished);
         QVERIFY(w.openPath(kim));
         QVERIFY(loaded.wait(60000));
         QVERIFY(w.documentState().value("read_only").toBool());
@@ -2810,8 +2810,8 @@ void MainWindow::fillRecentMenu()
 }
 ```
 
-`openDialog`: `QFileDialog::getOpenFileName(this, tr("Open"), QString(), tr("KIMCAD and IFC files (*.kim *.ifc);;KIMCAD projects (*.kim);;IFC files (*.ifc)"))` then `openPath(path)`.
-`openProjectDialog`: `getExistingDirectory(this, tr("Open a KIMCAD project folder"))` then `openProject(folder)`.
+`openDialog`: `QFileDialog::getOpenFileName(this, tr("Open"), QString(), tr("KimBim and IFC files (*.kim *.ifc);;KimBim projects (*.kim);;IFC files (*.ifc)"))` then `openPath(path)`.
+`openProjectDialog`: `getExistingDirectory(this, tr("Open a KimBim project folder"))` then `openProject(folder)`.
 `main.cpp`: `window.openPath(parser.positionalArguments().first());`.
 
 Saving:
@@ -2885,7 +2885,7 @@ void MainWindow::saveAsDialog()
 {
     QString selected;
     const QString path = QFileDialog::getSaveFileName(this, tr("Save As"), m_document.value("path").toString(),
-        tr("KIMCAD project (*.kim);;IFC file (*.ifc)"), &selected);
+        tr("KimBim project (*.kim);;IFC file (*.ifc)"), &selected);
     if (!path.isEmpty())
         saveAs(path);
 }
@@ -2942,7 +2942,7 @@ then, when `documentState()` mode is `kim`, `bridge("save_document")` so the fil
         name += QStringLiteral(" (%1)").arg(option);
     if (doc.value("read_only").toBool())
         name += QStringLiteral(" [%1]").arg(tr("read-only"));
-    setWindowTitle(QStringLiteral("KIMCAD — %1[*]").arg(name));
+    setWindowTitle(QStringLiteral("KimBim — %1[*]").arg(name));
     setWindowModified(isDirty());
 ```
 
@@ -2961,7 +2961,7 @@ Expected: all pass (36 + new).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add python/kimcad/documents.py python/kimcad/app_bridge.py app/src/MainWindow.h app/src/MainWindow.cpp app/src/main.cpp app/tests/test_main_window.cpp tests/python/test_documents.py
+git add python/kimbim/documents.py python/kimbim/app_bridge.py app/src/MainWindow.h app/src/MainWindow.cpp app/src/main.cpp app/tests/test_main_window.cpp tests/python/test_documents.py
 git commit -m "feat(app): File menu on .kim files: open (.kim/.ifc/folder), save, save as, export IFC, recent files, read-only"
 ```
 
@@ -2988,7 +2988,7 @@ git commit -m "feat(app): File menu on .kim files: open (.kim/.ifc/folder), save
         QTemporaryDir tmp;
         const QString kim = tmp.filePath(QStringLiteral("ajustes.kim"));
         {
-            kimcad::MainWindow w(nullptr, /*quiet=*/true);
+            kimbim::MainWindow w(nullptr, /*quiet=*/true);
             QVERIFY(w.newProject());
             QVERIFY(w.createLayer(QStringLiteral("A-WALL")));
             QVERIFY(w.setProjectSettings({{"plan_cut_height", 1.0}, {"sheet_paper", "A3"}, {"drawing_scale", 50},
@@ -3000,8 +3000,8 @@ git commit -m "feat(app): File menu on .kim files: open (.kim/.ifc/folder), save
             QVERIFY(w.saveAs(kim));
             QVERIFY(w.close());
         }
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
-        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
+        QSignalSpy loaded(&w, &kimbim::MainWindow::loadFinished);
         QVERIFY(w.openPath(kim));
         QVERIFY(loaded.wait(60000));
         QCOMPARE(w.planCutHeight(), 1.0);
@@ -3015,7 +3015,7 @@ git commit -m "feat(app): File menu on .kim files: open (.kim/.ifc/folder), save
 
     void projectSettingsDialogReportsOnlyChanges()
     {
-        kimcad::ProjectSettingsDialog d({{"plan_cut_height", 1.2}, {"drawing_scale", 100}, {"sheet_paper", "A1"},
+        kimbim::ProjectSettingsDialog d({{"plan_cut_height", 1.2}, {"drawing_scale", 100}, {"sheet_paper", "A1"},
                                          {"length_unit", "m"}, {"length_decimals", 2}}, /*kept=*/false, nullptr);
         QVERIFY(d.findChild<QLabel*>("notKeptNote")->isVisibleTo(&d));
         d.findChild<QComboBox*>("sheetPaper")->setCurrentText("A3");
@@ -3139,8 +3139,8 @@ git commit -m "feat(app): project settings applied on open and kept in the .kim 
 ```cpp
     void theDialogWritesWhatTheUserPicked()
     {
-        kimcad::Preferences p;
-        kimcad::PreferencesDialog d(p, nullptr);
+        kimbim::Preferences p;
+        kimbim::PreferencesDialog d(p, nullptr);
         QVERIFY(!d.findChild<QLabel*>("restartNote")->isVisibleTo(&d));
         d.findChild<QComboBox*>("language")->setCurrentIndex(2); // auto, en, es
         QVERIFY(d.findChild<QLabel*>("restartNote")->isVisibleTo(&d));
@@ -3170,13 +3170,13 @@ git commit -m "feat(app): project settings applied on open and kept in the .kim 
     void automaticVersionsEveryNSaves()
     {
         QTemporaryDir tmp;
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->click({0, 0});
         w.wallTool()->click({5, 0});
         w.wallTool()->finish();
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QVERIFY(w.saveAs(tmp.filePath(QStringLiteral("auto.kim"))));
         w.preferences().setValue("auto_version", "saves");
         w.preferences().setValue("auto_version_every", 2);
@@ -3196,23 +3196,23 @@ git commit -m "feat(app): project settings applied on open and kept in the .kim 
     {
         QString wall;
         {
-            kimcad::MainWindow w(nullptr, /*quiet=*/true);
+            kimbim::MainWindow w(nullptr, /*quiet=*/true);
             QVERIFY(w.newProject());
-            w.setTool(kimcad::MainWindow::Tool::Wall);
+            w.setTool(kimbim::MainWindow::Tool::Wall);
             w.wallTool()->click({0, 0});
             w.wallTool()->click({5, 0});
             w.wallTool()->finish();
-            w.setTool(kimcad::MainWindow::Tool::None);
+            w.setTool(kimbim::MainWindow::Tool::None);
             wall = w.viewport()->guids().first();
             QVERIFY(w.writeRecovery());
             // A crash: the model goes away without the window closing (no close_document).
             QString error;
-            kimcad::PythonEngine::instance().callJson("new_project", {QStringLiteral("x")}, &error);
+            kimbim::PythonEngine::instance().callJson("new_project", {QStringLiteral("x")}, &error);
         } // destroyed without close()
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         const QJsonArray items = w.recoveries();
         QVERIFY(!items.isEmpty());
-        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        QSignalSpy loaded(&w, &kimbim::MainWindow::loadFinished);
         QVERIFY(w.recoverFrom(items.first().toObject().value("id").toString()));
         QVERIFY(loaded.wait(60000));
         QVERIFY(w.viewport()->guids().contains(wall));
@@ -3233,7 +3233,7 @@ Run: `pixi run app-build` → FAIL (`PreferencesDialog`, `writeRecovery` unknown
 
 `PreferencesDialog`: a `QFormLayout`:
 - Language: combo "Automatic (system)", "English", "Español" (data auto/en/es); `restartNote` label
-  "The language changes the next time KIMCAD starts." visible when the choice differs from the stored one.
+  "The language changes the next time KimBim starts." visible when the choice differs from the stored one.
 - Templates folder: `QLineEdit` + "Browse..." (`QFileDialog::getExistingDirectory`).
 - Your name / email (for versions): two `QLineEdit`s.
 - New views open as: "Tabs" / "Free windows" (tab/window).
@@ -3292,7 +3292,7 @@ void MainWindow::offerRecovery()
         const QString what = item.value("name").toString().isEmpty() ? tr("an untitled project") : item.value("name").toString();
         const QString when = QLocale().toString(QDateTime::fromSecsSinceEpoch(qint64(item.value("time").toDouble())), QLocale::ShortFormat);
         const auto answer = QMessageBox::question(this, tr("Recover unsaved work"),
-            tr("KIMCAD closed unexpectedly. Recover your work on %1 from %2?").arg(what, when),
+            tr("KimBim closed unexpectedly. Recover your work on %1 from %2?").arg(what, when),
             QMessageBox::Yes | QMessageBox::Discard, QMessageBox::Yes);
         if (answer == QMessageBox::Yes)
             return void(recoverFrom(item.value("id").toString()));
@@ -3308,13 +3308,13 @@ and `restartRecoveryTimer()` at the end of the constructor. Edit menu: `Edit ›
 `main.cpp`:
 
 ```cpp
-    kimcad::Preferences prefs(kimcad::Preferences::defaultPath());
+    kimbim::Preferences prefs(kimbim::Preferences::defaultPath());
     prefs.load();
     const QString language = parser.isSet(lang) ? parser.value(lang)
         : prefs.language() == QLatin1String("auto") ? QString() : prefs.language();
-    kimcad::installTranslator(app, kimcad::pickLanguage(language));
+    kimbim::installTranslator(app, kimbim::pickLanguage(language));
     ...
-    kimcad::MainWindow window;
+    kimbim::MainWindow window;
     window.show();
     if (!parser.positionalArguments().isEmpty())
         window.openPath(parser.positionalArguments().first());
@@ -3330,7 +3330,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/src/PreferencesDialog.h app/src/PreferencesDialog.cpp app/src/MainWindow.h app/src/MainWindow.cpp app/src/main.cpp app/CMakeLists.txt app/tests/test_preferences.cpp app/tests/test_main_window.cpp python/kimcad/documents.py
+git add app/src/PreferencesDialog.h app/src/PreferencesDialog.cpp app/src/MainWindow.h app/src/MainWindow.cpp app/src/main.cpp app/CMakeLists.txt app/tests/test_preferences.cpp app/tests/test_main_window.cpp python/kimbim/documents.py
 git commit -m "feat(app): preferences dialog (language, author, new views, IFC opening, automatic versions, recovery)"
 ```
 
@@ -3353,14 +3353,14 @@ git commit -m "feat(app): preferences dialog (language, author, new views, IFC o
     void projectsStartFromOfficeTemplates()
     {
         QTemporaryDir tmp;
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         w.preferences().setValue("templates_folder", tmp.filePath(QStringLiteral("Plantillas")));
         QVERIFY(w.newProject());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->click({0, 0});
         w.wallTool()->click({5, 0});
         w.wallTool()->finish();
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         const QString original = w.viewport()->guids().first();
         QVERIFY(w.saveAsTemplate(QStringLiteral("Oficina")));
         QVERIFY(!w.saveAsTemplate(QStringLiteral("Oficina"))); // exists; quiet mode doesn't replace
@@ -3368,7 +3368,7 @@ git commit -m "feat(app): preferences dialog (language, author, new views, IFC o
         const QString path = tmp.filePath(QStringLiteral("Plantillas/Oficina.kim"));
         QVERIFY(QFile::exists(path));
 
-        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        QSignalSpy loaded(&w, &kimbim::MainWindow::loadFinished);
         QVERIFY(w.newFromTemplate(path));
         QVERIFY(loaded.wait(60000));
         QCOMPARE(w.viewport()->elementCount(), 1);
@@ -3427,7 +3427,7 @@ void MainWindow::newProjectDialog()
     choices->setObjectName(QStringLiteral("templateList"));
     for (const auto& v : list) {
         const QJsonObject t = v.toObject();
-        auto* item = new QListWidgetItem(t.value("builtin").toBool() ? tr("KIMCAD default")
+        auto* item = new QListWidgetItem(t.value("builtin").toBool() ? tr("KimBim default")
             : QStringLiteral("%1  (%2)").arg(t.value("name").toString(), t.value("modified").toString()), choices);
         item->setData(Qt::UserRole, t.value("path").toString());
     }
@@ -3489,7 +3489,7 @@ git commit -m "feat(app): office templates: New project lists them, Save as temp
 ### Task 13: Docs, translations, decision
 
 **Files:**
-- Modify: `docs/decisions.md` (D72; D56 note), `docs/03-versioning.md` (project modes), `docs/04-app-features.md`, `docs/13-architect-feedback.md`, `app/translations/kimcad_es.ts`, `app/translations/kimcad_en.ts`
+- Modify: `docs/decisions.md` (D72; D56 note), `docs/03-versioning.md` (project modes), `docs/04-app-features.md`, `docs/13-architect-feedback.md`, `app/translations/kimbim_es.ts`, `app/translations/kimbim_en.ts`
 
 - [ ] **Step 1: D72** — one row in `docs/decisions.md`:
 
@@ -3506,7 +3506,7 @@ plus the A1-sheet fix.
 
 Run: `pixi run app-build` (lupdate runs with the build; if not, run the `update_translations` target:
 `cmake --build build/app --target update_translations`). Then fill every new `unfinished` entry in
-`kimcad_es.ts` with Spanish (e.g. "Save as &template..." → "Guardar como &plantilla...", "Recent files"
+`kimbim_es.ts` with Spanish (e.g. "Save as &template..." → "Guardar como &plantilla...", "Recent files"
 → "Archivos recientes", "read-only" → "solo lectura", "Untitled" → "Sin título", "Automatic version"
 → "Versión automática", "Project se&ttings..." → "&Configuración del proyecto...", "Preferences..."
 → "Preferencias...").

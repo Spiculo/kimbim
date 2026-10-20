@@ -8,7 +8,7 @@ class QAction;
 class QComboBox;
 class QToolButton;
 
-namespace kimcad {
+namespace kimbim {
 
 // The active level (IfcBuildingStorey) for drawing and plan views. D75: "Add level..." and "New
 // model..." are in the drop-down beside it (and in the Model menu), not buttons of their own; D79:
@@ -53,4 +53,4 @@ private:
     bool m_filling = false;
 };
 
-} // namespace kimcad
+} // namespace kimbim

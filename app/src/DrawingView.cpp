@@ -15,7 +15,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace kimcad {
+namespace kimbim {
 
 DrawingView::DrawingView(const QString& guid, QWidget* parent)
     : QWidget(parent)
@@ -200,4 +200,4 @@ void DrawingView::resizeEvent(QResizeEvent*)
         fit();
 }
 
-} // namespace kimcad
+} // namespace kimbim

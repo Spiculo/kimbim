@@ -13,7 +13,7 @@ class QLabel;
 class QPushButton;
 class QSvgRenderer;
 
-namespace kimcad {
+namespace kimbim {
 
 // One drawing in a tab (Slice 14): the generated SVG, wheel zoom at the cursor, middle-drag pan,
 // fit; an "out of date" bar with Regenerate while the model has changed since it was generated.
@@ -79,4 +79,4 @@ private:
     QPointF m_dragStart;     // widget position where the drag started
 };
 
-} // namespace kimcad
+} // namespace kimbim

@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** `kimcad-app`, a native Qt 6 desktop application for Windows and Linux in English and Spanish. It opens an IFC file, shows it progressively in an OCCT 3D viewport that stays interactive at 100k elements, and offers a model tree, a properties panel, two-way selection, hide/isolate, a plan cut and a section box.
+**Goal:** `kimbim-app`, a native Qt 6 desktop application for Windows and Linux in English and Spanish. It opens an IFC file, shows it progressively in an OCCT 3D viewport that stays interactive at 100k elements, and offers a model tree, a properties panel, two-way selection, hide/isolate, a plan cut and a section box.
 
 **Architecture:**
 - **C++ Qt 6 application** (`app/`) built with CMake from the pixi environment (D04, D25).
-- **Embedded CPython** (D22) runs `kimcad.app_bridge`, which owns the IfcOpenShell model and answers JSON queries (tree, properties) plus binary mesh chunks. The C++ side never parses IFC.
+- **Embedded CPython** (D22) runs `kimbim.app_bridge`, which owns the IfcOpenShell model and answers JSON queries (tree, properties) plus binary mesh chunks. The C++ side never parses IFC.
 - **Viewport:** OCCT V3d/AIS in a native child widget, navigated through `AIS_ViewController`.
 - **Batched presentation (D42):** each `ElementBatch` AIS object draws about 1,000 elements, with one `ElementOwner` selection owner and one `Select3D_SensitivePrimitiveArray` per element. Picking, highlighting and visibility stay per element.
 - **Background loading:** meshing runs on a worker thread that holds the GIL per chunk; batches appear progressively.
@@ -43,7 +43,7 @@
 ```text
 CMakeLists.txt                      # top level: find Qt6, OpenCASCADE, Python3; add app/
 app/
-  CMakeLists.txt                    # kimcad-app executable + kimcad_core static lib + tests
+  CMakeLists.txt                    # kimbim-app executable + kimbim_core static lib + tests
   src/main.cpp                      # args (--version, --lang, --open, --self-test), translator, window
   src/MainWindow.{h,cpp}            # menus, docks, toolbar, status bar; wires everything
   src/Translations.{h,cpp}          # installTranslator(lang) -> bool
@@ -55,9 +55,9 @@ app/
   src/ModelTreePanel.{h,cpp}        # spatial tree + search filter; selection signals
   src/PropertiesPanel.{h,cpp}       # attributes + property sets of the selected element
   src/SelfTest.{h,cpp}              # --self-test: open, load, measure, print JSON, exit
-  translations/kimcad_en.ts, kimcad_es.ts
+  translations/kimbim_en.ts, kimbim_es.ts
   tests/test_translations.cpp, test_python_engine.cpp, test_mesh_chunk.cpp
-python/kimcad/app_bridge.py         # model session for the app (open, tree, properties, mesh chunks)
+python/kimbim/app_bridge.py         # model session for the app (open, tree, properties, mesh chunks)
 tests/python/test_app_bridge.py
 tools/check_translations.py         # fail on unfinished/empty Spanish translations
 ```
@@ -66,16 +66,16 @@ tools/check_translations.py         # fail on unfinished/empty Spanish translati
 
 ### Task 1: App skeleton, i18n, build tasks
 
-**Files:** create `CMakeLists.txt`, `app/CMakeLists.txt`, `app/src/main.cpp`, `app/src/MainWindow.{h,cpp}`, `app/src/Translations.{h,cpp}`, `app/translations/kimcad_{en,es}.ts`, `app/tests/test_translations.cpp`, `tools/check_translations.py`; modify `pixi.toml`, `tools/check_spdx.py` (add `app` dir and `.cpp`/`.h`), `.gitignore` (`/build/`).
+**Files:** create `CMakeLists.txt`, `app/CMakeLists.txt`, `app/src/main.cpp`, `app/src/MainWindow.{h,cpp}`, `app/src/Translations.{h,cpp}`, `app/translations/kimbim_{en,es}.ts`, `app/tests/test_translations.cpp`, `tools/check_translations.py`; modify `pixi.toml`, `tools/check_spdx.py` (add `app` dir and `.cpp`/`.h`), `.gitignore` (`/build/`).
 
 **Interfaces:**
-- `bool kimcad::installTranslator(QCoreApplication&, const QString& lang)` loads the embedded `:/i18n/kimcad_<lang>.qm`. It returns false for unknown languages, and English is the source language.
-- `kimcad-app --version` prints `KIMCAD 0.1.0` and exits 0. `--lang es|en` overrides the system locale.
+- `bool kimbim::installTranslator(QCoreApplication&, const QString& lang)` loads the embedded `:/i18n/kimbim_<lang>.qm`. It returns false for unknown languages, and English is the source language.
+- `kimbim-app --version` prints `KimBim 0.1.0` and exits 0. `--lang es|en` overrides the system locale.
 - pixi tasks:
   - `app-configure`: `cmake -S . -B build/app -G Ninja -DCMAKE_BUILD_TYPE=Release`
   - `app-build`: `cmake --build build/app`, depends on `app-configure`
   - `app-test`: `ctest --test-dir build/app --output-on-failure`, depends on `app-build`
-  - `app`: `build/app/app/kimcad-app`, depends on `app-build`, with env `KIMCAD_PYTHON_PATH=$PIXI_PROJECT_ROOT/python`
+  - `app`: `build/app/app/kimbim-app`, depends on `app-build`, with env `KIMBIM_PYTHON_PATH=$PIXI_PROJECT_ROOT/python`
   - `check-translations`
 
 - [ ] **Step 1: Failing test** `app/tests/test_translations.cpp` (Qt Test):
@@ -89,39 +89,39 @@ class TestTranslations : public QObject {
     Q_OBJECT
 private slots:
     void spanishMenusAreTranslated() {
-        QVERIFY(kimcad::installTranslator(*QCoreApplication::instance(), "es"));
+        QVERIFY(kimbim::installTranslator(*QCoreApplication::instance(), "es"));
         QCOMPARE(QCoreApplication::translate("MainWindow", "&File"), QString("&Archivo"));
         QCOMPARE(QCoreApplication::translate("MainWindow", "&Open IFC..."), QString("&Abrir IFC..."));
     }
     void unknownLanguageIsRejected() {
-        QVERIFY(!kimcad::installTranslator(*QCoreApplication::instance(), "xx"));
+        QVERIFY(!kimbim::installTranslator(*QCoreApplication::instance(), "xx"));
     }
 };
 QTEST_MAIN(TestTranslations)
 #include "test_translations.moc"
 ```
 
-Also `tools/check_translations.py` (pytest-free script): parse `app/translations/kimcad_es.ts`, and fail if any `<translation type="unfinished">` exists or any translation is empty.
+Also `tools/check_translations.py` (pytest-free script): parse `app/translations/kimbim_es.ts`, and fail if any `<translation type="unfinished">` exists or any translation is empty.
 
 - [ ] **Step 2:** `pixi run app-test` fails (no CMake project).
 - [ ] **Step 3: Implement.**
-  - CMake: `qt_standard_project_setup()`, `qt_add_executable(kimcad-app ...)`, a static library `kimcad_core` for everything except `main.cpp`, and `qt_add_translations(kimcad_core TS_FILES ... RESOURCE_PREFIX /i18n)`.
-  - `MainWindow` has the File menu (`&Open IFC...`, `&Quit`), the View menu (`&Fit all`), and Help (`&About KIMCAD`). Status bar text: `tr("Ready")`.
+  - CMake: `qt_standard_project_setup()`, `qt_add_executable(kimbim-app ...)`, a static library `kimbim_core` for everything except `main.cpp`, and `qt_add_translations(kimbim_core TS_FILES ... RESOURCE_PREFIX /i18n)`.
+  - `MainWindow` has the File menu (`&Open IFC...`, `&Quit`), the View menu (`&Fit all`), and Help (`&About KimBim`). Status bar text: `tr("Ready")`.
   - Run `lupdate` to produce the `.ts` files, then fill in the Spanish translations.
-- [ ] **Step 4:** `pixi run app-test` passes (2/2). `pixi run app -- --version` prints `KIMCAD 0.1.0`. `pixi run check-translations` passes.
+- [ ] **Step 4:** `pixi run app-test` passes (2/2). `pixi run app -- --version` prints `KimBim 0.1.0`. `pixi run check-translations` passes.
 - [ ] **Step 5:** commit `feat(app): Qt 6 application skeleton with English/Spanish translations`.
 
 ### Task 2: Embedded Python engine and app bridge (open, tree, properties)
 
-**Files:** create `python/kimcad/app_bridge.py`, `tests/python/test_app_bridge.py`, `app/src/PythonEngine.{h,cpp}`, `app/tests/test_python_engine.cpp`.
+**Files:** create `python/kimbim/app_bridge.py`, `tests/python/test_app_bridge.py`, `app/src/PythonEngine.{h,cpp}`, `app/tests/test_python_engine.cpp`.
 
 **Interfaces:**
-- Python `kimcad.app_bridge`, a module-level single session:
+- Python `kimbim.app_bridge`, a module-level single session:
   - `open_model(path: str) -> str`. Returns JSON `{"ok": true, "schema", "project", "elements": int}` or `{"ok": false, "error": str}`. It never raises.
   - `spatial_tree() -> str`: JSON node `{"guid", "type", "name", "children": [...]}`. The root is IfcProject. Elements appear under their container (or aggregate), sorted by type then name.
   - `properties(guid: str) -> str`: JSON `{"guid", "type", "name", "attributes": {..scalar attrs..}, "psets": {pset: {prop: value}}}`, or `{"error"}` if unknown.
-- C++ `kimcad::PythonEngine` (QObject, singleton per app):
-  - `bool start(QString* error)` sets PYTHONHOME from `CONDA_PREFIX`, prepends `KIMCAD_PYTHON_PATH` to `sys.path`, and imports `kimcad.app_bridge`.
+- C++ `kimbim::PythonEngine` (QObject, singleton per app):
+  - `bool start(QString* error)` sets PYTHONHOME from `CONDA_PREFIX`, prepends `KIMBIM_PYTHON_PATH` to `sys.path`, and imports `kimbim.app_bridge`.
   - `QJsonDocument callJson(const char* fn, const QStringList& args)` calls a bridge function holding the GIL and parses the returned JSON.
   - `void stop()` finalizes Python on exit.
 
@@ -133,7 +133,7 @@ import json
 
 from conftest import build_model
 
-from kimcad import app_bridge
+from kimbim import app_bridge
 
 
 def test_open_tree_properties(tmp_path):
@@ -174,7 +174,7 @@ def test_open_errors_are_reported_not_raised(tmp_path):
 
 ### Task 3: Mesh chunks (Python producer, C++ parser)
 
-**Files:** modify `python/kimcad/app_bridge.py`, `tests/python/test_app_bridge.py`; create `app/src/MeshChunk.{h,cpp}`, `app/tests/test_mesh_chunk.cpp`.
+**Files:** modify `python/kimbim/app_bridge.py`, `tests/python/test_app_bridge.py`; create `app/src/MeshChunk.{h,cpp}`, `app/tests/test_mesh_chunk.cpp`.
 
 **Interfaces:**
 - Python:
@@ -206,7 +206,7 @@ def test_open_errors_are_reported_not_raised(tmp_path):
   - Signals: `selectionChanged(QStringList guids)`, `hovered(QString guid)`.
   - `void selectGuids(const QStringList&)`, `void setHidden(const QStringList&, bool)`, `void isolate(const QStringList&)`, `void showAll()`
   - `int visibleElementCount() const`, `double measureFps(int frames)`
-- Self-test: `kimcad-app --self-test <ifc> [--frames N]` opens the model, loads all chunks, fits, orbits N frames, and picks the screen center. It prints JSON `{"ok", "elements", "batches", "triangles", "load_s", "fps", "picked"}` and exits 0, or 1 with `{"ok": false, "error"}`.
+- Self-test: `kimbim-app --self-test <ifc> [--frames N]` opens the model, loads all chunks, fits, orbits N frames, and picks the screen center. It prints JSON `{"ok", "elements", "batches", "triangles", "load_s", "fps", "picked"}` and exits 0, or 1 with `{"ok": false, "error"}`.
 
 - [ ] **Step 1: Failing check.** Running `pixi run app -- --self-test <fixture.ifc>` fails because `--self-test` is unknown.
 - [ ] **Step 2: Implement** the viewport, batch, owner and self-test.

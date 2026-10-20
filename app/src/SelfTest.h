@@ -5,7 +5,7 @@
 #include <QString>
 #include <QStringList>
 
-namespace kimcad {
+namespace kimbim {
 
 struct SelfTestOptions {
     QString path;                 // IFC file, or ":fixture:" for the built-in 2-wall test model
@@ -51,4 +51,4 @@ struct SelfTestOptions {
 int runSelfTest(const SelfTestOptions& options);
 int runRealOpen(const SelfTestOptions& options, const QString& path); // SelfTestRealOpen.cpp
 
-} // namespace kimcad
+} // namespace kimbim

@@ -6,7 +6,7 @@
 #include <gp_Pln.hxx>
 #include <gp_Pnt.hxx>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -38,4 +38,4 @@ std::vector<Handle(Graphic3d_ClipPlane)> makePlanes(const CutState& state)
     return planes;
 }
 
-} // namespace kimcad
+} // namespace kimbim

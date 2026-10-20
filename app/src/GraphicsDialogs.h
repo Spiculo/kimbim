@@ -22,7 +22,7 @@ class QPushButton;
 class QTableWidget;
 class QVBoxLayout;
 
-namespace kimcad {
+namespace kimbim {
 
 class PenGrid;
 
@@ -279,4 +279,4 @@ private:
     bool m_loading = false;
 };
 
-} // namespace kimcad
+} // namespace kimbim

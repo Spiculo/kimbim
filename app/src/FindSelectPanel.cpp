@@ -17,7 +17,7 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -26,29 +26,29 @@ struct Choice {
     const char* label;
 };
 
-// The fields and, per field, the operators kimcad.queries accepts (FIELD_OPS).
+// The fields and, per field, the operators kimbim.queries accepts (FIELD_OPS).
 const Choice kFields[] = {
-    {"ifc_class", QT_TRANSLATE_NOOP("kimcad::FindSelectPanel", "IFC class")},
-    {"kind", QT_TRANSLATE_NOOP("kimcad::FindSelectPanel", "Element kind")},
-    {"type", QT_TRANSLATE_NOOP("kimcad::FindSelectPanel", "Type")},
-    {"name", QT_TRANSLATE_NOOP("kimcad::FindSelectPanel", "Name")},
-    {"property", QT_TRANSLATE_NOOP("kimcad::FindSelectPanel", "Property")},
-    {"layer", QT_TRANSLATE_NOOP("kimcad::FindSelectPanel", "Layer")},
-    {"level", QT_TRANSLATE_NOOP("kimcad::FindSelectPanel", "Level")},
-    {"status", QT_TRANSLATE_NOOP("kimcad::FindSelectPanel", "Renovation status")},
-    {"material", QT_TRANSLATE_NOOP("kimcad::FindSelectPanel", "Material")},
+    {"ifc_class", QT_TRANSLATE_NOOP("kimbim::FindSelectPanel", "IFC class")},
+    {"kind", QT_TRANSLATE_NOOP("kimbim::FindSelectPanel", "Element kind")},
+    {"type", QT_TRANSLATE_NOOP("kimbim::FindSelectPanel", "Type")},
+    {"name", QT_TRANSLATE_NOOP("kimbim::FindSelectPanel", "Name")},
+    {"property", QT_TRANSLATE_NOOP("kimbim::FindSelectPanel", "Property")},
+    {"layer", QT_TRANSLATE_NOOP("kimbim::FindSelectPanel", "Layer")},
+    {"level", QT_TRANSLATE_NOOP("kimbim::FindSelectPanel", "Level")},
+    {"status", QT_TRANSLATE_NOOP("kimbim::FindSelectPanel", "Renovation status")},
+    {"material", QT_TRANSLATE_NOOP("kimbim::FindSelectPanel", "Material")},
 };
 
 const Choice kOps[] = {
     {"equals", "="},
     {"not_equals", "≠"},
-    {"contains", QT_TRANSLATE_NOOP("kimcad::FindSelectPanel", "contains")},
+    {"contains", QT_TRANSLATE_NOOP("kimbim::FindSelectPanel", "contains")},
     {"less", "<"},
     {"more", ">"},
-    {"exists", QT_TRANSLATE_NOOP("kimcad::FindSelectPanel", "has a value")},
-    {"missing", QT_TRANSLATE_NOOP("kimcad::FindSelectPanel", "has none")},
-    {"true", QT_TRANSLATE_NOOP("kimcad::FindSelectPanel", "is true")},
-    {"false", QT_TRANSLATE_NOOP("kimcad::FindSelectPanel", "is false")},
+    {"exists", QT_TRANSLATE_NOOP("kimbim::FindSelectPanel", "has a value")},
+    {"missing", QT_TRANSLATE_NOOP("kimbim::FindSelectPanel", "has none")},
+    {"true", QT_TRANSLATE_NOOP("kimbim::FindSelectPanel", "is true")},
+    {"false", QT_TRANSLATE_NOOP("kimbim::FindSelectPanel", "is false")},
 };
 
 QStringList opsFor(const QString& field)
@@ -270,7 +270,7 @@ void FindSelectPanel::addRow(const QString& field, const QString& op, const QStr
     r.field->setMinimumContentsLength(6);
     r.field->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
     for (const Choice& c : kFields)
-        r.field->addItem(QCoreApplication::translate("kimcad::FindSelectPanel", c.label), QString::fromLatin1(c.key));
+        r.field->addItem(QCoreApplication::translate("kimbim::FindSelectPanel", c.label), QString::fromLatin1(c.key));
     r.field->setCurrentIndex(std::max(0, r.field->findData(field)));
     r.property = new QLineEdit(r.widget);
     r.property->setPlaceholderText(tr("Pset.Property"));
@@ -342,7 +342,7 @@ void FindSelectPanel::fillOps(Row& row, const QString& keep)
     for (const QString& op : opsFor(field))
         for (const Choice& c : kOps)
             if (op == QLatin1String(c.key))
-                row.op->addItem(QCoreApplication::translate("kimcad::FindSelectPanel", c.label), op);
+                row.op->addItem(QCoreApplication::translate("kimbim::FindSelectPanel", c.label), op);
     row.op->setCurrentIndex(std::max(0, row.op->findData(keep)));
     row.op->blockSignals(false);
     row.value->setEnabled(needsValue(row.op->currentData().toString()));
@@ -485,4 +485,4 @@ void FindSelectPanel::recallSet(const QString& name, How how)
         emit recallSetRequested(name, how);
 }
 
-} // namespace kimcad
+} // namespace kimbim

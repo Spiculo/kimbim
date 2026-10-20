@@ -23,16 +23,16 @@
 #include "UnderlayDialogs.h"
 #include "Viewport.h"
 
-using kimcad::Snap;
-using kimcad::UnderlayPlacement;
-using kimcad::UnderlaySnapIndex;
+using kimbim::Snap;
+using kimbim::UnderlayPlacement;
+using kimbim::UnderlaySnapIndex;
 
 namespace {
 
 QJsonObject engine(const char* fn, const QStringList& args = {})
 {
     QString error;
-    return kimcad::PythonEngine::instance().callJson(fn, args, &error).object();
+    return kimbim::PythonEngine::instance().callJson(fn, args, &error).object();
 }
 
 bool close(QPointF a, QPointF b, double tol = 1e-6)
@@ -71,7 +71,7 @@ private slots:
     {
         QStandardPaths::setTestModeEnabled(true);
         QString error;
-        QVERIFY2(kimcad::PythonEngine::instance().start(&error), qPrintable(error));
+        QVERIFY2(kimbim::PythonEngine::instance().start(&error), qPrintable(error));
         QVERIFY(m_data.isValid());
         engine("set_app_paths", {m_data.path()});
     }
@@ -110,7 +110,7 @@ private slots:
         QVERIFY(index->onLine(QPointF(3, 0.02), 0.05, &q) && close(q, QPointF(3, 0)));
         QVERIFY(!index->endpoint(QPointF(10, 10), 0.05, &q));
 
-        kimcad::Snapper s;
+        kimbim::Snapper s;
         s.setUnderlays(index);
         Snap snap = s.snap(QPointF(3.98, 0.03), 0.05);
         QCOMPARE(snap.kind, Snap::UnderlayEnd);
@@ -129,16 +129,16 @@ private slots:
         const unsigned char rgb[6] = {255, 0, 0, 0, 0, 0};
         QList<QByteArray> parts{R"({"ok": true, "count": 2, "origin": [512000.0, 4012000.0]})",
             QByteArray(reinterpret_cast<const char*>(coords), sizeof coords), QByteArray(reinterpret_cast<const char*>(rgb), sizeof rgb)};
-        const auto lines = kimcad::UnderlayLines::fromParts(parts);
+        const auto lines = kimbim::UnderlayLines::fromParts(parts);
         QVERIFY(lines);
         QCOMPARE(lines->count(), 2);
         QCOMPARE(lines->origin, QPointF(512000, 4012000));
         parts[1].chop(4);
-        QVERIFY(!kimcad::UnderlayLines::fromParts(parts));
-        QCOMPARE(kimcad::underlayColour(Qt::red, true, QColor(), 1.0, Qt::white), QColor::fromRgbF(0.299f, 0.299f, 0.299f));
-        QCOMPARE(kimcad::underlayColour(Qt::black, false, QColor(), 0.5, Qt::white).red(), 128);
-        QCOMPARE(kimcad::PlaceUnderlayDialog::rasterScale("pdf", 100, 0), 0.0254 / 72 * 100);
-        QCOMPARE(kimcad::PlaceUnderlayDialog::rasterScale("image", 50, 200), 0.0254 / 200 * 50);
+        QVERIFY(!kimbim::UnderlayLines::fromParts(parts));
+        QCOMPARE(kimbim::underlayColour(Qt::red, true, QColor(), 1.0, Qt::white), QColor::fromRgbF(0.299f, 0.299f, 0.299f));
+        QCOMPARE(kimbim::underlayColour(Qt::black, false, QColor(), 0.5, Qt::white).red(), 128);
+        QCOMPARE(kimbim::PlaceUnderlayDialog::rasterScale("pdf", 100, 0), 0.0254 / 72 * 100);
+        QCOMPARE(kimbim::PlaceUnderlayDialog::rasterScale("image", 50, 200), 0.0254 / 200 * 50);
     }
 
     void placeSnapCalibrateMoveAndHide()
@@ -146,10 +146,10 @@ private slots:
         QTemporaryDir dir;
         const QString dxf = dir.filePath("survey.dxf");
         writeSurvey(dxf);
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         QVERIFY(w.newProject());
         const QString storey = w.levelsBar()->activeStorey();
-        kimcad::Viewport* plan = w.openPlanTab(storey);
+        kimbim::Viewport* plan = w.openPlanTab(storey);
         QVERIFY(plan);
         const QJsonObject r = w.placeUnderlay(dxf, {});
         QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
@@ -167,7 +167,7 @@ private slots:
         QCOMPARE(s.kind, Snap::UnderlayMid);
 
         // calibrate: the survey was really drawn at half size, so its 4 m side is 8 m
-        w.startUnderlayPick(id, kimcad::UnderlayPicker::Calibrate);
+        w.startUnderlayPick(id, kimbim::UnderlayPicker::Calibrate);
         QVERIFY(w.underlayPicker()->isActive());
         QVERIFY(w.viewport()->isDrawingMode());
         emit w.viewport()->workPointClicked(QPointF(0.01, -0.01), 0.05, Qt::NoModifier); // snaps to 0,0
@@ -184,7 +184,7 @@ private slots:
         QVERIFY(close(s.point, QPointF(8, 0)));
 
         // move by two clicks
-        w.startUnderlayPick(id, kimcad::UnderlayPicker::Move);
+        w.startUnderlayPick(id, kimbim::UnderlayPicker::Move);
         QVERIFY(!w.underlayPicker()->click(QPointF(0, 0), 0.05, false));
         QVERIFY(w.underlayPicker()->click(QPointF(1.0, 3.0), 0.001, false));
         QVERIFY(w.finishUnderlayPick());
@@ -194,7 +194,7 @@ private slots:
         QVERIFY(close(w.twoPointTool()->snapper().snap(QPointF(8.99, 3.01), 0.05).point, QPointF(9.0, 3.0)));
 
         // Esc cancels a pick
-        w.startUnderlayPick(id, kimcad::UnderlayPicker::Move);
+        w.startUnderlayPick(id, kimbim::UnderlayPicker::Move);
         emit w.viewport()->drawingEnded();
         QVERIFY(!w.underlayPicker()->isActive());
 
@@ -222,9 +222,9 @@ private slots:
         QTemporaryDir dir;
         const QString dxf = dir.filePath("big.dxf");
         writeSurvey(dxf, 50000);
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         QVERIFY(w.newProject());
-        kimcad::Viewport* plan = w.openPlanTab(w.levelsBar()->activeStorey());
+        kimbim::Viewport* plan = w.openPlanTab(w.levelsBar()->activeStorey());
         QElapsedTimer t;
         t.start();
         const QJsonObject probe = engine("underlay_probe", {dxf}); // what the dialog does first: reads the DXF

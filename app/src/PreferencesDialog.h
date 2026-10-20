@@ -8,7 +8,7 @@ class QLabel;
 class QLineEdit;
 class QSpinBox;
 
-namespace kimcad {
+namespace kimbim {
 
 class Preferences;
 
@@ -39,4 +39,4 @@ private:
     QComboBox* m_scroll; // D89
 };
 
-} // namespace kimcad
+} // namespace kimbim

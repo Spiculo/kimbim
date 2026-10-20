@@ -9,7 +9,7 @@
 
 #include "Snapper.h"
 
-namespace kimcad {
+namespace kimbim {
 
 // One segment from two snapped clicks (beams, grid lines, the move tool's base and target).
 // A typed length places the second point along the mouse direction. Pure logic.
@@ -46,4 +46,4 @@ private:
     std::optional<QPointF> m_hover;
 };
 
-} // namespace kimcad
+} // namespace kimbim

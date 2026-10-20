@@ -10,7 +10,7 @@
 #include <QDir>
 #include <QJsonParseError>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -69,7 +69,7 @@ bool PythonEngine::start(QString* error)
     const QByteArray prefix = qgetenv("CONDA_PREFIX");
     if (prefix.isEmpty()) {
         if (error)
-            *error = QStringLiteral("CONDA_PREFIX is not set: run KIMCAD through `pixi run app`");
+            *error = QStringLiteral("CONDA_PREFIX is not set: run KimBim through `pixi run app`");
         return false;
     }
 
@@ -86,7 +86,7 @@ bool PythonEngine::start(QString* error)
         return false;
     }
 
-    const QByteArray extra = qgetenv("KIMCAD_PYTHON_PATH");
+    const QByteArray extra = qgetenv("KIMBIM_PYTHON_PATH");
     if (!extra.isEmpty()) {
         PyObject* sysPath = PySys_GetObject("path"); // borrowed
         PyObject* dir = PyUnicode_FromString(QDir::toNativeSeparators(QString::fromLocal8Bit(extra)).toUtf8().constData());
@@ -94,10 +94,10 @@ bool PythonEngine::start(QString* error)
         Py_DECREF(dir);
     }
 
-    PyObject* module = PyImport_ImportModule("kimcad.app_bridge");
+    PyObject* module = PyImport_ImportModule("kimbim.app_bridge");
     if (!module) {
         if (error)
-            *error = QStringLiteral("could not import kimcad.app_bridge: %1").arg(fetchError());
+            *error = QStringLiteral("could not import kimbim.app_bridge: %1").arg(fetchError());
         return false;
     }
     m_module = module;
@@ -141,7 +141,7 @@ bool PythonEngine::callParts(const char* fn, const QStringList& args, QList<QByt
     PyObject* func = PyObject_GetAttrString(asModule(m_module), fn);
     if (!func) {
         if (error)
-            *error = QStringLiteral("kimcad.app_bridge has no function %1 (%2)").arg(QString::fromUtf8(fn), fetchError());
+            *error = QStringLiteral("kimbim.app_bridge has no function %1 (%2)").arg(QString::fromUtf8(fn), fetchError());
         return false;
     }
     PyObject* pyArgs = buildArgs(args);
@@ -181,4 +181,4 @@ bool PythonEngine::callParts(const char* fn, const QStringList& args, QList<QByt
     return ok;
 }
 
-} // namespace kimcad
+} // namespace kimbim

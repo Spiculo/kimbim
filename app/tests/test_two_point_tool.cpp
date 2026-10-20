@@ -4,7 +4,7 @@
 
 #include "TwoPointTool.h"
 
-using kimcad::TwoPointTool;
+using kimbim::TwoPointTool;
 
 class TestTwoPointTool : public QObject {
     Q_OBJECT

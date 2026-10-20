@@ -1,6 +1,6 @@
 # Slice 21 (R4) — Merge engine
 
-**Goal:** combining two design options is a deterministic three-way merge of KIMCAD records with a conflict model the app can show (Slice 22), checked against ifcmerge's test cases.
+**Goal:** combining two design options is a deterministic three-way merge of KimBim records with a conflict model the app can show (Slice 22), checked against ifcmerge's test cases.
 
 ## Rules (D68, docs/03)
 
@@ -21,13 +21,13 @@ Conflict ids are stable strings (`o/<GlobalId>`, `o/<GlobalId>#Name`, `dangling:
 
 - Rust store: `merge_base`, `commit_merge` (fast-import `merge` lines: two parents), `fast_forward` (refuses when the branch is not contained).
 - `Project.merge_preview(other)` → `up_to_date` / `fast_forward` / `merge` (+ `MergeResult`); `Project.merge(other, message, resolutions)` raises `MergeConflicts` until every conflict has a choice, checks the result composes to IFC, then commits.
-- CLI: `kimcad merge OPTION [-m MSG] [--resolve ID=CHOICE ...] [--json]`.
+- CLI: `kimbim merge OPTION [-m MSG] [--resolve ID=CHOICE ...] [--json]`.
 
 ## ifcmerge cases ported (tests/python/test_merge.py)
 
 Fixtures copied from ifcmerge (GPL-3.0-or-later, attribution in `tests/fixtures/ifcmerge/README.md`). Results, with ifcmerge's numbering from `t/003.ifc.t`:
 
-| Case | ifcmerge | KIMCAD |
+| Case | ifcmerge | KimBim |
 |---|---|---|
 | 1, 2, 3, 7, 10, 11, 14, 15, 17, 18, 19, 20 (additions, deletions, modifications of different elements) | merges | merges, no new IFC schema problems |
 | 8 floor deleted + wall added | merges | merges (a shared direction the wall reuses is restored) |

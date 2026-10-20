@@ -7,7 +7,7 @@
 
 #include "MeasureTool.h"
 
-namespace kimcad {
+namespace kimbim {
 
 // The measure tool's path in a view (D79): the segments, a dashed closing edge from three points,
 // a dot on every point and the readout beside the last one. Drawn over the model (topmost layer),
@@ -23,4 +23,4 @@ private:
     QString m_label;
 };
 
-} // namespace kimcad
+} // namespace kimbim

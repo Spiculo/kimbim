@@ -32,7 +32,7 @@ private slots:
     void parsesAValidChunk()
     {
         QString error;
-        auto c = kimcad::MeshChunk::parse(kMeta, verts(), tris(), &error);
+        auto c = kimbim::MeshChunk::parse(kMeta, verts(), tris(), &error);
         QVERIFY2(c.has_value(), qPrintable(error));
         QCOMPARE(c->elementCount(), 2);
         QCOMPARE(c->guids, QStringList({"A", "B"}));
@@ -46,13 +46,13 @@ private slots:
     void rejectsInconsistentData()
     {
         QString error;
-        QVERIFY(!kimcad::MeshChunk::parse(kMeta, verts().left(10), tris(), &error)); // not whole floats
-        QVERIFY(!kimcad::MeshChunk::parse(kMeta, verts(), tris().left(24), &error)); // offsets beyond data
-        QVERIFY(!kimcad::MeshChunk::parse(kMeta, verts(), uints({0,1,2, 3,4,5, 3,5,99}), &error)); // index out of range
+        QVERIFY(!kimbim::MeshChunk::parse(kMeta, verts().left(10), tris(), &error)); // not whole floats
+        QVERIFY(!kimbim::MeshChunk::parse(kMeta, verts(), tris().left(24), &error)); // offsets beyond data
+        QVERIFY(!kimbim::MeshChunk::parse(kMeta, verts(), uints({0,1,2, 3,4,5, 3,5,99}), &error)); // index out of range
         QVERIFY(error.contains("index"));
-        QVERIFY(!kimcad::MeshChunk::parse(R"({"guids":["A"],"types":["IfcWall","IfcSlab"],"voff":[0,3,7],"toff":[0,1,3]})",
+        QVERIFY(!kimbim::MeshChunk::parse(R"({"guids":["A"],"types":["IfcWall","IfcSlab"],"voff":[0,3,7],"toff":[0,1,3]})",
             verts(), tris(), &error)); // counts disagree
-        QVERIFY(!kimcad::MeshChunk::parse("not json", verts(), tris(), &error));
+        QVERIFY(!kimbim::MeshChunk::parse("not json", verts(), tris(), &error));
     }
 };
 

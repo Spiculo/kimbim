@@ -32,7 +32,7 @@ M3 slices: **4 (this): new project, levels, walls** → 5: slabs, openings, door
 
 ### Task 1: Bridge authoring core
 
-**Files:** Create `python/kimcad/authoring.py` (modeling functions, kept out of `app_bridge.py`, which re-exports them); modify `app_bridge.py` (`_run` change tracking, undo/redo report geometry, `mesh_elements`); test `tests/python/test_authoring.py`.
+**Files:** Create `python/kimbim/authoring.py` (modeling functions, kept out of `app_bridge.py`, which re-exports them); modify `app_bridge.py` (`_run` change tracking, undo/redo report geometry, `mesh_elements`); test `tests/python/test_authoring.py`.
 
 **Produces (all return JSON strings; lengths in metres):**
 - `new_project(name) -> {ok}`: in-memory IFC4 file: project, mm units, Model/Body + Plan/Annotation contexts, site, building, "Level 1" at 0. Resets history; `path` empty (Save asks).

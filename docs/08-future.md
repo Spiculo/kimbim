@@ -6,7 +6,7 @@
 
 **Cheapest path:** the repository is already Git ([03](03-versioning.md)), so sync is `git fetch` / `git push` to any Git remote: a self-hosted Forgejo/Gitea, GitLab, GitHub, or a bare repo on a shared drive or LAN machine.
 
-- `kimcad pull` = fetch + KIMCAD merge (never Git's text merge).
+- `kimbim pull` = fetch + KimBim merge (never Git's text merge).
 - Partial clone / sparse fetch (Git `--filter=blob:none`) lets clients download geometry blobs lazily.
 
 **Constraint on current work:** keep everything in standard Git objects and refs, and keep no state outside the repo that collaborators need.
@@ -33,7 +33,7 @@ How Live fits into Git-style history:
 
 - **LAN:** mDNS discovery plus direct QUIC.
 - **Internet:** **iroh** (MIT/Apache, QUIC with hole-punching and relay fallback) instead of building NAT traversal ourselves.
-- **Optional host / super-peer:** an always-on peer that provides a Git remote, relay, backup, indexing and validation workers. It is not the source of truth. Planned license: AGPL-3.0-or-later ([06](06-reuse-and-licensing.md#kimcad-license)).
+- **Optional host / super-peer:** an always-on peer that provides a Git remote, relay, backup, indexing and validation workers. It is not the source of truth. Planned license: AGPL-3.0-or-later ([06](06-reuse-and-licensing.md#kimbim-license)).
 - Transport for durable sync can be the Git protocol tunneled over the P2P connection.
 
 ## Security and permissions
@@ -55,7 +55,7 @@ How Live fits into Git-style history:
 
 ## BCF issues
 
-- Issues reference KIMCAD ID + GlobalId + commit + viewpoint (spec §41).
+- Issues reference KimBim ID + GlobalId + commit + viewpoint (spec §41).
 - Issues could be stored in the repo (as records or a separate ref), so they sync with the model.
 - Reuse IfcOpenShell's `bcf` library (LGPL).
 
@@ -72,7 +72,7 @@ Spec §36–38 still applies:
 ## Federation and linked models
 
 - Discipline models (architecture, structure, MEP) live in separate repositories. A federation manifest pins each one to a commit (like Git submodules, but presented as "linked models").
-- Cross-model references use (repository ID, KIMCAD ID).
+- Cross-model references use (repository ID, KimBim ID).
 - Owner request (2026-10-07), out of scope for now: open several separate models together (site, building, structure), each with its own history, and switch between them. Show one model inside another as a reference, and copy, model or modify elements across models, as with Revit links or Archicad hotlinks.
 - Open questions for research:
   - One `.kim` per model, linked by path and pinned version? Or one project `.kim` that holds all models?
@@ -82,7 +82,7 @@ Spec §36–38 still applies:
 
 ## Architect-oriented forge
 
-See [10-forge-feasibility.md](10-forge-feasibility.md). Recommended: KIMCAD Hub as a service on top of unmodified Forgejo.
+See [10-forge-feasibility.md](10-forge-feasibility.md). Recommended: KimBim Hub as a service on top of unmodified Forgejo.
 
 ## Large assets
 

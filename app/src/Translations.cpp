@@ -4,14 +4,14 @@
 #include <QLocale>
 #include <QTranslator>
 
-namespace kimcad {
+namespace kimbim {
 
 bool installTranslator(QCoreApplication& app, const QString& lang)
 {
     if (lang == QLatin1String("en"))
         return true;
     auto* translator = new QTranslator(&app);
-    if (!translator->load(QStringLiteral(":/i18n/kimcad_%1.qm").arg(lang))) {
+    if (!translator->load(QStringLiteral(":/i18n/kimbim_%1.qm").arg(lang))) {
         delete translator;
         return false;
     }
@@ -26,4 +26,4 @@ QString pickLanguage(const QString& requested)
     return QLocale::system().language() == QLocale::Spanish ? QStringLiteral("es") : QStringLiteral("en");
 }
 
-} // namespace kimcad
+} // namespace kimbim

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Fill app/translations/kimcad_es.ts from the Spanish glossary below.
+"""Fill app/translations/kimbim_es.ts from the Spanish glossary below.
 
 Workflow: `pixi run cmake --build build/app --target update_translations` (lupdate), then
 `python tools/fill_translations_es.py`, then `pixi run check-translations`.
@@ -9,7 +9,7 @@ import pathlib
 import xml.etree.ElementTree as ET
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-TS = ROOT / "app" / "translations" / "kimcad_es.ts"
+TS = ROOT / "app" / "translations" / "kimbim_es.ts"
 
 ES = {
     "&File": "&Archivo",
@@ -18,13 +18,13 @@ ES = {
     "&View": "&Ver",
     "&Fit all": "&Encuadrar todo",
     "&Help": "A&yuda",
-    "&About KIMCAD": "&Acerca de KIMCAD",
-    "About KIMCAD": "Acerca de KIMCAD",
+    "&About KimBim": "&Acerca de KimBim",
+    "About KimBim": "Acerca de KimBim",
     "Ready": "Listo",
-    "KIMCAD %1\nOpen-source native BIM for architects, with version control built in.\nLicense: GPL-3.0-or-later":
-        "KIMCAD %1\nBIM nativo de código abierto para arquitectos, con control de versiones integrado.\n"
+    "KimBim %1\nOpen-source native BIM for architects, with version control built in.\nLicense: GPL-3.0-or-later":
+        "KimBim %1\nBIM nativo de código abierto para arquitectos, con control de versiones integrado.\n"
         "Licencia: GPL-3.0 o posterior",
-    "KIMCAD cannot start": "KIMCAD no puede iniciarse",
+    "KimBim cannot start": "KimBim no puede iniciarse",
     "Model": "Modelo",
     "Properties": "Propiedades",
     "Open IFC": "Abrir IFC",
@@ -207,7 +207,7 @@ ES = {
     "Open &project...": "Abrir &proyecto...",
     "Enable &versioning...": "Activar &versiones...",
     "Save &version...": "Guardar &versión...",
-    "Saved from KIMCAD": "Guardado desde KIMCAD",
+    "Saved from KimBim": "Guardado desde KimBim",
     "Project": "Proyecto",
     "Option": "Opción",
     "New option...": "Nueva opción...",
@@ -217,7 +217,7 @@ ES = {
     "This model is already versioned": "Este modelo ya tiene versiones",
     "Choose an empty folder for the project": "Elija una carpeta vacía para el proyecto",
     "Could not open the project": "No se pudo abrir el proyecto",
-    "Open a KIMCAD project folder": "Abrir una carpeta de proyecto KIMCAD",
+    "Open a KimBim project folder": "Abrir una carpeta de proyecto KimBim",
     "No version saved: %1": "No se guardó ninguna versión: %1",
     "Version saved: %1 added, %2 modified, %3 removed": "Versión guardada: %1 añadidos, %2 modificados, %3 eliminados",
     "Enable versioning first (File menu)": "Active las versiones primero (menú Archivo)",
@@ -783,16 +783,16 @@ ES = {
     "Could not save the IDS report: %1": "No se pudo guardar el informe IDS: %1",
     "Clash set %1 saved in the project": "Conjunto de colisión %1 guardado en el proyecto",
     # D82: Python console
-    "Python: ifc, selection(), select(...), with edit(): ..., refresh(), help_kimcad()\nEnter runs, Shift+Enter adds a line, Up/Down recall earlier input":
-        "Python: ifc, selection(), select(...), with edit(): ..., refresh(), help_kimcad()\nIntro ejecuta, Mayús+Intro añade una línea, Arriba/Abajo recuperan entradas anteriores",
-    "Output. Type help_kimcad() below for the console's names.": "Salida. Escriba help_kimcad() abajo para ver los nombres de la consola.",
+    "Python: ifc, selection(), select(...), with edit(): ..., refresh(), help_kimbim()\nEnter runs, Shift+Enter adds a line, Up/Down recall earlier input":
+        "Python: ifc, selection(), select(...), with edit(): ..., refresh(), help_kimbim()\nIntro ejecuta, Mayús+Intro añade una línea, Arriba/Abajo recuperan entradas anteriores",
+    "Output. Type help_kimbim() below for the console's names.": "Salida. Escriba help_kimbim() abajo para ver los nombres de la consola.",
     "Run": "Ejecutar",
     "Run the input (Enter)": "Ejecutar la entrada (Intro)",
     "Run script...": "Ejecutar script...",
     "Run a Python file in the console": "Ejecutar un archivo Python en la consola",
     "Clear": "Borrar",
     "Python &console": "&Consola Python",
-    "Run Python on the open model (ifcopenshell and KIMCAD's commands)": "Ejecutar Python sobre el modelo abierto (ifcopenshell y los comandos de KIMCAD)",
+    "Run Python on the open model (ifcopenshell and KimBim's commands)": "Ejecutar Python sobre el modelo abierto (ifcopenshell y los comandos de KimBim)",
     "Run Python scrip&t...": "Ejecutar scrip&t Python...",
     "Run a .py file in the Python console": "Ejecutar un archivo .py en la consola Python",
     "Console": "Consola",
@@ -813,10 +813,10 @@ ES = {
     "File": "Archivo",
     "Floor plan": "Planta",
     "Folder for the DXF files": "Carpeta para los archivos DXF",
-    "By KIMCAD layer": "Por capa de KIMCAD",
+    "By KimBim layer": "Por capa de KimBim",
     "By element kind (A-WALL, A-DOOR...)": "Por tipo de elemento (A-WALL, A-DOOR...)",
-    "Elements without a KIMCAD layer go on the layer of their kind":
-        "Los elementos sin capa de KIMCAD van a la capa de su tipo",
+    "Elements without a KimBim layer go on the layer of their kind":
+        "Los elementos sin capa de KimBim van a la capa de su tipo",
     "Dimensions as DIMENSION entities": "Cotas como entidades DIMENSION",
     "Off: dimensions as lines and text": "Desactivado: cotas como líneas y texto",
     "Drawings go to model space at real size; sheets to a paper-space layout.":

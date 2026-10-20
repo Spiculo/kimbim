@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Spike S6: IfcOpenShell's SVG serializer on KIMCAD files — quality and speed (Slice 14 risk check).
+"""Spike S6: IfcOpenShell's SVG serializer on KimBim files — quality and speed (Slice 14 risk check).
 
 For an IFC file it adds drawing definitions the way Bonsai does (an IfcAnnotation with ObjectType
 DRAWING: placement = camera, Body = IfcBlock giving width x height x depth, EPset_Drawing.Scale),

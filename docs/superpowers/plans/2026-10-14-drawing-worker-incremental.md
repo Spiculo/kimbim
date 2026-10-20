@@ -22,7 +22,7 @@
 | A worker already survives across drawings at one state | `drawings.py` `_worker`, `_worker_generate` |
 | But every **new state** writes a snapshot and restarts the worker | `_snapshot()` + `_state_key()` today |
 | The app already knows exactly what an edit changed | `app_bridge._deltas` / `_future_deltas`: per-transaction GlobalIds whose shape changed or that were removed; cascades included (joins, openings, rooms via `AFTER_ACTION`) |
-| Canonical, reference-resolved records already exist | `python/kimcad/records.py` (`decompose`/`compose`, `state_hash`) — used by versioning, tested for round-trip |
+| Canonical, reference-resolved records already exist | `python/kimbim/records.py` (`decompose`/`compose`, `state_hash`) — used by versioning, tested for round-trip |
 | Drawings depend on geometry + annotations, not on UI state | `drawgen` inputs inventory (see the subset plan) |
 
 ## Architecture
@@ -48,13 +48,13 @@ Building the delta reuses the **records closure** from the subset plan: a change
 
 ### Phase 3 — verify and gate
 - After each `apply`, the app compares the worker's `hash` with its own `geometry_revision`-derived hash (or a `records.state_hash` of the affected subtrees). On mismatch, the app sends `{op: "reload", path}` with a freshly written full snapshot and marks the delta path as unreliable for that session (telemetry).
-- Everything sits behind a flag (`KIMCAD_DRAWING_DELTA`, default on once green; off restores today's behaviour exactly).
+- Everything sits behind a flag (`KIMBIM_DRAWING_DELTA`, default on once green; off restores today's behaviour exactly).
 
 ### Where it plugs in
-- `python/kimcad/drawings.py`: `_worker_generate` grows `apply`/`reload`; `raw_drawing` decides write-full vs send-delta.
-- `python/kimcad/app_bridge.py`: expose the last transaction's `{changed, removed}` (already kept in `_deltas`); expose a stable content key.
-- `python/kimcad/drawgen.py`: `worker()` handles `apply`/`reload` in addition to `generate`.
-- New `python/kimcad/subset.py` (shared with the subset plan): the closure + delta builder.
+- `python/kimbim/drawings.py`: `_worker_generate` grows `apply`/`reload`; `raw_drawing` decides write-full vs send-delta.
+- `python/kimbim/app_bridge.py`: expose the last transaction's `{changed, removed}` (already kept in `_deltas`); expose a stable content key.
+- `python/kimbim/drawgen.py`: `worker()` handles `apply`/`reload` in addition to `generate`.
+- New `python/kimbim/subset.py` (shared with the subset plan): the closure + delta builder.
 
 ## Global Constraints
 

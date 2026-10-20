@@ -16,9 +16,9 @@ int main(int argc, char* argv[])
         if (qstrcmp(argv[i], "--export-sheet") == 0 && qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM"))
             qputenv("QT_QPA_PLATFORM", "offscreen");
     QApplication app(argc, argv);
-    QApplication::setApplicationName(QStringLiteral("KIMCAD"));
-    QApplication::setOrganizationName(QStringLiteral("KIMCAD")); // QSettings: the window layout (D71)
-    QApplication::setApplicationVersion(QStringLiteral(KIMCAD_VERSION));
+    QApplication::setApplicationName(QStringLiteral("KimBim"));
+    QApplication::setOrganizationName(QStringLiteral("KimBim")); // QSettings: the window layout (D71)
+    QApplication::setApplicationVersion(QStringLiteral(KIMBIM_VERSION));
 
     QCommandLineParser parser;
     parser.addHelpOption();
@@ -138,26 +138,26 @@ int main(int argc, char* argv[])
     parser.process(app);
 
     if (parser.isSet(version)) {
-        std::printf("KIMCAD %s\n", KIMCAD_VERSION);
+        std::printf("KimBim %s\n", KIMBIM_VERSION);
         return 0;
     }
-    kimcad::Preferences prefs(kimcad::Preferences::defaultPath()); // D72: the language preference
+    kimbim::Preferences prefs(kimbim::Preferences::defaultPath()); // D72: the language preference
     prefs.load();
     const QString language = parser.isSet(lang) ? parser.value(lang)
         : prefs.language() == QLatin1String("auto") ? QString() : prefs.language();
-    kimcad::installTranslator(app, kimcad::pickLanguage(language));
+    kimbim::installTranslator(app, kimbim::pickLanguage(language));
 
     if (parser.isSet(exportSheet)) {
         const QStringList args = parser.positionalArguments();
         if (args.size() != 2) {
-            std::fprintf(stderr, "usage: kimcad-app --export-sheet NUMBER model.ifc out.pdf\n");
+            std::fprintf(stderr, "usage: kimbim-app --export-sheet NUMBER model.ifc out.pdf\n");
             return 2;
         }
-        return kimcad::exportSheetCommand(args.at(0), parser.value(exportSheet), args.at(1));
+        return kimbim::exportSheetCommand(args.at(0), parser.value(exportSheet), args.at(1));
     }
 
     if (parser.isSet(selfTest)) {
-        kimcad::SelfTestOptions options;
+        kimbim::SelfTestOptions options;
         options.path = parser.value(selfTest);
         options.frames = parser.value(frames).toInt();
         options.quitDuringLoad = parser.isSet(quitDuringLoad);
@@ -195,10 +195,10 @@ int main(int argc, char* argv[])
         options.minimize = parser.isSet(minimizeOption);
         options.openDrawing = parser.value(openDrawing);
         options.createDrawings = parser.isSet(createDrawings);
-        return kimcad::runSelfTest(options);
+        return kimbim::runSelfTest(options);
     }
 
-    kimcad::MainWindow window;
+    kimbim::MainWindow window;
     window.show();
     if (!parser.positionalArguments().isEmpty())
         window.openPath(parser.positionalArguments().first());

@@ -2,7 +2,7 @@
 // D88: stairs, ramps and railings in the main window (doc 14 §6). The Stair tool (T) draws a stair or
 // a ramp: straight, L or U by its start and direction (two clicks), or by sketch (the walking line as
 // a polyline, Enter to finish); the Railing tool puts railings on both sides of a clicked stair or ramp,
-// or along a clicked path. The shapes are python/kimcad/stairs.py's, one undo step each. Plan views get
+// or along a clicked path. The shapes are python/kimbim/stairs.py's, one undo step each. Plan views get
 // the stairs' symbols (walking line, break line, the part above the cut dashed, UP) as plan-only
 // annotations named after the stair, and a click on a flight, a landing or the symbol selects the stair.
 #include <QComboBox>
@@ -21,7 +21,7 @@
 #include "TwoPointTool.h"
 #include "Viewport.h"
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -420,4 +420,4 @@ void MainWindow::expandAssemblies(QStringList& guids) const
     guids = out;
 }
 
-} // namespace kimcad
+} // namespace kimbim

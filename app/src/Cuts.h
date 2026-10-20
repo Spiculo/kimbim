@@ -6,7 +6,7 @@
 
 #include <vector>
 
-namespace kimcad {
+namespace kimbim {
 
 // Cuts are view state (docs/05): never stored in model history.
 struct CutState {
@@ -20,4 +20,4 @@ struct CutState {
 // equation is >= 0, so every plane's normal points into the kept region.
 std::vector<Handle(Graphic3d_ClipPlane)> makePlanes(const CutState& state);
 
-} // namespace kimcad
+} // namespace kimbim

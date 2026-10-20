@@ -77,7 +77,7 @@ def bench(path: pathlib.Path):
     rss_open = proc.memory_info().rss
     settings = ifcopenshell.geom.settings()
     threads = multiprocessing.cpu_count()
-    kernel = os.environ.get("KIMCAD_KERNEL", "hybrid-cgal-simple-opencascade")
+    kernel = os.environ.get("KIMBIM_KERNEL", "hybrid-cgal-simple-opencascade")
     it = ifcopenshell.geom.iterator(settings, f, threads, geometry_library=kernel)
     elements = tris = 0
     peak = rss_open

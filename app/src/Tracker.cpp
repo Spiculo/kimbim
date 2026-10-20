@@ -3,7 +3,7 @@
 
 #include <cmath>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 constexpr double kPi = 3.14159265358979323846;
@@ -177,4 +177,4 @@ std::optional<QPointF> Tracker::target() const
     return *m_anchor + d * length;
 }
 
-} // namespace kimcad
+} // namespace kimbim

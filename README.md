@@ -1,8 +1,8 @@
-# KIMCAD
+# KimBim
 
 **Open-source native BIM for architects, with version control built in.**
 
-KIMCAD is a desktop BIM application for Windows and Linux built on open standards (IFC). Model your building, cut through it, manage object data, reuse libraries and produce drawings. Then save versions, explore design options, compare them and combine them, the way software developers use Git, but for buildings.
+KimBim is a desktop BIM application for Windows and Linux built on open standards (IFC). Model your building, cut through it, manage object data, reuse libraries and produce drawings. Then save versions, explore design options, compare them and combine them, the way software developers use Git, but for buildings.
 
 > Status: **early development.** Slice 1 works: versioned IFC projects from the command line. The desktop app comes next. Design docs: [docs/README.md](docs/README.md).
 
@@ -10,7 +10,7 @@ KIMCAD is a desktop BIM application for Windows and Linux built on open standard
 
 ```bash
 pixi install
-pixi run app                      # opens KIMCAD (English or Spanish, following your system)
+pixi run app                      # opens KimBim (English or Spanish, following your system)
 pixi run app -- model.ifc --lang es
 pixi run app -- --self-test model.ifc --screenshot shot.png   # load, measure fps/picking, print JSON
 pixi run app -- --self-test model.ifc --create-drawings --open-drawing "South Elevation"   # time a drawing
@@ -41,8 +41,8 @@ Open an IFC file. It appears progressively in the 3D view, with the spatial tree
 | Delete | **Del** (deleting a wall also deletes its doors and windows) |
 | Sections / elevations | **V** section, **Shift+V** elevation: click the line's two ends, then the side it looks at (as in Archicad). New projects come with North/South/East/West elevations; *View › Create elevations* adds them to an opened IFC. Markers show in plan view; select, move, rotate or delete them like elements |
 | Floor plans | Every level has a floor plan drawing (cut at 1.10 m, as in Archicad): walls cut, door swings, window glass, your labels, dimensions and marks, and the section/elevation markers. *View › Create floor plans and elevations* adds them to an opened IFC |
-| Annotation | **A** text, **Q** dimension (Shift+click adds points to a chain; snaps to wall faces), **X** mark, **Shift+A** leader. Text size is in millimetres on paper (*Properties › KIMCAD_Annotation › Size*) |
-| Sheets and PDF | *Sheets* tab: *New* (A1/A3, numbered A01, A02…), select a drawing in *Drawings* and *Place drawing*; open the sheet and drag drawings into place. *File › Project info…* fills the title block; *File › Export sheet as PDF…/SVG…*. Without a window: `kimcad-app --export-sheet A01 model.ifc A01.pdf` |
+| Annotation | **A** text, **Q** dimension (Shift+click adds points to a chain; snaps to wall faces), **X** mark, **Shift+A** leader. Text size is in millimetres on paper (*Properties › KIMBIM_Annotation › Size*) |
+| Sheets and PDF | *Sheets* tab: *New* (A1/A3, numbered A01, A02…), select a drawing in *Drawings* and *Place drawing*; open the sheet and drag drawings into place. *File › Project info…* fills the title block; *File › Export sheet as PDF…/SVG…*. Without a window: `kimbim-app --export-sheet A01 model.ifc A01.pdf` |
 | Drawings | The *Drawings* tab (left) lists them; double-click opens one in a tab next to *Model* (wheel zoom, drag to pan). It is generated in the background and shows *Regenerate* when the model has changed |
 
 ## Try it (command line)
@@ -51,16 +51,16 @@ Requires [pixi](https://pixi.sh). Works on Windows and Linux.
 
 ```bash
 pixi install                      # environment from conda-forge (IfcOpenShell, Rust, Git, ...)
-pixi run build                    # build the Rust engine (kimcad._core)
+pixi run build                    # build the Rust engine (kimbim._core)
 
-pixi run kimcad init my-house                       # create a project
-pixi run kimcad -C my-house commit model.ifc -m "Import from Revit"
-pixi run kimcad -C my-house status edited.ifc       # what would change
-pixi run kimcad -C my-house commit edited.ifc -m "Fire ratings"
-pixi run kimcad -C my-house log
-pixi run kimcad -C my-house diff                    # last version vs its parent
-pixi run kimcad -C my-house export v1.ifc --rev HEAD~1
-pixi run kimcad -C my-house branch option-b         # a design option
+pixi run kimbim init my-house                       # create a project
+pixi run kimbim -C my-house commit model.ifc -m "Import from Revit"
+pixi run kimbim -C my-house status edited.ifc       # what would change
+pixi run kimbim -C my-house commit edited.ifc -m "Fire ratings"
+pixi run kimbim -C my-house log
+pixi run kimbim -C my-house diff                    # last version vs its parent
+pixi run kimbim -C my-house export v1.ifc --rev HEAD~1
+pixi run kimbim -C my-house branch option-b         # a design option
 ```
 
 Each version stores the model as canonical, object-level records in a standard Git repository (`my-house/.git`). A one-property edit on a 10,000-object Revit model is stored as **one changed record**. Exports are lossless and byte-identical on Windows and Linux. See [docs/11](docs/11-spike-results.md) for how that was validated.

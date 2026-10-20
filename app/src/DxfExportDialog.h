@@ -19,10 +19,10 @@ class QThread;
 class QTreeWidget;
 class QTreeWidgetItem;
 
-namespace kimcad {
+namespace kimbim {
 
 // File > Export DXF... (D83, Archicad's Publisher, lite): tick drawings and sheets, pick a folder and the
-// layer mapping, Export. Each item becomes one DXF file, written by Python (kimcad.dxf) on a worker
+// layer mapping, Export. Each item becomes one DXF file, written by Python (kimbim.dxf) on a worker
 // thread, one bridge call per item, so the window keeps painting and the bar moves; Cancel stops after
 // the current file.
 class DxfExportDialog : public QDialog {
@@ -87,4 +87,4 @@ private:
     QStringList m_errors;
 };
 
-} // namespace kimcad
+} // namespace kimbim

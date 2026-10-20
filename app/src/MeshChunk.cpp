@@ -9,7 +9,7 @@
 
 #include "PythonEngine.h"
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -119,4 +119,4 @@ bool fetchMeshChunk(PythonEngine& py, int maxElements, MeshChunk* out, bool* don
     return true;
 }
 
-} // namespace kimcad
+} // namespace kimbim

@@ -30,7 +30,7 @@
 #include "SelfTest.h"
 #include "Viewport.h"
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -178,13 +178,13 @@ void settle(int ms)
 int runRealOpen(const SelfTestOptions& options, const QString& path)
 {
     // The test's own preferences, recovery copies and caches (Qt's test locations), never the person's.
-    // Each run starts from no preferences, or from a copy of the file KIMCAD_SELFTEST_PREFS names
+    // Each run starts from no preferences, or from a copy of the file KIMBIM_SELFTEST_PREFS names
     // (someone's preferences.json: their saved layout and window geometry, maximized or not).
     QStandardPaths::setTestModeEnabled(true);
     const QString prefs = Preferences::defaultPath();
     QDir().mkpath(QFileInfo(prefs).absolutePath());
     QFile::remove(prefs);
-    if (const QString seed = qEnvironmentVariable("KIMCAD_SELFTEST_PREFS"); !seed.isEmpty() && !QFile::copy(seed, prefs))
+    if (const QString seed = qEnvironmentVariable("KIMBIM_SELFTEST_PREFS"); !seed.isEmpty() && !QFile::copy(seed, prefs))
         say(QStringLiteral("cannot copy ") + seed);
     say(QStringLiteral("preferences: ") + prefs);
     Answerer answerer(options.answers);
@@ -244,4 +244,4 @@ int runRealOpen(const SelfTestOptions& options, const QString& path)
     return result.value("ok").toBool() ? 0 : 1;
 }
 
-} // namespace kimcad
+} // namespace kimbim

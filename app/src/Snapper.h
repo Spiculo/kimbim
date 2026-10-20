@@ -9,7 +9,7 @@
 #include <memory>
 #include <optional>
 
-namespace kimcad {
+namespace kimbim {
 
 class InputAids;
 class UnderlaySnapIndex;
@@ -97,4 +97,4 @@ private:
     std::shared_ptr<InputAids> m_aids;
 };
 
-} // namespace kimcad
+} // namespace kimbim

@@ -9,7 +9,7 @@
 
 **Architecture:**
 - Navigation and selection are configured on OCCT's `AIS_ViewController` (gesture map, selection schemes, rotation mode). There is no custom mouse code.
-- Edits run in Python (`kimcad.app_bridge`) through `ifcopenshell.api` inside ifcopenshell file transactions, which gives undo/redo for free. The C++ side sends JSON commands and refreshes the panels.
+- Edits run in Python (`kimbim.app_bridge`) through `ifcopenshell.api` inside ifcopenshell file transactions, which gives undo/redo for free. The C++ side sends JSON commands and refreshes the panels.
 - M2 edits never change geometry, so the viewport isn't re-meshed. Geometry-changing edits arrive with M3.
 
 **Tech Stack:** as Slice 2 (C++17, Qt 6, OCCT 8 `novtk`, embedded CPython, ifcopenshell 0.9), plus `ifcopenshell.api.pset` / `attribute` and ifcopenshell file transactions.
@@ -71,7 +71,7 @@
 
 ### Task 3: Bridge commands: merged properties, edit, add/remove, undo/redo, save
 
-**Files:** modify `python/kimcad/app_bridge.py`, `tests/python/test_app_bridge.py`.
+**Files:** modify `python/kimbim/app_bridge.py`, `tests/python/test_app_bridge.py`.
 
 **Interfaces** (all return JSON and never raise):
 - `properties_multi(guids_json) -> {"count", "types": [...], "name": {"value"|"varies"}, "psets": {pset: {prop: {"value": v, "varies": bool, "ifc_type": "IfcLabel"}}}}`

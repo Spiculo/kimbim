@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The Python console (D82): MainWindow members kept in their own file. The code runs in the embedded
-// interpreter (kimcad.console) on a worker thread; the window stays painted and a Stop button can
+// interpreter (kimbim.console) on a worker thread; the window stays painted and a Stop button can
 // interrupt it. Its edits come back like the app's own (one undo step, afterEdit).
 #include "MainWindow.h"
 
@@ -29,7 +29,7 @@
 
 #include <thread>
 
-namespace kimcad {
+namespace kimbim {
 
 void MainWindow::buildConsoleActions()
 {
@@ -37,7 +37,7 @@ void MainWindow::buildConsoleActions()
     auto* show = new QAction(tr("Python &console"), this);
     show->setObjectName(QStringLiteral("actionConsole"));
     show->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_P));
-    show->setToolTip(tr("Run Python on the open model (ifcopenshell and KIMCAD's commands)"));
+    show->setToolTip(tr("Run Python on the open model (ifcopenshell and KimBim's commands)"));
     connect(show, &QAction::triggered, this, [this] {
         consolePanel();
         m_dock->raisePanel(QStringLiteral("console"));
@@ -108,7 +108,7 @@ QJsonObject MainWindow::runConsoleCall(const char* fn, const QString& arg)
 
     // A short script just runs (input held back meanwhile); a long one shows a modal dialog with Stop.
     QDialog running(this);
-    running.setWindowTitle(QStringLiteral("KIMCAD"));
+    running.setWindowTitle(QStringLiteral("KimBim"));
     running.setModal(true);
     running.setWindowModality(Qt::ApplicationModal); // the console may float in its own window
     running.setWindowFlag(Qt::WindowCloseButtonHint, false);
@@ -174,4 +174,4 @@ QJsonObject MainWindow::runConsoleCall(const char* fn, const QString& arg)
     return r;
 }
 
-} // namespace kimcad
+} // namespace kimbim

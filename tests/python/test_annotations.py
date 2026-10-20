@@ -5,7 +5,7 @@ import json
 import ifcopenshell.validate
 import pytest
 
-from kimcad import app_bridge as b
+from kimbim import app_bridge as b
 
 
 def call(fn, *args):
@@ -111,7 +111,7 @@ def _literals(guid):
 
 def test_typed_dimension_text_with_spaces_is_kept_whole(plan):
     """Labels were split on whitespace (one word per segment): "2.50 m" printed as "2.50"."""
-    from kimcad import drawgen
+    from kimbim import drawgen
 
     one = call("add_annotation", plan["l1"], "dimension", json.dumps([[0, 0], [2.5, 0], [0, -1]]), "2.50 m")["guid"]
     assert _literals(one) == ["2.50 m"]
@@ -126,7 +126,7 @@ def test_typed_dimension_text_with_spaces_is_kept_whole(plan):
 
 def test_annotations_take_the_current_pen_and_can_change_it(plan):
     """D73: new annotations take the current pen (the bottom bar's); a selected one can take another."""
-    from kimcad import settings as s
+    from kimbim import settings as s
     assert json.loads(s.set_project_settings(json.dumps({"current_pen": 26})))["ok"]
     guid = call("add_annotation", plan["l1"], "text", json.dumps([[1.0, 1.0]]), "Hello")["guid"]
     assert listed(plan["l1"])[guid]["pen"] == 26

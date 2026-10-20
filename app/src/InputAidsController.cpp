@@ -10,7 +10,7 @@
 
 #include <cmath>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -299,4 +299,4 @@ void InputAidsController::setGuidesEnabled(bool on)
     refresh();
 }
 
-} // namespace kimcad
+} // namespace kimbim

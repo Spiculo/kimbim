@@ -12,7 +12,7 @@ class QMenu;
 class QMenuBar;
 class QToolButton;
 
-namespace kimcad {
+namespace kimbim {
 
 // One of the minimize / maximize-restore / close buttons, drawn to match the window's palette (the
 // close button turns red on hover, as on Windows).
@@ -88,4 +88,4 @@ private:
     CaptionButton* m_close;
 };
 
-} // namespace kimcad
+} // namespace kimbim

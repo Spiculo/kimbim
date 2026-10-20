@@ -10,7 +10,7 @@ from collections import Counter
 import blake3
 import ifcopenshell
 
-from kimcad.records import Schema, agg_info, norm_float
+from kimbim.records import Schema, agg_info, norm_float
 
 
 def _schema(f):

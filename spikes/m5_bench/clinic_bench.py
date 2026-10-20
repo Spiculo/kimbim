@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "python"))
-from kimcad import app_bridge as b  # noqa: E402
+from kimbim import app_bridge as b  # noqa: E402
 
 
 def call(fn, *args):

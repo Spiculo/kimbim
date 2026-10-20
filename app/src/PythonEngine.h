@@ -6,16 +6,16 @@
 #include <QString>
 #include <QStringList>
 
-namespace kimcad {
+namespace kimbim {
 
-// Embedded CPython running `kimcad.app_bridge` (docs/01, D22, D44).
+// Embedded CPython running `kimbim.app_bridge` (docs/01, D22, D44).
 // Thread-safe: every call takes the GIL, so the model loader can call from a worker thread.
 class PythonEngine {
 public:
     static PythonEngine& instance();
 
     // Starts the interpreter (idempotent). PYTHONHOME comes from CONDA_PREFIX (the pixi
-    // environment); KIMCAD_PYTHON_PATH is prepended to sys.path. Imports kimcad.app_bridge.
+    // environment); KIMBIM_PYTHON_PATH is prepended to sys.path. Imports kimbim.app_bridge.
     bool start(QString* error);
     bool isRunning() const { return m_module != nullptr; }
     void stop();
@@ -34,4 +34,4 @@ private:
     void* m_mainThreadState = nullptr;
 };
 
-} // namespace kimcad
+} // namespace kimbim

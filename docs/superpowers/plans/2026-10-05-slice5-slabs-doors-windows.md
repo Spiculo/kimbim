@@ -23,7 +23,7 @@ Previews reuse the unselectable preview batch.
 
 - IFC4, project units (new projects mm); bridge APIs in metres (D51). One action = one undo step with a geometry delta (D49/D51).
 - Standard IFC relations: `IfcRelVoidsElement` (wall → opening), `IfcRelFillsElement` (opening → door/window), `IfcRelDefinesByType`; slabs `IfcSlab` + layered `IfcSlabType` (`IfcMaterialLayerSet`, layer usage on the slab); doors/windows `IfcDoor`/`IfcWindow` + `IfcDoorType`/`IfcWindowType`.
-- Opening sizes live on the occurrence (`OverallWidth`/`OverallHeight`, standard attributes); the type carries KIMCAD defaults in a custom pset `KIMCAD_OpeningDefaults` (Width, Height, SillHeight), since IFC types have no size attributes.
+- Opening sizes live on the occurrence (`OverallWidth`/`OverallHeight`, standard attributes); the type carries KimBim defaults in a custom pset `KIMBIM_OpeningDefaults` (Width, Height, SillHeight), since IFC types have no size attributes.
 - EN/ES UI, SPDX, DCO; headless CI (pure logic unit-tested; rendering via GUI self-tests).
 
 ## Review Focus
@@ -37,7 +37,7 @@ Previews reuse the unselectable preview batch.
 ---
 
 ### Task 1: Bridge — slabs, doors, windows, openings, cascade delete
-**Files:** `python/kimcad/authoring.py`, `app_bridge.py` (re-exports), tests `tests/python/test_authoring_openings.py`.
+**Files:** `python/kimbim/authoring.py`, `app_bridge.py` (re-exports), tests `tests/python/test_authoring_openings.py`.
 **Produces (JSON, metres):**
 - `slab_types()`: library defaults on first use: "Floor 200" (concrete 200), "Floor 300" (screed 50 / insulation 50 / concrete 200).
 - `create_slab(storey, type, points_json, offset)`: polygon in plan (≥3 points, not self-intersecting); top of slab at storey elevation + offset (default 0); returns `{ok, guid, geometry}`.
@@ -55,5 +55,5 @@ Previews reuse the unselectable preview batch.
 - Self-test `--house`: new project → walls loop 8×6 → slab from walls → a door on the south wall and a window on the north wall → report `{walls 4, slabs 1, doors 1, windows 1, openings 2, ok}`; screenshot.
 
 ### Task 3: Docs and verification
-- README keys (S, D, N, slab from walls), doc 04 §5 status, roadmap M3 progress, decisions D53 (opening sizes on occurrences + KIMCAD_OpeningDefaults pset on types; slab top at level; outline at outer faces).
+- README keys (S, D, N, slab from walls), doc 04 §5 status, roadmap M3 progress, decisions D53 (opening sizes on occurrences + KIMBIM_OpeningDefaults pset on types; slab top at level; outline at outer faces).
 - Full suites Windows + WSL; screenshots; self-review; finish the branch (owner decides merge).

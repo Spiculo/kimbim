@@ -12,9 +12,9 @@
 
 namespace {
 
-Handle(kimcad::ElementBatch) batch(int n)
+Handle(kimbim::ElementBatch) batch(int n)
 {
-    kimcad::MeshChunk c;
+    kimbim::MeshChunk c;
     c.voff.push_back(0);
     c.toff.push_back(0);
     for (int e = 0; e < n; ++e) {
@@ -28,7 +28,7 @@ Handle(kimcad::ElementBatch) batch(int n)
         c.voff.push_back(uint32_t(c.verts.size() / 3));
         c.toff.push_back(uint32_t(c.tris.size() / 3));
     }
-    return new kimcad::ElementBatch(std::move(c));
+    return new kimbim::ElementBatch(std::move(c));
 }
 
 QJsonObject tree()
@@ -53,7 +53,7 @@ class TestSelection : public QObject {
 private slots:
     void modifiersFollowRevitAndArchicad()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         QCOMPARE(v.selectionSchemeFor(Aspect_VKeyMouse_LeftButton, Aspect_VKeyFlags_NONE), AIS_SelectionScheme_Replace);
         QCOMPARE(v.selectionSchemeFor(Aspect_VKeyMouse_LeftButton, Aspect_VKeyFlags_CTRL), AIS_SelectionScheme_Add);
         QCOMPARE(v.selectionSchemeFor(Aspect_VKeyMouse_LeftButton, Aspect_VKeyFlags_SHIFT), AIS_SelectionScheme_XOR);
@@ -61,7 +61,7 @@ private slots:
 
     void selectsSeveralElements()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         v.addBatch(batch(4));
         v.selectGuids({"g0", "g2"});
         QCOMPARE(sorted(v.selectedGuids()), QStringList({"g0", "g2"}));
@@ -69,7 +69,7 @@ private slots:
 
     void hidingDeselectsOnlyTheHiddenElements()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         v.addBatch(batch(4));
         v.selectGuids({"g0", "g1"});
         v.setHidden({"g0"}, true);
@@ -78,11 +78,11 @@ private slots:
 
     void treeSelectsSeveralAndReportsThem()
     {
-        kimcad::ModelTreePanel panel;
+        kimbim::ModelTreePanel panel;
         panel.setTree(tree());
         panel.selectGuids({"g0", "g2"}); // programmatic: no echo
         QCOMPARE(sorted(panel.selectedGuids()), QStringList({"g0", "g2"}));
-        QSignalSpy spy(&panel, &kimcad::ModelTreePanel::guidsSelected);
+        QSignalSpy spy(&panel, &kimbim::ModelTreePanel::guidsSelected);
         panel.itemFor("g1")->setSelected(true); // user extends the selection
         QVERIFY(spy.count() >= 1);
         QCOMPARE(sorted(spy.last().first().toStringList()), QStringList({"g0", "g1", "g2"}));

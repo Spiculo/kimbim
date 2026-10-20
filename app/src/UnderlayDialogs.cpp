@@ -21,7 +21,7 @@
 
 #include <cmath>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -29,12 +29,12 @@ struct UnitChoice {
     const char* label;
     double metres;
 };
-const UnitChoice kUnits[] = {{QT_TRANSLATE_NOOP("kimcad::PlaceUnderlayDialog", "millimetres"), 0.001},
-    {QT_TRANSLATE_NOOP("kimcad::PlaceUnderlayDialog", "centimetres"), 0.01},
-    {QT_TRANSLATE_NOOP("kimcad::PlaceUnderlayDialog", "decimetres"), 0.1},
-    {QT_TRANSLATE_NOOP("kimcad::PlaceUnderlayDialog", "metres"), 1.0},
-    {QT_TRANSLATE_NOOP("kimcad::PlaceUnderlayDialog", "inches"), 0.0254},
-    {QT_TRANSLATE_NOOP("kimcad::PlaceUnderlayDialog", "feet"), 0.3048}};
+const UnitChoice kUnits[] = {{QT_TRANSLATE_NOOP("kimbim::PlaceUnderlayDialog", "millimetres"), 0.001},
+    {QT_TRANSLATE_NOOP("kimbim::PlaceUnderlayDialog", "centimetres"), 0.01},
+    {QT_TRANSLATE_NOOP("kimbim::PlaceUnderlayDialog", "decimetres"), 0.1},
+    {QT_TRANSLATE_NOOP("kimbim::PlaceUnderlayDialog", "metres"), 1.0},
+    {QT_TRANSLATE_NOOP("kimbim::PlaceUnderlayDialog", "inches"), 0.0254},
+    {QT_TRANSLATE_NOOP("kimbim::PlaceUnderlayDialog", "feet"), 0.3048}};
 
 QDoubleSpinBox* lengthBox(double value, double range = 1e6)
 {
@@ -408,4 +408,4 @@ QString UnderlayPicker::hint() const
                               : QCoreApplication::translate("UnderlayPicker", "Move underlay: click where it goes (Esc cancels)");
 }
 
-} // namespace kimcad
+} // namespace kimbim

@@ -13,7 +13,7 @@
 
 #include "PythonEngine.h"
 
-namespace kimcad {
+namespace kimbim {
 
 bool exportSvgToPdf(const QByteArray& svg, double widthMm, double heightMm, const QString& path, QString* error)
 {
@@ -24,7 +24,7 @@ bool exportSvgToPdf(const QByteArray& svg, double widthMm, double heightMm, cons
         return false;
     }
     QPdfWriter pdf(path);
-    pdf.setCreator(QStringLiteral("KIMCAD"));
+    pdf.setCreator(QStringLiteral("KimBim"));
     pdf.setResolution(600); // QPdfWriter is vector; this only sets the painter's unit
     const QPageSize size(QSizeF(widthMm, heightMm), QPageSize::Millimeter);
     if (!pdf.setPageSize(size) || !pdf.setPageMargins(QMarginsF(0, 0, 0, 0))) {
@@ -79,4 +79,4 @@ int exportSheetCommand(const QString& ifcPath, const QString& number, const QStr
         {"width_mm", sheet.value("width").toDouble()}, {"height_mm", sheet.value("height").toDouble()}});
 }
 
-} // namespace kimcad
+} // namespace kimbim

@@ -90,7 +90,7 @@ opening flyouts; users can pin any panel as a permanent tab · panels shrink fir
 vertical icon strip with titles [option, off].
 
 **Python console (owner)**: every run is one undo step, dropped when it changed nothing (no empty steps) · Scripting
-menu with pinned scripts: with P2 plugins · `kimcad run script.py model.ifc` for batch jobs: yes.
+menu with pinned scripts: with P2 plugins · `kimbim run script.py model.ifc` for batch jobs: yes.
 
 ## Presets (resolved 2026-10-20, D93)
 
@@ -113,7 +113,7 @@ These are listed in [07-roadmap.md](07-roadmap.md#spikes-do-first-each-is-small-
 - The size threshold that moves geometry into separate records.
 - Ownership rules for non-rooted entities that are referenced by several roots without a clear owner.
 - Representing IFC2X3 files: convert to IFC4 on import, or store natively by schema?
-- Where saved views, drawing definitions and library references live (in-model IFC entities vs `kimcad.toml`).
+- Where saved views, drawing definitions and library references live (in-model IFC entities vs `kimbim.toml`).
 - Undo across "Save version": can you undo past a commit, or does a commit reset the undo stack?
 - Spanish terminology for UI and IFC display labels: pick one regional variant (neutral Latin American vs. Spain) or ship both?
 - Community: where the project lives (Codeberg/GitHub), communication channel, and its relationship with the OSArch / IfcOpenShell communities. Upstreaming fixes to IfcOpenShell is strongly encouraged.

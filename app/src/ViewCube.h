@@ -14,7 +14,7 @@
 
 #include <functional>
 
-namespace kimcad {
+namespace kimbim {
 
 // Preset views and the view cube (D76). Directions are from the target towards the eye, Z up,
 // north = +Y: "Front" looks north from the south side, as on Archicad's and Revit's cubes.
@@ -46,4 +46,4 @@ Handle(AIS_InteractiveObject) makeHomeButton(double devicePixelRatio);
 QRect viewCubeRect(const QSize& widget);
 QRect homeButtonRect(const QSize& widget);
 
-} // namespace kimcad
+} // namespace kimbim

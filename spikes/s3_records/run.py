@@ -27,7 +27,7 @@ from semantic import compare
 
 HERE = pathlib.Path(__file__).parent
 CORPUS = HERE.parent / "corpus" / "files"
-OUT = pathlib.Path(os.environ.get("KIMCAD_SPIKE_OUT", HERE / "out"))
+OUT = pathlib.Path(os.environ.get("KIMBIM_SPIKE_OUT", HERE / "out"))
 
 
 def body_text(path):
@@ -59,7 +59,7 @@ def run_one(path: pathlib.Path):
     try:
         b = compose(r1)
     except RuntimeError as e:
-        # Distinguish KIMCAD bugs from schema-invalid input: validate the original file.
+        # Distinguish KimBim bugs from schema-invalid input: validate the original file.
         log = ifcopenshell.validate.json_logger()
         ifcopenshell.validate.validate(a, log)
         if log.statements:

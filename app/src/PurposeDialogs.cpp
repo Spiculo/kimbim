@@ -12,7 +12,7 @@
 #include <QTableWidget>
 #include <QVBoxLayout>
 
-namespace kimcad {
+namespace kimbim {
 
 // ---------------- LayerCombinationsDialog ----------------
 
@@ -173,4 +173,4 @@ void PurposesDialog::showSet(const QString&)
     m_loading = false;
 }
 
-} // namespace kimcad
+} // namespace kimbim

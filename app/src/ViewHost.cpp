@@ -6,7 +6,7 @@
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 
-namespace kimcad {
+namespace kimbim {
 
 ViewHost::ViewHost(Viewport* view, QWidget* parent)
     : QWidget(parent)
@@ -33,4 +33,4 @@ void ViewHost::adoptChrome(QWidget* optionsStrip, QWidget* cutColumn)
         m_row->addWidget(cutColumn);
 }
 
-} // namespace kimcad
+} // namespace kimbim

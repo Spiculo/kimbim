@@ -3,7 +3,7 @@
 
 #include <cmath>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 constexpr double kMinLength = 0.001; // metres
@@ -78,4 +78,4 @@ std::optional<std::pair<QPointF, QPointF>> TwoPointTool::preview() const
     return std::make_pair(*m_start, *m_hover);
 }
 
-} // namespace kimcad
+} // namespace kimbim

@@ -13,12 +13,12 @@ class QLineEdit;
 class QTreeWidget;
 class QTreeWidgetItem;
 
-namespace kimcad {
+namespace kimbim {
 
 // The object library (D86, Archicad's Library and Object settings): categories with the objects'
 // plan symbols as thumbnails, a search field, and the selected object's parameters. Place (or a
 // double click) starts the Object tool with that object and those values. The panel only lists and
-// edits; the main window places (kimcad.library) and keeps the office library paths.
+// edits; the main window places (kimbim.library) and keeps the office library paths.
 class LibraryPanel : public QWidget {
     Q_OBJECT
 public:
@@ -59,4 +59,4 @@ private:
     QJsonObject m_params;
 };
 
-} // namespace kimcad
+} // namespace kimbim

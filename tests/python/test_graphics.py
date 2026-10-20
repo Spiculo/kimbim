@@ -5,9 +5,9 @@ import re
 
 import pytest
 
-from kimcad import app_bridge as b
-from kimcad import graphics as g
-from kimcad import settings as s
+from kimbim import app_bridge as b
+from kimbim import graphics as g
+from kimbim import settings as s
 
 
 def setup_function():
@@ -88,7 +88,7 @@ import ifcopenshell.api.pset
 import ifcopenshell.api.root
 import ifcopenshell.api.type
 
-from kimcad.testing import _reset_owner, _set_owner, build_model
+from kimbim.testing import _reset_owner, _set_owner, build_model
 
 
 def _model(schema="IFC4"):
@@ -381,7 +381,7 @@ def test_a_purpose_naming_a_missing_filter_is_refused_by_set_graphics():
 
 
 def _reno_model():
-    from kimcad import renovation as r
+    from kimbim import renovation as r
 
     f = _model()
     walls = {}
@@ -425,7 +425,7 @@ def test_legend_lists_only_applied_entries_in_order():
 
 
 def test_legend_has_no_rows_without_an_override_applied():
-    from kimcad import renovation as r
+    from kimbim import renovation as r
 
     f, w = _reno_model()
     r.write_status(w["demolish"], "existing")
@@ -456,7 +456,7 @@ def test_legend_svg_rows_and_restriction():
     f, w = _reno_model()
     out = g.resolve("Demolition", model=f)
     body, width, height = g.legend_svg(out)
-    assert body.count('class="kimcad-legend-row"') == 2
+    assert body.count('class="kimbim-legend-row"') == 2
     assert "To be demolished" in body and 'stroke-dasharray="3 1.5"' in body
     assert width > 40 and height == pytest.approx(8 + 2 * 7)
     body, _, _ = g.legend_svg(out, guids={w["existing"].GlobalId})
@@ -464,14 +464,14 @@ def test_legend_svg_rows_and_restriction():
     body, _, h = g.legend_svg(g.resolve("Working", model=f))
     assert g.LEGEND_EMPTY in body and h == pytest.approx(8 + 7)
     body, _, _ = g.legend_svg(out, guids={w["existing"].GlobalId, w["demolish"].GlobalId})
-    assert body.count('class="kimcad-legend-row"') == 2
+    assert body.count('class="kimbim-legend-row"') == 2
 
 
 def test_a_lone_override_row_stays_in_the_legend():
-    from kimcad import renovation as r
+    from kimbim import renovation as r
 
     f, w = _reno_model()
     r.write_status(w["existing"], "new")  # only the demolished wall is left showing a status change
     out = g.resolve("Demolition", model=f)
     body, _, _ = g.legend_svg(out)
-    assert body.count('class="kimcad-legend-row"') == 1 and "To be demolished" in body
+    assert body.count('class="kimbim-legend-row"') == 1 and "To be demolished" in body

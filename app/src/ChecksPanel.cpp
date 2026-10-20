@@ -22,7 +22,7 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -544,4 +544,4 @@ QString ClashSetDialog::sideText(const QJsonObject& side)
     return strings(side.value("classes")).join(QStringLiteral(", "));
 }
 
-} // namespace kimcad
+} // namespace kimbim

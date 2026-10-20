@@ -3,7 +3,7 @@
 
 #include <cmath>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 constexpr double kMinLength = 0.001; // metres: shorter segments (double clicks) are ignored
@@ -85,4 +85,4 @@ std::optional<std::pair<QPointF, QPointF>> WallTool::preview() const
     return std::make_pair(m_start, *m_hover);
 }
 
-} // namespace kimcad
+} // namespace kimbim

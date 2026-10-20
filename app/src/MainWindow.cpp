@@ -112,7 +112,7 @@
 #include "Viewport.h"
 #include "DraftTool.h"
 
-namespace kimcad {
+namespace kimbim {
 
 void readDrafting(const QJsonObject& o, Viewport::Annotation* a); // D84, DraftTools.cpp
 void readStairSymbols(const QJsonObject& data, QVector<Viewport::Annotation>* list); // D88, StairTools.cpp
@@ -139,7 +139,7 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     , m_loader(new ModelLoader(chunkSize))
 {
     m_prefs.load();
-    qRegisterMetaType<kimcad::MeshChunk>();
+    qRegisterMetaType<kimbim::MeshChunk>();
     // D71: the bottom bar (pen, layers, zoom, selection, messages) replaces the status bar.
     m_status = new StatusStrip(this);
     auto* bottom = new QToolBar(tr("Status"), this);
@@ -164,7 +164,7 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
             setCurrentPen(pen);
     });
     connect(m_status, &StatusStrip::layerVisibilityToggled, this, &MainWindow::setLayerVisible);
-    setWindowTitle(QStringLiteral("KIMCAD"));
+    setWindowTitle(QStringLiteral("KimBim"));
     resize(1280, 800);
     // The plan-cut height slider at the right edge of the active model view (owner feedback).
     m_cutColumn = new QWidget(this);
@@ -252,7 +252,7 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
 
     QString error;
     if (!PythonEngine::instance().start(&error))
-        showError(tr("KIMCAD cannot start"), error);
+        showError(tr("KimBim cannot start"), error);
     bridge("set_app_paths", {QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)});
     bridge("set_author", {m_prefs.authorName(), m_prefs.authorEmail()});
     applyDrawingPrefs();
@@ -286,7 +286,7 @@ void MainWindow::clampWindowSize()
     const int capW = avail.width() * 4, capH = avail.height() * 4;
     if (m_clamping || (width() <= capW && height() <= capH && minimumWidth() <= capW && minimumHeight() <= capH))
         return;
-    qWarning("KIMCAD: the window asked for %dx%d (minimum %dx%d); back to 1280x800", width(), height(),
+    qWarning("KimBim: the window asked for %dx%d (minimum %dx%d); back to 1280x800", width(), height(),
         minimumWidth(), minimumHeight());
     m_clamping = true;
     m_dock->restoreLayout(QByteArray()); // the default layout: resets the splitter sizes
@@ -599,7 +599,7 @@ void MainWindow::buildMenus()
     m_graphicsMenu = graphics;
     QMenu* help = m_menuBar->addMenu(tr("&Help"));
     m_helpMenu = help;
-    QAction* about = help->addAction(tr("&About KIMCAD"));
+    QAction* about = help->addAction(tr("&About KimBim"));
     connect(about, &QAction::triggered, this, &MainWindow::showAbout);
 }
 
@@ -816,10 +816,10 @@ void MainWindow::applyCuts()
 
 void MainWindow::showAbout()
 {
-    QMessageBox::about(this, tr("About KIMCAD"),
-        tr("KIMCAD %1\nOpen-source native BIM for architects, with version control built in.\n"
+    QMessageBox::about(this, tr("About KimBim"),
+        tr("KimBim %1\nOpen-source native BIM for architects, with version control built in.\n"
            "License: GPL-3.0-or-later")
-            .arg(QStringLiteral(KIMCAD_VERSION)));
+            .arg(QStringLiteral(KIMBIM_VERSION)));
 }
 
 void MainWindow::showError(const QString& title, const QString& message)
@@ -832,7 +832,7 @@ void MainWindow::showError(const QString& title, const QString& message)
 void MainWindow::openDialog()
 {
     const QString path = QFileDialog::getOpenFileName(this, tr("Open"), QString(),
-        tr("KIMCAD and IFC files (*.kim *.ifc);;KIMCAD projects (*.kim);;IFC files (*.ifc)"));
+        tr("KimBim and IFC files (*.kim *.ifc);;KimBim projects (*.kim);;IFC files (*.ifc)"));
     if (!path.isEmpty())
         openPath(path);
 }
@@ -899,7 +899,7 @@ QJsonObject MainWindow::bridgeInBackground(const char* fn, const QStringList& ar
     const QByteArray name(fn);
     QThread* worker = QThread::create([&] { r = PythonEngine::instance().callJson(name.constData(), args, &error).object(); });
     QProgressDialog progress(label, QString(), 0, 0, this);
-    progress.setWindowTitle(QStringLiteral("KIMCAD"));
+    progress.setWindowTitle(QStringLiteral("KimBim"));
     progress.setWindowModality(Qt::WindowModal);
     progress.setCancelButton(nullptr); // the Python call can't be interrupted
     progress.setMinimumDuration(m_quiet ? std::numeric_limits<int>::max() : 300);
@@ -986,7 +986,7 @@ bool MainWindow::applyPropertyEdit(const QString& pset, const QString& prop, con
     if (m_selection.isEmpty())
         return false;
     // The Dimensions group is live geometry, not a property set: it edits the elements' shape.
-    if (pset == QLatin1String("KIMCAD_Annotation") && (prop == QLatin1String("Text") || prop == QLatin1String("Size"))) {
+    if (pset == QLatin1String("KIMBIM_Annotation") && (prop == QLatin1String("Text") || prop == QLatin1String("Size"))) {
         bool all = true;
         for (const QString& g : std::as_const(m_selection)) {
             const QString v = value.isDouble() ? QString::number(value.toDouble(), 'g', 17) : value.toString();
@@ -2450,7 +2450,7 @@ void MainWindow::enableVersioningDialog()
     if (m_versioned || m_quiet)
         return;
     QString path = QFileDialog::getSaveFileName(this, tr("Enable versioning"), m_document.value("path").toString(),
-        tr("KIMCAD project (*.kim)"));
+        tr("KimBim project (*.kim)"));
     if (path.isEmpty())
         return;
     if (QFileInfo(path).suffix().compare(QLatin1String("kim"), Qt::CaseInsensitive) != 0)
@@ -2593,7 +2593,7 @@ void MainWindow::refreshProject()
         name += QStringLiteral(" (%1)").arg(option);
     if (doc.value("read_only").toBool())
         name += QStringLiteral(" [%1]").arg(tr("read-only"));
-    setWindowTitle(QStringLiteral("KIMCAD — %1[*]").arg(name));
+    setWindowTitle(QStringLiteral("KimBim — %1[*]").arg(name));
     setWindowModified(isDirty());
 }
 
@@ -2665,7 +2665,7 @@ MainWindow::LargeIfc MainWindow::askLargeIfc(const QString& path, double mb)
         return m_largeIfcAnswer ? m_largeIfcAnswer(file, mb) : LargeIfc::MakeKim;
     QMessageBox box(QMessageBox::Question, tr("Open IFC"),
         tr("%1 is a large model (%2 MB).").arg(file, QLocale().toString(mb, 'f', mb < 10.0 ? 1 : 0)), QMessageBox::Cancel, this);
-    box.setInformativeText(tr("Making a KIMCAD project from it can take several minutes.\n\n"
+    box.setInformativeText(tr("Making a KimBim project from it can take several minutes.\n\n"
         "Editing the IFC directly opens it at once, without version history, options, compare or "
         "combine, and project settings (cut height, layer states, drawing scale, units) aren't kept. "
         "You can make a .kim later with File > Save As."));
@@ -2769,7 +2769,7 @@ void MainWindow::fillRecentMenu()
 
 void MainWindow::openProjectDialog()
 {
-    const QString folder = QFileDialog::getExistingDirectory(this, tr("Open a KIMCAD project folder"));
+    const QString folder = QFileDialog::getExistingDirectory(this, tr("Open a KimBim project folder"));
     if (!folder.isEmpty())
         openProject(folder);
 }
@@ -4995,7 +4995,7 @@ void MainWindow::saveAsDialog()
 {
     QString selected;
     const QString path = QFileDialog::getSaveFileName(this, tr("Save As"), m_document.value("path").toString(),
-        tr("KIMCAD project (*.kim);;IFC file (*.ifc)"), &selected);
+        tr("KimBim project (*.kim);;IFC file (*.ifc)"), &selected);
     if (!path.isEmpty())
         saveAs(path);
 }
@@ -5066,7 +5066,7 @@ void MainWindow::newProjectDialog()
     choices->setObjectName(QStringLiteral("templateList"));
     for (const auto& v : list) {
         const QJsonObject t = v.toObject();
-        auto* item = new QListWidgetItem(t.value("builtin").toBool() ? tr("KIMCAD default")
+        auto* item = new QListWidgetItem(t.value("builtin").toBool() ? tr("KimBim default")
             : QStringLiteral("%1  (%2)").arg(t.value("name").toString(), t.value("modified").toString()), choices);
         item->setData(Qt::UserRole, t.value("path").toString());
     }
@@ -5166,7 +5166,7 @@ void MainWindow::offerRecovery()
         const QString what = item.value("name").toString().isEmpty() ? tr("an untitled project") : item.value("name").toString();
         const QString when = QLocale().toString(QDateTime::fromSecsSinceEpoch(qint64(item.value("time").toDouble())), QLocale::ShortFormat);
         const auto answer = QMessageBox::question(this, tr("Recover unsaved work"),
-            tr("KIMCAD closed unexpectedly. Recover your work on %1 from %2?").arg(what, when),
+            tr("KimBim closed unexpectedly. Recover your work on %1 from %2?").arg(what, when),
             QMessageBox::Yes | QMessageBox::Discard, QMessageBox::Yes);
         if (answer == QMessageBox::Yes)
             return void(recoverFrom(item.value("id").toString()));
@@ -5316,4 +5316,4 @@ void MainWindow::onFailed(const QString& error)
     emit loadFailed(error);
 }
 
-} // namespace kimcad
+} // namespace kimbim

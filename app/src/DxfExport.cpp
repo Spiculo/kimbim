@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // DXF export (D83): File > Export DXF... A MainWindow member kept in its own file; the export itself runs
-// in Python (kimcad.dxf), one file per drawing or sheet, on the dialog's worker thread.
+// in Python (kimbim.dxf), one file per drawing or sheet, on the dialog's worker thread.
 #include "MainWindow.h"
 
 #include "DxfExportDialog.h"
@@ -11,7 +11,7 @@
 #include <QFileInfo>
 #include <QStandardPaths>
 
-namespace kimcad {
+namespace kimbim {
 
 void MainWindow::exportDxfDialog()
 {
@@ -41,4 +41,4 @@ void MainWindow::exportDxfDialog()
     restartRecoveryTimer();
 }
 
-} // namespace kimcad
+} // namespace kimbim

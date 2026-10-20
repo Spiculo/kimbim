@@ -3,7 +3,7 @@ import json
 
 from conftest import build_model
 
-from kimcad.cli import main
+from kimbim.cli import main
 
 
 def run(capsys, *argv):
@@ -66,8 +66,8 @@ def test_unicode_names_survive_real_pipes(tmp_path):
     env = {k: v for k, v in os.environ.items() if k not in ("PYTHONIOENCODING", "PYTHONUTF8")}
     env["PYTHONPATH"] = str(pathlib.Path(__file__).resolve().parents[2] / "python")
     proj = tmp_path / "p"
-    cmd = [sys.executable, "-m", "kimcad", "-C", str(proj)]
-    subprocess.run([sys.executable, "-m", "kimcad", "init", str(proj)], env=env, check=True, capture_output=True)
+    cmd = [sys.executable, "-m", "kimbim", "-C", str(proj)]
+    subprocess.run([sys.executable, "-m", "kimbim", "init", str(proj)], env=env, check=True, capture_output=True)
     out = subprocess.run(cmd + ["status", str(a)], env=env, capture_output=True)
     assert out.returncode == 0, out.stderr.decode(errors="replace")
     assert "墙 ✓ Muro" in out.stdout.decode("utf-8")
@@ -75,7 +75,7 @@ def test_unicode_names_survive_real_pipes(tmp_path):
 
 def test_not_a_project(tmp_path, capsys):
     code, _, err = run(capsys, "-C", str(tmp_path), "log")
-    assert code == 1 and "not a KIMCAD project" in err
+    assert code == 1 and "not a KimBim project" in err
 
 
 def test_engine_errors_are_messages_not_tracebacks(tmp_path, capsys, monkeypatch):
@@ -83,7 +83,7 @@ def test_engine_errors_are_messages_not_tracebacks(tmp_path, capsys, monkeypatch
     a = tmp_path / "a.ifc"
     build_model().write(str(a))
     run(capsys, "init", str(proj))
-    monkeypatch.setenv("KIMCAD_AUTHOR_NAME", "Evil <x>")
+    monkeypatch.setenv("KIMBIM_AUTHOR_NAME", "Evil <x>")
     code, _, err = run(capsys, "-C", str(proj), "commit", str(a), "-m", "x")
     assert code == 1 and "invalid author" in err and "Traceback" not in err
 

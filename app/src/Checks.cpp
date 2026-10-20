@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Checks (D81): schema validation, IDS, clash detection and model checks. MainWindow members kept in
-// their own file; the checks themselves run in Python (kimcad.checks), on a worker thread.
+// their own file; the checks themselves run in Python (kimbim.checks), on a worker thread.
 #include "MainWindow.h"
 
 #include "ChecksPanel.h"
@@ -26,7 +26,7 @@
 
 #include <limits>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -111,7 +111,7 @@ bool MainWindow::runChecks(const QStringList& checks, const QJsonObject& options
         return false;
     }
     // One worker thread per check, behind a window-modal progress dialog: the window keeps painting,
-    // nothing edits the model meanwhile, and Cancel stops the running check (kimcad.checks).
+    // nothing edits the model meanwhile, and Cancel stops the running check (kimbim.checks).
     m_recoveryTimer.stop();
     panel->clearResults();
     QProgressDialog progress(tr("Checking..."), tr("Cancel"), 0, int(checks.size()), this);
@@ -242,4 +242,4 @@ bool MainWindow::deleteClashSet(const QString& name)
     return ok;
 }
 
-} // namespace kimcad
+} // namespace kimbim

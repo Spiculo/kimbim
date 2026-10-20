@@ -12,8 +12,8 @@ import ezdxf
 import numpy as np
 import pytest
 
-from kimcad import app_bridge as b
-from kimcad import underlays as U
+from kimbim import app_bridge as b
+from kimbim import underlays as U
 
 
 def call(fn, *args):
@@ -273,7 +273,7 @@ def _tree(project):
 
 
 def test_underlay_files_are_versioned(tmp_path):
-    from kimcad import versioning as V
+    from kimbim import versioning as V
 
     assert call("new_project", "Under")["ok"]
     storey = call("storeys")["storeys"][0]["guid"]
@@ -284,7 +284,7 @@ def test_underlay_files_are_versioned(tmp_path):
     r = call("add_underlay", str(dxf_path), json.dumps({"storey": storey}))
     assert r["ok"], r
     u = r["underlay"]
-    local = tmp_path / "p" / ".kimcad" / "underlays" / u["file"]
+    local = tmp_path / "p" / ".kimbim" / "underlays" / u["file"]
     assert local.is_file() and local.read_bytes() == dxf_path.read_bytes()
     assert call("version_changes")["settings"] == ["underlays"]
     assert call("save_version", "Survey")["ok"]
@@ -320,7 +320,7 @@ def test_kim_round_trip_keeps_the_underlay(tmp_path, data_dir):
     assert call("save_as_kim", str(kim), "First")["ok"]
     with zipfile.ZipFile(kim) as z:
         names = z.namelist()
-    assert f".kimcad/underlays/{u['file']}" in names
+    assert f".kimbim/underlays/{u['file']}" in names
     assert call("close_document")["ok"]
     assert call("new_project", "Other")["ok"]
     assert call("underlays")["underlays"] == []

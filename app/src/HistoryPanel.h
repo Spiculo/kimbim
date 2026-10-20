@@ -10,7 +10,7 @@ class QListWidget;
 class QPushButton;
 class QTreeWidget;
 
-namespace kimcad {
+namespace kimbim {
 
 // Versions of the current design option (newest first) and the result of a Compare: elements
 // added / modified / removed. The viewport colours them; clicking one selects it.
@@ -46,4 +46,4 @@ private:
     int m_changeCount = 0;
 };
 
-} // namespace kimcad
+} // namespace kimbim

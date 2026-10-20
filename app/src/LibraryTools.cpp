@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // D86: the object library in the main window (doc 14 §8): the Library panel and the Object tool.
-// The objects, their types and plan symbols are python/kimcad/library.py's; one undo step each.
+// The objects, their types and plan symbols are python/kimbim/library.py's; one undo step each.
 #include <QAction>
 #include <QFileDialog>
 #include <QJsonArray>
@@ -18,7 +18,7 @@
 #include "TwoPointTool.h"
 #include "Viewport.h"
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -171,4 +171,4 @@ void MainWindow::updateObjectPreview()
     m_viewport->setPreviewBoxes(boxes);
 }
 
-} // namespace kimcad
+} // namespace kimbim

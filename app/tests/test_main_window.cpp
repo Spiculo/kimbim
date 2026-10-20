@@ -64,9 +64,9 @@
 
 namespace {
 
-Handle(kimcad::ElementBatch) batch(int n)
+Handle(kimbim::ElementBatch) batch(int n)
 {
-    kimcad::MeshChunk c;
+    kimbim::MeshChunk c;
     c.voff.push_back(0);
     c.toff.push_back(0);
     for (int e = 0; e < n; ++e) {
@@ -80,10 +80,10 @@ Handle(kimcad::ElementBatch) batch(int n)
         c.voff.push_back(uint32_t(c.verts.size() / 3));
         c.toff.push_back(uint32_t(c.tris.size() / 3));
     }
-    return new kimcad::ElementBatch(std::move(c));
+    return new kimbim::ElementBatch(std::move(c));
 }
 
-QAction* action(kimcad::MainWindow& w, const char* name)
+QAction* action(kimbim::MainWindow& w, const char* name)
 {
     QAction* a = w.findChild<QAction*>(QString::fromLatin1(name));
     if (!a)
@@ -101,9 +101,9 @@ private slots:
     // D71: the 3D view, drawings and sheets are center tabs; the panels are tabbed on the right.
     void viewsAndPanelsLiveInTheDockLayout()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         QVERIFY(w.newProject());
-        kimcad::DockLayout* dock = w.dockLayout();
+        kimbim::DockLayout* dock = w.dockLayout();
         QVERIFY(dock->view("3d"));
         QVERIFY(!dock->manager()->findDockWidget("3d")->features().testFlag(ads::CDockWidget::DockWidgetClosable));
         for (const char* panel : {"tree", "properties", "layers", "history", "drawings", "sheets"})
@@ -124,9 +124,9 @@ private slots:
     // used by nothing else in the window.
     void presetViewsAndPerspectiveFromTheViewMenu()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         QVERIFY(w.newProject());
-        kimcad::Viewport* v = w.viewport();
+        kimbim::Viewport* v = w.viewport();
         action(w, "actionViewFront")->trigger();
         QVERIFY(v->view()->Camera()->Direction().Y() > 0.999); // from the south, looking north
         action(w, "actionViewTop")->trigger();
@@ -160,7 +160,7 @@ private slots:
     // The rework is for room: the model view gets most of the width; the side columns stay narrow.
     void theModelViewGetsMostOfTheWidth()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         w.resize(1600, 1000);
         w.show();
         QCoreApplication::processEvents();
@@ -171,7 +171,7 @@ private slots:
     // A panel closed with its x comes back from View > Panels.
     void closedPanelsComeBackFromTheViewMenu()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         w.show();
         ads::CDockWidget* tree = w.dockLayout()->manager()->findDockWidget("tree");
         tree->closeDockWidget();
@@ -186,12 +186,12 @@ private slots:
     {
         QByteArray saved;
         {
-            kimcad::MainWindow w(nullptr, true);
+            kimbim::MainWindow w(nullptr, true);
             QVERIFY(w.newProject());
             QVERIFY(w.openDrawing(w.drawingGuid(QStringLiteral("North Elevation"))));
             saved = w.dockLayout()->saveLayout();
         }
-        kimcad::MainWindow w(nullptr, true); // a new session: that drawing tab doesn't exist here
+        kimbim::MainWindow w(nullptr, true); // a new session: that drawing tab doesn't exist here
         QVERIFY(w.newProject());
         w.dockLayout()->restoreLayout(saved); // never throws, never loses the 3D tab
         QVERIFY(w.dockLayout()->view("3d"));
@@ -203,53 +203,53 @@ private slots:
     // D71: plan tabs per level, views of the one loaded model.
     void planTabsShareTheModel()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         QVERIFY(w.newProject());
         const QString l1 = w.levelsBar()->activeStorey();
-        kimcad::Viewport* plan = w.openPlanTab(l1);
+        kimbim::Viewport* plan = w.openPlanTab(l1);
         QVERIFY(plan && plan != w.modelView());
         QCOMPARE(w.viewport(), plan);
         QVERIFY(plan->isPlanView());
         QCOMPARE(w.currentViewKey(), QStringLiteral("plan:") + l1);
         QCOMPARE(w.openPlanTab(l1), plan); // opened once, raised again
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->setTolerance(0.05);
         for (const QPointF& p : {QPointF(0, 0), QPointF(4, 0)})
             w.wallTool()->click(p);
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QCOMPARE(w.modelView()->elementCount(), plan->elementCount()); // one model
         QVERIFY(plan->elementCount() > 0);
         w.modelView()->selectGuids(plan->guids().mid(0, 1));
         QCOMPARE(plan->selectedGuids().size(), 1);
         QVERIFY(!w.modelView()->isPlanView());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         action(w, "action3DView")->trigger();
         QCOMPARE(w.viewport(), w.modelView());
-        QCOMPARE(w.tool(), kimcad::MainWindow::Tool::None); // switching views cancels the tool
+        QCOMPARE(w.tool(), kimbim::MainWindow::Tool::None); // switching views cancels the tool
         action(w, "actionPlanView")->trigger(); // P: the active level's plan tab
         QCOMPARE(w.viewport(), plan);
     }
 
     void deletingTheActivePlanLevel()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         QVERIFY(w.newProject());
         QVERIFY(w.addLevel(QStringLiteral("Level 2"), 3.0));
         const QString l2 = w.levelsBar()->activeStorey();
         QVERIFY(w.openPlanTab(l2));
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->setTolerance(0.05);
         w.wallTool()->click(QPointF(0, 0)); // a wall half-drawn
         action(w, "actionUndo")->trigger(); // the level goes (undoing Add level)
         QVERIFY(!w.dockLayout()->view(QStringLiteral("plan:") + l2));
         QCOMPARE(w.currentViewKey(), QString("3d"));
-        QCOMPARE(w.tool(), kimcad::MainWindow::Tool::None);
+        QCOMPARE(w.tool(), kimbim::MainWindow::Tool::None);
         QCOMPARE(w.viewport(), w.modelView());
     }
 
     void openingAFileClosesPlanTabs()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         QVERIFY(w.newProject());
         QVERIFY(w.openPlanTab(w.levelsBar()->activeStorey()));
         QVERIFY(w.newProject());
@@ -260,9 +260,9 @@ private slots:
 
     void eachViewKeepsItsOwnCut()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         QVERIFY(w.newProject());
-        kimcad::Viewport* plan = w.openPlanTab(w.levelsBar()->activeStorey());
+        kimbim::Viewport* plan = w.openPlanTab(w.levelsBar()->activeStorey());
         QVERIFY(plan->clipPlaneCount() >= 1); // a plan is cut
         QVERIFY(action(w, "actionPlanCut")->isChecked());
         w.dockLayout()->raise(QStringLiteral("3d"));
@@ -275,8 +275,8 @@ private slots:
     // D71: tools on the left in four groups; each tool in exactly one.
     void everyToolIsInOnePaletteGroup()
     {
-        kimcad::MainWindow w(nullptr, true);
-        kimcad::ToolPalette* p = w.toolPalette();
+        kimbim::MainWindow w(nullptr, true);
+        kimbim::ToolPalette* p = w.toolPalette();
         QCOMPARE(p->groups(), QStringList({"3d", "plane", "view", "edit"}));
         const QHash<QString, QStringList> expected = {
             {"3d", {"actionWallTool", "actionSlabTool", "actionColumnTool", "actionBeamTool", "actionDoorTool",
@@ -301,19 +301,19 @@ private slots:
         QVERIFY(!w.findChild<QToolBar*>(QStringLiteral("modelingToolbar"))); // the old toolbar is gone
         QVERIFY(w.dockLayout()->manager()->findDockWidget("tools"));
         action(w, "actionMirror")->trigger();
-        QCOMPARE(w.tool(), kimcad::MainWindow::Tool::None); // nothing selected: refused, as before
+        QCOMPARE(w.tool(), kimbim::MainWindow::Tool::None); // nothing selected: refused, as before
     }
 
     // D90: an icon for every tool, flyouts for related tools, a palette that fits 800 px; icon panel
     // tabs; the rarely used panels in View > Panels (and the panel area's Panels button).
     void paletteFlyoutsAndPanelTabs()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         w.resize(1500, 860);
         w.show();
         QVERIFY(w.newProject());
         QCoreApplication::processEvents();
-        kimcad::ToolPalette* p = w.toolPalette();
+        kimbim::ToolPalette* p = w.toolPalette();
         for (const QString& g : p->groups())
             for (QAction* a : p->actions(g)) {
                 QVERIFY2(!a->icon().isNull(), qPrintable(a->objectName()));
@@ -327,7 +327,7 @@ private slots:
         QCOMPARE(p->buttonFor(action(w, "actionElevationTool")), p->buttonFor(action(w, "actionSectionTool")));
         action(w, "actionRadialDimensionTool")->trigger(); // the last one used shows on the flyout
         QCOMPARE(dims->defaultAction(), action(w, "actionRadialDimensionTool"));
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QCOMPARE(p->columns(), 2);
         QWidget* inner = p->findChild<QScrollArea*>()->widget();
         QVERIFY2(inner->sizeHint().height() <= 800, qPrintable(QString::number(inner->sizeHint().height())));
@@ -350,7 +350,7 @@ private slots:
 
     void newPlanTabAndNewSheetFromThePalette()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         QVERIFY(w.newProject());
         action(w, "actionNewPlanTab")->trigger();
         QCOMPARE(w.currentViewKey(), QStringLiteral("plan:") + w.levelsBar()->activeStorey());
@@ -362,18 +362,18 @@ private slots:
     // D71: the active tool's fields in a strip above the active view, only while a tool is active.
     void toolOptionsFollowTheTool()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         w.show();
         QVERIFY(w.newProject());
-        kimcad::ToolOptionsBar* bar = w.toolOptions();
+        kimbim::ToolOptionsBar* bar = w.toolOptions();
         QVERIFY(bar->isHidden());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         QVERIFY(!bar->isHidden());
         QVERIFY(w.findChild<QDoubleSpinBox*>(QStringLiteral("wallHeight"))->isVisibleTo(bar));
         QVERIFY(!w.findChild<QComboBox*>(QStringLiteral("roofKind"))->isVisibleTo(bar));
-        w.setTool(kimcad::MainWindow::Tool::Roof);
+        w.setTool(kimbim::MainWindow::Tool::Roof);
         QVERIFY(w.findChild<QComboBox*>(QStringLiteral("roofKind"))->isVisibleTo(bar));
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QVERIFY(bar->isHidden());
         QVERIFY(w.dockLayout()->view(w.currentViewKey())->isAncestorOf(bar)); // in the active tab
         QVERIFY(w.openPlanTab(w.levelsBar()->activeStorey()));
@@ -384,17 +384,17 @@ private slots:
     // D71: the bottom bar: pen, layers, zoom, selection, messages.
     void bottomBarFollowsTheWindow()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         QVERIFY(w.newProject());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
-        QCOMPARE(w.statusStrip()->message(), QCoreApplication::translate("kimcad::MainWindow", "Wall: click the start point"));
+        w.setTool(kimbim::MainWindow::Tool::Wall);
+        QCOMPARE(w.statusStrip()->message(), QCoreApplication::translate("kimbim::MainWindow", "Wall: click the start point"));
         w.wallTool()->setTolerance(0.05);
         for (const QPointF& p : {QPointF(0, 0), QPointF(4, 0)})
             w.wallTool()->click(p);
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QVERIFY(w.statusStrip()->selectionText().isEmpty());
         w.setSelection(w.viewport()->guids().mid(0, 1));
-        QCOMPARE(w.statusStrip()->selectionText(), QStringLiteral("1 ") + kimcad::ModelTreePanel::plainName(QStringLiteral("IfcWall")));
+        QCOMPARE(w.statusStrip()->selectionText(), QStringLiteral("1 ") + kimbim::ModelTreePanel::plainName(QStringLiteral("IfcWall")));
         QVERIFY(!w.statusStrip()->layersText().isEmpty());
         QVERIFY(w.statusBar()->isHidden());
     }
@@ -403,13 +403,13 @@ private slots:
     // Versions button; no top toolbar and no separate menu row.
     void oneTitleBar()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         for (QToolBar* b : w.findChildren<QToolBar*>())
             QVERIFY(w.toolBarArea(b) != Qt::TopToolBarArea);
-        kimcad::TitleBar* bar = w.titleBar();
+        kimbim::TitleBar* bar = w.titleBar();
         QCOMPARE(w.menuWidget(), static_cast<QWidget*>(bar));
         QVERIFY(w.windowFlags() & Qt::FramelessWindowHint);
-        QVERIFY(bar->findChild<kimcad::LevelsBar*>());
+        QVERIFY(bar->findChild<kimbim::LevelsBar*>());
         QVERIFY(bar->findChild<QDoubleSpinBox*>(QStringLiteral("planCutHeight")));
         QVERIFY(bar->findChild<QToolButton*>(QStringLiteral("versionsButton")));
         for (const char* name : {"minimizeButton", "maximizeButton", "closeButton"})
@@ -426,11 +426,11 @@ private slots:
     // D75: a narrow window collapses the menus into one menu button instead of clipping them.
     void narrowTitleBarCollapsesTheMenus()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         w.resize(1600, 900);
         w.show();
         QVERIFY(QTest::qWaitForWindowExposed(&w));
-        kimcad::TitleBar* bar = w.titleBar();
+        kimbim::TitleBar* bar = w.titleBar();
         QVERIFY(!bar->menusCollapsed());
         QVERIFY(bar->menuButton()->isHidden());
         w.resize(700, 900);
@@ -446,14 +446,14 @@ private slots:
     // D75: the title shows the document, its design option and a modified marker; empty space drags.
     void titleBarShowsTheDocument()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         w.resize(1600, 900);
         w.show();
         QVERIFY(QTest::qWaitForWindowExposed(&w));
         QVERIFY(w.newProject());
-        kimcad::TitleBar* bar = w.titleBar();
+        kimbim::TitleBar* bar = w.titleBar();
         QVERIFY(bar->title().contains(QObject::tr("Untitled")));
-        QVERIFY(!bar->title().startsWith(QStringLiteral("KIMCAD")));
+        QVERIFY(!bar->title().startsWith(QStringLiteral("KimBim")));
         QVERIFY(w.addLevel(QStringLiteral("Level 2"), 3.0));
         QVERIFY(bar->title().endsWith(QStringLiteral("•")));
         QWidget* title = bar->findChild<QWidget*>(QStringLiteral("documentTitle"));
@@ -469,27 +469,27 @@ private slots:
     {
         const QRect work(0, 0, 1920, 1020); // 1920 x 1080 at 125 %, the taskbar below
         // maximized: the frame (10 px at 120 dpi) reaches past every side
-        QCOMPARE(kimcad::TitleBar::maximizedMargins(work.adjusted(-10, -10, 10, 10), work, 10, 1.25), QMargins(8, 8, 8, 8));
-        QCOMPARE(kimcad::TitleBar::maximizedMargins(work, work, 10, 1.25), QMargins());
+        QCOMPARE(kimbim::TitleBar::maximizedMargins(work.adjusted(-10, -10, 10, 10), work, 10, 1.25), QMargins(8, 8, 8, 8));
+        QCOMPARE(kimbim::TitleBar::maximizedMargins(work, work, 10, 1.25), QMargins());
         // minimized: the iconic rect, nowhere near the work area
         const QRect iconic(-32000, -32000, 200, 40);
-        QCOMPARE(kimcad::TitleBar::maximizedMargins(iconic, work, 10, 1.25), QMargins());
+        QCOMPARE(kimbim::TitleBar::maximizedMargins(iconic, work, 10, 1.25), QMargins());
         // a window larger than the screen (growing), or across monitors: never more than a frame
-        const QMargins grown = kimcad::TitleBar::maximizedMargins(QRect(-7, -7, 32800, 32164), work, 10, 1.25);
+        const QMargins grown = kimbim::TitleBar::maximizedMargins(QRect(-7, -7, 32800, 32164), work, 10, 1.25);
         QVERIFY(grown.left() <= 16 && grown.top() <= 16 && grown.right() <= 16 && grown.bottom() <= 16);
-        QCOMPARE(kimcad::TitleBar::maximizedMargins(QRect(-1930, -10, 1940, 1040), work, 10, 1.25), QMargins(0, 8, 0, 8));
+        QCOMPARE(kimbim::TitleBar::maximizedMargins(QRect(-1930, -10, 1940, 1040), work, 10, 1.25), QMargins(0, 8, 0, 8));
     }
 
     // D71: double-click an element for its properties; a level for its plan.
     void doubleClickShowsPropertiesOrOpensThePlan()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         QVERIFY(w.newProject());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->setTolerance(0.05);
         for (const QPointF& p : {QPointF(0, 0), QPointF(4, 0)})
             w.wallTool()->click(p);
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         const QString wall = w.viewport()->guids().constLast();
         w.dockLayout()->raisePanel(QStringLiteral("tree"));
         QVERIFY(!w.dockLayout()->isPanelShown(QStringLiteral("properties")));
@@ -502,8 +502,8 @@ private slots:
 
     void visibilityActionsUseTheSelection()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
-        kimcad::Viewport* v = w.viewport();
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::Viewport* v = w.viewport();
         v->addBatch(batch(4));
 
         v->selectGuids({"g1"});
@@ -520,8 +520,8 @@ private slots:
 
     void cutActionsAddAndRemoveClipPlanes()
     {
-        kimcad::MainWindow w(nullptr, true);
-        kimcad::Viewport* v = w.viewport();
+        kimbim::MainWindow w(nullptr, true);
+        kimbim::Viewport* v = w.viewport();
         v->addBatch(batch(4));
         QCOMPARE(v->clipPlaneCount(), 0);
         w.setPlanCutHeight(0.5);
@@ -540,13 +540,13 @@ private slots:
     {
         QTemporaryDir tmp;
         const QString path = tmp.filePath(QStringLiteral("modelo ñ.ifc"));
-        auto& py = kimcad::PythonEngine::instance();
+        auto& py = kimbim::PythonEngine::instance();
         QString error;
         QVERIFY(py.start(&error));
         py.callJson("_write_test_model", {path});
 
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
-        QSignalSpy done(&w, &kimcad::MainWindow::loadFinished);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
+        QSignalSpy done(&w, &kimbim::MainWindow::loadFinished);
         w.openFile(path);
         QVERIFY(done.wait(60000));
         const QStringList walls = w.viewport()->guids();
@@ -590,13 +590,13 @@ private slots:
     {
         QTemporaryDir tmp;
         const QString path = tmp.filePath(QStringLiteral("tipos.ifc"));
-        auto& py = kimcad::PythonEngine::instance();
+        auto& py = kimbim::PythonEngine::instance();
         QString error;
         QVERIFY(py.start(&error));
         py.callJson("_write_test_model", {path});
 
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
-        QSignalSpy done(&w, &kimcad::MainWindow::loadFinished);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
+        QSignalSpy done(&w, &kimbim::MainWindow::loadFinished);
         w.openFile(path);
         QVERIFY(done.wait(60000));
         const QStringList walls = w.viewport()->guids();
@@ -628,13 +628,13 @@ private slots:
     {
         QTemporaryDir tmp;
         const QString path = tmp.filePath(QStringLiteral("borrar.ifc"));
-        auto& py = kimcad::PythonEngine::instance();
+        auto& py = kimbim::PythonEngine::instance();
         QString error;
         QVERIFY(py.start(&error));
         py.callJson("_write_test_model", {path});
 
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
-        QSignalSpy done(&w, &kimcad::MainWindow::loadFinished);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
+        QSignalSpy done(&w, &kimbim::MainWindow::loadFinished);
         w.openFile(path);
         QVERIFY(done.wait(60000));
         const QStringList walls = w.viewport()->guids();
@@ -657,7 +657,7 @@ private slots:
     // Slice 4: new project with one level; levels can be added and undone.
     void newProjectAndLevels()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         QCOMPARE(w.viewport()->elementCount(), 0);
         QCOMPARE(w.levelsBar()->count(), 1);
@@ -681,16 +681,16 @@ private slots:
     // a slab from the wall loop, and Esc leaving the tool.
     void wallsDoorSlabWithTheTools()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->setTolerance(0.05);
         for (const QPointF& p : {QPointF(0, 0), QPointF(8, 0), QPointF(8, 6), QPointF(0, 6), QPointF(0, 0)})
             w.wallTool()->click(p);
         QCOMPARE(w.viewport()->elementCount(), 4);
         const QStringList walls = w.viewport()->guids();
 
-        w.setTool(kimcad::MainWindow::Tool::Door);
+        w.setTool(kimbim::MainWindow::Tool::Door);
         QVERIFY(action(w, "actionDoorTool")->isChecked());
         QVERIFY(!action(w, "actionWallTool")->isChecked());
         w.hostTool()->setTolerance(0.05);
@@ -701,19 +701,19 @@ private slots:
         action(w, "actionRedo")->trigger();
         QCOMPARE(w.viewport()->elementCount(), 5);
 
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QVERIFY(w.slabFromWalls(walls));
         QCOMPARE(w.viewport()->elementCount(), 6);
         QVERIFY(!w.slabFromWalls(walls.mid(0, 2))); // not a closed loop: refused, nothing added
         QCOMPARE(w.viewport()->elementCount(), 6);
 
-        w.setTool(kimcad::MainWindow::Tool::Slab);
+        w.setTool(kimbim::MainWindow::Tool::Slab);
         w.polygonTool()->click({10, 0});
         w.polygonTool()->click({12, 0});
         w.polygonTool()->click({12, 2});
         w.polygonTool()->finish(); // Enter
         QCOMPARE(w.viewport()->elementCount(), 7);
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QVERIFY(!w.viewport()->isDrawingMode());
         QVERIFY(w.close());
     }
@@ -721,16 +721,16 @@ private slots:
     // Slice 6: columns, beams and grid lines through the tools; undo removes them.
     void columnBeamGridWithTheTools()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
-        w.setTool(kimcad::MainWindow::Tool::Grid);
+        w.setTool(kimbim::MainWindow::Tool::Grid);
         w.twoPointTool()->click({0, -1});
         w.twoPointTool()->click({0, 7});
         QCOMPARE(w.gridLineCount(), 1);
-        w.setTool(kimcad::MainWindow::Tool::Column);
+        w.setTool(kimbim::MainWindow::Tool::Column);
         w.columnAt(QPointF(0.03, 0.02)); // snaps onto the grid line
         QCOMPARE(w.viewport()->elementCount(), 1);
-        w.setTool(kimcad::MainWindow::Tool::Beam);
+        w.setTool(kimbim::MainWindow::Tool::Beam);
         w.twoPointTool()->click({0, 0});
         w.twoPointTool()->click({0, 5});
         QCOMPARE(w.viewport()->elementCount(), 2);
@@ -747,14 +747,14 @@ private slots:
     // beam, stretch a wall, change a wall's height, resize a door; undo restores.
     void moveRotateStretchWithTheTools()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->setTolerance(0.05);
         for (const QPointF& p : {QPointF(0, 0), QPointF(8, 0), QPointF(8, 6), QPointF(0, 6), QPointF(0, 0)})
             w.wallTool()->click(p);
         const QStringList walls = w.viewport()->guids();
-        w.setTool(kimcad::MainWindow::Tool::Door);
+        w.setTool(kimbim::MainWindow::Tool::Door);
         w.hostTool()->setTolerance(0.05);
         w.hostTool()->click({4.0, 0.0});
         QString door;
@@ -777,7 +777,7 @@ private slots:
 
         // Move the south wall 1 m south: the door goes with it, the side walls follow.
         w.setSelection({south});
-        w.setTool(kimcad::MainWindow::Tool::Move);
+        w.setTool(kimbim::MainWindow::Tool::Move);
         w.twoPointTool()->click({4, 0});
         w.twoPointTool()->click({4, -1});
         QVERIFY(std::abs(centre(door)[1] - (doorY - 1.0)) < 0.01);
@@ -786,7 +786,7 @@ private slots:
 
         // Moving only the door slides it along its wall.
         w.setSelection({door});
-        w.setTool(kimcad::MainWindow::Tool::Move);
+        w.setTool(kimbim::MainWindow::Tool::Move);
         w.twoPointTool()->setOrtho(true); // Shift: straight along X
         w.twoPointTool()->click({4, 0});
         w.twoPointTool()->click({6, 0.5});
@@ -795,12 +795,12 @@ private slots:
         QVERIFY(std::abs(centre(door)[1] - doorY) < 0.01);
 
         // Rotate a beam 90 degrees around its start.
-        w.setTool(kimcad::MainWindow::Tool::Beam);
+        w.setTool(kimbim::MainWindow::Tool::Beam);
         w.twoPointTool()->click({10, 0});
         w.twoPointTool()->click({14, 0});
         const QString beam = w.viewport()->guids().last();
         w.setSelection({beam});
-        w.setTool(kimcad::MainWindow::Tool::Rotate);
+        w.setTool(kimbim::MainWindow::Tool::Rotate);
         w.rotateTool()->click({10, 0});
         w.rotateTool()->click({14, 0});
         w.rotateTool()->click({10, 4});
@@ -808,18 +808,18 @@ private slots:
         QVERIFY(w.viewport()->guids().contains(beam));   // same element
 
         // Stretch a free wall's end from x = 24 to x = 26.
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->click({20, 0});
         w.wallTool()->click({24, 0});
         w.wallTool()->finish();
         const QString free = w.viewport()->guids().last();
-        w.setTool(kimcad::MainWindow::Tool::Stretch);
+        w.setTool(kimbim::MainWindow::Tool::Stretch);
         w.gripTool()->setTolerance(0.1);
         w.gripTool()->click({24, 0});
         w.gripTool()->click({26, 0});
         QVERIFY(std::abs(centre(free)[3] - 6.0) < 0.05);
 
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QVERIFY(w.setWallHeight({free}, 4.5));
         QVERIFY(std::abs(centre(free)[2] - 4.5) < 0.01);
         QVERIFY(w.resizeOpening(door, 1.2, 2.2, 0.0));
@@ -833,15 +833,15 @@ private slots:
     void splitTrimAndJoinWithTheTools()
     {
         // D80: split a wall with a door, merge it back, trim a crossing wall, join and unjoin; undo.
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->setTolerance(0.05);
         w.wallTool()->click({0, 0});
         w.wallTool()->click({10, 0});
         w.wallTool()->finish();
         const QString wall = w.viewport()->guids().last();
-        w.setTool(kimcad::MainWindow::Tool::Door);
+        w.setTool(kimbim::MainWindow::Tool::Door);
         w.hostTool()->setTolerance(0.05);
         w.hostTool()->click({2.0, 0.0});
         auto walls = [&] {
@@ -858,7 +858,7 @@ private slots:
         };
         QCOMPARE(walls().size(), 1);
 
-        w.setTool(kimcad::MainWindow::Tool::Split);
+        w.setTool(kimbim::MainWindow::Tool::Split);
         QVERIFY(w.toolOptions()->findChild<QComboBox*>("modifyMode")->isHidden());
         w.modifyTool()->setTolerance(0.05);
         w.modifyTool()->click({6.0, 0.05});
@@ -875,7 +875,7 @@ private slots:
         QCOMPARE(walls().size(), 2);
 
         // Join merges the two pieces back into the first.
-        w.setTool(kimcad::MainWindow::Tool::Join);
+        w.setTool(kimbim::MainWindow::Tool::Join);
         w.modifyTool()->setTolerance(0.05);
         w.modifyTool()->click({1.0, 0.0});
         w.modifyTool()->click({9.0, 0.0});
@@ -883,12 +883,12 @@ private slots:
         QVERIFY(std::abs(lengthX(wall) - 10.0) < 0.4);
 
         // A crossing wall trimmed to it, keeping the north side.
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->click({5, -2});
         w.wallTool()->click({5, 4});
         w.wallTool()->finish();
         const QString cross = w.viewport()->guids().last();
-        w.setTool(kimcad::MainWindow::Tool::Trim);
+        w.setTool(kimbim::MainWindow::Tool::Trim);
         auto* mode = w.toolOptions()->findChild<QComboBox*>("modifyMode");
         QCOMPARE(mode->count(), 2);
         w.modifyTool()->setTolerance(0.05);
@@ -899,26 +899,26 @@ private slots:
         QVERIFY(y0 > -0.5 && y1 > 3.9);
 
         // Unjoin (the Join tool's second mode) breaks the T the trim made.
-        w.setTool(kimcad::MainWindow::Tool::Join);
+        w.setTool(kimbim::MainWindow::Tool::Join);
         w.toolOptions()->findChild<QComboBox*>("modifyMode")->setCurrentIndex(1);
-        QCOMPARE(w.modifyTool()->mode(), kimcad::ModifyTool::Mode::Unjoin);
+        QCOMPARE(w.modifyTool()->mode(), kimbim::ModifyTool::Mode::Unjoin);
         w.modifyTool()->click({5.0, 3.0});
         w.modifyTool()->click({3.0, 0.0});
         QVERIFY(!w.unjoinElements(cross, wall)); // no longer joined: refused
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QVERIFY(w.close());
     }
 
     void lStairRailingAndRampWithTheTools()
     {
         // D88: an L stair drawn with the Stair tool, railings on it with the Railing tool, a ramp.
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         const QString l1 = w.levelsBar()->activeStorey();
         QVERIFY(w.addLevel(QStringLiteral("Level 2"), 3.0));
         w.levelsBar()->setActive(l1);
         QVERIFY(w.openPlanTab(l1)); // the plan symbol shows in plan views
-        w.setTool(kimcad::MainWindow::Tool::Stair);
+        w.setTool(kimbim::MainWindow::Tool::Stair);
         w.setStairShape(QStringLiteral("stair"), QStringLiteral("L"), QStringLiteral("left"));
         w.twoPointTool()->click({1, 1});
         w.twoPointTool()->click({5, 1});
@@ -934,7 +934,7 @@ private slots:
         QVERIFY(std::abs(x1 - (1.0 + 8 * 0.28 + 1.0)) < 0.01); // the quarter landing's far side
         QVERIFY(y1 > 1.0 + 0.5 + 8 * 0.28 - 0.01);            // the second flight turns left
         // A click on a flight selects the stair with its parts; Properties show the stair.
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         w.setSelection({flights.first()});
         QCOMPARE(w.selection().size(), 4); // the stair, two flights, the landing
         // The plan symbol is drawn as plan annotations named after the stair.
@@ -943,34 +943,34 @@ private slots:
             symbol = symbol || g.endsWith(QStringLiteral("~symbol"));
         QVERIFY(symbol);
         // Railings on both sides: one click on the stair.
-        w.setTool(kimcad::MainWindow::Tool::Railing);
+        w.setTool(kimbim::MainWindow::Tool::Railing);
         QVERIFY(action(w, "actionRailingTool")->isChecked());
         QVERIFY(w.railStairAt({2.0, 1.0}));
         QCOMPARE(w.viewport()->elementCount(), 5);
         QVERIFY(!w.railStairAt({20.0, 20.0})); // nothing there
         // A ramp: Stair tool, ramp kind.
-        w.setTool(kimcad::MainWindow::Tool::Stair);
+        w.setTool(kimbim::MainWindow::Tool::Stair);
         w.setStairShape(QStringLiteral("ramp"), QStringLiteral("straight"));
         w.twoPointTool()->click({1, -3});
         w.twoPointTool()->click({5, -3});
         QCOMPARE(w.viewport()->elementCount(), 6);
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QVERIFY(w.close());
     }
 
     void secondFloorWithTheTools()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         const QString l1 = w.levelsBar()->activeStorey();
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->setTolerance(0.05);
         for (const QPointF& p : {QPointF(0, 0), QPointF(8, 0), QPointF(8, 6), QPointF(0, 6), QPointF(0, 0)})
             w.wallTool()->click(p);
-        w.setTool(kimcad::MainWindow::Tool::Door);
+        w.setTool(kimbim::MainWindow::Tool::Door);
         w.hostTool()->setTolerance(0.05);
         w.hostTool()->click({4.0, 0.0});
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QStringList walls;
         for (const QString& g : w.viewport()->guids())
             if (w.viewport()->typeOf(g) == QLatin1String("IfcWall"))
@@ -983,7 +983,7 @@ private slots:
         QCOMPARE(w.viewport()->elementCount(), 10); // 4 walls + door, twice
 
         w.levelsBar()->setActive(l1);
-        w.setTool(kimcad::MainWindow::Tool::Stair);
+        w.setTool(kimbim::MainWindow::Tool::Stair);
         w.twoPointTool()->click({1, 1});
         w.twoPointTool()->click({5, 1});
         QCOMPARE(w.viewport()->elementCount(), 11);
@@ -992,14 +992,14 @@ private slots:
         QVERIFY(std::abs(z1 - 3.0) < 0.01); // up to Level 2
 
         w.levelsBar()->setActive(l2);
-        w.setTool(kimcad::MainWindow::Tool::Slab);
+        w.setTool(kimbim::MainWindow::Tool::Slab);
         for (const QPointF& p : {QPointF(0, 0), QPointF(8, 0), QPointF(8, 6), QPointF(0, 6)})
             w.polygonTool()->click(p);
         w.polygonTool()->finish();
         const QString slab = w.viewport()->guids().last();
         QCOMPARE(w.viewport()->typeOf(slab), QString("IfcSlab"));
         w.setSelection({slab});
-        w.setTool(kimcad::MainWindow::Tool::SlabOpening);
+        w.setTool(kimbim::MainWindow::Tool::SlabOpening);
         QVERIFY(action(w, "actionSlabOpeningTool")->isChecked());
         for (const QPointF& p : {QPointF(1, 0.5), QPointF(5.8, 0.5), QPointF(5.8, 1.6), QPointF(1, 1.6)})
             w.polygonTool()->click(p);
@@ -1014,15 +1014,15 @@ private slots:
     void versionedProjectFlow()
     {
         QTemporaryDir tmp;
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->click({0, 0});
         w.wallTool()->click({5, 0});
         w.wallTool()->finish();
         w.wallTool()->click({0, 3});
         w.wallTool()->click({5, 3});
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         const QStringList walls = w.viewport()->guids();
         QCOMPARE(walls.size(), 2);
 
@@ -1030,7 +1030,7 @@ private slots:
         auto* versions = w.titleBar()->findChild<QToolButton*>(QStringLiteral("versionsButton"));
         QVERIFY(action(w, "actionEnableVersioning")->isVisible());
         QVERIFY(!action(w, "actionNewOption")->isVisible());
-        QCOMPARE(versions->text(), QCoreApplication::translate("kimcad::MainWindow", "Versions"));
+        QCOMPARE(versions->text(), QCoreApplication::translate("kimbim::MainWindow", "Versions"));
         QVERIFY(w.enableVersioning(tmp.filePath(QStringLiteral("proyecto ñ"))));
         QVERIFY(!action(w, "actionEnableVersioning")->isVisible());
         QVERIFY(action(w, "actionNewOption")->isVisible() && action(w, "actionShowHistory")->isVisible());
@@ -1063,7 +1063,7 @@ private slots:
         QVERIFY(w.saveVersion(QStringLiteral("B without the north wall")));
         QCOMPARE(w.viewport()->elementCount(), 1);
 
-        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        QSignalSpy loaded(&w, &kimbim::MainWindow::loadFinished);
         QVERIFY(w.switchOption(QStringLiteral("main")));
         QVERIFY(loaded.wait(60000));
         QCOMPARE(w.viewport()->elementCount(), 2); // main still has both walls
@@ -1082,15 +1082,15 @@ private slots:
     void m5ExitCombineOptions()
     {
         QTemporaryDir tmp;
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->click({0, 0});
         w.wallTool()->click({5, 0});
         w.wallTool()->finish();
         w.wallTool()->click({0, 3});
         w.wallTool()->click({5, 3});
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         const QStringList walls = w.viewport()->guids();
         QCOMPARE(walls.size(), 2);
         QVERIFY(w.enableVersioning(tmp.filePath(QStringLiteral("casa"))));
@@ -1099,14 +1099,14 @@ private slots:
         QVERIFY(w.createOption(QStringLiteral("Scheme B")));
         w.setSelection({walls[0]});
         QVERIFY(w.applyName(QStringLiteral("South wall (B)")));
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->click({0, 6});
         w.wallTool()->click({5, 6});
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QVERIFY(w.saveVersion(QStringLiteral("B: rename, third wall")));
 
         // main: the same wall renamed differently.
-        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        QSignalSpy loaded(&w, &kimbim::MainWindow::loadFinished);
         QVERIFY(w.switchOption(QStringLiteral("main")));
         QVERIFY(loaded.wait(60000));
         w.setSelection({walls[0]});
@@ -1121,9 +1121,9 @@ private slots:
         // Combined in the dialog: one conflict, resolved by choosing the other option's name.
         auto bridge = [](const char* fn, const QStringList& args) {
             QString error;
-            return kimcad::PythonEngine::instance().callJson(fn, args, &error).object();
+            return kimbim::PythonEngine::instance().callJson(fn, args, &error).object();
         };
-        kimcad::CombineDialog dialog(bridge, {QStringLiteral("Scheme B")});
+        kimbim::CombineDialog dialog(bridge, {QStringLiteral("Scheme B")});
         QCOMPARE(dialog.option(), QStringLiteral("Scheme B"));
         QCOMPARE(dialog.table()->rowCount(), 1);
         QVERIFY(dialog.table()->item(0, 0)->text().contains(QStringLiteral("IfcWall")));
@@ -1148,10 +1148,10 @@ private slots:
     {
         // The drag kept an index into the placed drawings; a sheet refresh (a background generation
         // finishing) replaced them mid-drag, and paint/release read past the end of the list.
-        kimcad::DrawingView view(QStringLiteral("sheet:A01"));
+        kimbim::DrawingView view(QStringLiteral("sheet:A01"));
         view.resize(400, 300);
         view.setPlaced({{QStringLiteral("d1"), QRectF(0, 0, 50, 50)}, {QStringLiteral("d2"), QRectF(60, 0, 50, 50)}});
-        QSignalSpy moved(&view, &kimcad::DrawingView::placedMoved);
+        QSignalSpy moved(&view, &kimbim::DrawingView::placedMoved);
         const QPointF from = (QPointF(80, 10) - view.toPaper(QPointF(0, 0))) * view.zoom(); // on d2
         QTest::mousePress(&view, Qt::LeftButton, {}, from.toPoint());
         view.setPlaced({{QStringLiteral("d1"), QRectF(0, 0, 50, 50)}}); // d2's plan was deleted meanwhile
@@ -1165,12 +1165,12 @@ private slots:
     // D74: a legend placed on a sheet tab is drawn, dragged and removed like a placed drawing.
     void sheetLegendPlacedDraggedRemoved()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         const QString number = w.addSheet(QStringLiteral("A3"), QStringLiteral("Legend"));
         QVERIFY(!number.isEmpty());
         QVERIFY(w.placeLegend(number));
-        kimcad::DrawingView* view = w.sheetView(number);
+        kimbim::DrawingView* view = w.sheetView(number);
         QVERIFY(view);
         QString id;
         for (const auto& p : view->placed())
@@ -1178,7 +1178,7 @@ private slots:
                 id = p.guid;
         QVERIFY(!id.isEmpty());
         auto legends = [number] {
-            for (const auto& v : kimcad::PythonEngine::instance().callJson("sheets", {}).object().value("sheets").toArray())
+            for (const auto& v : kimbim::PythonEngine::instance().callJson("sheets", {}).object().value("sheets").toArray())
                 if (v.toObject().value("number").toString() == number)
                     return v.toObject().value("legends").toArray();
             return QJsonArray();
@@ -1188,14 +1188,14 @@ private slots:
         emit view->placedRemoveRequested(id);
         QVERIFY(legends().isEmpty());
         QVERIFY(std::none_of(view->placed().begin(), view->placed().end(),
-            [](const kimcad::DrawingView::Placed& p) { return p.guid.startsWith(QLatin1String("legend:")); }));
+            [](const kimbim::DrawingView::Placed& p) { return p.guid.startsWith(QLatin1String("legend:")); }));
     }
 
     void combineDialogPreviewsOncePerChoice()
     {
         // A choice queued a refresh and choose() refreshed again: the three-way merge ran twice.
         int previews = 0;
-        kimcad::CombineDialog::Bridge bridge = [&previews](const char* fn, const QStringList&) {
+        kimbim::CombineDialog::Bridge bridge = [&previews](const char* fn, const QStringList&) {
             if (QByteArray(fn) == "combine_preview")
                 ++previews;
             const QJsonObject conflict{{"id", "o/W#Name"}, {"kind", "attribute"}, {"attribute", "Name"},
@@ -1203,7 +1203,7 @@ private slots:
             return QJsonObject{{"ok", true}, {"status", "merge"}, {"conflicts", QJsonArray{conflict}},
                 {"unresolved", QJsonArray{}}, {"from_theirs", QJsonArray{}}};
         };
-        kimcad::CombineDialog dialog(bridge, {QStringLiteral("Scheme B")});
+        kimbim::CombineDialog dialog(bridge, {QStringLiteral("Scheme B")});
         QCoreApplication::processEvents();
         previews = 0;
         QVERIFY(dialog.choose(0, QStringLiteral("theirs")));
@@ -1214,12 +1214,12 @@ private slots:
     void milestonesHistoryAndDeleteOption()
     {
         QTemporaryDir tmp;
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->click({0, 0});
         w.wallTool()->click({5, 0});
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         const QString wall = w.viewport()->guids().first();
         QVERIFY(w.enableVersioning(tmp.filePath(QStringLiteral("hitos"))));
         const QString first = w.history().first().toObject().value("id").toString();
@@ -1243,7 +1243,7 @@ private slots:
         w.endCompare();
         QVERIFY(w.createOption(QStringLiteral("Scheme B")));
         QVERIFY(!w.deleteOption(QStringLiteral("Scheme B"))); // the current option
-        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        QSignalSpy loaded(&w, &kimbim::MainWindow::loadFinished);
         QVERIFY(w.switchOption(QStringLiteral("main")));
         QVERIFY(loaded.wait(60000));
         QVERIFY(w.deleteOption(QStringLiteral("Scheme B")));
@@ -1254,7 +1254,7 @@ private slots:
     // Feedback: the plan cut height is a slider at the right of the 3D view; using it turns the cut on.
     void planCutSliderBesideTheView()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         auto* slider = w.findChild<QSlider*>(QStringLiteral("planCutSlider"));
         QVERIFY(slider);
@@ -1272,12 +1272,12 @@ private slots:
     // Owner feedback: editing a length in the Properties panel changes the element.
     void editingDimensionsInThePanelChangesGeometry()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->click({0, 0});
         w.wallTool()->click({5, 0});
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         const QString wall = w.viewport()->guids().first();
         w.setSelection({wall});
         QVERIFY(w.applyPropertyEdit(QStringLiteral("Dimensions"), QStringLiteral("Length"), QJsonValue(6.5)));
@@ -1295,12 +1295,12 @@ private slots:
     // (snapped: here 0.97 m becomes 1 m on the grid... the angle snap keeps it straight).
     void draggingASelectedElementMovesIt()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->click({0, 0});
         w.wallTool()->click({5, 0});
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         const QString wall = w.viewport()->guids().first();
         w.setSelection({wall});
         w.dragMoveTo(QPointF(2.5, 0.0), QPointF(2.52, -1.004), 0.05, Qt::NoModifier); // preview only
@@ -1316,15 +1316,15 @@ private slots:
     // Owner feedback: layers as boundaries, views as collections of layers.
     void layersAndViews()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->click({0, 0});
         w.wallTool()->click({5, 0});
         w.wallTool()->finish();
         w.wallTool()->click({0, 3});
         w.wallTool()->click({5, 3});
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QStringList walls = w.viewport()->guids();
         QVERIFY(w.columnAt(QPointF(8, 0)));
         QCOMPARE(w.viewport()->visibleElementCount(), 3);
@@ -1348,27 +1348,27 @@ private slots:
     // Owner feedback: "models" — an apartment drawn once and placed on many levels.
     void modelsPlacedOnLevels()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         const QString level = w.levelsBar()->activeStorey();
         QVERIFY(w.createModel(QStringLiteral("Apartment A")));
         const QString model = w.levelsBar()->activeStorey();
         QVERIFY(model != level); // the new model is where we draw now
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->click({0, 0});
         w.wallTool()->click({5, 0});
         w.wallTool()->click({5, 3});
         w.wallTool()->finish();
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         const QStringList inModel = w.viewport()->guids();
         QCOMPARE(w.viewport()->visibleElementCount(), 2);
         w.levelsBar()->setActive(level);
         QCOMPARE(w.viewport()->visibleElementCount(), 0); // models aren't part of the building
 
-        w.setTool(kimcad::MainWindow::Tool::PlaceModel);
+        w.setTool(kimbim::MainWindow::Tool::PlaceModel);
         QVERIFY(w.placeModelAt(QPointF(10, 0), false));
         QVERIFY(w.placeModelAt(QPointF(10, 10), true));
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QCOMPARE(w.viewport()->visibleElementCount(), 4);
 
         QString part;
@@ -1379,11 +1379,11 @@ private slots:
         QCOMPARE(w.selection().size(), 2); // a click on an instance takes the whole instance
 
         w.levelsBar()->setActive(model);
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->click({0, 3});
         w.wallTool()->click({0, 0});
         w.wallTool()->finish();
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QVERIFY(w.updateModelInstances());
         w.levelsBar()->setActive(level);
         QCOMPARE(w.viewport()->visibleElementCount(), 6);
@@ -1398,31 +1398,31 @@ private slots:
     // Owner feedback: architects put labels, dimensions and marks on the plan.
     void planAnnotations()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         QVERIFY(w.addAnnotation(QStringLiteral("text"), {QPointF(1, 2)}, QStringLiteral("Living room")));
         QVERIFY(w.addAnnotation(QStringLiteral("mark"), {QPointF(3, 3)}, QStringLiteral("A")));
         QCOMPARE(w.viewport()->annotationCount(), 2);
 
         // The dimension tool: click both ends, then where the dimension line goes.
-        w.setTool(kimcad::MainWindow::Tool::Dimension);
+        w.setTool(kimbim::MainWindow::Tool::Dimension);
         for (const QPointF p : {QPointF(0, 0), QPointF(4.5, 0), QPointF(2, -1)})
             emit w.viewport()->workPointClicked(p, 0.01, Qt::NoModifier);
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QCOMPARE(w.viewport()->annotationCount(), 3);
         QVERIFY(w.viewport()->annotationTexts().contains(QStringLiteral("4.50")));
 
         // Slice 15: Shift+click chains more points; the Leader tool points at something.
-        w.setTool(kimcad::MainWindow::Tool::Dimension);
+        w.setTool(kimbim::MainWindow::Tool::Dimension);
         emit w.viewport()->workPointClicked(QPointF(0, 5), 0.01, Qt::NoModifier);
         emit w.viewport()->workPointClicked(QPointF(3, 5), 0.01, Qt::NoModifier);
         emit w.viewport()->workPointClicked(QPointF(7, 5), 0.01, Qt::ShiftModifier);
         emit w.viewport()->workPointClicked(QPointF(2, 6), 0.01, Qt::NoModifier);
         QVERIFY(w.viewport()->annotationTexts().contains(QStringLiteral("3.00 4.00")));
-        w.setTool(kimcad::MainWindow::Tool::Leader);
+        w.setTool(kimbim::MainWindow::Tool::Leader);
         emit w.viewport()->workPointClicked(QPointF(1, 1), 0.01, Qt::NoModifier);
         emit w.viewport()->workPointClicked(QPointF(2, 2), 0.01, Qt::NoModifier);
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QCOMPARE(w.viewport()->annotationCount(), 5);
         QVERIFY(w.viewport()->annotationTexts().contains(QStringLiteral("Note")));
 
@@ -1441,7 +1441,7 @@ private slots:
 
     void sectionsAndElevations()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         // D61: a new project has Archicad's four template elevations, listed and marked in plan.
         QCOMPARE(w.drawingsPanel()->count(), 5);
@@ -1451,17 +1451,17 @@ private slots:
         QCOMPARE(w.viewport()->markerCount(), 4);
         QCOMPARE(w.viewport()->annotationCount(), 0); // markers are not plan annotations
 
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->setTolerance(0.05);
         for (const QPointF& p : {QPointF(0, 0), QPointF(8, 0)})
             w.wallTool()->click(p);
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
 
         // The Section tool (D61): two clicks for the line, a third for the side it looks at.
-        w.setTool(kimcad::MainWindow::Tool::Section);
+        w.setTool(kimbim::MainWindow::Tool::Section);
         for (const QPointF p : {QPointF(4, -2), QPointF(4, 6), QPointF(6, 0)})
             emit w.viewport()->workPointClicked(p, 0.01, Qt::NoModifier);
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QCOMPARE(w.drawingsPanel()->count(), 6);
         QCOMPARE(w.viewport()->markerCount(), 5);
         const QString section = w.drawingGuid(QStringLiteral("Section 1"));
@@ -1469,7 +1469,7 @@ private slots:
 
         // Open it in a tab: generated in the background, shown when ready.
         QVERIFY(w.openDrawing(section));
-        kimcad::DrawingView* view = w.drawingView(section);
+        kimbim::DrawingView* view = w.drawingView(section);
         QVERIFY(view);
         QTRY_VERIFY_WITH_TIMEOUT(view->hasDrawing(), 60000);
         QVERIFY(!view->isStale());
@@ -1477,11 +1477,11 @@ private slots:
 
         // An edit makes it out of date; regenerating brings it back.
         w.showModelTab();
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->setTolerance(0.05);
         for (const QPointF& p : {QPointF(0, 3), QPointF(8, 3)})
             w.wallTool()->click(p);
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QVERIFY(view->isStale());
         w.regenerateDrawing(section);
         QTRY_VERIFY_WITH_TIMEOUT(!view->isStale(), 60000);
@@ -1512,19 +1512,19 @@ private slots:
 
     void sheetsAndPdf()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->setTolerance(0.05);
         for (const QPointF& p : {QPointF(0, 0), QPointF(6, 0), QPointF(6, 4)})
             w.wallTool()->click(p);
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QVERIFY(w.setProjectInfo(QJsonObject{{"number", "T-1"}, {"name", "Test house"}}));
         const QString number = w.addSheet(QStringLiteral("A3"), QStringLiteral("Plans"));
         QCOMPARE(number, QStringLiteral("A01"));
         QCOMPARE(w.sheetsPanel()->count(), 1);
         QVERIFY(w.placeOnSheet(number, w.drawingGuid(QStringLiteral("Level 1 Floor Plan"))));
-        kimcad::DrawingView* sheet = w.sheetView(number);
+        kimbim::DrawingView* sheet = w.sheetView(number);
         QVERIFY(sheet);
         QTRY_VERIFY_WITH_TIMEOUT(sheet->hasDrawing(), 60000);
         QCOMPARE(sheet->paperSize(), QSizeF(420, 297));
@@ -1539,13 +1539,13 @@ private slots:
 
     void everydayEditing()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->setTolerance(0.05);
         for (const QPointF& p : {QPointF(0, 0), QPointF(5, 0)})
             w.wallTool()->click(p);
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QCOMPARE(w.viewport()->elementCount(), 1);
         const QString wall = w.viewport()->guids().first();
         w.setSelection({wall});
@@ -1563,7 +1563,7 @@ private slots:
         QVERIFY(w.multiplySelection(QStringLiteral("linear"), {{"dx", 0.0}, {"dy", 6.0}, {"count", 2}}));
         QCOMPARE(w.viewport()->elementCount(), 6);
         w.setSelection({wall});
-        w.setTool(kimcad::MainWindow::Tool::Mirror); // Ctrl+M: two clicks; Ctrl on the second copies
+        w.setTool(kimbim::MainWindow::Tool::Mirror); // Ctrl+M: two clicks; Ctrl on the second copies
         emit w.viewport()->workPointClicked(QPointF(0, -2), 0.01, Qt::NoModifier);
         emit w.viewport()->workPointClicked(QPointF(5, -2), 0.01, Qt::ControlModifier);
         QCOMPARE(w.viewport()->elementCount(), 7);
@@ -1575,16 +1575,16 @@ private slots:
 
     void roomsAndSchedule()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->setTolerance(0.05);
         for (const QPointF& p : {QPointF(0, 0), QPointF(6, 0), QPointF(6, 4), QPointF(0, 4), QPointF(0, 0)})
             w.wallTool()->click(p);
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QCOMPARE(w.viewport()->elementCount(), 4);
         const int before = w.viewport()->annotationCount();
-        w.setTool(kimcad::MainWindow::Tool::Room); // Z: click inside the walls
+        w.setTool(kimbim::MainWindow::Tool::Room); // Z: click inside the walls
         emit w.viewport()->workPointClicked(QPointF(20, 20), 0.01, Qt::NoModifier); // outside: nothing
         QCOMPARE(w.viewport()->annotationCount(), before);
         emit w.viewport()->workPointClicked(QPointF(3, 2), 0.01, Qt::NoModifier);
@@ -1598,22 +1598,22 @@ private slots:
 
     void schedulesSelectAndEdit()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->setTolerance(0.05);
         for (const QPointF& p : {QPointF(0, 0), QPointF(6, 0), QPointF(6, 4), QPointF(0, 4), QPointF(0, 0)})
             w.wallTool()->click(p);
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QVERIFY(action(w, "actionSchedules"));
-        kimcad::SchedulesDialog* s = w.openSchedules(QStringLiteral("walls"));
+        kimbim::SchedulesDialog* s = w.openSchedules(QStringLiteral("walls"));
         QVERIFY(s && s->objectName() == QLatin1String("schedulesDialog"));
         QCOMPARE(s->currentScheme(), QStringLiteral("walls"));
         QTableWidget* t = s->table();
         QCOMPARE(s->dataRows(), 4);
         QCOMPARE(t->rowCount(), 5); // and the total row
         // The columns: Mark, Name, Type, Level, Length (m), ...; lengths on the axes 6 + 4 + 6 + 4 = 20 m.
-        QCOMPARE(t->horizontalHeaderItem(4)->text(), kimcad::SchedulesDialog::translatedLabel(QStringLiteral("Length")) + QStringLiteral(" (m)"));
+        QCOMPARE(t->horizontalHeaderItem(4)->text(), kimbim::SchedulesDialog::translatedLabel(QStringLiteral("Length")) + QStringLiteral(" (m)"));
         QCOMPARE(t->item(4, 4)->text(), QLocale().toString(20.0, 'f', 2));
         // Clicking a row selects its wall in the model.
         t->selectRow(1);
@@ -1626,7 +1626,7 @@ private slots:
         t->item(1, 1)->setText(QStringLiteral("North wall"));
         QString error;
         auto name = [&] {
-            return kimcad::PythonEngine::instance().callJson("properties", {guid}, &error).object().value("name").toString();
+            return kimbim::PythonEngine::instance().callJson("properties", {guid}, &error).object().value("name").toString();
         };
         QCOMPARE(name(), QStringLiteral("North wall"));
         QTRY_VERIFY(s->dataRows() == 4);
@@ -1645,21 +1645,21 @@ private slots:
 
     void roofsAndTrimToRoof()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->setTolerance(0.05);
         for (const QPointF& p : {QPointF(0, 0), QPointF(6, 0), QPointF(6, 4), QPointF(0, 4), QPointF(0, 0)})
             w.wallTool()->click(p);
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         const QStringList walls = w.viewport()->guids();
         QCOMPARE(walls.size(), 4);
-        w.setTool(kimcad::MainWindow::Tool::Roof); // Shift+R: the eaves outline, like a slab
+        w.setTool(kimbim::MainWindow::Tool::Roof); // Shift+R: the eaves outline, like a slab
         w.setRoofKind(QStringLiteral("hip"), 35.0);
         w.polygonTool()->setTolerance(0.01);
         for (const QPointF& p : {QPointF(-0.5, -0.5), QPointF(6.5, -0.5), QPointF(6.5, 4.5), QPointF(-0.5, 4.5), QPointF(-0.5, -0.5)})
             w.polygonTool()->click(p);
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QCOMPARE(w.viewport()->elementCount(), 5);
         QString roof;
         for (const QString& g : w.viewport()->guids())
@@ -1675,12 +1675,12 @@ private slots:
 
     void shortcutsAreTheDocumentedOnes()
     {
-        kimcad::MainWindow w0(nullptr, true);
+        kimbim::MainWindow w0(nullptr, true);
         QCOMPARE(action(w0, "actionDuplicate")->shortcut(), QKeySequence(Qt::CTRL | Qt::Key_D));
         QCOMPARE(action(w0, "actionMirror")->shortcut(), QKeySequence(Qt::CTRL | Qt::Key_M));
         QCOMPARE(action(w0, "actionMultiply")->shortcut(), QKeySequence(Qt::CTRL | Qt::Key_U));
         QCOMPARE(action(w0, "actionCopy")->shortcut(), QKeySequence(QKeySequence::Copy));
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         QCOMPARE(action(w, "actionSectionTool")->shortcut(), QKeySequence(Qt::Key_V));
         QCOMPARE(action(w, "actionLeaderTool")->shortcut(), QKeySequence(Qt::SHIFT | Qt::Key_A));
         QCOMPARE(action(w, "actionElevationTool")->shortcut(), QKeySequence(Qt::SHIFT | Qt::Key_V));
@@ -1715,11 +1715,11 @@ private slots:
     // D72: new views follow the "new_views" preference.
     void newViewsFollowThePreference()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
-        QCOMPARE(w.newViewPlacement(), kimcad::DockLayout::Placement::AfterCurrent);
+        QCOMPARE(w.newViewPlacement(), kimbim::DockLayout::Placement::AfterCurrent);
         w.preferences().setValue("new_views", "window");
-        QCOMPARE(w.newViewPlacement(), kimcad::DockLayout::Placement::Floating);
+        QCOMPARE(w.newViewPlacement(), kimbim::DockLayout::Placement::Floating);
         w.openPlanTab(w.levelsBar()->activeStorey());
         const QString key = QStringLiteral("plan:") + w.levelsBar()->activeStorey();
         QVERIFY(w.dockLayout()->manager()->findDockWidget(key)->isFloating());
@@ -1732,13 +1732,13 @@ private slots:
         QTemporaryDir tmp;
         const QString kim = tmp.filePath(QStringLiteral("Casa ñ.kim"));
         {
-            kimcad::MainWindow w(nullptr, /*quiet=*/true);
+            kimbim::MainWindow w(nullptr, /*quiet=*/true);
             QVERIFY(w.newProject());
-            w.setTool(kimcad::MainWindow::Tool::Wall);
+            w.setTool(kimbim::MainWindow::Tool::Wall);
             w.wallTool()->click({0, 0});
             w.wallTool()->click({5, 0});
             w.wallTool()->finish();
-            w.setTool(kimcad::MainWindow::Tool::None);
+            w.setTool(kimbim::MainWindow::Tool::None);
             QVERIFY(w.saveAs(kim));
             QVERIFY(QFile::exists(kim) && QFile::exists(kim + ".lock"));
             QVERIFY(w.windowTitle().contains(QStringLiteral("Casa ñ.kim")));
@@ -1753,8 +1753,8 @@ private slots:
             QVERIFY(w.close());
         }
         QVERIFY(!QFile::exists(kim + ".lock"));
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
-        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
+        QSignalSpy loaded(&w, &kimbim::MainWindow::loadFinished);
         QVERIFY(w.openPath(kim));
         QVERIFY(loaded.wait(60000));
         QCOMPARE(w.viewport()->elementCount(), 1);
@@ -1769,13 +1769,13 @@ private slots:
         QTemporaryDir tmp;
         const QString ifc = tmp.filePath(QStringLiteral("House.ifc"));
         {
-            kimcad::MainWindow w(nullptr, /*quiet=*/true);
+            kimbim::MainWindow w(nullptr, /*quiet=*/true);
             QVERIFY(w.newProject());
             QVERIFY(w.exportIfc(ifc));
             QVERIFY(w.close());
         }
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
-        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
+        QSignalSpy loaded(&w, &kimbim::MainWindow::loadFinished);
         QVERIFY(w.openPath(ifc));
         QVERIFY(loaded.wait(60000));
         QVERIFY(QFile::exists(tmp.filePath(QStringLiteral("House.kim"))));
@@ -1795,13 +1795,13 @@ private slots:
         QTemporaryDir tmp;
         const QString ifc = tmp.filePath(QStringLiteral("House.ifc"));
         {
-            kimcad::MainWindow w(nullptr, /*quiet=*/true);
+            kimbim::MainWindow w(nullptr, /*quiet=*/true);
             QVERIFY(w.newProject());
             QVERIFY(w.exportIfc(ifc));
             QVERIFY(w.close());
         }
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
-        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
+        QSignalSpy loaded(&w, &kimbim::MainWindow::loadFinished);
         bool ranMeanwhile = false;
         QTimer::singleShot(0, &w, [&] { ranMeanwhile = true; }); // runs only if openPath turns the event loop
         QVERIFY(w.openPath(ifc));
@@ -1820,15 +1820,15 @@ private slots:
         const QString ifc = tmp.filePath(QStringLiteral("House.ifc"));
         const QString kim = tmp.filePath(QStringLiteral("House.kim"));
         {
-            kimcad::MainWindow w(nullptr, /*quiet=*/true);
+            kimbim::MainWindow w(nullptr, /*quiet=*/true);
             QVERIFY(w.newProject());
             QVERIFY(w.exportIfc(ifc));
             QVERIFY(w.close());
         }
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
-        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
+        QSignalSpy loaded(&w, &kimbim::MainWindow::loadFinished);
         int asked = 0;
-        auto answer = kimcad::MainWindow::LargeIfc::Cancel;
+        auto answer = kimbim::MainWindow::LargeIfc::Cancel;
         w.setLargeIfcAnswer([&](const QString& file, double mb) {
             ++asked;
             [&] { QCOMPARE(file, QString("House.ifc")); QVERIFY(mb > 0.0); }();
@@ -1850,7 +1850,7 @@ private slots:
         QVERIFY(!QFile::exists(kim));
 
         // Edit the IFC directly: opens at once as a plain IFC
-        answer = kimcad::MainWindow::LargeIfc::EditIfc;
+        answer = kimbim::MainWindow::LargeIfc::EditIfc;
         QVERIFY(w.openPath(ifc));
         QVERIFY(loaded.wait(60000));
         QCOMPARE(asked, 2);
@@ -1858,7 +1858,7 @@ private slots:
         QCOMPARE(w.documentState().value("mode").toString(), QString("plain"));
 
         // Make a .kim
-        answer = kimcad::MainWindow::LargeIfc::MakeKim;
+        answer = kimbim::MainWindow::LargeIfc::MakeKim;
         QVERIFY(w.openPath(ifc));
         QVERIFY(loaded.wait(60000));
         QCOMPARE(asked, 3);
@@ -1889,14 +1889,14 @@ private slots:
     }
 
     // Draws one wall with the wall tool; returns its GlobalId.
-    static QString drawWall(kimcad::MainWindow& w, QPointF a = QPointF(0, 0), QPointF b = QPointF(4, 0))
+    static QString drawWall(kimbim::MainWindow& w, QPointF a = QPointF(0, 0), QPointF b = QPointF(4, 0))
     {
         const QStringList before = w.viewport()->guids();
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->setTolerance(0.05);
         w.wallTool()->click(a);
         w.wallTool()->click(b);
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         for (const QString& g : w.viewport()->guids())
             if (!before.contains(g))
                 return g;
@@ -1906,12 +1906,12 @@ private slots:
     // D73: picking a purpose restyles the views.
     void purposesRestyleTheViews()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         const QString wall = drawWall(w);
         QVERIFY(!wall.isEmpty());
         QVERIFY(w.setPurpose(QStringLiteral("Permit")));
-        const kimcad::ElementStyle* s = w.viewport()->graphics().styleOf(wall);
+        const kimbim::ElementStyle* s = w.viewport()->graphics().styleOf(wall);
         QVERIFY(s);
         QCOMPARE(s->projection.color, QColor("#000000"));
         QCOMPARE(w.viewport()->graphics().purpose(), QString("Permit"));
@@ -1924,7 +1924,7 @@ private slots:
     // D74: renovation status from the Model menu and Properties; the status for new elements.
     void renovationStatusFromMenuAndForNewElements()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         const QString wall = drawWall(w);
         QVERIFY(!wall.isEmpty());
@@ -1957,43 +1957,43 @@ private slots:
         QTemporaryDir dir;
         const QString path = dir.filePath(QStringLiteral("survey.ifc"));
         QString error;
-        QVERIFY(kimcad::PythonEngine::instance().start(&error));
-        QVERIFY(kimcad::PythonEngine::instance().callJson("_write_unmarked_model", {path}).object().value("ok").toBool());
+        QVERIFY(kimbim::PythonEngine::instance().start(&error));
+        QVERIFY(kimbim::PythonEngine::instance().callJson("_write_unmarked_model", {path}).object().value("ok").toBool());
         {
-            kimcad::MainWindow w(nullptr, /*quiet=*/true);
+            kimbim::MainWindow w(nullptr, /*quiet=*/true);
             w.preferences().setValue(QStringLiteral("open_ifc"), QStringLiteral("edit_ifc"));
             w.setImportStatusAnswer(QStringLiteral("existing"));
-            QSignalSpy done(&w, &kimcad::MainWindow::loadFinished);
+            QSignalSpy done(&w, &kimbim::MainWindow::loadFinished);
             QVERIFY(w.openIfc(path));
             QVERIFY(done.wait(60000));
             auto count = [] {
-                return kimcad::PythonEngine::instance().callJson("unmarked", {}).object().value("count").toInt();
+                return kimbim::PythonEngine::instance().callJson("unmarked", {}).object().value("count").toInt();
             };
             QTRY_COMPARE(count(), 0);
-            QVERIFY(kimcad::PythonEngine::instance().callJson("undo", {}).object().value("ok").toBool()); // one step
+            QVERIFY(kimbim::PythonEngine::instance().callJson("undo", {}).object().value("ok").toBool()); // one step
             QCOMPARE(count(), 2);
         }
         {
-            kimcad::MainWindow w(nullptr, /*quiet=*/true);
+            kimbim::MainWindow w(nullptr, /*quiet=*/true);
             w.preferences().setValue(QStringLiteral("open_ifc"), QStringLiteral("edit_ifc"));
             w.setImportStatusAnswer(QString()); // leave them
-            QSignalSpy done(&w, &kimcad::MainWindow::loadFinished);
+            QSignalSpy done(&w, &kimbim::MainWindow::loadFinished);
             QVERIFY(w.openIfc(path));
             QVERIFY(done.wait(60000));
             QCoreApplication::processEvents();
-            QCOMPARE(kimcad::PythonEngine::instance().callJson("unmarked", {}).object().value("count").toInt(), 2);
+            QCOMPARE(kimbim::PythonEngine::instance().callJson("unmarked", {}).object().value("count").toInt(), 2);
         }
     }
 
     // D74: the purpose popup's renovation filter; customizing keeps it unless given.
     void purposePopupSetsTheRenovationFilter()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         QVERIFY(w.setPurpose(QStringLiteral("Demolition")));
         QVERIFY(w.customizePurpose(QStringLiteral("Permit"), QStringLiteral("Architectural"), QStringLiteral("None"), QString()));
         auto purposes = [] {
-            return kimcad::PythonEngine::instance().callJson("graphics_tables", {}).object()
+            return kimbim::PythonEngine::instance().callJson("graphics_tables", {}).object()
                 .value("tables").toObject().value("purposes").toObject();
         };
         QCOMPARE(purposes().value("Demolition (modified)").toObject().value("renovation").toString(), QString("Demolition plan"));
@@ -2005,7 +2005,7 @@ private slots:
     // D73: elements drawn after switching purpose get the purpose's style.
     void newElementsGetThePurposeStyle()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         QVERIFY(w.setPurpose(QStringLiteral("Permit")));
         const QString wall = drawWall(w);
@@ -2016,7 +2016,7 @@ private slots:
     // D73: hidden kinds can't be selected and Show all doesn't reveal them.
     void hiddenKindsAreNotSelectableAndSurviveShowAll()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         const QString wall = drawWall(w);
         QVERIFY(w.setGraphics(QStringLiteral(R"({"visibility_sets": {"Everything": {"hidden_kinds": [], "rules": []},
@@ -2040,7 +2040,7 @@ private slots:
     // annotations take it.
     void thePenButtonShowsAndSetsTheCurrentPen()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         auto* pen = w.findChild<QToolButton*>(QStringLiteral("penButton"));
         QVERIFY(pen && pen->isEnabled());
@@ -2052,7 +2052,7 @@ private slots:
         QVERIFY(w.setCurrentPen(26));
         QVERIFY(pen->text().startsWith(QStringLiteral("26")));
         QCOMPARE(w.projectSettings().value("current_pen").toInt(), 26);
-        const QJsonObject r = kimcad::PythonEngine::instance().callJson("annotations", {l1}).object();
+        const QJsonObject r = kimbim::PythonEngine::instance().callJson("annotations", {l1}).object();
         QCOMPARE(r.value("annotations").toArray().at(0).toObject().value("pen").toInt(), 26);
         QVERIFY(!w.setCurrentPen(0));
     }
@@ -2060,7 +2060,7 @@ private slots:
     // D73: the Graphics menu opens the editors.
     void theGraphicsMenuHasTheEditors()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         for (const char* name : {"actionPenSets", "actionLineTypes", "actionElementStyles", "actionVisibilitySets",
                  "actionOverrides", "actionLayerCombinations", "actionPurposes"})
             QVERIFY2(action(w, name) && action(w, name)->isEnabled(), name);
@@ -2069,7 +2069,7 @@ private slots:
     // D73: the bottom bar switches purpose; a purpose with a layer combination applies it.
     void theBottomBarSwitchesPurposeAndAppliesItsLayers()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         const QString layer = QStringLiteral("A-Furniture");
         QVERIFY(w.setGraphics(QStringLiteral(R"({"layer_combinations": {"Hide": {"hidden": ["A-Furniture"], "locked": []}},
@@ -2088,12 +2088,12 @@ private slots:
     // D73: changing a built-in purpose's pieces makes a "(modified)" copy; the built-in stays.
     void customizingABuiltInPurposeCopiesIt()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         QVERIFY(w.setPurpose(QStringLiteral("Permit")));
         QVERIFY(w.customizePurpose(QStringLiteral("Permit"), QStringLiteral("No furniture"), QStringLiteral("None"), QString()));
         QCOMPARE(w.viewport()->graphics().purpose(), QString("Permit (modified)"));
-        const QJsonObject tables = kimcad::PythonEngine::instance().callJson("graphics_tables", {}).object()
+        const QJsonObject tables = kimbim::PythonEngine::instance().callJson("graphics_tables", {}).object()
                                        .value("tables").toObject();
         QCOMPARE(tables.value("purposes").toObject().value("Permit").toObject().value("visibility").toString(), QString("Architectural"));
         QCOMPARE(tables.value("purposes").toObject().value("Permit (modified)").toObject().value("visibility").toString(), QString("No furniture"));
@@ -2104,7 +2104,7 @@ private slots:
 
     void viewsRememberTheirPurpose()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         QVERIFY(w.setPurpose(QStringLiteral("Permit")));
         QVERIFY(w.saveView(QStringLiteral("Permit plan")));
@@ -2115,10 +2115,10 @@ private slots:
 
     void sheetsPrintWithTheirPurpose()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         drawWall(w);
-        auto& py = kimcad::PythonEngine::instance();
+        auto& py = kimbim::PythonEngine::instance();
         QVERIFY(py.callJson("create_drawings", {}).object().value("ok").toBool());
         const QString number = py.callJson("add_sheet", {QStringLiteral("A3"), QStringLiteral("Plan")}).object().value("number").toString();
         QString plan;
@@ -2134,7 +2134,7 @@ private slots:
 
     void trueLineWeightsAreAPreference()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         QVERIFY(!w.preferences().trueLineWeights());
         auto* toggle = action(w, "actionTrueLineWeights");
@@ -2152,7 +2152,7 @@ private slots:
         QTemporaryDir tmp;
         const QString kim = tmp.filePath(QStringLiteral("a.kim"));
         {
-            kimcad::MainWindow w(nullptr, /*quiet=*/true);
+            kimbim::MainWindow w(nullptr, /*quiet=*/true);
             QVERIFY(w.newProject());
             QVERIFY(w.saveAs(kim));
             QVERIFY(w.close());
@@ -2161,8 +2161,8 @@ private slots:
         QVERIFY(lock.open(QIODevice::WriteOnly));
         lock.write(R"({"user": "Ana", "account": "ana", "machine": "OTHER-PC", "pid": 4, "since": "2026-10-08T10:42"})");
         lock.close();
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
-        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
+        QSignalSpy loaded(&w, &kimbim::MainWindow::loadFinished);
         QVERIFY(w.openPath(kim));
         QVERIFY(loaded.wait(60000));
         QVERIFY(w.documentState().value("read_only").toBool());
@@ -2178,7 +2178,7 @@ private slots:
         QTemporaryDir tmp;
         const QString kim = tmp.filePath(QStringLiteral("ajustes.kim"));
         {
-            kimcad::MainWindow w(nullptr, /*quiet=*/true);
+            kimbim::MainWindow w(nullptr, /*quiet=*/true);
             QVERIFY(w.newProject());
             QVERIFY(w.createLayer(QStringLiteral("A-WALL")));
             QVERIFY(w.setProjectSettings({{"plan_cut_height", 1.0}, {"sheet_paper", "A3"}, {"drawing_scale", 50},
@@ -2190,8 +2190,8 @@ private slots:
             QVERIFY(w.saveAs(kim));
             QVERIFY(w.close());
         }
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
-        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
+        QSignalSpy loaded(&w, &kimbim::MainWindow::loadFinished);
         QVERIFY(w.openPath(kim));
         QVERIFY(loaded.wait(60000));
         QCOMPARE(w.planCutHeight(), 1.0);
@@ -2205,7 +2205,7 @@ private slots:
 
     void projectSettingsDialogReportsOnlyChanges()
     {
-        kimcad::ProjectSettingsDialog d({{"plan_cut_height", 1.2}, {"drawing_scale", 100}, {"sheet_paper", "A1"},
+        kimbim::ProjectSettingsDialog d({{"plan_cut_height", 1.2}, {"drawing_scale", 100}, {"sheet_paper", "A1"},
                                          {"length_unit", "m"}, {"length_decimals", 2}}, /*kept=*/false, nullptr);
         QVERIFY(d.findChild<QLabel*>("notKeptNote")->isVisibleTo(&d));
         d.findChild<QComboBox*>("sheetPaper")->setCurrentText("A3");
@@ -2218,7 +2218,7 @@ private slots:
     {
         QTemporaryDir tmp;
         const QString ifc = tmp.filePath(QStringLiteral("directo.ifc"));
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         w.preferences().setValue("open_ifc", "edit_ifc");
         QVERIFY(w.newProject());
         QVERIFY(w.createLayer(QStringLiteral("A-WALL")));
@@ -2233,13 +2233,13 @@ private slots:
     void automaticVersionsEveryNSaves()
     {
         QTemporaryDir tmp;
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->click({0, 0});
         w.wallTool()->click({5, 0});
         w.wallTool()->finish();
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QVERIFY(w.saveAs(tmp.filePath(QStringLiteral("auto.kim"))));
         w.preferences().setValue("auto_version", "saves");
         w.preferences().setValue("auto_version_every", 2);
@@ -2259,23 +2259,23 @@ private slots:
     {
         QString wall;
         {
-            kimcad::MainWindow w(nullptr, /*quiet=*/true);
+            kimbim::MainWindow w(nullptr, /*quiet=*/true);
             QVERIFY(w.newProject());
-            w.setTool(kimcad::MainWindow::Tool::Wall);
+            w.setTool(kimbim::MainWindow::Tool::Wall);
             w.wallTool()->click({0, 0});
             w.wallTool()->click({5, 0});
             w.wallTool()->finish();
-            w.setTool(kimcad::MainWindow::Tool::None);
+            w.setTool(kimbim::MainWindow::Tool::None);
             wall = w.viewport()->guids().first();
             QVERIFY(w.writeRecovery());
             // A crash: the model goes away without the window closing (no close_document).
             QString error;
-            kimcad::PythonEngine::instance().callJson("new_project", {QStringLiteral("x")}, &error);
+            kimbim::PythonEngine::instance().callJson("new_project", {QStringLiteral("x")}, &error);
         } // destroyed without close()
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         const QJsonArray items = w.recoveries();
         QVERIFY(!items.isEmpty());
-        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        QSignalSpy loaded(&w, &kimbim::MainWindow::loadFinished);
         QVERIFY(w.recoverFrom(items.first().toObject().value("id").toString()));
         QVERIFY(loaded.wait(60000));
         QVERIFY(w.viewport()->guids().contains(wall));
@@ -2288,14 +2288,14 @@ private slots:
     void projectsStartFromOfficeTemplates()
     {
         QTemporaryDir tmp;
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         w.preferences().setValue("templates_folder", tmp.filePath(QStringLiteral("Plantillas")));
         QVERIFY(w.newProject());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->click({0, 0});
         w.wallTool()->click({5, 0});
         w.wallTool()->finish();
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         const QString original = w.viewport()->guids().first();
         QVERIFY(w.saveAsTemplate(QStringLiteral("Oficina")));
         QVERIFY(!w.saveAsTemplate(QStringLiteral("Oficina"))); // exists; quiet mode doesn't replace
@@ -2303,7 +2303,7 @@ private slots:
         const QString path = tmp.filePath(QStringLiteral("Plantillas/Oficina.kim"));
         QVERIFY(QFile::exists(path));
 
-        QSignalSpy loaded(&w, &kimcad::MainWindow::loadFinished);
+        QSignalSpy loaded(&w, &kimbim::MainWindow::loadFinished);
         QVERIFY(w.newFromTemplate(path));
         QVERIFY(loaded.wait(60000));
         QCOMPARE(w.viewport()->elementCount(), 1);
@@ -2325,7 +2325,7 @@ private slots:
         QVERIFY(bad.open(QIODevice::WriteOnly));
         bad.write("not a zip");
         bad.close();
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         QVERIFY(w.saveAs(kim));
         QVERIFY(!w.openPath(junk));

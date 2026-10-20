@@ -10,7 +10,7 @@
 
 #include <QThread>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -29,7 +29,7 @@ Handle(Aspect_DisplayConnection) sharedDisplay()
         } catch (const Standard_Failure& e) {
             if (attempt >= 9)
                 throw;
-            qWarning("KIMCAD: no display connection yet (%s), retrying", e.what());
+            qWarning("KimBim: no display connection yet (%s), retrying", e.what());
             QThread::msleep(200);
         }
     }
@@ -44,8 +44,8 @@ Scene::Scene(QObject* parent)
     // No vsync by default: the view only redraws when something changes, so this never spins, and a
     // frame takes ~1 ms. With vsync each redraw blocked the UI until the next screen refresh (33 ms
     // on 30 Hz laptop panels), so drawing tools lagged behind the mouse (owner feedback).
-    // KIMCAD_VSYNC=1 turns it back on (e.g. if orbiting tears on some screen).
-    if (qEnvironmentVariableIntValue("KIMCAD_VSYNC") != 1)
+    // KIMBIM_VSYNC=1 turns it back on (e.g. if orbiting tears on some screen).
+    if (qEnvironmentVariableIntValue("KIMBIM_VSYNC") != 1)
         driver->ChangeOptions().swapInterval = 0;
     m_viewer = new V3d_Viewer(driver);
     // A fixed "sun" from the south-east above plus soft ambient and fill. A headlight along the
@@ -91,4 +91,4 @@ void Scene::elementsChanged()
     emit redrawRequested();
 }
 
-} // namespace kimcad
+} // namespace kimbim

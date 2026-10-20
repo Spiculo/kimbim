@@ -32,9 +32,9 @@ class TestPropertiesPanel : public QObject {
 private slots:
     void editsEmitTypedValues()
     {
-        kimcad::PropertiesPanel panel;
+        kimbim::PropertiesPanel panel;
         panel.showMulti(sample());
-        QSignalSpy spy(&panel, &kimcad::PropertiesPanel::propertyEdited);
+        QSignalSpy spy(&panel, &kimbim::PropertiesPanel::propertyEdited);
 
         panel.itemFor("P", "Txt")->setText(1, "b");
         QCOMPARE(spy.count(), 1);
@@ -51,22 +51,22 @@ private slots:
 
     void variesIsShownAndCanBeOverwritten()
     {
-        kimcad::PropertiesPanel panel;
+        kimbim::PropertiesPanel panel;
         panel.showMulti(sample());
         QTreeWidgetItem* var = panel.itemFor("P", "Var");
         QCOMPARE(var->text(1), panel.variesText());
         QVERIFY(var->font(1).italic());
-        QSignalSpy spy(&panel, &kimcad::PropertiesPanel::propertyEdited);
+        QSignalSpy spy(&panel, &kimbim::PropertiesPanel::propertyEdited);
         var->setText(1, "x");
         QCOMPARE(spy.last().at(2).value<QJsonValue>(), QJsonValue("x"));
     }
 
     void quantitiesAreReadOnlyAndNameIsEditable()
     {
-        kimcad::PropertiesPanel panel;
+        kimbim::PropertiesPanel panel;
         panel.showMulti(sample());
         QVERIFY(!(panel.itemFor("P", "Area")->flags() & Qt::ItemIsEditable));
-        QSignalSpy names(&panel, &kimcad::PropertiesPanel::nameEdited);
+        QSignalSpy names(&panel, &kimbim::PropertiesPanel::nameEdited);
         panel.nameItem()->setText(1, "Muro nuevo");
         QCOMPARE(names.count(), 1);
         QCOMPARE(names.last().at(0).toString(), QString("Muro nuevo"));
@@ -82,7 +82,7 @@ private slots:
               "Over":{"value":0.5,"varies":false,"ifc_type":"IfcReal","editable":true,"source":"override","type_value":0.35},
               "Own":{"value":"x","varies":false,"ifc_type":"IfcLabel","editable":true,"source":"element","type_value":null}}}})")
                                        .object();
-        kimcad::PropertiesPanel panel;
+        kimbim::PropertiesPanel panel;
         panel.showMulti(merged);
         QTreeWidgetItem* fromType = panel.itemFor("P", "FromType");
         QTreeWidgetItem* over = panel.itemFor("P", "Over");
@@ -102,8 +102,8 @@ private slots:
         QVERIFY(names(over).contains("editTypeValue") && names(over).contains("resetToType"));
         QVERIFY(!names(own).contains("editTypeValue") && !names(own).contains("resetToType"));
 
-        QSignalSpy edits(&panel, &kimcad::PropertiesPanel::typeEditRequested);
-        QSignalSpy resets(&panel, &kimcad::PropertiesPanel::resetToTypeRequested);
+        QSignalSpy edits(&panel, &kimbim::PropertiesPanel::typeEditRequested);
+        QSignalSpy resets(&panel, &kimbim::PropertiesPanel::resetToTypeRequested);
         for (QAction* a : panel.actionsFor(over))
             if (a->objectName() == "editTypeValue" || a->objectName() == "resetToType")
                 a->trigger();
@@ -114,8 +114,8 @@ private slots:
 
     void rebuildingDoesNotEmit()
     {
-        kimcad::PropertiesPanel panel;
-        QSignalSpy spy(&panel, &kimcad::PropertiesPanel::propertyEdited);
+        kimbim::PropertiesPanel panel;
+        QSignalSpy spy(&panel, &kimbim::PropertiesPanel::propertyEdited);
         panel.showMulti(sample());
         panel.showMulti(sample());
         QCOMPARE(spy.count(), 0);
@@ -124,14 +124,14 @@ private slots:
     // D74: the renovation status drop-down, with mixed values shown as "(varies)".
     void statusShowsAndEmits()
     {
-        kimcad::PropertiesPanel panel;
+        kimbim::PropertiesPanel panel;
         QJsonObject m = sample();
         m.insert("status", QJsonObject{{"value", QJsonValue()}, {"varies", true}});
         panel.showMulti(m);
         QComboBox* c = panel.statusCombo();
         QVERIFY(c);
         QCOMPARE(c->currentText(), panel.variesText());
-        QSignalSpy spy(&panel, &kimcad::PropertiesPanel::statusEdited);
+        QSignalSpy spy(&panel, &kimbim::PropertiesPanel::statusEdited);
         c->setCurrentIndex(c->findData(QStringLiteral("demolish")));
         QCOMPARE(spy.count(), 1);
         QCOMPARE(spy.first().first().toString(), QStringLiteral("demolish"));

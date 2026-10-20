@@ -12,7 +12,7 @@
 #include <QTextBlock>
 #include <QVBoxLayout>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -76,7 +76,7 @@ ConsoleInput::ConsoleInput(QWidget* parent)
 {
     setFont(monospace());
     setTabStopDistance(QFontMetricsF(font()).horizontalAdvance(QLatin1Char(' ')) * 4);
-    setPlaceholderText(tr("Python: ifc, selection(), select(...), with edit(): ..., refresh(), help_kimcad()\n"
+    setPlaceholderText(tr("Python: ifc, selection(), select(...), with edit(): ..., refresh(), help_kimbim()\n"
                           "Enter runs, Shift+Enter adds a line, Up/Down recall earlier input"));
     new PythonHighlighter(document());
 }
@@ -148,7 +148,7 @@ ConsolePanel::ConsolePanel(QWidget* parent)
     m_output->setReadOnly(true);
     m_output->setFont(monospace());
     m_output->setMaximumBlockCount(5000);
-    m_output->setPlaceholderText(tr("Output. Type help_kimcad() below for the console's names."));
+    m_output->setPlaceholderText(tr("Output. Type help_kimbim() below for the console's names."));
     m_input = new ConsoleInput(this);
     m_input->setObjectName(QStringLiteral("consoleInput"));
     connect(m_input, &ConsoleInput::runRequested, this, &ConsolePanel::run);
@@ -228,4 +228,4 @@ void ConsolePanel::run()
     emit runRequested(code);
 }
 
-} // namespace kimcad
+} // namespace kimbim

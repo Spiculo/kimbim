@@ -26,7 +26,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -581,4 +581,4 @@ QJsonObject ScheduleSchemeDialog::scheme() const
     return s;
 }
 
-} // namespace kimcad
+} // namespace kimbim

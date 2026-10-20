@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // D84: the 2D drafting tools of the main window (doc 14 §12): Line, Polyline, Arc/circle, Rectangle
-// and Fill in the Plane group. The clicking is DraftTool's; the shapes are python/kimcad/drafting.py's
+// and Fill in the Plane group. The clicking is DraftTool's; the shapes are python/kimbim/drafting.py's
 // (IfcAnnotation on the level), one undo step each.
 #include <QComboBox>
 #include <QJsonArray>
@@ -17,7 +17,7 @@
 #include "ToolOptionsBar.h"
 #include "Viewport.h"
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -293,4 +293,4 @@ void MainWindow::updateDraftPreview()
     m_viewport->setPreviewBoxes(boxes);
 }
 
-} // namespace kimcad
+} // namespace kimbim

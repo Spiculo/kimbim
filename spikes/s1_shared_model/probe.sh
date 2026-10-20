@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Spike S1 helper: inspect the conda-forge IfcOpenShell 0.9 C++/Python API available in the env.
-ENV=~/kimcad-s1/env
+ENV=~/kimbim-s1/env
 cd "$ENV/include" || exit 1
 grep -n 'class IFC_PARSE_API\|^class \|schema() const\|IfcFile(' ifcparse/file.h | head -12
 grep -n 'declaration_by_name' ifcparse/schema.h ifcparse/*.h 2>/dev/null | head -4

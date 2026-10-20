@@ -28,14 +28,14 @@ M4 Libraries + cloning + drawings          R4 Merge + reconciliation
 | S3 | Does the record decomposition round-trip the test corpus losslessly? | ✅ Yes: 77/77 valid files lossless, fixed point, deterministic export (D34–D36) |
 | S4 | Do Windows and Linux produce identical record hashes? | ✅ Yes: 77/77 identical state hashes and IFC exports |
 | S5 | How do `gix` writes perform at 1M blobs: commit time, repo size, checkout-to-model time? | ✅ Viable with packs only and no deltas (D39) |
-| S6 | Is IfcOpenShell's SVG serializer good and fast enough for KIMCAD's drawings (Slice 14 risk check)? | ✅ Quality yes; speed needs visible elements only, polygon HLR and a child process (D60, proposed) |
+| S6 | Is IfcOpenShell's SVG serializer good and fast enough for KimBim's drawings (Slice 14 risk check)? | ✅ Quality yes; speed needs visible elements only, polygon HLR and a child process (D60, proposed) |
 
 The spike code lives in [`spikes/`](../spikes/README.md).
 
 ## App track
 
 ### M0 — Foundations ✅
-Repo, LICENSE, CMake, pixi environment, CI (Windows + Linux), Qt 6 main window, IfcOpenShell through embedded Python, `kimcad-app --version`, i18n pipeline (English + Spanish, `tr()` + Qt Linguist, CI check for untranslated strings). Done in Slice 2 ([plan](superpowers/plans/2026-10-04-slice2-desktop-viewer.md)).
+Repo, LICENSE, CMake, pixi environment, CI (Windows + Linux), Qt 6 main window, IfcOpenShell through embedded Python, `kimbim-app --version`, i18n pipeline (English + Spanish, `tr()` + Qt Linguist, CI check for untranslated strings). Done in Slice 2 ([plan](superpowers/plans/2026-10-04-slice2-desktop-viewer.md)).
 
 ### M1 — Viewer ✅ (core)
 Done in Slice 2:
@@ -48,7 +48,7 @@ Done in Slice 2:
 - hide, isolate, show all (also per storey from the tree);
 - plan cut with a height control, and a section box.
 
-Measured (`kimcad-app --self-test`, integrated GPU): Duplex at 60 fps (vsync); a 100k-element model loads in about 35 s and renders at 150 fps with vsync off.
+Measured (`kimbim-app --self-test`, integrated GPU): Duplex at 60 fps (vsync); a 100k-element model loads in about 35 s and renders at 150 fps with vsync off.
 
 Not yet: colour by property, walk mode, measure, saved views, a "show spaces" toggle, section-box handles (the box is around the selection), and a fix for vsync double-waits in a bare top-level viewport.
 
@@ -88,10 +88,10 @@ Slices **18 ✅ rooms and areas** (`IfcSpace` from the surrounding walls, room s
 ## Repo track
 
 ### R0 — Workspace ✅
-Cargo workspace, crates skeleton, `kimcad` CLI skeleton, CI. Done in Slice 1 ([plan](superpowers/plans/2026-10-04-slice1-cli-versioning.md)).
+Cargo workspace, crates skeleton, `kimbim` CLI skeleton, CI. Done in Slice 1 ([plan](superpowers/plans/2026-10-04-slice1-cli-versioning.md)).
 
 ### R1 — Canonical records ✅ (Python)
-Done in Slice 1 in Python (`kimcad.records`), byte-identical to the spike golden hashes. A Rust port waits until speed demands it.
+Done in Slice 1 in Python (`kimbim.records`), byte-identical to the spike golden hashes. A Rust port waits until speed demands it.
 
 Record decomposition, canonical JSON, BLAKE3 references, records → IFC export with deterministic step IDs.
 **Exit:** corpus round-trip is a fixed point; golden hashes match on Windows and Linux.
@@ -99,7 +99,7 @@ Record decomposition, canonical JSON, BLAKE3 references, records → IFC export 
 ### R2 — Store and history ✅
 Done in Slice 1: `init / commit / status / log / show / export / branch / switch` through the Rust store; Slice 20 added `tag` (annotated tags = milestones) and `blame` (object history).
 
-`kimcad init / import / commit / log / show / export / branch / switch / tag` on the gitoxide-backed store; local cache.
+`kimbim init / import / commit / log / show / export / branch / switch / tag` on the gitoxide-backed store; local cache.
 **Exit:** import 100k-object model, change one property, commit; the new commit adds only a handful of objects.
 
 ### R3 — Diff 🟡
@@ -109,7 +109,7 @@ Tree diff, per-category classification, property-level changes, JSON and human o
 **Exit:** diff time depends on the size of the change, not the size of the model (benchmark).
 
 ### R4 — Merge and reconciliation 🟡 (merge ✅ Slice 21; reconciliation to do)
-Slice 21 ([plan](superpowers/plans/2026-10-07-slice21-merge-engine.md)): three-way record merge with the conflict model, integrity pass and IFC validation, `kimcad merge`, and ifcmerge's cases ported (fixtures in `tests/fixtures/ifcmerge`).
+Slice 21 ([plan](superpowers/plans/2026-10-07-slice21-merge-engine.md)): three-way record merge with the conflict model, integrity pass and IFC validation, `kimbim merge`, and ifcmerge's cases ported (fixtures in `tests/fixtures/ifcmerge`).
 
 Three-way merge with conflict model, integrity pass, conflict serialization for the UI; GlobalId/Tag/heuristic reconciliation with report.
 **Exit:** merge test suite (including ported `ifcmerge` cases) passes; re-importing a Revit-exported file with regenerated GlobalIds keeps more than 95% of identities on the corpus pair.

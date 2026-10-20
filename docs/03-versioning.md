@@ -1,10 +1,10 @@
 # 03 — Versioning
 
-## Key decision: the KIMCAD repository *is* a Git repository
+## Key decision: the KimBim repository *is* a Git repository
 
-**Decided.** The owner said: "reduce all work as much as possible" and "the git style is for storing". So KIMCAD does not build its own object store, pack format, refs and transfer protocol. It stores its canonical records **as Git objects**:
+**Decided.** The owner said: "reduce all work as much as possible" and "the git style is for storing". So KimBim does not build its own object store, pack format, refs and transfer protocol. It stores its canonical records **as Git objects**:
 
-| KIMCAD concept | Git object |
+| KimBim concept | Git object |
 |----------------|-----------|
 | Canonical record (object / shared value / geometry) | blob |
 | Model state (all records) | tree, sharded by ID prefix |
@@ -15,13 +15,13 @@
 What this gives us for free:
 
 - Content addressing, a Merkle structure, deterministic state hashes (the root tree hash), packfiles, delta compression and garbage collection.
-- **Remotes and sync today**: push/pull to any Git host (Gitea, GitLab, GitHub, a bare repo on a NAS) with no KIMCAD server. That covers most of "future sync" with zero code. See [08](08-future.md).
+- **Remotes and sync today**: push/pull to any Git host (Gitea, GitLab, GitHub, a bare repo on a NAS) with no KimBim server. That covers most of "future sync" with zero code. See [08](08-future.md).
 - **Push-time checks**: server-side hooks on a Git host can enforce permissions and validation (owner answer 5).
 - Inspectability: `git log` works, and records can be read as JSON.
 
 What it costs:
 
-- Git uses SHA-1 (or SHA-256) for storage. KIMCAD still uses BLAKE3 for its own content keys (loose and geometry records, and the initial IDs of shared nodes), so the two hash spaces are independent.
+- Git uses SHA-1 (or SHA-256) for storage. KimBim still uses BLAKE3 for its own content keys (loose and geometry records, and the initial IDs of shared nodes), so the two hash spaces are independent.
 - We must use a custom **merge** (Git's text merge is never used on records) and keep Git from checking out 1M files (see below).
 
 **Library:** `gitoxide` (`gix`, pure Rust, MIT/Apache-2.0) for object and ref access. For network operations where `gix` is still incomplete, call the `git` CLI as a fallback. Bonsai's IfcGit does exactly this.
@@ -31,19 +31,19 @@ What it costs:
 ```text
 my-project/
 ├── .git/                     # standard Git object database (no working-tree checkout of records)
-├── kimcad.toml               # project manifest: format version, IFC schema, units, model resolution
-├── .kimcad/                  # local only, never committed
+├── kimbim.toml               # project manifest: format version, IFC schema, units, model resolution
+├── .kimbim/                  # local only, never committed
 │   ├── cache/                # model snapshot per tree hash, meshes, spatial indexes
 │   ├── oplog/                # crash-recovery log of uncommitted operations
 │   └── index.db              # search index (SQLite)
-└── exports/                  # optional: IFC exports for people without KIMCAD
+└── exports/                  # optional: IFC exports for people without KimBim
 ```
 
 Tree structure inside each commit:
 
 ```text
-kimcad.toml
-objects/<aa>/<bb>/<kimcad-id>.json      # rooted entity records          (o/)
+kimbim.toml
+objects/<aa>/<bb>/<kimbim-id>.json      # rooted entity records          (o/)
 nodes/<aa>/<bb>/<node-id>.json           # shared nodes, stable ids       (n/)
 loose/<aa>/<hash>.json                   # unreferenced entities + count  (l/)
 geometry/<aa>/<hash>.json                # heavy geometry records
@@ -56,7 +56,7 @@ geometry/<aa>/<hash>.json                # heavy geometry records
 - **Records are written into the object database as packs, never as loose objects.** On Windows each loose object costs about 7.6 ms, so a 10k-record import took 140 s loose versus 2.9 s as a pack. A 1M-record import as one pack takes about 6.5 minutes. MVP uses `git fast-import`; a native `gix-pack` writer with parallel compression comes later.
 - **Record blobs are packed without deltas** (`repack --window=0`). Deep delta chains made random reads about 30× slower and saved under 2% of space for small records. Without deltas, 100k records read back in 1.7 s sequentially and 0.2 s on 16 threads.
 - **Commit cost does not depend on model size.** A one-record commit takes about 90 ms at 1M records.
-- Records are never checked out as files, so Windows/Linux filesystems never see a million JSON files. `kimcad export-tree <dir>` materializes them for debugging. Opening a project normally reads the local model cache (`.kimcad/cache`, keyed by tree hash), not every record.
+- Records are never checked out as files, so Windows/Linux filesystems never see a million JSON files. `kimbim export-tree <dir>` materializes them for debugging. Opening a project normally reads the local model cache (`.kimbim/cache`, keyed by tree hash), not every record.
 
 ## Project modes: versioning is optional
 
@@ -65,13 +65,13 @@ geometry/<aa>/<hash>.json                # heavy geometry records
 | Mode | Storage | What you get |
 |------|---------|--------------|
 | **Plain** | A single `.ifc` file | Open → edit → save IFC. Undo/redo only. Works like any IFC editor. |
-| **Versioned** | A project folder (Git repo + `kimcad.toml`) | Full history, design options, compare, combine, object history. |
-| **`.kim` file** (D72) | One zip of the versioned project folder (plus `kimcad-file.json`) | The same as a project folder, as one file to email or archive. Unpacked to a local working folder while open, packed back on Ctrl+S. |
+| **Versioned** | A project folder (Git repo + `kimbim.toml`) | Full history, design options, compare, combine, object history. |
+| **`.kim` file** (D72) | One zip of the versioned project folder (plus `kimbim-file.json`) | The same as a project folder, as one file to email or archive. Unpacked to a local working folder while open, packed back on Ctrl+S. |
 
-**Since D72:** every `.kim` is versioned. Ctrl+S saves the file (the working copy and the project settings) without making a version; *Save version* adds one. Opening an `.ifc` makes a `.kim` beside it with a first version "Imported from …" (a preference keeps the old Plain mode). Building that first version with the Python decomposer takes minutes on large files (the Clinic, 13 MB: about 6 min), so an IFC over the `large_ifc_mb` preference (default 5 MB) asks first, offering to edit the IFC directly instead; the conversion runs on a worker thread behind a progress window. Project settings are `settings.json` in each version's tree. A `.kim` or project folder is locked (`<file>.kim.lock`, or `.kimcad/lock`) while someone edits it; others open it read-only.
+**Since D72:** every `.kim` is versioned. Ctrl+S saves the file (the working copy and the project settings) without making a version; *Save version* adds one. Opening an `.ifc` makes a `.kim` beside it with a first version "Imported from …" (a preference keeps the old Plain mode). Building that first version with the Python decomposer takes minutes on large files (the Clinic, 13 MB: about 6 min), so an IFC over the `large_ifc_mb` preference (default 5 MB) asks first, offering to edit the IFC directly instead; the conversion runs on a worker thread behind a progress window. Project settings are `settings.json` in each version's tree. A `.kim` or project folder is locked (`<file>.kim.lock`, or `.kimbim/lock`) while someone edits it; others open it read-only.
 
 - **Enable versioning:** creates the repository from the current model. The first commit is "Initial import".
-- **Working copy (Slice 8):** the open model is the working state. *Save version* writes it to `<project>/.kimcad/working.ifc` (local, never committed) and commits it. Opening a project or switching option exports that option's latest version to the same file. Unsaved work is guarded on close, open and option switches (save a version / discard / cancel).
+- **Working copy (Slice 8):** the open model is the working state. *Save version* writes it to `<project>/.kimbim/working.ifc` (local, never committed) and commits it. Opening a project or switching option exports that option's latest version to the same file. Unsaved work is guarded on close, open and option switches (save a version / discard / cancel).
 - **Disable versioning:** exports the current state to `.ifc` and reverts to Plain mode. History stays in the folder unless the user deletes it.
 
 ## Working state, operations and commits
@@ -163,24 +163,24 @@ Heuristic matches require confirmation. The import then becomes an ordinary comm
 
 ## Object history ("blame")
 
-For any object or property, walk the commits that changed its record. Each step is cheap because the path is known (`objects/<aa>/<bb>/<id>.json`). The index (`.kimcad/index.db`) caches object → commits for speed.
+For any object or property, walk the commits that changed its record. Each step is cheap because the path is known (`objects/<aa>/<bb>/<id>.json`). The index (`.kimbim/index.db`) caches object → commits for speed.
 
 ## CLI
 
 The engine is fully usable without the GUI:
 
 ```bash
-kimcad init [--from model.ifc]
-kimcad import model.ifc          # with reconciliation report
-kimcad export -o model.ifc [rev]
-kimcad status
-kimcad commit -m "message"
-kimcad log [--object <id>]
-kimcad diff [rev] [rev]
-kimcad branch / switch / tag
-kimcad merge <branch>
-kimcad blame <id> [property]
-kimcad show <id> [rev]           # canonical JSON
-kimcad export-tree <dir>
-kimcad push / pull               # thin wrappers over git remotes
+kimbim init [--from model.ifc]
+kimbim import model.ifc          # with reconciliation report
+kimbim export -o model.ifc [rev]
+kimbim status
+kimbim commit -m "message"
+kimbim log [--object <id>]
+kimbim diff [rev] [rev]
+kimbim branch / switch / tag
+kimbim merge <branch>
+kimbim blame <id> [property]
+kimbim show <id> [rev]           # canonical JSON
+kimbim export-tree <dir>
+kimbim push / pull               # thin wrappers over git remotes
 ```

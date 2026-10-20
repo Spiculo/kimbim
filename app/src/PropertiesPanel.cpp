@@ -11,7 +11,7 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
-namespace kimcad {
+namespace kimbim {
 
 QStringList renovationKeys()
 {
@@ -296,4 +296,4 @@ void PropertiesPanel::showContextMenu(const QPoint& pos)
         menu.exec(m_tree->viewport()->mapToGlobal(pos));
 }
 
-} // namespace kimcad
+} // namespace kimbim

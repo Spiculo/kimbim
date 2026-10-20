@@ -64,7 +64,7 @@
 #include <cmath>
 #include <set>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -128,7 +128,7 @@ Viewport::Viewport(Scene* scene, QWidget* parent)
     m_view->SetBackgroundColor(background);
     ElementBatch::setBackground(background); // lines-only faces blend into it
     m_view->SetProj(HomeOrientation);
-    m_animation = new AIS_AnimationCamera("kimcadViewAnimation", m_view);
+    m_animation = new AIS_AnimationCamera("kimbimViewAnimation", m_view);
     SetViewAnimation(m_animation); // played in handleViewRedraw, stopped by mouse input
     applyNavigationPreset();
     connect(m_scene, &Scene::redrawRequested, this, qOverload<>(&QWidget::update));
@@ -779,7 +779,7 @@ bool Viewport::ensureWindow()
         return true;
     } catch (const Standard_Failure& e) {
         // Never let an OCCT exception escape into a Qt event handler (it aborts the app).
-        qWarning("KIMCAD: cannot attach the 3D view to its window: %s", e.what());
+        qWarning("KimBim: cannot attach the 3D view to its window: %s", e.what());
         return false;
     }
 }
@@ -2336,12 +2336,12 @@ void Viewport::eraseViewCube()
 
 QRect Viewport::viewCubeRect() const
 {
-    return viewCubeShown() ? kimcad::viewCubeRect(size()) : QRect();
+    return viewCubeShown() ? kimbim::viewCubeRect(size()) : QRect();
 }
 
 QRect Viewport::homeButtonRect() const
 {
-    return viewCubeShown() ? kimcad::homeButtonRect(size()) : QRect();
+    return viewCubeShown() ? kimbim::homeButtonRect(size()) : QRect();
 }
 
 bool Viewport::viewCubeOrientationAt(const QPointF& pos, V3d_TypeOfOrientation* orientation)
@@ -2505,4 +2505,4 @@ void Viewport::orbitBy(double dx, double dy)
     update();
 }
 
-} // namespace kimcad
+} // namespace kimbim

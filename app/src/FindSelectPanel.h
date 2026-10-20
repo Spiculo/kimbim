@@ -12,13 +12,13 @@ class QLineEdit;
 class QListWidget;
 class QVBoxLayout;
 
-namespace kimcad {
+namespace kimbim {
 
 // Find & Select (D78, Archicad's palette): criteria rows (class, kind, type, name, property value,
 // layer, level, renovation status, material) joined by AND/OR over a scope (the whole model, the
 // active level, the current selection); Select replaces the selection, Add and Remove change it.
 // Criteria sets and selection sets are saved by name in the project settings (versioned). The panel
-// only edits and asks; the main window runs the query (kimcad.queries) and selects.
+// only edits and asks; the main window runs the query (kimbim.queries) and selects.
 class FindSelectPanel : public QWidget {
     Q_OBJECT
 public:
@@ -88,4 +88,4 @@ private:
     QJsonObject m_choices, m_savedCriteria;
 };
 
-} // namespace kimcad
+} // namespace kimbim

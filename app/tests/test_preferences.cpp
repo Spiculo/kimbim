@@ -18,7 +18,7 @@ private slots:
     void defaultsWhenThereIsNoFile()
     {
         QTemporaryDir tmp;
-        kimcad::Preferences p(tmp.filePath("preferences.json"));
+        kimbim::Preferences p(tmp.filePath("preferences.json"));
         QVERIFY(p.load());
         QCOMPARE(p.language(), QString("auto"));
         QCOMPARE(p.newViews(), QString("tab"));
@@ -27,7 +27,7 @@ private slots:
         QCOMPARE(p.autoVersionEvery(), 10);
         QCOMPARE(p.recoveryMinutes(), 5);
         QCOMPARE(p.largeIfcMb(), 5.0);
-        QVERIFY(p.templatesFolder().endsWith(QStringLiteral("KIMCAD Templates")));
+        QVERIFY(p.templatesFolder().endsWith(QStringLiteral("KimBim Templates")));
         QVERIFY(p.recent().isEmpty());
     }
 
@@ -36,17 +36,17 @@ private slots:
         QTemporaryDir tmp;
         const QString path = tmp.filePath("sub/preferences.json");
         {
-            kimcad::Preferences p(path);
+            kimbim::Preferences p(path);
             p.setValue("new_views", "window");
-            p.setValue("from_a_newer_kimcad", 42);
+            p.setValue("from_a_newer_kimbim", 42);
             p.setLayout(QByteArray("\x01\x02layout", 8));
             p.setWindowGeometry(QByteArray("\x03geometry", 9));
             QVERIFY(p.save());
         }
-        kimcad::Preferences q(path);
+        kimbim::Preferences q(path);
         QVERIFY(q.load());
         QCOMPARE(q.newViews(), QString("window"));
-        QCOMPARE(q.value("from_a_newer_kimcad").toInt(), 42);
+        QCOMPARE(q.value("from_a_newer_kimbim").toInt(), 42);
         QCOMPARE(q.layout(), QByteArray("\x01\x02layout", 8));
         QCOMPARE(q.windowGeometry(), QByteArray("\x03geometry", 9));
     }
@@ -59,7 +59,7 @@ private slots:
         QVERIFY(f.open(QIODevice::WriteOnly));
         f.write("{ not json");
         f.close();
-        kimcad::Preferences p(path);
+        kimbim::Preferences p(path);
         QVERIFY(!p.load());
         QCOMPARE(p.newViews(), QString("tab"));
         QVERIFY(QFile::exists(path + ".bad"));
@@ -67,7 +67,7 @@ private slots:
 
     void recentFilesAreMostRecentFirstWithoutDuplicates()
     {
-        kimcad::Preferences p;
+        kimbim::Preferences p;
         for (int i = 0; i < 12; ++i)
             p.addRecent(QStringLiteral("C:/p/%1.kim").arg(i));
         p.addRecent("C:/p/5.kim");
@@ -80,7 +80,7 @@ private slots:
 
     void badValuesFallBackToDefaults()
     {
-        kimcad::Preferences p;
+        kimbim::Preferences p;
         p.setValue("new_views", "sideways");
         p.setValue("recovery_minutes", -3);
         p.setValue("auto_version_every", "lots");
@@ -96,8 +96,8 @@ private slots:
 
     void theDialogWritesWhatTheUserPicked()
     {
-        kimcad::Preferences p;
-        kimcad::PreferencesDialog d(p, nullptr);
+        kimbim::Preferences p;
+        kimbim::PreferencesDialog d(p, nullptr);
         QVERIFY(!d.findChild<QLabel*>("restartNote")->isVisibleTo(&d));
         d.findChild<QComboBox*>("language")->setCurrentIndex(2); // auto, en, es
         QVERIFY(d.findChild<QLabel*>("restartNote")->isVisibleTo(&d));

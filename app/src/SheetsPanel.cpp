@@ -8,7 +8,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 constexpr int NumberRole = Qt::UserRole;
@@ -119,4 +119,4 @@ QMenu* SheetsPanel::purposeMenu(const QString& number)
     return menu;
 }
 
-} // namespace kimcad
+} // namespace kimbim

@@ -22,7 +22,7 @@
 
 #include "MeshChunk.h"
 
-namespace kimcad {
+namespace kimbim {
 
 class ElementBatch;
 
@@ -192,4 +192,4 @@ private:
     bool m_showEdges = true;
 };
 
-} // namespace kimcad
+} // namespace kimbim

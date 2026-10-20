@@ -10,7 +10,7 @@ import ifcopenshell.util.unit
 import numpy as np
 import pytest
 
-from kimcad import app_bridge as b
+from kimbim import app_bridge as b
 
 
 def call(fn, *args):
@@ -86,7 +86,7 @@ def test_walls_on_level_2_sit_at_its_elevation(project):
 
 
 def test_metre_unit_files_get_the_same_wall(tmp_path):
-    from kimcad.testing import build_model
+    from kimbim.testing import build_model
 
     f = build_model(walls=0)
     import ifcopenshell.api.unit
@@ -181,7 +181,7 @@ def test_mesh_elements_matches_the_chunk_format(project):
 
 def test_files_without_a_body_context_get_one(tmp_path):
     """Exports like Revit 2011's Duplex have no Model/Body/MODEL_VIEW context: drawing still works."""
-    from kimcad.testing import build_model
+    from kimbim.testing import build_model
 
     f = build_model(walls=0)
     for c in f.by_type("IfcGeometricRepresentationSubContext"):

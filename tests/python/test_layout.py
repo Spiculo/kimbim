@@ -3,7 +3,7 @@ import subprocess
 
 import pytest
 
-from kimcad.layout import META_PATH, blob_oid, key_to_path, path_to_key
+from kimbim.layout import META_PATH, blob_oid, key_to_path, path_to_key
 
 
 @pytest.mark.parametrize(
@@ -16,7 +16,7 @@ def test_key_path_roundtrip(key):
 
 
 def test_meta_path():
-    assert key_to_path("meta") == META_PATH == "kimcad.json"
+    assert key_to_path("meta") == META_PATH == "kimbim.json"
 
 
 def test_unknown_keys_and_paths_are_rejected():

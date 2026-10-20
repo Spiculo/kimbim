@@ -16,7 +16,7 @@
 #include "ElementBatch.h"
 #include "Graphics.h"
 
-namespace kimcad {
+namespace kimbim {
 
 // The loaded model as OCCT shows it (D71): one viewer and interactive context, the element batches,
 // the selection, element colours and layer state. Each tab's Viewport is one V3d_View of it, so a 3D
@@ -59,4 +59,4 @@ private:
     Handle(AIS_InteractiveContext) m_context;
 };
 
-} // namespace kimcad
+} // namespace kimbim

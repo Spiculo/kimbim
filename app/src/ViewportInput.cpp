@@ -12,7 +12,7 @@
 
 #include <cmath>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 Viewport::ScrollMode g_scrollMode = Viewport::ScrollMode::Auto;
@@ -223,4 +223,4 @@ bool Viewport::event(QEvent* e)
     return QWidget::event(e);
 }
 
-} // namespace kimcad
+} // namespace kimbim

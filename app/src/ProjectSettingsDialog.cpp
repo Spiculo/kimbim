@@ -11,7 +11,7 @@
 
 #include <cmath>
 
-namespace kimcad {
+namespace kimbim {
 
 ProjectSettingsDialog::ProjectSettingsDialog(const QJsonObject& settings, bool kept, QWidget* parent)
     : QDialog(parent)
@@ -77,4 +77,4 @@ QJsonObject ProjectSettingsDialog::changes() const
     return out;
 }
 
-} // namespace kimcad
+} // namespace kimbim

@@ -140,7 +140,7 @@ progress, the same as Esc.
 | `ModelTreePanel` | the tidied tree |
 | `MainWindow` | wiring between these and the Python bridge |
 
-The bridge (`python/kimcad`) doesn't change.
+The bridge (`python/kimbim`) doesn't change.
 
 ## Testing
 

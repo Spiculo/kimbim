@@ -10,7 +10,7 @@
 class QListWidget;
 class QMenu;
 
-namespace kimcad {
+namespace kimbim {
 
 // Sheets (Slice 16, Archicad's layouts): new A1/A3 sheet, open, place the drawing selected in the
 // Drawings panel, delete.
@@ -42,4 +42,4 @@ private:
     QJsonObject m_sheetPurposes;
 };
 
-} // namespace kimcad
+} // namespace kimbim

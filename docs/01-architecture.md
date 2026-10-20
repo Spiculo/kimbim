@@ -4,7 +4,7 @@
 
 ```text
 ┌───────────────────────────────────────────────────────────────┐
-│                     kimcad (Qt 6 desktop app, C++)            │
+│                     kimbim (Qt 6 desktop app, C++)            │
 │  Viewport · Model tree · Properties · Libraries · Drawings     │
 │  History / Compare · Design options · Commands / Undo         │
 └───────────────┬───────────────────────────────┬───────────────┘
@@ -17,7 +17,7 @@
 │   (ifcopenshell.api, C++)    │   │  Commits, refs, history    │
 │  Geometry iterator (OCCT)    │   │  Diff, three-way merge     │
 │  Spatial tree / clash        │   │  Import reconciliation     │
-│  Drawing (SVG serializer)    │   │  CLI: `kimcad`             │
+│  Drawing (SVG serializer)    │   │  CLI: `kimbim`             │
 └──────────────────────────────┘   └────────────────────────────┘
 ```
 
@@ -37,7 +37,7 @@ So the split follows **where mature code already exists**:
 | Concern | Owner | Language | Reused from |
 |---------|-------|----------|-------------|
 | IFC schema, parsing, writing | Model engine | C++ | IfcOpenShell |
-| Authoring operations | Model engine | Python, then C++ for hot paths | `ifcopenshell.api` (LGPL), Bonsai logic (GPL, porting allowed because KIMCAD is GPL) |
+| Authoring operations | Model engine | Python, then C++ for hot paths | `ifcopenshell.api` (LGPL), Bonsai logic (GPL, porting allowed because KimBim is GPL) |
 | Geometry / tessellation | Model engine | C++ | IfcOpenShell geometry iterator + OpenCASCADE |
 | Spatial index / clash | Model engine | C++ | IfcOpenShell `IfcGeom::tree`, `ifcclash` |
 | 2D drawings | Model engine | C++ | IfcOpenShell SVG serializer (used by Bonsai) |
@@ -53,14 +53,14 @@ Rust keeps the parts where it is strongest and where nothing BIM-specific exists
 **Phase 1 (now):** a single process.
 
 ```text
-kimcad.exe
+kimbim.exe
  ├── Qt GUI thread
  ├── Model engine (in-process, worker threads for geometry)
  ├── Embedded CPython (ifcopenshell.api, scripting, plugins)
  └── Repository engine (in-process Rust library)
 ```
 
-**Later:** the repository engine can run as its own process (`kimcad serve`) for background work, headless CI and sync. The engine API is designed as message-style calls (request → result, with no shared pointers across the boundary), so moving it out of process means changing the transport, not redesigning the API.
+**Later:** the repository engine can run as its own process (`kimbim serve`) for background work, headless CI and sync. The engine API is designed as message-style calls (request → result, with no shared pointers across the boundary), so moving it out of process means changing the transport, not redesigning the API.
 
 ## Engine boundaries
 
@@ -91,8 +91,8 @@ kimcad.exe
 ## Proposed source layout
 
 ```text
-kimcad/
-├── app/                 # Qt 6 C++ application (kimcad GUI)
+kimbim/
+├── app/                 # Qt 6 C++ application (kimbim GUI)
 │   ├── viewport/
 │   ├── panels/          # tree, properties, libraries, history…
 │   ├── commands/        # command definitions, undo stack
@@ -102,14 +102,14 @@ kimcad/
 │   ├── geometry/
 │   └── bridge/          # cxx bridge to Rust
 ├── crates/              # Rust workspace
-│   ├── kimcad-format/   # canonical records, canonical JSON, hashing
-│   ├── kimcad-repo/     # git-backed store, commits, refs
-│   ├── kimcad-diff/
-│   ├── kimcad-merge/
-│   ├── kimcad-reconcile/# import identity reconciliation
-│   ├── kimcad-ffi/      # C ABI
-│   └── kimcad-cli/      # `kimcad` binary
-├── python/kimcad/       # ops, scripting API, plugins
+│   ├── kimbim-format/   # canonical records, canonical JSON, hashing
+│   ├── kimbim-repo/     # git-backed store, commits, refs
+│   ├── kimbim-diff/
+│   ├── kimbim-merge/
+│   ├── kimbim-reconcile/# import identity reconciliation
+│   ├── kimbim-ffi/      # C ABI
+│   └── kimbim-cli/      # `kimbim` binary
+├── python/kimbim/       # ops, scripting API, plugins
 ├── libraries/           # bundled default type libraries (.ifc)
 ├── tests/corpus/        # IFC test files (see 09)
 └── docs/

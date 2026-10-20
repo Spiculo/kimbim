@@ -18,7 +18,7 @@
 
 #include <cstring>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -202,4 +202,4 @@ void Viewport::removeUnderlays()
     m_underlays.clear();
 }
 
-} // namespace kimcad
+} // namespace kimbim

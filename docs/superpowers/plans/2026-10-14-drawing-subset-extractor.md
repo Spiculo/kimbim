@@ -35,7 +35,7 @@ Two ways to build the subset. **Recommend A2** — it reuses code that already r
 Walk a whitelist of reference attributes (representations, placements, materials, styles, contexts, units) plus the inverse relationships above, copying into a fresh `ifcopenshell.file`; reconstruct filtered `IfcRelContainedInSpatialStructure` / `IfcRelAggregates` / `IfcRelDefinesByType` so the products (and the drawing) sit where the serializer expects. More control, more edge cases to enumerate by hand.
 
 ### A2 — reuse `records.decompose` / `records.compose` (chosen)
-`python/kimcad/records.py` already turns an `ifcopenshell.file` into canonical per-entity records (`decompose(f) -> (records, decomposer)`) and back (`compose(records) -> file`), deterministically, and `decompose(compose(records))` is a tested fixed point (`tests/python/test_records.py`). Build the subset as: decompose the model — **cached per drawing state** — then compose only the transitively-closed set of records the drawing needs.
+`python/kimbim/records.py` already turns an `ifcopenshell.file` into canonical per-entity records (`decompose(f) -> (records, decomposer)`) and back (`compose(records) -> file`), deterministically, and `decompose(compose(records))` is a tested fixed point (`tests/python/test_records.py`). Build the subset as: decompose the model — **cached per drawing state** — then compose only the transitively-closed set of records the drawing needs.
 
 - **Closure roots:** the drawing; the include set (`visibleFrom`); `IfcProject` (pulls units + representation contexts); the drawing's storey and its ancestors.
 - **Closure edges:** records already carry resolved node references (`Decomposer` resolves them), so the closure is a graph walk over record references, not IFC attributes. A record is pulled when its node id is referenced by a kept record; inverse relationships (containment, aggregates, type assignment) are added as an explicit edge set for the spatial/decomposition/type rels.
@@ -45,7 +45,7 @@ Walk a whitelist of reference attributes (representations, placements, materials
 If A2's per-record closure proves too slow to compute per state, fall back to A1 for the spatial rels only (they are the part `add` gets wrong) while keeping `add` for the rest.
 
 ### Where it plugs in
-`python/kimcad/drawings.py::_snapshot()` becomes `_snapshot(guid, include_json)`:
+`python/kimbim/drawings.py::_snapshot()` becomes `_snapshot(guid, include_json)`:
 - if the subset path is enabled **and** the include is non-empty, build/invalidate a subset keyed by `(state, include)`;
 - otherwise keep writing the full snapshot (current behaviour, fallback).
 The worker (`drawgen.py --worker`) is unchanged: it opens whatever path it is given and can be restarted with a new subset. `model_bounds` is already passed in, so the child never needs the full model for placement.
@@ -56,7 +56,7 @@ Everything `drawgen` reads from the file, so the closure is provably complete:
 - `settings_of(drawing)`, `_block(drawing)`, `marker(drawing)` — drawing pset + CSG block.
 - `drawn_products(f)` — the include, minus `NOT_DRAWN`.
 - `_storey(drawing, s)`, `storey_elevation(storey)`, `plan_camera` — storey entity/placement.
-- `overlay` for plans: `door_swings`, `window_symbol` (need the host wall's layer set), `object_symbols` (type RepresentationMaps), `plan_annotations`, `room_stamps` (`_space_outline`, `Qto_SpaceBaseQuantities`, `KIMCAD_Room`), `markers`.
+- `overlay` for plans: `door_swings`, `window_symbol` (need the host wall's layer set), `object_symbols` (type RepresentationMaps), `plan_annotations`, `room_stamps` (`_space_outline`, `Qto_SpaceBaseQuantities`, `KIMBIM_Room`), `markers`.
 - serializer: representation contexts (Model/Body/MODEL_VIEW), units, `elevation-ref-guid`.
 
 ## Global Constraints
@@ -72,7 +72,7 @@ Everything `drawgen` reads from the file, so the closure is provably complete:
 1. The SVG-equality harness runs in CI on the house and one corpus file for plan, section and elevation.
 2. The subset parses and validates (`ifcopenshell.validate`) for every drawing kind.
 3. An "inputs inventory" test fails if `drawgen` reads a file attribute the closure does not pull (fuzz: build a subset, then assert generation does not raise).
-4. Kill switch: `KIMCAD_DRAWING_SUBSET=0` (or a settings key) forces the full snapshot; the app behaves as today.
+4. Kill switch: `KIMBIM_DRAWING_SUBSET=0` (or a settings key) forces the full snapshot; the app behaves as today.
 
 ---
 
@@ -92,7 +92,7 @@ Everything `drawgen` reads from the file, so the closure is provably complete:
 - [ ] Follow boolean/CSG operands (`IfcBooleanClippingResult`, `IfcCsgSolid`).
 
 ### Task 3: Plan overlays in the subset
-- [ ] Pull the storey's `IfcAnnotation` (`KIMCAD_Annotation`), `IfcSpace` (+ `Qto_SpaceBaseQuantities`, `KIMCAD_Room`), `IfcGrid`, and library-object types (`KIMCAD_LibraryObject` + plan `RepresentationMap`).
+- [ ] Pull the storey's `IfcAnnotation` (`KIMBIM_Annotation`), `IfcSpace` (+ `Qto_SpaceBaseQuantities`, `KIMBIM_Room`), `IfcGrid`, and library-object types (`KIMBIM_LibraryObject` + plan `RepresentationMap`).
 - [ ] Match `door_swings`/`window_symbol`, which need the door/window's host wall layer set: pull the host wall and its material.
 - [ ] Assert `overlay` produced no empty group where the full model had one.
 
@@ -124,5 +124,5 @@ Everything `drawgen` reads from the file, so the closure is provably complete:
 ## Open questions (owner)
 
 1. **Accept byte-identical (slower to get right) or visually-equal (faster, riskier)?** Recommend byte-identical.
-2. **Should the subset be persisted** (`.kimcad/drawings/<guid>/model.ifc`) so reopening a versioned project is instant, as slice 14's cache note proposed? Recommend yes, as a follow-up task.
+2. **Should the subset be persisted** (`.kimbim/drawings/<guid>/model.ifc`) so reopening a versioned project is instant, as slice 14's cache note proposed? Recommend yes, as a follow-up task.
 3. Any corpus files beyond the two present that should be added to the CI matrix?

@@ -19,7 +19,7 @@
 #include <QToolTip>
 #include <QVBoxLayout>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -458,4 +458,4 @@ ToolPalette::Mode ToolPalette::modeFromKey(const QString& key)
     return Mode::IconsAndLabels;
 }
 
-} // namespace kimcad
+} // namespace kimbim

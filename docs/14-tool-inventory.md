@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-# 14 — Tool inventory: what architects get elsewhere, and what KIMCAD still lacks
+# 14 — Tool inventory: what architects get elsewhere, and what KimBim still lacks
 
-A checklist of the tools that mainstream BIM and CAD apps give architects, with KIMCAD's status for each.
+A checklist of the tools that mainstream BIM and CAD apps give architects, with KimBim's status for each.
 Use it to pick the next slices. [04](04-app-features.md) stays the source of decided priorities; this document is
 wider and lists tools 04 does not mention yet.
 
@@ -20,7 +20,7 @@ wider and lists tools 04 does not mention yet.
 | **AL** | Allplan | Listed only where it adds something |
 | **SU** | SketchUp | Listed only where it adds something |
 
-**KIMCAD**: ✅ done · 🟡 partly done · ⬜ not started · 🔮 deliberately left for later ([08](08-future.md)).
+**KimBim**: ✅ done · 🟡 partly done · ⬜ not started · 🔮 deliberately left for later ([08](08-future.md)).
 **Pri** is the priority from [04](04-app-features.md) where 04 gives one. `new` means 04 does not list the tool yet, so it needs a priority.
 
 The **Has** column comes from general knowledge of each product. It was not checked against each vendor's current
@@ -30,7 +30,7 @@ release notes, so check before relying on a single cell.
 
 ## 1. Project and files
 
-| Tool | Has | KIMCAD | Pri | Notes |
+| Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Open / save IFC | AC RV VW BB | ✅ | P0 | IFC4; IFC2X3 import through IfcOpenShell (not tested yet) |
 | New project | all | ✅ | P0 | IFC4 in mm, levels |
@@ -45,7 +45,7 @@ release notes, so check before relying on a single cell.
 
 ## 2. Viewing and navigation
 
-| Tool | Has | KIMCAD | Pri | Notes |
+| Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Orbit, pan, zoom, fit all | all | ✅ | P0 | D48 preset |
 | Plan view and 3D view | all | ✅ | P0 | P / 3 |
@@ -72,7 +72,7 @@ release notes, so check before relying on a single cell.
 
 ## 3. Selection
 
-| Tool | Has | KIMCAD | Pri | Notes |
+| Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Click, Ctrl/Shift add and toggle | all | ✅ | P0 | |
 | Box selection (visible only; Alt goes through) | all | ✅ | P0 | D52 |
@@ -86,7 +86,7 @@ release notes, so check before relying on a single cell.
 
 ## 4. Editing tools (general)
 
-| Tool | Has | KIMCAD | Pri | Notes |
+| Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Undo / redo | all | ✅ | P0 | |
 | Move, drag to move | all | ✅ | P0 | Joined walls follow; Ctrl detaches (D54) |
@@ -110,7 +110,7 @@ release notes, so check before relying on a single cell.
 
 ## 5. Input aids
 
-| Tool | Has | KIMCAD | Pri | Notes |
+| Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Snapping (endpoint, midpoint, on element, grid) | all | ✅ | P0 | |
 | Ortho / angle steps | all | ✅ | P0 | 15° steps, Shift = ortho |
@@ -124,7 +124,7 @@ release notes, so check before relying on a single cell.
 
 ## 6. Building elements
 
-| Tool | Has | KIMCAD | Pri | Notes |
+| Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Walls: straight, layered, L/T joins | all | ✅ | P0 | |
 | Walls: curved | all | ⬜ | new | |
@@ -160,7 +160,7 @@ release notes, so check before relying on a single cell.
 
 ## 7. Site
 
-| Tool | Has | KIMCAD | Pri | Notes |
+| Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Terrain from survey points or contours | AC RV VW BB | ⬜ | new | Archicad Mesh, Revit Toposolid, Vectorworks Site Model |
 | Building pad / cut-and-fill | RV VW | ⬜ | new | |
@@ -170,7 +170,7 @@ release notes, so check before relying on a single cell.
 
 ## 8. Objects and libraries
 
-| Tool | Has | KIMCAD | Pri | Notes |
+| Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Library browser (thumbnails, search, categories) | all | ✅ | P0 | D86: Library panel |
 | Bundled library: furniture, sanitary, kitchen, lighting, people, trees, cars | all | 🟡 | P0 | D86: 21 parametric objects generated in code; no lighting yet |
@@ -182,7 +182,7 @@ release notes, so check before relying on a single cell.
 
 ## 9. Organising the model
 
-| Tool | Has | KIMCAD | Pri | Notes |
+| Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Layers (shown, locked, active) | AC VW | ✅ | — | D57 |
 | Layer combinations / view templates | AC RV VW | 🟡 | new | Saved views store layer states; no reusable templates |
@@ -193,11 +193,11 @@ release notes, so check before relying on a single cell.
 | Dimensions group (length, height… edits the shape) | AC RV | ✅ | — | |
 | Expression / calculated properties | AC RV VW | ⬜ | new | Archicad expression-based properties, Revit formulas |
 | Renovation status (existing / demolish / new) and filters | AC RV VW | ✅ | new | D74: Archicad statuses, renovation filters in purposes, legends; Revit phases not done |
-| Design options | AC RV VW | ✅ | P0 | KIMCAD uses branches (D56); Archicad and Revit store options inside one file |
+| Design options | AC RV VW | ✅ | P0 | KimBim uses branches (D56); Archicad and Revit store options inside one file |
 
 ## 10. Attributes and graphics standards
 
-| Tool | Has | KIMCAD | Pri | Notes |
+| Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Layered (composite) wall and slab types | all | ✅ | P0 | |
 | Material editor (cut fill, surface, physical data) | all | ⬜ | P0 | |
@@ -209,7 +209,7 @@ release notes, so check before relying on a single cell.
 
 ## 11. Drawings (views made from the model)
 
-| Tool | Has | KIMCAD | Pri | Notes |
+| Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Floor plan drawings (one per story, cut plane, symbols) | all | ✅ | P1 | Slice 15: cut at 1.10 m (Archicad), door swings, window glass, annotations and markers drawn on |
 | Section views (marker in plan, linked view) | all | 🟡 | P1 | Slice 14: Section tool (V), Archicad's three clicks; SVG from IfcOpenShell's serializer, in a tab (D60, D61). Not yet: scale setting, detail level, cropping by hand |
@@ -223,7 +223,7 @@ release notes, so check before relying on a single cell.
 
 ## 12. 2D drafting
 
-| Tool | Has | KIMCAD | Pri | Notes |
+| Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Lines, polylines, arcs, circles, splines | all | 🟡 | new | D84: line, polyline, arc/circle (centre-radius, 3-point, centre-start-end), rectangle; snaps, typed lengths, grips; in plans, drawings, sheets, DXF. No splines yet |
 | Fills / hatches (regions) | all | ✅ | new | D84: IfcAnnotationFillArea + IfcFillAreaStyleHatching; pattern table in project settings; pens fg/bg; area label; magic wand (Alt+click) |
@@ -233,7 +233,7 @@ release notes, so check before relying on a single cell.
 
 ## 13. Annotation
 
-| Tool | Has | KIMCAD | Pri | Notes |
+| Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Text labels | all | ✅ | P1 | Screen-sized; paper-unit size is open (doc 13) |
 | Linear dimension (two points) | all | ✅ | P1 | |
@@ -252,7 +252,7 @@ release notes, so check before relying on a single cell.
 
 ## 14. Sheets and output
 
-| Tool | Has | KIMCAD | Pri | Notes |
+| Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Sheets / layouts with drawings placed at scale | all | ✅ | P1 | Slice 16 (M4 exit): A1/A3, numbered, drag to place (D62) |
 | Title blocks filled from project data | all | 🟡 | P1 | Slice 16: one built-in title block; custom templates later |
@@ -260,11 +260,11 @@ release notes, so check before relying on a single cell.
 | Revisions / issue management | AC RV VW | ⬜ | new | Could use versions and milestones (P2 item in 04) |
 | Print, PDF export | all | ✅ | P1 | Slice 16: PDF and SVG per sheet (Qt, vector) |
 | Batch publishing (sets of sheets to PDF/DWG) | AC RV VW | 🟡 | new | D83: File › Export DXF... exports ticked drawings and sheets to a folder (DXF; PDF stays one sheet at a time) |
-| DWG/DXF export | AC RV VW BB | 🟡 | P1 | D83: DXF (ezdxf): drawings in model space at real size, sheets as paper-space layouts; lineweights, colours, linetypes from pens; poché hatches; real dimensions; layers by KIMCAD layer or kind. DWG not yet (open question) |
+| DWG/DXF export | AC RV VW BB | 🟡 | P1 | D83: DXF (ezdxf): drawings in model space at real size, sheets as paper-space layouts; lineweights, colours, linetypes from pens; poché hatches; real dimensions; layers by KimBim layer or kind. DWG not yet (open question) |
 
 ## 15. Schedules and quantities
 
-| Tool | Has | KIMCAD | Pri | Notes |
+| Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Element schedules (doors, windows, walls), editable | all | ✅ | P1 | D77: built-in and custom schemes, rows select elements, Name/Mark/property cells edit the model (one undo step) |
 | Room / area schedules | all | ✅ | P1 | D77: the Rooms schedule (every IfcSpace) |
@@ -276,7 +276,7 @@ release notes, so check before relying on a single cell.
 
 ## 16. Visualisation
 
-| Tool | Has | KIMCAD | Pri | Notes |
+| Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Real-time textured 3D | all | ⬜ | new | |
 | Photorealistic rendering | AC RV VW | ⬜ | new | Archicad CineRender, Revit cloud render, Twinmotion link. Could export to Blender |
@@ -286,9 +286,9 @@ release notes, so check before relying on a single cell.
 
 ## 17. Collaboration and versions
 
-| Tool | Has | KIMCAD | Pri | Notes |
+| Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
-| Save version, History, Compare (colours and list) | — | ✅ | P0 | KIMCAD's own feature (Slice 8). Competitors have backups and Revit compare add-ins at most |
+| Save version, History, Compare (colours and list) | — | ✅ | P0 | KimBim's own feature (Slice 8). Competitors have backups and Revit compare add-ins at most |
 | Milestones, object history, before/after | — | ✅ | P0 | Slice 20 (M5) |
 | Combine options with conflict UI | — | ⬜ | P1 | M5 exit |
 | Several people on one project (Teamwork, Worksharing, Project Sharing) | AC RV VW | 🔮 | P2 | Git remotes first ([08](08-future.md)) |
@@ -300,7 +300,7 @@ release notes, so check before relying on a single cell.
 
 ## 18. Interoperability
 
-| Tool | Has | KIMCAD | Pri | Notes |
+| Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | IFC export, valid against the schema | all | ✅ | P0 | Checked in CI |
 | IFC export settings (what to export, property mapping) | AC RV VW | ⬜ | new | |
@@ -313,7 +313,7 @@ release notes, so check before relying on a single cell.
 
 ## 19. Analysis and checking
 
-| Tool | Has | KIMCAD | Pri | Notes |
+| Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Measure distance, angle, area | all | ✅ | P1 | D79: Shift+M, snaps, 3D surfaces, copy to clipboard |
 | IFC schema validation in the app | BB | ✅ | P1 | Checks panel, EXPRESS rules included (D81) |
@@ -325,7 +325,7 @@ release notes, so check before relying on a single cell.
 
 ## 20. Automation and customisation
 
-| Tool | Has | KIMCAD | Pri | Notes |
+| Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Python console with the model API | RV(pyRevit) BB | ✅ | P1 | D82: Console panel, `edit()` as one undo step, Stop; [15](15-scripting.md) |
 | Visual programming | AC RV VW | ⬜ | new | Grasshopper, Dynamo, Marionette |
@@ -338,7 +338,7 @@ release notes, so check before relying on a single cell.
 
 ## Largest gaps
 
-These are the gaps that most often stop an architect from finishing a real project in KIMCAD, roughly in the order
+These are the gaps that most often stop an architect from finishing a real project in KimBim, roughly in the order
 they would come up:
 
 1. **Drawings and sheets** (§11, §13, §14): sections, elevations, sheets with title blocks and PDF export. This is the M4 exit and the deliverable clients pay for.

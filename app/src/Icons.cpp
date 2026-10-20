@@ -10,7 +10,7 @@
 #include <QPixmap>
 #include <QSvgRenderer>
 
-namespace kimcad {
+namespace kimbim {
 
 QIcon iconFor(const QString& ifcClass)
 {
@@ -81,7 +81,7 @@ public:
 
     QSize actualSize(const QSize& size, QIcon::Mode, QIcon::State) override { return size; }
     QIconEngine* clone() const override { return new TintedSvgEngine(m_svg); }
-    QString key() const override { return QStringLiteral("kimcadTintedSvg"); }
+    QString key() const override { return QStringLiteral("kimbimTintedSvg"); }
     bool isNull() override { return m_svg.isEmpty(); }
 
 private:
@@ -141,4 +141,4 @@ QIcon letterIcon(const QString& label)
     return *it;
 }
 
-} // namespace kimcad
+} // namespace kimbim

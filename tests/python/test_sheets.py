@@ -8,7 +8,7 @@ from pathlib import Path
 import ifcopenshell.validate
 import pytest
 
-from kimcad import app_bridge as b
+from kimbim import app_bridge as b
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
 import make_house  # noqa: E402
@@ -94,7 +94,7 @@ def test_listing_sheets_after_an_edit_never_generates_drawings(house, monkeypatc
     """sheets() runs on the GUI thread after every edit. It measured each placed drawing at the new model
     state by generating it (52 s for a real elevation); it now reuses the last size until the background
     generation of the sheet brings the new one."""
-    from kimcad import drawings as D
+    from kimbim import drawings as D
 
     sizes = {v["drawing"]: (v["w"], v["h"]) for s in call("sheets")["sheets"] for v in s["views"]}
     assert sizes
@@ -135,8 +135,8 @@ def test_m4_exit_sheet_has_plan_section_elevation_and_title_block(house, tmp_pat
     assert r["ok"], r
     svg = r["svg"]
     assert re.search(r'<svg[^>]*width="420mm" height="297mm" viewBox="0 0 420 297"', svg)  # A3
-    assert svg.count('class="kimcad-view"') == 3
-    for text in ("KIMCAD two-storey house", "A01", "1:100", "Level 1 Floor Plan", "Section 1", "South Elevation"):
+    assert svg.count('class="kimbim-view"') == 3
+    for text in ("KimBim two-storey house", "A01", "1:100", "Level 1 Floor Plan", "Section 1", "South Elevation"):
         assert f">{text}<" in svg, text
     out = tmp_path / "A01.svg"
     assert call("export_sheet_svg", "A01", str(out))["ok"] and out.read_text(encoding="utf-8") == svg
@@ -145,7 +145,7 @@ def test_m4_exit_sheet_has_plan_section_elevation_and_title_block(house, tmp_pat
 def test_sheets_work_on_ifc2x3_models(tmp_path):
     """IFC2X3 names the sheet number DocumentId and the drawing link ItemReference, and its references
     have no Description: adding an A1 sheet to the Clinic (IFC2X3) failed outright."""
-    from kimcad.testing import _reset_owner, build_model
+    from kimbim.testing import _reset_owner, build_model
     path = tmp_path / "x3.ifc"
     try:
         build_model(schema="IFC2X3", walls=2).write(str(path))
@@ -177,7 +177,7 @@ def _check_ifc2x3_sheets(path):
     assert leg["ok"], leg
     assert call("move_legend", "B01", leg["id"], 200, 100)["ok"]
     assert [(x["x"], x["y"]) for x in next(s for s in call("sheets")["sheets"] if s["number"] == "B01")["legends"]] == [(200, 100)]
-    assert 'class="kimcad-legend"' in call("sheet_svg", "B01")["svg"]
+    assert 'class="kimbim-legend"' in call("sheet_svg", "B01")["svg"]
     assert call("remove_legend", "B01", leg["id"])["ok"]
     assert call("remove_placed", "B01", plan)["ok"]
     assert call("delete_sheet", "B01")["ok"] and call("sheets")["sheets"] == []
@@ -185,11 +185,11 @@ def _check_ifc2x3_sheets(path):
 
 def test_sheet_weights_do_not_scale(house):
     """A pen prints at its weight whatever the scale: the sheet divides weights by its scaling (D73)."""
-    from kimcad import settings as s
+    from kimbim import settings as s
     number = call("add_sheet", "A1", "Weights")["number"]
     assert call("place_drawing", number, drawing("Level 1 Floor Plan"), -1, -1, 50)["ok"]
     svg = call("sheet_svg", number)["svg"]
-    view = svg.split('class="kimcad-view"', 1)[1]
+    view = svg.split('class="kimbim-view"', 1)[1]
     widths = {float(w) for w in re.findall(r'<g [^>]*class="IfcWall"[^>]*stroke-width="([\d.]+)"', view)}
     assert widths == {0.25}  # 0.50 mm pen / k (k = 100/50 = 2): prints 0.50 mm on paper
     assert 'stroke="#5a3a22"' in svg  # the current purpose (Working)
@@ -224,7 +224,7 @@ def test_a_legend_is_placed_moved_drawn_and_removed(house):
     assert call("move_legend", number, leg["id"], 300, 200)["ok"]
     assert (_sheet_of(number)["legends"][0]["x"], _sheet_of(number)["legends"][0]["y"]) == (300, 200)
     svg = call("sheet_svg", number)["svg"]
-    assert 'class="kimcad-legend" transform="translate(300.000 200.000)"' in svg and "To be demolished" in svg
+    assert 'class="kimbim-legend" transform="translate(300.000 200.000)"' in svg and "To be demolished" in svg
     assert call("undo")["ok"]  # the move is one step
     assert _sheet_of(number)["legends"][0]["x"] == leg["x"]
     assert call("remove_legend", number, leg["id"])["ok"]

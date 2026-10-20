@@ -4,7 +4,7 @@
 #include <QIcon>
 #include <QString>
 
-namespace kimcad {
+namespace kimbim {
 
 // A small line icon for an IFC class (walls, slabs, doors... a generic one for anything else).
 QIcon iconFor(const QString& ifcClass);
@@ -16,4 +16,4 @@ QIcon themedIcon(const QString& name);
 // D90: a stand-in for an action without an icon: its first letter in a rounded box, themed the same way.
 QIcon letterIcon(const QString& label);
 
-} // namespace kimcad
+} // namespace kimbim

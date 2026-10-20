@@ -9,9 +9,9 @@ import ezdxf
 import ifcopenshell.validate
 import pytest
 
-from kimcad import app_bridge as b
-from kimcad import settings as s
-from kimcad import symbols, tags
+from kimbim import app_bridge as b
+from kimbim import settings as s
+from kimbim import symbols, tags
 
 
 def call(fn, *args):
@@ -87,7 +87,7 @@ def test_a_tag_follows_its_element_and_shows_its_values(flat):
     tag = b._model.by_guid(t["guid"])
     assert tag.ObjectType == "TAG" and tags.element_of(tag).GlobalId == flat["door"]
     rel = next(r for r in tag.HasAssignments if r.is_a("IfcRelAssignsToProduct"))
-    assert rel.RelatingProduct.GlobalId == flat["door"]  # IFC's association, not only KIMCAD's pset
+    assert rel.RelatingProduct.GlobalId == flat["door"]  # IFC's association, not only KimBim's pset
     first = listed(flat["l1"])[t["guid"]]
     assert first["text"] == "0.90×2.10" and first["labels"][0]["text"] == "0.90×2.10"
     # The wall (and its door) move: the tag follows, keeping its place relative to the door.
@@ -256,7 +256,7 @@ def test_plan_drawing_has_tags_stamps_and_symbols(flat, tmp_path):
     call("add_symbol", flat["l1"], "cloud", json.dumps([[1, 1], [3, 1], [3, 2]]), json.dumps({"text": "A"}))
     call("add_symbol", flat["l1"], "angle", json.dumps([[0, 0], [2, 0], [0, 2], [1, 1]]), "")
     svg = plan_svg()
-    marks = svg.split('class="kimcad-marks"', 1)[1]
+    marks = svg.split('class="kimbim-marks"', 1)[1]
     assert f'ifc:guid="{t}"' in marks and ">0.90×2.10</text>" in marks
     assert 'data-symbol="north"' in marks and ">N</text>" in marks and ">A</text>" in marks
     assert ">90.00°</text>" in marks and ">Living room</text>" in marks  # the room stamp
@@ -287,7 +287,7 @@ def test_sheet_north_arrow_scale_bar_and_cloud(flat, tmp_path):
     kinds = {x["kind"]: x for x in sheet["symbols"]}
     assert set(kinds) == {"north", "scalebar", "cloud"} and kinds["cloud"]["x"] == 30 and kinds["cloud"]["w"] == 40
     svg = call("sheet_svg", number)["svg"]
-    assert svg.count('class="kimcad-sheet-symbol"') == 3
+    assert svg.count('class="kimbim-sheet-symbol"') == 3
     assert ">1:50</text>" in svg and ">2.5 m</text>" in svg  # the bar shows the drawing's scale (50 mm of paper)
     assert call("move_sheet_symbol", number, north["id"], 100, 50)["ok"]
     sheet = next(x for x in call("sheets")["sheets"] if x["number"] == number)

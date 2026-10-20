@@ -12,7 +12,7 @@ Code and instructions: [`spikes/`](../spikes/README.md). Test corpus: 80 buildin
 | S3 | Lossless, deterministic IFC ↔ records round-trip? Local edits? | **Yes**, after three design rules found by the spike (below). |
 | S4 | Identical hashes on Windows and Linux? | **Yes: 77/77 identical state hashes and byte-identical IFC exports.** |
 | S5 | Git object DB for a 1M-record model? | **Yes, if records are written as packs (never loose objects) and packs avoid deltas.** |
-| S6 | Can IfcOpenShell's SVG serializer make KIMCAD's drawings, fast enough? | **Yes for quality; speed needs**: sending only visible elements (the big win), polygon HLR (a smaller one), and generating in a child process (the serializer holds the GIL). |
+| S6 | Can IfcOpenShell's SVG serializer make KimBim's drawings, fast enough? | **Yes for quality; speed needs**: sending only visible elements (the big win), polygon HLR (a smaller one), and generating in a child process (the serializer holds the GIL). |
 
 ---
 
@@ -90,7 +90,7 @@ Hybrid kernel, 16 threads, machine otherwise idle:
 **Findings**
 - **OCCT's cost is per interactive object, not per triangle.** 110,000 separate objects are unusable: 2.7 fps and 3.2 GB. The same geometry in 110 batches meets the targets (≥ 30 fps, pick under 100 ms) on integrated graphics.
 - **Real single-discipline models (a few thousand elements) are fine either way**, at 60 fps.
-- **The conda-forge "all" build of OCCT forces software rendering on Windows.** It pulls VTK, then viskores, then Mesa, whose `opengl32.dll` lands in the environment and is loaded before the GPU driver. The first measurements ran on Mesa llvmpipe (the CPU). Fix: pin OCCT's `novtk` build (D43). Without this, every KIMCAD user on Windows would have had CPU rendering.
+- **The conda-forge "all" build of OCCT forces software rendering on Windows.** It pulls VTK, then viskores, then Mesa, whose `opengl32.dll` lands in the environment and is loaded before the GPU driver. The first measurements ran on Mesa llvmpipe (the CPU). Fix: pin OCCT's `novtk` build (D43). Without this, every KimBim user on Windows would have had CPU rendering.
 
 **Decisions (D42, D43)**
 - The viewport draws elements in **batches** (about 1,000 elements per OCCT object, grouped by storey and type). Each batch is a custom AIS object with **one selection owner per element**, so picking, highlighting, hiding and isolating stay per element.
@@ -129,8 +129,8 @@ Record storage is roughly the same size as the IFC text before compression. Git 
 3. **Loose entities keep multiplicity.** Entities with no referrers (e.g. `IfcStyledItem`) are stored with a count, so identical duplicates are not merged away.
 
 **Other findings**
-- **Invalid input:** 3 ISO example files use an IFC4 ADD1 attribute shape (`PnIndex` as a list of lists). ifcopenshell *reads* them but refuses to *write* them. KIMCAD needs an explicit policy: validate on import, report, and repair or reject. These files are classed INVALID, not as failures.
-- **Duplicate GlobalIds** exist in real files (Schependomlaan). Import must detect them and assign new KIMCAD IDs deterministically, with a warning.
+- **Invalid input:** 3 ISO example files use an IFC4 ADD1 attribute shape (`PnIndex` as a list of lists). ifcopenshell *reads* them but refuses to *write* them. KimBim needs an explicit policy: validate on import, report, and repair or reject. These files are classed INVALID, not as failures.
+- **Duplicate GlobalIds** exist in real files (Schependomlaan). Import must detect them and assign new KimBim IDs deterministically, with a warning.
 - **No Unicode normalization.** NFC-normalizing strings would break losslessness, so strings are stored exactly as parsed. Doc 02 is corrected.
 - **INTEGER vs REAL must stay distinct.** Pure RFC 8785 would write `1.0` as `1`, so our canonical JSON keeps the IFC type distinction.
 
@@ -187,7 +187,7 @@ Synthetic ~700-byte canonical records, sharded `objects/<aa>/<bb>/<id>.json`, on
 **Decisions**
 - MVP import uses `git fast-import` followed by `git repack -adf --window=0`. The repack is slow (636 s at 1M records), so it should be a background step after import.
 - Later, a native pack writer through `gix-pack`, with parallel compression and no deltas for records.
-- Keep the local model cache (`.kimcad/cache`, keyed by tree hash) so opening a project normally skips the read-all path.
+- Keep the local model cache (`.kimbim/cache`, keyed by tree hash) so opening a project normally skips the read-all path.
 
 ---
 
@@ -224,7 +224,7 @@ swing in their representation; Slice 15). Polygon HLR (`svg-poly`) gives the sam
 - Clinic confirms the synthetic results on a real Revit export: a plan of its fullest floor takes 6.4 s, a section or
   elevation of the whole building 17–34 s (runners vary), and geometry (7–11 s) matters too, not only HLR. The visible-element pass cuts both.
 - Hidden-line removal dominates, and it grows with everything behind the cut, not with what is visible. Sending only
-  the elements the camera can see cut the elevation from 52 s to 3.4 s. KIMCAD already renders element IDs into an
+  the elements the camera can see cut the elevation from 52 s to 3.4 s. KimBim already renders element IDs into an
   offscreen image for box selection (D52); the same pass from the drawing's camera gives the visible set.
 - `svg-poly` (with `svg-prefilter` on and `svg-unify-inputs` off) makes HLR 1.1–1.6× faster with the same drawings,
   and `write` 3–4× faster. Worth having, but it is not the fix. (Earlier runs that showed a 4× gain were taken while

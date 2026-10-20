@@ -7,9 +7,9 @@ import ifcopenshell.api.type
 import ifcopenshell.util.element
 import pytest
 
-from kimcad import graphics as g
-from kimcad import renovation as r
-from kimcad.testing import _reset_owner, _set_owner
+from kimbim import graphics as g
+from kimbim import renovation as r
+from kimbim.testing import _reset_owner, _set_owner
 
 
 def _model(schema="IFC4"):
@@ -54,20 +54,20 @@ def test_write_to_the_common_pset_as_enumerated_ifc4():
     assert len([p for p in f.by_type("IfcPropertyEnumeratedValue") if p.Name == "Status"]) == 1
 
 
-def test_classes_without_a_status_template_use_kimcad_renovation():
+def test_classes_without_a_status_template_use_kimbim_renovation():
     f = _model()
     space = _el(f, "IfcSpace")
     r.write_status(space, "existing")
-    assert ifcopenshell.util.element.get_pset(space, "KIMCAD_Renovation")["Status"] == "EXISTING"
+    assert ifcopenshell.util.element.get_pset(space, "KIMBIM_Renovation")["Status"] == "EXISTING"
     assert r.status_of(space) == "existing"
 
 
-def test_ifc2x3_uses_kimcad_renovation():
+def test_ifc2x3_uses_kimbim_renovation():
     try:
         f = _model("IFC2X3")
         w = _el(f, "IfcWall")
         r.write_status(w, "demolish")
-        assert ifcopenshell.util.element.get_pset(w, "KIMCAD_Renovation")["Status"] == "DEMOLISH"
+        assert ifcopenshell.util.element.get_pset(w, "KIMBIM_Renovation")["Status"] == "DEMOLISH"
         assert r.status_of(w) == "demolish"
     finally:
         _reset_owner()
@@ -75,9 +75,9 @@ def test_ifc2x3_uses_kimcad_renovation():
 
 def test_writing_clears_the_other_place():
     f = _model()
-    w = _el(f, "IfcWall", KIMCAD_Renovation={"Status": "DEMOLISH"})
-    r.write_status(w, "existing")  # goes to Pset_WallCommon; the KIMCAD one must not contradict it
-    assert "Status" not in (ifcopenshell.util.element.get_pset(w, "KIMCAD_Renovation") or {})
+    w = _el(f, "IfcWall", KIMBIM_Renovation={"Status": "DEMOLISH"})
+    r.write_status(w, "existing")  # goes to Pset_WallCommon; the KimBim one must not contradict it
+    assert "Status" not in (ifcopenshell.util.element.get_pset(w, "KIMBIM_Renovation") or {})
     assert r.status_of(w) == "existing"
 
 
@@ -107,10 +107,10 @@ import json  # noqa: E402
 import pathlib  # noqa: E402
 import tempfile  # noqa: E402
 
-from kimcad import app_bridge as b  # noqa: E402  (first: annotations imports it)
-from kimcad import annotations  # noqa: E402
-from kimcad import authoring as A  # noqa: E402
-from kimcad import settings as s  # noqa: E402
+from kimbim import app_bridge as b  # noqa: E402  (first: annotations imports it)
+from kimbim import annotations  # noqa: E402
+from kimbim import authoring as A  # noqa: E402
+from kimbim import settings as s  # noqa: E402
 
 
 def call(fn, *args):
@@ -177,7 +177,7 @@ def test_annotations_are_not_stamped():
     level, _, _, _ = _house()
     out = json.loads(annotations.add_annotation(level, "text", json.dumps([[0, 0]]), "Hi"))
     note = b._model.by_guid(out["guid"])
-    assert ifcopenshell.util.element.get_pset(note, "KIMCAD_Renovation") is None
+    assert ifcopenshell.util.element.get_pset(note, "KIMBIM_Renovation") is None
 
 
 def test_unmarked_and_mark_unmarked():

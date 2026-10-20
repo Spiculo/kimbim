@@ -7,7 +7,7 @@
 
 class QPushButton;
 
-namespace kimcad {
+namespace kimbim {
 
 // The console's input (D82): Enter runs, Shift+Enter adds a line, Up/Down on the first/last line recall
 // earlier input. Python is highlighted (keywords, strings, comments, numbers).
@@ -57,4 +57,4 @@ private:
     ConsoleInput* m_input = nullptr;
 };
 
-} // namespace kimcad
+} // namespace kimbim

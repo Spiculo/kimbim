@@ -3,7 +3,7 @@ import json
 
 from conftest import build_model
 
-from kimcad import app_bridge
+from kimbim import app_bridge
 
 
 def _names(node, out):

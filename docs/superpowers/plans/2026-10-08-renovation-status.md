@@ -4,9 +4,9 @@
 
 **Goal:** Elements carry an Archicad-style renovation status (Existing / To be demolished / New) that purposes show, hide or restyle through renovation filters, with a legend on screen and on sheets.
 
-**Architecture:** Status is IFC model data (`Pset_<Class>Common.Status` enumerated, or `KIMCAD_Renovation.Status`), read through the existing per-name property index. Renovation filters are a new D73-style settings table; `graphics.resolve` applies visibility → renovation filter → override rules and reports legend entries. Sheets get legend references beside placed drawings. The C++ app adds a Properties drop-down, a Model menu, a bottom-bar status for new elements, a filter editor and sheet legends.
+**Architecture:** Status is IFC model data (`Pset_<Class>Common.Status` enumerated, or `KIMBIM_Renovation.Status`), read through the existing per-name property index. Renovation filters are a new D73-style settings table; `graphics.resolve` applies visibility → renovation filter → override rules and reports legend entries. Sheets get legend references beside placed drawings. The C++ app adds a Properties drop-down, a Model menu, a bottom-bar status for new elements, a filter editor and sheet legends.
 
-**Tech Stack:** Python 3.12 + IfcOpenShell (python/kimcad), C++17/Qt 6 + OCCT app (app/src), pytest, Qt Test/ctest, pixi.
+**Tech Stack:** Python 3.12 + IfcOpenShell (python/kimbim), C++17/Qt 6 + OCCT app (app/src), pytest, Qt Test/ctest, pixi.
 
 **Spec:** `docs/superpowers/specs/2026-10-08-renovation-status-design.md`
 
@@ -15,13 +15,13 @@
 - Three statuses; internal keys `existing`, `demolish`, `new`; IFC values written `EXISTING`, `DEMOLISH`, `NEW`.
 - No status, or any unknown value, means `new`.
 - Read `Status` from any pset, or `Renovation Status`; own values win over type values.
-- Write to `Pset_<Class>Common.Status` (an `IfcPropertyEnumeratedValue`) only when the schema's template has it (IFC4 yes; IFC2X3 Common psets don't), else `KIMCAD_Renovation.Status` (an `IfcLabel`).
+- Write to `Pset_<Class>Common.Status` (an `IfcPropertyEnumeratedValue`) only when the schema's template has it (IFC4 yes; IFC2X3 Common psets don't), else `KIMBIM_Renovation.Status` (an `IfcLabel`).
 - Empty `renovation_filters` means the built-ins; the first edit writes the whole table (D73 rule).
 - Purposes without `renovation`, or naming a missing filter, mean `Everything`.
 - Pens 31 (existing grey `#808080` 0.18), 32 (demolition `#c09000` 0.25), 33 (demolition fill `#f8e8a0`). In Permit: 31 `#808080`, 32 `#000000`, 33 `#ffffff`.
 - Bridge functions follow the app_bridge protocol: strings in, JSON out, never raise.
 - Every model edit is one undo step through `B._run`.
-- Every new UI string gets Spanish (`app/translations/kimcad_es.ts`); `pixi run check-translations` passes.
+- Every new UI string gets Spanish (`app/translations/kimbim_es.ts`); `pixi run check-translations` passes.
 - Python tests: `pixi run test-py` (or `pixi run pytest tests/python/<file> -q` after `pixi run build`). App: `pixi run app-test`.
 
 ## Review Focus
@@ -38,8 +38,8 @@
 ### Task 1: Status read and write (`renovation.py`)
 
 **Files:**
-- Create: `python/kimcad/renovation.py`
-- Modify: `python/kimcad/graphics.py` (`_property_index`: enumerated values)
+- Create: `python/kimbim/renovation.py`
+- Modify: `python/kimbim/graphics.py` (`_property_index`: enumerated values)
 - Test: `tests/python/test_renovation.py`
 
 **Interfaces:**
@@ -57,9 +57,9 @@ import ifcopenshell.api.type
 import ifcopenshell.util.element
 import pytest
 
-from kimcad import graphics as g
-from kimcad import renovation as r
-from kimcad.testing import _reset_owner, _set_owner
+from kimbim import graphics as g
+from kimbim import renovation as r
+from kimbim.testing import _reset_owner, _set_owner
 
 
 def _model(schema="IFC4"):
@@ -104,20 +104,20 @@ def test_write_to_the_common_pset_as_enumerated_ifc4():
     assert len([p for p in f.by_type("IfcPropertyEnumeratedValue") if p.Name == "Status"]) == 1
 
 
-def test_classes_without_a_status_template_use_kimcad_renovation():
+def test_classes_without_a_status_template_use_kimbim_renovation():
     f = _model()
     space = _el(f, "IfcSpace")
     r.write_status(space, "existing")
-    assert ifcopenshell.util.element.get_pset(space, "KIMCAD_Renovation")["Status"] == "EXISTING"
+    assert ifcopenshell.util.element.get_pset(space, "KIMBIM_Renovation")["Status"] == "EXISTING"
     assert r.status_of(space) == "existing"
 
 
-def test_ifc2x3_uses_kimcad_renovation():
+def test_ifc2x3_uses_kimbim_renovation():
     try:
         f = _model("IFC2X3")
         w = _el(f, "IfcWall")
         r.write_status(w, "demolish")
-        assert ifcopenshell.util.element.get_pset(w, "KIMCAD_Renovation")["Status"] == "DEMOLISH"
+        assert ifcopenshell.util.element.get_pset(w, "KIMBIM_Renovation")["Status"] == "DEMOLISH"
         assert r.status_of(w) == "demolish"
     finally:
         _reset_owner()
@@ -125,9 +125,9 @@ def test_ifc2x3_uses_kimcad_renovation():
 
 def test_writing_clears_the_other_place():
     f = _model()
-    w = _el(f, "IfcWall", KIMCAD_Renovation={"Status": "DEMOLISH"})
-    r.write_status(w, "existing")  # goes to Pset_WallCommon; the KIMCAD one must not contradict it
-    assert "Status" not in (ifcopenshell.util.element.get_pset(w, "KIMCAD_Renovation") or {})
+    w = _el(f, "IfcWall", KIMBIM_Renovation={"Status": "DEMOLISH"})
+    r.write_status(w, "existing")  # goes to Pset_WallCommon; the KimBim one must not contradict it
+    assert "Status" not in (ifcopenshell.util.element.get_pset(w, "KIMBIM_Renovation") or {})
     assert r.status_of(w) == "existing"
 
 
@@ -154,7 +154,7 @@ def test_property_index_reads_enumerated_values():
 - [ ] **Step 2: Run them to make sure they fail**
 
 Run: `pixi run pytest tests/python/test_renovation.py -q`
-Expected: FAIL, `ModuleNotFoundError: kimcad.renovation`
+Expected: FAIL, `ModuleNotFoundError: kimbim.renovation`
 
 - [ ] **Step 3: Enumerated values in the property index**
 
@@ -176,7 +176,7 @@ In `graphics._property_index`, extend the candidate loop:
 ```python
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Renovation status (Archicad's model): Existing, To be demolished, New. Stored where IFC keeps it,
-Pset_<Class>Common.Status (an enumerated value: EXISTING, DEMOLISH, NEW), or KIMCAD_Renovation.Status
+Pset_<Class>Common.Status (an enumerated value: EXISTING, DEMOLISH, NEW), or KIMBIM_Renovation.Status
 where the schema's template for the class has no Status (IFC2X3, spaces, furniture occurrences). Read
 from any pset's Status or Archicad's "Renovation Status"; no status, or an unknown one, is New.
 Same protocol as app_bridge for the bridge functions (strings in, JSON out, never raise).
@@ -191,7 +191,7 @@ import ifcopenshell.util.pset
 
 STATUSES = ("existing", "demolish", "new")
 IFC_VALUE = {"existing": "EXISTING", "demolish": "DEMOLISH", "new": "NEW"}
-PSET = "KIMCAD_Renovation"
+PSET = "KIMBIM_Renovation"
 NAMES = ("Status", "Renovation Status")
 
 
@@ -263,8 +263,8 @@ Expected: all pass. The graphics tests must keep passing after the index change.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add python/kimcad/renovation.py python/kimcad/graphics.py tests/python/test_renovation.py
-git commit -m "feat(renovation): status read and written where IFC keeps it (Common pset Status or KIMCAD_Renovation)"
+git add python/kimbim/renovation.py python/kimbim/graphics.py tests/python/test_renovation.py
+git commit -m "feat(renovation): status read and written where IFC keeps it (Common pset Status or KIMBIM_Renovation)"
 ```
 
 ---
@@ -272,7 +272,7 @@ git commit -m "feat(renovation): status read and written where IFC keeps it (Com
 ### Task 2: Setting the status: bridge, stamping new elements, copies, Properties data
 
 **Files:**
-- Modify: `python/kimcad/renovation.py`, `python/kimcad/settings.py`, `python/kimcad/authoring.py` (each `layers.assign_active(...)` and `layers.copy_layer(...)` call), `python/kimcad/rooms.py:263`, `python/kimcad/roofs.py:287`, `python/kimcad/app_bridge.py` (`properties_multi`, the bridge imports)
+- Modify: `python/kimbim/renovation.py`, `python/kimbim/settings.py`, `python/kimbim/authoring.py` (each `layers.assign_active(...)` and `layers.copy_layer(...)` call), `python/kimbim/rooms.py:263`, `python/kimbim/roofs.py:287`, `python/kimbim/app_bridge.py` (`properties_multi`, the bridge imports)
 - Test: `tests/python/test_renovation.py`
 
 **Interfaces:**
@@ -286,9 +286,9 @@ import json
 import pathlib
 import tempfile
 
-from kimcad import app_bridge as b
-from kimcad import authoring as A
-from kimcad import settings as s
+from kimbim import app_bridge as b
+from kimbim import authoring as A
+from kimbim import settings as s
 
 
 def call(fn, *args):
@@ -377,12 +377,12 @@ def test_unmarked_and_mark_unmarked():
 
 def test_annotations_are_not_stamped():
     _house()
-    from kimcad import annotations
+    from kimbim import annotations
 
     level = json.loads(A.storeys())["storeys"][0]["guid"]
     out = json.loads(annotations.create_annotation(level, "text", json.dumps({"points": [[0, 0]], "text": "Hi"})))
     note = b._model.by_guid(out["guid"])
-    assert ifcopenshell.util.element.get_pset(note, "KIMCAD_Renovation") is None
+    assert ifcopenshell.util.element.get_pset(note, "KIMBIM_Renovation") is None
 ```
 
 Before running, check these names in the code and adjust the test (not the code) to match:
@@ -394,7 +394,7 @@ Before running, check these names in the code and adjust the test (not the code)
 - [ ] **Step 2: Run them to make sure they fail**
 
 Run: `pixi run pytest tests/python/test_renovation.py -q`
-Expected: FAIL, `AttributeError: module 'kimcad.app_bridge' has no attribute 'set_status'`
+Expected: FAIL, `AttributeError: module 'kimbim.app_bridge' has no attribute 'set_status'`
 
 - [ ] **Step 3: Settings key**
 
@@ -555,7 +555,7 @@ Also run `pixi run golden`. New elements now carry a Status pset, which golden h
 - [ ] **Step 8: Commit**
 
 ```bash
-git add -A python/kimcad tests/python/test_renovation.py
+git add -A python/kimbim tests/python/test_renovation.py
 git commit -m "feat(renovation): set the status (one undo step), status for new elements, copies keep theirs, mark unmarked elements, Properties data"
 ```
 
@@ -564,7 +564,7 @@ git commit -m "feat(renovation): set the status (one undo step), status for new 
 ### Task 3: Renovation filters table, pens 31–33, purposes
 
 **Files:**
-- Modify: `python/kimcad/graphics.py` (`TABLES`, `_BUILTINS`, `_ROLES`, `_pen_set`, `validate`, `_references_error`), `python/kimcad/settings.py` (`DEFAULTS`)
+- Modify: `python/kimbim/graphics.py` (`TABLES`, `_BUILTINS`, `_ROLES`, `_pen_set`, `validate`, `_references_error`), `python/kimbim/settings.py` (`DEFAULTS`)
 - Test: `tests/python/test_graphics.py`
 
 **Interfaces:**
@@ -715,7 +715,7 @@ Expected: all pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add python/kimcad/graphics.py python/kimcad/settings.py tests/python/test_graphics.py
+git add python/kimbim/graphics.py python/kimbim/settings.py tests/python/test_graphics.py
 git commit -m "feat(graphics): renovation filters table, existing/demolition pens, Existing/Demolition/New construction purposes"
 ```
 
@@ -724,7 +724,7 @@ git commit -m "feat(graphics): renovation filters table, existing/demolition pen
 ### Task 4: Resolution with the renovation filter, and legend entries
 
 **Files:**
-- Modify: `python/kimcad/graphics.py` (`resolve`, `graphics_state`, `GRAPHICS_KEYS`)
+- Modify: `python/kimbim/graphics.py` (`resolve`, `graphics_state`, `GRAPHICS_KEYS`)
 - Test: `tests/python/test_graphics.py`
 
 **Interfaces:**
@@ -736,7 +736,7 @@ git commit -m "feat(graphics): renovation filters table, existing/demolition pen
 ```python
 def _reno_model():
     f = _model()
-    from kimcad import renovation as r
+    from kimbim import renovation as r
     walls = {}
     for st in ("existing", "demolish", "new"):
         w = _el(f, "IfcWall", Pset_WallCommon={"FireRating": "60" if st == "demolish" else ""})
@@ -778,7 +778,7 @@ def test_legend_lists_only_applied_entries_in_order():
 
 def test_legend_has_no_demolition_row_without_demolished_elements():
     f, w = _reno_model()
-    from kimcad import renovation as r
+    from kimbim import renovation as r
     r.write_status(w["demolish"], "existing")
     out = g.resolve("Demolition", model=f)
     assert [e["key"] for e in out["legend"]] == []  # only as-is rows left: nothing to explain
@@ -889,13 +889,13 @@ Expected: all pass.
 - [ ] **Step 5: Time the Clinic**
 
 Run (needs the corpus; skip with a note if missing):
-`pixi run python -c "import time,json,kimcad.app_bridge as b,kimcad.graphics as g; b.open_model('tests/corpus/files/Clinic_Architectural.ifc'); t=time.time(); g.resolve('Demolition'); print(time.time()-t)"`
+`pixi run python -c "import time,json,kimbim.app_bridge as b,kimbim.graphics as g; b.open_model('tests/corpus/files/Clinic_Architectural.ifc'); t=time.time(); g.resolve('Demolition'); print(time.time()-t)"`
 Expected: under 0.5 s. Record the number for doc 11 (Task 9).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add python/kimcad/graphics.py tests/python/test_graphics.py
+git add python/kimbim/graphics.py tests/python/test_graphics.py
 git commit -m "feat(graphics): the purpose's renovation filter hides or restyles by status, override rules on top; legend entries"
 ```
 
@@ -904,7 +904,7 @@ git commit -m "feat(graphics): the purpose's renovation filter hides or restyles
 ### Task 5: Legend SVG
 
 **Files:**
-- Modify: `python/kimcad/graphics.py` (new `legend_svg`)
+- Modify: `python/kimbim/graphics.py` (new `legend_svg`)
 - Test: `tests/python/test_graphics.py`
 
 **Interfaces:**
@@ -918,11 +918,11 @@ def test_legend_svg_rows_and_restriction():
     f, w = _reno_model()
     out = g.resolve("Demolition", model=f)
     body, width, height = g.legend_svg(out)
-    assert body.count('class="kimcad-legend-row"') == 2
+    assert body.count('class="kimbim-legend-row"') == 2
     assert "To be demolished" in body and 'stroke-dasharray="3 1.5"' in body
     assert width > 40 and height == pytest.approx(8 + 2 * 7)
     body, _, _ = g.legend_svg(out, guids={w["existing"].GlobalId})
-    assert body.count('class="kimcad-legend-row"') == 1  # the demolished wall isn't in these drawings
+    assert body.count('class="kimbim-legend-row"') == 1  # the demolished wall isn't in these drawings
     body, _, h = g.legend_svg(g.resolve("Working", model=f))
     assert g.LEGEND_EMPTY in body and h == pytest.approx(8 + 7)
 ```
@@ -960,7 +960,7 @@ def legend_svg(resolved: dict, guids=None) -> tuple:
     for e in rows:
         st = styles[e["style"]]
         fill = st.get("fill") or st.get("surface") or "none"
-        parts.append(f'<g class="kimcad-legend-row"><rect x="0" y="{y:g}" width="{_SWATCH_W:g}" height="{_SWATCH_H:g}" '
+        parts.append(f'<g class="kimbim-legend-row"><rect x="0" y="{y:g}" width="{_SWATCH_W:g}" height="{_SWATCH_H:g}" '
                      f'fill="{fill}"{_stroke(st["cut"], 1.0)}/>'
                      f'<text x="{_SWATCH_W + 3:g}" y="{y + 4:g}" font-size="3" font-family="sans-serif">{_xml(e["label"])}</text></g>')
         longest = max(longest, len(e["label"]))
@@ -978,7 +978,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add python/kimcad/graphics.py tests/python/test_graphics.py
+git add python/kimbim/graphics.py tests/python/test_graphics.py
 git commit -m "feat(graphics): legend as SVG (swatch and label per entry, limited to given elements)"
 ```
 
@@ -987,12 +987,12 @@ git commit -m "feat(graphics): legend as SVG (swatch and label per entry, limite
 ### Task 6: Legends on sheets
 
 **Files:**
-- Modify: `python/kimcad/sheets.py`, `python/kimcad/app_bridge.py` (bridge imports)
+- Modify: `python/kimbim/sheets.py`, `python/kimbim/app_bridge.py` (bridge imports)
 - Test: `tests/python/test_sheets.py`
 
 **Interfaces:**
 - Consumes: Task 5 `graphics.legend_svg`.
-- Produces: bridge `place_legend(number) -> {"ok", "id", ...edit}`, `move_legend(number, id, x, y)`, `remove_legend(number, id)`; `sheets()` per sheet gains `"legends": [{"id", "x", "y", "w", "h"}]`; `sheet_svg` draws them (`<g class="kimcad-legend">`). Legend refs: `IfcDocumentReference` with Location `kimcad:legend#{json}` (IFC2X3) or Location `kimcad:legend` + Description JSON (IFC4); id in `Identification` / `ItemReference`.
+- Produces: bridge `place_legend(number) -> {"ok", "id", ...edit}`, `move_legend(number, id, x, y)`, `remove_legend(number, id)`; `sheets()` per sheet gains `"legends": [{"id", "x", "y", "w", "h"}]`; `sheet_svg` draws them (`<g class="kimbim-legend">`). Legend refs: `IfcDocumentReference` with Location `kimbim:legend#{json}` (IFC2X3) or Location `kimbim:legend` + Description JSON (IFC4); id in `Identification` / `ItemReference`.
 
 - [ ] **Step 1: Read the reference helpers.** Read `sheets.py:35-75` and `place_drawing` (`:334-366`) to reuse `_data`, `_link_attr`, `MARKER`, `_free_spot` and the IFC2X3 Location fallback.
 
@@ -1000,7 +1000,7 @@ git commit -m "feat(graphics): legend as SVG (swatch and label per entry, limite
 
 ```python
 def _demolish_one_wall():
-    from kimcad import renovation as r
+    from kimbim import renovation as r
     wall = b._model.by_type("IfcWall")[0]
     assert call("set_status", json.dumps([wall.GlobalId]), "demolish")["ok"]
     return wall
@@ -1018,7 +1018,7 @@ def test_a_legend_is_placed_moved_drawn_and_removed(house):
     assert leg["id"] == r["id"] and leg["w"] > 0 and leg["h"] > 0
     assert call("move_legend", number, leg["id"], 300, 200)["ok"]
     svg = call("sheet_svg", number)["svg"]
-    assert 'class="kimcad-legend"' in svg and "To be demolished" in svg and "translate(300" in svg
+    assert 'class="kimbim-legend"' in svg and "To be demolished" in svg and "translate(300" in svg
     assert call("undo")["ok"]  # the move is one step
     assert call("remove_legend", number, leg["id"])["ok"]
     sheet = next(s_ for s_ in call("sheets")["sheets"] if s_["number"] == number)
@@ -1051,7 +1051,7 @@ Expected: FAIL (`AttributeError: place_legend`)
 - [ ] **Step 4: Implement in `sheets.py`**
 
 ```python
-LEGEND = "kimcad:legend"
+LEGEND = "kimbim:legend"
 
 
 def _legends(sheet):
@@ -1093,7 +1093,7 @@ In `sheet_svg`, after the views loop:
     for ref in _legends(sheet):
         p = _placement(ref)
         body, _, _ = legend_body if legend_body is not None else (legend_body := _legend_content(sheet, number))
-        parts.append(f'<g class="kimcad-legend" transform="translate({p["x"]:.3f} {p["y"]:.3f})">\n{body}\n</g>')
+        parts.append(f'<g class="kimbim-legend" transform="translate({p["x"]:.3f} {p["y"]:.3f})">\n{body}\n</g>')
 ```
 
 (Initialise `legend_body = None` before the loop.) `_views` filters on `MARKER`, so legends never appear as views.
@@ -1108,7 +1108,7 @@ Expected: all pass.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add python/kimcad/sheets.py python/kimcad/app_bridge.py tests/python/test_sheets.py
+git add python/kimbim/sheets.py python/kimbim/app_bridge.py tests/python/test_sheets.py
 git commit -m "feat(sheets): legends placed on sheets, drawn from the sheet purpose and its drawings' elements"
 ```
 
@@ -1333,7 +1333,7 @@ git commit -m "feat(app): renovation filters editor, renovation in purposes and 
 **Files:**
 - Modify: `app/src/SheetsPanel.{h,cpp}` (Place legend), `app/src/DrawingView.{h,cpp}` (right-click *Remove from sheet* on a placed item), `app/src/MainWindow.cpp` (`refreshSheets`, `openSheet`)
 - Create: `tools/check_renovation.py`; `pixi.toml` task `renovation`; `.github/workflows/*.yml` step beside `pixi run m4`
-- Modify: `docs/decisions.md` (D74), `docs/14-tool-inventory.md` (Renovation status row ✅; Graphic overrides note), `docs/04-app-features.md` (renovation entry, as D73 did), `docs/11-spike-results.md` (Clinic timing from Task 4), `docs/07-roadmap.md` (if D73 is listed there), `app/translations/kimcad_es.ts` / `kimcad_en.ts`
+- Modify: `docs/decisions.md` (D74), `docs/14-tool-inventory.md` (Renovation status row ✅; Graphic overrides note), `docs/04-app-features.md` (renovation entry, as D73 did), `docs/11-spike-results.md` (Clinic timing from Task 4), `docs/07-roadmap.md` (if D73 is listed there), `app/translations/kimbim_es.ts` / `kimbim_en.ts`
 - Test: `app/tests/test_main_window.cpp`
 
 **Interfaces:**
@@ -1382,7 +1382,7 @@ import pathlib
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "python"))
-from kimcad import app_bridge as b  # noqa: E402
+from kimbim import app_bridge as b  # noqa: E402
 
 
 def call(fn, *args):
@@ -1412,7 +1412,7 @@ def main(house: str, out: str) -> int:
         for guid in walls:
             if (guid in svg) != (guid in shown):
                 failures.append(f"{purpose}: wall {guid} {'missing' if guid in shown else 'shown'}")
-        if 'class="kimcad-legend"' not in svg:
+        if 'class="kimbim-legend"' not in svg:
             failures.append(f"{purpose}: no legend")
     if "To be demolished" not in (outdir / "Demolition.svg").read_text(encoding="utf-8"):
         failures.append("Demolition: the legend has no demolition row")
@@ -1436,7 +1436,7 @@ and a CI step `pixi run renovation` after `pixi run m4`.
 
 - [ ] **Step 4: Translations**
 
-Regenerate the `.ts` files the way the D73 commit did (`git show 91d6e41 --stat`; find `lupdate` under `.pixi/envs/default`, e.g. `pixi run lupdate app/src -ts app/translations/kimcad_en.ts app/translations/kimcad_es.ts`). Translate every new Spanish entry:
+Regenerate the `.ts` files the way the D73 commit did (`git show 91d6e41 --stat`; find `lupdate` under `.pixi/envs/default`, e.g. `pixi run lupdate app/src -ts app/translations/kimbim_en.ts app/translations/kimbim_es.ts`). Translate every new Spanish entry:
 
 | English | Spanish |
 |---|---|
@@ -1465,7 +1465,7 @@ Run `pixi run check-translations` and `ctest --test-dir build/app -R translation
 
 - [ ] **Step 5: Docs**
 
-- D74 row in `docs/decisions.md`, in D73's style: what was decided (status in Pset Common Status / KIMCAD_Renovation, three statuses, no status = New, filters stack before override rules, legends on screen and on sheets from the sheet's drawings, Model menu not a context menu), "Decided (owner, 2026-10-08; architect check pending)", spec and plan links.
+- D74 row in `docs/decisions.md`, in D73's style: what was decided (status in Pset Common Status / KIMBIM_Renovation, three statuses, no status = New, filters stack before override rules, legends on screen and on sheets from the sheet's drawings, Model menu not a context menu), "Decided (owner, 2026-10-08; architect check pending)", spec and plan links.
 - Doc 14:
   - *Renovation status (existing / demolish / new) and filters* ✅ D74;
   - *Colour by property, class or type* note "D73 rules";

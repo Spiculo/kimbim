@@ -9,7 +9,7 @@
 
 #include "MeasureTool.h"
 
-namespace kimcad {
+namespace kimbim {
 
 class Viewport;
 
@@ -40,4 +40,4 @@ private:
     QPointer<Viewport> m_view;
 };
 
-} // namespace kimcad
+} // namespace kimbim

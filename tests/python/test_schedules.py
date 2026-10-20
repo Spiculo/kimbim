@@ -9,9 +9,9 @@ from pathlib import Path
 import ifcopenshell.api.pset
 import pytest
 
-from kimcad import app_bridge as b
-from kimcad import schedules as S
-from kimcad import settings
+from kimbim import app_bridge as b
+from kimbim import schedules as S
+from kimbim import settings
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
 import make_house  # noqa: E402

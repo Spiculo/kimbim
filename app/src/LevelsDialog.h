@@ -10,7 +10,7 @@
 class QTableWidget;
 class QPushButton;
 
-namespace kimcad {
+namespace kimbim {
 
 // The levels table's data (D79, Archicad's Story Settings), without widgets: edits made in the
 // dialog, sent to the engine as one change (app_bridge.edit_storeys, one undo step). Rows are kept
@@ -92,4 +92,4 @@ private:
     bool m_filling = false;
 };
 
-} // namespace kimcad
+} // namespace kimbim

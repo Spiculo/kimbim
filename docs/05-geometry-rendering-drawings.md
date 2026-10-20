@@ -13,10 +13,10 @@ IfcOpenShell geometry iterator  (C++, multi-threaded, OpenCASCADE kernel)
         └──► AABBs           ──► spatial tree (IfcGeom::tree) ──► picking, clash candidates
         │
         ▼
-derived cache  (.kimcad/cache, keyed by record hash + kernel version)
+derived cache  (.kimbim/cache, keyed by record hash + kernel version)
 ```
 
-- **Reuse:** the IfcOpenShell geometry iterator already converts every IFC representation type (extrusions, booleans and openings, BReps, tessellations, mapped items/instancing) into meshes and/or OpenCASCADE shapes, in parallel. KIMCAD writes no IFC geometry interpretation of its own.
+- **Reuse:** the IfcOpenShell geometry iterator already converts every IFC representation type (extrusions, booleans and openings, BReps, tessellations, mapped items/instancing) into meshes and/or OpenCASCADE shapes, in parallel. KimBim writes no IFC geometry interpretation of its own.
 - **Kernel (spike S2):** display tessellation uses IfcOpenShell's `hybrid-cgal-simple-opencascade` kernel, the same choice as Bonsai. On the Clinic model (3,258 elements) it took 3.1 s versus 17.9 s for pure OpenCASCADE, with no elements lost. Pure CGAL was faster still but silently dropped elements, so it is not used. Exact OpenCASCADE stays in use for precise work: drawings, measuring and clash.
 - **Incremental:** a change set re-tessellates only the affected objects. When an opening changes, that includes its host wall.
 - **Derived data is never part of the model state** ([02](02-data-model-and-format.md#determinism)).
@@ -46,7 +46,7 @@ derived cache  (.kimcad/cache, keyed by record hash + kernel version)
 
 ### Later renderer (only if S2 or real usage demands it)
 
-- A KIMCAD renderer on **Qt RHI**, Qt's abstraction over Vulkan, Direct3D 11/12 and OpenGL. It would add GPU-driven instancing, LOD, occlusion culling and streaming for 1M+ object models (spec §21, §48).
+- A KimBim renderer on **Qt RHI**, Qt's abstraction over Vulkan, Direct3D 11/12 and OpenGL. It would add GPU-driven instancing, LOD, occlusion culling and streaming for 1M+ object models (spec §21, §48).
 - The viewport talks to the renderer through a narrow interface (`Scene`: add/update/remove object meshes, set clipping, set colors, pick), so the backend can be swapped without touching panels or commands.
 
 ## Cuts in 3D
@@ -64,7 +64,7 @@ derived cache  (.kimcad/cache, keyed by record hash + kernel version)
 - cut-face fills/hatches per material;
 - storey-height plan cuts and arbitrary section planes.
 
-KIMCAD drawing flow:
+KimBim drawing flow:
 
 ```text
 drawing definition (camera/cut plane, scale, view range, filters)  ── stored in model as IfcAnnotation context
@@ -80,13 +80,13 @@ sheet composition (title block, viewports at scale)  ──►  PDF / SVG export
 ```
 
 - Drawing definitions and annotations are part of the model, so they are versioned. Generated linework is a derived cache.
-- **Porting source:** Bonsai's drawing and sheet subsystem (Python, GPL-3) is the most complete open implementation of this flow. KIMCAD is GPL-3 ([06](06-reuse-and-licensing.md)), so we can port its logic with attribution.
+- **Porting source:** Bonsai's drawing and sheet subsystem (Python, GPL-3) is the most complete open implementation of this flow. KimBim is GPL-3 ([06](06-reuse-and-licensing.md)), so we can port its logic with attribution.
 - PDF export uses SVG → PDF through Qt (`QPdfWriter`/`QSvgRenderer`) at first. Revisit if output quality is insufficient.
 
 **As built (Slice 14, spike S6, D60/D61):**
-- A drawing is an `IfcAnnotation` DRAWING (Bonsai's definition): placement = camera, `Body` = `IfcBlock` for the extent, `EPset_Drawing`; KIMCAD's settings in `KIMCAD_Drawing`. The marker line in plan is the camera's X axis over the block width, so moving the annotation moves the drawing. Infinite ranges (Archicad's default) are re-fitted to the model when generating.
+- A drawing is an `IfcAnnotation` DRAWING (Bonsai's definition): placement = camera, `Body` = `IfcBlock` for the extent, `EPset_Drawing`; KimBim's settings in `KIMBIM_Drawing`. The marker line in plan is the camera's X axis over the block width, so moving the annotation moves the drawing. Infinite ranges (Archicad's default) are re-fitted to the model when generating.
 - IfcOpenShell 0.9 has no `addDrawing()` from Python; drawings go through `elevation-ref-guid`, and the annotation itself must be among the elements given to the serializer. Openings, spaces and annotations are left out.
-- Generation (`kimcad/drawgen.py`) runs in a **child process** from a snapshot of the model, because the serializer holds the GIL for its whole hidden-line pass. Polygon HLR (`svg-poly`) is used.
+- Generation (`kimbim/drawgen.py`) runs in a **child process** from a snapshot of the model, because the serializer holds the GIL for its whole hidden-line pass. Polygon HLR (`svg-poly`) is used.
 - Hidden-line removal grows with everything behind the cut, so the 3D view first renders element ids from the drawing's camera (the D52 pass) and only the visible elements are sent: an elevation of a 2,880-element model went from 52 s to about 4 s.
 - The SVG is cropped to its content and cached per drawing and model state (the last four states, so undo returns to a cached drawing). It is never written into the model.
 

@@ -8,7 +8,7 @@
 
 #include "Snapper.h"
 
-namespace kimcad {
+namespace kimbim {
 
 // Rotation by three clicks: the centre, a reference direction, then the target direction. The
 // angle snaps to 15 degree steps when close (always to 90 with ortho); a typed angle in degrees
@@ -48,4 +48,4 @@ private:
     std::optional<QPointF> m_hover;
 };
 
-} // namespace kimcad
+} // namespace kimbim

@@ -7,7 +7,7 @@
 
 #include "Graphics.h"
 
-namespace kimcad {
+namespace kimbim {
 
 // The pens as Archicad shows them (D73): a 16 x 16 grid of swatches, pen n at row n / 16, column n % 16
 // (cell 0 is empty). Used by the pen button's popup, the pen-set editor and the pen pickers.
@@ -39,4 +39,4 @@ private:
     int m_current = 0;
 };
 
-} // namespace kimcad
+} // namespace kimbim

@@ -4,7 +4,7 @@
 
 **Goal:** The properties panel shows where each value comes from (the element's type or the element itself), edits stay per element by default, and the user can deliberately change a value on the type (all elements of that type) or reset an override back to the type value.
 
-**Architecture:** The bridge (`python/kimcad/app_bridge.py`) adds the source of each value to `properties_multi` and three functions: `type_usage`, `set_type_property`, `reset_to_type`. Each edit is one ifcopenshell transaction, so undo/redo and the dirty state work unchanged. The C++ `PropertiesPanel` draws inherited values in grey with a tooltip, and its context menu offers "Edit type value…" and "Reset to type value". `MainWindow` confirms type edits with the number of affected elements.
+**Architecture:** The bridge (`python/kimbim/app_bridge.py`) adds the source of each value to `properties_multi` and three functions: `type_usage`, `set_type_property`, `reset_to_type`. Each edit is one ifcopenshell transaction, so undo/redo and the dirty state work unchanged. The C++ `PropertiesPanel` draws inherited values in grey with a tooltip, and its context menu offers "Edit type value…" and "Reset to type value". `MainWindow` confirms type edits with the number of affected elements.
 
 **Tech Stack:** Python + ifcopenshell.api (pset, util.element), Qt 6 Widgets, Qt Test, pytest.
 
@@ -30,7 +30,7 @@
 ### Task 1: Bridge — value source, type usage, type edit, reset to type
 
 **Files:**
-- Modify: `python/kimcad/app_bridge.py` (`_element_values`, `properties_multi`, new `type_usage`, `set_type_property`, `reset_to_type`, `_write_test_model` gets a wall type)
+- Modify: `python/kimbim/app_bridge.py` (`_element_values`, `properties_multi`, new `type_usage`, `set_type_property`, `reset_to_type`, `_write_test_model` gets a wall type)
 - Test: `tests/python/test_app_bridge_types.py`
 
 **Interfaces — Produces:**

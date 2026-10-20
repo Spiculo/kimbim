@@ -1,6 +1,6 @@
 # `.kim` file, preferences and templates — design (step 2 of 3)
 
-Owner request, 2026-10-07: save and load user and project preferences, and a KIMCAD file format for
+Owner request, 2026-10-07: save and load user and project preferences, and a KimBim file format for
 what a plain IFC can't hold. Step 1 (main window rework, D71) is merged. Step 3 (pen sets) comes next
 and stores its sets in the project settings defined here.
 
@@ -57,7 +57,7 @@ The window title shows the file name, `[read-only]` when someone else has it ope
 
 A readable `preferences.json` in the user's settings folder (`QStandardPaths::AppConfigLocation`).
 A missing, unreadable or garbled file means defaults (and the bad file is kept as
-`preferences.json.bad` for inspection); unknown keys are kept on save, so an older KIMCAD doesn't drop
+`preferences.json.bad` for inspection); unknown keys are kept on save, so an older KimBim doesn't drop
 a newer one's settings.
 
 | Key | Default | Meaning |
@@ -65,7 +65,7 @@ a newer one's settings.
 | `language` | `auto` | `auto`, `en` or `es`; `--lang` still overrides |
 | `layout` | — | the window layout (moved from `QSettings`; the old value is read once) |
 | `recent` | `[]` | up to 10 recent `.kim`, `.ifc` and project folders |
-| `templates_folder` | `Documents/KIMCAD Templates` | may point to an office drive |
+| `templates_folder` | `Documents/KimBim Templates` | may point to an office drive |
 | `author_name`, `author_email` | Git's `user.name`/`user.email`, else empty | the name on versions |
 | `new_views` | `tab` | `tab` (docked next to the current tab, raised) or `window` (a free window) |
 | `open_ifc` | `make_kim` | `make_kim` or `edit_ifc` |
@@ -75,7 +75,7 @@ a newer one's settings.
 
 ### Project settings — in the `.kim`, versioned
 
-`settings.json` in each version's tree, beside the records (`kimcad.json` is the manifest; this is a
+`settings.json` in each version's tree, beside the records (`kimbim.json` is the manifest; this is a
 new tree entry, key `settings`). Its own record so Compare and Combine can see it.
 
 | Key | Default | Used by |
@@ -106,16 +106,16 @@ A zip. Its root holds the project folder exactly as it is unpacked:
 
 ```
 House.kim
-├── kimcad-file.json          {"format": "kim", "version": 1, "kind": "project"|"template", "app": "0.x"}
+├── kimbim-file.json          {"format": "kim", "version": 1, "kind": "project"|"template", "app": "0.x"}
 ├── .git/                     the history (absent in a template)
-├── .kimcad/working.ifc       the current work (what Ctrl+S saved)
-└── .kimcad/settings.json     the current project settings (Ctrl+S state; versions hold their own)
+├── .kimbim/working.ifc       the current work (what Ctrl+S saved)
+└── .kimbim/settings.json     the current project settings (Ctrl+S state; versions hold their own)
 ```
 
 - Git pack files are stored, not compressed again (they already are); everything else is deflated.
-- Local caches (`.kimcad/cache`, `index.db`) are left out; they rebuild.
-- A `version` higher than this KIMCAD knows is refused with "made by a newer KIMCAD".
-- A `.kim` that isn't a valid zip or lacks `kimcad-file.json` is refused with a clear message; the file
+- Local caches (`.kimbim/cache`, `index.db`) are left out; they rebuild.
+- A `version` higher than this KimBim knows is refused with "made by a newer KimBim".
+- A `.kim` that isn't a valid zip or lacks `kimbim-file.json` is refused with a clear message; the file
   is never modified.
 
 ### Opening
@@ -128,7 +128,7 @@ House.kim
 2. **Unpack** to a working folder: `AppLocalDataLocation/open/<16-hex hash of the .kim's full path>/`,
    outside OneDrive so sync never fights the working files. An existing folder from the same file is
    reused only for recovery (below); otherwise it is cleared first.
-3. **Open** `.kimcad/working.ifc` and `.kimcad/settings.json` as the model and project settings, on the
+3. **Open** `.kimbim/working.ifc` and `.kimbim/settings.json` as the model and project settings, on the
    current design option.
 
 ### Saving (Ctrl+S)
@@ -156,13 +156,13 @@ folder deleted.
 Every `recovery_minutes` while there is unsaved work, the model and settings are written to
 `AppLocalDataLocation/recovery/<hash>/` with the source path (`.kim`, `.ifc` or untitled). This works
 in every mode. On the next start, a recovery copy newer than its source's last save is offered:
-"KIMCAD closed unexpectedly. Recover your work on House.kim from 10:58?" → **Recover** / Discard. A
+"KimBim closed unexpectedly. Recover your work on House.kim from 10:58?" → **Recover** / Discard. A
 clean close or a save deletes the copy.
 
 ### Folder mode
 
 "Open project folder…" opens an unpacked project folder in place (no zip, no copy): the lock is
-`.kimcad/lock` inside it, Ctrl+S writes `working.ifc` and `settings.json` there, and versions go to its
+`.kimbim/lock` inside it, Ctrl+S writes `working.ifc` and `settings.json` there, and versions go to its
 `.git`. This is today's versioned project, so existing project folders open unchanged (a folder without
 `settings.json` gets the defaults). "Save as project folder…" writes the open project out as a folder
 (from a `.kim`: the unpacked content) and switches to it; "Save As…" from a folder writes a `.kim`.
@@ -183,7 +183,7 @@ With `open_ifc = edit_ifc`: today's plain mode — Save writes the `.ifc`, no hi
 ## Templates
 
 A template is a `.kim` with `"kind": "template"`, no `.git`, the model content (levels, grids, sheets
-with title block, elevation markers…) and project settings. They live in `templates_folder`; KIMCAD's
+with title block, elevation markers…) and project settings. They live in `templates_folder`; KimBim's
 own default template is built in (what "New project" makes today) and always listed first.
 
 - **File › New project…** lists the built-in template and every `.kim` template in the folder (name and
@@ -213,9 +213,9 @@ it is.
 
 ## How it is built
 
-- **Python** (`python/kimcad/kimfile.py`): pack/unpack, the manifest, locks, the working folder,
+- **Python** (`python/kimbim/kimfile.py`): pack/unpack, the manifest, locks, the working folder,
   recovery copies, templates (write, list, instantiate with new GlobalIds). Project settings in
-  `python/kimcad/settings.py`: defaults, get/set, read from and written to the working folder, committed
+  `python/kimbim/settings.py`: defaults, get/set, read from and written to the working folder, committed
   with versions (`Project.commit(..., extra={"settings": bytes})`). Bridge functions follow the existing
   protocol (strings in, JSON out, never raise).
 - **C++**: `Preferences` (load/save `preferences.json`, defaults, keep unknown keys) and a

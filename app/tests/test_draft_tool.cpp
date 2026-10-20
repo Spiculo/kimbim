@@ -15,8 +15,8 @@
 #include "MainWindow.h"
 #include "Viewport.h"
 
-using kimcad::DraftTool;
-using kimcad::MainWindow;
+using kimbim::DraftTool;
+using kimbim::MainWindow;
 
 class TestDraftTool : public QObject {
     Q_OBJECT
@@ -124,13 +124,13 @@ private slots:
 
     void snapsToDraftingPoints()
     {
-        kimcad::Snapper s;
+        kimbim::Snapper s;
         s.setGrid(0.5);
-        s.setPoints({{QPointF(1.23, 4.56), kimcad::Snap::Endpoint, {}}, {QPointF(3.01, 3.01), kimcad::Snap::Centre, {}}});
+        s.setPoints({{QPointF(1.23, 4.56), kimbim::Snap::Endpoint, {}}, {QPointF(3.01, 3.01), kimbim::Snap::Centre, {}}});
         QCOMPARE(s.snap(QPointF(1.25, 4.55), 0.1).point, QPointF(1.23, 4.56));
-        QCOMPARE(s.snap(QPointF(1.25, 4.55), 0.1).kind, kimcad::Snap::Endpoint);
-        QCOMPARE(s.snap(QPointF(3.05, 3.0), 0.1).kind, kimcad::Snap::Centre);
-        QCOMPARE(s.snap(QPointF(2.1, 2.1), 0.1).kind, kimcad::Snap::Grid);
+        QCOMPARE(s.snap(QPointF(1.25, 4.55), 0.1).kind, kimbim::Snap::Endpoint);
+        QCOMPARE(s.snap(QPointF(3.05, 3.0), 0.1).kind, kimbim::Snap::Centre);
+        QCOMPARE(s.snap(QPointF(2.1, 2.1), 0.1).kind, kimbim::Snap::Grid);
     }
 
     void windowDrawsShapesThroughTheTools()
@@ -138,7 +138,7 @@ private slots:
         MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         w.findChild<QAction*>(QStringLiteral("actionPlanView"))->trigger(); // P: the plan tab
-        kimcad::Viewport* v = w.viewport();
+        kimbim::Viewport* v = w.viewport();
         const int before = v->annotationCount();
         w.setTool(MainWindow::Tool::Line);
         emit v->workPointClicked(QPointF(0, 0), 0.01, Qt::NoModifier);

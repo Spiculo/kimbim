@@ -2,12 +2,12 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A `kimcad` CLI that turns IFC files into versions in a Git-backed KIMCAD repository. You can commit an IFC, see status, log and diff at the record level, and export any version back to IFC, with results byte-identical to the spike golden hashes.
+**Goal:** A `kimbim` CLI that turns IFC files into versions in a Git-backed KimBim repository. You can commit an IFC, see status, log and diff at the record level, and export any version back to IFC, with results byte-identical to the spike golden hashes.
 
 **Architecture:**
-- **Python package `kimcad`.** It ports the validated spike decomposer (`spikes/s3_records/records.py`), owns all IFC work through ifcopenshell, and drives the CLI.
-- **Rust crate `kimcad-repo`.** It owns storage: writes go through `git fast-import` (pack-only), reads through gitoxide.
-- **PyO3 module `kimcad._core`.** It exposes the Rust crate to Python. This is the first of the two planned boundaries; the C++ `cxx` bridge comes with the GUI.
+- **Python package `kimbim`.** It ports the validated spike decomposer (`spikes/s3_records/records.py`), owns all IFC work through ifcopenshell, and drives the CLI.
+- **Rust crate `kimbim-repo`.** It owns storage: writes go through `git fast-import` (pack-only), reads through gitoxide.
+- **PyO3 module `kimbim._core`.** It exposes the Rust crate to Python. This is the first of the two planned boundaries; the C++ `cxx` bridge comes with the GUI.
 - **Environment.** pixi + conda-forge provide everything on Windows and Linux.
 
 **Tech Stack:** Python 3.12, ifcopenshell 0.9.0, blake3, pytest; Rust (edition 2024), gix 0.88, rayon, thiserror, PyO3 + maturin; git ≥ 2.45; pixi; GitHub Actions.
@@ -19,7 +19,7 @@
 - License `GPL-3.0-or-later`. Every source file starts with `SPDX-License-Identifier: GPL-3.0-or-later` (D08).
 - Platforms: Windows and Linux (D03). CI runs both.
 - ifcopenshell **0.9.0 from conda-forge**, never the pip wheel (D37).
-- Record format tag `kimcad/1`. Record keys `o/<GlobalId>`, `n/<node-id>`, `l/<hash>`, `meta` (D34).
+- Record format tag `kimbim/1`. Record keys `o/<GlobalId>`, `n/<node-id>`, `l/<hash>`, `meta` (D34).
 - Canonical JSON: sorted keys, no whitespace, UTF-8, strings not normalized, INTEGER vs REAL distinct, SETs sorted (D35).
 - Storage: packs only (`git fast-import`), never loose blobs. Repack without deltas after large writes (> 10,000 changed records) (D39).
 - The repository is a standard Git repo at `<project>/.git` with `core.bare = true`. Records are never checked out (doc 03).
@@ -41,22 +41,22 @@
 
 ```text
 pixi.toml                         # env + tasks (build, test, golden, fetch-corpus, check-spdx)
-pyproject.toml                    # maturin build of kimcad + kimcad._core, pytest config
+pyproject.toml                    # maturin build of kimbim + kimbim._core, pytest config
 Cargo.toml                        # Rust workspace (excludes spikes/)
 CONTRIBUTING.md                   # DCO, SPDX, how to build/test
 THIRD_PARTY.md                    # dependency licenses
 tools/check_spdx.py               # SPDX header check
-crates/kimcad-repo/               # Rust: git-backed record store
+crates/kimbim-repo/               # Rust: git-backed record store
   Cargo.toml, src/lib.rs, tests/repo.rs
-crates/kimcad-py/                 # Rust: PyO3 module kimcad._core
+crates/kimbim-py/                 # Rust: PyO3 module kimbim._core
   Cargo.toml, src/lib.rs
-python/kimcad/
+python/kimbim/
   __init__.py                     # version
   records.py                      # decompose/compose (from spike), canonical JSON, hashes
   layout.py                       # record key <-> git path, git blob oid
   nodeids.py                      # stable node ids across versions
   project.py                      # Project: init/open/commit/status/log/diff/export/show/branches
-  cli.py                          # argparse CLI `kimcad`
+  cli.py                          # argparse CLI `kimbim`
 tests/python/
   conftest.py                     # tiny IFC fixtures built with ifcopenshell.api
   semantic.py                     # independent semantic comparison (from spike)
@@ -72,11 +72,11 @@ tests/golden/manifest-*.json      # golden hashes (from spikes/s3_records/golden
 ### Task 1: Foundations (pixi, workspace skeleton, SPDX, contributing)
 
 **Files:**
-- Create: `pixi.toml`, `pyproject.toml`, `Cargo.toml`, `CONTRIBUTING.md`, `THIRD_PARTY.md`, `tools/check_spdx.py`, `python/kimcad/__init__.py`, `tests/python/test_smoke.py`
+- Create: `pixi.toml`, `pyproject.toml`, `Cargo.toml`, `CONTRIBUTING.md`, `THIRD_PARTY.md`, `tools/check_spdx.py`, `python/kimbim/__init__.py`, `tests/python/test_smoke.py`
 - Modify: `.gitignore`
 
 **Interfaces:**
-- Produces: `pixi run <task>` for `build`, `test-rust`, `test-py`, `test`, `golden`, `fetch-corpus`, `check-spdx`. Package `kimcad` with `kimcad.__version__ == "0.1.0"`.
+- Produces: `pixi run <task>` for `build`, `test-rust`, `test-py`, `test`, `golden`, `fetch-corpus`, `check-spdx`. Package `kimbim` with `kimbim.__version__ == "0.1.0"`.
 
 - [ ] **Step 1: Write the failing smoke test** `tests/python/test_smoke.py`
 
@@ -90,16 +90,16 @@ def test_ifcopenshell_is_conda_forge_0_9():
 
 
 def test_package_version():
-    import kimcad
+    import kimbim
 
-    assert kimcad.__version__ == "0.1.0"
+    assert kimbim.__version__ == "0.1.0"
 ```
 
 - [ ] **Step 2: Create `pixi.toml`**
 
 ```toml
 [workspace]
-name = "kimcad"
+name = "kimbim"
 channels = ["conda-forge"]
 platforms = ["win-64", "linux-64"]
 
@@ -123,7 +123,7 @@ fetch-corpus = "python tests/corpus/fetch.py"
 golden = { cmd = "pytest -m golden", depends-on = ["build"] }
 ```
 
-`--skip-install` builds `_core` in place into `python/kimcad/`. pytest finds the package through `pythonpath = ["python"]` (below), so pip never pulls PyPI wheels over the conda packages.
+`--skip-install` builds `_core` in place into `python/kimbim/`. pytest finds the package through `pythonpath = ["python"]` (below), so pip never pulls PyPI wheels over the conda packages.
 
 - [ ] **Step 3: Create `pyproject.toml`**
 
@@ -133,7 +133,7 @@ requires = ["maturin>=1.15,<2"]
 build-backend = "maturin"
 
 [project]
-name = "kimcad"
+name = "kimbim"
 version = "0.1.0"
 description = "Open-source native BIM for architects, with version control built in"
 license = "GPL-3.0-or-later"
@@ -141,12 +141,12 @@ requires-python = ">=3.11"
 # Runtime deps (ifcopenshell, blake3) come from conda-forge via pixi; not listed for pip.
 
 [project.scripts]
-kimcad = "kimcad.cli:main"
+kimbim = "kimbim.cli:main"
 
 [tool.maturin]
 python-source = "python"
-module-name = "kimcad._core"
-manifest-path = "crates/kimcad-py/Cargo.toml"
+module-name = "kimbim._core"
+manifest-path = "crates/kimbim-py/Cargo.toml"
 features = ["pyo3/extension-module"]
 
 [tool.pytest.ini_options]
@@ -164,7 +164,7 @@ addopts = "-m 'not golden and not slow'"
 ```toml
 [workspace]
 resolver = "3"
-members = ["crates/kimcad-repo", "crates/kimcad-py"]
+members = ["crates/kimbim-repo", "crates/kimbim-py"]
 exclude = ["spikes"]
 
 [workspace.package]
@@ -175,11 +175,11 @@ license = "GPL-3.0-or-later"
 
 The member crates are created in Tasks 2–3. Until then, Step 8 runs only `check-spdx` and the Python smoke test.
 
-- [ ] **Step 5: Create `python/kimcad/__init__.py`**
+- [ ] **Step 5: Create `python/kimbim/__init__.py`**
 
 ```python
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""KIMCAD: open-source native BIM for architects, with version control built in."""
+"""KimBim: open-source native BIM for architects, with version control built in."""
 
 __version__ = "0.1.0"
 ```
@@ -241,8 +241,8 @@ if __name__ == "__main__":
 ```text
 /.pixi/
 /tests/corpus/files/
-/python/kimcad/_core*.pyd
-/python/kimcad/_core*.so
+/python/kimbim/_core*.pyd
+/python/kimbim/_core*.so
 ```
 
 - [ ] **Step 8: Run**
@@ -259,10 +259,10 @@ git commit -s -m "build: pixi environment, workspace skeleton, SPDX check, contr
 
 ---
 
-### Task 2: Rust record store `kimcad-repo`
+### Task 2: Rust record store `kimbim-repo`
 
 **Files:**
-- Create: `crates/kimcad-repo/Cargo.toml`, `crates/kimcad-repo/src/lib.rs`, `crates/kimcad-repo/tests/repo.rs`
+- Create: `crates/kimbim-repo/Cargo.toml`, `crates/kimbim-repo/src/lib.rs`, `crates/kimbim-repo/tests/repo.rs`
 
 **Interfaces:**
 - Produces (Rust, used by Task 3):
@@ -281,13 +281,13 @@ git commit -s -m "build: pixi environment, workspace skeleton, SPDX check, contr
   - `pub struct CommitInfo { pub id, pub parents: Vec<String>, pub author_name, pub author_email, pub time: i64, pub message }`
   - `pub enum Error { NotARepo, AlreadyExists, UnknownRev, InvalidPath, InvalidOid, UnknownBranch, Git, Io }`
 
-- [ ] **Step 1: Write failing integration tests** `crates/kimcad-repo/tests/repo.rs`
+- [ ] **Step 1: Write failing integration tests** `crates/kimbim-repo/tests/repo.rs`
 
 ```rust
 // SPDX-License-Identifier: GPL-3.0-or-later
 use std::collections::BTreeMap;
 
-use kimcad_repo::{Error, Repo, Signature};
+use kimbim_repo::{Error, Repo, Signature};
 
 fn sig(t: i64) -> Signature {
     Signature { name: "Test".into(), email: "test@example.org".into(), time: t }
@@ -314,16 +314,16 @@ fn commit_read_modify_delete_log() {
     let dir = tempfile::tempdir().unwrap();
     let repo = Repo::init(dir.path()).unwrap();
     let c1 = repo
-        .commit(&changes(&[("objects/ab/W1.json", Some("{\"a\":1}")), ("kimcad.json", Some("{}"))]), "first", &sig(1_790_000_000))
+        .commit(&changes(&[("objects/ab/W1.json", Some("{\"a\":1}")), ("kimbim.json", Some("{}"))]), "first", &sig(1_790_000_000))
         .unwrap();
     assert_eq!(repo.head().unwrap().as_deref(), Some(c1.as_str()));
     let e1 = repo.tree_entries("HEAD").unwrap();
-    assert_eq!(e1.keys().cloned().collect::<Vec<_>>(), vec!["kimcad.json", "objects/ab/W1.json"]);
+    assert_eq!(e1.keys().cloned().collect::<Vec<_>>(), vec!["kimbim.json", "objects/ab/W1.json"]);
     let blobs = repo.read_blobs(&[e1["objects/ab/W1.json"].clone()]).unwrap();
     assert_eq!(blobs[0], b"{\"a\":1}");
 
     let c2 = repo
-        .commit(&changes(&[("objects/ab/W1.json", Some("{\"a\":2}")), ("kimcad.json", None), ("nodes/cd/N1.json", Some("[]"))]), "second", &sig(1_790_000_100))
+        .commit(&changes(&[("objects/ab/W1.json", Some("{\"a\":2}")), ("kimbim.json", None), ("nodes/cd/N1.json", Some("[]"))]), "second", &sig(1_790_000_100))
         .unwrap();
     let e2 = repo.tree_entries("HEAD").unwrap();
     assert_eq!(e2.keys().cloned().collect::<Vec<_>>(), vec!["nodes/cd/N1.json", "objects/ab/W1.json"]);
@@ -376,11 +376,11 @@ fn paths_with_spaces_and_unicode_work() {
 }
 ```
 
-- [ ] **Step 2: Create `crates/kimcad-repo/Cargo.toml` and run the tests to see them fail**
+- [ ] **Step 2: Create `crates/kimbim-repo/Cargo.toml` and run the tests to see them fail**
 
 ```toml
 [package]
-name = "kimcad-repo"
+name = "kimbim-repo"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -394,14 +394,14 @@ thiserror = "2"
 tempfile = "3"
 ```
 
-Run: `pixi run cargo test -p kimcad-repo`
+Run: `pixi run cargo test -p kimbim-repo`
 Expected: compile errors (`Repo` not found).
 
-- [ ] **Step 3: Implement `crates/kimcad-repo/src/lib.rs`**
+- [ ] **Step 3: Implement `crates/kimbim-repo/src/lib.rs`**
 
 ```rust
 // SPDX-License-Identifier: GPL-3.0-or-later
-//! Git-backed record store for KIMCAD (docs/03-versioning.md, D39).
+//! Git-backed record store for KimBim (docs/03-versioning.md, D39).
 //!
 //! Writes go through `git fast-import` (one pack per commit, never loose objects).
 //! Reads use gitoxide. The repository lives at `<project>/.git` with `core.bare = true`;
@@ -415,7 +415,7 @@ use rayon::prelude::*;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("not a KIMCAD project (no .git found): {0}")]
+    #[error("not a KimBim project (no .git found): {0}")]
     NotARepo(PathBuf),
     #[error("a repository already exists at {0}")]
     AlreadyExists(PathBuf),
@@ -661,33 +661,33 @@ The gix 0.88 method names above (`try_find_reference`, `peel_to_id`, `rev_parse_
 
 - [ ] **Step 4: Run the tests until they pass**
 
-Run: `pixi run cargo test -p kimcad-repo`
+Run: `pixi run cargo test -p kimbim-repo`
 Expected: 5 passed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add crates/kimcad-repo Cargo.lock
+git add crates/kimbim-repo Cargo.lock
 git commit -s -m "feat(repo): git-backed record store (fast-import writes, gix reads)"
 ```
 
 ---
 
-### Task 3: PyO3 module `kimcad._core`
+### Task 3: PyO3 module `kimbim._core`
 
 **Files:**
-- Create: `crates/kimcad-py/Cargo.toml`, `crates/kimcad-py/src/lib.rs`, `tests/python/test_core.py`
+- Create: `crates/kimbim-py/Cargo.toml`, `crates/kimbim-py/src/lib.rs`, `tests/python/test_core.py`
 
 **Interfaces:**
-- Consumes: Task 2 `kimcad_repo::Repo`.
-- Produces (Python): `kimcad._core.Repo` with:
+- Consumes: Task 2 `kimbim_repo::Repo`.
+- Produces (Python): `kimbim._core.Repo` with:
   - `init(path)`, `open(path)` (static)
   - `head() -> str | None`, `current_branch() -> str`, `resolve(rev) -> str`
   - `tree_entries(rev) -> dict[str, str]`, `read_blobs(list[str]) -> list[bytes]`
   - `commit(changes: dict[str, bytes | None], message, author_name, author_email, time: int) -> str`
   - `log(rev, limit) -> list[Commit]`, `branches() -> list[str]`, `create_branch(name, rev)`, `switch(name)`, `repack_no_delta()`
-- `kimcad._core.Commit` has attributes `id, parents, author_name, author_email, time, message`.
-- `kimcad._core.RepoError(Exception)`.
+- `kimbim._core.Commit` has attributes `id, parents, author_name, author_email, time, message`.
+- `kimbim._core.RepoError(Exception)`.
 
 - [ ] **Step 1: Write the failing test** `tests/python/test_core.py`
 
@@ -695,17 +695,17 @@ git commit -s -m "feat(repo): git-backed record store (fast-import writes, gix r
 # SPDX-License-Identifier: GPL-3.0-or-later
 import pytest
 
-from kimcad import _core
+from kimbim import _core
 
 
 def test_roundtrip_through_rust(tmp_path):
     repo = _core.Repo.init(str(tmp_path))
     assert repo.head() is None
-    c1 = repo.commit({"objects/ab/W.json": b'{"a":1}', "kimcad.json": b"{}"}, "first", "T", "t@example.org", 1790000000)
+    c1 = repo.commit({"objects/ab/W.json": b'{"a":1}', "kimbim.json": b"{}"}, "first", "T", "t@example.org", 1790000000)
     entries = repo.tree_entries("HEAD")
-    assert sorted(entries) == ["kimcad.json", "objects/ab/W.json"]
+    assert sorted(entries) == ["kimbim.json", "objects/ab/W.json"]
     assert repo.read_blobs([entries["objects/ab/W.json"]]) == [b'{"a":1}']
-    c2 = repo.commit({"kimcad.json": None}, "second", "T", "t@example.org", 1790000001)
+    c2 = repo.commit({"kimbim.json": None}, "second", "T", "t@example.org", 1790000001)
     log = repo.log("HEAD", 10)
     assert [c.id for c in log] == [c2, c1]
     assert log[0].parents == [c1]
@@ -713,18 +713,18 @@ def test_roundtrip_through_rust(tmp_path):
 
 
 def test_errors_are_repo_errors(tmp_path):
-    with pytest.raises(_core.RepoError, match="not a KIMCAD project"):
+    with pytest.raises(_core.RepoError, match="not a KimBim project"):
         _core.Repo.open(str(tmp_path))
     repo = _core.Repo.init(str(tmp_path))
     with pytest.raises(_core.RepoError, match="unknown revision"):
         repo.resolve("nope")
 ```
 
-- [ ] **Step 2: Create `crates/kimcad-py/Cargo.toml`**
+- [ ] **Step 2: Create `crates/kimbim-py/Cargo.toml`**
 
 ```toml
 [package]
-name = "kimcad-py"
+name = "kimbim-py"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -734,17 +734,17 @@ name = "_core"
 crate-type = ["cdylib"]
 
 [dependencies]
-kimcad-repo = { path = "../kimcad-repo" }
+kimbim-repo = { path = "../kimbim-repo" }
 pyo3 = "0.27"
 ```
 
 (Use the latest PyO3 that `cargo search pyo3` shows. The API below is the Bound API from PyO3 ≥ 0.23.)
 
-- [ ] **Step 3: Implement `crates/kimcad-py/src/lib.rs`**
+- [ ] **Step 3: Implement `crates/kimbim-py/src/lib.rs`**
 
 ```rust
 // SPDX-License-Identifier: GPL-3.0-or-later
-//! PyO3 bindings: `kimcad._core` (first of the two engine boundaries; the C++ `cxx` bridge comes with the GUI).
+//! PyO3 bindings: `kimbim._core` (first of the two engine boundaries; the C++ `cxx` bridge comes with the GUI).
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -754,7 +754,7 @@ use pyo3::types::PyBytes;
 
 create_exception!(_core, RepoError, pyo3::exceptions::PyException);
 
-fn err(e: kimcad_repo::Error) -> PyErr {
+fn err(e: kimbim_repo::Error) -> PyErr {
     RepoError::new_err(e.to_string())
 }
 
@@ -770,18 +770,18 @@ struct Commit {
 
 #[pyclass(frozen)]
 struct Repo {
-    inner: kimcad_repo::Repo,
+    inner: kimbim_repo::Repo,
 }
 
 #[pymethods]
 impl Repo {
     #[staticmethod]
     fn init(path: PathBuf) -> PyResult<Self> {
-        Ok(Repo { inner: kimcad_repo::Repo::init(&path).map_err(err)? })
+        Ok(Repo { inner: kimbim_repo::Repo::init(&path).map_err(err)? })
     }
     #[staticmethod]
     fn open(path: PathBuf) -> PyResult<Self> {
-        Ok(Repo { inner: kimcad_repo::Repo::open(&path).map_err(err)? })
+        Ok(Repo { inner: kimbim_repo::Repo::open(&path).map_err(err)? })
     }
     fn head(&self) -> PyResult<Option<String>> {
         self.inner.head().map_err(err)
@@ -808,7 +808,7 @@ impl Repo {
         author_email: String,
         time: i64,
     ) -> PyResult<String> {
-        let sig = kimcad_repo::Signature { name: author_name, email: author_email, time };
+        let sig = kimbim_repo::Signature { name: author_name, email: author_email, time };
         py.detach(|| self.inner.commit(&changes, message, &sig)).map_err(err)
     }
     fn log(&self, rev: &str, limit: usize) -> PyResult<Vec<Commit>> {
@@ -860,20 +860,20 @@ Expected: 2 passed.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add crates/kimcad-py Cargo.lock tests/python/test_core.py
-git commit -s -m "feat(py): PyO3 module kimcad._core exposing the record store"
+git add crates/kimbim-py Cargo.lock tests/python/test_core.py
+git commit -s -m "feat(py): PyO3 module kimbim._core exposing the record store"
 ```
 
 ---
 
-### Task 4: Canonical records (`kimcad.records`) from the spike
+### Task 4: Canonical records (`kimbim.records`) from the spike
 
 **Files:**
-- Create: `python/kimcad/records.py` (copied from `spikes/s3_records/records.py`, then modified as below), `tests/python/semantic.py` (copied from `spikes/s3_records/semantic.py`, with `from kimcad.records import ...`), `tests/python/conftest.py`, `tests/python/test_records.py`, `tests/python/test_golden.py`, `tests/corpus/fetch.py` (copied from `spikes/corpus/fetch.py`; `OUT` stays `HERE / "files"`), `tests/golden/manifest-windows.json`, `tests/golden/manifest-linux.json`, `tests/golden/README.md` (copied from `spikes/s3_records/golden/`)
+- Create: `python/kimbim/records.py` (copied from `spikes/s3_records/records.py`, then modified as below), `tests/python/semantic.py` (copied from `spikes/s3_records/semantic.py`, with `from kimbim.records import ...`), `tests/python/conftest.py`, `tests/python/test_records.py`, `tests/python/test_golden.py`, `tests/corpus/fetch.py` (copied from `spikes/corpus/fetch.py`; `OUT` stays `HERE / "files"`), `tests/golden/manifest-windows.json`, `tests/golden/manifest-linux.json`, `tests/golden/README.md` (copied from `spikes/s3_records/golden/`)
 
 **Interfaces:**
 - Produces:
-  - `FORMAT = "kimcad/1"`
+  - `FORMAT = "kimbim/1"`
   - `decompose(f, *, format_tag: str = FORMAT, resolve_node_id: Callable[[str, bytes], str | None] | None = None) -> tuple[dict[str, bytes], Decomposer]`. `resolve_node_id(ifc_type, canonical_bytes)` returns an existing id or `None` (meaning use the content hash).
   - `compose(records: dict[str, bytes]) -> ifcopenshell.file`
   - `state_hash(records) -> str`, `canon(obj) -> bytes`, `h(bytes) -> str`
@@ -881,7 +881,7 @@ git commit -s -m "feat(py): PyO3 module kimcad._core exposing the record store"
   - `body_text(path) -> str` (IFC text from `DATA;`)
 
 **Modifications to the copied spike `records.py`:**
-1. SPDX header. `FORMAT = "kimcad/1"`. Module docstring references `docs/02-data-model-and-format.md`.
+1. SPDX header. `FORMAT = "kimbim/1"`. Module docstring references `docs/02-data-model-and-format.md`.
 2. `Decomposer.__init__(self, f, format_tag=FORMAT, resolve_node_id=None)` replaces `prev`. Remove `self.prev` and the spike-only `while f"n/{key}" in self.records` loop.
 3. `node()` becomes:
 
@@ -970,7 +970,7 @@ import ifcopenshell
 from conftest import build_model
 from semantic import compare
 
-from kimcad.records import FORMAT, body_text, compose, decompose
+from kimbim.records import FORMAT, body_text, compose, decompose
 
 
 def roundtrip(f, tmp_path, name="b.ifc"):
@@ -1023,7 +1023,7 @@ def test_strings_are_not_normalized(model, tmp_path):
 
 def test_integer_and_real_stay_distinct(model, tmp_path):
     w = model.by_type("IfcWall")[0]
-    pset = ifcopenshell.api.pset.add_pset(model, product=w, name="KIMCAD_Test")
+    pset = ifcopenshell.api.pset.add_pset(model, product=w, name="KIMBIM_Test")
     ifcopenshell.api.pset.edit_pset(model, pset=pset, properties={"I": model.createIfcInteger(1), "R": model.createIfcReal(1.0)})
     _, _, b2, _ = roundtrip(model, tmp_path)
     vals = {p.Name: p.NominalValue for p in b2.by_type("IfcPropertySingleValue") if p.Name in ("I", "R")}
@@ -1052,9 +1052,9 @@ def test_ifc2x3_and_ifc4x3_models_roundtrip(tmp_path):
 - [ ] **Step 2: Run the tests to see them fail**
 
 Run: `pixi run pytest tests/python/test_records.py -q`
-Expected: `ModuleNotFoundError: kimcad.records`.
+Expected: `ModuleNotFoundError: kimbim.records`.
 
-- [ ] **Step 3: Copy and modify the spike code** as listed in **Modifications** above. Copy `semantic.py` and change its import to `from kimcad.records import Schema, agg_info, norm_float`.
+- [ ] **Step 3: Copy and modify the spike code** as listed in **Modifications** above. Copy `semantic.py` and change its import to `from kimbim.records import Schema, agg_info, norm_float`.
 
 - [ ] **Step 4: Run the tests until they pass**
 
@@ -1073,7 +1073,7 @@ import blake3
 import ifcopenshell
 import pytest
 
-from kimcad.records import body_text, compose, decompose, state_hash
+from kimbim.records import body_text, compose, decompose, state_hash
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CORPUS = ROOT / "tests" / "corpus" / "files"
@@ -1091,7 +1091,7 @@ def test_matches_spike_golden_hashes(rel, tmp_path, request):
     if path.stat().st_size > LARGE and "slow" not in request.config.getoption("-m"):
         pytest.skip("large file: run with -m 'golden and slow'")
     want_state, want_export = GOLDEN[rel]
-    recs, _ = decompose(ifcopenshell.open(str(path)), format_tag="kimcad-spike/1")
+    recs, _ = decompose(ifcopenshell.open(str(path)), format_tag="kimbim-spike/1")
     assert state_hash(recs) == want_state
     out = tmp_path / "b.ifc"
     compose(recs).write(str(out))
@@ -1104,7 +1104,7 @@ Expected: every small corpus file passes. If the conda-forge build ever disagree
 - [ ] **Step 6: Commit**
 
 ```bash
-git add python/kimcad/records.py tests/python tests/corpus/fetch.py tests/golden
+git add python/kimbim/records.py tests/python tests/corpus/fetch.py tests/golden
 git commit -s -m "feat(records): canonical record decomposition ported from spike S3, golden-hash tests"
 ```
 
@@ -1113,14 +1113,14 @@ git commit -s -m "feat(records): canonical record decomposition ported from spik
 ### Task 5: Record layout and stable node ids across versions
 
 **Files:**
-- Create: `python/kimcad/layout.py`, `python/kimcad/nodeids.py`, `tests/python/test_layout.py`, `tests/python/test_nodeids.py`
+- Create: `python/kimbim/layout.py`, `python/kimbim/nodeids.py`, `tests/python/test_layout.py`, `tests/python/test_nodeids.py`
 
 **Interfaces:**
 - Produces:
   - `layout.key_to_path(key: str) -> str`
   - `layout.path_to_key(path: str) -> str`
   - `layout.blob_oid(data: bytes) -> str` (Git SHA-1 blob id)
-  - `layout.META_PATH = "kimcad.json"`
+  - `layout.META_PATH = "kimbim.json"`
   - `nodeids.decompose_against_head(f, head_entries: dict[str, str], read_blobs: Callable[[list[str]], list[bytes]], *, format_tag=FORMAT, max_rounds=5) -> tuple[dict[str, bytes], Decomposer]`
 - Consumes: Task 4 `decompose`.
 
@@ -1128,7 +1128,7 @@ Layout:
 - `o/<id>` → `objects/<first 2 hex of blake3(id)>/<id>.json`
 - `n/<id>` → `nodes/<id[:2]>/<id>.json`
 - `l/<h>` → `loose/<h[:2]>/<h>.json`
-- `meta` → `kimcad.json`
+- `meta` → `kimbim.json`
 
 One shard level for now. Adaptive sharding (D39) is deferred until models above 64k records need it, and the layout is isolated in this module so it can change.
 
@@ -1146,7 +1146,7 @@ import subprocess
 
 import pytest
 
-from kimcad.layout import META_PATH, blob_oid, key_to_path, path_to_key
+from kimbim.layout import META_PATH, blob_oid, key_to_path, path_to_key
 
 
 @pytest.mark.parametrize("key", ["o/2O2Fr$t4X7Zf8NOew3FLOH", "o/2O2Fr$t4X7Zf8NOew3FLOH~1", "n/0123abcd", "l/ffee00", "meta"])
@@ -1157,7 +1157,7 @@ def test_key_path_roundtrip(key):
 
 
 def test_meta_path():
-    assert key_to_path("meta") == META_PATH == "kimcad.json"
+    assert key_to_path("meta") == META_PATH == "kimbim.json"
 
 
 def test_blob_oid_matches_git():
@@ -1170,9 +1170,9 @@ def test_blob_oid_matches_git():
 # SPDX-License-Identifier: GPL-3.0-or-later  (tests/python/test_nodeids.py)
 from conftest import build_model
 
-from kimcad.layout import blob_oid, key_to_path
-from kimcad.nodeids import decompose_against_head
-from kimcad.records import decompose
+from kimbim.layout import blob_oid, key_to_path
+from kimbim.nodeids import decompose_against_head
+from kimbim.records import decompose
 
 
 def as_head(records):
@@ -1216,18 +1216,18 @@ def test_new_node_never_reuses_an_old_id():
 - [ ] **Step 2: Run the tests to see them fail**
 
 Run: `pixi run pytest tests/python/test_layout.py tests/python/test_nodeids.py -q`
-Expected: `ModuleNotFoundError: kimcad.layout`.
+Expected: `ModuleNotFoundError: kimbim.layout`.
 
-- [ ] **Step 3: Implement `python/kimcad/layout.py`**
+- [ ] **Step 3: Implement `python/kimbim/layout.py`**
 
 ```python
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Where records live inside a KIMCAD Git tree (docs/03-versioning.md)."""
+"""Where records live inside a KimBim Git tree (docs/03-versioning.md)."""
 import hashlib
 
 import blake3
 
-META_PATH = "kimcad.json"
+META_PATH = "kimbim.json"
 
 
 def key_to_path(key: str) -> str:
@@ -1260,7 +1260,7 @@ def blob_oid(data: bytes) -> str:
     return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
 ```
 
-- [ ] **Step 4: Implement `python/kimcad/nodeids.py`**
+- [ ] **Step 4: Implement `python/kimbim/nodeids.py`**
 
 ```python
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -1329,7 +1329,7 @@ Expected: 8 passed.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add python/kimcad/layout.py python/kimcad/nodeids.py tests/python/test_layout.py tests/python/test_nodeids.py
+git add python/kimbim/layout.py python/kimbim/nodeids.py tests/python/test_layout.py tests/python/test_nodeids.py
 git commit -s -m "feat: record layout and stable shared-node ids across versions"
 ```
 
@@ -1338,12 +1338,12 @@ git commit -s -m "feat: record layout and stable shared-node ids across versions
 ### Task 6: `Project`: commit, status, log, diff, export, show, branches
 
 **Files:**
-- Create: `python/kimcad/project.py`, `tests/python/test_project.py`
+- Create: `python/kimbim/project.py`, `tests/python/test_project.py`
 
 **Interfaces:**
 - Consumes: `_core.Repo` (Task 3), `decompose_against_head` (Task 5), `compose`, `body_text` (Task 4), `key_to_path`/`path_to_key`/`blob_oid` (Task 5).
 - Produces:
-  - Exceptions: `KimcadError(Exception)` and its subclasses `NotAProject`, `NothingToCommit`, `SchemaMismatch`, `InvalidInput`, `NoVersions`, `UnknownRevision`, `TargetExists`.
+  - Exceptions: `KimbimError(Exception)` and its subclasses `NotAProject`, `NothingToCommit`, `SchemaMismatch`, `InvalidInput`, `NoVersions`, `UnknownRevision`, `TargetExists`.
   - `@dataclass Change(kind: str /*added|modified|removed*/, key: str, ifc_type: str, name: str | None)`
   - `@dataclass Changes(items: list[Change])` with properties `added`, `modified`, `removed` and `__bool__`.
   - `Project.init(path) -> Project`, `Project.open(path) -> Project`
@@ -1364,8 +1364,8 @@ import ifcopenshell
 import pytest
 from conftest import build_model
 
-from kimcad.project import NoVersions, NothingToCommit, Project, SchemaMismatch, InvalidInput, TargetExists, NotAProject
-from kimcad.records import body_text, decompose
+from kimbim.project import NoVersions, NothingToCommit, Project, SchemaMismatch, InvalidInput, TargetExists, NotAProject
+from kimbim.records import body_text, decompose
 
 AUTHOR = ("Test", "test@example.org")
 
@@ -1470,13 +1470,13 @@ def test_branches(project, tmp_path):
 - [ ] **Step 2: Run the tests to see them fail**
 
 Run: `pixi run pytest tests/python/test_project.py -q`
-Expected: `ModuleNotFoundError: kimcad.project`.
+Expected: `ModuleNotFoundError: kimbim.project`.
 
-- [ ] **Step 3: Implement `python/kimcad/project.py`**
+- [ ] **Step 3: Implement `python/kimbim/project.py`**
 
 ```python
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""A KIMCAD project: IFC versions stored as canonical records in Git (docs/03-versioning.md)."""
+"""A KimBim project: IFC versions stored as canonical records in Git (docs/03-versioning.md)."""
 from __future__ import annotations
 
 import json
@@ -1497,35 +1497,35 @@ from .records import compose
 REPACK_THRESHOLD = 10_000  # changed records; D39
 
 
-class KimcadError(Exception):
+class KimbimError(Exception):
     pass
 
 
-class NotAProject(KimcadError):
+class NotAProject(KimbimError):
     pass
 
 
-class NothingToCommit(KimcadError):
+class NothingToCommit(KimbimError):
     pass
 
 
-class SchemaMismatch(KimcadError):
+class SchemaMismatch(KimbimError):
     pass
 
 
-class NoVersions(KimcadError):
+class NoVersions(KimbimError):
     pass
 
 
-class UnknownRevision(KimcadError):
+class UnknownRevision(KimbimError):
     pass
 
 
-class TargetExists(KimcadError):
+class TargetExists(KimbimError):
     pass
 
 
-class InvalidInput(KimcadError):
+class InvalidInput(KimbimError):
     def __init__(self, message: str, messages: list[str]):
         super().__init__(message)
         self.messages = messages
@@ -1572,8 +1572,8 @@ def _describe(key: str, blob: bytes) -> tuple[str, str | None]:
 
 
 def _author() -> tuple[str, str]:
-    name = os.environ.get("KIMCAD_AUTHOR_NAME") or _git_config("user.name") or "KIMCAD User"
-    email = os.environ.get("KIMCAD_AUTHOR_EMAIL") or _git_config("user.email") or "user@localhost"
+    name = os.environ.get("KIMBIM_AUTHOR_NAME") or _git_config("user.name") or "KimBim User"
+    email = os.environ.get("KIMBIM_AUTHOR_EMAIL") or _git_config("user.email") or "user@localhost"
     return name, email
 
 
@@ -1597,7 +1597,7 @@ class Project:
         try:
             return cls(path, _core.Repo.init(str(path)))
         except _core.RepoError as e:
-            raise KimcadError(str(e)) from None
+            raise KimbimError(str(e)) from None
 
     @classmethod
     def open(cls, path) -> Project:
@@ -1610,7 +1610,7 @@ class Project:
     # ---- helpers ----
     def _rev(self, rev: str) -> str:
         if self.repo.head() is None:
-            raise NoVersions("this project has no versions yet (use `kimcad commit <file.ifc>`)")
+            raise NoVersions("this project has no versions yet (use `kimbim commit <file.ifc>`)")
         try:
             return self.repo.resolve(rev)
         except _core.RepoError:
@@ -1662,7 +1662,7 @@ class Project:
         if current and f.schema_identifier != current:
             raise SchemaMismatch(
                 f"{ifc_path} is {f.schema_identifier} but this project is {current}; "
-                "KIMCAD never converts schemas silently (docs/02, D30)"
+                "KimBim never converts schemas silently (docs/02, D30)"
             )
         head = self.repo.head()
         entries = self.repo.tree_entries(head) if head else {}
@@ -1722,7 +1722,7 @@ class Project:
         entries = self._entries(rev)
         p = key_to_path(key)
         if p not in entries:
-            raise KimcadError(f"no record {key} in {rev}")
+            raise KimbimError(f"no record {key} in {rev}")
         return json.loads(self.repo.read_blobs([entries[p]])[0])
 
     def branches(self) -> list[str]:
@@ -1738,7 +1738,7 @@ class Project:
         try:
             self.repo.switch(name)
         except _core.RepoError as e:
-            raise KimcadError(str(e)) from None
+            raise KimbimError(str(e)) from None
 ```
 
 Note on `diff()`: `_changes` compares old entries against new records. For historical diffs the "new" side is read from the repo, which is correct but reads every record of `rev_b`. Optimizing this to compare tree entries only, reading just the changed blobs, is a follow-up once diff speed matters (R3).
@@ -1751,20 +1751,20 @@ Expected: 7 passed.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add python/kimcad/project.py tests/python/test_project.py
+git add python/kimbim/project.py tests/python/test_project.py
 git commit -s -m "feat: Project API (commit/status/log/diff/export/show/branches)"
 ```
 
 ---
 
-### Task 7: `kimcad` CLI
+### Task 7: `kimbim` CLI
 
 **Files:**
-- Create: `python/kimcad/cli.py`, `python/kimcad/__main__.py`, `tests/python/test_cli.py`
+- Create: `python/kimbim/cli.py`, `python/kimbim/__main__.py`, `tests/python/test_cli.py`
 
 **Interfaces:**
 - Consumes: `Project` and the exceptions from Task 6.
-- Produces: `main(argv: list[str] | None = None) -> int`. Exit 0 on success, 1 on `KimcadError` (message on stderr as `kimcad: error: …`), 2 on usage errors. Commands:
+- Produces: `main(argv: list[str] | None = None) -> int`. Exit 0 on success, 1 on `KimbimError` (message on stderr as `kimbim: error: …`), 2 on usage errors. Commands:
   - `init [DIR]`
   - `commit FILE -m MSG`
   - `status FILE`
@@ -1784,7 +1784,7 @@ import json
 
 from conftest import build_model
 
-from kimcad.cli import main
+from kimbim.cli import main
 
 
 def run(capsys, *argv):
@@ -1835,19 +1835,19 @@ def test_empty_project_messages(tmp_path, capsys):
 
 def test_not_a_project(tmp_path, capsys):
     code, _, err = run(capsys, "-C", str(tmp_path), "log")
-    assert code == 1 and "not a KIMCAD project" in err
+    assert code == 1 and "not a KimBim project" in err
 ```
 
 - [ ] **Step 2: Run to see it fail**
 
 Run: `pixi run pytest tests/python/test_cli.py -q`
-Expected: `ModuleNotFoundError: kimcad.cli`.
+Expected: `ModuleNotFoundError: kimbim.cli`.
 
-- [ ] **Step 3: Implement `python/kimcad/cli.py` and `python/kimcad/__main__.py`**
+- [ ] **Step 3: Implement `python/kimbim/cli.py` and `python/kimbim/__main__.py`**
 
 ```python
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""`kimcad` command line (docs/03-versioning.md#cli)."""
+"""`kimbim` command line (docs/03-versioning.md#cli)."""
 from __future__ import annotations
 
 import argparse
@@ -1856,7 +1856,7 @@ import json
 import pathlib
 import sys
 
-from .project import Changes, KimcadError, Project
+from .project import Changes, KimbimError, Project
 
 SYMBOL = {"added": "+", "modified": "~", "removed": "-"}
 
@@ -1874,7 +1874,7 @@ def _print_changes(changes: Changes, as_json: bool = False):
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="kimcad", description="Versioned IFC projects.")
+    p = argparse.ArgumentParser(prog="kimbim", description="Versioned IFC projects.")
     p.add_argument("-C", dest="project", default=".", help="project directory (default: current)")
     sub = p.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("init", help="create a project")
@@ -1910,7 +1910,7 @@ def run(args) -> int:
     if args.cmd == "init":
         target = pathlib.Path(args.dir or args.project)
         Project.init(target)
-        print(f"Initialized KIMCAD project in {target.resolve()}")
+        print(f"Initialized KimBim project in {target.resolve()}")
         return 0
     proj = Project.open(args.project)
     if args.cmd == "commit":
@@ -1954,18 +1954,18 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         return run(args)
-    except KimcadError as e:
-        print(f"kimcad: error: {e}", file=sys.stderr)
+    except KimbimError as e:
+        print(f"kimbim: error: {e}", file=sys.stderr)
         for m in getattr(e, "messages", [])[:20]:
             print(f"  {m}", file=sys.stderr)
         return 1
     except OSError as e:
-        print(f"kimcad: error: {e}", file=sys.stderr)
+        print(f"kimbim: error: {e}", file=sys.stderr)
         return 1
 ```
 
 ```python
-# SPDX-License-Identifier: GPL-3.0-or-later  (python/kimcad/__main__.py)
+# SPDX-License-Identifier: GPL-3.0-or-later  (python/kimbim/__main__.py)
 import sys
 
 from .cli import main
@@ -1973,7 +1973,7 @@ from .cli import main
 sys.exit(main())
 ```
 
-`test_empty_project_messages` expects "no versions" from `log`, which `run` prints, and from diff/export through `NoVersions`. `test_not_a_project` relies on the `NotAProject` message from Rust ("not a KIMCAD project").
+`test_empty_project_messages` expects "no versions" from `log`, which `run` prints, and from diff/export through `NoVersions`. `test_not_a_project` relies on the `NotAProject` message from Rust ("not a KimBim project").
 
 - [ ] **Step 4: Run the tests until they pass**
 
@@ -1983,8 +1983,8 @@ Expected: 3 passed.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add python/kimcad/cli.py python/kimcad/__main__.py tests/python/test_cli.py
-git commit -s -m "feat(cli): kimcad init/commit/status/log/diff/export/show/branch/switch"
+git add python/kimbim/cli.py python/kimbim/__main__.py tests/python/test_cli.py
+git commit -s -m "feat(cli): kimbim init/commit/status/log/diff/export/show/branch/switch"
 ```
 
 ---
@@ -2012,8 +2012,8 @@ import ifcopenshell.api.pset
 import ifcopenshell.util.element
 import pytest
 
-from kimcad.project import Project
-from kimcad.records import body_text
+from kimbim.project import Project
+from kimbim.records import body_text
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 DUPLEX = ROOT / "tests/corpus/files/community/IFC 2.3.0.1 (IFC 2x3)/Duplex Apartment/Duplex_A_20110907.ifc"
@@ -2033,7 +2033,7 @@ def test_duplex_property_edit_roundtrip(tmp_path):
     f = ifcopenshell.open(str(DUPLEX))
     wall = f.by_type("IfcWall")[len(f.by_type("IfcWall")) // 2]
     pset = ifcopenshell.util.element.get_pset(wall, "Pset_WallCommon")
-    ifcopenshell.api.pset.edit_pset(f, pset=f.by_id(pset["id"]), properties={"FireRating": "EI60-KIMCAD"})
+    ifcopenshell.api.pset.edit_pset(f, pset=f.by_id(pset["id"]), properties={"FireRating": "EI60-KimBim"})
     edited = tmp_path / "edited.ifc"
     f.write(str(edited))
     _, changes = proj.commit(edited, "FireRating EI60", author=("T", "t@e.org"), time=2)
@@ -2042,7 +2042,7 @@ def test_duplex_property_edit_roundtrip(tmp_path):
     assert not changes.removed
 
     v2 = proj.export(tmp_path / "v2.ifc")
-    assert "EI60-KIMCAD" in body_text(v2)
+    assert "EI60-KimBim" in body_text(v2)
     assert not proj.status(v2)
 ```
 
@@ -2081,10 +2081,10 @@ jobs:
 (Use the latest `setup-pixi` release tag if a newer one exists.)
 
 - [ ] **Step 3: Docs.**
-  - `README.md`: a "Try it" section with `pixi install`, `pixi run build`, `pixi run kimcad init demo`, `commit`/`log`/`diff`/`export`.
+  - `README.md`: a "Try it" section with `pixi install`, `pixi run build`, `pixi run kimbim init demo`, `commit`/`log`/`diff`/`export`.
   - `docs/07-roadmap.md`: R0 ✅, R1 ✅ (Python decomposer; Rust port later if speed demands it), R2 ✅ except tags, R3 basic record diff ✅.
   - `docs/decisions.md`:
-    - **D40:** PyO3 `kimcad._core` for Python ↔ Rust; `cxx` for C++ later (two boundaries, owner choice).
+    - **D40:** PyO3 `kimbim._core` for Python ↔ Rust; `cxx` for C++ later (two boundaries, owner choice).
     - **D41:** Slice 1 CLI is Python (it needs ifcopenshell); storage writes via `git fast-import`, one shard level until adaptive sharding is needed.
   - `docs/02` rule 5: "New shared nodes get their content hash; if that collides with an existing node id, it is re-hashed deterministically" (replaces UUIDv7, which would break cross-machine determinism).
 

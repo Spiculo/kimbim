@@ -1384,15 +1384,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "kimcad-py"
+name = "kimbim-py"
 version = "0.1.0"
 dependencies = [
- "kimcad-repo",
+ "kimbim-repo",
  "pyo3",
 ]
 
 [[package]]
-name = "kimcad-repo"
+name = "kimbim-repo"
 version = "0.1.0"
 dependencies = [
  "gix",

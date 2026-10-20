@@ -8,7 +8,7 @@
 
 #include "MeshChunk.h"
 
-namespace kimcad {
+namespace kimbim {
 
 // Opens a model and streams mesh chunks from a worker thread (the GUI thread never tessellates,
 // docs/01 threading rule 1). Every Python call takes the GIL, so GUI queries stay possible.
@@ -27,7 +27,7 @@ public slots:
 
 signals:
     void opened(const QJsonObject& info);
-    void chunkReady(const kimcad::MeshChunk& chunk);
+    void chunkReady(const kimbim::MeshChunk& chunk);
     void finished(int elements, bool stopped);
     void failed(const QString& error);
 
@@ -36,4 +36,4 @@ private:
     std::atomic<bool> m_stop{false};
 };
 
-} // namespace kimcad
+} // namespace kimbim

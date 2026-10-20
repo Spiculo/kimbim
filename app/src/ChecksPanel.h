@@ -16,13 +16,13 @@ class QListWidget;
 class QTreeWidget;
 class QTreeWidgetItem;
 
-namespace kimcad {
+namespace kimbim {
 
 // Checks (D81, doc 14 §19): pick the checks (schema validation, IDS, clash detection, model checks),
 // run them, and see the issues by check, then by group (a rule, an IDS specification, a clash set, a
 // model check): severity, message, elements. Clicking an issue selects and shows its elements; a
 // group, all of its elements. The IDS files and clash sets are project settings. The panel only
-// shows and asks; the main window runs the checks (kimcad.checks) on a worker thread.
+// shows and asks; the main window runs the checks (kimbim.checks) on a worker thread.
 class ChecksPanel : public QWidget {
     Q_OBJECT
 public:
@@ -104,4 +104,4 @@ private:
     QDoubleSpinBox* m_distance;
 };
 
-} // namespace kimcad
+} // namespace kimbim

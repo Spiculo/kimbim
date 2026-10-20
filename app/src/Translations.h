@@ -4,13 +4,13 @@
 #include <QCoreApplication>
 #include <QString>
 
-namespace kimcad {
+namespace kimbim {
 
 // Installs the translator for `lang` ("en" is the source language and needs none).
-// Returns false for languages KIMCAD does not ship (docs/04 §12: English and Spanish).
+// Returns false for languages KimBim does not ship (docs/04 §12: English and Spanish).
 bool installTranslator(QCoreApplication& app, const QString& lang);
 
 // The language to use: an explicit "en"/"es" wins, otherwise the system locale, otherwise English.
 QString pickLanguage(const QString& requested);
 
-} // namespace kimcad
+} // namespace kimbim

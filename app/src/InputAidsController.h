@@ -14,7 +14,7 @@
 
 class QKeyEvent;
 
-namespace kimcad {
+namespace kimbim {
 
 class Viewport;
 
@@ -74,4 +74,4 @@ private:
     bool m_trackerShown = false;
 };
 
-} // namespace kimcad
+} // namespace kimbim

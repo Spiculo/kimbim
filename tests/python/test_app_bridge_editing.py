@@ -10,8 +10,8 @@ import ifcopenshell.api.spatial
 import pytest
 from conftest import build_model
 
-from kimcad import app_bridge
-from kimcad.records import decompose
+from kimbim import app_bridge
+from kimbim.records import decompose
 
 
 def call(fn, *args):
@@ -26,7 +26,7 @@ def opened(tmp_path):
     slab = ifcopenshell.api.root.create_entity(f, ifc_class="IfcSlab", name="Losa")
     ifcopenshell.api.spatial.assign_container(f, products=[slab], relating_structure=storey)
     w0 = f.by_type("IfcWall")[0]
-    custom = ifcopenshell.api.pset.add_pset(f, product=w0, name="KIMCAD_Test")
+    custom = ifcopenshell.api.pset.add_pset(f, product=w0, name="KIMBIM_Test")
     ifcopenshell.api.pset.edit_pset(f, pset=custom, properties={"Width": f.createIfcReal(0.2)})
     path = tmp_path / "Proyecto ñ.ifc"
     f.write(str(path))
@@ -78,14 +78,14 @@ def test_new_edit_after_undo_drops_redo(opened):
 
 def test_values_keep_their_ifc_type_and_bad_input_changes_nothing(opened):
     w0 = opened["walls"][:1]
-    ok = call("set_property", json.dumps(w0), "KIMCAD_Test", "Width", json.dumps("0.25"))  # text that is a number
+    ok = call("set_property", json.dumps(w0), "KIMBIM_Test", "Width", json.dumps("0.25"))  # text that is a number
     assert ok["ok"]
-    width = multi(w0)["psets"]["KIMCAD_Test"]["Width"]
+    width = multi(w0)["psets"]["KIMBIM_Test"]["Width"]
     assert width["value"] == 0.25 and width["ifc_type"] == "IfcReal"
     state_before = call("state")
-    bad = call("set_property", json.dumps(w0), "KIMCAD_Test", "Width", json.dumps("abc"))
+    bad = call("set_property", json.dumps(w0), "KIMBIM_Test", "Width", json.dumps("abc"))
     assert bad["ok"] is False and "abc" in bad["error"]
-    assert multi(w0)["psets"]["KIMCAD_Test"]["Width"]["value"] == 0.25
+    assert multi(w0)["psets"]["KIMBIM_Test"]["Width"]["value"] == 0.25
     assert call("state") == state_before  # no new undo step, dirty unchanged
 
 

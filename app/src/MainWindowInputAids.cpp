@@ -21,7 +21,7 @@
 #include "Viewport.h"
 #include "WallTool.h"
 
-namespace kimcad {
+namespace kimbim {
 
 void MainWindow::setupInputAids()
 {
@@ -110,4 +110,4 @@ bool MainWindow::trackerClassic(const Tracker& t)
     return false;
 }
 
-} // namespace kimcad
+} // namespace kimbim

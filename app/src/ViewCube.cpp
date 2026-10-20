@@ -13,7 +13,7 @@
 
 #include <cmath>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -170,4 +170,4 @@ QRect homeButtonRect(const QSize& widget)
     return QRect(widget.width() - HomeCenterX - HomeHalf, HomeCenterY - HomeHalf, 2 * HomeHalf, 2 * HomeHalf);
 }
 
-} // namespace kimcad
+} // namespace kimbim

@@ -11,19 +11,19 @@ class TestModelLoader : public QObject {
 private slots:
     void initTestCase()
     {
-        qRegisterMetaType<kimcad::MeshChunk>();
+        qRegisterMetaType<kimbim::MeshChunk>();
         QString error;
-        QVERIFY2(kimcad::PythonEngine::instance().start(&error), qPrintable(error));
+        QVERIFY2(kimbim::PythonEngine::instance().start(&error), qPrintable(error));
     }
 
     void loadsAllChunks()
     {
         QTemporaryDir tmp;
         const QString path = tmp.filePath(QStringLiteral("m.ifc"));
-        kimcad::PythonEngine::instance().callJson("_write_test_model", {path});
-        kimcad::ModelLoader loader(1);
-        QSignalSpy chunks(&loader, &kimcad::ModelLoader::chunkReady);
-        QSignalSpy finished(&loader, &kimcad::ModelLoader::finished);
+        kimbim::PythonEngine::instance().callJson("_write_test_model", {path});
+        kimbim::ModelLoader loader(1);
+        QSignalSpy chunks(&loader, &kimbim::ModelLoader::chunkReady);
+        QSignalSpy finished(&loader, &kimbim::ModelLoader::finished);
         loader.load(path);
         QCOMPARE(chunks.count(), 2);
         QCOMPARE(finished.count(), 1);
@@ -36,10 +36,10 @@ private slots:
     {
         QTemporaryDir tmp;
         const QString path = tmp.filePath(QStringLiteral("m.ifc"));
-        kimcad::PythonEngine::instance().callJson("_write_test_model", {path});
-        kimcad::ModelLoader loader(1);
-        QSignalSpy chunks(&loader, &kimcad::ModelLoader::chunkReady);
-        QSignalSpy finished(&loader, &kimcad::ModelLoader::finished);
+        kimbim::PythonEngine::instance().callJson("_write_test_model", {path});
+        kimbim::ModelLoader loader(1);
+        QSignalSpy chunks(&loader, &kimbim::ModelLoader::chunkReady);
+        QSignalSpy finished(&loader, &kimbim::ModelLoader::finished);
         loader.requestStop();
         loader.load(path);
         QCOMPARE(chunks.count(), 0);

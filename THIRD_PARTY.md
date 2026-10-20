@@ -1,6 +1,6 @@
 # Third-party components
 
-KIMCAD is GPL-3.0-or-later. These are the components it uses, how each is linked, and its license. See [docs/06](docs/06-reuse-and-licensing.md) for the compatibility rules.
+KimBim is GPL-3.0-or-later. These are the components it uses, how each is linked, and its license. See [docs/06](docs/06-reuse-and-licensing.md) for the compatibility rules.
 
 | Component | License | Use | Linking |
 |-----------|---------|-----|---------|

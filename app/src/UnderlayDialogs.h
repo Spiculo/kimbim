@@ -21,7 +21,7 @@ class QPushButton;
 class QSlider;
 class QSpinBox;
 
-namespace kimcad {
+namespace kimbim {
 
 // D85: File > Place underlay..., after the file is chosen and read (app_bridge.underlay_probe): a DXF's
 // unit (asked when $INSUNITS is unitless, else shown), a PDF's page, the drawing scale (1:N, and an
@@ -127,4 +127,4 @@ private:
     Snapper m_snapper;
 };
 
-} // namespace kimcad
+} // namespace kimbim

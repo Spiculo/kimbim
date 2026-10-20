@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // D80: the Split, Trim/extend and Join tools of the main window (doc 14 §4). The clicking is
-// ModifyTool's; the edits are python/kimcad/modify.py's, one undo step each.
+// ModifyTool's; the edits are python/kimbim/modify.py's, one undo step each.
 #include <QComboBox>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -14,7 +14,7 @@
 #include "ToolOptionsBar.h"
 #include "Viewport.h"
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -146,4 +146,4 @@ bool MainWindow::unjoinElements(const QString& first, const QString& second)
     return modifyResult(bridge("unjoin_elements", {list}), tr("Could not unjoin: %1"));
 }
 
-} // namespace kimcad
+} // namespace kimbim

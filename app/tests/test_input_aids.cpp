@@ -11,10 +11,10 @@
 #include <cmath>
 #include <memory>
 
-using kimcad::InputAids;
-using kimcad::Snap;
-using kimcad::Snapper;
-using kimcad::Tracker;
+using kimbim::InputAids;
+using kimbim::Snap;
+using kimbim::Snapper;
+using kimbim::Tracker;
 
 namespace {
 

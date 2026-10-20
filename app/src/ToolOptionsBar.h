@@ -6,7 +6,7 @@
 
 class QHBoxLayout;
 
-namespace kimcad {
+namespace kimbim {
 
 // The active tool's fields (type, heights, roof, length) in a strip above the active view (D71).
 // Its owner shows and hides the fields per tool; the strip itself shows only while a tool is active
@@ -23,4 +23,4 @@ private:
     QList<QWidget*> m_fields;
 };
 
-} // namespace kimcad
+} // namespace kimbim

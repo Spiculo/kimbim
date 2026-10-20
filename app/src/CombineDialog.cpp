@@ -13,7 +13,7 @@
 #include <QTableWidget>
 #include <QVBoxLayout>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 enum Column { Element, What, Base, Ours, Theirs, Choice, Columns };
@@ -171,4 +171,4 @@ void CombineDialog::refresh()
     m_refreshing = false;
 }
 
-} // namespace kimcad
+} // namespace kimbim

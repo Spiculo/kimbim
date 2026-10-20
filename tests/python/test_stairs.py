@@ -11,10 +11,10 @@ import ifcopenshell.validate
 import numpy as np
 import pytest
 
-from kimcad import app_bridge as b
-from kimcad import drawgen
-from kimcad import stairs
-from kimcad import testing
+from kimbim import app_bridge as b
+from kimbim import drawgen
+from kimbim import stairs
+from kimbim import testing
 
 
 def call(fn, *args):
@@ -252,7 +252,7 @@ def test_railing_by_path_and_on_an_l_stair(levels):
     stair = call("create_stair", levels["l1"], 0, 3, 0, 1.0, 3.0, json.dumps({"shape": "L"}))["guid"]
     rl = call("add_stair_railings", stair, "1.0", "right")
     assert rl["ok"] and len(rl["guids"]) == 1
-    path = json.loads(ifcopenshell.util.element.get_pset(b._model.by_guid(rl["guids"][0]), "KIMCAD_Railing")["Path"])
+    path = json.loads(ifcopenshell.util.element.get_pset(b._model.by_guid(rl["guids"][0]), "KIMBIM_Railing")["Path"])
     assert len(path) == 5  # flight, round the outside of the landing (one corner), flight
     assert errors() == []
 
@@ -284,7 +284,7 @@ def test_copy_and_mirror_an_l_stair(levels):
     assert c["ok"] and len(c["guids"]) == 3  # the stair (its parts come with it) and its two railings
     copy = b._model.by_guid(c["guids"][0])
     assert len(stairs.parts(copy)) == 3
-    assert {ifcopenshell.util.element.get_pset(b._model.by_guid(x), "KIMCAD_Railing")["Host"] for x in c["guids"][1:]} == {copy.GlobalId}
+    assert {ifcopenshell.util.element.get_pset(b._model.by_guid(x), "KIMBIM_Railing")["Host"] for x in c["guids"][1:]} == {copy.GlobalId}
     lo, _ = bbox(p.GlobalId for p in stairs.parts(copy))
     assert lo[0] == pytest.approx(11.0, abs=2e-3)
     assert call("mirror_elements", g(r["guid"]), 0, 0, 1, 0)["ok"]

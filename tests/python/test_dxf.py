@@ -16,8 +16,8 @@ import ifcopenshell.util.element
 import numpy as np
 import pytest
 
-from kimcad import app_bridge as b
-from kimcad import drawgen, drawings, dxf, graphics
+from kimbim import app_bridge as b
+from kimbim import drawgen, drawings, dxf, graphics
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -141,7 +141,7 @@ def test_house_plan_to_dxf_at_real_size_with_pens(house, tmp_path):
     hatch = msp.query('HATCH[layer=="A-WALL-PATT"]').first
     assert hatch.dxf.solid_fill == 1 and hatch.rgb == dxf._rgb(pens["12"]["color"])
     dim = msp.query("DIMENSION").first
-    assert dim.dxf.layer == "A-ANNO-DIMS" and dim.dxf.dimstyle == "KIMCAD"
+    assert dim.dxf.layer == "A-ANNO-DIMS" and dim.dxf.dimstyle == "KimBim"
     assert dim.get_measurement() == pytest.approx(10000.0, abs=1.0)  # the house's 10 m chain
 
 
@@ -166,7 +166,7 @@ def test_section_uses_true_elevations(house, tmp_path):
     assert slabs.extmax.y > 5800  # the level 3 slab, above 6 m
 
 
-def test_layers_by_kimcad_layer_or_by_kind(house, tmp_path):
+def test_layers_by_kimbim_layer_or_by_kind(house, tmp_path):
     wall = next(e.GlobalId for e in b._model.by_type("IfcWall"))
     assert call("create_layer", "Bearing walls")["ok"]
     assert call("assign_layer", json.dumps([wall]), "Bearing walls")["ok"]
@@ -236,7 +236,7 @@ def test_sheet_a01_is_a_paper_space_layout(house, tmp_path):
         assert box.extmax.y <= 297 - view["y"] + 0.5 and box.extmin.y >= 297 - view["y"] - view["h"] - 0.5, view["name"]
     texts = [t.dxf.text for t in layout.query("TEXT")]
     assert "A01" in texts and "Level 1 Floor Plan" in texts and "1:100" in texts
-    assert "KIMCAD two-storey house" in texts or any("M4-01" in t for t in texts)
+    assert "KimBim two-storey house" in texts or any("M4-01" in t for t in texts)
     frame = layout.query('LWPOLYLINE[layer=="A-ANNO-TTLB"]')
     assert any(e.dxf.lineweight == 70 for e in frame)  # the 0.7 mm border
     # Model space has the same drawings at real size.
@@ -293,7 +293,7 @@ def test_clinic_plan_export_timed(tmp_path):
 # ---------------------------------------------------------------- command line
 
 def test_cli_exports_a_version_to_dxf(house_file, tmp_path, capsys):
-    from kimcad.cli import main
+    from kimbim.cli import main
 
     proj = tmp_path / "proj"
     assert main(["init", str(proj)]) == 0

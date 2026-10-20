@@ -12,9 +12,9 @@
 namespace {
 
 // Three unit "boxes" (one triangle each, enough for bounds/selection), along X.
-kimcad::MeshChunk threeElements()
+kimbim::MeshChunk threeElements()
 {
-    kimcad::MeshChunk c;
+    kimbim::MeshChunk c;
     c.guids = {"A", "B", "C"};
     c.types = {"IfcWall", "IfcWall", "IfcSlab"};
     for (int e = 0; e < 3; ++e) {
@@ -31,9 +31,9 @@ kimcad::MeshChunk threeElements()
 
 // One element from quads (4 corner indices each, any winding), unwelded like OCCT output:
 // every triangle gets its own 3 vertices.
-kimcad::MeshChunk fromQuads(const std::vector<std::array<std::array<float, 3>, 4>>& quads)
+kimbim::MeshChunk fromQuads(const std::vector<std::array<std::array<float, 3>, 4>>& quads)
 {
-    kimcad::MeshChunk c;
+    kimbim::MeshChunk c;
     c.guids = {"Q"};
     c.types = {"IfcWall"};
     uint32_t n = 0;
@@ -48,7 +48,7 @@ kimcad::MeshChunk fromQuads(const std::vector<std::array<std::array<float, 3>, 4
     return c;
 }
 
-kimcad::MeshChunk unitCube()
+kimbim::MeshChunk unitCube()
 {
     // 6 faces, outward winding.
     return fromQuads({{{{0, 0, 0}, {0, 1, 0}, {1, 1, 0}, {1, 0, 0}}},
@@ -59,7 +59,7 @@ kimcad::MeshChunk unitCube()
         {{{1, 0, 0}, {1, 1, 0}, {1, 1, 1}, {1, 0, 1}}}});
 }
 
-int selectionEntities(const Handle(kimcad::ElementBatch)& batch)
+int selectionEntities(const Handle(kimbim::ElementBatch)& batch)
 {
     Handle(SelectMgr_Selection) sel = new SelectMgr_Selection(0);
     batch->ComputeSelection(sel, 0);
@@ -75,22 +75,22 @@ private slots:
     // coplanar seams are not drawn. Meshes are unwelded, so edges pair up by position.
     void cubeHasTwelveFeatureEdges()
     {
-        QCOMPARE(int(kimcad::ElementBatch::featureEdges(unitCube(), 0).size()), 12);
+        QCOMPARE(int(kimbim::ElementBatch::featureEdges(unitCube(), 0).size()), 12);
     }
 
     void flatQuadHasOnlyItsBorder()
     {
-        QCOMPARE(int(kimcad::ElementBatch::featureEdges(fromQuads({{{{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}}}}), 0).size()), 4);
+        QCOMPARE(int(kimbim::ElementBatch::featureEdges(fromQuads({{{{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}}}}), 0).size()), 4);
         // Two coplanar quads sharing an edge: the seam is not drawn (2 + 2 + 1 + 1 border pieces).
         const auto two = fromQuads({{{{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}}}, {{{1, 0, 0}, {2, 0, 0}, {2, 1, 0}, {1, 1, 0}}}});
-        QCOMPARE(int(kimcad::ElementBatch::featureEdges(two, 0).size()), 6);
+        QCOMPARE(int(kimbim::ElementBatch::featureEdges(two, 0).size()), 6);
     }
 
     void inconsistentWindingIsNotACrease()
     {
         // Second quad wound the other way (common in exported meshes): still coplanar, no seam.
         const auto flipped = fromQuads({{{{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}}}, {{{1, 0, 0}, {1, 1, 0}, {2, 1, 0}, {2, 0, 0}}}});
-        QCOMPARE(int(kimcad::ElementBatch::featureEdges(flipped, 0).size()), 6);
+        QCOMPARE(int(kimbim::ElementBatch::featureEdges(flipped, 0).size()), 6);
     }
 
     // Slice 4b: element ids drawn as colours for "only what you can see" box selection.
@@ -98,27 +98,27 @@ private slots:
     void idColoursRoundTripWithNoise()
     {
         for (int id : {1, 2, 63, 64, 4095, 4096, 100000, 262143}) {
-            const auto rgb = kimcad::ElementBatch::idRgb(id);
+            const auto rgb = kimbim::ElementBatch::idRgb(id);
             for (int d : {-1, 0, 1})
-                QCOMPARE(kimcad::ElementBatch::idFromRgb(rgb[0] + d, rgb[1] + d, rgb[2] - d), id);
+                QCOMPARE(kimbim::ElementBatch::idFromRgb(rgb[0] + d, rgb[1] + d, rgb[2] - d), id);
         }
-        QCOMPARE(kimcad::ElementBatch::idFromRgb(0, 0, 0), -1);       // black background
-        QCOMPARE(kimcad::ElementBatch::idFromRgb(240, 240, 244), -1); // anything off the grid
-        QCOMPARE(kimcad::ElementBatch::maxId(), 262143);
+        QCOMPARE(kimbim::ElementBatch::idFromRgb(0, 0, 0), -1);       // black background
+        QCOMPARE(kimbim::ElementBatch::idFromRgb(240, 240, 244), -1); // anything off the grid
+        QCOMPARE(kimbim::ElementBatch::maxId(), 262143);
     }
 
     // Owner feedback: cut elements need their section drawn (OCCT capping doesn't show on these
     // meshes). The section of an element at height z = its closed outline(s) in plan.
     void sectionOfACubeIsItsSquare()
     {
-        const auto loops = kimcad::ElementBatch::sectionLoops(unitCube(), 0, 0.5);
+        const auto loops = kimbim::ElementBatch::sectionLoops(unitCube(), 0, 0.5);
         QCOMPARE(int(loops.size()), 1);
         double area = 0;
         const auto& p = loops.front();
         for (size_t i = 0; i < p.size(); ++i)
             area += p[i].X() * p[(i + 1) % p.size()].Y() - p[(i + 1) % p.size()].X() * p[i].Y();
         QVERIFY(std::abs(std::abs(area) / 2 - 1.0) < 1e-9);
-        QVERIFY(kimcad::ElementBatch::sectionLoops(unitCube(), 0, 1.5).empty()); // above it
+        QVERIFY(kimbim::ElementBatch::sectionLoops(unitCube(), 0, 1.5).empty()); // above it
         QCOMPARE(int(p.size()), 4); // collinear points from the triangulation are merged
     }
 
@@ -126,7 +126,7 @@ private slots:
     // (locked elements can't be selected).
     void layerHiddenAndLockedElements()
     {
-        Handle(kimcad::ElementBatch) b = new kimcad::ElementBatch(threeElements());
+        Handle(kimbim::ElementBatch) b = new kimbim::ElementBatch(threeElements());
         b->setLayerHidden(0, true);
         QVERIFY(b->isHidden(0));
         QCOMPARE(b->visibleCount(), 2);
@@ -143,14 +143,14 @@ private slots:
     // D73: border lines are drawn in one group per style (colour, width, pattern).
     void linesAreGroupedByStyle()
     {
-        Handle(kimcad::ElementBatch) b = new kimcad::ElementBatch(threeElements());
-        const kimcad::BatchLine red{Quantity_Color(1, 0, 0, Quantity_TOC_RGB), 2.0f, 0xFFFF};
+        Handle(kimbim::ElementBatch) b = new kimbim::ElementBatch(threeElements());
+        const kimbim::BatchLine red{Quantity_Color(1, 0, 0, Quantity_TOC_RGB), 2.0f, 0xFFFF};
         b->setLineStyle(0, red);
         b->setLineStyle(1, red);
         const Quantity_Color fallback(0.2, 0.2, 0.2, Quantity_TOC_RGB);
         auto buckets = b->lineBuckets(fallback);
         QCOMPARE(int(buckets.size()), 2); // red (A and B) and the default (C)
-        b->setLineStyle(1, kimcad::BatchLine{Quantity_Color(1, 0, 0, Quantity_TOC_RGB), 2.0f, 0xF0F0});
+        b->setLineStyle(1, kimbim::BatchLine{Quantity_Color(1, 0, 0, Quantity_TOC_RGB), 2.0f, 0xF0F0});
         QCOMPARE(int(b->lineBuckets(fallback).size()), 3); // same colour, other pattern
         b->setHidden(2, true);
         QCOMPARE(int(b->lineBuckets(fallback).size()), 2); // hidden elements draw no lines
@@ -162,7 +162,7 @@ private slots:
     // D73: hidden by the visibility set is a third kind of hidden: Show all doesn't reveal it.
     void graphicsHiddenSurvivesShowAll()
     {
-        Handle(kimcad::ElementBatch) b = new kimcad::ElementBatch(threeElements());
+        Handle(kimbim::ElementBatch) b = new kimbim::ElementBatch(threeElements());
         b->setGraphicsHidden(1, true);
         QVERIFY(b->isHidden(1) && b->isGraphicsHidden(1));
         QCOMPARE(b->visibleCount(), 2);
@@ -177,7 +177,7 @@ private slots:
     // D73: an override surface colour replaces the palette; Compare's colour still wins.
     void surfaceColoursAndCompareOverrides()
     {
-        Handle(kimcad::ElementBatch) b = new kimcad::ElementBatch(threeElements());
+        Handle(kimbim::ElementBatch) b = new kimbim::ElementBatch(threeElements());
         const Quantity_Color red(1, 0, 0, Quantity_TOC_RGB), green(0, 1, 0, Quantity_TOC_RGB);
         QVERIFY(!b->surfaceColor(0).IsEqual(red));
         b->setSurface(0, red);
@@ -191,16 +191,16 @@ private slots:
 
     void acceptsShadedIdAndLinesModes()
     {
-        Handle(kimcad::ElementBatch) b = new kimcad::ElementBatch(unitCube());
-        QVERIFY(b->AcceptDisplayMode(kimcad::ElementBatch::Shaded));
-        QVERIFY(b->AcceptDisplayMode(kimcad::ElementBatch::Ids));
-        QVERIFY(b->AcceptDisplayMode(kimcad::ElementBatch::LinesOnly));
+        Handle(kimbim::ElementBatch) b = new kimbim::ElementBatch(unitCube());
+        QVERIFY(b->AcceptDisplayMode(kimbim::ElementBatch::Shaded));
+        QVERIFY(b->AcceptDisplayMode(kimbim::ElementBatch::Ids));
+        QVERIFY(b->AcceptDisplayMode(kimbim::ElementBatch::LinesOnly));
         QVERIFY(!b->AcceptDisplayMode(3));
     }
 
     void indexesElementsByGuid()
     {
-        Handle(kimcad::ElementBatch) b = new kimcad::ElementBatch(threeElements());
+        Handle(kimbim::ElementBatch) b = new kimbim::ElementBatch(threeElements());
         QCOMPARE(b->elementCount(), 3);
         QCOMPARE(b->indexOf("B"), 1);
         QCOMPARE(b->indexOf("nope"), -1);
@@ -212,7 +212,7 @@ private slots:
 
     void selectionHasOneOwnerPerVisibleElement()
     {
-        Handle(kimcad::ElementBatch) b = new kimcad::ElementBatch(threeElements());
+        Handle(kimbim::ElementBatch) b = new kimbim::ElementBatch(threeElements());
         QCOMPARE(selectionEntities(b), 3);
         b->setHidden(1, true);
         QVERIFY(b->isHidden(1));
@@ -224,7 +224,7 @@ private slots:
 
     void boundsFollowVisibility()
     {
-        Handle(kimcad::ElementBatch) b = new kimcad::ElementBatch(threeElements());
+        Handle(kimbim::ElementBatch) b = new kimbim::ElementBatch(threeElements());
         double x0, y0, z0, x1, y1, z1;
         b->visibleBounds().Get(x0, y0, z0, x1, y1, z1);
         QCOMPARE(x0, 0.0);

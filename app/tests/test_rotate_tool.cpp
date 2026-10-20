@@ -6,7 +6,7 @@
 
 #include <cmath>
 
-using kimcad::RotateTool;
+using kimbim::RotateTool;
 
 class TestRotateTool : public QObject {
     Q_OBJECT

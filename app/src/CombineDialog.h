@@ -12,7 +12,7 @@ class QLabel;
 class QPushButton;
 class QTableWidget;
 
-namespace kimcad {
+namespace kimbim {
 
 // Combine options (Slice 22, M5): choose the option to bring into the current one, see what it
 // brings and each conflict (common version, this option, the other option), choose per conflict,
@@ -49,4 +49,4 @@ private:
     bool m_refreshQueued = false; // a choice queued a refresh; a direct refresh() makes it unneeded
 };
 
-} // namespace kimcad
+} // namespace kimbim

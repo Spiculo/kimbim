@@ -8,7 +8,7 @@
 #include <QString>
 #include <QVector>
 
-namespace kimcad {
+namespace kimbim {
 
 // D89: the temporary guides in a view: a small cross on every acquired point and the dashed guide
 // lines the cursor is on (at height z). Topmost layer, display only.
@@ -46,4 +46,4 @@ private:
     double m_ratio;
 };
 
-} // namespace kimcad
+} // namespace kimbim

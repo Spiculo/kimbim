@@ -6,8 +6,8 @@
 
 #include "WallTool.h"
 
-using kimcad::WallSegment;
-using kimcad::WallTool;
+using kimbim::WallSegment;
+using kimbim::WallTool;
 
 
 namespace {
@@ -52,7 +52,7 @@ private slots:
     {
         WallTool tool;
         tool.setTolerance(0.1);
-        tool.snapper().setWalls(kimcad::Snapper::parse(QJsonDocument::fromJson(
+        tool.snapper().setWalls(kimbim::Snapper::parse(QJsonDocument::fromJson(
             R"({"walls":[{"guid":"A","x1":0,"y1":0,"x2":4,"y2":0,"thickness":0.2}]})").object()));
         QSignalSpy walls(&tool, &WallTool::wallRequested);
         tool.click(QPointF(4.02, 0.03));  // at A's end

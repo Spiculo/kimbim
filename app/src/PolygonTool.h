@@ -11,7 +11,7 @@
 
 #include "Snapper.h"
 
-namespace kimcad {
+namespace kimbim {
 
 // Draws a closed outline (slabs) from plan points: click points (snapped like walls), close by
 // clicking the first point again or with finish() (Enter / double click). Pure logic: the viewport
@@ -53,4 +53,4 @@ private:
     std::optional<QPointF> m_hover;
 };
 
-} // namespace kimcad
+} // namespace kimbim

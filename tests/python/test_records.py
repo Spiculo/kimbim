@@ -6,7 +6,7 @@ import ifcopenshell.api.pset
 from conftest import build_model
 from semantic import compare
 
-from kimcad.records import FORMAT, body_text, compose, decompose
+from kimbim.records import FORMAT, body_text, compose, decompose
 
 
 def roundtrip(f, tmp_path, name="b.ifc"):
@@ -59,7 +59,7 @@ def test_strings_are_not_normalized(model, tmp_path):
 
 def test_integer_and_real_stay_distinct(model, tmp_path):
     w = model.by_type("IfcWall")[0]
-    pset = ifcopenshell.api.pset.add_pset(model, product=w, name="KIMCAD_Test")
+    pset = ifcopenshell.api.pset.add_pset(model, product=w, name="KIMBIM_Test")
     ifcopenshell.api.pset.edit_pset(
         model, pset=pset, properties={"I": model.createIfcInteger(1), "R": model.createIfcReal(1.0)}
     )

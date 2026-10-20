@@ -14,7 +14,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 constexpr double kDefaultHeight = 3.0; // metres: a new level's height when nothing says otherwise
@@ -367,4 +367,4 @@ void LevelsDialog::deleteSelected(const QString& quietChoice)
     selectRow(std::min(i, m_table.count() - 1));
 }
 
-} // namespace kimcad
+} // namespace kimbim

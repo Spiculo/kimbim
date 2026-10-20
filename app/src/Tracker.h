@@ -12,7 +12,7 @@
 
 #include "InputAids.h"
 
-namespace kimcad {
+namespace kimbim {
 
 // D89: the tracker's input (Archicad's Tracker; AutoCAD's dynamic input), pure logic. While a tool
 // places points it shows the live length and angle from the tool's previous point (the anchor) and
@@ -59,4 +59,4 @@ private:
     bool m_absolute = false;
 };
 
-} // namespace kimcad
+} // namespace kimbim

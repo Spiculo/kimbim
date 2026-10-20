@@ -36,7 +36,7 @@
 #include <cstdio>
 #include <cstring>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 constexpr int kMaxTexture = 8192;
@@ -294,7 +294,7 @@ void MainWindow::refreshUnderlays()
              &m_gripTool->snapper(), &m_measure->tool()->snapper(), &m_modifyTool->snapper(), &m_draftTool->snapper(),
              &m_underlayPicker->snapper()})
         s->setUnderlays(m_underlaySnap);
-    if (qEnvironmentVariableIsSet("KIMCAD_TIMINGS") && !all.isEmpty())
+    if (qEnvironmentVariableIsSet("KIMBIM_TIMINGS") && !all.isEmpty())
         qInfo("underlays refreshed in %lld ms", static_cast<long long>(timer.elapsed()));
 }
 
@@ -375,4 +375,4 @@ bool MainWindow::finishUnderlayPick(std::optional<double> distance)
     return true;
 }
 
-} // namespace kimcad
+} // namespace kimbim

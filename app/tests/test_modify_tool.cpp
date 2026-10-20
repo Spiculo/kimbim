@@ -6,7 +6,7 @@
 
 #include "ModifyTool.h"
 
-using kimcad::ModifyTool;
+using kimbim::ModifyTool;
 
 namespace {
 
@@ -20,7 +20,7 @@ void load(ModifyTool& tool)
     const QJsonObject beams = QJsonDocument::fromJson(
         R"({"beams":[{"guid":"M","x1":0,"y1":6,"x2":6,"y2":6,"width":0.2}]})").object();
     tool.setTargets(snap, beams);
-    tool.snapper().setWalls(kimcad::Snapper::parse(snap));
+    tool.snapper().setWalls(kimbim::Snapper::parse(snap));
 }
 
 } // namespace

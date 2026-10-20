@@ -7,7 +7,7 @@
 #include "MeasureOverlay.h"
 #include "Viewport.h"
 
-namespace kimcad {
+namespace kimbim {
 
 MeasureController::MeasureController(std::function<QString(double)> length, QObject* parent)
     : QObject(parent)
@@ -75,4 +75,4 @@ void MeasureController::redraw()
     m_view->setToolOverlay(new MeasureOverlay(path, label));
 }
 
-} // namespace kimcad
+} // namespace kimbim

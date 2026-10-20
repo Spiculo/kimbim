@@ -44,6 +44,6 @@ Large files are stored with Git LFS or downloaded by a script, so they are not c
 ## Engineering practices
 
 - **Code review** on every change, plus a **DCO sign-off** on every commit ([06](06-reuse-and-licensing.md)).
-- **Format versioning:** any change to the canonical record format bumps `kimcad/N` and ships a migration with tests.
+- **Format versioning:** any change to the canonical record format bumps `kimbim/N` and ships a migration with tests.
 - **Every bug fix adds a test.** If the bug involves a file, the file joins the corpus.
 - **Decision log:** architectural changes are recorded in [decisions.md](decisions.md) before they are implemented.

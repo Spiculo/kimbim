@@ -39,10 +39,10 @@
 - Hidden by visibility is separate from H/I and from layers: Show all doesn't reveal it, and it isn't
   selectable.
 - A 0.50 mm pen prints 0.50 mm at any sheet scale (weights and dashes ÷ k, where k = 100 / scale).
-- UI strings in English with Spanish in `kimcad_es.ts` (`pixi run check-translations` must pass), and
+- UI strings in English with Spanish in `kimbim_es.ts` (`pixi run check-translations` must pass), and
   an SPDX header on new files (`pixi run check-spdx`).
 - Tests: `pixi run test` (Python), `pixi run app-test` (C++). A single C++ test runs with
-  `KIMCAD_PYTHON_PATH=$PWD/python pixi run build/app/<test>.exe <fn> -o out.txt,txt`.
+  `KIMBIM_PYTHON_PATH=$PWD/python pixi run build/app/<test>.exe <fn> -o out.txt,txt`.
 
 ## Review focus
 
@@ -66,13 +66,13 @@
 
 | File | Status | Responsibility |
 |---|---|---|
-| `python/kimcad/graphics.py` | new | Built-ins, `effective`, `validate`, `kind_of`, `matches`, `resolve`, `style_svg`, bridge functions |
-| `python/kimcad/settings.py` | modify | DEFAULTS for the new keys; `_error` delegates to `graphics.validate` |
-| `python/kimcad/app_bridge.py` | modify | Re-export graphics bridge functions; `set_annotation_pen` |
-| `python/kimcad/drawgen.py` | modify | `svg-segment-projection`, `svg-no-css`, overlay tagging |
-| `python/kimcad/drawings.py` | modify | `generate_drawing` styles (k = 1) and excludes graphics-hidden elements |
-| `python/kimcad/sheets.py` | modify | `sheet_svg` styles each view with k = 100 / scale and the sheet's purpose; `set_sheet_purpose` |
-| `python/kimcad/annotations.py` | modify | `Pen` on annotations; `current_pen` for new ones; `set_annotation_pen` |
+| `python/kimbim/graphics.py` | new | Built-ins, `effective`, `validate`, `kind_of`, `matches`, `resolve`, `style_svg`, bridge functions |
+| `python/kimbim/settings.py` | modify | DEFAULTS for the new keys; `_error` delegates to `graphics.validate` |
+| `python/kimbim/app_bridge.py` | modify | Re-export graphics bridge functions; `set_annotation_pen` |
+| `python/kimbim/drawgen.py` | modify | `svg-segment-projection`, `svg-no-css`, overlay tagging |
+| `python/kimbim/drawings.py` | modify | `generate_drawing` styles (k = 1) and excludes graphics-hidden elements |
+| `python/kimbim/sheets.py` | modify | `sheet_svg` styles each view with k = 100 / scale and the sheet's purpose; `set_sheet_purpose` |
+| `python/kimbim/annotations.py` | modify | `Pen` on annotations; `current_pen` for new ones; `set_annotation_pen` |
 | `tests/python/test_graphics.py` | new | Tables, validation, kinds, rules, resolve, style_svg, bridge |
 | `tests/python/test_drawings.py`, `test_sheets.py`, `test_annotations.py` | modify | Styled drawings, sheet weights, annotation pens |
 | `app/src/Graphics.{h,cpp}` | new | Parsed resolved state; line widths, patterns |
@@ -91,8 +91,8 @@
 ### Task 1: Graphics tables, built-ins and validation (Python)
 
 **Files:**
-- Create: `python/kimcad/graphics.py`
-- Modify: `python/kimcad/settings.py:15-24` (DEFAULTS), `:87-105` (`_error`)
+- Create: `python/kimbim/graphics.py`
+- Modify: `python/kimbim/settings.py:15-24` (DEFAULTS), `:87-105` (`_error`)
 - Test: `tests/python/test_graphics.py`
 
 **Interfaces:**
@@ -116,9 +116,9 @@ import json
 
 import pytest
 
-from kimcad import app_bridge as b
-from kimcad import graphics as g
-from kimcad import settings as s
+from kimbim import app_bridge as b
+from kimbim import graphics as g
+from kimbim import settings as s
 
 
 def setup_function():
@@ -196,7 +196,7 @@ def test_pen_and_dash_fall_back():
 - [ ] **Step 2: Run them to watch them fail**
 
 Run: `pixi run pytest tests/python/test_graphics.py -q`
-Expected: FAIL (`ModuleNotFoundError: No module named 'kimcad.graphics'`, or ImportError).
+Expected: FAIL (`ModuleNotFoundError: No module named 'kimbim.graphics'`, or ImportError).
 
 - [ ] **Step 3: Write `graphics.py` (tables part)**
 
@@ -530,7 +530,7 @@ Expected: all pass. If a settings test compared DEFAULTS exactly, update its exp
 - [ ] **Step 6: Commit**
 
 ```bash
-git add python/kimcad/graphics.py python/kimcad/settings.py tests/python/test_graphics.py
+git add python/kimbim/graphics.py python/kimbim/settings.py tests/python/test_graphics.py
 git commit -m "feat(graphics): pen sets, line types, element styles, visibility, overrides and purposes tables with built-ins and validation"
 ```
 
@@ -539,7 +539,7 @@ git commit -m "feat(graphics): pen sets, line types, element styles, visibility,
 ### Task 2: Element kinds, rules and resolution (Python)
 
 **Files:**
-- Modify: `python/kimcad/graphics.py`
+- Modify: `python/kimbim/graphics.py`
 - Test: `tests/python/test_graphics.py`
 
 **Interfaces:**
@@ -567,7 +567,7 @@ import ifcopenshell
 import ifcopenshell.api.pset
 import ifcopenshell.api.root
 
-from kimcad.testing import build_model
+from kimbim.testing import build_model
 
 
 def _model(schema="IFC4"):
@@ -711,7 +711,7 @@ def test_resolve_is_cached_on_the_model_state():
 - [ ] **Step 2: Run them to watch them fail**
 
 Run: `pixi run pytest tests/python/test_graphics.py -q`
-Expected: the new tests fail with `AttributeError: module 'kimcad.graphics' has no attribute 'kind_of'`.
+Expected: the new tests fail with `AttributeError: module 'kimbim.graphics' has no attribute 'kind_of'`.
 
 - [ ] **Step 3: Implement** (append to `graphics.py`)
 
@@ -961,7 +961,7 @@ Expected: all pass.
 - [ ] **Step 5: Time it on the Clinic** (performance check, not a test)
 
 ```bash
-pixi run python -c "import sys,time,json; sys.path.insert(0,'python'); from kimcad import app_bridge as B, graphics as g; B.open_model(r'tests/corpus/files/community/IFC 2.3.0.1 (IFC 2x3)/Medical-Dental Clinic/Clinic_Architectural.ifc'); [ (lambda t: (g.resolve(p), print(p, round(time.perf_counter()-t,2))))(time.perf_counter()) for p in ('Working','Highlight','Permit')]"
+pixi run python -c "import sys,time,json; sys.path.insert(0,'python'); from kimbim import app_bridge as B, graphics as g; B.open_model(r'tests/corpus/files/community/IFC 2.3.0.1 (IFC 2x3)/Medical-Dental Clinic/Clinic_Architectural.ifc'); [ (lambda t: (g.resolve(p), print(p, round(time.perf_counter()-t,2))))(time.perf_counter()) for p in ('Working','Highlight','Permit')]"
 ```
 
 Expected: Working < 0.2 s, Highlight (property rules) < 1 s. Write the numbers into the ledger. If
@@ -970,7 +970,7 @@ Highlight is over 1 s, cache `_Facts` psets per type object. That is a ruling.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add python/kimcad/graphics.py tests/python/test_graphics.py
+git add python/kimbim/graphics.py tests/python/test_graphics.py
 git commit -m "feat(graphics): element kinds (IFC4 and IFC2X3 by type), rules and resolution per purpose"
 ```
 
@@ -979,7 +979,7 @@ git commit -m "feat(graphics): element kinds (IFC4 and IFC2X3 by type), rules an
 ### Task 3: Graphics bridge functions (Python)
 
 **Files:**
-- Modify: `python/kimcad/graphics.py`, `python/kimcad/app_bridge.py` (re-exports near the settings re-exports)
+- Modify: `python/kimbim/graphics.py`, `python/kimbim/app_bridge.py` (re-exports near the settings re-exports)
 - Test: `tests/python/test_graphics.py`
 
 **Interfaces:**
@@ -1051,7 +1051,7 @@ def test_set_current_pen():
 - [ ] **Step 2: Run to watch them fail**
 
 Run: `pixi run pytest tests/python/test_graphics.py -q -k "bridge or set_"`
-Expected: FAIL (`AttributeError: module 'kimcad.app_bridge' has no attribute 'graphics_state'`).
+Expected: FAIL (`AttributeError: module 'kimbim.app_bridge' has no attribute 'graphics_state'`).
 
 - [ ] **Step 3: Implement** (append to `graphics.py`)
 
@@ -1177,7 +1177,7 @@ Expected: pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add python/kimcad/graphics.py python/kimcad/app_bridge.py tests/python/test_graphics.py
+git add python/kimbim/graphics.py python/kimbim/app_bridge.py tests/python/test_graphics.py
 git commit -m "feat(graphics): bridge: graphics_state, graphics_tables, set_graphics, set_purpose (applies layer combinations), set_current_pen"
 ```
 
@@ -1186,8 +1186,8 @@ git commit -m "feat(graphics): bridge: graphics_state, graphics_tables, set_grap
 ### Task 4: Drawings and sheets styled by the purpose (Python)
 
 **Files:**
-- Modify: `python/kimcad/drawgen.py` (settings in `generate`, overlay tags), `python/kimcad/graphics.py`
-  (`style_svg`), `python/kimcad/drawings.py:258-289`, `python/kimcad/sheets.py:460-492` (+ `set_sheet_purpose`)
+- Modify: `python/kimbim/drawgen.py` (settings in `generate`, overlay tags), `python/kimbim/graphics.py`
+  (`style_svg`), `python/kimbim/drawings.py:258-289`, `python/kimbim/sheets.py:460-492` (+ `set_sheet_purpose`)
 - Test: `tests/python/test_graphics.py`, `tests/python/test_drawings.py`, `tests/python/test_sheets.py`
 
 **Interfaces:**
@@ -1216,7 +1216,7 @@ git commit -m "feat(graphics): bridge: graphics_state, graphics_tables, set_grap
   - The width is `weight / k`. `stroke-dasharray` is the dash list ÷ k (omitted when empty).
   - `stroke-linecap="butt"`.
 - Annotations in the overlay use pen `annotation_pen`, or the annotation's own pen. That pen is given
-  as `data-pen` on its group by drawgen, read from `KIMCAD_Annotation.Pen` (Task 5 writes it; until
+  as `data-pen` on its group by drawgen, read from `KIMBIM_Annotation.Pen` (Task 5 writes it; until
   then it is absent).
 - The overlay's default stroke-width (`0.18`) is divided by k.
 - Any SVG `<style>` block is removed (svg-no-css should already omit it).
@@ -1254,7 +1254,7 @@ def test_style_svg_applies_lines_fills_and_removes_hidden():
 
 ```python
 def test_drawings_are_styled_by_the_purpose(house):
-    from kimcad import settings as s
+    from kimbim import settings as s
     guid = call("create_section", -1.0, 4.5, 11.0, 4.5, 5.0, 8.0, -1)["guid"]
     working = call("generate_drawing", guid, "")["svg"]
     assert 'stroke="#5a3a22"' in working  # Working: walls cut, dark brown
@@ -1266,7 +1266,7 @@ def test_drawings_are_styled_by_the_purpose(house):
 
 
 def test_hidden_kinds_are_left_out_of_drawings(house):
-    from kimcad import settings as s
+    from kimbim import settings as s
     guid = call("create_section", -1.0, 4.5, 11.0, 4.5, 5.0, 8.0, -1)["guid"]
     assert "IfcWall" in call("generate_drawing", guid, "")["svg"]
     vis = {**call("graphics_tables")["tables"]["visibility_sets"], "No walls": {"hidden_kinds": ["walls"], "rules": []}}
@@ -1285,7 +1285,7 @@ fixture that makes a sheet with a placed drawing), add:
 def test_sheet_weights_do_not_scale(house):  # adapt the fixture name to the module's
     number = <make a sheet and place one section at scale 50 using the module's helpers>
     svg = call("sheet_svg", number)["svg"]
-    view = svg.split('class="kimcad-view"', 1)[1]
+    view = svg.split('class="kimbim-view"', 1)[1]
     widths = {float(w) for w in re.findall(r'<g class="IfcWall"[^>]*stroke-width="([\d.]+)"', view)}
     assert widths == {0.25}  # 0.50 mm pen / k (k = 100/50 = 2): prints 0.50 mm on paper
     assert call("set_sheet_purpose", number, "Permit")["ok"]
@@ -1328,7 +1328,7 @@ def _tagged(kind: str, parts: list) -> list:
 
 Inside `plan_annotations`, wrap each annotation's output in
 `<g data-kind="annotation" ifc:guid="{a.GlobalId}"{pen_attr}>…</g>`. `pen_attr` is
-` data-pen="{n}"` when its `KIMCAD_Annotation` pset has an integer `Pen`, otherwise empty. Read the
+` data-pen="{n}"` when its `KIMBIM_Annotation` pset has an integer `Pen`, otherwise empty. Read the
 function first; it loops over the storey's annotations.
 
 `graphics.style_svg`:
@@ -1390,8 +1390,8 @@ def style_svg(svg: str, resolved: dict, k: float = 1.0) -> str:
         pos = m.end()
     out.append(svg[pos:])
     svg = "".join(out)
-    return svg.replace('class="kimcad-overlay" fill="none" stroke="#000000" stroke-width="0.18"',
-                       f'class="kimcad-overlay" fill="none" stroke="#000000" stroke-width="{_fmt(0.18 / k)}"', 1)
+    return svg.replace('class="kimbim-overlay" fill="none" stroke="#000000" stroke-width="0.18"',
+                       f'class="kimbim-overlay" fill="none" stroke="#000000" stroke-width="{_fmt(0.18 / k)}"', 1)
 ```
 
 Annotation text inside the overlay has `fill="#000000"` set by the overlay. In the annotation branch,
@@ -1444,7 +1444,7 @@ def set_sheet_purpose(number: str, purpose: str) -> str:
 ```
 
   Re-export `set_sheet_purpose` where the other sheets functions are re-exported in `app_bridge`.
-  Check with `grep -n "sheet_svg" python/kimcad/app_bridge.py`.
+  Check with `grep -n "sheet_svg" python/kimbim/app_bridge.py`.
 
 - [ ] **Step 4: Run the drawing, sheet and graphics tests**
 
@@ -1461,7 +1461,7 @@ output and ledger a ruling.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add python/kimcad/drawgen.py python/kimcad/graphics.py python/kimcad/drawings.py python/kimcad/sheets.py python/kimcad/app_bridge.py tests/python
+git add python/kimbim/drawgen.py python/kimbim/graphics.py python/kimbim/drawings.py python/kimbim/sheets.py python/kimbim/app_bridge.py tests/python
 git commit -m "feat(graphics): drawings and sheets styled by the purpose; weights and dashes divided by the sheet scale; sheet purposes"
 ```
 
@@ -1470,7 +1470,7 @@ git commit -m "feat(graphics): drawings and sheets styled by the purpose; weight
 ### Task 5: Annotation pens (Python)
 
 **Files:**
-- Modify: `python/kimcad/annotations.py` (`_set`, `_read`, `add_annotation`, `annotations`, new `set_annotation_pen`), `app_bridge.py` re-export
+- Modify: `python/kimbim/annotations.py` (`_set`, `_read`, `add_annotation`, `annotations`, new `set_annotation_pen`), `app_bridge.py` re-export
 - Test: `tests/python/test_annotations.py`
 
 **Interfaces:**
@@ -1483,7 +1483,7 @@ git commit -m "feat(graphics): drawings and sheets styled by the purpose; weight
 
 ```python
 def test_annotations_take_the_current_pen_and_can_change_it(house):  # adapt to the module's fixture
-    from kimcad import settings as s
+    from kimbim import settings as s
     assert json.loads(s.set_project_settings(json.dumps({"current_pen": 26})))["ok"]
     storey = call("storeys")["storeys"][0]["guid"]
     guid = call("add_annotation", storey, "text", json.dumps([[1.0, 1.0]]), "Hello")["guid"]
@@ -1520,7 +1520,7 @@ Expected: pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add python/kimcad/annotations.py python/kimcad/drawgen.py python/kimcad/app_bridge.py tests/python/test_annotations.py
+git add python/kimbim/annotations.py python/kimbim/drawgen.py python/kimbim/app_bridge.py tests/python/test_annotations.py
 git commit -m "feat(graphics): annotations carry a pen; new ones take the current pen"
 ```
 
@@ -1530,13 +1530,13 @@ git commit -m "feat(graphics): annotations carry a pen; new ones take the curren
 
 **Files:**
 - Create: `app/src/Graphics.h`, `app/src/Graphics.cpp`, `app/tests/test_graphics.cpp`
-- Modify: `app/CMakeLists.txt` (source + `kimcad_test(test_graphics)`)
+- Modify: `app/CMakeLists.txt` (source + `kimbim_test(test_graphics)`)
 
 **Interfaces:**
 - Produces:
 
 ```cpp
-namespace kimcad {
+namespace kimbim {
 struct LineStyle {
     QColor color = Qt::black;
     double weight = 0.18;          // mm on paper
@@ -1596,10 +1596,10 @@ private slots:
                         "projection": {"color": "#222222", "weight": 0.18, "dash": [3.0, 1.5]},
                         "fill": "#333333", "surface": "#445566", "transparency": 0.5}],
             "elements": {"W1": 0}, "hidden": ["F1"]})";
-        const auto g = kimcad::Graphics::fromJson(QJsonDocument::fromJson(json).object());
+        const auto g = kimbim::Graphics::fromJson(QJsonDocument::fromJson(json).object());
         QCOMPARE(g.purpose(), QString("Working"));
         QCOMPARE(g.currentPen(), 26);
-        const kimcad::ElementStyle* s = g.styleOf("W1");
+        const kimbim::ElementStyle* s = g.styleOf("W1");
         QVERIFY(s);
         QCOMPARE(s->cut.color, QColor("#111111"));
         QCOMPARE(s->projection.dash, (QVector<double>{3.0, 1.5}));
@@ -1614,22 +1614,22 @@ private slots:
     }
     void badInputGivesAnEmptyState()
     {
-        const auto g = kimcad::Graphics::fromJson(QJsonObject{{"ok", false}});
+        const auto g = kimbim::Graphics::fromJson(QJsonObject{{"ok", false}});
         QVERIFY(g.isEmpty());
         QCOMPARE(g.currentPen(), 23);
-        const auto bad = kimcad::Graphics::fromJson(QJsonDocument::fromJson(
+        const auto bad = kimbim::Graphics::fromJson(QJsonDocument::fromJson(
             R"({"ok": true, "styles": [], "elements": {"W1": 5}})").object());
         QVERIFY(!bad.styleOf("W1")); // index out of range is ignored
     }
     void pixelsAndPatterns()
     {
-        QCOMPARE(kimcad::Graphics::pixels(0.5, false), 1.0f);
-        QCOMPARE(kimcad::Graphics::pixels(0.5, true), 2.0f);
-        QCOMPARE(kimcad::Graphics::pixels(0.13, true), 1.0f);
-        QCOMPARE(kimcad::Graphics::pixels(5.0, true), 6.0f);
-        QCOMPARE(kimcad::Graphics::pattern({}), uint16_t(0xFFFF));
-        QVERIFY(kimcad::Graphics::pattern({3.0, 1.5}) != 0xFFFF);
-        QVERIFY(kimcad::Graphics::pattern({3.0, 1.5}) != 0);
+        QCOMPARE(kimbim::Graphics::pixels(0.5, false), 1.0f);
+        QCOMPARE(kimbim::Graphics::pixels(0.5, true), 2.0f);
+        QCOMPARE(kimbim::Graphics::pixels(0.13, true), 1.0f);
+        QCOMPARE(kimbim::Graphics::pixels(5.0, true), 6.0f);
+        QCOMPARE(kimbim::Graphics::pattern({}), uint16_t(0xFFFF));
+        QVERIFY(kimbim::Graphics::pattern({3.0, 1.5}) != 0xFFFF);
+        QVERIFY(kimbim::Graphics::pattern({3.0, 1.5}) != 0);
     }
 };
 
@@ -1653,7 +1653,7 @@ Expected: compile error (`Graphics.h` not found). This is the RED for a new clas
 #include <algorithm>
 #include <cmath>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 LineStyle line(const QJsonObject& o)
@@ -1745,15 +1745,15 @@ uint16_t Graphics::pattern(const QVector<double>& dashMm)
     return bits == 0 ? 0xFFFF : bits;
 }
 
-} // namespace kimcad
+} // namespace kimbim
 ```
 
-Add `src/Graphics.cpp` to `kimcad_core`'s sources in `app/CMakeLists.txt`, and add
-`kimcad_test(test_graphics)`.
+Add `src/Graphics.cpp` to `kimbim_core`'s sources in `app/CMakeLists.txt`, and add
+`kimbim_test(test_graphics)`.
 
 - [ ] **Step 4: Build and run**
 
-Run: `pixi run app-build && KIMCAD_PYTHON_PATH=$PWD/python pixi run build/app/test_graphics.exe -o out.txt,txt; tail -3 out.txt`
+Run: `pixi run app-build && KIMBIM_PYTHON_PATH=$PWD/python pixi run build/app/test_graphics.exe -o out.txt,txt; tail -3 out.txt`
 Expected: `Totals: 5 passed`.
 
 - [ ] **Step 5: Commit**
@@ -1793,16 +1793,16 @@ int lineGroupCount() const;                                  // groups made by t
 ```cpp
     void linesAreGroupedByStyle()
     {
-        Handle(kimcad::ElementBatch) b = new kimcad::ElementBatch(threeBoxes()); // use the file's chunk helper
-        b->setLineStyle(0, kimcad::BatchLine{Quantity_Color(1, 0, 0, Quantity_TOC_RGB), 2.0f, 0xFFFF});
-        b->setLineStyle(1, kimcad::BatchLine{Quantity_Color(1, 0, 0, Quantity_TOC_RGB), 2.0f, 0xFFFF});
+        Handle(kimbim::ElementBatch) b = new kimbim::ElementBatch(threeBoxes()); // use the file's chunk helper
+        b->setLineStyle(0, kimbim::BatchLine{Quantity_Color(1, 0, 0, Quantity_TOC_RGB), 2.0f, 0xFFFF});
+        b->setLineStyle(1, kimbim::BatchLine{Quantity_Color(1, 0, 0, Quantity_TOC_RGB), 2.0f, 0xFFFF});
         Handle(Prs3d_Presentation) prs = new Prs3d_Presentation(dummyStructureManager()); // see note
-        b->Compute(nullptr, prs, kimcad::ElementBatch::Shaded);
+        b->Compute(nullptr, prs, kimbim::ElementBatch::Shaded);
         QCOMPARE(b->lineGroupCount(), 2); // red (0 and 1) and the default (2)
     }
     void graphicsHiddenSurvivesShowAll()
     {
-        Handle(kimcad::ElementBatch) b = new kimcad::ElementBatch(threeBoxes());
+        Handle(kimbim::ElementBatch) b = new kimbim::ElementBatch(threeBoxes());
         b->setGraphicsHidden(1, true);
         QVERIFY(b->isHidden(1));
         b->setHidden(1, false); // Show all
@@ -1883,12 +1883,12 @@ git commit -m "feat(app): batches draw lines per style, override surfaces and tr
     // D73: picking a purpose restyles the view; hidden kinds can't be selected and survive Show all.
     void purposesRestyleAndHide()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         // a wall and a furniture element through the bridge helpers the file already uses
         const QString wall = addWallForTest(w);           // use the file's existing way to add a wall
         QVERIFY(w.setPurpose("Permit"));
-        const kimcad::ElementStyle* s = w.viewport()->graphics().styleOf(wall);
+        const kimbim::ElementStyle* s = w.viewport()->graphics().styleOf(wall);
         QVERIFY(s);
         QCOMPARE(s->projection.color, QColor("#000000"));
         QVERIFY(w.setPurpose("Working"));
@@ -1897,7 +1897,7 @@ git commit -m "feat(app): batches draw lines per style, override surfaces and tr
     }
     void newElementsGetThePurposeStyle()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         QVERIFY(w.setPurpose("Permit"));
         const QString wall = addWallForTest(w);
@@ -1907,7 +1907,7 @@ git commit -m "feat(app): batches draw lines per style, override surfaces and tr
     }
     void hiddenKindsAreNotSelectableAndSurviveShowAll()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         const QString wall = addWallForTest(w);
         // a visibility set hiding walls, and a purpose using it, through the bridge
@@ -1924,7 +1924,7 @@ git commit -m "feat(app): batches draw lines per style, override surfaces and tr
     }
     void trueLineWeightsAreAPreference()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         QVERIFY(!w.preferences().trueLineWeights());
         w.setTrueLineWeights(true);
@@ -2048,9 +2048,9 @@ signals:
     // test_graphics.cpp
     void penGridClicksReportThePen()
     {
-        kimcad::PenGrid grid;
+        kimbim::PenGrid grid;
         grid.resize(16 * 20, 16 * 20);
-        QSignalSpy clicked(&grid, &kimcad::PenGrid::penClicked);
+        QSignalSpy clicked(&grid, &kimbim::PenGrid::penClicked);
         QTest::mouseClick(&grid, Qt::LeftButton, {}, QPoint(20 * 7 + 10, 20 * 1 + 10)); // row 1, col 7 = pen 23
         QCOMPARE(clicked.count(), 1);
         QCOMPARE(clicked.at(0).at(0).toInt(), 23);
@@ -2063,7 +2063,7 @@ signals:
     // test_main_window.cpp
     void thePenButtonShowsAndSetsTheCurrentPen()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         auto* pen = w.findChild<QToolButton*>("penButton");
         QVERIFY(pen && pen->isEnabled());
@@ -2097,7 +2097,7 @@ signals:
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/src/PenGrid.h app/src/PenGrid.cpp app/src/StatusStrip.h app/src/StatusStrip.cpp app/src/MainWindow.h app/src/MainWindow.cpp app/src/Graphics.h app/src/Graphics.cpp python/kimcad/graphics.py app/CMakeLists.txt app/tests
+git add app/src/PenGrid.h app/src/PenGrid.cpp app/src/StatusStrip.h app/src/StatusStrip.cpp app/src/MainWindow.h app/src/MainWindow.cpp app/src/Graphics.h app/src/Graphics.cpp python/kimbim/graphics.py app/CMakeLists.txt app/tests
 git commit -m "feat(app): the pen button shows the current pen and picks one from a 16x16 grid; selected annotations take it"
 ```
 
@@ -2132,7 +2132,7 @@ git commit -m "feat(app): the pen button shows the current pen and picks one fro
     void penSetsDialogReportsOnlyChangedTables()
     {
         const QJsonObject tables = tablesFromBridge(); // PythonEngine::instance().callJson("graphics_tables").object().value("tables")
-        kimcad::PenSetsDialog d(tables, nullptr);
+        kimbim::PenSetsDialog d(tables, nullptr);
         QVERIFY(d.changes().isEmpty());
         d.selectSet("Permit");
         d.selectPen(10);
@@ -2147,12 +2147,12 @@ git commit -m "feat(app): the pen button shows the current pen and picks one fro
         QJsonObject tables = tablesFromBridge();
         QJsonObject one{{"Only", tables.value("pen_sets").toObject().value("Permit")}};
         tables.insert("pen_sets", one);
-        kimcad::PenSetsDialog d(tables, nullptr);
+        kimbim::PenSetsDialog d(tables, nullptr);
         QVERIFY(!d.findChild<QPushButton*>("deleteSet")->isEnabled());
     }
     void lineTypesRefuseBadPatterns()
     {
-        kimcad::LineTypesDialog d(tablesFromBridge(), nullptr);
+        kimbim::LineTypesDialog d(tablesFromBridge(), nullptr);
         QVERIFY(d.setPattern("Dashed", "3 1.5 2"));  // returns validity: false
         // ...: setPattern returns false for an odd count; OK is disabled
         QVERIFY(!d.okEnabled());
@@ -2162,7 +2162,7 @@ git commit -m "feat(app): the pen button shows the current pen and picks one fro
     }
     void elementStylesChangeAPen()
     {
-        kimcad::ElementStylesDialog d(tablesFromBridge(), nullptr);
+        kimbim::ElementStylesDialog d(tablesFromBridge(), nullptr);
         d.setCutPen("walls", 7);
         QCOMPARE(d.changes().value("element_styles").toObject().value("walls").toObject()
                      .value("cut").toObject().value("pen").toInt(), 7);
@@ -2224,7 +2224,7 @@ git commit -m "feat(app): Graphics menu: pen sets (16x16 grid), line types and e
 ```cpp
     void visibilityHidesKindsAndKeepsRules()
     {
-        kimcad::VisibilitySetsDialog d(tablesFromBridge(), nullptr);
+        kimbim::VisibilitySetsDialog d(tablesFromBridge(), nullptr);
         d.selectSet("Everything");
         d.setKindHidden("furniture", true);
         d.addRule(QJsonObject{{"name", "Not load-bearing"},
@@ -2235,7 +2235,7 @@ git commit -m "feat(app): Graphics menu: pen sets (16x16 grid), line types and e
     }
     void overrideRulesKeepTheirOrder()
     {
-        kimcad::OverridesDialog d(tablesFromBridge(), nullptr);
+        kimbim::OverridesDialog d(tablesFromBridge(), nullptr);
         d.selectSet("Fire rating");
         d.moveRule(3, 0);
         d.setRuleEnabled(1, false);
@@ -2246,7 +2246,7 @@ git commit -m "feat(app): Graphics menu: pen sets (16x16 grid), line types and e
     }
     void ruleEditorRoundTrips()
     {
-        kimcad::RuleEditor e;
+        kimbim::RuleEditor e;
         const QJsonObject rule{{"name", "x"}, {"when", QJsonObject{{"kind", "walls"}, {"property", "FireRating"},
             {"op", "contains"}, {"value", "60"}}}, {"then", QJsonObject{{"pen", 26}, {"surface", "#e05040"}}}};
         e.setRule(rule);
@@ -2309,7 +2309,7 @@ git commit -m "feat(app): visibility sets and override rules editors"
     // test_graphics.cpp
     void purposesPickTheirPieces()
     {
-        kimcad::PurposesDialog d(tablesFromBridge(), nullptr);
+        kimbim::PurposesDialog d(tablesFromBridge(), nullptr);
         d.selectPurpose("Permit");
         d.setPieces("Presentation", "No furniture", "None", "All visible");
         const QJsonObject p = d.changes().value("purposes").toObject().value("Permit").toObject();
@@ -2318,7 +2318,7 @@ git commit -m "feat(app): visibility sets and override rules editors"
     }
     void layerCombinationsTakeTheCurrentLayers()
     {
-        kimcad::LayerCombinationsDialog d(tablesFromBridge(), {"A-Wall", "A-Furniture"}, {"A-Furniture"}, {}, nullptr);
+        kimbim::LayerCombinationsDialog d(tablesFromBridge(), {"A-Wall", "A-Furniture"}, {"A-Furniture"}, {}, nullptr);
         d.selectSet("All visible");
         d.takeCurrent();
         const QJsonObject c = d.changes().value("layer_combinations").toObject().value("All visible").toObject();
@@ -2330,7 +2330,7 @@ git commit -m "feat(app): visibility sets and override rules editors"
     // test_main_window.cpp
     void theBottomBarSwitchesPurposeAndAppliesItsLayers()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         // a layer combination hiding the active layer's name, and a purpose using it
         const QString layer = w.activeLayerForTest(); // the file's way to read the active layer name
@@ -2346,7 +2346,7 @@ git commit -m "feat(app): visibility sets and override rules editors"
     }
     void viewsRememberTheirPurpose()
     {
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         QVERIFY(w.setPurpose("Permit"));
         QVERIFY(w.saveView("Permit plan"));   // the existing save-view API (read the file)
@@ -2389,7 +2389,7 @@ git commit -m "feat(app): purposes in the bottom bar (with layer combinations an
   - `docs/13-architect-feedback.md` (a "2026-10-08 (later): pen sets, line types, visibility, purposes (step 3 of 3)" section with a "Try it" table);
   - `docs/14-tool-inventory.md` (§10 rows: pen sets ✅, line types 🟡 = dash patterns, no fill patterns);
   - `docs/11-spike-results.md` (resolution timings on the Clinic from Task 2 Step 5);
-  - `app/translations/kimcad_es.ts`.
+  - `app/translations/kimbim_es.ts`.
 - Test: `pixi run check-translations`, `pixi run check-spdx`, the full suites.
 
 - [ ] **Step 1:** Regenerate the `.ts` files: `pixi run cmake --build build/app --target update_translations`.

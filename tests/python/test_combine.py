@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from kimcad import app_bridge as b
+from kimbim import app_bridge as b
 
 
 def call(fn, *args):
@@ -111,7 +111,7 @@ def test_compare_two_options_by_name(options):
 def test_a_fast_forward_compares_the_versions_once(options):
     """combine_options repeated the merge preview through combine_preview, which diffed the two versions
     twice: four decompositions of the model for one fast-forward (seconds on real files)."""
-    from kimcad import versioning
+    from kimbim import versioning
 
     c = call("combine_preview", "Scheme B", "{}")["conflicts"][0]
     assert call("combine_options", "Scheme B", json.dumps({c["id"]: "theirs"}))["ok"]

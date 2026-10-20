@@ -11,7 +11,7 @@
 
 #include <algorithm>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 enum Role { GuidRole = Qt::UserRole, ElevationRole, ModelRole };
@@ -135,4 +135,4 @@ void LevelsBar::onIndexChanged(int index)
     emit activeStoreyChanged(guid, index >= 0 ? m_combo->itemData(index, ElevationRole).toDouble() : 0.0);
 }
 
-} // namespace kimcad
+} // namespace kimbim

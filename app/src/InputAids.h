@@ -6,7 +6,7 @@
 
 #include <optional>
 
-namespace kimcad {
+namespace kimbim {
 
 // D89: the drawing aids every tool's Snapper shares (pure logic, one per window).
 //
@@ -75,4 +75,4 @@ private:
     int m_kind = 0;
 };
 
-} // namespace kimcad
+} // namespace kimbim

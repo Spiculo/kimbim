@@ -4,7 +4,7 @@
 
 ## Decisions (D64)
 
-| Command | Archicad behaviour followed | KIMCAD |
+| Command | Archicad behaviour followed | KimBim |
 |---|---|---|
 | Copy / Paste | Ctrl+C, Ctrl+V; paste keeps the original position | Pastes onto the **active level** at the same plan position (copy to another level when another level is active); the copies are selected so you drag them into place |
 | Duplicate | Ctrl+D, an offset copy | Copy offset (1 m, 1 m) |
@@ -17,7 +17,7 @@ Copies get **new GlobalIds**, keep their **layers**, walls bring their **doors/w
 
 ## Done
 
-- [x] `kimcad/editing.py`: `copy_elements`, `duplicate_elements`, `array_elements`, `mirror_elements`, `offset_elements`, `slab_outline`.
+- [x] `kimbim/editing.py`: `copy_elements`, `duplicate_elements`, `array_elements`, `mirror_elements`, `offset_elements`, `slab_outline`.
 - [x] App: Edit › Copy, Paste, Duplicate, Mirror (tool), Multiply… (dialog), Offset… (dialog); Ctrl+drag copies.
 - [x] Tests: Python `test_editing.py` (6: copy keeps layers and joins and undoes; paste onto another level; duplicate; mirror in place keeps GlobalIds, reverses the wall, mirrors the door's position and hand; mirror a copy reflects a slab outline; linear and polar arrays; offset of walls and slabs; IFC validation), app `everydayEditing` and shortcuts.
 

@@ -2,8 +2,8 @@
 """Step 2: project settings (defaults, validation, dirty, merge, units)."""
 import json
 
-from kimcad import app_bridge as b
-from kimcad import settings as S
+from kimbim import app_bridge as b
+from kimbim import settings as S
 
 
 def call(fn, *args):

@@ -10,7 +10,7 @@
 
 #include "Snapper.h"
 
-namespace kimcad {
+namespace kimbim {
 
 // The 2D drafting tools (D84, doc 14 §12): line, polyline, rectangle, circle (centre and radius),
 // arc (three points, or centre, start and end) and fill. Clicks snap like the other tools (Shift:
@@ -70,4 +70,4 @@ private:
     std::optional<QPointF> m_hover;
 };
 
-} // namespace kimcad
+} // namespace kimbim

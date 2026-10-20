@@ -8,14 +8,14 @@
 
 #include <cmath>
 
-using kimcad::Host;
-using kimcad::HostTool;
+using kimbim::Host;
+using kimbim::HostTool;
 
 namespace {
 
-QVector<kimcad::SnapWall> walls()
+QVector<kimbim::SnapWall> walls()
 {
-    return kimcad::Snapper::parse(QJsonDocument::fromJson(R"({"walls":[
+    return kimbim::Snapper::parse(QJsonDocument::fromJson(R"({"walls":[
         {"guid":"A","x1":0,"y1":0,"x2":4,"y2":0,"thickness":0.3},
         {"guid":"B","x1":4,"y1":0,"x2":4,"y2":3,"thickness":0.3},
         {"guid":"C","x1":10,"y1":0,"x2":10.5,"y2":0,"thickness":0.2}]})").object());

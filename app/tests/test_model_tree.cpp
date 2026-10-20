@@ -31,7 +31,7 @@ class TestModelTree : public QObject {
 private slots:
     void buildsTheTreeAndFindsElements()
     {
-        kimcad::ModelTreePanel panel;
+        kimbim::ModelTreePanel panel;
         panel.setTree(sampleTree());
         QCOMPARE(panel.itemCount(), 7);
         QVERIFY(panel.selectGuid("W1"));
@@ -44,7 +44,7 @@ private slots:
     // category under their level.
     void singleChildSpatialRowsAreMerged()
     {
-        kimcad::ModelTreePanel panel;
+        kimbim::ModelTreePanel panel;
         panel.setTree(sampleTree());
         QCOMPARE(panel.tree()->topLevelItemCount(), 1);
         QTreeWidgetItem* top = panel.tree()->topLevelItem(0);
@@ -58,7 +58,7 @@ private slots:
 
     void elementsAreGroupedByCategoryUnderALevel()
     {
-        kimcad::ModelTreePanel panel;
+        kimbim::ModelTreePanel panel;
         panel.setTree(sampleTree());
         QTreeWidgetItem* level = panel.itemFor("L1");
         QCOMPARE(level->childCount(), 2);
@@ -83,7 +83,7 @@ private slots:
         site["children"] = buildings;
         sites[0] = site;
         root["children"] = sites;
-        kimcad::ModelTreePanel panel;
+        kimbim::ModelTreePanel panel;
         panel.setTree(root);
         QTreeWidgetItem* top = panel.tree()->topLevelItem(0);
         QCOMPARE(top->text(0), QString("Sitio")); // Casa › Sitio merged, then two buildings
@@ -92,19 +92,19 @@ private slots:
 
     void typeStillSearchableAndInTheHint()
     {
-        kimcad::ModelTreePanel panel;
+        kimbim::ModelTreePanel panel;
         panel.setTree(sampleTree());
         QVERIFY(panel.hintFor("W1").contains("IfcWall"));
         QCOMPARE(panel.ifcTypeOf("W2"), QString("IfcWall"));
-        QCOMPARE(kimcad::ModelTreePanel::plainName("IfcWallStandardCase"), QString("Wall"));
-        QCOMPARE(kimcad::ModelTreePanel::plainPlural("IfcSpace"), QString("Rooms"));
+        QCOMPARE(kimbim::ModelTreePanel::plainName("IfcWallStandardCase"), QString("Wall"));
+        QCOMPARE(kimbim::ModelTreePanel::plainPlural("IfcSpace"), QString("Rooms"));
     }
 
     void doubleClickActivates()
     {
-        kimcad::ModelTreePanel panel;
+        kimbim::ModelTreePanel panel;
         panel.setTree(sampleTree());
-        QSignalSpy spy(&panel, &kimcad::ModelTreePanel::guidActivated);
+        QSignalSpy spy(&panel, &kimbim::ModelTreePanel::guidActivated);
         emit panel.tree()->itemDoubleClicked(panel.itemFor("W1"), 0);
         QCOMPARE(spy.count(), 1);
         QCOMPARE(spy.first().first().toString(), QString("W1"));
@@ -114,7 +114,7 @@ private slots:
 
     void expandedGroupsSurviveARefresh()
     {
-        kimcad::ModelTreePanel panel;
+        kimbim::ModelTreePanel panel;
         panel.setTree(sampleTree());
         QTreeWidgetItem* walls = panel.itemFor("L1")->child(1);
         walls->setExpanded(true);
@@ -124,9 +124,9 @@ private slots:
 
     void userSelectionEmitsGuids()
     {
-        kimcad::ModelTreePanel panel;
+        kimbim::ModelTreePanel panel;
         panel.setTree(sampleTree());
-        QSignalSpy spy(&panel, &kimcad::ModelTreePanel::guidsSelected);
+        QSignalSpy spy(&panel, &kimbim::ModelTreePanel::guidsSelected);
         panel.tree()->setCurrentItem(panel.itemFor("D1"));
         QCOMPARE(spy.count(), 1);
         QCOMPARE(spy.first().first().toStringList(), QStringList({"D1"}));
@@ -137,7 +137,7 @@ private slots:
 
     void filterKeepsMatchesAndTheirParents()
     {
-        kimcad::ModelTreePanel panel;
+        kimbim::ModelTreePanel panel;
         panel.setTree(sampleTree());
         panel.setFilter("ñandú"); // case-insensitive, non-ASCII
         QVERIFY(!panel.itemFor("W1")->isHidden());
@@ -153,19 +153,19 @@ private slots:
     // Owner feedback: objects get an icon (per kind of element) and a hint on hover.
     void itemsHaveIconsByKind()
     {
-        kimcad::ModelTreePanel panel;
+        kimbim::ModelTreePanel panel;
         panel.setTree(sampleTree());
         const QIcon wall = panel.itemFor("W1")->icon(0);
         QVERIFY(!wall.pixmap(16).isNull());
-        QCOMPARE(panel.itemFor("W2")->icon(0).cacheKey(), kimcad::iconFor("IfcWallStandardCase").cacheKey());
+        QCOMPARE(panel.itemFor("W2")->icon(0).cacheKey(), kimbim::iconFor("IfcWallStandardCase").cacheKey());
         QVERIFY(panel.itemFor("D1")->icon(0).cacheKey() != wall.cacheKey());
         QVERIFY(!panel.itemFor("L1")->icon(0).isNull());
-        QVERIFY(!kimcad::iconFor("IfcFurnishingElement").pixmap(16).isNull()); // a generic icon
+        QVERIFY(!kimbim::iconFor("IfcFurnishingElement").pixmap(16).isNull()); // a generic icon
     }
 
     void hoverHintNamesTypeAndLevel()
     {
-        kimcad::ModelTreePanel panel;
+        kimbim::ModelTreePanel panel;
         panel.setTree(sampleTree());
         const QString hint = panel.hintFor("W1");
         QVERIFY(hint.contains("Muro Ñandú") && hint.contains("IfcWall") && hint.contains("Planta baja"));
@@ -174,7 +174,7 @@ private slots:
 
     void storeyGuidsCollectsDescendants()
     {
-        kimcad::ModelTreePanel panel;
+        kimbim::ModelTreePanel panel;
         panel.setTree(sampleTree());
         QStringList g = panel.descendantGuids("L1");
         g.sort();

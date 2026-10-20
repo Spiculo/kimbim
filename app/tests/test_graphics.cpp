@@ -17,9 +17,9 @@ namespace {
 QJsonObject tablesFromBridge()
 {
     QString error;
-    kimcad::PythonEngine::instance().start(&error);
-    kimcad::PythonEngine::instance().callJson("set_project_settings", {QStringLiteral("{}")}, &error);
-    return kimcad::PythonEngine::instance().callJson("graphics_tables", {}, &error).object();
+    kimbim::PythonEngine::instance().start(&error);
+    kimbim::PythonEngine::instance().callJson("set_project_settings", {QStringLiteral("{}")}, &error);
+    return kimbim::PythonEngine::instance().callJson("graphics_tables", {}, &error).object();
 }
 } // namespace
 
@@ -34,10 +34,10 @@ private slots:
                         "projection": {"color": "#222222", "weight": 0.18, "dash": [3.0, 1.5]},
                         "fill": "#333333", "surface": "#445566", "transparency": 0.5}],
             "elements": {"W1": 0}, "hidden": ["F1"]})";
-        const auto g = kimcad::Graphics::fromJson(QJsonDocument::fromJson(json).object());
+        const auto g = kimbim::Graphics::fromJson(QJsonDocument::fromJson(json).object());
         QCOMPARE(g.purpose(), QString("Working"));
         QCOMPARE(g.currentPen(), 26);
-        const kimcad::ElementStyle* s = g.styleOf("W1");
+        const kimbim::ElementStyle* s = g.styleOf("W1");
         QVERIFY(s);
         QCOMPARE(s->cut.color, QColor("#111111"));
         QCOMPARE(s->projection.dash, (QVector<double>{3.0, 1.5}));
@@ -52,22 +52,22 @@ private slots:
     }
     void badInputGivesAnEmptyState()
     {
-        const auto g = kimcad::Graphics::fromJson(QJsonObject{{"ok", false}});
+        const auto g = kimbim::Graphics::fromJson(QJsonObject{{"ok", false}});
         QVERIFY(g.isEmpty());
         QCOMPARE(g.currentPen(), 23);
-        const auto bad = kimcad::Graphics::fromJson(QJsonDocument::fromJson(
+        const auto bad = kimbim::Graphics::fromJson(QJsonDocument::fromJson(
             R"({"ok": true, "styles": [], "elements": {"W1": 5}})").object());
         QVERIFY(!bad.styleOf("W1")); // index out of range is ignored
     }
     void pixelsAndPatterns()
     {
-        QCOMPARE(kimcad::Graphics::pixels(0.5, false), 1.0f);
-        QCOMPARE(kimcad::Graphics::pixels(0.5, true), 2.0f);
-        QCOMPARE(kimcad::Graphics::pixels(0.13, true), 1.0f);
-        QCOMPARE(kimcad::Graphics::pixels(5.0, true), 6.0f);
-        QCOMPARE(kimcad::Graphics::pattern({}), uint16_t(0xFFFF));
-        QVERIFY(kimcad::Graphics::pattern({3.0, 1.5}) != 0xFFFF);
-        QVERIFY(kimcad::Graphics::pattern({3.0, 1.5}) != 0);
+        QCOMPARE(kimbim::Graphics::pixels(0.5, false), 1.0f);
+        QCOMPARE(kimbim::Graphics::pixels(0.5, true), 2.0f);
+        QCOMPARE(kimbim::Graphics::pixels(0.13, true), 1.0f);
+        QCOMPARE(kimbim::Graphics::pixels(5.0, true), 6.0f);
+        QCOMPARE(kimbim::Graphics::pattern({}), uint16_t(0xFFFF));
+        QVERIFY(kimbim::Graphics::pattern({3.0, 1.5}) != 0xFFFF);
+        QVERIFY(kimbim::Graphics::pattern({3.0, 1.5}) != 0);
     }
     void parsesPenNames()
     {
@@ -75,26 +75,26 @@ private slots:
         const QJsonObject state{{"ok", true},
             {"pens", QJsonObject{{"23", QJsonObject{{"color", "#000000"}, {"weight", 0.18}}}}},
             {"pen_names", QJsonObject{{"23", "Annotations"}}}};
-        const auto g = kimcad::Graphics::fromJson(state);
+        const auto g = kimbim::Graphics::fromJson(state);
         QCOMPARE(g.penNames().value(23), QString("Annotations"));
         QCOMPARE(g.pens().value(23).weight, 0.18);
     }
     void penGridClicksReportThePen()
     {
-        kimcad::PenGrid grid;
+        kimbim::PenGrid grid;
         grid.resize(16 * 20, 16 * 20);
-        QSignalSpy clicked(&grid, &kimcad::PenGrid::penClicked);
+        QSignalSpy clicked(&grid, &kimbim::PenGrid::penClicked);
         QTest::mouseClick(&grid, Qt::LeftButton, {}, QPoint(20 * 7 + 10, 20 * 1 + 10)); // row 1, col 7 = pen 23
         QCOMPARE(clicked.count(), 1);
         QCOMPARE(clicked.at(0).at(0).toInt(), 23);
         QCOMPARE(grid.current(), 23);
         QTest::mouseClick(&grid, Qt::LeftButton, {}, QPoint(10, 10)); // cell 0: no pen
         QCOMPARE(clicked.count(), 1);
-        QCOMPARE(kimcad::PenGrid::penAt(QSize(320, 320), QPoint(319, 319)), 255);
+        QCOMPARE(kimbim::PenGrid::penAt(QSize(320, 320), QPoint(319, 319)), 255);
     }
     void penSetsDialogReportsOnlyChangedTables()
     {
-        kimcad::PenSetsDialog d(tablesFromBridge(), nullptr);
+        kimbim::PenSetsDialog d(tablesFromBridge(), nullptr);
         QVERIFY(d.changes().isEmpty());
         d.selectSet(QStringLiteral("Permit"));
         d.selectPen(10);
@@ -107,7 +107,7 @@ private slots:
     }
     void penSetsCanBeCopiedRenamedAndDeleted()
     {
-        kimcad::PenSetsDialog d(tablesFromBridge(), nullptr);
+        kimbim::PenSetsDialog d(tablesFromBridge(), nullptr);
         d.selectSet(QStringLiteral("Permit"));
         QVERIFY(d.copySetAs(QStringLiteral("Office")));
         QVERIFY(!d.copySetAs(QStringLiteral("Office"))); // names are unique
@@ -137,13 +137,13 @@ private slots:
         }
         tables.insert("purposes", purposes);
         reply.insert("tables", tables);
-        kimcad::PenSetsDialog d(reply, nullptr);
+        kimbim::PenSetsDialog d(reply, nullptr);
         QVERIFY(!d.findChild<QPushButton*>(QStringLiteral("deleteSet"))->isEnabled());
         QVERIFY(!d.deleteCurrentSet());
     }
     void lineTypesRefuseBadPatterns()
     {
-        kimcad::LineTypesDialog d(tablesFromBridge(), nullptr);
+        kimbim::LineTypesDialog d(tablesFromBridge(), nullptr);
         QVERIFY(!d.setPattern(QStringLiteral("Dashed"), QStringLiteral("3 1.5 2"))); // dashes and gaps in pairs
         QVERIFY(!d.okEnabled());
         QVERIFY(!d.setPattern(QStringLiteral("Dashed"), QStringLiteral("3 -1")));
@@ -157,7 +157,7 @@ private slots:
     }
     void elementStylesChangeAPenAndALine()
     {
-        kimcad::ElementStylesDialog d(tablesFromBridge(), nullptr);
+        kimbim::ElementStylesDialog d(tablesFromBridge(), nullptr);
         QVERIFY(d.changes().isEmpty());
         d.setCutPen(QStringLiteral("walls"), 7);
         d.setProjectionLine(QStringLiteral("furniture"), QStringLiteral("Dashed"));
@@ -168,7 +168,7 @@ private slots:
     }
     void visibilityHidesKindsAndKeepsRules()
     {
-        kimcad::VisibilitySetsDialog d(tablesFromBridge(), nullptr);
+        kimbim::VisibilitySetsDialog d(tablesFromBridge(), nullptr);
         d.selectSet(QStringLiteral("Everything"));
         d.setKindHidden(QStringLiteral("furniture"), true);
         d.addRule(QJsonObject{{"name", "Not load-bearing"},
@@ -182,7 +182,7 @@ private slots:
     }
     void overrideRulesKeepTheirOrder()
     {
-        kimcad::OverridesDialog d(tablesFromBridge(), nullptr);
+        kimbim::OverridesDialog d(tablesFromBridge(), nullptr);
         d.selectSet(QStringLiteral("Fire rating"));
         d.moveRule(3, 0);
         d.setRuleEnabled(1, false);
@@ -194,7 +194,7 @@ private slots:
     }
     void ruleEditorRoundTrips()
     {
-        kimcad::RuleEditor e(QStringList{"walls", "slabs"}, QStringList{"Solid", "Dashed"});
+        kimbim::RuleEditor e(QStringList{"walls", "slabs"}, QStringList{"Solid", "Dashed"});
         const QJsonObject rule{{"name", "x"}, {"when", QJsonObject{{"kind", "walls"}, {"property", "FireRating"},
             {"op", "contains"}, {"value", "60"}}}, {"then", QJsonObject{{"pen", 26}, {"surface", "#e05040"}, {"line", "Dashed"}}}};
         e.setRule(rule);
@@ -206,7 +206,7 @@ private slots:
     }
     void purposesPickTheirPieces()
     {
-        kimcad::PurposesDialog d(tablesFromBridge(), nullptr);
+        kimbim::PurposesDialog d(tablesFromBridge(), nullptr);
         d.selectSet(QStringLiteral("Permit"));
         d.setPieces(QStringLiteral("Presentation"), QStringLiteral("No furniture"), QStringLiteral("None"),
             QStringLiteral("All visible"));
@@ -220,7 +220,7 @@ private slots:
     // D74: the renovation filter editor writes valid tables.
     void renovationFilterEditorWritesValidTables()
     {
-        kimcad::RenovationFiltersDialog d(tablesFromBridge(), nullptr);
+        kimbim::RenovationFiltersDialog d(tablesFromBridge(), nullptr);
         d.selectSet(QStringLiteral("Demolition plan"));
         d.setShow(QStringLiteral("new"), QStringLiteral("as_is"));
         d.setShow(QStringLiteral("existing"), QStringLiteral("override"));
@@ -240,14 +240,14 @@ private slots:
         QCOMPARE(d.changes().value("renovation_filters").toObject().value("Demolition plan").toObject()
                      .value("existing").toObject(), (QJsonObject{{"show", "hide"}}));
         QString error;
-        const QJsonObject r = kimcad::PythonEngine::instance()
+        const QJsonObject r = kimbim::PythonEngine::instance()
                                   .callJson("set_graphics", {QString::fromUtf8(QJsonDocument(d.changes()).toJson())}, &error)
                                   .object();
         QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
     }
     void purposesHaveARenovationFilter()
     {
-        kimcad::PurposesDialog d(tablesFromBridge(), nullptr);
+        kimbim::PurposesDialog d(tablesFromBridge(), nullptr);
         d.selectSet(QStringLiteral("Working"));
         auto* c = d.findChild<QComboBox*>(QStringLiteral("renovationOf"));
         QVERIFY(c);
@@ -261,7 +261,7 @@ private slots:
     }
     void legendParsed()
     {
-        const auto g = kimcad::Graphics::fromJson(QJsonObject{{"ok", true}, {"styles", QJsonArray{}}, {"legend", QJsonArray{
+        const auto g = kimbim::Graphics::fromJson(QJsonObject{{"ok", true}, {"styles", QJsonArray{}}, {"legend", QJsonArray{
             QJsonObject{{"label", "To be demolished"}, {"source", "renovation"}, {"key", "demolish"}, {"style", 0}}}}});
         QCOMPARE(g.legend().size(), 1);
         QCOMPARE(g.legend().first().key, QString("demolish"));
@@ -270,7 +270,7 @@ private slots:
     }
     void layerCombinationsTakeTheCurrentLayers()
     {
-        kimcad::LayerCombinationsDialog d(tablesFromBridge(), {"A-Wall", "A-Furniture"}, {"A-Furniture"}, {"A-Wall"}, nullptr);
+        kimbim::LayerCombinationsDialog d(tablesFromBridge(), {"A-Wall", "A-Furniture"}, {"A-Furniture"}, {"A-Wall"}, nullptr);
         d.selectSet(QStringLiteral("All visible"));
         d.takeCurrent();
         QJsonObject c = d.changes().value("layer_combinations").toObject().value("All visible").toObject();

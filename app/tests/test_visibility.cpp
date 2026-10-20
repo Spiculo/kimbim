@@ -9,9 +9,9 @@
 namespace {
 
 // n elements, one triangle each, guids prefix+i.
-kimcad::MeshChunk chunk(const QString& prefix, int n)
+kimbim::MeshChunk chunk(const QString& prefix, int n)
 {
-    kimcad::MeshChunk c;
+    kimbim::MeshChunk c;
     c.voff.push_back(0);
     c.toff.push_back(0);
     for (int e = 0; e < n; ++e) {
@@ -28,9 +28,9 @@ kimcad::MeshChunk chunk(const QString& prefix, int n)
     return c;
 }
 
-Handle(kimcad::ElementBatch) batch(const QString& prefix, int n)
+Handle(kimbim::ElementBatch) batch(const QString& prefix, int n)
 {
-    return new kimcad::ElementBatch(chunk(prefix, n));
+    return new kimbim::ElementBatch(chunk(prefix, n));
 }
 
 } // namespace
@@ -40,7 +40,7 @@ class TestVisibility : public QObject {
 private slots:
     void hideIsolateShowAll()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         v.addBatch(batch("a", 3));
         v.addBatch(batch("b", 2));
         QCOMPARE(v.elementCount(), 5);
@@ -60,7 +60,7 @@ private slots:
 
     void isolatingAStoreyKeepsExactlyItsElements()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         v.addBatch(batch("a", 4));
         const QStringList storey{"a0", "a2", "storey-guid-without-geometry"};
         v.isolate(storey);
@@ -70,7 +70,7 @@ private slots:
 
     void selectingAHiddenElementRevealsIt()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         v.addBatch(batch("a", 3));
         v.setHidden({"a2"}, true);
         QCOMPARE(v.visibleElementCount(), 2);
@@ -83,7 +83,7 @@ private slots:
     // native window (headless "offscreen" platform), view operations degrade instead of throwing.
     void viewOperationsWithoutANativeWindowDoNotThrow()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         v.addBatch(batch("a", 2));
         v.fitAll();
         QCOMPARE(v.pickAt(1, 1), QString());
@@ -95,7 +95,7 @@ private slots:
     // Slice 4: edits replace or remove elements live; old instances never come back.
     void replacedElementsAreRetiredForGood()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         v.addBatch(batch("a", 3));
         v.replaceElements(chunk("a", 1)); // a0 has new geometry
         QCOMPARE(v.elementCount(), 3);
@@ -114,7 +114,7 @@ private slots:
 
     void removedElementsDisappear()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         v.addBatch(batch("a", 3));
         v.selectGuids({"a1", "a2"});
         v.removeElements({"a1", "unknown"});
@@ -132,26 +132,26 @@ private slots:
     // Slice 4b: lines-only (hidden-line) display for plans; new batches follow the current mode.
     void linesOnlySwitchesEveryBatch()
     {
-        kimcad::Viewport v;
-        Handle(kimcad::ElementBatch) a = batch("a", 2);
+        kimbim::Viewport v;
+        Handle(kimbim::ElementBatch) a = batch("a", 2);
         v.addBatch(a);
         QVERIFY(!v.linesOnly());
         v.setLinesOnly(true);
         QVERIFY(v.linesOnly());
-        QCOMPARE(a->DisplayMode(), int(kimcad::ElementBatch::LinesOnly));
-        Handle(kimcad::ElementBatch) b = batch("b", 1);
+        QCOMPARE(a->DisplayMode(), int(kimbim::ElementBatch::LinesOnly));
+        Handle(kimbim::ElementBatch) b = batch("b", 1);
         v.addBatch(b);
-        QCOMPARE(b->DisplayMode(), int(kimcad::ElementBatch::LinesOnly));
+        QCOMPARE(b->DisplayMode(), int(kimbim::ElementBatch::LinesOnly));
         v.setLinesOnly(false);
-        QCOMPARE(a->DisplayMode(), int(kimcad::ElementBatch::Shaded));
-        QCOMPARE(b->DisplayMode(), int(kimcad::ElementBatch::Shaded));
+        QCOMPARE(a->DisplayMode(), int(kimbim::ElementBatch::Shaded));
+        QCOMPARE(b->DisplayMode(), int(kimbim::ElementBatch::Shaded));
     }
 
     // Slice 8: Compare colours changed elements; the colours follow elements that get re-meshed.
     void elementColoursOverrideAndClear()
     {
-        kimcad::Viewport v;
-        Handle(kimcad::ElementBatch) a = batch("a", 3);
+        kimbim::Viewport v;
+        Handle(kimbim::ElementBatch) a = batch("a", 3);
         v.addBatch(a);
         v.setElementColors({{"a0", QColor(40, 200, 80)}, {"a2", QColor(240, 150, 30)}, {"nope", Qt::red}});
         QCOMPARE(v.coloredCount(), 2);
@@ -168,7 +168,7 @@ private slots:
     // The plan cut draws the sections of what it cuts; hidden elements have none.
     void planCutDrawsSections()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         v.addBatch(batch("a", 3)); // each element: one triangle from z 0 to 1
         v.setSectionHeight(0.5);
         QCOMPARE(v.sectionElementCount(), 0); // a single triangle has no closed section
@@ -178,7 +178,7 @@ private slots:
 
     void hidingClearsSelection()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         v.addBatch(batch("a", 2));
         v.selectGuids({"a0"});
         v.setHidden({"a0"}, true);

@@ -9,7 +9,7 @@
 
 #include "Snapper.h"
 
-namespace kimcad {
+namespace kimbim {
 
 // Stretch a wall: click near one of its ends to grab it, click again where it should go (snapped
 // from the end that stays, so angles and grid points work), or type the new length. Pure logic.
@@ -49,4 +49,4 @@ private:
     std::optional<QPointF> m_hover;
 };
 
-} // namespace kimcad
+} // namespace kimbim

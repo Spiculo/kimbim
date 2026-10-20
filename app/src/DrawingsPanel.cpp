@@ -7,7 +7,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 constexpr int GuidRole = Qt::UserRole;
@@ -79,4 +79,4 @@ int DrawingsPanel::count() const
     return m_list->count();
 }
 
-} // namespace kimcad
+} // namespace kimbim

@@ -9,7 +9,7 @@ from pathlib import Path
 import ifcopenshell.validate
 import pytest
 
-from kimcad import app_bridge as b
+from kimbim import app_bridge as b
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
 import make_house  # noqa: E402
@@ -136,10 +136,10 @@ def test_depth_and_delete(house):
     assert call("set_drawing_depth", guid, -1)["ok"] and drawing(guid)["depth"] is None
     assert call("rename_drawing", guid, "A-A")["ok"] and "A-A" in drawings()
     n = len(b._model.by_type("IfcShapeRepresentation"))
-    psets = len([p for p in b._model.by_type("IfcPropertySet") if p.Name in ("KIMCAD_Drawing", "EPset_Drawing")])
+    psets = len([p for p in b._model.by_type("IfcPropertySet") if p.Name in ("KIMBIM_Drawing", "EPset_Drawing")])
     assert call("delete_drawing", guid)["ok"] and drawing(guid) is None
     assert len(b._model.by_type("IfcShapeRepresentation")) == n - 1
-    assert len([p for p in b._model.by_type("IfcPropertySet") if p.Name in ("KIMCAD_Drawing", "EPset_Drawing")]) == psets - 2
+    assert len([p for p in b._model.by_type("IfcPropertySet") if p.Name in ("KIMBIM_Drawing", "EPset_Drawing")]) == psets - 2
     assert call("undo")["ok"] and "A-A" in drawings()
 
 
@@ -212,7 +212,7 @@ def test_house_floor_plan_reads_like_a_permit_plan(house):
     svg = r["svg"]
     assert 'class="IfcWall"' in svg and 'class="section"' in svg  # walls cut (poché)
     assert svg.count('class="swing"') >= 1  # the front door swings
-    overlay = svg.split('class="kimcad-overlay"', 1)[1]
+    overlay = svg.split('class="kimbim-overlay"', 1)[1]
     assert ">Living room</text>" in overlay  # the plan's text label
     assert ">10.00</text>" in overlay  # the dimension, measured
     assert ">South Elevation</text>" in overlay and ">North Elevation</text>" in overlay  # markers
@@ -221,7 +221,7 @@ def test_house_floor_plan_reads_like_a_permit_plan(house):
 
 
 def test_drawings_are_styled_by_the_purpose(house):
-    from kimcad import settings as s
+    from kimbim import settings as s
     guid = call("create_section", -1.0, 4.5, 11.0, 4.5, 5.0, 8.0, -1)["guid"]
     working = call("generate_drawing", guid, "")["svg"]
     assert 'stroke="#5a3a22"' in working  # Working: walls cut, dark brown
@@ -233,7 +233,7 @@ def test_drawings_are_styled_by_the_purpose(house):
 
 
 def test_hidden_kinds_are_left_out_of_drawings(house):
-    from kimcad import settings as s
+    from kimbim import settings as s
     guid = call("create_section", -1.0, 4.5, 11.0, 4.5, 5.0, 8.0, -1)["guid"]
     assert "IfcWall" in call("generate_drawing", guid, "")["svg"]
     vis = {**call("graphics_tables")["tables"]["visibility_sets"], "No walls": {"hidden_kinds": ["walls"], "rules": []}}
@@ -277,7 +277,7 @@ def test_drawing_bounds_lists_the_buildings_elements(house):
     """The app frames sections and elevations on the meshes of the building's elements, so the bounds
     carry their GlobalIds: the walls, the roof and the D86 tree inside the building, not the drawing
     markers. Cached per model state (the app asks for every drawing it generates)."""
-    from kimcad import drawings as D
+    from kimbim import drawings as D
 
     r = call("drawing_bounds")
     assert r["ok"] and len(r["lo"]) == 3 and len(r["hi"]) == 3

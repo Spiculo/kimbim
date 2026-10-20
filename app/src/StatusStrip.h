@@ -10,7 +10,7 @@ class QLabel;
 class QTimer;
 class QToolButton;
 
-namespace kimcad {
+namespace kimbim {
 
 // The bottom bar (D71), left to right: the current pen (pen sets come in step 3), the active layer,
 // the visible layers, the zoom, the selection and the status messages.
@@ -55,4 +55,4 @@ private:
     QString m_zoomText, m_layersText;
 };
 
-} // namespace kimcad
+} // namespace kimbim

@@ -13,7 +13,7 @@
 
 // The resolved purpose (D73): what graphics_state returns, parsed for the views. Python decides every
 // element's pens, line types and visibility; the views only draw what this says.
-namespace kimcad {
+namespace kimbim {
 struct LineStyle {
     QColor color = Qt::black;
     double weight = 0.18;          // mm on paper

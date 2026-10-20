@@ -27,7 +27,7 @@
 #include <Bnd_Box.hxx>
 
 class QAction;
-namespace kimcad {
+namespace kimbim {
 class InputAidsController;
 class Tracker;
 }
@@ -45,7 +45,7 @@ class QLabel;
 class QDoubleSpinBox;
 class QLineEdit;
 
-namespace kimcad {
+namespace kimbim {
 
 class LevelsBar;
 class TitleBar;
@@ -120,8 +120,8 @@ public:
     bool isDirty() const;
     bool deleteSelection();
     // Slice 4: new project, levels, plan view.
-    bool newProject(); // from KIMCAD's built-in template
-    // D72: office templates. "builtin" is KIMCAD's default; a template opens as an untitled project.
+    bool newProject(); // from KimBim's built-in template
+    // D72: office templates. "builtin" is KimBim's default; a template opens as an untitled project.
     bool newFromTemplate(const QString& path);
     bool saveAsTemplate(const QString& name, bool replace = false); // false if it exists and wasn't replaced
     bool addLevel(const QString& name, double elevation);
@@ -355,7 +355,7 @@ public:
     void applyGeometry(const QJsonObject& geometry);
     // D78: selection tools (SelectionTools.cpp). Select similar: "type" = the selected elements' IFC
     // types (untyped: same class and predefined type), "class" = their classes. Find & Select runs a
-    // query (kimcad.queries) and changes the selection by `how`: "replace", "add" or "remove"; it
+    // query (kimbim.queries) and changes the selection by `how`: "replace", "add" or "remove"; it
     // returns how many elements matched (-1 if refused). Only what can be selected is taken: not on
     // hidden or locked layers, not hidden in the view. Criteria and selection sets are project settings.
     bool selectSimilar(const QString& mode);
@@ -376,7 +376,7 @@ public:
     double objectAngle() const { return m_objectAngle; } // degrees
     void setObjectAngle(double degrees);
     void applyLibraryPaths(); // the office library from the preferences (folder and IFC files)
-    // D81: checks (Checks.cpp). Runs kimcad.checks ("schema", "ids", "clash", "model") one by one on a
+    // D81: checks (Checks.cpp). Runs kimbim.checks ("schema", "ids", "clash", "model") one by one on a
     // worker thread behind a progress dialog (Cancel stops them) and lists the issues in the panel;
     // false if any could not run or it was cancelled. IDS files (their XML) and clash sets are
     // project settings. showIssue selects the issue's elements and fits the view to them.
@@ -388,7 +388,7 @@ public:
     bool saveClashSet(const QString& name, const QJsonObject& set, const QString& replaces = QString());
     bool deleteClashSet(const QString& name);
     void showIssue(const QStringList& guids);
-    // D82: the Python console (ConsoleTools.cpp). Runs code / a .py file in kimcad.console's namespace on a
+    // D82: the Python console (ConsoleTools.cpp). Runs code / a .py file in kimbim.console's namespace on a
     // worker thread (Stop interrupts it), shows the output in the panel, then applies its edits (afterEdit)
     // and selection. Returns console_run's result: {ok, output, error, traceback, geometry, edited, select}.
     ConsolePanel* consolePanel(); // created and docked on first use
@@ -690,4 +690,4 @@ private:
     std::shared_ptr<UnderlayPicker> m_underlayPicker;
 };
 
-} // namespace kimcad
+} // namespace kimbim

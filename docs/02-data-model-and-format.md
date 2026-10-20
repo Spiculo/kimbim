@@ -2,22 +2,22 @@
 
 ## Principle: IFC-schema native, not IFC-file native
 
-- KIMCAD's data model **is the IFC schema**: IFC4 entities, attributes and relationships, through IfcOpenShell. We do not invent a parallel BIM schema. That would be an enormous amount of work, and every import and export would lose data.
-- KIMCAD's **storage format is not the IFC file.** An `.ifc` (STEP) file is a poor unit for versioning:
+- KimBim's data model **is the IFC schema**: IFC4 entities, attributes and relationships, through IfcOpenShell. We do not invent a parallel BIM schema. That would be an enormous amount of work, and every import and export would lose data.
+- KimBim's **storage format is not the IFC file.** An `.ifc` (STEP) file is a poor unit for versioning:
   - Entity `#ids` are local to the file and get renumbered.
   - Ordering is arbitrary.
   - A one-property change can reshuffle the whole file.
 - So the repository stores the IFC graph as **canonical records**. IFC files are produced on export, and step IDs are regenerated deterministically.
 
-Prior art: Bonsai and FreeCAD edit IFC "natively" and use `ifcmerge`, which relies on preserving step IDs. KIMCAD removes that dependency on step IDs by storing records keyed by stable object identity.
+Prior art: Bonsai and FreeCAD edit IFC "natively" and use `ifcmerge`, which relies on preserving step IDs. KimBim removes that dependency on step IDs by storing records keyed by stable object identity.
 
 ## Decomposing the IFC graph into records
 
 IFC entities fall into two kinds:
 
-| Kind | Examples | Has GlobalId | KIMCAD treatment |
+| Kind | Examples | Has GlobalId | KimBim treatment |
 |------|----------|--------------|------------------|
-| **Rooted** (`IfcRoot` subtypes) | `IfcWall`, `IfcDoor`, `IfcPropertySet`, `IfcRelContainedInSpatialStructure`, `IfcWallType` | yes | **Identity record.** It has a stable KIMCAD ID and changes over time. |
+| **Rooted** (`IfcRoot` subtypes) | `IfcWall`, `IfcDoor`, `IfcPropertySet`, `IfcRelContainedInSpatialStructure`, `IfcWallType` | yes | **Identity record.** It has a stable KimBim ID and changes over time. |
 | **Non-rooted** | `IfcCartesianPoint`, `IfcLocalPlacement`, `IfcExtrudedAreaSolid`, `IfcPropertySingleValue`, `IfcMaterialLayerSet`, `IfcOwnerHistory` | no | **Value**, embedded in its owner, or a **shared node** with a stable ID. |
 
 Rules (validated by spike S3, see [11](11-spike-results.md#s3--canonical-records-round-trip)):
@@ -26,7 +26,7 @@ Rules (validated by spike S3, see [11](11-spike-results.md#s3--canonical-records
 2. **Classify by content, never by instance.** Identical non-rooted entities are first grouped into **content classes** (hash-consing). Reference counts are then taken between classes, as distinct (parent class, attribute, index) edges. Real exports contain duplicate identical entities, and an export merges them. If classification depended on instance counts, export → re-import would change the records.
 3. **Inline** when a class has exactly one reference edge.
 4. **Owner-path reference** when several entities reference a class but exactly one rooted entity holds it in a single-valued attribute. The main case is a storey's `IfcLocalPlacement`, referenced by every contained element's `PlacementRelTo`. The value is embedded in the owner, and other references use `{"@a": "<owner id>/<attribute>"}`. Raising a storey therefore changes **one** record (spike S3).
-5. **Shared nodes** (`n/<id>`) for everything else that is referenced from several places: owner history, representation contexts, representation maps, materials, profiles. A shared node gets a **stable ID**: the content hash at first import, **kept when its content later changes**. Without this, one `IfcOwnerHistory` timestamp update rewrote 3,897 of 9,996 records (spike S3). New shared nodes get their content hash. If that collides with an existing node's ID (an edited node keeps its original hash as its ID), it is re-hashed deterministically, so every machine still derives the same IDs. Matching across versions is in `python/kimcad/nodeids.py`: same content keeps the ID, and an edited node keeps it when it is the only changed node of its IFC type (e.g. `IfcOwnerHistory`).
+5. **Shared nodes** (`n/<id>`) for everything else that is referenced from several places: owner history, representation contexts, representation maps, materials, profiles. A shared node gets a **stable ID**: the content hash at first import, **kept when its content later changes**. Without this, one `IfcOwnerHistory` timestamp update rewrote 3,897 of 9,996 records (spike S3). New shared nodes get their content hash. If that collides with an existing node's ID (an edited node keeps its original hash as its ID), it is re-hashed deterministically, so every machine still derives the same IDs. Matching across versions is in `python/kimbim/nodeids.py`: same content keeps the ID, and an edited node keeps it when it is the only changed node of its IFC type (e.g. `IfcOwnerHistory`).
 6. **Loose entities** (`l/<hash>`) are entities nothing references, e.g. `IfcStyledItem`. They are keyed by content and stored with a **count**, so identical duplicates survive the round trip.
 7. **Heavy geometry.** Representation items above a size threshold (large tessellations from Revit exports, for example) are split into **geometry records**. A property-only change then never rewrites geometry. This is the spec's structural sharing (§10) done at the record level.
 8. Step `#ids` never appear. Inverse attributes are not stored, because they are derived. Relationships are stored once, as the rooted `IfcRel*` entities that IFC already defines.
@@ -36,7 +36,7 @@ This structure is naturally a Merkle DAG. Measured edit locality (spike S3, Dupl
 ### Import policies (from spike S3)
 
 - **Invalid input.** ifcopenshell reads some schema-invalid files that it then refuses to write (e.g. IFC4 ADD1-era `PnIndex`). Import validates every file (`ifcopenshell.validate`) and reports problems. The user then chooses: repair automatically where a known fix exists, import read-only, or cancel.
-- **Duplicate GlobalIds** occur in real exports. Import gives the second and later occurrences new KIMCAD IDs, deterministically in file order, and lists them in the import report.
+- **Duplicate GlobalIds** occur in real exports. Import gives the second and later occurrences new KimBim IDs, deterministically in file order, and lists them in the import report.
 
 ## IFC schema version
 
@@ -52,7 +52,7 @@ This structure is naturally a Merkle DAG. Measured edit locality (spike S3, Dupl
 Compatibility rules, which apply from day one so that IFC4X3 support later is a matter of testing, not a rewrite:
 
 - **No hard-coded schema assumptions.** Code goes through IfcOpenShell's schema-aware APIs (`ifcopenshell.api`, schema declarations). If something differs between schemas, it is handled through a schema check, never by assuming IFC4.
-- **Every record and `kimcad.toml` carry the schema identifier.** Records of different schemas never mix in one project.
+- **Every record and `kimbim.toml` carry the schema identifier.** Records of different schemas never mix in one project.
 - **No silent conversion.** A file is saved in the schema it was opened in. Moving between schemas is an explicit "Upgrade/Downgrade schema" command (IfcOpenShell `ifcpatch` Migrate) that becomes its own version in history.
 - **Both schemas are in the test corpus** from M1. IFC4X3 tests run in CI as non-blocking until after the MVP.
 
@@ -72,8 +72,8 @@ Plan to make IFC4X3 the default for new projects once the major authoring tools 
 
 **Decided (spec §12, owner answer):** a repository-level identity is kept separately from the IFC GlobalId.
 
-- **KIMCAD ID** is 128 bits. It is assigned when an object is created or first imported. By default it **equals the decoded IFC GlobalId at that moment**, so in the common case the two match and no lookup is needed.
-- **GlobalId** is an ordinary attribute in the record. If an external tool regenerates GlobalIds on re-export, reconciliation (see [03](03-versioning.md#import-reconciliation)) maps the new GlobalId onto the existing KIMCAD ID and history is kept.
+- **KimBim ID** is 128 bits. It is assigned when an object is created or first imported. By default it **equals the decoded IFC GlobalId at that moment**, so in the common case the two match and no lookup is needed.
+- **GlobalId** is an ordinary attribute in the record. If an external tool regenerates GlobalIds on re-export, reconciliation (see [03](03-versioning.md#import-reconciliation)) maps the new GlobalId onto the existing KimBim ID and history is kept.
 - If reconciliation cannot match an object, the import treats it as delete plus create. That object's history link is lost (owner answer 1), but the project stays valid.
 
 ## Canonical format
@@ -93,7 +93,7 @@ Example record (illustrative; the exact schema is decided during milestone R1):
 
 ```json
 {
-  "k": "kimcad/1",
+  "k": "kimbim/1",
   "id": "0f3a9c2e-...",
   "type": "IfcWall",
   "attr": {
@@ -122,7 +122,7 @@ Canonicalization rules:
 - **SET aggregates are sorted** by the canonical bytes of their members. LIST, ARRAY and BAG keep their order.
 - Typed values in SELECTs keep their type: `{"@t": "IfcLabel", "v": "x"}`.
 - Numbers follow the [determinism](#determinism) rules. **INTEGER and REAL stay distinct** (`1` vs `1.0`). This is a deliberate deviation from RFC 8785, which would write both as `1`.
-- Every record carries its format version (`"k": "kimcad/1"`), and format changes come with migrations.
+- Every record carries its format version (`"k": "kimbim/1"`), and format changes come with migrations.
 
 ## Round-trip guarantee
 
@@ -161,10 +161,10 @@ This rule also applies to future live collaboration: live operations carry resul
 
 ### 4. Quantize at the operation boundary
 
-Values that KIMCAD **computes** during editing (placements after move/rotate, generated profile points) are snapped to a model resolution before they are written:
+Values that KimBim **computes** during editing (placements after move/rotate, generated profile points) are snapped to a model resolution before they are written:
 
-- Lengths: **0.01 mm (1e-5 m)** by default (Decided, D31). This is configurable per project and stored in `kimcad.toml`. Why this value:
-  - It matches the IFC convention: `IfcGeometricRepresentationContext.Precision` is typically 1e-5 to 1e-8 in metre-based models, and IfcOpenShell defaults to 1e-5. KIMCAD writes the resolution into that attribute on export.
+- Lengths: **0.01 mm (1e-5 m)** by default (Decided, D31). This is configurable per project and stored in `kimbim.toml`. Why this value:
+  - It matches the IFC convention: `IfcGeometricRepresentationContext.Precision` is typically 1e-5 to 1e-8 in metre-based models, and IfcOpenShell defaults to 1e-5. KimBim writes the resolution into that attribute on export.
   - It is about 100× finer than construction tolerances (millimetres) and much finer than authoring-tool limits. Revit's minimum curve length is about 0.8 mm. So snapping never changes anything an architect can see or build.
   - 0.1 mm would also be safe for buildings. 0.01 mm leaves headroom for detailed elements (fixings, joinery) at no cost.
   - The resolution is always defined **in metres** and converted to the project unit. A literal 1e-5 in a millimetre-unit project would be far too tight.

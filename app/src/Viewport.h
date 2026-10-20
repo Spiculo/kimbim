@@ -44,7 +44,7 @@
 class QTimer;
 class QWheelEvent;
 
-namespace kimcad {
+namespace kimbim {
 
 // OCCT 3D view in a native Qt widget (D45). Navigation and click-selection come from
 // AIS_ViewController; the model is a set of ElementBatch objects (D42) held by a Scene that several
@@ -418,4 +418,4 @@ private:
     bool m_cubeDragging = false;
 };
 
-} // namespace kimcad
+} // namespace kimbim

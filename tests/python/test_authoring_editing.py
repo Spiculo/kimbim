@@ -8,7 +8,7 @@ import ifcopenshell.util.shape
 import numpy as np
 import pytest
 
-from kimcad import app_bridge as b
+from kimbim import app_bridge as b
 
 
 def call(fn, *args):

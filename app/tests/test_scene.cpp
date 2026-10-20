@@ -13,9 +13,9 @@
 namespace {
 
 // n one-triangle elements g0, g1, ... (as test_selection.cpp builds them).
-Handle(kimcad::ElementBatch) batch(int n)
+Handle(kimbim::ElementBatch) batch(int n)
 {
-    kimcad::MeshChunk c;
+    kimbim::MeshChunk c;
     c.voff.push_back(0);
     c.toff.push_back(0);
     for (int e = 0; e < n; ++e) {
@@ -29,7 +29,7 @@ Handle(kimcad::ElementBatch) batch(int n)
         c.voff.push_back(uint32_t(c.verts.size() / 3));
         c.toff.push_back(uint32_t(c.tris.size() / 3));
     }
-    return new kimcad::ElementBatch(std::move(c));
+    return new kimbim::ElementBatch(std::move(c));
 }
 
 } // namespace
@@ -39,13 +39,13 @@ class TestScene : public QObject {
 private slots:
     void editAndSelectionReachEveryView()
     {
-        kimcad::Scene scene;
-        kimcad::Viewport model(&scene), plan(&scene);
+        kimbim::Scene scene;
+        kimbim::Viewport model(&scene), plan(&scene);
         model.addBatch(batch(2));
         QCOMPARE(plan.elementCount(), 2); // loaded once, seen by both
         model.selectGuids({"g0"});
         QCOMPARE(plan.selectedGuids(), QStringList({"g0"}));
-        QSignalSpy redraw(&scene, &kimcad::Scene::redrawRequested);
+        QSignalSpy redraw(&scene, &kimbim::Scene::redrawRequested);
         plan.removeElements({"g1"});
         QCOMPARE(model.elementCount(), 1);
         QVERIFY(redraw.count() >= 1); // both views repaint
@@ -55,7 +55,7 @@ private slots:
 
     void aViewportWithoutASceneOwnsOne()
     {
-        kimcad::Viewport alone;
+        kimbim::Viewport alone;
         QVERIFY(alone.scene());
         alone.addBatch(batch(2));
         QCOMPARE(alone.elementCount(), 2);
@@ -63,8 +63,8 @@ private slots:
 
     void overlaysAndCutsStayInTheirView()
     {
-        kimcad::Scene scene;
-        kimcad::Viewport model(&scene), plan(&scene);
+        kimbim::Scene scene;
+        kimbim::Viewport model(&scene), plan(&scene);
         model.addBatch(batch(2));
         plan.setPlanView(0.0);
         plan.setGridLines({{QPointF(0, 0), QPointF(10, 0), "A"}}, 0.0);
@@ -75,7 +75,7 @@ private slots:
         plan.addClipPlanes({cut});
         QCOMPARE(plan.viewClipPlaneCount(), 1);
         QCOMPARE(model.viewClipPlaneCount(), 0); // the 3D tab is not cut by the plan's cut
-        kimcad::Viewport later(&scene);          // a view opened afterwards doesn't show it either
+        kimbim::Viewport later(&scene);          // a view opened afterwards doesn't show it either
         QVERIFY(!plan.showsOverlay(plan.gridObject(), later.view()));
         plan.clearClipPlanes();
         QCOMPARE(plan.viewClipPlaneCount(), 0);
@@ -83,11 +83,11 @@ private slots:
 
     void viewsAreCountedAndRemoved()
     {
-        kimcad::Scene scene;
-        QSignalSpy views(&scene, &kimcad::Scene::viewsChanged);
+        kimbim::Scene scene;
+        QSignalSpy views(&scene, &kimbim::Scene::viewsChanged);
         {
-            kimcad::Viewport a(&scene);
-            kimcad::Viewport b(&scene);
+            kimbim::Viewport a(&scene);
+            kimbim::Viewport b(&scene);
             QCOMPARE(views.count(), 2);
         }
         QCOMPARE(views.count(), 4); // each destroyed view leaves the viewer

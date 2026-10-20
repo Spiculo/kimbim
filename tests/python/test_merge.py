@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Slice 21 (R4): three-way merge of records. Cases ported from ifcmerge (Bruno Postle, GPL-3.0-or-later,
-t/003.ifc.t and t/005.float_normalisation.t); fixtures in tests/fixtures/ifcmerge. KIMCAD merges by
-GlobalId records, not STEP ids, so ifcmerge's renumbering cases simply merge; where KIMCAD's rules differ
+t/003.ifc.t and t/005.float_normalisation.t); fixtures in tests/fixtures/ifcmerge. KimBim merges by
+GlobalId records, not STEP ids, so ifcmerge's renumbering cases simply merge; where KimBim's rules differ
 on purpose (both sides moving one element is a conflict, docs/03) the test says so."""
 import json
 import pathlib
@@ -9,10 +9,10 @@ import pathlib
 import ifcopenshell
 import pytest
 
-from kimcad.layout import blob_oid, key_to_path
-from kimcad.merge import merge_records
-from kimcad.nodeids import decompose_against_head
-from kimcad.records import compose, decompose
+from kimbim.layout import blob_oid, key_to_path
+from kimbim.merge import merge_records
+from kimbim.nodeids import decompose_against_head
+from kimbim.records import compose, decompose
 
 FIXTURES = pathlib.Path(__file__).resolve().parents[1] / "fixtures" / "ifcmerge"
 
@@ -131,7 +131,7 @@ def test_boundary_type_conflict():
 
 
 def test_both_moving_one_element_is_a_conflict():
-    # 13: ifcmerge picks one placement automatically; KIMCAD asks (placements are absolute, docs/03).
+    # 13: ifcmerge picks one placement automatically; KimBim asks (placements are absolute, docs/03).
     r = merge(BASE, "placement_window1_moved_left.ifc", "placement_window1_moved_right.ifc")
     assert not r.clean
     assert any(c.kind == "attribute" and c.attribute == "ObjectPlacement" or c.key.startswith("n/") for c in r.conflicts)
@@ -220,10 +220,10 @@ def test_dangling_reference_and_double_containment():
     assert fixed.clean and json.loads(fixed.records["o/R3"])["a"]["RelatedElements"] == []
 
 
-# ---------------------------------------------------------------- repository: kimcad merge
+# ---------------------------------------------------------------- repository: kimbim merge
 
-from kimcad.cli import main as cli  # noqa: E402
-from kimcad.project import MergeConflicts, Project  # noqa: E402
+from kimbim.cli import main as cli  # noqa: E402
+from kimbim.project import MergeConflicts, Project  # noqa: E402
 
 
 def two_options(tmp_path, ours, theirs):

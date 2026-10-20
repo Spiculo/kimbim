@@ -4,8 +4,8 @@ import ifcopenshell.api.pset
 import pytest
 from conftest import build_model
 
-from kimcad.project import InvalidInput, NotAProject, NothingToCommit, NoVersions, Project, SchemaMismatch, TargetExists
-from kimcad.records import body_text, decompose
+from kimbim.project import InvalidInput, NotAProject, NothingToCommit, NoVersions, Project, SchemaMismatch, TargetExists
+from kimbim.records import body_text, decompose
 
 AUTHOR = ("Test", "test@example.org")
 

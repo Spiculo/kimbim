@@ -5,7 +5,7 @@
 #include <cmath>
 #include <numeric>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -152,4 +152,4 @@ std::vector<uint32_t> PolygonTool::triangulate(const QVector<QPointF>& polygon)
     return out;
 }
 
-} // namespace kimcad
+} // namespace kimbim

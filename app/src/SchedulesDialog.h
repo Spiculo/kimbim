@@ -15,12 +15,12 @@ class QPushButton;
 class QTableWidget;
 class QTableWidgetItem;
 
-namespace kimcad {
+namespace kimbim {
 
 // Schedules and quantities (doc 14 §15, D77), after Archicad's Interactive Schedule: a window (not
 // modal) with a table of the elements a scheme lists. Clicking rows selects their elements in the
 // model; editing a Name, Mark or property cell writes it back as one undo step; "Merge identical
-// items" groups rows and sums their quantities. Schemes are project settings (kimcad.schedules).
+// items" groups rows and sums their quantities. Schemes are project settings (kimbim.schedules).
 class SchedulesDialog : public QDialog {
     Q_OBJECT
 public:
@@ -92,4 +92,4 @@ private:
     QListWidget* m_fields;
 };
 
-} // namespace kimcad
+} // namespace kimbim

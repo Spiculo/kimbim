@@ -16,10 +16,10 @@ import ifcopenshell.util.element
 import numpy as np
 import pytest
 
-from kimcad import app_bridge as b
-from kimcad import checks
-from kimcad import settings
-from kimcad.testing import build_model
+from kimbim import app_bridge as b
+from kimbim import checks
+from kimbim import settings
+from kimbim.testing import build_model
 
 ROOT = Path(__file__).resolve().parents[2]
 CLINIC = ROOT / "tests" / "corpus" / "files" / "community" / "IFC 2.3.0.1 (IFC 2x3)" / "Medical-Dental Clinic" / "Clinic_Architectural.ifc"

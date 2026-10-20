@@ -10,7 +10,7 @@
 
 #include "Snapper.h"
 
-namespace kimcad {
+namespace kimbim {
 
 // Where a door/window goes: the wall, its centre's distance from the wall axis start (metres), the
 // centre point on the axis and the wall direction (radians).
@@ -41,7 +41,7 @@ public:
     std::optional<Host> hover() const { return m_hover; }
 
 signals:
-    void openingRequested(const kimcad::Host& host);
+    void openingRequested(const kimbim::Host& host);
     void previewChanged();
 
 private:
@@ -51,6 +51,6 @@ private:
     std::optional<Host> m_hover;
 };
 
-} // namespace kimcad
+} // namespace kimbim
 
-Q_DECLARE_METATYPE(kimcad::Host)
+Q_DECLARE_METATYPE(kimbim::Host)

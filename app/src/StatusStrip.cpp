@@ -15,7 +15,7 @@
 
 #include <algorithm>
 
-namespace kimcad {
+namespace kimbim {
 
 StatusStrip::StatusStrip(QWidget* parent)
     : QWidget(parent)
@@ -187,4 +187,4 @@ void StatusStrip::setPurposes(const QStringList& names, const QString& current)
     m_purpose->setCurrentText(current);
 }
 
-} // namespace kimcad
+} // namespace kimbim

@@ -14,7 +14,7 @@ class QScrollArea;
 class QToolButton;
 class QVBoxLayout;
 
-namespace kimcad {
+namespace kimbim {
 
 // The tools on the left (D71, D90: Archicad's Toolbox): collapsible groups (3D, Plane, View, Edit) of
 // buttons in a grid whose column count follows the panel's width. Related tools can share one
@@ -50,7 +50,7 @@ public:
     static QString iconName(const QAction* action);
 
 signals:
-    void modeChanged(kimcad::ToolPalette::Mode mode);
+    void modeChanged(kimbim::ToolPalette::Mode mode);
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
@@ -82,4 +82,4 @@ private:
     int m_columns = 0;
 };
 
-} // namespace kimcad
+} // namespace kimbim

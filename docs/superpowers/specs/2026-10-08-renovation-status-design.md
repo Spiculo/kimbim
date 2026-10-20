@@ -33,7 +33,7 @@ Out of scope:
 They are stored in IFC as the standard `Status` property, an `IfcPropertyEnumeratedValue` with IFC4's
 `PEnum_ElementStatus`:
 
-| KIMCAD | IFC `Status` written | Also read as this status |
+| KimBim | IFC `Status` written | Also read as this status |
 |---|---|---|
 | Existing | `EXISTING` | `Existing` (case-insensitive), Archicad's "Existing" |
 | To be demolished | `DEMOLISH` | `DEMOLISHED`, "To Be Demolished" |
@@ -42,7 +42,7 @@ They are stored in IFC as the standard `Status` property, an `IfcPropertyEnumera
 - **Where it is written.** The element's own `Pset_<Class>Common.Status` when the IFC4 (or IFC2X3)
   template for its class has `Status`. This covers walls, slabs, doors, windows, columns, beams,
   stairs, roofs, coverings, railings and proxies. For other classes (spaces, furniture, whose
-  `Status` is only on the type, annotations, MEP), it goes in `KIMCAD_Renovation.Status`.
+  `Status` is only on the type, annotations, MEP), it goes in `KIMBIM_Renovation.Status`.
   An element's own value overrides its type's (D50 already behaves this way).
 - **Where it is read.** Any pset's `Status` property, or `Renovation Status` (the name Archicad's IFC
   export uses), through the per-name property index in `graphics._property_index`. Own values win
@@ -206,7 +206,7 @@ changes nothing, it says "Everything is drawn with its element styles".
     model. A legend for a ground-floor plan doesn't list a rule that only matched the roof.
   - If no drawing is placed, it uses the whole model.
 - **Storage.** A legend is an `IfcDocumentReference` on the sheet, like a placed drawing, but with
-  the location marker `kimcad:legend` and `{"x", "y"}` in the same data slot. IFC2X3 uses the same
+  the location marker `kimbim:legend` and `{"x", "y"}` in the same data slot. IFC2X3 uses the same
   Location-marker fallback as placed drawings. Other tools see a reference they ignore. Legends are
   not drawings, so they have no scale and no title strip.
 - `sheets()` returns `legends: [{id, x, y, w, h}]` per sheet. The id is the reference's
@@ -216,7 +216,7 @@ changes nothing, it says "Everything is drawn with its element styles".
 
 | Unit | Responsibility |
 |---|---|
-| `python/kimcad/renovation.py` (new) | Status names and IFC values; `status_of(element, facts)`; `write_status(element, status)` (Common pset with an enumerated value, or `KIMCAD_Renovation`); `stamp_new(*elements)`; `copy_status(source, target)`; bridge `set_status(guids_json, status)`, `set_status_for_new(status)`. |
+| `python/kimbim/renovation.py` (new) | Status names and IFC values; `status_of(element, facts)`; `write_status(element, status)` (Common pset with an enumerated value, or `KIMBIM_Renovation`); `stamp_new(*elements)`; `copy_status(source, target)`; bridge `set_status(guids_json, status)`, `set_status_for_new(status)`. |
 | `graphics.py` | Built-in `renovation_filters`, the three new pens, the new purposes; `validate` for the table and the purposes' `renovation` field; enumerated values in `_property_index`; resolution step 2; `legend` in the output; `legend_svg(resolved, guids=None)`, the legend rows as SVG in mm. |
 | `settings.py` | `renovation_filters` and `status_for_new` in DEFAULTS (empty / "new"); validation delegated. |
 | `authoring.py`, `rooms.py`, `roofs.py` | Call `renovation.stamp_new` beside `layers.assign_active`, and `renovation.copy_status` beside `layers.copy_layer`. |
@@ -238,7 +238,7 @@ changes nothing, it says "Everything is drawn with its element styles".
 - **Unknown status values in a file** are read as New. A filter naming a missing pen or line type
   falls back as in D73.
 - **Setting a status** on an element whose Common pset can't be written (another tool's odd data)
-  falls back to `KIMCAD_Renovation`. If the write still fails, the whole action is rolled back, as
+  falls back to `KIMBIM_Renovation`. If the write still fails, the whole action is rolled back, as
   other edits are, and the status bar shows the error.
 - **A legend on a sheet whose purpose changes nothing** prints its title and the "Everything is drawn
   with its element styles" line, so it is never an empty box.
@@ -254,7 +254,7 @@ changes nothing, it says "Everything is drawn with its element styles".
 ## Testing
 
 - **Python:**
-  - Status written to the Common pset (enumerated) or `KIMCAD_Renovation`, in IFC4 and IFC2X3.
+  - Status written to the Common pset (enumerated) or `KIMBIM_Renovation`, in IFC4 and IFC2X3.
   - Read back from either, from a type, from `Renovation Status`, and from odd values (as New).
   - Stamping on every creation path.
   - `unmarked` counts only elements without any status; `mark_unmarked` is one undo step and leaves

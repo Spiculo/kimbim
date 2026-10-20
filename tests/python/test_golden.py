@@ -7,7 +7,7 @@ import blake3
 import ifcopenshell
 import pytest
 
-from kimcad.records import body_text, compose, decompose, state_hash
+from kimbim.records import body_text, compose, decompose, state_hash
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CORPUS = ROOT / "tests" / "corpus" / "files"
@@ -29,7 +29,7 @@ def test_matches_spike_golden_hashes(rel, tmp_path):
     if not path.exists():
         pytest.skip("corpus not downloaded (pixi run fetch-corpus)")
     want_state, want_export = GOLDEN[rel]
-    recs, _ = decompose(ifcopenshell.open(str(path)), format_tag="kimcad-spike/1")
+    recs, _ = decompose(ifcopenshell.open(str(path)), format_tag="kimbim-spike/1")
     assert state_hash(recs) == want_state
     out = tmp_path / "b.ifc"
     compose(recs).write(str(out))

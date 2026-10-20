@@ -19,13 +19,13 @@ System 4.x (LGPL-2.1, built with CMake `FetchContent`), CMake + Ninja via pixi.
 
 ## Global Constraints
 
-- Every new UI string goes through `tr()` and has a Spanish translation in `app/translations/kimcad_es.ts`; `pixi run check-translations` passes.
+- Every new UI string goes through `tr()` and has a Spanish translation in `app/translations/kimbim_es.ts`; `pixi run check-translations` passes.
 - Every new source file starts with `// SPDX-License-Identifier: GPL-3.0-or-later` (`pixi run check-spdx`).
-- The bridge (`python/kimcad`) doesn't change; `pixi run test` (Python) stays green.
+- The bridge (`python/kimbim`) doesn't change; `pixi run test` (Python) stays green.
 - Existing action object names and shortcuts don't change (`actionWallTool` = W, ...); `shortcutsAreTheDocumentedOnes` keeps passing.
 - No OCCT exception may escape into a Qt event handler (wrap OCCT window calls in `try`/`catch (const Standard_Failure&)` as `Viewport::ensureWindow` does).
-- Builds and tests pass on Windows and on Linux (WSL Ubuntu at `~/kimcad-verify`, as CI runs them).
-- The refresh after an edit, timed on `Clinic_Architectural.ifc` (`kimcad-app --self-test` tool benchmark), is no slower with a 3D tab and a plan tab open than with the 3D view alone today.
+- Builds and tests pass on Windows and on Linux (WSL Ubuntu at `~/kimbim-verify`, as CI runs them).
+- The refresh after an edit, timed on `Clinic_Architectural.ifc` (`kimbim-app --self-test` tool benchmark), is no slower with a 3D tab and a plan tab open than with the 3D view alone today.
 - ADS is pinned to one release tag *and* its commit hash; `THIRD_PARTY.md` lists it with its license.
 
 ## Review Focus
@@ -62,10 +62,10 @@ System 4.x (LGPL-2.1, built with CMake `FetchContent`), CMake + Ninja via pixi.
 
 Commands (Git Bash; add pixi to PATH first: `export PATH="$HOME/.pixi/bin:$PATH"`):
 - Build app + tests: `pixi run app-build`
-- One C++ test binary: `pixi run bash -c 'QT_QPA_PLATFORM=offscreen KIMCAD_PYTHON_PATH="$PWD/python" ./build/app/<test>.exe [testFunction] -o out.txt,txt; cat out.txt; rm -f out.txt'`
-- All app tests: `KIMCAD_PYTHON_PATH="$PWD/python" pixi run ctest --test-dir build/app --output-on-failure`
+- One C++ test binary: `pixi run bash -c 'QT_QPA_PLATFORM=offscreen KIMBIM_PYTHON_PATH="$PWD/python" ./build/app/<test>.exe [testFunction] -o out.txt,txt; cat out.txt; rm -f out.txt'`
+- All app tests: `KIMBIM_PYTHON_PATH="$PWD/python" pixi run ctest --test-dir build/app --output-on-failure`
 
-A running `kimcad-app` locks the exe; close it before building, and check the build's exit code.
+A running `kimbim-app` locks the exe; close it before building, and check the build's exit code.
 
 ---
 
@@ -78,7 +78,7 @@ A running `kimcad-app` locks the exe; close it before building, and check the bu
 **Interfaces:**
 - Produces:
   ```cpp
-  namespace kimcad {
+  namespace kimbim {
   class DockLayout : public QObject {
       Q_OBJECT
   public:
@@ -130,12 +130,12 @@ FetchContent_Declare(qtads
 FetchContent_MakeAvailable(qtads)
 ```
 
-In `app/CMakeLists.txt` add `src/DockLayout.cpp src/DockLayout.h` to `kimcad_core`, link the library and register the test:
+In `app/CMakeLists.txt` add `src/DockLayout.cpp src/DockLayout.h` to `kimbim_core`, link the library and register the test:
 
 ```cmake
-target_link_libraries(kimcad_core PUBLIC ads::qtadvanceddocking-qt6)
+target_link_libraries(kimbim_core PUBLIC ads::qtadvanceddocking-qt6)
 ...
-kimcad_test(test_dock_layout)
+kimbim_test(test_dock_layout)
 ```
 
 Run: `pixi run app-configure && cmake --build build/app --target qtadvanceddocking-qt6`
@@ -162,14 +162,14 @@ private slots:
     void viewsAreKeyedTabsInTheCenter()
     {
         QMainWindow w;
-        kimcad::DockLayout layout(&w);
+        kimbim::DockLayout layout(&w);
         auto* model = new QLabel("3D");
         layout.addView("3d", "3D", model, false);
         layout.addView("plan:L1", "Level 1 plan", new QLabel("plan"), true);
         QCOMPARE(layout.viewKeys(), QStringList({"3d", "plan:L1"}));
         QCOMPARE(layout.view("3d"), model);
         QCOMPARE(layout.keyOf(model), QString("3d"));
-        QSignalSpy current(&layout, &kimcad::DockLayout::currentChanged);
+        QSignalSpy current(&layout, &kimbim::DockLayout::currentChanged);
         layout.raise("plan:L1");
         QCOMPARE(layout.current(), QString("plan:L1"));
         QCOMPARE(current.count(), 1);
@@ -180,11 +180,11 @@ private slots:
     void the3DViewCannotBeClosedOthersAsk()
     {
         QMainWindow w;
-        kimcad::DockLayout layout(&w);
+        kimbim::DockLayout layout(&w);
         layout.addView("3d", "3D", new QLabel, false);
         layout.addView("D1", "Section 1", new QLabel, true);
         QVERIFY(!layout.manager()->findDockWidget("3d")->features().testFlag(ads::CDockWidget::DockWidgetClosable));
-        QSignalSpy close(&layout, &kimcad::DockLayout::closeRequested);
+        QSignalSpy close(&layout, &kimbim::DockLayout::closeRequested);
         layout.manager()->findDockWidget("D1")->closeDockWidget(); // the tab's x
         QCOMPARE(close.count(), 1);
         QCOMPARE(close.first().first().toString(), QString("D1"));
@@ -197,7 +197,7 @@ private slots:
     void panelsAreTabbedOnTheRightAndCanBeRaised()
     {
         QMainWindow w;
-        kimcad::DockLayout layout(&w);
+        kimbim::DockLayout layout(&w);
         layout.addView("3d", "3D", new QLabel, false);
         layout.addPanel("tree", "Model", new QLabel);
         layout.addPanel("properties", "Properties", new QLabel);
@@ -212,7 +212,7 @@ private slots:
     void layoutRoundTripsAndFallsBack()
     {
         QMainWindow w;
-        kimcad::DockLayout layout(&w);
+        kimbim::DockLayout layout(&w);
         layout.addView("3d", "3D", new QLabel, false);
         layout.addPanel("tree", "Model", new QLabel);
         layout.captureDefault();
@@ -249,7 +249,7 @@ class CDockWidget;
 class CDockAreaWidget;
 }
 
-namespace kimcad {
+namespace kimbim {
 
 // The main window's docking (D71, Qt Advanced Docking System): center views as tabs that can be
 // dragged out to their own windows and docked back, tabbed panels on the right, tools on the left,
@@ -269,7 +269,7 @@ private:
     QByteArray m_default;
 };
 
-} // namespace kimcad
+} // namespace kimbim
 ```
 
 `app/src/DockLayout.cpp`:
@@ -288,7 +288,7 @@ private:
 #include <QMainWindow>
 #include <QScreen>
 
-namespace kimcad {
+namespace kimbim {
 
 DockLayout::DockLayout(QMainWindow* window)
     : QObject(window)
@@ -451,7 +451,7 @@ bool DockLayout::restoreLayout(const QByteArray& state)
     return false;
 }
 
-} // namespace kimcad
+} // namespace kimbim
 ```
 
 - [ ] **Step 6: Run the test.** Run: `pixi run app-build` then the `test_dock_layout.exe` command. Expected: all four tests PASS. If an ADS method name is wrong for the pinned release, fix it from the fetched headers in `build/app/_deps/qtads-src/src/` and note it in the commit message.
@@ -460,7 +460,7 @@ bool DockLayout::restoreLayout(const QByteArray& state)
 `Qt Advanced Docking System 4.X.Y (commit <hash>) — LGPL-2.1-or-later — docking, floating and auto-hide panels; built from source with CMake FetchContent; https://github.com/githubuser0xFFFF/Qt-Advanced-Docking-System`
 
 - [ ] **Step 8: Linux build check** (CI builds Linux too):
-Run in WSL: `cd ~/kimcad-verify && git fetch /mnt/c/Users/lecot/OneDrive/Projects/kimcad ui-rework && git checkout FETCH_HEAD && pixi run app-build && QT_QPA_PLATFORM=offscreen ./build/app/test_dock_layout`
+Run in WSL: `cd ~/kimbim-verify && git fetch /mnt/c/Users/lecot/OneDrive/Projects/kimbim ui-rework && git checkout FETCH_HEAD && pixi run app-build && QT_QPA_PLATFORM=offscreen ./build/app/test_dock_layout`
 Expected: builds and PASS. If ADS needs `Qt6::GuiPrivate` headers that aren't in the pixi Qt, the configure step says so; then add the missing pixi package (`pixi add qt6-main` variant with private headers) and record it in the commit.
 
 - [ ] **Step 9: Commit**
@@ -481,7 +481,7 @@ git commit -m "feat(app): DockLayout on the Qt Advanced Docking System (pinned 4
 **Interfaces:**
 - Produces:
   ```cpp
-  namespace kimcad {
+  namespace kimbim {
   class Scene : public QObject {
       Q_OBJECT
   public:
@@ -525,7 +525,7 @@ git commit -m "feat(app): DockLayout on the Qt Advanced Docking System (pinned 4
 
 namespace {
 // Two boxes, guids A and B (the same fixture shape test_selection.cpp builds).
-kimcad::MeshChunk twoBoxes();
+kimbim::MeshChunk twoBoxes();
 }
 
 class TestScene : public QObject {
@@ -533,13 +533,13 @@ class TestScene : public QObject {
 private slots:
     void editAndSelectionReachEveryView()
     {
-        kimcad::Scene scene;
-        kimcad::Viewport model(&scene), plan(&scene);
-        model.addBatch(new kimcad::ElementBatch(twoBoxes()));
+        kimbim::Scene scene;
+        kimbim::Viewport model(&scene), plan(&scene);
+        model.addBatch(new kimbim::ElementBatch(twoBoxes()));
         QCOMPARE(plan.elementCount(), 2);            // loaded once, seen by both
         model.selectGuids({"A"});
         QCOMPARE(plan.selectedGuids(), QStringList({"A"}));
-        QSignalSpy redraw(&scene, &kimcad::Scene::redrawRequested);
+        QSignalSpy redraw(&scene, &kimbim::Scene::redrawRequested);
         plan.removeElements({"B"});
         QCOMPARE(model.elementCount(), 1);
         QVERIFY(redraw.count() >= 1);                // both views repaint
@@ -549,19 +549,19 @@ private slots:
 
     void aViewportWithoutASceneOwnsOne()
     {
-        kimcad::Viewport alone;
+        kimbim::Viewport alone;
         QVERIFY(alone.scene());
-        alone.addBatch(new kimcad::ElementBatch(twoBoxes()));
+        alone.addBatch(new kimbim::ElementBatch(twoBoxes()));
         QCOMPARE(alone.elementCount(), 2);
     }
 
     void viewsAreCountedAndRemoved()
     {
-        kimcad::Scene scene;
-        QSignalSpy views(&scene, &kimcad::Scene::viewsChanged);
+        kimbim::Scene scene;
+        QSignalSpy views(&scene, &kimbim::Scene::viewsChanged);
         {
-            kimcad::Viewport a(&scene);
-            kimcad::Viewport b(&scene);
+            kimbim::Viewport a(&scene);
+            kimbim::Viewport b(&scene);
             QCOMPARE(views.count(), 2);
         }
         QCOMPARE(views.count(), 4); // each destroyed view leaves the viewer
@@ -574,7 +574,7 @@ QTEST_MAIN(TestScene)
 
 Fill `twoBoxes()` by copying the fixture-building function from `app/tests/test_selection.cpp` (it builds a `MeshChunk` of two boxes with guids; rename its guids to `"A"` and `"B"`).
 
-Register in `app/CMakeLists.txt`: `kimcad_test(test_scene)`; add `src/Scene.cpp src/Scene.h` to `kimcad_core`.
+Register in `app/CMakeLists.txt`: `kimbim_test(test_scene)`; add `src/Scene.cpp src/Scene.h` to `kimbim_core`.
 
 - [ ] **Step 2: Run it to make sure it fails.** `pixi run app-build` → compile error (`Scene.h` missing).
 
@@ -589,7 +589,7 @@ Register in `app/CMakeLists.txt`: `kimcad_test(test_scene)`; add `src/Scene.cpp 
 #include <V3d_AmbientLight.hxx>
 #include <V3d_DirectionalLight.hxx>
 
-namespace kimcad {
+namespace kimbim {
 
 Handle(Aspect_DisplayConnection) sharedDisplay(); // moved here from Viewport.cpp (unchanged)
 
@@ -597,7 +597,7 @@ Scene::Scene(QObject* parent)
     : QObject(parent)
 {
     Handle(OpenGl_GraphicDriver) driver = new OpenGl_GraphicDriver(sharedDisplay(), false);
-    if (qEnvironmentVariableIntValue("KIMCAD_VSYNC") != 1)
+    if (qEnvironmentVariableIntValue("KIMBIM_VSYNC") != 1)
         driver->ChangeOptions().swapInterval = 0; // see the comment kept from Viewport.cpp
     m_viewer = new V3d_Viewer(driver);
     // lights: the ambient, "sun" and fill lines from Viewport.cpp, unchanged
@@ -623,10 +623,10 @@ void Scene::removeView(const Handle(V3d_View)& view)
 
 void Scene::changed() { emit redrawRequested(); }
 
-} // namespace kimcad
+} // namespace kimbim
 ```
 
-`sharedDisplay()` moves from `Viewport.cpp`'s anonymous namespace into `Scene.cpp` (non-static, declared in `Scene.h` inside `namespace kimcad`), because `Viewport::ensureWindow` on Linux still needs the display connection.
+`sharedDisplay()` moves from `Viewport.cpp`'s anonymous namespace into `Scene.cpp` (non-static, declared in `Scene.h` inside `namespace kimbim`), because `Viewport::ensureWindow` on Linux still needs the display connection.
 
 - [ ] **Step 4: Point `Viewport` at the `Scene`.** In `Viewport.h`: delete the members `m_viewer`, `m_context`, `m_batches`, `m_locate`, `m_colors`, `m_layerHidden`, `m_layerLocked`, `m_linesOnly`, `m_quietSelection`, `m_nextIdBase`, `m_idBases` and the `Loc` struct. Add:
 
@@ -704,9 +704,9 @@ and cut in both. Each view now keeps them to itself.
 ```cpp
     void overlaysAndCutsStayInTheirView()
     {
-        kimcad::Scene scene;
-        kimcad::Viewport model(&scene), plan(&scene);
-        model.addBatch(new kimcad::ElementBatch(twoBoxes()));
+        kimbim::Scene scene;
+        kimbim::Viewport model(&scene), plan(&scene);
+        model.addBatch(new kimbim::ElementBatch(twoBoxes()));
         plan.setPlanView(0.0);
         plan.setGridLines({{QPointF(0, 0), QPointF(10, 0), "A"}}, 0.0);
         QCOMPARE(plan.gridLineCount(), 1);
@@ -716,7 +716,7 @@ and cut in both. Each view now keeps them to itself.
         plan.addClipPlanes({cut});
         QCOMPARE(plan.viewClipPlaneCount(), 1);
         QCOMPARE(model.viewClipPlaneCount(), 0); // the 3D tab is not cut by the plan's cut
-        kimcad::Viewport later(&scene);          // a view opened afterwards doesn't show it either
+        kimbim::Viewport later(&scene);          // a view opened afterwards doesn't show it either
         QVERIFY(!plan.showsOverlay(plan.gridObject(), later.view()));
     }
 ```
@@ -796,7 +796,7 @@ if (args.contains(QStringLiteral("--pop-out"))) {
     floating->resize(640, 480);
     floating->show();
     QCoreApplication::processEvents();
-    const QString outside = QDir::temp().filePath(QStringLiteral("kimcad-popout.png"));
+    const QString outside = QDir::temp().filePath(QStringLiteral("kimbim-popout.png"));
     const bool shownOutside = view->dumpImage(outside) && !QImage(outside).isNull()
         && view->pickAt(view->width() / 2, view->height() / 2) != QStringLiteral("error");
     host->layout()->addWidget(view);        // docked back
@@ -810,10 +810,10 @@ if (args.contains(QStringLiteral("--pop-out"))) {
 Register in `app/CMakeLists.txt`:
 
 ```cmake
-kimcad_gui_test(app_selftest_pop_out "\"ok\":true.*\"pop_out\":true" :fixture: --frames 2 --pop-out)
+kimbim_gui_test(app_selftest_pop_out "\"ok\":true.*\"pop_out\":true" :fixture: --frames 2 --pop-out)
 ```
 
-- [ ] **Step 2: Run to make sure it fails.** `pixi run app-build && KIMCAD_PYTHON_PATH="$PWD/python" pixi run ctest --test-dir build/app -R pop_out --output-on-failure`. Expected: FAIL (`"pop_out":false`, or an OCCT error on the stale window).
+- [ ] **Step 2: Run to make sure it fails.** `pixi run app-build && KIMBIM_PYTHON_PATH="$PWD/python" pixi run ctest --test-dir build/app -R pop_out --output-on-failure`. Expected: FAIL (`"pop_out":false`, or an OCCT error on the stale window).
 
 - [ ] **Step 3: Implement.** In `Viewport.h` add `bool event(QEvent* e) override;` and `void rebindWindow();`. In `Viewport.cpp`:
 
@@ -843,7 +843,7 @@ void Viewport::rebindWindow()
         ensureWindow(); // attaches to the new native window
         update();
     } catch (const Standard_Failure& e) {
-        qWarning("KIMCAD: cannot move the 3D view to its new window: %s", e.what());
+        qWarning("KimBim: cannot move the 3D view to its new window: %s", e.what());
     }
 }
 ```
@@ -895,9 +895,9 @@ center views, and the panels go into the right area.
 ```cpp
     void viewsAndPanelsLiveInTheDockLayout()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         QVERIFY(w.newProject());
-        kimcad::DockLayout* dock = w.dockLayout();
+        kimbim::DockLayout* dock = w.dockLayout();
         QVERIFY(dock->view("3d"));
         QVERIFY(!dock->manager()->findDockWidget("3d")->features().testFlag(ads::CDockWidget::DockWidgetClosable));
         for (const char* panel : {"tree", "properties", "layers", "history", "drawings", "sheets"})
@@ -915,12 +915,12 @@ center views, and the panels go into the right area.
         QStandardPaths::setTestModeEnabled(true);
         QByteArray saved;
         {
-            kimcad::MainWindow w(nullptr, true);
+            kimbim::MainWindow w(nullptr, true);
             QVERIFY(w.newProject());
             QVERIFY(w.openDrawing(w.drawingGuid(QStringLiteral("North Elevation"))));
             saved = w.dockLayout()->saveLayout();
         }
-        kimcad::MainWindow w(nullptr, true);     // a new session: that drawing tab doesn't exist yet
+        kimbim::MainWindow w(nullptr, true);     // a new session: that drawing tab doesn't exist yet
         QVERIFY(w.newProject());
         QVERIFY(w.dockLayout()->restoreLayout(saved) || true); // never throws, never loses the 3D tab
         QVERIFY(w.dockLayout()->view("3d"));
@@ -943,7 +943,7 @@ center views, and the panels go into the right area.
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 
-namespace kimcad {
+namespace kimbim {
 
 ViewHost::ViewHost(Viewport* view, QWidget* parent)
     : QWidget(parent)
@@ -970,7 +970,7 @@ void ViewHost::adoptChrome(QWidget* optionsStrip, QWidget* cutColumn)
         m_row->addWidget(cutColumn);
 }
 
-} // namespace kimcad
+} // namespace kimbim
 ```
 
 - [ ] **Step 4: Rewire `MainWindow`.**
@@ -988,8 +988,8 @@ void ViewHost::adoptChrome(QWidget* optionsStrip, QWidget* cutColumn)
   - The loops `for (int i = m_tabs->count() - 1; i > 0; --i)` in `refreshDrawings` and `refreshSheets` become `for (const QString& key : m_dock->viewKeys())`, with `auto* view = qobject_cast<DrawingView*>(m_dock->view(key))` and `continue` when null. `closeDrawingTab(i)` → `closeView(key)`.
   - `showModelTab()` → `m_dock->raise(QStringLiteral("3d"))`.
   - `currentViewKey()` returns `m_dock->current()`.
-  - Layout memory. At the end of the constructor, `m_dock->captureDefault()`; then, unless `m_quiet`, `m_dock->restoreLayout(QSettings().value("layout/state").toByteArray())`. In `closeEvent`, after the save check passes, `QSettings().setValue("layout/state", m_dock->saveLayout())`. In `main.cpp`, before creating the window, `QCoreApplication::setOrganizationName("KIMCAD"); QCoreApplication::setApplicationName("KIMCAD");` if not already set.
-  - Add `src/ViewHost.cpp src/ViewHost.h` to `kimcad_core`.
+  - Layout memory. At the end of the constructor, `m_dock->captureDefault()`; then, unless `m_quiet`, `m_dock->restoreLayout(QSettings().value("layout/state").toByteArray())`. In `closeEvent`, after the save check passes, `QSettings().setValue("layout/state", m_dock->saveLayout())`. In `main.cpp`, before creating the window, `QCoreApplication::setOrganizationName("KimBim"); QCoreApplication::setApplicationName("KimBim");` if not already set.
+  - Add `src/ViewHost.cpp src/ViewHost.h` to `kimbim_core`.
 
 - [ ] **Step 5: Run the tests.** Build, then run `test_main_window.exe`. Expected: the new tests PASS and the existing ones too. Fix any that reached into `QDockWidget`s or `mainTabs`; today only `planCutSliderBesideTheView` uses `findChild` (`planCutSlider`), and it still works. Then all ctest.
 
@@ -1031,16 +1031,16 @@ Rules (from the spec, made precise):
 ```cpp
     void planTabsShareTheModel()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         QVERIFY(w.newProject());
         QVERIFY(w.addLevel(QStringLiteral("Level 2"), 3.0));
         const QString l1 = w.levelsBar()->activeStorey();
-        kimcad::Viewport* plan = w.openPlanTab(l1);
+        kimbim::Viewport* plan = w.openPlanTab(l1);
         QVERIFY(plan && plan != w.modelView());
         QCOMPARE(w.viewport(), plan);
         QVERIFY(plan->isPlanView());
         QCOMPARE(w.currentViewKey(), QStringLiteral("plan:") + l1);
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         QVERIFY(w.createWall({QPointF(0, 0), QPointF(4, 0)}));
         QCOMPARE(w.modelView()->elementCount(), plan->elementCount()); // one model
         w.modelView()->selectGuids(plan->guids().mid(0, 1));
@@ -1048,12 +1048,12 @@ Rules (from the spec, made precise):
         QVERIFY(!w.modelView()->isPlanView());
         triggerAction(w, "action3DView");
         QCOMPARE(w.viewport(), w.modelView());
-        QCOMPARE(w.tool(), kimcad::MainWindow::Tool::None); // switching views cancels the tool
+        QCOMPARE(w.tool(), kimbim::MainWindow::Tool::None); // switching views cancels the tool
     }
 
     void deletingTheActivePlanLevel()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         QVERIFY(w.newProject());
         QVERIFY(w.addLevel(QStringLiteral("Level 2"), 3.0));
         QString l2;
@@ -1062,19 +1062,19 @@ Rules (from the spec, made precise):
             l2 = s.data(Qt::UserRole).toString();
         QVERIFY(!l2.isEmpty());
         QVERIFY(w.openPlanTab(l2));
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         w.wallTool()->click(QPointF(0, 0));                  // a wall half-drawn
         w.setSelection({l2});
         QVERIFY(w.deleteSelection());
         QVERIFY(!w.dockLayout()->view(QStringLiteral("plan:") + l2));
         QCOMPARE(w.currentViewKey(), QString("3d"));
-        QCOMPARE(w.tool(), kimcad::MainWindow::Tool::None);
+        QCOMPARE(w.tool(), kimbim::MainWindow::Tool::None);
         QCOMPARE(w.viewport(), w.modelView());
     }
 
     void openingAFileClosesPlanTabs()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         QVERIFY(w.newProject());
         QVERIFY(w.openPlanTab(w.levelsBar()->activeStorey()));
         QVERIFY(w.newProject());
@@ -1085,9 +1085,9 @@ Rules (from the spec, made precise):
 
     void eachViewKeepsItsOwnCut()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         QVERIFY(w.newProject());
-        kimcad::Viewport* plan = w.openPlanTab(w.levelsBar()->activeStorey());
+        kimbim::Viewport* plan = w.openPlanTab(w.levelsBar()->activeStorey());
         QVERIFY(plan->clipPlaneCount() >= 1);                // a plan is cut
         w.dockLayout()->raise(QStringLiteral("3d"));
         QCOMPARE(w.modelView()->clipPlaneCount(), 0);        // the 3D tab is not
@@ -1189,7 +1189,7 @@ class TestToolPalette : public QObject {
 private slots:
     void groupsHoldButtonsForTheirActions()
     {
-        kimcad::ToolPalette p;
+        kimbim::ToolPalette p;
         QAction wall("Wall"), slab("Slab"), text("Text");
         p.addGroup("3d", "3D", {&wall, &slab});
         p.addGroup("plane", "Plane", {&text});
@@ -1215,8 +1215,8 @@ In `test_main_window.cpp`:
 ```cpp
     void everyToolIsInOnePaletteGroup()
     {
-        kimcad::MainWindow w(nullptr, true);
-        kimcad::ToolPalette* p = w.toolPalette();
+        kimbim::MainWindow w(nullptr, true);
+        kimbim::ToolPalette* p = w.toolPalette();
         QCOMPARE(p->groups(), QStringList({"3d", "plane", "view", "edit"}));
         const QHash<QString, QStringList> expected = {
             {"3d", {"actionWallTool", "actionSlabTool", "actionColumnTool", "actionBeamTool", "actionDoorTool",
@@ -1238,7 +1238,7 @@ In `test_main_window.cpp`:
     }
 ```
 
-Register `kimcad_test(test_tool_palette)`; add `src/ToolPalette.cpp src/ToolPalette.h` to `kimcad_core`.
+Register `kimbim_test(test_tool_palette)`; add `src/ToolPalette.cpp src/ToolPalette.h` to `kimbim_core`.
 
 - [ ] **Step 2: Run to make sure they fail.** Build: compile errors.
 
@@ -1253,7 +1253,7 @@ Register `kimcad_test(test_tool_palette)`; add `src/ToolPalette.cpp src/ToolPale
 #include <QToolButton>
 #include <QVBoxLayout>
 
-namespace kimcad {
+namespace kimbim {
 
 ToolPalette::ToolPalette(QWidget* parent)
     : QWidget(parent)
@@ -1345,7 +1345,7 @@ void ToolPalette::setCompact(bool iconsOnly)
         b->setToolButtonStyle(iconsOnly ? Qt::ToolButtonIconOnly : Qt::ToolButtonTextBesideIcon);
 }
 
-} // namespace kimcad
+} // namespace kimbim
 ```
 
 Header members: `struct Group { QString id; QToolButton* header; QWidget* body; QList<QAction*> actions; }; QVector<Group> m_groups; QList<QToolButton*> m_buttons; QVBoxLayout* m_column; bool m_compact = false;`.
@@ -1420,7 +1420,7 @@ git commit -m "feat(app): tool palette on the left, grouped 3D / Plane / View / 
 ```cpp
     void optionsStripShowsOnlyWithAToolAndAField()
     {
-        kimcad::ToolOptionsBar bar;
+        kimbim::ToolOptionsBar bar;
         auto* height = new QLineEdit;
         bar.addField(height);
         bar.show();
@@ -1439,24 +1439,24 @@ In `test_main_window.cpp`:
 ```cpp
     void toolOptionsFollowTheTool()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         w.show();
         QVERIFY(w.newProject());
-        kimcad::ToolOptionsBar* bar = w.toolOptions();
+        kimbim::ToolOptionsBar* bar = w.toolOptions();
         QVERIFY(bar->isHidden());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         QVERIFY(!bar->isHidden());
         QVERIFY(w.findChild<QDoubleSpinBox*>(QStringLiteral("wallHeight"))->isVisibleTo(bar));
         QVERIFY(!w.findChild<QComboBox*>(QStringLiteral("roofKind"))->isVisibleTo(bar));
-        w.setTool(kimcad::MainWindow::Tool::Roof);
+        w.setTool(kimbim::MainWindow::Tool::Roof);
         QVERIFY(w.findChild<QComboBox*>(QStringLiteral("roofKind"))->isVisibleTo(bar));
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QVERIFY(bar->isHidden());
         QCOMPARE(bar->parentWidget()->parentWidget(), w.dockLayout()->view(w.currentViewKey())); // in the active tab
     }
 ```
 
-Add `src/ToolOptionsBar.cpp src/ToolOptionsBar.h` to `kimcad_core`.
+Add `src/ToolOptionsBar.cpp src/ToolOptionsBar.h` to `kimbim_core`.
 
 - [ ] **Step 2: Run to make sure they fail.** Build: compile errors.
 
@@ -1468,7 +1468,7 @@ Add `src/ToolOptionsBar.cpp src/ToolOptionsBar.h` to `kimcad_core`.
 
 #include <QHBoxLayout>
 
-namespace kimcad {
+namespace kimbim {
 
 ToolOptionsBar::ToolOptionsBar(QWidget* parent)
     : QWidget(parent)
@@ -1497,7 +1497,7 @@ void ToolOptionsBar::setActive(bool toolActive)
     setVisible(toolActive && any);
 }
 
-} // namespace kimcad
+} // namespace kimbim
 ```
 
 In `MainWindow::buildModelingToolbar`: create `m_toolOptions = new ToolOptionsBar(this)`. Create `m_types`, `m_wallHeight`, the roof box and `m_lengthInput` with `m_toolOptions` as parent, and add each with `m_toolOptions->addField(...)` instead of `bar->addWidget(...)`. Delete `m_wallHeightAction`, `m_roofAction` and `m_lengthAction` (header + uses). In `setTool`, the three `...Action->setVisible(x)` become `m_wallHeight->setVisible(x)`, `m_roofKind->parentWidget()->setVisible(x)` (the roof box) and `m_lengthInput->setVisible(x)`. At the end of every path of `setTool`, call `m_toolOptions->setActive(m_tool != Tool::None)`. In `activateView`, pass `m_toolOptions` to `adoptChrome`.
@@ -1548,8 +1548,8 @@ git commit -m "feat(app): the active tool's fields (type, height, roof, length) 
 ```cpp
     void statusStripShowsLayersZoomSelectionAndMessages()
     {
-        kimcad::StatusStrip s;
-        QSignalSpy active(&s, &kimcad::StatusStrip::activeLayerRequested);
+        kimbim::StatusStrip s;
+        QSignalSpy active(&s, &kimbim::StatusStrip::activeLayerRequested);
         s.setLayers({"A-WALL", "A-DOOR", "A-ANNO"}, "A-WALL", {"A-ANNO"});
         QCOMPARE(s.layersText(), QString("2/3"));
         auto* combo = s.findChild<QComboBox*>(QStringLiteral("activeLayer"));
@@ -1571,10 +1571,10 @@ In `test_main_window.cpp`:
 ```cpp
     void bottomBarFollowsTheWindow()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         QVERIFY(w.newProject());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
-        QCOMPARE(w.statusStrip()->message(), QCoreApplication::translate("kimcad::MainWindow", "Wall: click the start point"));
+        w.setTool(kimbim::MainWindow::Tool::Wall);
+        QCOMPARE(w.statusStrip()->message(), QCoreApplication::translate("kimbim::MainWindow", "Wall: click the start point"));
         QVERIFY(w.createWall({QPointF(0, 0), QPointF(4, 0)}));
         w.setSelection(w.viewport()->guids().mid(0, 1));
         QVERIFY(w.statusStrip()->selectionText().contains(QLatin1String("1")));
@@ -1582,7 +1582,7 @@ In `test_main_window.cpp`:
     }
 ```
 
-Add `src/StatusStrip.cpp src/StatusStrip.h` to `kimcad_core`.
+Add `src/StatusStrip.cpp src/StatusStrip.h` to `kimbim_core`.
 
 - [ ] **Step 2: Run to make sure they fail.** Build: compile errors.
 
@@ -1599,7 +1599,7 @@ Add `src/StatusStrip.cpp src/StatusStrip.h` to `kimcad_core`.
 #include <QTimer>
 #include <QToolButton>
 
-namespace kimcad {
+namespace kimbim {
 
 StatusStrip::StatusStrip(QWidget* parent)
     : QWidget(parent)
@@ -1688,7 +1688,7 @@ QString StatusStrip::zoomText() const { return m_zoomText; }
 QString StatusStrip::selectionText() const { return m_selection->text(); }
 QString StatusStrip::layersText() const { return m_layersText; }
 
-} // namespace kimcad
+} // namespace kimbim
 ```
 
 `Viewport::zoomPercent()`: remember `m_fitScale = m_view->Scale()` in `fitAll()` and return
@@ -1724,7 +1724,7 @@ git commit -m "feat(app): bottom bar with pen placeholder, active layer, visible
 ```cpp
     void oneTopBar()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         const auto bars = w.findChildren<QToolBar*>();
         QStringList top;
         for (QToolBar* b : bars)
@@ -1733,7 +1733,7 @@ git commit -m "feat(app): bottom bar with pen placeholder, active layer, visible
         QCOMPARE(top, QStringList({"topToolbar"}));
         QToolBar* bar = w.findChild<QToolBar*>(QStringLiteral("topToolbar"));
         QVERIFY(bar->findChild<QComboBox*>(QStringLiteral("optionCombo")));
-        QVERIFY(bar->findChild<kimcad::LevelsBar*>());
+        QVERIFY(bar->findChild<kimbim::LevelsBar*>());
         QVERIFY(bar->findChild<QDoubleSpinBox*>(QStringLiteral("planCutHeight")));
     }
 ```
@@ -1780,7 +1780,7 @@ git commit -am "feat(app): one slim top bar: design option, level and cuts (repl
 ```cpp
     void buildsTheTreeAndFindsElements()
     {
-        kimcad::ModelTreePanel panel;
+        kimbim::ModelTreePanel panel;
         panel.setTree(sampleTree());
         QCOMPARE(panel.itemCount(), 7);                       // every guid is still findable
         QVERIFY(panel.selectGuid("W1"));
@@ -1791,7 +1791,7 @@ git commit -am "feat(app): one slim top bar: design option, level and cuts (repl
 
     void singleChildSpatialRowsAreMerged()
     {
-        kimcad::ModelTreePanel panel;
+        kimbim::ModelTreePanel panel;
         panel.setTree(sampleTree());
         QCOMPARE(panel.tree()->topLevelItemCount(), 1);
         QTreeWidgetItem* top = panel.tree()->topLevelItem(0);
@@ -1805,7 +1805,7 @@ git commit -am "feat(app): one slim top bar: design option, level and cuts (repl
 
     void elementsAreGroupedByCategoryUnderALevel()
     {
-        kimcad::ModelTreePanel panel;
+        kimbim::ModelTreePanel panel;
         panel.setTree(sampleTree());
         QTreeWidgetItem* level = panel.itemFor("L1");
         QCOMPARE(level->childCount(), 2);
@@ -1830,7 +1830,7 @@ git commit -am "feat(app): one slim top bar: design option, level and cuts (repl
         site["children"] = buildings;
         sites[0] = site;
         root["children"] = sites;
-        kimcad::ModelTreePanel panel;
+        kimbim::ModelTreePanel panel;
         panel.setTree(root);
         QTreeWidgetItem* top = panel.tree()->topLevelItem(0);
         QCOMPARE(top->text(0), QString("Sitio"));             // Casa › Sitio merged, then two buildings
@@ -1839,7 +1839,7 @@ git commit -am "feat(app): one slim top bar: design option, level and cuts (repl
 
     void typeStillSearchableAndInTheHint()
     {
-        kimcad::ModelTreePanel panel;
+        kimbim::ModelTreePanel panel;
         panel.setTree(sampleTree());
         panel.setFilter("IfcDoor");
         QVERIFY(!panel.itemFor("D1")->isHidden());
@@ -2019,9 +2019,9 @@ git commit -am "feat(app): tidier model tree: plain names, single-child Project/
 ```cpp
     void doubleClickActivates()
     {
-        kimcad::ModelTreePanel panel;
+        kimbim::ModelTreePanel panel;
         panel.setTree(sampleTree());
-        QSignalSpy spy(&panel, &kimcad::ModelTreePanel::guidActivated);
+        QSignalSpy spy(&panel, &kimbim::ModelTreePanel::guidActivated);
         emit panel.tree()->itemDoubleClicked(panel.itemFor("W1"), 0);
         QCOMPARE(spy.count(), 1);
         QCOMPARE(spy.first().first().toString(), QString("W1"));
@@ -2035,11 +2035,11 @@ git commit -am "feat(app): tidier model tree: plain names, single-child Project/
 ```cpp
     void doubleClickShowsPropertiesOrOpensThePlan()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         QVERIFY(w.newProject());
-        w.setTool(kimcad::MainWindow::Tool::Wall);
+        w.setTool(kimbim::MainWindow::Tool::Wall);
         QVERIFY(w.createWall({QPointF(0, 0), QPointF(4, 0)}));
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         const QString wall = w.viewport()->guids().constLast();
         w.dockLayout()->raisePanel(QStringLiteral("tree"));
         QVERIFY(!w.dockLayout()->isPanelShown(QStringLiteral("properties")));
@@ -2089,9 +2089,9 @@ git commit -am "feat(app): double-click an element (view or tree) to bring Prope
 ### Task 13: Translations, docs, speed and the whole check
 
 **Files:**
-- Modify: `app/translations/kimcad_es.ts`, `app/translations/kimcad_en.ts`, `docs/decisions.md`, `docs/04-app-features.md`, `docs/13-architect-feedback.md`
+- Modify: `app/translations/kimbim_es.ts`, `app/translations/kimbim_en.ts`, `docs/decisions.md`, `docs/04-app-features.md`, `docs/13-architect-feedback.md`
 
-- [ ] **Step 1: Translations.** Update the `.ts` files the way the repo does it. Read `tools/check_translations.py` for the expected workflow; it is usually `pixi run bash -c "lupdate app/src -ts app/translations/kimcad_es.ts app/translations/kimcad_en.ts"`. Fill in the Spanish for every new `unfinished` entry. Suggested wording:
+- [ ] **Step 1: Translations.** Update the `.ts` files the way the repo does it. Read `tools/check_translations.py` for the expected workflow; it is usually `pixi run bash -c "lupdate app/src -ts app/translations/kimbim_es.ts app/translations/kimbim_en.ts"`. Fill in the Spanish for every new `unfinished` entry. Suggested wording:
 
 | English | Spanish |
 |---|---|
@@ -2139,7 +2139,7 @@ Run: `pixi run check-translations` → `translations OK`. Run `test_translations
 
 Run:
 ```bash
-pixi run app-build && KIMCAD_PYTHON_PATH="$PWD/python" pixi run ctest --test-dir build/app --output-on-failure
+pixi run app-build && KIMBIM_PYTHON_PATH="$PWD/python" pixi run ctest --test-dir build/app --output-on-failure
 pixi run pytest -q -p no:cacheprovider
 pixi run check-translations && pixi run check-spdx
 ```

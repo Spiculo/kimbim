@@ -12,7 +12,7 @@
 #include "Viewport.h"
 #include "WallTool.h"
 
-using kimcad::MainWindow;
+using kimbim::MainWindow;
 
 class TestMarkupTools : public QObject {
     Q_OBJECT
@@ -24,7 +24,7 @@ private slots:
         MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         w.findChild<QAction*>(QStringLiteral("actionPlanView"))->trigger();
-        kimcad::Viewport* v = w.viewport();
+        kimbim::Viewport* v = w.viewport();
         w.setTool(MainWindow::Tool::Wall);
         QVERIFY(w.createWall({QPointF(0, 0), QPointF(6, 0), {}, {}}));
         QVERIFY(w.createWall({QPointF(0, 4), QPointF(6, 4), {}, {}}));

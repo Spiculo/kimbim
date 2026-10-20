@@ -7,8 +7,8 @@
 
 #include <cmath>
 
-using kimcad::Snap;
-using kimcad::Snapper;
+using kimbim::Snap;
+using kimbim::Snapper;
 
 namespace {
 
@@ -120,7 +120,7 @@ private slots:
     void wallFacesWhenEnabled()
     {
         Snapper s;
-        s.setWalls({kimcad::SnapWall{QStringLiteral("w"), QPointF(0, 0), QPointF(4, 0), 0.3}});
+        s.setWalls({kimbim::SnapWall{QStringLiteral("w"), QPointF(0, 0), QPointF(4, 0), 0.3}});
         QCOMPARE(s.snap(QPointF(0.02, 0.17), 0.1).kind, Snap::Grid); // off by default
         s.setFaceSnapping(true);
         const Snap corner = s.snap(QPointF(0.02, 0.17), 0.1);

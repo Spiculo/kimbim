@@ -10,7 +10,7 @@
 #include <Prs3d_TextAspect.hxx>
 #include <TCollection_ExtendedString.hxx>
 
-namespace kimcad {
+namespace kimbim {
 
 MeasureOverlay::MeasureOverlay(QVector<MeasurePoint> path, QString label)
     : m_path(std::move(path))
@@ -62,4 +62,4 @@ void MeasureOverlay::Compute(const Handle(PrsMgr_PresentationManager)&, const Ha
     }
 }
 
-} // namespace kimcad
+} // namespace kimbim

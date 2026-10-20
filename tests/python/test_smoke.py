@@ -7,6 +7,6 @@ def test_ifcopenshell_is_conda_forge_0_9():
 
 
 def test_package_version():
-    import kimcad
+    import kimbim
 
-    assert kimcad.__version__ == "0.1.0"
+    assert kimbim.__version__ == "0.1.0"

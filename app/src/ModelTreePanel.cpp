@@ -13,7 +13,7 @@
 #include <QMap>
 #include <QVBoxLayout>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 constexpr int GuidRole = Qt::UserRole;
@@ -334,4 +334,4 @@ void ModelTreePanel::showContextMenu(const QPoint& pos)
     menu.exec(m_tree->viewport()->mapToGlobal(pos));
 }
 
-} // namespace kimcad
+} // namespace kimbim

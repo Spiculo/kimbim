@@ -9,7 +9,7 @@ class QComboBox;
 class QTreeWidget;
 class QTreeWidgetItem;
 
-namespace kimcad {
+namespace kimbim {
 
 // Layers (shown / locked / active, element count) and views (named collections of layer states).
 class LayersPanel : public QWidget {
@@ -42,4 +42,4 @@ private:
     bool m_filling = false;
 };
 
-} // namespace kimcad
+} // namespace kimbim

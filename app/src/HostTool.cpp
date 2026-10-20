@@ -5,7 +5,7 @@
 #include <cmath>
 #include <limits>
 
-namespace kimcad {
+namespace kimbim {
 
 HostTool::HostTool(QObject* parent)
     : QObject(parent)
@@ -49,4 +49,4 @@ void HostTool::click(QPointF p)
         emit openingRequested(*host);
 }
 
-} // namespace kimcad
+} // namespace kimbim

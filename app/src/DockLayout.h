@@ -15,7 +15,7 @@ class CDockWidget;
 class CDockAreaWidget;
 }
 
-namespace kimcad {
+namespace kimbim {
 
 // The main window's docking (D71, Qt Advanced Docking System): center views as tabs that can be
 // dragged out to their own windows and docked back, tabbed panels on the right, tools on the left,
@@ -78,4 +78,4 @@ private:
     QByteArray m_default;
 };
 
-} // namespace kimcad
+} // namespace kimbim

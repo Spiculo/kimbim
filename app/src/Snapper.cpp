@@ -10,7 +10,7 @@
 #include <cmath>
 #include <limits>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -434,4 +434,4 @@ Snap Snapper::compute(QPointF p, double tolerance, const QPointF* from, bool ort
     return Snap{onGrid(p), Snap::Grid, {}};
 }
 
-} // namespace kimcad
+} // namespace kimbim

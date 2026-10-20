@@ -14,7 +14,7 @@
 #include "PenGrid.h"
 #include "PropertiesPanel.h" // renovationKeys, renovationLabel
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 QIcon colorIcon(const QColor& color)
@@ -146,4 +146,4 @@ void RenovationFiltersDialog::showSet(const QString&)
     }
 }
 
-} // namespace kimcad
+} // namespace kimbim

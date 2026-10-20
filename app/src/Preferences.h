@@ -7,7 +7,7 @@
 #include <QString>
 #include <QStringList>
 
-namespace kimcad {
+namespace kimbim {
 // User preferences, per computer (D72): a readable preferences.json in the user's settings folder.
 class Preferences {
 public:

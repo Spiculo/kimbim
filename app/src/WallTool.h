@@ -10,7 +10,7 @@
 
 #include "Snapper.h"
 
-namespace kimcad {
+namespace kimbim {
 
 // One wall to create: axis from p1 to p2 (metres, on the active level) and the walls to join at
 // each end (empty: none).
@@ -43,7 +43,7 @@ public:
     std::optional<std::pair<QPointF, QPointF>> preview() const;
 
 signals:
-    void wallRequested(const kimcad::WallSegment& segment);
+    void wallRequested(const kimbim::WallSegment& segment);
     void previewChanged();
     void finished();
 
@@ -61,6 +61,6 @@ private:
     std::optional<QPointF> m_hover;
 };
 
-} // namespace kimcad
+} // namespace kimbim
 
-Q_DECLARE_METATYPE(kimcad::WallSegment)
+Q_DECLARE_METATYPE(kimbim::WallSegment)

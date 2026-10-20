@@ -29,17 +29,17 @@ EAST, NORTH = 580000.0, 6140000.0  # a UTM-like survey point (metres)
 
 
 def app() -> Path:
-    for name in ("kimcad-app.exe", "kimcad-app"):
+    for name in ("kimbim-app.exe", "kimbim-app"):
         for base in (ROOT / "build" / "app" / "app", ROOT / "build" / "app"):
             if (base / name).exists():
                 return base / name
-    raise SystemExit("kimcad-app not built (pixi run app-build)")
+    raise SystemExit("kimbim-app not built (pixi run app-build)")
 
 
 def open_drawing(ifc: str, name: str, out: Path) -> dict:
     """Open `name` in the app (self-test), wait for it, return the self-test report and the SVG."""
     shot = out / (re.sub(r"\W+", "-", f"{Path(ifc).stem}-{name}") + ".png")
-    env = {**os.environ, "KIMCAD_PYTHON_PATH": str(ROOT / "python")}
+    env = {**os.environ, "KIMBIM_PYTHON_PATH": str(ROOT / "python")}
     done = subprocess.run([str(app()), "--self-test", ifc, "--frames", "1", "--open-drawing", name,
                            "--screenshot", str(shot), "--window-size", "1500x860"],
                           capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, timeout=900)
@@ -91,7 +91,7 @@ def span(gs: list[dict]) -> tuple[float, float]:
 
 def stair_section(house: Path, out: Path) -> Path:
     """The house with a section across its U stair (x = 2 m, looking west)."""
-    from kimcad import app_bridge as b
+    from kimbim import app_bridge as b
 
     path = out / "house-stair.ifc"
     assert json.loads(b.open_model(str(house))).get("ok") is not False

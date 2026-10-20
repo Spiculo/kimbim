@@ -16,7 +16,7 @@
 
 namespace {
 
-QAction* action(kimcad::MainWindow& w, const char* name)
+QAction* action(kimbim::MainWindow& w, const char* name)
 {
     QAction* a = w.findChild<QAction*>(QString::fromLatin1(name));
     if (!a)
@@ -38,7 +38,7 @@ private slots:
     {
         QStandardPaths::setTestModeEnabled(true);
         QString error;
-        QVERIFY2(kimcad::PythonEngine::instance().start(&error), qPrintable(error));
+        QVERIFY2(kimbim::PythonEngine::instance().start(&error), qPrintable(error));
     }
 
     void countsTheHouseWallsAndUndoesAConsoleEdit()
@@ -46,20 +46,20 @@ private slots:
         // The exit-test house (tools/make_house.py), built through the engine like `pixi run house`.
         QTemporaryDir tmp;
         const QString house = tmp.filePath(QStringLiteral("house.ifc"));
-        const QString tool = QDir(qEnvironmentVariable("KIMCAD_PYTHON_PATH")).absoluteFilePath(QStringLiteral("../tools/make_house.py"));
+        const QString tool = QDir(qEnvironmentVariable("KIMBIM_PYTHON_PATH")).absoluteFilePath(QStringLiteral("../tools/make_house.py"));
         QVERIFY(QFileInfo::exists(tool));
-        const QJsonObject made = kimcad::PythonEngine::instance().callJson("console_run",
+        const QJsonObject made = kimbim::PythonEngine::instance().callJson("console_run",
             {QStringLiteral("import runpy\nrunpy.run_path(%1)['build'](%2)['walls']").arg(pyString(tool), pyString(house)),
                 QStringLiteral("[]")}).object();
         QVERIFY2(!made.value("error").toBool(), qPrintable(made.value("traceback").toString()));
         QCOMPARE(made.value("output").toString(), QStringLiteral("8\n"));
 
-        kimcad::MainWindow w(nullptr, /*quiet=*/true);
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
 
-        QSignalSpy done(&w, &kimcad::MainWindow::loadFinished);
+        QSignalSpy done(&w, &kimbim::MainWindow::loadFinished);
         w.openFile(house);
         QVERIFY(done.wait(120000));
-        kimcad::ConsolePanel* panel = w.consolePanel();
+        kimbim::ConsolePanel* panel = w.consolePanel();
         QJsonObject r = w.runConsole(QStringLiteral("len(ifc.by_type(\"IfcWall\"))"));
         QVERIFY(r.value("ok").toBool());
         QCOMPARE(r.value("output").toString(), QStringLiteral("8\n"));
@@ -94,14 +94,14 @@ private slots:
 
     void consoleIsInViewPanelsAndInputKeepsHistory()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         QAction* show = action(w, "actionConsole");
         QCOMPARE(show->shortcut(), QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_P));
         QVERIFY(w.findChild<QMenu*>(QStringLiteral("panelsMenu"))->actions().contains(show));
         QVERIFY(action(w, "actionRunScript"));
         show->trigger();
-        kimcad::ConsolePanel* panel = w.consolePanel();
-        kimcad::ConsoleInput* input = panel->input();
+        kimbim::ConsolePanel* panel = w.consolePanel();
+        kimbim::ConsoleInput* input = panel->input();
         input->setPlainText(QStringLiteral("a = 2"));
         QTest::keyClick(input, Qt::Key_Return); // Enter runs
         QVERIFY(input->toPlainText().isEmpty());

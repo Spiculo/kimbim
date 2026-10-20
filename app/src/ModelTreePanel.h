@@ -10,7 +10,7 @@ class QLineEdit;
 class QTreeWidget;
 class QTreeWidgetItem;
 
-namespace kimcad {
+namespace kimbim {
 
 // The model tree (D71: less noise): the spatial structure with single-child Project/Site/Building rows
 // merged into one, plain names ("Wall", not IfcWallStandardCase; the IFC class on hover and in the
@@ -62,4 +62,4 @@ private:
     QStringList m_mergedGuids; // guids of the rows merged into the next one being added
 };
 
-} // namespace kimcad
+} // namespace kimbim

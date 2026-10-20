@@ -14,7 +14,7 @@
 
 namespace {
 
-QAction* action(kimcad::MainWindow& w, const char* name)
+QAction* action(kimbim::MainWindow& w, const char* name)
 {
     QAction* a = w.findChild<QAction*>(QString::fromLatin1(name));
     if (!a)
@@ -40,26 +40,26 @@ private slots:
 
     void panelListsAndSearches()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         QVERIFY(w.newProject());
         action(w, "actionObjectLibrary")->trigger();
-        kimcad::LibraryPanel* panel = w.libraryPanel();
+        kimbim::LibraryPanel* panel = w.libraryPanel();
         QVERIFY(panel->visibleObjectCount() >= 21);
         panel->findChild<QLineEdit*>(QStringLiteral("librarySearch"))->setText(QStringLiteral("bed"));
         QCOMPARE(panel->visibleObjectCount(), 2); // single and double bed
         panel->setFilter(QString());
         QVERIFY(panel->selectObject(QStringLiteral("sofa")));
         QCOMPARE(panel->currentParams().value("seats").toInt(), 3);
-        QVERIFY(!kimcad::LibraryPanel::symbolIcon(QJsonArray{QJsonArray{QJsonArray{0, 0}, QJsonArray{1, 1}}}, 1, 1).isNull());
+        QVERIFY(!kimbim::LibraryPanel::symbolIcon(QJsonArray{QJsonArray{QJsonArray{0, 0}, QJsonArray{1, 1}}}, 1, 1).isNull());
     }
 
     void objectToolPlacesTurnsAndUndoes()
     {
-        kimcad::MainWindow w(nullptr, true);
+        kimbim::MainWindow w(nullptr, true);
         QVERIFY(w.newProject());
         QVERIFY(w.toolPalette()->findChildren<QObject*>().size() > 0);
         QVERIFY(w.chooseObject(QStringLiteral("table"), QJsonObject{{"width", 1.2}}));
-        QCOMPARE(w.tool(), kimcad::MainWindow::Tool::Object);
+        QCOMPARE(w.tool(), kimbim::MainWindow::Tool::Object);
         QVERIFY(action(w, "actionTurnObject")->isEnabled());
         const QStringList before = w.viewport()->guids();
         emit w.viewport()->workPointMoved(QPointF(2, 3), 0.01, Qt::NoModifier); // the preview follows
@@ -67,7 +67,7 @@ private slots:
         QStringList made = added(before, w.viewport()->guids());
         QCOMPARE(made.size(), 1);
         QCOMPARE(w.viewport()->typeOf(made[0]), QStringLiteral("IfcFurniture"));
-        const QJsonObject props = kimcad::PythonEngine::instance().callJson("properties", {made[0]}).object();
+        const QJsonObject props = kimbim::PythonEngine::instance().callJson("properties", {made[0]}).object();
         QVERIFY(props.value("name").toString() == QLatin1String("Table"));
 
         action(w, "actionTurnObject")->trigger(); // Tab
@@ -79,11 +79,11 @@ private slots:
         QCOMPARE(added(before2, w.viewport()->guids()).size(), 1);
 
         // Parameters in Properties: the selected table gets a new width (a new type; the other keeps its own).
-        w.setTool(kimcad::MainWindow::Tool::None);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QVERIFY(!action(w, "actionTurnObject")->isEnabled()); // Tab is the focus key again
         w.setSelection({made[0]});
         QVERIFY(w.applyPropertyEdit(QStringLiteral("Parameters"), QStringLiteral("Width"), 1.8));
-        const QJsonObject multi = kimcad::PythonEngine::instance().callJson("properties_multi", {QStringLiteral("[\"%1\"]").arg(made[0])}).object();
+        const QJsonObject multi = kimbim::PythonEngine::instance().callJson("properties_multi", {QStringLiteral("[\"%1\"]").arg(made[0])}).object();
         QCOMPARE(multi.value("psets").toObject().value("Parameters").toObject().value("Width").toObject().value("value").toDouble(), 1.8);
 
         // Undo: the edit, then the second table, each one step.

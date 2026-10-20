@@ -27,7 +27,7 @@
 
 #include <algorithm>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -90,7 +90,7 @@ DockLayout::DockLayout(QMainWindow* window)
     ads::CDockComponentsFactory::setFactory(new Factory);
     m_manager = new ads::CDockManager(window); // becomes the window's central widget
     m_manager->setObjectName(QStringLiteral("dockManager"));
-    m_manager->setProperty("kimcadDockLayout", QVariant::fromValue<QObject*>(this));
+    m_manager->setProperty("kimbimDockLayout", QVariant::fromValue<QObject*>(this));
     // ADS draws inactive tab titles in palette(dark): unreadable on a dark palette (the owner's screen).
     // D90: compact title bars (12 px buttons, no extra padding): a panel's title row costs ~20 px.
     m_manager->setStyleSheet(m_manager->styleSheet() + QStringLiteral(
@@ -282,7 +282,7 @@ void DockLayout::styleArea(ads::CDockAreaWidget* area)
 {
     if (!area || !area->dockManager())
         return;
-    auto* self = qobject_cast<DockLayout*>(area->dockManager()->property("kimcadDockLayout").value<QObject*>());
+    auto* self = qobject_cast<DockLayout*>(area->dockManager()->property("kimbimDockLayout").value<QObject*>());
     if (!self)
         return;
     bool panels = false, tools = false;
@@ -434,4 +434,4 @@ bool DockLayout::restoreLayout(const QByteArray& state)
     return false;
 }
 
-} // namespace kimcad
+} // namespace kimbim

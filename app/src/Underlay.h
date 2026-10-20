@@ -12,7 +12,7 @@
 #include <memory>
 #include <vector>
 
-namespace kimcad {
+namespace kimbim {
 
 // Where an underlay's drawing goes on its level (D85): drawing point `base` (drawing units: DXF units,
 // PDF points or image pixels, y down for PDF/images) lands on level point `at` (metres), the drawing
@@ -95,4 +95,4 @@ private:
     std::vector<int> m_cellStart, m_cellItems;
 };
 
-} // namespace kimcad
+} // namespace kimbim

@@ -7,7 +7,7 @@ title block, exported to PDF; CI checks it automatically (`pixi run m4`).
 
 - **A sheet is an `IfcDocumentInformation`** (Purpose `SHEET`, Identification = sheet number, Name = title,
   Scope = paper), as Bonsai stores sheets. Each placed drawing is an `IfcDocumentReference` to it:
-  Identification = the drawing's GlobalId, Location `kimcad:drawing`, Description = `{x, y, scale}` (sheet mm,
+  Identification = the drawing's GlobalId, Location `kimbim:drawing`, Description = `{x, y, scale}` (sheet mm,
   top-left; 1:n). The name is read from the drawing (an EXPRESS rule allows a Name or a referenced document,
   not both). Sheets are model data: versioned, undoable; their SVG is composed on demand.
 - **Paper sizes** A1 (841 × 594) and A3 (420 × 297), landscape; **automatic numbering** A01, A02…
@@ -15,16 +15,16 @@ title block, exported to PDF; CI checks it automatically (`pixi run m4`).
   name = `IfcProject.LongName`, address = `IfcBuilding.BuildingAddress`, client = an `IfcActor` assigned to
   the project with the CLIENT role. *File › Project info…*.
 - **Title block** (bottom right, 180 × 50 mm): project name, number, client, address, sheet title, sheet
-  number, scale ("As indicated" when drawings differ), date, KIMCAD. Each placed drawing has a title line
+  number, scale ("As indicated" when drawings differ), date, KimBim. Each placed drawing has a title line
   with its name and scale, as on Archicad layouts.
 - **Composition**: each drawing's SVG is embedded in a `<g>` with translate/scale (QtSvg has no nested
   `<svg>`); drawings are auto-placed left to right, top to bottom, clear of each other and the title block.
 - **PDF through Qt** (doc 05): `QPdfWriter` + `QSvgRenderer`, vector, page = the paper size. SVG export too.
-  `kimcad-app --export-sheet NUMBER model.ifc out.pdf|out.svg` exports without a window (CI, scripts).
+  `kimbim-app --export-sheet NUMBER model.ifc out.pdf|out.svg` exports without a window (CI, scripts).
 
 ## Done
 
-- [x] `kimcad/sheets.py`: project info, sheets, place/move/scale/remove drawings, `sheet_svg`, `export_sheet_svg`.
+- [x] `kimbim/sheets.py`: project info, sheets, place/move/scale/remove drawings, `sheet_svg`, `export_sheet_svg`.
 - [x] App: *Sheets* panel (New A1/A3, Place drawing, Open, Delete), sheets in tabs (drag a placed drawing to
   move it), *File › Project info…*, *Export sheet as PDF… / SVG…*; headless `--export-sheet`.
 - [x] `tools/make_house.py` builds the M4 sheet (A3: ground floor plan, a section, the south elevation);

@@ -8,7 +8,7 @@ import ifcopenshell.util.element
 import numpy as np
 import pytest
 
-from kimcad import app_bridge as b
+from kimbim import app_bridge as b
 
 
 def call(fn, *args):
@@ -64,12 +64,12 @@ def test_placing_a_model_copies_its_elements_linked_to_it(apartment):
     on_l1 = contained(apartment["l1"])
     assert sorted(e.is_a() for e in on_l1) == ["IfcDoor", "IfcWall", "IfcWall"]
     first_wall = next(e for e in on_l1 if e.is_a("IfcWall") and
-                      ifcopenshell.util.element.get_psets(e)["KIMCAD_ModelInstance"]["Source"] == apartment["walls"][0])
+                      ifcopenshell.util.element.get_psets(e)["KIMBIM_ModelInstance"]["Source"] == apartment["walls"][0])
     lo, hi = bbox(first_wall.GlobalId)
     assert lo[0] == pytest.approx(10.0, abs=0.2) and hi[0] == pytest.approx(16.15, abs=0.2) and lo[2] == pytest.approx(0.0, abs=1e-3)
     on_l2 = contained(apartment["l2"])
     turned = next(e for e in on_l2 if e.is_a("IfcWall") and
-                  ifcopenshell.util.element.get_psets(e)["KIMCAD_ModelInstance"]["Source"] == apartment["walls"][0])
+                  ifcopenshell.util.element.get_psets(e)["KIMBIM_ModelInstance"]["Source"] == apartment["walls"][0])
     lo, hi = bbox(turned.GlobalId)
     assert hi[1] - lo[1] == pytest.approx(6.15, abs=0.2) and lo[2] == pytest.approx(3.0, abs=1e-3)  # along Y now
     joins = b._model.by_type("IfcRelConnectsPathElements")
@@ -97,7 +97,7 @@ def test_explode_unlinks_an_instance(apartment):
     r = call("place_model", apartment["model"], apartment["l1"], 10, 0, 0)
     assert call("explode_instance", r["instance"])["ok"]
     for e in contained(apartment["l1"]):
-        assert "KIMCAD_ModelInstance" not in ifcopenshell.util.element.get_psets(e)
+        assert "KIMBIM_ModelInstance" not in ifcopenshell.util.element.get_psets(e)
     assert call("models")["models"][0]["instances"] == 0
     assert call("instance_members")["instances"] == {}
 
@@ -115,7 +115,7 @@ def test_a_moved_instance_stays_where_it_was_moved(apartment):
     assert call("move_elements", g(*r["guids"]), 0, 5, 0)["ok"]
     call("update_model_instances", apartment["model"])
     wall = next(e for e in contained(apartment["l1"]) if e.is_a("IfcWall") and
-                ifcopenshell.util.element.get_psets(e)["KIMCAD_ModelInstance"]["Source"] == apartment["walls"][0])
+                ifcopenshell.util.element.get_psets(e)["KIMBIM_ModelInstance"]["Source"] == apartment["walls"][0])
     lo, hi = bbox(wall.GlobalId)
     assert lo[0] == pytest.approx(10.0, abs=0.2) and (lo[1] + hi[1]) / 2 == pytest.approx(5.0, abs=0.05)
 

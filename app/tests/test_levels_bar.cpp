@@ -23,8 +23,8 @@ class TestLevelsBar : public QObject {
 private slots:
     void listsLevelsByElevationAndStartsOnTheLowest()
     {
-        kimcad::LevelsBar bar;
-        QSignalSpy changed(&bar, &kimcad::LevelsBar::activeStoreyChanged);
+        kimbim::LevelsBar bar;
+        QSignalSpy changed(&bar, &kimbim::LevelsBar::activeStoreyChanged);
         bar.setStoreys(storeys(R"([{"guid":"b","name":"Level 2","elevation":3.0},
                                    {"guid":"a","name":"Level 1","elevation":0.0}])"));
         QCOMPARE(bar.count(), 2);
@@ -37,9 +37,9 @@ private slots:
 
     void choosingALevelEmitsItsElevation()
     {
-        kimcad::LevelsBar bar;
+        kimbim::LevelsBar bar;
         bar.setStoreys(storeys(R"([{"guid":"a","name":"L1","elevation":0.0},{"guid":"b","name":"L2","elevation":3.0}])"));
-        QSignalSpy changed(&bar, &kimcad::LevelsBar::activeStoreyChanged);
+        QSignalSpy changed(&bar, &kimbim::LevelsBar::activeStoreyChanged);
         bar.combo()->setCurrentIndex(1);
         QCOMPARE(changed.count(), 1);
         QCOMPARE(changed.last().at(1).toDouble(), 3.0);
@@ -48,10 +48,10 @@ private slots:
 
     void refreshingKeepsTheActiveLevelQuietly()
     {
-        kimcad::LevelsBar bar;
+        kimbim::LevelsBar bar;
         bar.setStoreys(storeys(R"([{"guid":"a","name":"L1","elevation":0.0},{"guid":"b","name":"L2","elevation":3.0}])"));
         bar.setActive("b");
-        QSignalSpy changed(&bar, &kimcad::LevelsBar::activeStoreyChanged);
+        QSignalSpy changed(&bar, &kimbim::LevelsBar::activeStoreyChanged);
         bar.setStoreys(storeys(R"([{"guid":"a","name":"L1","elevation":0.0},{"guid":"b","name":"L2","elevation":3.0},
                                    {"guid":"c","name":"L3","elevation":6.0}])"));
         QCOMPARE(bar.activeStorey(), QString("b"));
@@ -63,8 +63,8 @@ private slots:
 
     void addButtonAsksForANewLevel()
     {
-        kimcad::LevelsBar bar;
-        QSignalSpy add(&bar, &kimcad::LevelsBar::addLevelRequested);
+        kimbim::LevelsBar bar;
+        QSignalSpy add(&bar, &kimbim::LevelsBar::addLevelRequested);
         QVERIFY(bar.menuButton()->menu()->actions().contains(bar.addLevelAction())); // D75: in the drop-down
         bar.addLevelAction()->trigger();
         QCOMPARE(add.count(), 1);

@@ -11,7 +11,7 @@
 
 #include "Snapper.h"
 
-namespace kimcad {
+namespace kimbim {
 
 // Split, trim / extend (to an element or a line, or two to their corner), join and unjoin walls and
 // beams by clicking them (D80). Pure logic: the window feeds it the level's walls, beams and grid
@@ -71,4 +71,4 @@ private:
     std::optional<QPointF> m_splitPoint;
 };
 
-} // namespace kimcad
+} // namespace kimbim

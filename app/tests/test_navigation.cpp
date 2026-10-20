@@ -24,7 +24,7 @@ private slots:
     // Owner bug report: pan/orbit kept going after releasing the mouse button until Shift was let go.
     void releasingTheButtonEndsTheGesture()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         v.resize(200, 200);
         QTest::mousePress(&v, Qt::MiddleButton, Qt::ShiftModifier, QPoint(50, 50));
         QCOMPARE(v.pressedButtons(), Aspect_VKeyMouse(Aspect_VKeyMouse_MiddleButton));
@@ -38,7 +38,7 @@ private slots:
     // The same with the exact event sequence a real mouse produces (moves before and after).
     void orbitStopsOnReleaseWhileShiftIsHeld()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         v.resize(200, 200);
         auto send = [&](QEvent::Type type, QPointF pos, Qt::MouseButton button, Qt::MouseButtons buttons) {
             QMouseEvent e(type, pos, v.mapToGlobal(pos), button, buttons, Qt::ShiftModifier);
@@ -56,7 +56,7 @@ private slots:
     // Slice 4: plan view looks straight down; Shift+middle pans instead of orbiting there.
     void planViewDisablesOrbit()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         QVERIFY(!v.isPlanView());
         v.setPlanView(3.0);
         QVERIFY(v.isPlanView());
@@ -70,14 +70,14 @@ private slots:
 
     void pointOnPlaneNeedsAWindow()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         gp_Pnt p;
         QVERIFY(!v.pointOnPlane(10, 10, 0.0, &p)); // headless: no projection to intersect
     }
 
     void middlePansShiftMiddleOrbitsLeftBoxSelects()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         QCOMPARE(v.gestureFor(Aspect_VKeyMouse_MiddleButton, Aspect_VKeyFlags_NONE), AIS_MouseGesture_Pan);
         QCOMPARE(v.gestureFor(Aspect_VKeyMouse_MiddleButton, Aspect_VKeyFlags_SHIFT), AIS_MouseGesture_RotateOrbit);
         QCOMPARE(v.gestureFor(Aspect_VKeyMouse_LeftButton, Aspect_VKeyFlags_NONE), AIS_MouseGesture_SelectRectangle);
@@ -85,27 +85,27 @@ private slots:
 
     void rightButtonIsLeftForContextMenus()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         QCOMPARE(v.gestureFor(Aspect_VKeyMouse_RightButton, Aspect_VKeyFlags_NONE), AIS_MouseGesture_NONE);
     }
 
     void orbitsAroundThePickedPoint()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         QCOMPARE(v.rotationMode(), AIS_RotationMode_PickLast);
     }
 
     // D76: every preset view looks from its side or corner; Top has north up, the others Z up.
     void presetViewsLookFromTheirSide()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         v.addBatch(batch(3));
-        QCOMPARE(kimcad::standardViews().size(), qsizetype(10));
-        for (const kimcad::StandardView& sv : kimcad::standardViews()) {
+        QCOMPARE(kimbim::standardViews().size(), qsizetype(10));
+        for (const kimbim::StandardView& sv : kimbim::standardViews()) {
             v.setStandardView(sv.orientation, false);
-            QVERIFY2(sameDir(eyeDir(v), kimcad::viewDirection(sv.orientation)), sv.id);
+            QVERIFY2(sameDir(eyeDir(v), kimbim::viewDirection(sv.orientation)), sv.id);
             const gp_Dir up = v.view()->Camera()->Up();
-            const gp_Dir eye = kimcad::viewDirection(sv.orientation);
+            const gp_Dir eye = kimbim::viewDirection(sv.orientation);
             if (std::abs(eye.Z()) > 0.999) {
                 QVERIFY2(sameDir(up, gp::DY()), sv.id); // north up
             } else { // upright: Z up, no roll
@@ -126,18 +126,18 @@ private slots:
 
     void homeIsTheDefaultIsometric()
     {
-        kimcad::Viewport v;
-        QVERIFY(sameDir(eyeDir(v), kimcad::viewDirection(kimcad::HomeOrientation)));
+        kimbim::Viewport v;
+        QVERIFY(sameDir(eyeDir(v), kimbim::viewDirection(kimbim::HomeOrientation)));
         v.setStandardView(V3d_Xneg, false);
-        QVERIFY(!sameDir(eyeDir(v), kimcad::viewDirection(kimcad::HomeOrientation)));
+        QVERIFY(!sameDir(eyeDir(v), kimbim::viewDirection(kimbim::HomeOrientation)));
         v.homeView(false);
-        QVERIFY(sameDir(eyeDir(v), kimcad::viewDirection(kimcad::HomeOrientation)));
+        QVERIFY(sameDir(eyeDir(v), kimbim::viewDirection(kimbim::HomeOrientation)));
     }
 
     // Plans look straight down: presets and perspective wait for the 3D view.
     void planViewsIgnorePresetsAndStayOrthographic()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         v.setPerspective(true);
         QVERIFY(!v.view()->Camera()->IsOrthographic());
         v.setPlanView(0.0);
@@ -154,7 +154,7 @@ private slots:
 
     void perspectiveToggles()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         QVERIFY(!v.isPerspective());
         QVERIFY(v.view()->Camera()->IsOrthographic());
         const double scale = v.view()->Camera()->Scale();
@@ -176,8 +176,8 @@ private slots:
     // Each view has its own camera (D71): one view's perspective doesn't change another's.
     void perspectiveIsPerView()
     {
-        kimcad::Viewport a;
-        kimcad::Viewport b(a.scene());
+        kimbim::Viewport a;
+        kimbim::Viewport b(a.scene());
         a.setPerspective(true);
         QVERIFY(!a.view()->Camera()->IsOrthographic());
         QVERIFY(b.view()->Camera()->IsOrthographic());
@@ -188,11 +188,11 @@ private slots:
     // Clicks on the cube or its home button never reach selection or start a box/gesture.
     void cubeClicksKeepTheSelection()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         v.resize(500, 400);
         v.addBatch(batch(4));
         v.selectGuids({"g1"});
-        QSignalSpy changed(&v, &kimcad::Viewport::selectionChanged);
+        QSignalSpy changed(&v, &kimbim::Viewport::selectionChanged);
         for (const QPoint at : {v.viewCubeRect().center(), v.viewCubeRect().topLeft() + QPoint(3, 3), v.homeButtonRect().center()}) {
             QVERIFY(v.viewCubeRect().contains(at) || v.homeButtonRect().contains(at));
             QTest::mousePress(&v, Qt::LeftButton, Qt::NoModifier, at);
@@ -207,7 +207,7 @@ private slots:
         // The home button turns the view home (no window: at once).
         v.setStandardView(V3d_Zpos, false);
         QTest::mouseClick(&v, Qt::LeftButton, Qt::NoModifier, v.homeButtonRect().center());
-        QVERIFY(sameDir(eyeDir(v), kimcad::viewDirection(kimcad::HomeOrientation)));
+        QVERIFY(sameDir(eyeDir(v), kimbim::viewDirection(kimbim::HomeOrientation)));
         // Outside the cube a left press still starts the box selection gesture.
         QTest::mousePress(&v, Qt::LeftButton, Qt::NoModifier, QPoint(40, 360));
         QCOMPARE(v.pressedButtons(), Aspect_VKeyMouse(Aspect_VKeyMouse_LeftButton));
@@ -216,7 +216,7 @@ private slots:
 
     void cubeDragOrbits()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         v.resize(500, 400);
         const gp_Dir before = eyeDir(v);
         const QPoint at = v.viewCubeRect().center();
@@ -234,22 +234,22 @@ private slots:
     void presetShortcutsAreDistinct()
     {
         QSet<QString> keys;
-        for (const kimcad::StandardView& sv : kimcad::standardViews()) {
+        for (const kimbim::StandardView& sv : kimbim::standardViews()) {
             QVERIFY(!sv.shortcut.isEmpty());
             keys.insert(sv.shortcut.toString());
         }
-        QCOMPARE(keys.size(), kimcad::standardViews().size());
+        QCOMPARE(keys.size(), kimbim::standardViews().size());
     }
 
 private:
-    static gp_Dir eyeDir(const kimcad::Viewport& v) { return v.view()->Camera()->Direction().Reversed(); }
+    static gp_Dir eyeDir(const kimbim::Viewport& v) { return v.view()->Camera()->Direction().Reversed(); }
     static bool sameDir(const gp_Dir& a, const gp_Dir& b) { return a.Dot(b) > 0.9999; }
 private slots:
     // D89 Tab cycling (Revit): Tab steps through the elements under the resting cursor; the click
     // selects the highlighted one instead of the front one.
     void tabCyclesThroughOverlappingElements()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         v.resize(300, 300);
         v.addBatch(batch(3));
         v.setPickProvider([](const QPointF&) { return QStringList{"g0", "g1", "g2"}; }); // front to back
@@ -265,7 +265,7 @@ private slots:
         QCOMPARE(v.cycleCandidate(), QString("g2"));
         QTest::keyClick(&v, Qt::Key_Backtab);
         QCOMPARE(v.cycleCandidate(), QString("g1"));
-        QSignalSpy changed(&v, &kimcad::Viewport::selectionChanged);
+        QSignalSpy changed(&v, &kimbim::Viewport::selectionChanged);
         QTest::mouseClick(&v, Qt::LeftButton, Qt::NoModifier, QPoint(51, 50));
         QCOMPARE(v.selectedGuids(), QStringList({"g1"}));
         QCOMPARE(changed.count(), 1);
@@ -287,7 +287,7 @@ private slots:
     // D89 touchpad: pixel deltas (two-finger scroll) pan, a notched wheel zooms, per the preference.
     void touchpadScrollPansWheelZooms()
     {
-        using kimcad::Viewport;
+        using kimbim::Viewport;
         Viewport v;
         v.resize(400, 300);
         v.addBatch(batch(3));
@@ -333,7 +333,7 @@ private slots:
 
     void pinchZooms()
     {
-        kimcad::Viewport v;
+        kimbim::Viewport v;
         v.resize(400, 300);
         v.addBatch(batch(3));
         v.fitAll();
@@ -349,9 +349,9 @@ private slots:
     }
 
 private:
-    static Handle(kimcad::ElementBatch) batch(int n)
+    static Handle(kimbim::ElementBatch) batch(int n)
     {
-        kimcad::MeshChunk c;
+        kimbim::MeshChunk c;
         c.voff.push_back(0);
         c.toff.push_back(0);
         for (int e = 0; e < n; ++e) {
@@ -365,7 +365,7 @@ private:
             c.voff.push_back(uint32_t(c.verts.size() / 3));
             c.toff.push_back(uint32_t(c.tris.size() / 3));
         }
-        return new kimcad::ElementBatch(std::move(c));
+        return new kimbim::ElementBatch(std::move(c));
     }
 };
 

@@ -54,7 +54,7 @@
 #include "ViewCube.h"
 #include "Viewport.h"
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -503,7 +503,7 @@ int runSelfTest(const SelfTestOptions& options)
         // D71: a tab dragged out moves its view to a new top-level window (a new native window).
         // The view must keep drawing there and after it is docked back.
         auto drawsSomething = [&](Viewport* v) {
-            const QString file = QDir::temp().filePath(QStringLiteral("kimcad-popout.png"));
+            const QString file = QDir::temp().filePath(QStringLiteral("kimbim-popout.png"));
             if (!v->dumpImage(file))
                 return false;
             const QImage image(file);
@@ -826,4 +826,4 @@ int runSelfTest(const SelfTestOptions& options)
     return report(result);
 }
 
-} // namespace kimcad
+} // namespace kimbim

@@ -10,7 +10,7 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 enum Column { NameCol = 0, ShownCol = 1, LockedCol = 2, CountCol = 3 };
@@ -155,4 +155,4 @@ void LayersPanel::onItemChanged(QTreeWidgetItem* item, int column)
     }
 }
 
-} // namespace kimcad
+} // namespace kimbim

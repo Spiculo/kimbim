@@ -8,18 +8,18 @@ class TestTranslations : public QObject {
 private slots:
     void spanishMenusAreTranslated()
     {
-        QVERIFY(kimcad::installTranslator(*QCoreApplication::instance(), "es"));
-        QCOMPARE(QCoreApplication::translate("kimcad::MainWindow", "&File"), QString("&Archivo"));
-        QCOMPARE(QCoreApplication::translate("kimcad::MainWindow", "&Open IFC..."), QString("&Abrir IFC..."));
-        QCOMPARE(QCoreApplication::translate("kimcad::MainWindow", "Ready"), QString("Listo"));
+        QVERIFY(kimbim::installTranslator(*QCoreApplication::instance(), "es"));
+        QCOMPARE(QCoreApplication::translate("kimbim::MainWindow", "&File"), QString("&Archivo"));
+        QCOMPARE(QCoreApplication::translate("kimbim::MainWindow", "&Open IFC..."), QString("&Abrir IFC..."));
+        QCOMPARE(QCoreApplication::translate("kimbim::MainWindow", "Ready"), QString("Listo"));
     }
     void englishIsTheSourceLanguage()
     {
-        QVERIFY(kimcad::installTranslator(*QCoreApplication::instance(), "en"));
+        QVERIFY(kimbim::installTranslator(*QCoreApplication::instance(), "en"));
     }
     void unknownLanguageIsRejected()
     {
-        QVERIFY(!kimcad::installTranslator(*QCoreApplication::instance(), "xx"));
+        QVERIFY(!kimbim::installTranslator(*QCoreApplication::instance(), "xx"));
     }
 };
 

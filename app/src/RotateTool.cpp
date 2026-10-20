@@ -3,7 +3,7 @@
 
 #include <cmath>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -87,4 +87,4 @@ void RotateTool::cancel()
     emit previewChanged();
 }
 
-} // namespace kimcad
+} // namespace kimbim

@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from kimcad import app_bridge as b
+from kimbim import app_bridge as b
 
 
 def call(fn, *args):
@@ -73,8 +73,8 @@ def test_combining_options_merges_settings_by_key(versioned):
 
 
 def test_old_projects_without_settings_open_with_the_defaults(versioned):
-    from kimcad import versioning
-    from kimcad.layout import SETTINGS_PATH
+    from kimbim import versioning
+    from kimbim.layout import SETTINGS_PATH
 
     project = versioning._project
     assert SETTINGS_PATH in project._head_entries()  # enable_versioning stores them

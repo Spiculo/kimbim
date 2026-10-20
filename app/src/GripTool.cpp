@@ -4,7 +4,7 @@
 #include <cmath>
 #include <limits>
 
-namespace kimcad {
+namespace kimbim {
 
 GripTool::GripTool(QObject* parent)
     : QObject(parent)
@@ -85,4 +85,4 @@ std::optional<std::pair<QPointF, QPointF>> GripTool::preview() const
     return m_movingStart ? std::make_pair(*m_hover, m_fixed) : std::make_pair(m_fixed, *m_hover);
 }
 
-} // namespace kimcad
+} // namespace kimbim

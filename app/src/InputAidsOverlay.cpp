@@ -9,7 +9,7 @@
 #include <Prs3d_TextAspect.hxx>
 #include <TCollection_ExtendedString.hxx>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 const Quantity_Color kGuideColour(0.10, 0.55, 0.85, Quantity_TOC_RGB); // blue: Archicad's guide colour family
@@ -90,4 +90,4 @@ double TrackerOverlay::width(const QVector<Box>& boxes, double pixelRatio)
     return w;
 }
 
-} // namespace kimcad
+} // namespace kimbim

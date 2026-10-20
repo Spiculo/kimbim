@@ -13,9 +13,9 @@
 #include "Viewport.h"
 #include "WallTool.h"
 
-using kimcad::MainWindow;
-using kimcad::Tracker;
-using kimcad::WallSegment;
+using kimbim::MainWindow;
+using kimbim::Tracker;
+using kimbim::WallSegment;
 
 namespace {
 
@@ -39,16 +39,16 @@ private slots:
         MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         w.findChild<QAction*>(QStringLiteral("actionPlanView"))->trigger();
-        kimcad::Viewport* v = w.viewport();
+        kimbim::Viewport* v = w.viewport();
         w.setTool(MainWindow::Tool::Wall);
-        QSignalSpy walls(w.wallTool(), &kimcad::WallTool::wallRequested);
+        QSignalSpy walls(w.wallTool(), &kimbim::WallTool::wallRequested);
         Tracker& t = w.inputAids()->tracker();
 
         emit v->workPointClicked(QPointF(1, 1), 0.01, Qt::NoModifier);
         emit v->workPointMoved(QPointF(4, 1.3), 0.01, Qt::NoModifier);
         QVERIFY(t.anchor() && samePoint(*t.anchor(), QPointF(1, 1)));
         QVERIFY(w.inputAids()->trackerShown());
-        QVERIFY(v->hasAidOverlay(kimcad::Viewport::AidOverlay::Tracker));
+        QVERIFY(v->hasAidOverlay(kimbim::Viewport::AidOverlay::Tracker));
         QCOMPARE(t.focus(), Tracker::Length);
         QVERIFY(std::abs(t.live(Tracker::Length) - std::hypot(3.0, 0.3)) < 0.02);
 
@@ -110,9 +110,9 @@ private slots:
         MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         w.findChild<QAction*>(QStringLiteral("actionPlanView"))->trigger();
-        kimcad::Viewport* v = w.viewport();
+        kimbim::Viewport* v = w.viewport();
         w.setTool(MainWindow::Tool::Wall);
-        QSignalSpy walls(w.wallTool(), &kimcad::WallTool::wallRequested);
+        QSignalSpy walls(w.wallTool(), &kimbim::WallTool::wallRequested);
         emit v->workPointClicked(QPointF(0, 0), 0.01, Qt::NoModifier);
         emit v->workPointClicked(QPointF(4, 3), 0.01, Qt::NoModifier);
         QCOMPARE(walls.count(), 1);
@@ -126,12 +126,12 @@ private slots:
         QVERIFY(aids->hovered().has_value());
         QTRY_COMPARE_WITH_TIMEOUT(aids->guides().size(), 1, 3000);
         QVERIFY(samePoint(aids->guides().first().at, QPointF(4, 3)));
-        QVERIFY(v->hasAidOverlay(kimcad::Viewport::AidOverlay::Guides));
+        QVERIFY(v->hasAidOverlay(kimbim::Viewport::AidOverlay::Guides));
 
         // Along the horizontal through (4, 3), far away: y is exactly 3.
         emit v->workPointMoved(QPointF(15.004, 3.03), 0.1, Qt::NoModifier);
         QVERIFY(samePoint(w.wallTool()->preview()->second, QPointF(15, 3)));
-        QCOMPARE(aids->lastKind(), int(kimcad::Snap::GuideLine));
+        QCOMPARE(aids->lastKind(), int(kimbim::Snap::GuideLine));
         emit v->workPointClicked(QPointF(15.004, 3.03), 0.1, Qt::NoModifier);
         QCOMPARE(walls.count(), 2);
         QCOMPARE(segment(walls, 1).p2.y(), 3.0);
@@ -146,7 +146,7 @@ private slots:
         aids->acquire({QPointF(1, 1), std::nullopt});
         w.setTool(MainWindow::Tool::None);
         QVERIFY(aids->guides().isEmpty());
-        QVERIFY(!v->hasAidOverlay(kimcad::Viewport::AidOverlay::Tracker));
+        QVERIFY(!v->hasAidOverlay(kimbim::Viewport::AidOverlay::Tracker));
     }
 
     void everyPointToolTakesTypedPoints()
@@ -154,9 +154,9 @@ private slots:
         MainWindow w(nullptr, /*quiet=*/true);
         QVERIFY(w.newProject());
         w.findChild<QAction*>(QStringLiteral("actionPlanView"))->trigger();
-        kimcad::Viewport* v = w.viewport();
+        kimbim::Viewport* v = w.viewport();
         w.setTool(MainWindow::Tool::Beam);
-        QSignalSpy segments(w.twoPointTool(), &kimcad::TwoPointTool::segmentFinished);
+        QSignalSpy segments(w.twoPointTool(), &kimbim::TwoPointTool::segmentFinished);
         emit v->workPointMoved(QPointF(7, 7), 0.05, Qt::NoModifier);
         Tracker& t = w.inputAids()->tracker();
         QVERIFY(!t.anchor());

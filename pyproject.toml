@@ -3,7 +3,7 @@ requires = ["maturin>=1.15,<2"]
 build-backend = "maturin"
 
 [project]
-name = "kimcad"
+name = "kimbim"
 version = "0.1.0"
 description = "Open-source native BIM for architects, with version control built in"
 license = "GPL-3.0-or-later"
@@ -11,12 +11,12 @@ requires-python = ">=3.11"
 # Runtime deps (ifcopenshell, blake3) come from conda-forge via pixi; not listed for pip.
 
 [project.scripts]
-kimcad = "kimcad.cli:main"
+kimbim = "kimbim.cli:main"
 
 [tool.maturin]
 python-source = "python"
-module-name = "kimcad._core"
-manifest-path = "crates/kimcad-py/Cargo.toml"
+module-name = "kimbim._core"
+manifest-path = "crates/kimbim-py/Cargo.toml"
 features = ["pyo3/extension-module"]
 
 [tool.pytest.ini_options]

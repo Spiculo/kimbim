@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // D87: the annotation pack of the main window (doc 14 §13): Tag, North arrow, Scale bar, Revision
 // cloud, Angle, Radius/diameter and Level/spot dimensions in the Plane group, and Tag all. The tags
-// and symbols are python/kimcad/tags.py's and symbols.py's (IfcAnnotation on the level), one undo
+// and symbols are python/kimbim/tags.py's and symbols.py's (IfcAnnotation on the level), one undo
 // step each.
 #include <QComboBox>
 #include <QJsonArray>
@@ -16,7 +16,7 @@
 #include "ToolOptionsBar.h"
 #include "Viewport.h"
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -289,4 +289,4 @@ bool MainWindow::placeSheetSymbol(const QString& number, const QString& kind)
     return true;
 }
 
-} // namespace kimcad
+} // namespace kimbim

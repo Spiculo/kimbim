@@ -10,8 +10,8 @@ import ifcopenshell.util.element
 import ifcopenshell.validate
 import pytest
 
-from kimcad import app_bridge as b
-from kimcad import library
+from kimbim import app_bridge as b
+from kimbim import library
 
 
 def call(fn, *args):
@@ -57,7 +57,7 @@ def test_each_object_is_a_valid_type_with_body_and_plan_symbol(project, key, tmp
     assert all(rep.Items[0].is_a("IfcMappedItem") for rep in reps)
     assert ifcopenshell.util.element.get_container(element).GlobalId == project
     assert ifcopenshell.util.element.get_pset(element, "Pset_" + element.is_a()[3:] + "Common") is not None or \
-        ifcopenshell.util.element.get_pset(element, "KIMCAD_Renovation") is not None  # D74 status
+        ifcopenshell.util.element.get_pset(element, "KIMBIM_Renovation") is not None  # D74 status
     path = tmp_path / f"{key}.ifc"
     b.save(str(path))
     assert validate(ifcopenshell.open(str(path))) == []
@@ -122,7 +122,7 @@ def test_floor_plan_drawing_shows_the_symbol_not_the_cut(project):
 
 
 def test_ifc2x3_classes(tmp_path):
-    from kimcad import testing
+    from kimbim import testing
 
     try:
         f = testing.build_model("IFC2X3", walls=1)

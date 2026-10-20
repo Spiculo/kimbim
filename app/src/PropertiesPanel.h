@@ -11,7 +11,7 @@ class QComboBox;
 class QTreeWidget;
 class QTreeWidgetItem;
 
-namespace kimcad {
+namespace kimbim {
 
 // D74: the renovation statuses in the order shown ("existing", "demolish", "new") and their names.
 QStringList renovationKeys();
@@ -58,4 +58,4 @@ private:
     bool m_building = false;
 };
 
-} // namespace kimcad
+} // namespace kimbim

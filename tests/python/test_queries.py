@@ -17,10 +17,10 @@ import ifcopenshell.api.spatial
 import ifcopenshell.api.type
 import pytest
 
-from kimcad import app_bridge as b
-from kimcad import queries as q
-from kimcad import renovation
-from kimcad import settings as s
+from kimbim import app_bridge as b
+from kimbim import queries as q
+from kimbim import renovation
+from kimbim import settings as s
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CLINIC = ROOT / "tests" / "corpus" / "files" / "community" / "IFC 2.3.0.1 (IFC 2x3)" / "Medical-Dental Clinic" / "Clinic_Architectural.ifc"
@@ -226,7 +226,7 @@ def test_choices_list_what_the_model_has(house):
 def test_queries_are_fast_on_the_clinic():
     if not CLINIC.exists():
         pytest.skip("corpus not downloaded (pixi run fetch-corpus)")
-    from kimcad.testing import _reset_owner
+    from kimbim.testing import _reset_owner
 
     try:
         b._model = ifcopenshell.open(str(CLINIC))

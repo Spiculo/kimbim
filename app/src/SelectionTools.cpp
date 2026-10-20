@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Selection tools (D78): select similar, Find & Select and selection sets. MainWindow members kept in
-// their own file; the queries themselves run in Python (kimcad.queries).
+// their own file; the queries themselves run in Python (kimbim.queries).
 #include "MainWindow.h"
 
 #include "DockLayout.h"
@@ -13,7 +13,7 @@
 #include <QJsonDocument>
 #include <QSet>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -208,4 +208,4 @@ FindSelectPanel* MainWindow::findSelectPanel()
     return m_findSelect;
 }
 
-} // namespace kimcad
+} // namespace kimbim

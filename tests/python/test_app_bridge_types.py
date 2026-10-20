@@ -11,7 +11,7 @@ import ifcopenshell.util.element
 import pytest
 from conftest import build_model
 
-from kimcad import app_bridge
+from kimbim import app_bridge
 
 PSET = "Pset_WallCommon"
 U = "ThermalTransmittance"

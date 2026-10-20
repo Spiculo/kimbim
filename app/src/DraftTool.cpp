@@ -8,7 +8,7 @@
 
 #include "PolygonTool.h"
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
@@ -336,4 +336,4 @@ QString DraftTool::hint() const
     return {};
 }
 
-} // namespace kimcad
+} // namespace kimbim

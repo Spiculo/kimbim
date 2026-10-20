@@ -18,7 +18,7 @@
 
 #include <algorithm>
 
-namespace kimcad {
+namespace kimbim {
 
 // ---------------- RuleEditor ----------------
 
@@ -423,4 +423,4 @@ OverridesDialog::OverridesDialog(const QJsonObject& reply, QWidget* parent)
                   .value(reply.value("purpose").toString()).toObject().value("overrides").toString());
 }
 
-} // namespace kimcad
+} // namespace kimbim

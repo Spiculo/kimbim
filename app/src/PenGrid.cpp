@@ -9,7 +9,7 @@
 #include <QToolTip>
 #include <QVBoxLayout>
 
-namespace kimcad {
+namespace kimbim {
 
 PenGrid::PenGrid(QWidget* parent)
     : QWidget(parent)
@@ -113,4 +113,4 @@ int PenGrid::pick(QWidget* anchor, const QHash<int, LineStyle>& pens, const QHas
     return picked;
 }
 
-} // namespace kimcad
+} // namespace kimbim

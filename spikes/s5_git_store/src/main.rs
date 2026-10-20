@@ -1,4 +1,4 @@
-//! Spike S5: can a Git object database (via gitoxide) hold a KIMCAD model of N records?
+//! Spike S5: can a Git object database (via gitoxide) hold a KimBim model of N records?
 //!
 //! Measures, for N synthetic canonical records (default 1,000,000):
 //!   1. initial import: write N blobs + sharded trees (objects/<aa>/<bb>/<id>.json) + commit
@@ -15,7 +15,7 @@ use gix::objs::tree::{Entry, EntryKind};
 use gix::ObjectId;
 
 fn record(i: u64, size: usize) -> (String, Vec<u8>) {
-    // Deterministic pseudo-random record resembling a canonical KIMCAD JSON record.
+    // Deterministic pseudo-random record resembling a canonical KimBim JSON record.
     let id = blake3::hash(&i.to_le_bytes()).to_hex()[..32].to_string();
     let mut x = i.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
     let mut s = format!(
@@ -32,8 +32,8 @@ fn record(i: u64, size: usize) -> (String, Vec<u8>) {
 
 fn sig() -> gix::actor::Signature {
     gix::actor::Signature {
-        name: "KIMCAD spike".into(),
-        email: "spike@kimcad.invalid".into(),
+        name: "KimBim spike".into(),
+        email: "spike@kimbim.invalid".into(),
         time: gix::date::Time { seconds: 1_790_000_000, offset: 0 },
     }
 }
@@ -110,7 +110,7 @@ fn import_fast(dir: &std::path::Path, n: u64, size: usize) -> (gix::Repository, 
         let mut w = std::io::BufWriter::with_capacity(1 << 20, child.stdin.take().unwrap());
         let msg = b"Initial import";
         write!(w, "commit refs/heads/main
-committer KIMCAD spike <spike@kimcad.invalid> 1790000000 +0000
+committer KimBim spike <spike@kimbim.invalid> 1790000000 +0000
 data {}
 ", msg.len()).unwrap();
         w.write_all(msg).unwrap();

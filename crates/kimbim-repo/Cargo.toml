@@ -1,0 +1,13 @@
+[package]
+name = "kimbim-repo"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+gix = "0.88"
+rayon = "1"
+thiserror = "2"
+
+[dev-dependencies]
+tempfile = "3"

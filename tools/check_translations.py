@@ -5,7 +5,7 @@ import sys
 import xml.etree.ElementTree as ET
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-TS = ROOT / "app" / "translations" / "kimcad_es.ts"
+TS = ROOT / "app" / "translations" / "kimbim_es.ts"
 
 
 def main() -> int:

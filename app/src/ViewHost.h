@@ -8,7 +8,7 @@
 class QHBoxLayout;
 class QVBoxLayout;
 
-namespace kimcad {
+namespace kimbim {
 
 class Viewport;
 
@@ -30,4 +30,4 @@ private:
     QString m_storey;
 };
 
-} // namespace kimcad
+} // namespace kimbim

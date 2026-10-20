@@ -13,7 +13,7 @@ private slots:
     void initTestCase()
     {
         QString error;
-        QVERIFY2(kimcad::PythonEngine::instance().start(&error), qPrintable(error));
+        QVERIFY2(kimbim::PythonEngine::instance().start(&error), qPrintable(error));
     }
 
     void opensModelAndAnswersQueries()
@@ -21,7 +21,7 @@ private slots:
         QTemporaryDir tmp;
         QVERIFY(QDir(tmp.path()).mkdir(QStringLiteral("Proyecto ñ")));
         const QString path = tmp.filePath(QStringLiteral("Proyecto ñ/modelo.ifc"));
-        auto& py = kimcad::PythonEngine::instance();
+        auto& py = kimbim::PythonEngine::instance();
 
         QString error;
         QJsonDocument written = py.callJson("_write_test_model", {path}, &error);
@@ -41,7 +41,7 @@ private slots:
     {
         QTemporaryDir tmp;
         const QString path = tmp.filePath(QStringLiteral("chunks.ifc"));
-        auto& py = kimcad::PythonEngine::instance();
+        auto& py = kimbim::PythonEngine::instance();
         QString error;
         py.callJson("_write_test_model", {path}, &error);
         QVERIFY(py.callJson("open_model", {path}, &error).object().value("ok").toBool());
@@ -49,8 +49,8 @@ private slots:
         int elements = 0, chunks = 0;
         bool done = false;
         while (!done) {
-            kimcad::MeshChunk chunk;
-            QVERIFY2(kimcad::fetchMeshChunk(py, 1, &chunk, &done, &error), qPrintable(error));
+            kimbim::MeshChunk chunk;
+            QVERIFY2(kimbim::fetchMeshChunk(py, 1, &chunk, &done, &error), qPrintable(error));
             if (!done) {
                 elements += chunk.elementCount();
                 ++chunks;
@@ -64,7 +64,7 @@ private slots:
     void reportsErrorsInsteadOfThrowing()
     {
         QString error;
-        auto& py = kimcad::PythonEngine::instance();
+        auto& py = kimbim::PythonEngine::instance();
         QJsonObject bad = py.callJson("open_model", {QStringLiteral("does/not/exist.ifc")}, &error).object();
         QCOMPARE(bad.value("ok").toBool(true), false);
         QJsonObject props = py.callJson("properties", {QStringLiteral("nope")}, &error).object();

@@ -7,7 +7,7 @@ import time
 import pytest
 from conftest import build_model
 
-from kimcad import app_bridge, console
+from kimbim import app_bridge, console
 
 
 def call(fn, *args):
@@ -118,7 +118,7 @@ def test_run_file_shares_the_namespace(opened, tmp_path):
 
 
 def test_help_lists_the_helpers(opened):
-    out = run("help_kimcad()")["output"]
+    out = run("help_kimbim()")["output"]
     for name in ("ifc", "selection()", "select(", "edit()", "refresh()"):
         assert name in out
 

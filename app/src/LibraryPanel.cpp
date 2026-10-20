@@ -19,13 +19,13 @@
 #include <algorithm>
 #include <cmath>
 
-namespace kimcad {
+namespace kimbim {
 
 namespace {
 
 enum { IdRole = Qt::UserRole + 1 };
 
-// The library's English names (kimcad/library.py), so lupdate finds them for translation.
+// The library's English names (kimbim/library.py), so lupdate finds them for translation.
 [[maybe_unused]] const char* const kNames[] = {
     QT_TRANSLATE_NOOP("LibraryPanel", "Furniture"), QT_TRANSLATE_NOOP("LibraryPanel", "Sanitary"),
     QT_TRANSLATE_NOOP("LibraryPanel", "Kitchen"), QT_TRANSLATE_NOOP("LibraryPanel", "People, trees and cars"),
@@ -302,4 +302,4 @@ void LibraryPanel::showParams()
     }
 }
 
-} // namespace kimcad
+} // namespace kimbim

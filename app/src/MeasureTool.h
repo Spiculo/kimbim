@@ -11,7 +11,7 @@
 
 #include "Snapper.h"
 
-namespace kimcad {
+namespace kimbim {
 
 // A point in world metres (the measure tool works in 3D: plan snaps on the work plane, or a point
 // picked on an element's surface in a 3D view).
@@ -76,4 +76,4 @@ private:
     std::optional<MeasurePoint> m_hover;
 };
 
-} // namespace kimcad
+} // namespace kimbim

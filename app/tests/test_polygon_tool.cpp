@@ -6,7 +6,7 @@
 
 #include <cmath>
 
-using kimcad::PolygonTool;
+using kimbim::PolygonTool;
 
 
 

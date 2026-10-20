@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from kimcad import app_bridge as b
+from kimbim import app_bridge as b
 
 
 def call(fn, *args):
@@ -35,7 +35,7 @@ def test_enabling_versioning_makes_a_first_version(versioned):
     assert st["dirty"] is False
     h = call("history", 10)["versions"]
     assert [v["message"] for v in h] == ["Initial import"]
-    assert (versioned["folder"] / ".kimcad" / "working.ifc").exists()
+    assert (versioned["folder"] / ".kimbim" / "working.ifc").exists()
 
 
 def test_enabling_in_a_used_folder_is_refused(tmp_path):

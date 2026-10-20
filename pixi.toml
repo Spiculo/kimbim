@@ -1,5 +1,5 @@
 [workspace]
-name = "kimcad"
+name = "kimbim"
 channels = ["conda-forge"]
 platforms = ["win-64", "linux-64"]
 # conda-forge's ifcopenshell ships no Python package metadata, so PyPI packages that need it
@@ -74,15 +74,15 @@ golden = { cmd = "pytest -m \"golden and not slow\"", depends-on = ["build"] }
 golden-all = { cmd = "pytest -m golden", depends-on = ["build"] }
 app-configure = "cmake -S . -B build/app -G Ninja -DCMAKE_BUILD_TYPE=Release"
 app-build = { cmd = "cmake --build build/app", depends-on = ["app-configure"] }
-app-test = { cmd = "ctest --test-dir build/app --output-on-failure", depends-on = ["app-build", "build"], env = { KIMCAD_PYTHON_PATH = "$PIXI_PROJECT_ROOT/python" } }
-app-test-nogui = { cmd = "ctest --test-dir build/app --output-on-failure -LE gui", depends-on = ["app-build", "build"], env = { KIMCAD_PYTHON_PATH = "$PIXI_PROJECT_ROOT/python" } }
-app = { cmd = "build/app/kimcad-app", depends-on = ["app-build", "build"], env = { KIMCAD_PYTHON_PATH = "$PIXI_PROJECT_ROOT/python" } }
+app-test = { cmd = "ctest --test-dir build/app --output-on-failure", depends-on = ["app-build", "build"], env = { KIMBIM_PYTHON_PATH = "$PIXI_PROJECT_ROOT/python" } }
+app-test-nogui = { cmd = "ctest --test-dir build/app --output-on-failure -LE gui", depends-on = ["app-build", "build"], env = { KIMBIM_PYTHON_PATH = "$PIXI_PROJECT_ROOT/python" } }
+app = { cmd = "build/app/kimbim-app", depends-on = ["app-build", "build"], env = { KIMBIM_PYTHON_PATH = "$PIXI_PROJECT_ROOT/python" } }
 # Spike S6: SVG drawing generation (plan, section, elevation) timed on the large Clinic model
 drawing-bench = "python spikes/s6_drawings/drawing_bench.py Clinic_Architectural.ifc build/s6-clinic"
 # Slices 18-22 timed on Clinic: after-edit hooks, versioning, history, before/after, combining options
 m5-bench = "python spikes/m5_bench/clinic_bench.py Clinic_Architectural.ifc build/m5-clinic"
 check-translations = "python tools/check_translations.py"
-kimcad = { cmd = "python -m kimcad", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/python" } }
+kimbim = { cmd = "python -m kimbim", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/python" } }
 
 # Spike S2 (viewer): OCCT AIS viewer through pythonocc-core, same OCCT (8.0.1) as ifcopenshell 0.9
 [feature.s2.dependencies]

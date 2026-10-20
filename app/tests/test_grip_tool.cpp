@@ -6,7 +6,7 @@
 
 #include "GripTool.h"
 
-using kimcad::GripTool;
+using kimbim::GripTool;
 
 class TestGripTool : public QObject {
     Q_OBJECT
@@ -15,7 +15,7 @@ private slots:
     {
         GripTool tool;
         tool.setTolerance(0.1);
-        tool.snapper().setWalls(kimcad::Snapper::parse(QJsonDocument::fromJson(
+        tool.snapper().setWalls(kimbim::Snapper::parse(QJsonDocument::fromJson(
             R"({"walls":[{"guid":"A","x1":0,"y1":0,"x2":4,"y2":0,"thickness":0.2}]})").object()));
         QSignalSpy done(&tool, &GripTool::stretchRequested);
         tool.click({2, 0});        // not an end: nothing grabbed
@@ -36,7 +36,7 @@ private slots:
     {
         GripTool tool;
         tool.setTolerance(0.1);
-        tool.snapper().setWalls(kimcad::Snapper::parse(QJsonDocument::fromJson(
+        tool.snapper().setWalls(kimbim::Snapper::parse(QJsonDocument::fromJson(
             R"({"walls":[{"guid":"A","x1":0,"y1":0,"x2":4,"y2":0,"thickness":0.2}]})").object()));
         QSignalSpy done(&tool, &GripTool::stretchRequested);
         tool.click({0.02, 0.0});
