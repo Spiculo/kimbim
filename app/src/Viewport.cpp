@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "Viewport.h"
+#include "CutPlanes.h"
 #include "Graphics.h"
 #include "PolygonTool.h"
 #include "ViewCube.h"
@@ -134,8 +135,8 @@ Viewport::Viewport(Scene* scene, QWidget* parent)
     connect(m_scene, &Scene::redrawRequested, this, qOverload<>(&QWidget::update));
     connect(m_scene, &Scene::viewsChanged, this, &Viewport::keepOverlaysHere); // views opened later
     connect(m_scene, &Scene::elementsAltered, this, [this] {
-        if (m_sectionZ)
-            rebuildSection();
+        if (!m_sectionPlanes.empty())
+            rebuildSections();
     });
 }
 
@@ -747,7 +748,7 @@ Viewport::~Viewport()
 {
     // This view's own overlays leave the shared context; the elements stay for the other views.
     for (const Handle(AIS_InteractiveObject)& o :
-         {Handle(AIS_InteractiveObject)(m_preview), Handle(AIS_InteractiveObject)(m_grid), Handle(AIS_InteractiveObject)(m_section),
+         {Handle(AIS_InteractiveObject)(m_preview), Handle(AIS_InteractiveObject)(m_grid),
              Handle(AIS_InteractiveObject)(m_cube), m_home})
         if (!o.IsNull())
             m_context->Remove(o, false);
@@ -884,10 +885,10 @@ private:
 
 namespace {
 
-// Cut sections: filled outlines (unlit) plus bold borders, drawn just below the cut plane. D73: one
-// part per style (the element's fill pen and cut line); no fill colour = outline only.
+// Cut sections: filled outlines (unlit) plus bold borders, drawn just inside the kept half-space.
+// D73: one part per style (the element's fill pen and cut line); no fill colour = outline only.
 struct SectionPart {
-    std::vector<std::vector<gp_Pnt2d>> loops;
+    std::vector<std::vector<gp_Pnt>> loops;
     std::optional<Quantity_Color> fill;
     Quantity_Color line;
     float width = 2.0f;
@@ -896,21 +897,32 @@ struct SectionPart {
 
 class SectionPrs : public AIS_InteractiveObject {
 public:
-    SectionPrs(std::vector<SectionPart> parts, double z)
+    SectionPrs(std::vector<SectionPart> parts, const gp_Pln& plane)
         : m_parts(std::move(parts))
-        , m_z(z)
+        , m_plane(plane)
     {
     }
     void Compute(const Handle(PrsMgr_PresentationManager)&, const Handle(Prs3d_Presentation)& prs, const int) override
     {
-        const double z = m_z - 1e-4;
+        gp_Pnt origin;
+        gp_Dir u, v;
+        planeBasis(m_plane, &origin, &u, &v);
+        const gp_Dir n = m_plane.Axis().Direction();
+        // A hair inside the kept half-space, so the fill never z-fights with the cut faces.
+        const gp_Vec lift = gp_Vec(n) * 1e-4;
+        auto liftPnt = [&](const gp_Pnt& p) {
+            const gp_Vec d(origin, p);
+            return gp_Pnt(origin.XYZ() + u.XYZ() * d.Dot(gp_Vec(u)) + v.XYZ() * d.Dot(gp_Vec(v)) + lift.XYZ());
+        };
         for (const SectionPart& part : m_parts) {
             int triangles = 0, segments = 0;
             std::vector<std::vector<uint32_t>> tris;
             for (const auto& loop : part.loops) {
                 QVector<QPointF> poly;
-                for (const auto& p : loop)
-                    poly << QPointF(p.X(), p.Y());
+                for (const auto& p : loop) {
+                    const gp_Vec d(origin, p);
+                    poly << QPointF(d.Dot(gp_Vec(u)), d.Dot(gp_Vec(v)));
+                }
                 tris.push_back(part.fill ? PolygonTool::triangulate(poly) : std::vector<uint32_t>{});
                 triangles += int(tris.back().size() / 3);
                 segments += int(loop.size());
@@ -918,8 +930,10 @@ public:
             if (triangles > 0) {
                 Handle(Graphic3d_ArrayOfTriangles) fill = new Graphic3d_ArrayOfTriangles(triangles * 3);
                 for (size_t l = 0; l < part.loops.size(); ++l)
-                    for (uint32_t i : tris[l])
-                        fill->AddVertex(gp_Pnt(part.loops[l][i].X(), part.loops[l][i].Y(), z));
+                    for (uint32_t i : tris[l]) {
+                        const gp_Pnt p = liftPnt(part.loops[l][i]);
+                        fill->AddVertex(p);
+                    }
                 Handle(Graphic3d_Group) g = prs->NewGroup();
                 Handle(Graphic3d_AspectFillArea3d) aspect = new Graphic3d_AspectFillArea3d();
                 aspect->SetInteriorStyle(Aspect_IS_SOLID);
@@ -933,8 +947,8 @@ public:
                 Handle(Graphic3d_ArrayOfSegments) lines = new Graphic3d_ArrayOfSegments(segments * 2);
                 for (const auto& loop : part.loops)
                     for (size_t i = 0; i < loop.size(); ++i) {
-                        lines->AddVertex(gp_Pnt(loop[i].X(), loop[i].Y(), z));
-                        lines->AddVertex(gp_Pnt(loop[(i + 1) % loop.size()].X(), loop[(i + 1) % loop.size()].Y(), z));
+                        lines->AddVertex(liftPnt(loop[i]));
+                        lines->AddVertex(liftPnt(loop[(i + 1) % loop.size()]));
                     }
                 Handle(Graphic3d_AspectLine3d) aspect = new Graphic3d_AspectLine3d(part.line, Aspect_TOL_SOLID, part.width);
                 if (part.pattern != 0xFFFF)
@@ -949,70 +963,136 @@ public:
 
 private:
     std::vector<SectionPart> m_parts;
-    double m_z;
+    gp_Pln m_plane;
 };
+
+bool samePlane(const gp_Pln& a, const gp_Pln& b)
+{
+    const gp_Dir na = a.Axis().Direction(), nb = b.Axis().Direction();
+    return na.Dot(nb) > 1 - 1e-9
+        && std::abs(gp_Vec(a.Location(), b.Location()).Dot(gp_Vec(na))) < 1e-7;
+}
+
+// Keep the part of a section loop inside another cut's kept half-space (Sutherland-Hodgman).
+std::vector<gp_Pnt> clipLoop(const std::vector<gp_Pnt>& loop, const gp_Pln& clip)
+{
+    const gp_Pnt o = clip.Location();
+    const gp_Dir n = clip.Axis().Direction();
+    auto side = [&](const gp_Pnt& p) { return gp_Vec(o, p).Dot(gp_Vec(n)); };
+    std::vector<gp_Pnt> out;
+    for (size_t i = 0; i < loop.size(); ++i) {
+        const gp_Pnt& a = loop[i];
+        const gp_Pnt& b = loop[(i + 1) % loop.size()];
+        const double da = side(a), db = side(b);
+        if (da >= -1e-9)
+            out.push_back(a);
+        if ((da > 1e-9 && db < -1e-9) || (da < -1e-9 && db > 1e-9)) {
+            const double t = da / (da - db);
+            out.emplace_back(a.X() + t * (b.X() - a.X()), a.Y() + t * (b.Y() - a.Y()),
+                a.Z() + t * (b.Z() - a.Z()));
+        }
+    }
+    // Consecutive duplicates make triangulation unhappy.
+    std::vector<gp_Pnt> clean;
+    for (const gp_Pnt& p : out)
+        if (clean.empty() || clean.back().Distance(p) > 1e-9)
+            clean.push_back(p);
+    if (clean.size() > 1 && clean.front().Distance(clean.back()) < 1e-9)
+        clean.pop_back();
+    return clean.size() >= 3 ? clean : std::vector<gp_Pnt>{};
+}
 
 } // namespace
 
 void Viewport::setSectionHeight(std::optional<double> z)
 {
-    m_sectionZ = z;
-    rebuildSection();
+    if (!z) {
+        setSectionPlanes({}, {});
+        return;
+    }
+    const gp_Pln plane(gp_Pnt(0, 0, *z), gp_Dir(0, 0, -1)); // keep below
+    setSectionPlanes({plane}, {plane});
 }
 
-void Viewport::rebuildSection()
+void Viewport::setSectionPlanes(const std::vector<gp_Pln>& keepRegion, const std::vector<gp_Pln>& sectionPlanes)
 {
-    if (!m_section.IsNull()) {
-        m_context->Remove(m_section, false);
-        m_section.Nullify();
-    }
+    m_sectionKeep = keepRegion;
+    m_sectionPlanes = sectionPlanes;
+    rebuildSections();
+}
+
+void Viewport::rebuildSections()
+{
+    for (const auto& prs : std::as_const(m_sections))
+        m_context->Remove(prs, false);
+    m_sections.clear();
     m_sectionElements = 0;
-    if (!m_sectionZ) {
+    m_sectionPlaneCount = 0;
+    if (m_sectionPlanes.empty()) {
         update();
         return;
     }
     // One part per style: elements without a style keep the dark fill and bold black outline.
     const Graphics& g = m_scene->graphics;
     auto occ = [](const QColor& c) { return Quantity_Color(c.redF(), c.greenF(), c.blueF(), Quantity_TOC_sRGB); };
-    std::vector<SectionPart> parts;
-    QHash<QString, size_t> partOf; // style key -> index in parts
-    int loopCount = 0;
-    for (const auto& b : m_scene->batches)
-        for (int i = 0; i < b->elementCount(); ++i) {
-            if (b->isHidden(i))
-                continue;
-            auto element = b->sectionLoops(i, *m_sectionZ);
-            if (element.empty())
-                continue;
-            ++m_sectionElements;
-            const ElementStyle* st = g.styleOf(b->guid(i));
-            SectionPart part;
-            part.fill = Quantity_Color(0.25, 0.25, 0.27, Quantity_TOC_RGB);
-            part.line = Quantity_Color(Quantity_NOC_BLACK);
-            if (st) {
-                part.fill = st->fill.isValid() ? std::optional<Quantity_Color>(occ(st->fill)) : std::nullopt;
-                part.line = occ(st->cut.color);
-                part.width = std::max(Graphics::pixels(st->cut.weight, true), 1.0f); // plan cuts stay bold
-                part.pattern = Graphics::pattern(st->cut.dash);
+    QSet<QString> cutElements;
+    for (const gp_Pln& section : m_sectionPlanes) {
+        std::vector<SectionPart> parts;
+        QHash<QString, size_t> partOf; // style key -> index in parts
+        int loopCount = 0;
+        for (const auto& b : m_scene->batches)
+            for (int i = 0; i < b->elementCount(); ++i) {
+                if (b->isHidden(i))
+                    continue;
+                auto element = ElementBatch::sectionLoopsPlane(b->chunk(), i, section);
+                if (element.empty())
+                    continue;
+                std::vector<std::vector<gp_Pnt>> clipped;
+                for (auto& loop : element) {
+                    for (const gp_Pln& clip : m_sectionKeep) {
+                        if (samePlane(section, clip))
+                            continue;
+                        loop = clipLoop(loop, clip);
+                        if (loop.empty())
+                            break;
+                    }
+                    if (!loop.empty())
+                        clipped.push_back(std::move(loop));
+                }
+                if (clipped.empty())
+                    continue;
+                cutElements.insert(b->guid(i));
+                const ElementStyle* st = g.styleOf(b->guid(i));
+                SectionPart part;
+                part.fill = Quantity_Color(0.25, 0.25, 0.27, Quantity_TOC_RGB);
+                part.line = Quantity_Color(Quantity_NOC_BLACK);
+                if (st) {
+                    part.fill = st->fill.isValid() ? std::optional<Quantity_Color>(occ(st->fill)) : std::nullopt;
+                    part.line = occ(st->cut.color);
+                    part.width = std::max(Graphics::pixels(st->cut.weight, true), 1.0f); // cuts stay bold
+                    part.pattern = Graphics::pattern(st->cut.dash);
+                }
+                const QString key = st ? QStringLiteral("%1|%2|%3|%4|%5").arg(st->fill.isValid() ? st->fill.name() : QString(),
+                    st->cut.color.name()).arg(part.width).arg(part.pattern).arg(0) : QStringLiteral("default");
+                auto it = partOf.constFind(key);
+                if (it == partOf.constEnd()) {
+                    it = partOf.insert(key, parts.size());
+                    parts.push_back(part);
+                }
+                for (auto& l : clipped) {
+                    parts[*it].loops.push_back(std::move(l));
+                    ++loopCount;
+                }
             }
-            const QString key = st ? QStringLiteral("%1|%2|%3|%4|%5").arg(st->fill.isValid() ? st->fill.name() : QString(),
-                st->cut.color.name()).arg(part.width).arg(part.pattern).arg(0) : QStringLiteral("default");
-            auto it = partOf.constFind(key);
-            if (it == partOf.constEnd()) {
-                it = partOf.insert(key, parts.size());
-                parts.push_back(part);
-            }
-            for (auto& l : element) {
-                parts[*it].loops.push_back(std::move(l));
-                ++loopCount;
-            }
+        if (loopCount > 0) {
+            Handle(SectionPrs) prs = new SectionPrs(std::move(parts), section);
+            m_context->Display(prs, 0, -1, false);
+            keepHere(prs);
+            m_sections.push_back(prs);
+            ++m_sectionPlaneCount;
         }
-    if (loopCount > 0) {
-        // 1 mm below the cut height: the view's own cut plane keeps what is below it.
-        m_section = new SectionPrs(std::move(parts), *m_sectionZ - 0.001);
-        m_context->Display(m_section, 0, -1, false);
-        keepHere(m_section);
     }
+    m_sectionElements = cutElements.size();
     update();
 }
 
@@ -1772,8 +1852,9 @@ void Viewport::clear()
     m_grid.Nullify();
     m_gridLineCount = 0;
     m_underlays.clear(); // RemoveAll above took them
-    m_section.Nullify();
+    m_sections.clear(); // RemoveAll above took them
     m_sectionElements = 0;
+    m_sectionPlaneCount = 0;
     m_preview.Nullify();
     m_scene->nextIdBase = 0;
     m_scene->changed();
@@ -2157,7 +2238,8 @@ void Viewport::keepOverlaysHere()
 {
     keepHere(m_preview);
     keepHere(m_grid);
-    keepHere(m_section);
+    for (const auto& s : std::as_const(m_sections))
+        keepHere(s);
     keepHere(m_cube);
     keepHere(m_home);
     for (const auto& a : std::as_const(m_annotations))

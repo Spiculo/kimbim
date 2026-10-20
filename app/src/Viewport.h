@@ -192,10 +192,13 @@ public:
     int markerCount() const;
     QStringList annotationGuids() const;
     QStringList annotationTexts() const;
-    // The plan cut's sections (owner feedback): elements cut at height z get a dark fill and a bold
-    // outline (poché); nullopt removes them. Kept up to date as elements change.
+    // The cut planes' sections (owner feedback, D95): elements cut by a plane get the purpose's cut
+    // fill and a bold outline (poché). `keepRegion` is every cut half-space (the sections are
+    // clipped against them); `sectionPlanes` are the planes whose faces are drawn. Empty removes them.
     void setSectionHeight(std::optional<double> z);
+    void setSectionPlanes(const std::vector<gp_Pln>& keepRegion, const std::vector<gp_Pln>& sectionPlanes);
     int sectionElementCount() const { return m_sectionElements; }
+    int sectionPlaneCount() const { return m_sectionPlaneCount; }
     int gridLineCount() const { return m_gridLineCount; }
     void clear();
     void fitAll();
@@ -368,10 +371,12 @@ private:
     double m_annotationZ = 0.0;
     QHash<QString, Handle(AIS_InteractiveObject)> m_annotations;
     void displayAnnotations();
-    Handle(AIS_InteractiveObject) m_section;
-    std::optional<double> m_sectionZ;
+    std::vector<Handle(AIS_InteractiveObject)> m_sections;
+    std::vector<gp_Pln> m_sectionKeep;
+    std::vector<gp_Pln> m_sectionPlanes;
     int m_sectionElements = 0;
-    void rebuildSection();
+    int m_sectionPlaneCount = 0;
+    void rebuildSections();
     void keepHere(const Handle(AIS_InteractiveObject)& obj);
     void keepOverlaysHere();
     int m_gridLineCount = 0;

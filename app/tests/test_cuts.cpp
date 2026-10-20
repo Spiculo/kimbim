@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QtTest>
 
+#include <array>
+#include <cmath>
+
 #include "Cuts.h"
 #include "CutPlanes.h"
+#include "ElementBatch.h"
+#include "Viewport.h"
 
 namespace {
 
@@ -13,6 +18,33 @@ bool kept(const std::vector<Handle(Graphic3d_ClipPlane)>& planes, double x, doub
         if (p->ProbePoint(NCollection_Vec4<double>(x, y, z, 1.0)) == Graphic3d_ClipState_Out)
             return false;
     return true;
+}
+
+} // namespace
+
+
+namespace {
+
+// A closed unit cube, one element (like ElementBatch's test fixture).
+Handle(kimbim::ElementBatch) cubeBatch()
+{
+    kimbim::MeshChunk c;
+    c.guids = {"cube"};
+    c.types = {"IfcWall"};
+    const std::array<std::array<std::array<float, 3>, 4>, 6> quads = {{{{{0, 0, 0}, {0, 1, 0}, {1, 1, 0}, {1, 0, 0}}},
+        {{{0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1}}}, {{{0, 0, 0}, {1, 0, 0}, {1, 0, 1}, {0, 0, 1}}},
+        {{{0, 1, 0}, {0, 1, 1}, {1, 1, 1}, {1, 1, 0}}}, {{{0, 0, 0}, {0, 0, 1}, {0, 1, 1}, {0, 1, 0}}},
+        {{{1, 0, 0}, {1, 1, 0}, {1, 1, 1}, {1, 0, 1}}}}};
+    uint32_t n = 0;
+    for (const auto& q : quads)
+        for (const auto& tri : {std::array<int, 3>{0, 1, 2}, std::array<int, 3>{0, 2, 3}})
+            for (int k : tri) {
+                c.verts.insert(c.verts.end(), {q[size_t(k)][0], q[size_t(k)][1], q[size_t(k)][2]});
+                c.tris.push_back(n++);
+            }
+    c.voff = {0, n};
+    c.toff = {0, n / 3};
+    return new kimbim::ElementBatch(std::move(c));
 }
 
 } // namespace
@@ -147,6 +179,29 @@ private slots:
         QVERIFY(back.point.Distance(p.point) < 1e-9);
         QVERIFY(std::abs(back.normal.Dot(p.normal) - 1.0) < 1e-9);
         QVERIFY(std::abs(back.angle - 22.5) < 1e-9);
+    }
+
+
+    // D95: every cut plane gets its own poché, clipped against the other cut half-spaces.
+    void verticalAndObliqueCutsDrawPoche()
+    {
+        kimbim::Viewport v;
+        v.addBatch(cubeBatch());
+        const gp_Pln vertical(gp_Pnt(0.5, 0, 0), gp_Dir(1, 0, 0)); // keep x >= 0.5
+        const gp_Pln oblique(gp_Pnt(0.5, 0.5, 0.5), gp_Dir(1, 0.4, 0.3));
+        v.setSectionPlanes({vertical, oblique}, {vertical, oblique});
+        QCOMPARE(v.sectionElementCount(), 1);
+        QCOMPARE(v.sectionPlaneCount(), 2);
+
+        // A plan cut above the cube leaves neither section; one through it adds a third.
+        v.setSectionPlanes({vertical}, {vertical});
+        QCOMPARE(v.sectionPlaneCount(), 1);
+        v.setSectionHeight(1.5);
+        QCOMPARE(v.sectionElementCount(), 0); // the plan cut is above the cube
+        v.setSectionHeight(0.5);
+        QCOMPARE(v.sectionElementCount(), 1);
+        v.setSectionHeight(std::nullopt);
+        QCOMPARE(v.sectionElementCount(), 0);
     }
 
     void offMeansNoPlanesAndEmptyBoxIsIgnored()
