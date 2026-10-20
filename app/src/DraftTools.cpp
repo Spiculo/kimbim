@@ -54,6 +54,7 @@ void readDrafting(const QJsonObject& o, Viewport::Annotation* a)
     }
     a->solid = o.value("solid").toBool();
     a->backgroundPen = o.value("background_pen").toInt(0);
+    a->outlinePen = o.value("outline_pen").toInt(-1);
     if (o.contains("label_at")) {
         a->labelAt = point(o.value("label_at"));
         a->text = o.value("area_text").toString();
@@ -106,7 +107,21 @@ void MainWindow::setupDraftTools(ToolOptionsBar* bar)
     m_draftShowArea->setText(tr("Area"));
     m_draftShowArea->setCheckable(true);
     m_draftShowArea->setToolTip(tr("Show the fill's area in its middle"));
-    for (QWidget* w : std::initializer_list<QWidget*>{m_draftArcMode, m_draftLineType, m_draftPattern, m_draftBackground, m_draftShowArea}) {
+    m_draftOutline = new QSpinBox(bar); // D92: the fill's outline pen
+    m_draftOutline->setObjectName(QStringLiteral("draftOutlinePen"));
+    m_draftOutline->setRange(-1, 255);
+    m_draftOutline->setSpecialValueText(tr("Same as the fill"));
+    m_draftOutline->setValue(-1);
+    m_draftOutline->setPrefix(tr("Outline pen "));
+    m_draftOutline->setToolTip(tr("The fill's outline pen (-1: the fill's own pen; 0: no outline)"));
+    m_draftPatternScale = new QComboBox(bar); // D92
+    m_draftPatternScale->setObjectName(QStringLiteral("draftPatternScale"));
+    m_draftPatternScale->addItem(tr("Paper pattern"), QStringLiteral("paper"));
+    m_draftPatternScale->addItem(tr("Model pattern"), QStringLiteral("model"));
+    m_draftPatternScale->setToolTip(tr("Paper: the pattern keeps its printed spacing at every drawing scale; "
+                                       "model: its spacing grows with the model"));
+    for (QWidget* w : std::initializer_list<QWidget*>{m_draftArcMode, m_draftLineType, m_draftPattern, m_draftBackground,
+                                                      m_draftShowArea, m_draftOutline, m_draftPatternScale}) {
         w->setVisible(false);
         bar->addField(w);
     }
@@ -132,7 +147,8 @@ void MainWindow::startDraftTool(Tool tool)
     const bool draft = isDraftTool(tool);
     m_draftArcMode->setVisible(tool == Tool::ArcCircle);
     m_draftLineType->setVisible(draft && tool != Tool::Fill && tool != Tool::Cloud);
-    for (QWidget* w : std::initializer_list<QWidget*>{m_draftPattern, m_draftBackground, m_draftShowArea})
+    for (QWidget* w : std::initializer_list<QWidget*>{m_draftPattern, m_draftBackground, m_draftShowArea,
+                                                      m_draftOutline, m_draftPatternScale})
         w->setVisible(tool == Tool::Fill);
     if (!draft) {
         m_draftTool->cancel();
@@ -198,6 +214,10 @@ QJsonObject MainWindow::draftOptions(const QString& kind) const
         o.insert("pattern", m_draftPattern->currentText().isEmpty() ? QStringLiteral("Solid") : m_draftPattern->currentText());
         o.insert("background_pen", m_draftBackground->value());
         o.insert("show_area", m_draftShowArea->isChecked());
+        if (m_draftOutline && m_draftOutline->value() >= 0)
+            o.insert("outline_pen", m_draftOutline->value());
+        if (m_draftPatternScale)
+            o.insert("pattern_scale", m_draftPatternScale->currentData().toString());
     } else if (!m_draftLineType->currentText().isEmpty()) {
         o.insert("line_type", m_draftLineType->currentText());
     }
@@ -242,7 +262,20 @@ bool MainWindow::draftGripClick(QPointF p, double tolerance, bool ortho)
         QVector<QPointF> pts = m_gripPoints;
         const QPointF from = pts[(m_gripIndex + 1) % pts.size()];
         pts[m_gripIndex] = m_draftTool->snapper().snap(p, tolerance, &from, ortho).point;
+        // D92: optionally keep a rectangle rectangular while one corner is dragged.
+        if (m_gripRect && m_prefs.keepRectanglesRectangular() && pts.size() == 4) {
+            const int i = m_gripIndex;
+            const QPointF corner = pts[i];
+            if (i % 2 == 0) {
+                pts[(i + 1) % 4].setY(corner.y());
+                pts[(i + 3) % 4].setX(corner.x());
+            } else {
+                pts[(i + 3) % 4].setY(corner.y());
+                pts[(i + 1) % 4].setX(corner.x());
+            }
+        }
         m_gripIndex = -1;
+        m_gripRect = false;
         m_viewport->setPreviewBoxes({});
         QJsonArray arr;
         for (const QPointF& q : pts)
@@ -274,6 +307,7 @@ bool MainWindow::draftGripClick(QPointF p, double tolerance, bool ortho)
                 m_gripGuid = o.value("guid").toString();
                 m_gripIndex = i;
                 m_gripPoints = pts;
+                m_gripRect = o.value("rect").toBool();
             }
         }
     }

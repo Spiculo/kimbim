@@ -188,6 +188,7 @@ public:
         QVector<QLineF> hatch;
         bool solid = false;
         int backgroundPen = 0;
+        int outlinePen = -1; // D92: a fill's outline pen (-1: the shape's own; 0: no outline)
         std::optional<QPointF> labelAt;
         bool isDrafting() const;
         // D87 symbols (tags, north arrows, scale bars, clouds, angle/radius/level dimensions), drawn in

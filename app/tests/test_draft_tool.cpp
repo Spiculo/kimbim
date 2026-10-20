@@ -172,6 +172,11 @@ private slots:
         QVERIFY(pattern && pattern->findText(QStringLiteral("Brick")) >= 0);
         pattern->setCurrentText(QStringLiteral("Brick"));
         w.findChild<QSpinBox*>(QStringLiteral("draftBackground"))->setValue(5);
+        auto* outline = w.findChild<QSpinBox*>(QStringLiteral("draftOutlinePen")); // D92
+        auto* patternScale = w.findChild<QComboBox*>(QStringLiteral("draftPatternScale"));
+        QVERIFY(outline && patternScale && outline->isVisibleTo(&w) && patternScale->isVisibleTo(&w));
+        outline->setValue(0); // no outline
+        patternScale->setCurrentIndex(patternScale->findData("model"));
         for (const QPointF p : {QPointF(0, -5), QPointF(4, -5), QPointF(4, -2), QPointF(0, -2), QPointF(0, -5)})
             emit w.viewport()->workPointClicked(p, 0.01, Qt::NoModifier);
         QCOMPARE(w.viewport()->draftingCount(), 5);
@@ -212,6 +217,41 @@ private slots:
         QVERIFY(w.viewport()->isPlanView());
         w.viewport()->set3DView();
         QCOMPARE(w.viewport()->draftingCount(), 0);
+    }
+
+    // D92: dragging a rectangle's corner can keep it rectangular.
+    void rectangleGripsKeepItRectangularWhenAsked()
+    {
+        MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        w.findChild<QAction*>(QStringLiteral("actionPlanView"))->trigger();
+        kimbim::Viewport* v = w.viewport();
+        w.setTool(MainWindow::Tool::Rectangle);
+        emit v->workPointClicked(QPointF(10, 0), 0.01, Qt::NoModifier);
+        emit v->workPointClicked(QPointF(13, 2), 0.01, Qt::NoModifier);
+        w.setTool(MainWindow::Tool::None);
+        const QString rect = v->annotationGuids().last();
+        QCOMPARE(v->annotationPoints(rect), (QVector<QPointF>{{10, 0}, {13, 0}, {13, 2}, {10, 2}}));
+
+        w.preferences().setValue(QStringLiteral("keep_rectangles_rectangular"), true);
+        w.setTool(MainWindow::Tool::Stretch);
+        emit v->workPointClicked(QPointF(13.02, 0.02), 0.1, Qt::NoModifier); // the lower-right corner
+        QVERIFY(w.draftGripActive());
+        emit v->workPointClicked(QPointF(14, 1), 0.001, Qt::NoModifier);
+        QVector<QPointF> moved = v->annotationPoints(rect);
+        QCOMPARE(moved.size(), 4);
+        QCOMPARE(moved[0].y(), moved[1].y()); // the two sides next to the dragged corner follow it
+        QCOMPARE(moved[1].x(), moved[2].x());
+        QCOMPARE(moved[0].x(), moved[3].x());
+        QCOMPARE(moved[2].y(), moved[3].y());
+        QVERIFY(moved[1].x() > 13.0);
+
+        w.preferences().setValue(QStringLiteral("keep_rectangles_rectangular"), false);
+        emit v->workPointClicked(moved[1] + QPointF(0.02, 0.02), 0.1, Qt::NoModifier);
+        emit v->workPointClicked(QPointF(15, 1.5), 0.001, Qt::NoModifier);
+        const QVector<QPointF> free = v->annotationPoints(rect);
+        QVERIFY(free[0].y() != free[1].y()); // the corner moves alone
+        QVERIFY(free[1].x() != free[2].x());
     }
 };
 

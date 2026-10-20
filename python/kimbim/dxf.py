@@ -462,7 +462,8 @@ class Writer:
                 self.drafting_fill(element, ctx)
             loose = []  # the group's single segments (the serializer writes one path per edge)
             for child in element:
-                if fill and (child.get("class") == "hatch" or child.get("data-fill") or child.get("data-fill-pen")):
+                if fill and (child.get("class") == "hatch" or child.get("data-fill") or child.get("data-fill-pen")
+                             or child.get("data-outline") == "none"):
                     continue
                 if child.tag == SVG + "path" and set(child.attrib) <= {"d", "class"}:
                     subpaths = parse_path(child.get("d", ""))
@@ -557,7 +558,7 @@ class Writer:
         from . import annotations as N
         from . import drafting
 
-        outline = next((c for c in group if c.tag == SVG + "path" and not c.get("class") and not c.get("data-fill")
+        outline = next((c for c in group.iter(SVG + "path") if not c.get("class") and not c.get("data-fill")
                         and not c.get("data-fill-pen")), None)
         subpaths = parse_path(outline.get("d", "")) if outline is not None else []
         if not subpaths:
@@ -569,6 +570,7 @@ class Writer:
             e = None
         extra = N.extra_of(e) if e is not None else {}
         layer = {"layer": self.doc.layer(ctx.get("layer", "0") + ("-PATT" if self.poche else ""))}
+        factor = 0.001 if extra.get("PatternScale") == "model" else None  # D92: model-scaled spacings
         pen_of = getattr(self.style, "pen", None)
         bg = int(extra.get("BackgroundPen") or 0)
         name = extra.get("Pattern") or "Solid"
@@ -584,7 +586,7 @@ class Writer:
             hatch.paths.add_polyline_path(loop, is_closed=True)
             self.count += 1
         families = [] if pattern.get("solid") else pattern.get("lines", []) or []
-        k = self.map.size  # model units per paper mm
+        k = factor if factor is not None else self.map.size  # model units per pattern mm
         definition = []
         for fam in families:
             a = math.radians(float(fam.get("angle", 0)))

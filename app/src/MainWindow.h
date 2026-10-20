@@ -595,6 +595,9 @@ private:
     QComboBox* m_draftPattern = nullptr;
     QSpinBox* m_draftBackground = nullptr; // 0: no background
     QToolButton* m_draftShowArea = nullptr;
+    QSpinBox* m_draftOutline = nullptr; // D92: -1 the fill's pen, 0 none
+    QComboBox* m_draftPatternScale = nullptr; // D92: paper or model
+    bool m_gripRect = false; // D92: the gripped shape is a rectangle (stays rectangular when asked)
     QComboBox* m_tagStyle = nullptr;   // D87: Automatic (by kind) or a tag style
     QComboBox* m_tagShape = nullptr;   // the style's, or none / circle / box / hexagon
     QToolButton* m_tagLeader = nullptr;

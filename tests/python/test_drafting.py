@@ -80,6 +80,24 @@ def test_each_shape_is_an_ifc_annotation_on_the_level(plan):
     assert valid() == []
 
 
+def test_fill_outline_pen_pattern_scale_and_rectangle_marker(plan):
+    """D92: a fill's outline can take its own pen or none; its pattern spacings can be paper or
+    model; a rectangle is marked so a grip can keep it rectangular."""
+    rect = call("add_drafting", plan["l1"], "rectangle", pts((0, 0), (4, 2)), "")["guid"]
+    assert listed(plan["l1"])[rect]["rect"] is True
+    none = call("add_drafting", plan["l1"], "fill", pts((0, 0), (4, 0), (4, 3), (0, 3)),
+                json.dumps({"pattern": "Diagonal", "outline_pen": 0, "pattern_scale": "paper"}))["guid"]
+    own = call("add_drafting", plan["l1"], "fill", pts((5, 0), (9, 0), (9, 3), (5, 3)),
+               json.dumps({"pattern": "Diagonal", "outline_pen": 12, "pattern_scale": "model"}))["guid"]
+    shown = listed(plan["l1"])
+    assert shown[none]["outline_pen"] == 0 and shown[own]["outline_pen"] == 12
+    assert len(shown[own]["hatch"]) > len(shown[none]["hatch"])  # model spacings are finer on paper
+    assert not call("add_drafting", plan["l1"], "fill", pts((0, 0), (2, 0), (2, 2)),
+                    json.dumps({"outline_pen": 300}))["ok"]
+    assert not call("add_drafting", plan["l1"], "fill", pts((0, 0), (2, 0), (2, 2)),
+                    json.dumps({"pattern_scale": "screen"}))["ok"]
+
+
 def test_every_built_in_pattern_is_schema_valid(plan):
     for name in drafting.patterns():
         r = call("add_drafting", plan["l1"], "fill", pts((0, 0), (3, 0), (3, 2)),

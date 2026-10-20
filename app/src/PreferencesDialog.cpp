@@ -197,6 +197,11 @@ PreferencesDialog::PreferencesDialog(Preferences& prefs, QWidget* parent)
     m_meshVertexSnaps->setChecked(prefs.meshVertexSnaps());
     m_meshVertexSnaps->setToolTip(tr("Adds the corners of slabs, roofs and other elements to the snap points"));
     form->addRow(QString(), m_meshVertexSnaps);
+    m_keepRectangles = new QCheckBox(tr("Keep rectangles rectangular when a corner is dragged"), this); // D92
+    m_keepRectangles->setObjectName(QStringLiteral("keepRectangles"));
+    m_keepRectangles->setChecked(prefs.keepRectanglesRectangular());
+    m_keepRectangles->setToolTip(tr("On: the two sides next to the dragged corner follow it; off: the corner moves freely"));
+    form->addRow(QString(), m_keepRectangles);
 
     // D92: the defaults a new underlay gets.
     m_underlayOpacity = new QSpinBox(this);
@@ -252,6 +257,7 @@ void PreferencesDialog::apply()
     m_prefs.setValue(QStringLiteral("split_join"), m_splitJoin->isChecked());
     m_prefs.setValue(QStringLiteral("merge_props"), m_mergeProps->currentData().toString());
     m_prefs.setValue(QStringLiteral("mesh_vertex_snaps"), m_meshVertexSnaps->isChecked());
+    m_prefs.setValue(QStringLiteral("keep_rectangles_rectangular"), m_keepRectangles->isChecked());
     m_prefs.setValue(QStringLiteral("underlay_opacity"), double(m_underlayOpacity->value()) / 100.0);
     m_prefs.setValue(QStringLiteral("underlay_greyscale"), m_underlayGrey->isChecked());
     m_prefs.setValue(QStringLiteral("underlay_tint"), m_underlayTint->text().trimmed());

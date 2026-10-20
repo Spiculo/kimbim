@@ -48,6 +48,7 @@ private:
     QCheckBox* m_splitJoin; // D92
     QComboBox* m_mergeProps; // D92
     QCheckBox* m_meshVertexSnaps; // D92
+    QCheckBox* m_keepRectangles; // D92
     QSpinBox* m_underlayOpacity; // D92: new underlay defaults
     QCheckBox* m_underlayGrey;
     QLineEdit* m_underlayTint;

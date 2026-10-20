@@ -1051,11 +1051,12 @@ class AnnotationPrs : public AIS_InteractiveObject {
 public:
     // `ink`: the pen's colour and width (D73); nullopt keeps the kind's own colours (markers, rooms).
     AnnotationPrs(Viewport::Annotation a, double z, std::optional<std::pair<Quantity_Color, float>> ink = std::nullopt,
-        std::optional<Quantity_Color> background = std::nullopt)
+        std::optional<Quantity_Color> background = std::nullopt, std::optional<Quantity_Color> outline = std::nullopt)
         : m_a(std::move(a))
         , m_z(z)
         , m_ink(std::move(ink))
         , m_background(std::move(background))
+        , m_outline(std::move(outline))
     {
         SetZLayer(Graphic3d_ZLayerId_Topmost);
     }
@@ -1116,7 +1117,7 @@ public:
             g->AddPrimitiveArray(arr);
         }
         const std::vector<std::pair<gp_Pnt, gp_Pnt>> segs = segments();
-        if (!segs.empty()) {
+        if (!segs.empty() && !(m_a.isDrafting() && m_a.outlinePen == 0)) {
             Handle(Graphic3d_ArrayOfSegments) arr = new Graphic3d_ArrayOfSegments(int(segs.size()) * 2);
             for (const auto& s : segs) {
                 arr->AddVertex(s.first);
@@ -1124,7 +1125,8 @@ public:
             }
             Handle(Graphic3d_Group) lines = prs->NewGroup();
             const float width = m_ink ? std::max(m_ink->second, 1.0f) : (room ? 1.0f : 1.5f);
-            Handle(Graphic3d_AspectLine3d) aspect = new Graphic3d_AspectLine3d(ink, room ? Aspect_TOL_DOT : Aspect_TOL_SOLID, width);
+            Handle(Graphic3d_AspectLine3d) aspect = new Graphic3d_AspectLine3d(
+                m_outline ? *m_outline : ink, room ? Aspect_TOL_DOT : Aspect_TOL_SOLID, width);
             if (!m_a.dash.isEmpty()) // D84: the drafting shape's line type
                 aspect->SetLinePattern(Graphics::pattern(m_a.dash));
             lines->SetGroupPrimitivesAspect(aspect);
@@ -1332,6 +1334,7 @@ private:
     double m_z;
     std::optional<std::pair<Quantity_Color, float>> m_ink;
     std::optional<Quantity_Color> m_background;
+    std::optional<Quantity_Color> m_outline;
     Handle(SelectMgr_EntityOwner) m_owner;
 };
 
@@ -1397,7 +1400,12 @@ void Viewport::displayAnnotations()
             } else if (a.backgroundPen > 0) {
                 background = Quantity_Color(Quantity_NOC_WHITE);
             }
-            Handle(AnnotationPrs) prs = new AnnotationPrs(a, m_annotationZ + 0.02, ink, background);
+            std::optional<Quantity_Color> outline; // D92: a fill's own outline pen
+            if (a.outlinePen > 0 && !g.isEmpty()) {
+                const LineStyle op = g.pen(a.outlinePen);
+                outline = Quantity_Color(op.color.redF(), op.color.greenF(), op.color.blueF(), Quantity_TOC_sRGB);
+            }
+            Handle(AnnotationPrs) prs = new AnnotationPrs(a, m_annotationZ + 0.02, ink, background, outline);
             m_context->Display(prs, 0, m_scene->layerLocked.contains(a.guid) ? -1 : 0, false);
             keepHere(prs);
             m_annotations.insert(a.guid, prs);

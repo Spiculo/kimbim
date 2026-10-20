@@ -56,6 +56,7 @@ QJsonObject Preferences::defaults()
         {"field_of_view", 45.0},
         {"north_arrow", true},
         {"mesh_vertex_snaps", false},
+        {"keep_rectangles_rectangular", false},
         {"underlay_opacity", 0.5},
         {"underlay_greyscale", false},
         {"underlay_tint", ""},
@@ -168,6 +169,7 @@ double Preferences::fieldOfView() const
 
 bool Preferences::northArrowPlans() const { return value("north_arrow").toBool(true); }
 bool Preferences::meshVertexSnaps() const { return value("mesh_vertex_snaps").toBool(false); }
+bool Preferences::keepRectanglesRectangular() const { return value("keep_rectangles_rectangular").toBool(false); }
 
 // D92: the defaults a new underlay gets.
 double Preferences::underlayOpacity() const

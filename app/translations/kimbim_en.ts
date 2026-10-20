@@ -3406,67 +3406,67 @@ License: GPL-3.0-or-later</source>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="2019"/>
-        <location filename="../src/DraftTools.cpp" line="174"/>
+        <location filename="../src/DraftTools.cpp" line="190"/>
         <source>endpoint</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="2019"/>
-        <location filename="../src/DraftTools.cpp" line="174"/>
+        <location filename="../src/DraftTools.cpp" line="190"/>
         <source>midpoint</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="2019"/>
-        <location filename="../src/DraftTools.cpp" line="174"/>
+        <location filename="../src/DraftTools.cpp" line="190"/>
         <source>perpendicular</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="2020"/>
-        <location filename="../src/DraftTools.cpp" line="175"/>
+        <location filename="../src/DraftTools.cpp" line="191"/>
         <source>on wall</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="2020"/>
-        <location filename="../src/DraftTools.cpp" line="175"/>
+        <location filename="../src/DraftTools.cpp" line="191"/>
         <source>angle</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="2020"/>
-        <location filename="../src/DraftTools.cpp" line="175"/>
+        <location filename="../src/DraftTools.cpp" line="191"/>
         <source>grid</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="2020"/>
-        <location filename="../src/DraftTools.cpp" line="175"/>
+        <location filename="../src/DraftTools.cpp" line="191"/>
         <source>grid crossing</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="2020"/>
-        <location filename="../src/DraftTools.cpp" line="176"/>
+        <location filename="../src/DraftTools.cpp" line="192"/>
         <source>on grid line</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="2021"/>
-        <location filename="../src/DraftTools.cpp" line="176"/>
+        <location filename="../src/DraftTools.cpp" line="192"/>
         <source>wall face end</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="2021"/>
-        <location filename="../src/DraftTools.cpp" line="176"/>
+        <location filename="../src/DraftTools.cpp" line="192"/>
         <source>on wall face</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="2021"/>
-        <location filename="../src/DraftTools.cpp" line="176"/>
+        <location filename="../src/DraftTools.cpp" line="192"/>
         <source>centre</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4423,7 +4423,7 @@ Editing the IFC directly opens it at once, without version history, options, com
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="2029"/>
-        <location filename="../src/DraftTools.cpp" line="179"/>
+        <location filename="../src/DraftTools.cpp" line="195"/>
         <source>Length %1</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5611,77 +5611,107 @@ Open it read-only?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="88"/>
+        <location filename="../src/DraftTools.cpp" line="89"/>
         <source>How the arc or circle is drawn</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="89"/>
+        <location filename="../src/DraftTools.cpp" line="90"/>
         <source>Circle: centre and radius</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="90"/>
+        <location filename="../src/DraftTools.cpp" line="91"/>
         <source>Arc: three points</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="91"/>
+        <location filename="../src/DraftTools.cpp" line="92"/>
         <source>Arc: centre, start and end</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="94"/>
+        <location filename="../src/DraftTools.cpp" line="95"/>
         <source>Line type</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="97"/>
+        <location filename="../src/DraftTools.cpp" line="98"/>
         <source>Fill pattern (Graphics &gt; fill patterns are project settings)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="101"/>
+        <location filename="../src/DraftTools.cpp" line="102"/>
         <source>No background</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="102"/>
+        <location filename="../src/DraftTools.cpp" line="103"/>
         <source>Background pen </source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="103"/>
+        <location filename="../src/DraftTools.cpp" line="104"/>
         <source>The fill&apos;s background pen (0: none, the model shows through)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="106"/>
+        <location filename="../src/DraftTools.cpp" line="107"/>
         <source>Area</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="108"/>
+        <location filename="../src/DraftTools.cpp" line="109"/>
         <source>Show the fill&apos;s area in its middle</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="217"/>
+        <location filename="../src/DraftTools.cpp" line="113"/>
+        <source>Same as the fill</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/DraftTools.cpp" line="115"/>
+        <source>Outline pen </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/DraftTools.cpp" line="116"/>
+        <source>The fill&apos;s outline pen (-1: the fill&apos;s own pen; 0: no outline)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/DraftTools.cpp" line="119"/>
+        <source>Paper pattern</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/DraftTools.cpp" line="120"/>
+        <source>Model pattern</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/DraftTools.cpp" line="121"/>
+        <source>Paper: the pattern keeps its printed spacing at every drawing scale; model: its spacing grows with the model</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/DraftTools.cpp" line="237"/>
         <source>Could not draw it: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="231"/>
+        <location filename="../src/DraftTools.cpp" line="251"/>
         <source>Could not fill: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="252"/>
+        <location filename="../src/DraftTools.cpp" line="285"/>
         <source>Could not move the point: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="281"/>
+        <location filename="../src/DraftTools.cpp" line="315"/>
         <source>Click the point&apos;s new position (Esc: leave it)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -6886,32 +6916,42 @@ Open it read-only?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/PreferencesDialog.cpp" line="205"/>
+        <location filename="../src/PreferencesDialog.cpp" line="200"/>
+        <source>Keep rectangles rectangular when a corner is dragged</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/PreferencesDialog.cpp" line="203"/>
+        <source>On: the two sides next to the dragged corner follow it; off: the corner moves freely</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/PreferencesDialog.cpp" line="210"/>
         <source> %</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/PreferencesDialog.cpp" line="207"/>
+        <location filename="../src/PreferencesDialog.cpp" line="212"/>
         <source>New underlay opacity:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/PreferencesDialog.cpp" line="208"/>
+        <location filename="../src/PreferencesDialog.cpp" line="213"/>
         <source>Show new underlays in grey</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/PreferencesDialog.cpp" line="215"/>
+        <location filename="../src/PreferencesDialog.cpp" line="220"/>
         <source>Tint new underlays this colour (leave empty for none)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/PreferencesDialog.cpp" line="216"/>
+        <location filename="../src/PreferencesDialog.cpp" line="221"/>
         <source>New underlay tint:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/PreferencesDialog.cpp" line="217"/>
+        <location filename="../src/PreferencesDialog.cpp" line="222"/>
         <source>Put each new underlay on its own layer, named after the file</source>
         <translation type="unfinished"></translation>
     </message>

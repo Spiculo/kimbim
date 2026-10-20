@@ -3004,37 +3004,37 @@ Licencia: GPL-3.0 o posterior</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="2019" />
-      <location filename="../src/DraftTools.cpp" line="174" />
+      <location filename="../src/DraftTools.cpp" line="190" />
       <source>endpoint</source>
       <translation>extremo</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="2019" />
-      <location filename="../src/DraftTools.cpp" line="174" />
+      <location filename="../src/DraftTools.cpp" line="190" />
       <source>midpoint</source>
       <translation>punto medio</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="2019" />
-      <location filename="../src/DraftTools.cpp" line="174" />
+      <location filename="../src/DraftTools.cpp" line="190" />
       <source>perpendicular</source>
       <translation>perpendicular</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="2020" />
-      <location filename="../src/DraftTools.cpp" line="175" />
+      <location filename="../src/DraftTools.cpp" line="191" />
       <source>on wall</source>
       <translation>sobre muro</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="2020" />
-      <location filename="../src/DraftTools.cpp" line="175" />
+      <location filename="../src/DraftTools.cpp" line="191" />
       <source>angle</source>
       <translation>ángulo</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="2020" />
-      <location filename="../src/DraftTools.cpp" line="175" />
+      <location filename="../src/DraftTools.cpp" line="191" />
       <source>grid</source>
       <translation>rejilla</translation>
     </message>
@@ -3610,31 +3610,31 @@ Licencia: GPL-3.0 o posterior</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="2020" />
-      <location filename="../src/DraftTools.cpp" line="175" />
+      <location filename="../src/DraftTools.cpp" line="191" />
       <source>grid crossing</source>
       <translation>cruce de ejes</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="2020" />
-      <location filename="../src/DraftTools.cpp" line="176" />
+      <location filename="../src/DraftTools.cpp" line="192" />
       <source>on grid line</source>
       <translation>sobre eje</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="2021" />
-      <location filename="../src/DraftTools.cpp" line="176" />
+      <location filename="../src/DraftTools.cpp" line="192" />
       <source>wall face end</source>
       <translation>extremo de cara de muro</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="2021" />
-      <location filename="../src/DraftTools.cpp" line="176" />
+      <location filename="../src/DraftTools.cpp" line="192" />
       <source>on wall face</source>
       <translation>sobre cara de muro</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="2021" />
-      <location filename="../src/DraftTools.cpp" line="176" />
+      <location filename="../src/DraftTools.cpp" line="192" />
       <source>centre</source>
       <translation>centro</translation>
     </message>
@@ -3690,7 +3690,7 @@ Licencia: GPL-3.0 o posterior</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="2029" />
-      <location filename="../src/DraftTools.cpp" line="179" />
+      <location filename="../src/DraftTools.cpp" line="195" />
       <source>Length %1</source>
       <translation>Longitud %1</translation>
     </message>
@@ -5795,77 +5795,107 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       <translation>La consola no devolvió nada</translation>
     </message>
     <message>
-      <location filename="../src/DraftTools.cpp" line="88" />
+      <location filename="../src/DraftTools.cpp" line="89" />
       <source>How the arc or circle is drawn</source>
       <translation>Cómo se dibuja el arco o el círculo</translation>
     </message>
     <message>
-      <location filename="../src/DraftTools.cpp" line="89" />
+      <location filename="../src/DraftTools.cpp" line="90" />
       <source>Circle: centre and radius</source>
       <translation>Círculo: centro y radio</translation>
     </message>
     <message>
-      <location filename="../src/DraftTools.cpp" line="90" />
+      <location filename="../src/DraftTools.cpp" line="91" />
       <source>Arc: three points</source>
       <translation>Arco: tres puntos</translation>
     </message>
     <message>
-      <location filename="../src/DraftTools.cpp" line="91" />
+      <location filename="../src/DraftTools.cpp" line="92" />
       <source>Arc: centre, start and end</source>
       <translation>Arco: centro, inicio y fin</translation>
     </message>
     <message>
-      <location filename="../src/DraftTools.cpp" line="94" />
+      <location filename="../src/DraftTools.cpp" line="95" />
       <source>Line type</source>
       <translation>Tipo de línea</translation>
     </message>
     <message>
-      <location filename="../src/DraftTools.cpp" line="97" />
+      <location filename="../src/DraftTools.cpp" line="98" />
       <source>Fill pattern (Graphics &gt; fill patterns are project settings)</source>
       <translation>Trama del relleno (las tramas son configuración del proyecto)</translation>
     </message>
     <message>
-      <location filename="../src/DraftTools.cpp" line="101" />
+      <location filename="../src/DraftTools.cpp" line="102" />
       <source>No background</source>
       <translation>Sin fondo</translation>
     </message>
     <message>
-      <location filename="../src/DraftTools.cpp" line="102" />
+      <location filename="../src/DraftTools.cpp" line="103" />
       <source>Background pen </source>
       <translation>Pluma de fondo </translation>
     </message>
     <message>
-      <location filename="../src/DraftTools.cpp" line="103" />
+      <location filename="../src/DraftTools.cpp" line="104" />
       <source>The fill's background pen (0: none, the model shows through)</source>
       <translation>La pluma de fondo del relleno (0: ninguna, el modelo se ve a través)</translation>
     </message>
     <message>
-      <location filename="../src/DraftTools.cpp" line="106" />
+      <location filename="../src/DraftTools.cpp" line="107" />
       <source>Area</source>
       <translation>Superficie</translation>
     </message>
     <message>
-      <location filename="../src/DraftTools.cpp" line="108" />
+      <location filename="../src/DraftTools.cpp" line="109" />
       <source>Show the fill's area in its middle</source>
       <translation>Mostrar la superficie del relleno en su centro</translation>
     </message>
     <message>
-      <location filename="../src/DraftTools.cpp" line="217" />
+      <location filename="../src/DraftTools.cpp" line="113" />
+      <source>Same as the fill</source>
+      <translation>Igual que el relleno</translation>
+    </message>
+    <message>
+      <location filename="../src/DraftTools.cpp" line="115" />
+      <source>Outline pen </source>
+      <translation>Pluma del contorno </translation>
+    </message>
+    <message>
+      <location filename="../src/DraftTools.cpp" line="116" />
+      <source>The fill's outline pen (-1: the fill's own pen; 0: no outline)</source>
+      <translation>La pluma del contorno del relleno (-1: la pluma del relleno; 0: sin contorno)</translation>
+    </message>
+    <message>
+      <location filename="../src/DraftTools.cpp" line="119" />
+      <source>Paper pattern</source>
+      <translation>Patrón de papel</translation>
+    </message>
+    <message>
+      <location filename="../src/DraftTools.cpp" line="120" />
+      <source>Model pattern</source>
+      <translation>Patrón de modelo</translation>
+    </message>
+    <message>
+      <location filename="../src/DraftTools.cpp" line="121" />
+      <source>Paper: the pattern keeps its printed spacing at every drawing scale; model: its spacing grows with the model</source>
+      <translation>Papel: el patrón conserva su separación impresa en cualquier escala de dibujo; modelo: su separación crece con el modelo</translation>
+    </message>
+    <message>
+      <location filename="../src/DraftTools.cpp" line="237" />
       <source>Could not draw it: %1</source>
       <translation>No se pudo dibujar: %1</translation>
     </message>
     <message>
-      <location filename="../src/DraftTools.cpp" line="231" />
+      <location filename="../src/DraftTools.cpp" line="251" />
       <source>Could not fill: %1</source>
       <translation>No se pudo rellenar: %1</translation>
     </message>
     <message>
-      <location filename="../src/DraftTools.cpp" line="252" />
+      <location filename="../src/DraftTools.cpp" line="285" />
       <source>Could not move the point: %1</source>
       <translation>No se pudo mover el punto: %1</translation>
     </message>
     <message>
-      <location filename="../src/DraftTools.cpp" line="281" />
+      <location filename="../src/DraftTools.cpp" line="315" />
       <source>Click the point's new position (Esc: leave it)</source>
       <translation>Haga clic en la nueva posición del punto (Esc: dejarlo)</translation>
     </message>
@@ -7082,32 +7112,42 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       <translation>Añade las esquinas de losas, cubiertas y otros elementos a los puntos de ajuste</translation>
     </message>
     <message>
-      <location filename="../src/PreferencesDialog.cpp" line="205" />
+      <location filename="../src/PreferencesDialog.cpp" line="200" />
+      <source>Keep rectangles rectangular when a corner is dragged</source>
+      <translation>Mantener los rectángulos rectangulares al arrastrar una esquina</translation>
+    </message>
+    <message>
+      <location filename="../src/PreferencesDialog.cpp" line="203" />
+      <source>On: the two sides next to the dragged corner follow it; off: the corner moves freely</source>
+      <translation>Activado: los dos lados junto a la esquina arrastrada la siguen; desactivado: la esquina se mueve libremente</translation>
+    </message>
+    <message>
+      <location filename="../src/PreferencesDialog.cpp" line="210" />
       <source> %</source>
       <translation> %</translation>
     </message>
     <message>
-      <location filename="../src/PreferencesDialog.cpp" line="207" />
+      <location filename="../src/PreferencesDialog.cpp" line="212" />
       <source>New underlay opacity:</source>
       <translation>Opacidad de las nuevas imágenes de fondo:</translation>
     </message>
     <message>
-      <location filename="../src/PreferencesDialog.cpp" line="208" />
+      <location filename="../src/PreferencesDialog.cpp" line="213" />
       <source>Show new underlays in grey</source>
       <translation>Mostrar las nuevas imágenes de fondo en gris</translation>
     </message>
     <message>
-      <location filename="../src/PreferencesDialog.cpp" line="215" />
+      <location filename="../src/PreferencesDialog.cpp" line="220" />
       <source>Tint new underlays this colour (leave empty for none)</source>
       <translation>Teñir las nuevas imágenes de fondo con este color (dejar vacío para ninguna)</translation>
     </message>
     <message>
-      <location filename="../src/PreferencesDialog.cpp" line="216" />
+      <location filename="../src/PreferencesDialog.cpp" line="221" />
       <source>New underlay tint:</source>
       <translation>Tinte de las nuevas imágenes de fondo:</translation>
     </message>
     <message>
-      <location filename="../src/PreferencesDialog.cpp" line="217" />
+      <location filename="../src/PreferencesDialog.cpp" line="222" />
       <source>Put each new underlay on its own layer, named after the file</source>
       <translation>Poner cada nueva imagen de fondo en su propia capa, con el nombre del archivo</translation>
     </message>

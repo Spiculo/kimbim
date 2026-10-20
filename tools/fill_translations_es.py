@@ -1295,6 +1295,15 @@ ES = {
     'The scale bar the Scale bar tool and the plan drawings place': 'La escala gráfica que colocan la herramienta Escala gráfica y los planos',
     'Scale bar:': 'Escala gráfica:',
 
+    'Same as the fill': 'Igual que el relleno',
+    'Outline pen ': 'Pluma del contorno ',
+    "The fill's outline pen (-1: the fill's own pen; 0: no outline)": 'La pluma del contorno del relleno (-1: la pluma del relleno; 0: sin contorno)',
+    'Paper pattern': 'Patrón de papel',
+    'Model pattern': 'Patrón de modelo',
+    'Paper: the pattern keeps its printed spacing at every drawing scale; model: its spacing grows with the model': 'Papel: el patrón conserva su separación impresa en cualquier escala de dibujo; modelo: su separación crece con el modelo',
+    'Keep rectangles rectangular when a corner is dragged': 'Mantener los rectángulos rectangulares al arrastrar una esquina',
+    'On: the two sides next to the dragged corner follow it; off: the corner moves freely': 'Activado: los dos lados junto a la esquina arrastrada la siguen; desactivado: la esquina se mueve libremente',
+
 }
 
 

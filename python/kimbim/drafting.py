@@ -22,7 +22,8 @@ import json
 import math
 
 KINDS = ("line", "polyline", "arc", "circle", "fill")
-EXTRA = ("Closed", "LineType", "Pattern", "BackgroundPen", "ShowArea")  # pset keys beside Kind/Points/...
+EXTRA = ("Closed", "LineType", "Pattern", "BackgroundPen", "ShowArea", "OutlinePen", "PatternScale",
+         "Rect")  # pset keys beside Kind/Points/...
 CIRCLE_SEGMENTS = 72  # tessellation of a full circle on screen and in drawings
 MAX_HATCH_SEGMENTS = 40000  # a finer hatch is not drawn (the fill and its outline still are)
 
@@ -256,8 +257,11 @@ def shape_data(kind: str, world, data: dict, metres_per_mm: float, settings: dic
     if kind == "fill" and len(world) >= 3:
         name = data.get("Pattern") or "Solid"
         pattern = patterns(settings).get(name) or {"solid": True}
+        # D92: paper-scaled (default: the same printed spacing at every scale) or model-scaled.
+        factor = 0.001 if data.get("PatternScale") == "model" else metres_per_mm
         out.update({"pattern": name, "solid": bool(pattern.get("solid")), "area": [list(p) for p in world],
-                    "hatch": hatch(world, pattern, metres_per_mm), "background_pen": int(data.get("BackgroundPen") or 0),
+                    "hatch": hatch(world, pattern, factor), "background_pen": int(data.get("BackgroundPen") or 0),
+                    "outline_pen": int(data["OutlinePen"]) if "OutlinePen" in data else -1,
                     "show_area": bool(data.get("ShowArea"))})
         if out["show_area"]:
             out["area_text"] = area_text(area(world))
@@ -370,11 +374,14 @@ def _style_error(o: dict) -> str | None:
         return f"unknown line type {o['line_type']}"
     if "pattern" in o and o["pattern"] not in patterns(st):
         return f"unknown fill pattern {o['pattern']}"
-    for k in ("pen", "background_pen"):
+    for k in ("pen", "background_pen", "outline_pen"):
         if k in o:
             v = o[k]
-            if not (isinstance(v, int) and not isinstance(v, bool) and (0 if k == "background_pen" else 1) <= v <= 255):
-                return "pens are 1-255" if k == "pen" else "the background pen is 0 (none) or 1-255"
+            low = 0 if k in ("background_pen", "outline_pen") else 1
+            if not (isinstance(v, int) and not isinstance(v, bool) and low <= v <= 255):
+                return "pens are 1-255" if k == "pen" else f"the {k.replace('_', ' ')} is 0 (none) or 1-255"
+    if "pattern_scale" in o and o["pattern_scale"] not in ("paper", "model"):
+        return f"unknown pattern scale {o['pattern_scale']}"
     return None
 
 
@@ -391,6 +398,10 @@ def _extra(kind: str, o: dict) -> dict:
             extra["BackgroundPen"] = int(o["background_pen"])
         if "show_area" in o:
             extra["ShowArea"] = bool(o["show_area"])
+        if "outline_pen" in o:  # D92: the outline's pen (0: no outline; absent: the fill's pen)
+            extra["OutlinePen"] = int(o["outline_pen"])
+        if "pattern_scale" in o:  # D92: the pattern's spacings are paper mm (default) or model mm
+            extra["PatternScale"] = o["pattern_scale"]
     return extra
 
 
@@ -402,7 +413,8 @@ def _shape(kind: str, points, o: dict):
         (x0, y0), (x1, y1) = points
         if abs(x1 - x0) < 1e-6 or abs(y1 - y0) < 1e-6:
             return "the rectangle has no area"
-        return "polyline", [(x0, y0), (x1, y0), (x1, y1), (x0, y1)], {**_extra("polyline", o), "Closed": True}
+        return "polyline", [(x0, y0), (x1, y0), (x1, y1), (x0, y1)], {**_extra("polyline", o), "Closed": True,
+                                                                      "Rect": True}
     if kind == "line":
         if len(points) != 2 or math.dist(*points) < 1e-6:
             return "a line needs two different points"
@@ -659,7 +671,13 @@ def drawing_parts(storey, to_paper, settings: dict | None = None) -> list:
                     (px, py), (qx, qy) = paper((x1, y1)), paper((x2, y2))
                     parts.append(f"M{fmt(px)},{fmt(py)} L{fmt(qx)},{fmt(qy)}")
                 out.append(f'<path class="hatch" d="{" ".join(parts)}" stroke-dasharray="none"/>')
-            out.append(f'<path d="{d}"/>')
+            if sd.get("outline_pen", -1) != 0:  # D92: the fill's outline, in its own pen when one is set
+                if sd.get("outline_pen", -1) > 0:
+                    out.append(f'<g data-kind="annotation" data-pen="{sd["outline_pen"]}"><path d="{d}"/></g>')
+                else:
+                    out.append(f'<path d="{d}"/>')
+            else:  # no outline: the loop is still there for the DXF hatch
+                out.append(f'<path d="{d}" data-outline="none" stroke="none"/>')
             if sd.get("show_area"):
                 x, y = paper(sd["label_at"])
                 out.append(f'<text x="{fmt(x)}" y="{fmt(y)}" font-size="{fmt(size)}" text-anchor="middle" '

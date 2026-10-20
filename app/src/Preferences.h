@@ -33,6 +33,7 @@ public:
     double fieldOfView() const;         // D92: the perspective camera's vertical field of view, degrees (default 45)
     bool northArrowPlans() const;       // D92: show the plan north indicator (on once true north is set)
     bool meshVertexSnaps() const;       // D92: snap to element mesh vertices while drawing (off)
+    bool keepRectanglesRectangular() const; // D92: dragging a rectangle grip keeps it rectangular (off)
     // D92: the defaults a new underlay gets.
     double underlayOpacity() const;
     bool underlayGreyscale() const;
