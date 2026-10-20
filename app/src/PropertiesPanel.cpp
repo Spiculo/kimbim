@@ -15,7 +15,8 @@ namespace kimbim {
 
 QStringList renovationKeys()
 {
-    return {QStringLiteral("existing"), QStringLiteral("demolish"), QStringLiteral("new")};
+    return {QStringLiteral("existing"), QStringLiteral("demolish"), QStringLiteral("new"),
+            QStringLiteral("temporary"), QStringLiteral("auxiliary")};
 }
 
 QString renovationLabel(const QString& key)
@@ -24,6 +25,10 @@ QString renovationLabel(const QString& key)
         return QCoreApplication::translate("Renovation", "Existing");
     if (key == QLatin1String("demolish"))
         return QCoreApplication::translate("Renovation", "To be demolished");
+    if (key == QLatin1String("temporary"))
+        return QCoreApplication::translate("Renovation", "Temporary");
+    if (key == QLatin1String("auxiliary"))
+        return QCoreApplication::translate("Renovation", "Auxiliary");
     return QCoreApplication::translate("Renovation", "New");
 }
 

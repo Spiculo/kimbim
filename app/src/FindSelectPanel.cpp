@@ -363,7 +363,7 @@ void FindSelectPanel::fillValues(Row& row, const QString& keep)
         for (const QString& k : kinds.isEmpty() ? QStringList{"walls", "slabs", "doors", "windows"} : kinds)
             v->addItem(kindLabel(k), k);
     } else if (field == QLatin1String("status")) {
-        for (const QString& s : {QStringLiteral("existing"), QStringLiteral("demolish"), QStringLiteral("new")})
+        for (const QString& s : renovationKeys())
             v->addItem(renovationLabel(s), s);
     } else if (field == QLatin1String("level")) {
         for (const auto& lv : m_choices.value("levels").toArray())

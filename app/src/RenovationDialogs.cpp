@@ -30,7 +30,7 @@ RenovationFiltersDialog::RenovationFiltersDialog(const QJsonObject& reply, QWidg
 {
     setWindowTitle(tr("Renovation filters"));
     buildPicker();
-    m_rows = new QTableWidget(3, 6, this);
+    m_rows = new QTableWidget(renovationKeys().size(), 6, this);
     m_rows->setObjectName(QStringLiteral("renovationRows"));
     m_rows->setHorizontalHeaderLabels({tr("Status"), tr("Show"), tr("Line pen"), tr("Line type"), tr("Fill pen"), tr("3D colour")});
     m_rows->verticalHeader()->hide();

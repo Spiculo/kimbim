@@ -403,6 +403,23 @@ def test_demolition_purpose_hides_new_and_restyles_demolished():
     assert out["renovation"] == "Demolition plan"
 
 
+def test_temporary_and_auxiliary_get_their_default_looks():
+    from kimbim import renovation as r
+
+    f = _model()
+    temp = _el(f, "IfcWall")
+    r.write_status(temp, "temporary")
+    aux = _el(f, "IfcWall")
+    r.write_status(aux, "auxiliary")
+    out = g.resolve("Working", model=f)
+    t = out["styles"][out["elements"][temp.GlobalId]]
+    a = out["styles"][out["elements"][aux.GlobalId]]
+    assert t["cut"]["color"] == "#00a0c0" and t["cut"]["dash"] == [3.0, 1.5]  # dashed cyan (D93)
+    assert a["cut"]["color"] == "#c020a0" and a["cut"]["dash"] == [3.0, 1.5]  # dashed magenta (D93)
+    assert [(e["source"], e["key"]) for e in out["legend"]] == [("renovation", "temporary"), ("renovation", "auxiliary")]
+    assert out["legend"][0]["label"] == "Temporary" and out["legend"][1]["label"] == "Auxiliary"
+
+
 def test_override_rules_apply_on_top_of_the_renovation_filter():
     f, w = _reno_model()
     s.load({"purposes": {**g.builtin("purposes"),

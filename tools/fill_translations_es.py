@@ -241,6 +241,8 @@ ES = {
     "Elements": "Elementos",
     "Double-click a layer to make it active: new elements go on it": "Doble clic en una capa para activarla: los elementos nuevos van a ella",
     "New": "Nueva",
+    "Temporary": "Temporal",
+    "Auxiliary": "Auxiliar",
     "New layer": "Nueva capa",
     "Delete": "Eliminar",
     "Delete the selected layer (its elements stay, without a layer)": "Eliminar la capa seleccionada (sus elementos quedan, sin capa)",

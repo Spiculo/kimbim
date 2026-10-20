@@ -31,7 +31,9 @@ def _el(f, cls, **psets):
 @pytest.mark.parametrize("value,expected", [
     ("EXISTING", "existing"), ("existing", "existing"), (["EXISTING"], "existing"),
     ("DEMOLISH", "demolish"), ("Demolished", "demolish"), ("To Be Demolished", "demolish"),
-    ("NEW", "new"), ("TEMPORARY", "new"), ("OTHER", "new"), ("", "new"), (None, "new"), ("garbage", "new"),
+    ("NEW", "new"), ("OTHER", "new"), ("", "new"), (None, "new"), ("garbage", "new"),
+    ("TEMPORARY", "temporary"), ("Temporary", "temporary"),
+    ("AUXILIARY", "auxiliary"), ("Auxiliary", "auxiliary"),
 ])
 def test_normalize(value, expected):
     assert r.normalize(value) == expected
@@ -79,6 +81,27 @@ def test_writing_clears_the_other_place():
     r.write_status(w, "existing")  # goes to Pset_WallCommon; the KimBim one must not contradict it
     assert "Status" not in (ifcopenshell.util.element.get_pset(w, "KIMBIM_Renovation") or {})
     assert r.status_of(w) == "existing"
+
+
+def test_temporary_uses_ifc_value_where_the_class_has_one():
+    f = _model()
+    w = _el(f, "IfcWall")
+    r.write_status(w, "temporary")
+    prop = next(p for p in f.by_type("IfcPropertyEnumeratedValue") if p.Name == "Status")
+    assert [v.wrappedValue for v in prop.EnumerationValues] == ["TEMPORARY"]
+    assert r.status_of(w) == "temporary"
+
+
+def test_auxiliary_has_no_ifc_value_so_it_lives_in_kimbims_pset():
+    f = _model()
+    w = _el(f, "IfcWall")
+    r.write_status(w, "auxiliary")
+    assert ifcopenshell.util.element.get_pset(w, "KIMBIM_Renovation")["Status"] == "AUXILIARY"
+    assert not [p for p in f.by_type("IfcPropertyEnumeratedValue") if p.Name == "Status"]
+    assert r.status_of(w) == "auxiliary"
+    r.write_status(w, "new")  # switching back clears KimBim's pset
+    assert "Status" not in (ifcopenshell.util.element.get_pset(w, "KIMBIM_Renovation") or {})
+    assert r.status_of(w) == "new"
 
 
 def test_read_from_archicad_name_and_from_the_type():

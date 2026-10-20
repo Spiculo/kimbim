@@ -18,10 +18,11 @@ KINDS = ("walls", "columns", "beams", "slabs", "roofs", "stairs", "railings", "d
          "annotations", "grids", "other")
 TABLES = ("pen_sets", "line_types", "element_styles", "visibility_sets", "override_sets",
           "layer_combinations", "purposes", "renovation_filters", "fill_patterns")
-STATUS_KEYS = ("existing", "demolish", "new")  # renovation status (D74)
+STATUS_KEYS = ("existing", "demolish", "new", "temporary", "auxiliary")  # renovation status (D74, D91)
 FILTER_SHOW = ("as_is", "hide", "override")
 FILTER_FIELDS = ("pen", "cut_pen", "projection_pen", "line", "fill", "surface", "transparency")
-_STATUS_LABELS = {"existing": "Existing", "demolish": "To be demolished", "new": "New"}
+_STATUS_LABELS = {"existing": "Existing", "demolish": "To be demolished", "new": "New",
+                  "temporary": "Temporary", "auxiliary": "Auxiliary"}
 OPS = ("equals", "not_equals", "contains", "exists", "missing", "true", "false", "less", "more")
 WHEN = ("kind", "ifc_class", "property", "op", "value", "layer", "material")
 THEN = ("pen", "cut_pen", "projection_pen", "line", "fill", "surface", "transparency", "hide")
@@ -33,10 +34,16 @@ _ROLES = {10: "Walls cut", 11: "Walls projection", 12: "Walls fill", 13: "Struct
           14: "Structure projection", 15: "Structure fill", 16: "Doors and windows",
           17: "Stairs and railings", 18: "Furniture", 19: "Plumbing", 20: "HVAC", 21: "Electrical",
           22: "Rooms", 23: "Annotations", 24: "Grids", 25: "Other", 26: "Highlight",
-          27: "Highlight 2", 28: "Highlight 3", 31: "Existing", 32: "Demolition", 33: "Demolition fill"}
-# D74: the renovation pens; black and white in the Permit set (permit drawings print in black).
-_RENOVATION_PENS = {"default": {31: ("#808080", .18), 32: ("#c09000", .25), 33: ("#f8e8a0", .18)},
-                    "Permit": {31: ("#808080", .18), 32: ("#000000", .25), 33: ("#ffffff", .18)}}
+          27: "Highlight 2", 28: "Highlight 3", 31: "Existing", 32: "Demolition", 33: "Demolition fill",
+          34: "Temporary", 35: "Temporary fill", 36: "Auxiliary", 37: "Auxiliary fill"}
+# D74, D91: the renovation pens; black and white in the Permit set (permit drawings print in black).
+# Temporary is dashed cyan like the demolition but cyan, Auxiliary dashed magenta (D93).
+_RENOVATION_PENS = {"default": {31: ("#808080", .18), 32: ("#c09000", .25), 33: ("#f8e8a0", .18),
+                                34: ("#00a0c0", .25), 35: ("#c8f0f8", .18),
+                                36: ("#c020a0", .25), 37: ("#f8c8f0", .18)},
+                    "Permit": {31: ("#808080", .18), 32: ("#000000", .25), 33: ("#ffffff", .18),
+                               34: ("#000000", .25), 35: ("#ffffff", .18),
+                               36: ("#000000", .25), 37: ("#ffffff", .18)}}
 _GENERIC = {1: 0.13, 2: 0.18, 3: 0.25, 4: 0.35, 5: 0.50, 6: 0.70, 7: 1.00}
 _HIGHLIGHT = {26: ("#e02020", 0.5), 27: ("#2050e0", 0.5), 28: ("#f08010", 0.5)}
 _SETS = {  # pen: (colour, weight) for pens 10-25 (fills use the weight only nominally)
@@ -165,16 +172,28 @@ _BUILTINS = {
                              "renovation": "New plan"},
     },
     # D74, Archicad's built-in renovation filters: each status shown as is, hidden or overridden.
+    # D91/D93: Temporary and Auxiliary always show their own look (dashed cyan / dashed magenta), so
+    # they stay recognisable in every filter.
     "renovation_filters": {
-        "Everything": {"existing": {"show": "as_is"}, "demolish": {"show": "as_is"}, "new": {"show": "as_is"}},
-        "Existing plan": {"existing": {"show": "as_is"}, "demolish": {"show": "as_is"}, "new": {"show": "hide"}},
+        "Everything": {"existing": {"show": "as_is"}, "demolish": {"show": "as_is"}, "new": {"show": "as_is"},
+                       "temporary": {"show": "override", "pen": 34, "line": "Dashed", "fill": 35},
+                       "auxiliary": {"show": "override", "pen": 36, "line": "Dashed", "fill": 37}},
+        "Existing plan": {"existing": {"show": "as_is"}, "demolish": {"show": "as_is"}, "new": {"show": "hide"},
+                          "temporary": {"show": "override", "pen": 34, "line": "Dashed", "fill": 35},
+                          "auxiliary": {"show": "override", "pen": 36, "line": "Dashed", "fill": 37}},
         "Demolition plan": {"existing": {"show": "as_is"},
                             "demolish": {"show": "override", "pen": 32, "line": "Dashed", "fill": 33,
                                          "surface": "#f0c020"},
-                            "new": {"show": "hide"}},
+                            "new": {"show": "hide"},
+                            "temporary": {"show": "override", "pen": 34, "line": "Dashed", "fill": 35},
+                            "auxiliary": {"show": "override", "pen": 36, "line": "Dashed", "fill": 37}},
         "New plan": {"existing": {"show": "override", "pen": 31, "fill": 31}, "demolish": {"show": "hide"},
-                     "new": {"show": "as_is"}},
-        "Planned": {"existing": {"show": "as_is"}, "demolish": {"show": "hide"}, "new": {"show": "as_is"}},
+                     "new": {"show": "as_is"},
+                     "temporary": {"show": "override", "pen": 34, "line": "Dashed", "fill": 35},
+                     "auxiliary": {"show": "override", "pen": 36, "line": "Dashed", "fill": 37}},
+        "Planned": {"existing": {"show": "as_is"}, "demolish": {"show": "hide"}, "new": {"show": "as_is"},
+                    "temporary": {"show": "override", "pen": 34, "line": "Dashed", "fill": 35},
+                    "auxiliary": {"show": "override", "pen": 36, "line": "Dashed", "fill": 37}},
     },
 }
 
@@ -686,13 +705,13 @@ def resolve(purpose: str | None = None, model=None, settings: dict | None = None
     reno = sorted((k, v) for k, v in legend_hits.items() if k[0] == "renovation")
     reno.sort(key=lambda kv: STATUS_KEYS.index(kv[0][1]))
     if any(flt.get(k[1], {}).get("show") == "override" for k, _ in reno):  # as-is rows only explain an override
-        for (src, key), (style_no, guids) in reno:
-            legend.append({"label": _STATUS_LABELS[key], "source": src, "key": key, "style": style_no,
-                           "override": flt.get(key, {}).get("show") == "override"})
+        for (src, skey), (style_no, guids) in reno:
+            legend.append({"label": _STATUS_LABELS[skey], "source": src, "key": skey, "style": style_no,
+                           "override": flt.get(skey, {}).get("show") == "override"})
             members.append(guids)
-    for (src, key), (style_no, guids) in legend_hits.items():
+    for (src, skey), (style_no, guids) in legend_hits.items():
         if src == "override":
-            legend.append({"label": key, "source": src, "key": key, "style": style_no, "override": True})
+            legend.append({"label": skey, "source": src, "key": skey, "style": style_no, "override": True})
             members.append(guids)
     ann = styles_by_kind.get("annotations") or builtin_styles["annotations"]
     out = {"purpose": name, "purposes": list(purposes), "pen_set": set_name, "visibility": vis_name or "", "overrides": ovr_name or "",

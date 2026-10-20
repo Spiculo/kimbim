@@ -1932,7 +1932,7 @@ private slots:
         QCOMPARE(w.propertiesPanel()->statusCombo()->currentData().toString(), QStringLiteral("new"));
         auto* menu = w.findChild<QMenu*>(QStringLiteral("renovationMenu"));
         QVERIFY(menu);
-        QCOMPARE(menu->actions().size(), 5); // 3 statuses, a separator, "Mark unmarked elements as"
+        QCOMPARE(menu->actions().size(), 7); // 5 statuses, a separator, "Mark unmarked elements as"
         menu->actions().at(1)->trigger();     // To be demolished
         QCOMPARE(w.propertiesPanel()->statusCombo()->currentData().toString(), QStringLiteral("demolish"));
         QVERIFY(w.setPurpose(QStringLiteral("New construction")));
