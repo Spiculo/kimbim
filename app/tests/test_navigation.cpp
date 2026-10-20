@@ -134,6 +134,30 @@ private slots:
         QVERIFY(sameDir(eyeDir(v), kimbim::viewDirection(kimbim::HomeOrientation)));
     }
 
+    // D91: every preset view fits the whole model, even when it was zoomed in (supersedes D76's
+    // keep-zoom); the cube's faces go through the same path.
+    void presetViewsAlwaysFitTheWholeModel()
+    {
+        if (QGuiApplication::platformName() == QLatin1String("offscreen"))
+            QSKIP("no OpenGL window: Fit all needs one");
+        kimbim::Viewport v;
+        v.resize(400, 300);
+        v.addBatch(batch(6));
+        v.fitAll();
+        QVERIFY(std::abs(v.zoomPercent() - 100.0) < 0.01);
+        v.zoomByFactor(2.0, QPointF(200, 150)); // zoom in: the model no longer fits
+        QVERIFY(v.zoomPercent() > 150.0);
+        for (const kimbim::StandardView& sv : kimbim::standardViews()) {
+            v.zoomByFactor(2.0, QPointF(200, 150));
+            v.setStandardView(sv.orientation, false);
+            QVERIFY2(std::abs(v.zoomPercent() - 100.0) < 0.01, sv.id);
+        }
+        // The cube face and the home button both fit as well.
+        v.zoomByFactor(2.0, QPointF(200, 150));
+        v.homeView(false);
+        QVERIFY(std::abs(v.zoomPercent() - 100.0) < 0.01);
+    }
+
     // Plans look straight down: presets and perspective wait for the 3D view.
     void planViewsIgnorePresetsAndStayOrthographic()
     {
