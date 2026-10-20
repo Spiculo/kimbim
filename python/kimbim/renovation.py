@@ -71,15 +71,32 @@ def _stored(element):
     return None
 
 
+def _host(element):
+    """The wall (or other element) a door or window fills, through its opening; None otherwise."""
+    for rel in getattr(element, "FillsVoids", ()) or ():
+        opening = rel.RelatingOpeningElement
+        for voids in getattr(opening, "VoidsElements", ()) or ():
+            host = voids.RelatingBuildingElement
+            if host is not None:
+                return host
+    return None
+
+
 def status_of(element, facts=None) -> str:
-    """`facts`: a graphics._Facts sharing the file-wide index (many elements); without it, only this
+    """The element's status. A door or window without its own status takes its host wall's (D91),
+    so it follows the wall when the wall's status changes; setting one on the door pins it.
+    `facts`: a graphics._Facts sharing the file-wide index (many elements); without it, only this
     element is read (one element: Properties, copies)."""
-    if facts is None:
-        return normalize(_stored(element))
-    for name in NAMES:
-        v = facts.prop(name)
-        if v is not None:
-            return normalize(v)
+    seen = set()
+    while element is not None and element.id() not in seen:
+        seen.add(element.id())
+        if facts is None:
+            own = _stored(element)
+        else:
+            own = next((facts.prop(n, element) for n in NAMES if facts.prop(n, element) is not None), None)
+        if own is not None:
+            return normalize(own)
+        element = _host(element)
     return "new"
 
 
@@ -127,9 +144,13 @@ def stamp_new(*elements) -> None:
 
 
 def copy_status(source, target) -> None:
-    """Copies keep their source's status, as they keep its layer."""
-    if not source.is_a("IfcAnnotation"):
-        write_status(target, status_of(source))
+    """Copies keep their source's own status, as they keep its layer; a door or window with none
+    stays without one and inherits its new host's (D91)."""
+    if source.is_a("IfcAnnotation"):
+        return
+    own = _stored(source)
+    if own is not None:
+        write_status(target, normalize(own))
 
 
 def _edit(elements, status) -> str:
@@ -170,14 +191,17 @@ def set_status_for_new(status: str) -> str:
 
 
 def _unmarked_elements() -> list:
-    """Building elements with no status at all, own or from the type (an explicit NEW is marked)."""
+    """Building elements with no status at all, own or from the type (an explicit NEW is marked).
+    Doors and windows are left out: they take their host wall's status (D91), so marking the wall
+    marks them too."""
     from . import app_bridge as B
     from . import graphics
 
     shared: dict = {}
     out = []
     for e in graphics._products(B._model):
-        if e.is_a("IfcAnnotation") or e.is_a("IfcGrid"):
+        if e.is_a("IfcAnnotation") or e.is_a("IfcGrid") or e.is_a("IfcOpeningElement") \
+                or getattr(e, "FillsVoids", None):
             continue
         facts = graphics._Facts(e, shared)
         if all(facts.prop(n) is None for n in NAMES):

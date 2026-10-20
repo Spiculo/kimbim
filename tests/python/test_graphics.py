@@ -403,6 +403,20 @@ def test_demolition_purpose_hides_new_and_restyles_demolished():
     assert out["renovation"] == "Demolition plan"
 
 
+def test_a_door_inherits_its_host_walls_status_in_the_resolve():
+    import ifcopenshell.api.feature
+
+    f = _model()
+    wall = _el(f, "IfcWall", Pset_WallCommon={"Status": ["EXISTING"]})
+    opening = ifcopenshell.api.root.create_entity(f, ifc_class="IfcOpeningElement")
+    door = ifcopenshell.api.root.create_entity(f, ifc_class="IfcDoor")
+    ifcopenshell.api.feature.add_feature(f, feature=opening, element=wall)
+    ifcopenshell.api.feature.add_filling(f, opening=opening, element=door)
+    out = g.resolve("Demolition", model=f)
+    assert door.GlobalId not in out["hidden"]  # D91: it inherits the wall's Existing, not New
+    assert wall.GlobalId not in out["hidden"]
+
+
 def test_temporary_and_auxiliary_get_their_default_looks():
     from kimbim import renovation as r
 

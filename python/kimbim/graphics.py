@@ -481,14 +481,14 @@ class _Facts:
             self._kind = kind_of(self.element)
         return self._kind
 
-    def prop(self, name: str):
+    def prop(self, name: str, element=None):
         key = ("property", name)
         if key not in self._shared:
             try:
                 self._shared[key] = _property_index(self.element.file, name)
             except Exception:  # an IFC this reader doesn't follow: no properties
                 self._shared[key] = {}
-        return self._shared[key].get(self.element.id())
+        return self._shared[key].get((element or self.element).id())
 
     @property
     def layer(self):

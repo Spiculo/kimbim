@@ -180,13 +180,20 @@ def test_new_elements_get_the_status_for_new():
     assert not call("set_status_for_new", "ruined")["ok"]
 
 
-def test_doors_in_a_demolished_wall_take_the_status_for_new():
+def test_doors_take_their_host_walls_status_and_follow_it():
     _, _, w1, _ = _house()
-    call("set_status", json.dumps([w1]), "demolish")
+    call("set_status", json.dumps([w1]), "existing")
     door_type = json.loads(A.opening_types("door"))["types"][0]["guid"]
     door = json.loads(A.insert_opening("door", w1, door_type, 2.0, 0.9, 2.1, 0.0))["guid"]
-    assert r.status_of(b._model.by_guid(door)) == "new"
-    assert ifcopenshell.util.element.get_pset(b._model.by_guid(door), "Pset_DoorCommon")["Status"] == ["NEW"]
+    assert r.status_of(b._model.by_guid(door)) == "existing"  # D91: the host wall's status
+    # It has no status of its own: it inherits, so it follows the wall when the wall changes.
+    assert ifcopenshell.util.element.get_pset(b._model.by_guid(door), "Pset_DoorCommon") is None
+    call("set_status", json.dumps([w1]), "demolish")
+    assert r.status_of(b._model.by_guid(door)) == "demolish"
+    # Set explicitly on the door, it stops following the wall.
+    call("set_status", json.dumps([door]), "temporary")
+    call("set_status", json.dumps([w1]), "new")
+    assert r.status_of(b._model.by_guid(door)) == "temporary"
 
 
 def test_copies_keep_the_source_status():
