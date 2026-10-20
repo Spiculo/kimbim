@@ -2226,10 +2226,11 @@ private slots:
     {
         kimbim::ProjectSettingsDialog d({{"plan_cut_height", 1.2}, {"drawing_scale", 100}, {"sheet_paper", "A1"},
                                          {"length_unit", "m"}, {"length_decimals", 2},
+                                         {"scales", QJsonArray{500, 100, 50, 20}},
                                          {"ifc_status_default", "existing"}}, /*kept=*/false, nullptr);
         QVERIFY(d.findChild<QLabel*>("notKeptNote")->isVisibleTo(&d));
         d.findChild<QComboBox*>("sheetPaper")->setCurrentText("A3");
-        d.findChild<QSpinBox*>("drawingScale")->setValue(50);
+        d.findChild<QComboBox*>("drawingScale")->setCurrentText("50"); // D93: a scale from the list
         auto* ifcStatus = d.findChild<QComboBox*>("ifcStatusDefault");
         QCOMPARE(ifcStatus->currentData().toString(), QStringLiteral("existing")); // D91 default
         ifcStatus->setCurrentIndex(1); // To be demolished

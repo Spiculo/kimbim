@@ -5,6 +5,7 @@
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
+#include <QJsonArray>
 #include <QLabel>
 #include <QSpinBox>
 #include <QVBoxLayout>
@@ -28,11 +29,17 @@ ProjectSettingsDialog::ProjectSettingsDialog(const QJsonObject& settings, bool k
     m_cut->setSuffix(QStringLiteral(" m"));
     m_cut->setValue(settings.value("plan_cut_height").toDouble(1.2));
     form->addRow(tr("Plan cut height:"), m_cut);
-    m_scale = new QSpinBox(this);
+    // D93: the built-in scales (1:500, 1:100, 1:50, 1:20) plus the project's own; type a new one.
+    m_scale = new QComboBox(this);
     m_scale->setObjectName(QStringLiteral("drawingScale"));
-    m_scale->setRange(1, 100000);
-    m_scale->setPrefix(QStringLiteral("1:"));
-    m_scale->setValue(settings.value("drawing_scale").toInt(100));
+    m_scale->setEditable(true);
+    m_scale->setInsertPolicy(QComboBox::NoInsert);
+    for (const auto& s : settings.value("scales").toArray())
+        m_scale->addItem(QString::number(s.toInt()));
+    const QString currentScale = QString::number(settings.value("drawing_scale").toInt(100));
+    if (m_scale->findText(currentScale) < 0)
+        m_scale->addItem(currentScale);
+    m_scale->setCurrentText(currentScale);
     form->addRow(tr("Drawings placed on sheets at:"), m_scale);
     m_paper = new QComboBox(this);
     m_paper->setObjectName(QStringLiteral("sheetPaper"));
@@ -87,8 +94,14 @@ QJsonObject ProjectSettingsDialog::changes() const
     QJsonObject out;
     if (std::lround(m_cut->value() * 100) != std::lround(m_settings.value("plan_cut_height").toDouble(1.2) * 100))
         out.insert("plan_cut_height", m_cut->value());
-    if (m_scale->value() != m_settings.value("drawing_scale").toInt(100))
-        out.insert("drawing_scale", m_scale->value());
+    const int scale = m_scale->currentText().toInt();
+    if (scale > 0 && scale != m_settings.value("drawing_scale").toInt(100))
+        out.insert("drawing_scale", scale);
+    if (scale > 0 && m_scale->findText(QString::number(scale)) < 0) { // a typed scale joins the list
+        QJsonArray scales = m_settings.value("scales").toArray();
+        scales.append(scale);
+        out.insert("scales", scales);
+    }
     if (m_paper->currentText() != m_settings.value("sheet_paper").toString(QStringLiteral("A1")))
         out.insert("sheet_paper", m_paper->currentText());
     if (m_unit->currentText() != m_settings.value("length_unit").toString(QStringLiteral("m")))

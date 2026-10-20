@@ -18,6 +18,7 @@ DEFAULTS = {
     "hidden_layers": [],
     "locked_layers": [],
     "drawing_scale": 100,
+    "scales": [500, 100, 50, 20],  # D93: the scales a drawing can be placed at; users add more
     "sheet_paper": "A1",
     "length_unit": "m",
     "length_decimals": 2,
@@ -129,6 +130,9 @@ def _error(key: str, value) -> str | None:
         return "the per-level plan cut heights must be numbers between 0 and 20 m"
     if key == "drawing_scale" and not (isinstance(value, int) and not isinstance(value, bool) and value > 0):
         return "the drawing scale must be a whole number above 0"
+    if key == "scales" and not (isinstance(value, list) and value and all(
+            isinstance(v, int) and not isinstance(v, bool) and v > 0 for v in value)):
+        return "the scales must be a non-empty list of whole numbers above 0"
     if key == "sheet_paper" and value not in PAPERS:
         return f"unknown paper size {value}"
     if key == "length_unit" and value not in UNITS:

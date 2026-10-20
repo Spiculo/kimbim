@@ -45,6 +45,14 @@ def test_the_default_status_for_unmarked_ifc_elements_is_a_setting():
         assert call("set_project_settings", json.dumps({"ifc_status_default": ok}))["ok"], ok
 
 
+def test_the_builtin_scales_and_user_scales():
+    assert call("new_project", "x")["ok"]
+    assert S.DEFAULTS["scales"] == [500, 100, 50, 20]  # D93
+    assert call("set_project_settings", json.dumps({"scales": [200, 100, 50, 20, 10]}))["ok"]
+    for bad in ([], [0], [-5], "100"):
+        assert not call("set_project_settings", json.dumps({"scales": bad}))["ok"], bad
+
+
 def test_bytes_round_trip_is_canonical():
     d = {**S.DEFAULTS, "hidden_layers": ["A-WALL"], "zz": 1}
     assert S.from_bytes(S.to_bytes(d)) == d
