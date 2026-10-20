@@ -364,7 +364,10 @@ def _side_elements(model, side: dict) -> list:
 
 
 def _related_pairs(model) -> set:
-    """Pairs that touch by design: a door or window and the wall it fills, a whole and its parts."""
+    """Pairs that touch by design: a door or window and the wall it fills, a whole and its parts, and
+    (D92, on by default) walls joined to each other."""
+    from . import settings
+
     pairs = set()
     for rel in model.by_type("IfcRelFillsElement"):
         filling = rel.RelatedBuildingElement
@@ -375,6 +378,9 @@ def _related_pairs(model) -> set:
         parts = list(rel.RelatedObjects or ())
         for p in parts:
             pairs.add(frozenset((whole.id(), p.id())))
+    if settings.current().get("check_ignore_joined", True):
+        for rel in model.by_type("IfcRelConnectsPathElements"):
+            pairs.add(frozenset((rel.RelatingElement.id(), rel.RelatedElement.id())))
     return pairs
 
 
@@ -469,9 +475,13 @@ def clash(model, clash_set: dict, name: str = "") -> list[dict]:
                 break
             _poll()
     _poll()
-    tolerance = float(clash_set.get("tolerance", 0.002))
+    from . import settings
+
+    defaults = settings.current()
+    tolerance = float(clash_set.get("tolerance", defaults.get("check_tolerance", 0.002)))
     if mode == "clearance":
-        results = tree.clash_clearance_many(a, b, clearance=float(clash_set.get("clearance", 0.05)), check_all=False)
+        results = tree.clash_clearance_many(
+            a, b, clearance=float(clash_set.get("clearance", defaults.get("check_clearance", 0.05))), check_all=False)
     else:
         results = tree.clash_intersection_many(a, b, tolerance=tolerance, check_all=False)
     skip = _related_pairs(model)
@@ -487,7 +497,8 @@ def clash(model, clash_set: dict, name: str = "") -> list[dict]:
         seen.add(key)
         d = abs(distance) * 1000.0
         if mode == "clearance":
-            text = f"{_label(ea)} and {_label(eb)} are {d:.0f} mm apart (clearance {float(clash_set.get('clearance', 0.05)) * 1000:.0f} mm)"
+            text = (f"{_label(ea)} and {_label(eb)} are {d:.0f} mm apart "
+                    f"(clearance {float(clash_set.get('clearance', defaults.get('check_clearance', 0.05))) * 1000:.0f} mm)")
         else:
             text = f"{_label(ea)} and {_label(eb)} intersect ({d:.0f} mm)"
         issues.append(_issue("warning" if mode == "clearance" else "error", text, [ea, eb], name))

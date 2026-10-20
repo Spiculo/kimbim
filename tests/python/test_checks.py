@@ -197,6 +197,23 @@ def test_hard_clashes_and_clearance_between_two_sets(opened):
     assert frozenset((near.GlobalId, w0.GlobalId)) not in {frozenset(i["guids"]) for i in tight["issues"]}
 
 
+def test_clash_tolerance_and_joined_walls_are_settings(opened):
+    # D92: the tolerance and clearance defaults live in the project settings, and joined walls are ignored.
+    f = opened(build_model())
+    _wall(f, "Overlapping", x=2.0)  # crosses both walls
+    assert call("set_project_settings", json.dumps({"check_tolerance": 1.0}))["ok"]
+    r = run("clash", {"clash_sets": {"w": {"a": {"classes": ["IfcWall"]}, "mode": "hard"}}})
+    assert r["issues"] == []  # a 1 m tolerance swallows the 200 mm overlap
+    assert call("set_project_settings", json.dumps({"check_tolerance": 0.002}))["ok"]
+    assert run("clash", {"clash_sets": {"w": {"a": {"classes": ["IfcWall"]}, "mode": "hard"}}})["issues"]
+    w0, w1 = f.by_type("IfcWall")[:2]
+    ifcopenshell.api.geometry.connect_path(f, relating_element=w0, related_element=w1,
+                                           relating_connection="ATEND", related_connection="ATSTART")
+    assert frozenset((w0.id(), w1.id())) in checks._related_pairs(f)
+    assert call("set_project_settings", json.dumps({"check_ignore_joined": False}))["ok"]
+    assert frozenset((w0.id(), w1.id())) not in checks._related_pairs(f)
+
+
 def test_clash_sets_from_saved_find_and_select_criteria(opened):
     f = opened(build_model())
     over = _wall(f, "Overlapping", x=2.0)
