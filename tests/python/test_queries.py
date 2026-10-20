@@ -162,7 +162,7 @@ def test_layer_material_level_and_status(house):
     assert names(f, find([{"field": "level", "op": "equals", "value": "Level 2"}])) == ["C", "F", "G"]
     # the door has no container: it is on its wall's level
     assert names(f, find([{"field": "level", "op": "equals", "value": l1.GlobalId}])) == ["A", "B", "D", "E", "Floor", "Front door"]
-    assert names(f, find([{"field": "status", "op": "equals", "value": "existing"}])) == ["A", "D"]
+    assert names(f, find([{"field": "status", "op": "equals", "value": "existing"}])) == ["A", "D", "Front door"]  # D91: the door follows its wall
     assert names(f, find([{"field": "status", "op": "equals", "value": "demolish"}])) == ["B"]
     assert "Floor" in names(f, find([{"field": "status", "op": "equals", "value": "new"}]))
 
@@ -219,7 +219,7 @@ def test_choices_list_what_the_model_has(house):
     assert [lv["name"] for lv in r["levels"]] == ["Level 1", "Level 2"]
     assert r["materials"] == ["Brick", "Plaster board"]
     assert "Pset_WallCommon.FireRating" in r["properties"]
-    assert r["statuses"] == ["existing", "demolish", "new"]
+    assert r["statuses"] == ["existing", "demolish", "new", "temporary", "auxiliary"]
 
 
 @pytest.mark.slow
