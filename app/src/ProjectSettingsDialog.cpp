@@ -57,6 +57,11 @@ ProjectSettingsDialog::ProjectSettingsDialog(const QJsonObject& settings, bool k
     m_ifcStatus->addItem(tr("Leave them (they count as New)"), QStringLiteral("leave"));
     m_ifcStatus->setCurrentIndex(std::max(0, m_ifcStatus->findData(settings.value("ifc_status_default").toString(QStringLiteral("existing")))));
     form->addRow(tr("Unmarked elements in an opened IFC:"), m_ifcStatus);
+    // D93: the active renovation-styles preset (the looks live in Graphics > Renovation styles).
+    m_renovationPreset = new QComboBox(this);
+    m_renovationPreset->setObjectName(QStringLiteral("renovationPreset"));
+    m_renovationPreset->addItem(settings.value("renovation_preset").toString(QStringLiteral("Uruguay")));
+    form->addRow(tr("Renovation styles:"), m_renovationPreset);
     layout->addLayout(form);
     auto* note = new QLabel(tr("These settings aren't kept with a plain IFC file. Save as .kim to keep them."), this);
     note->setObjectName(QStringLiteral("notKeptNote"));
@@ -84,7 +89,19 @@ QJsonObject ProjectSettingsDialog::changes() const
         out.insert("length_decimals", m_decimals->value());
     if (m_ifcStatus->currentData().toString() != m_settings.value("ifc_status_default").toString(QStringLiteral("existing")))
         out.insert("ifc_status_default", m_ifcStatus->currentData().toString());
+    if (m_renovationPreset->currentText() != m_settings.value("renovation_preset").toString(QStringLiteral("Uruguay")))
+        out.insert("renovation_preset", m_renovationPreset->currentText());
     return out;
+}
+
+void ProjectSettingsDialog::setRenovationPresets(const QStringList& presets)
+{
+    const QString current = m_renovationPreset->currentText();
+    m_renovationPreset->clear();
+    m_renovationPreset->addItems(presets);
+    if (!presets.contains(current))
+        m_renovationPreset->addItem(current);
+    m_renovationPreset->setCurrentText(current);
 }
 
 } // namespace kimbim

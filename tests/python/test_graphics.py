@@ -434,6 +434,33 @@ def test_temporary_and_auxiliary_get_their_default_looks():
     assert out["legend"][0]["label"] == "Temporary" and out["legend"][1]["label"] == "Auxiliary"
 
 
+def test_renovation_style_palette_drives_the_override_looks():
+    f, w = _reno_model()
+    out = g.resolve("Demolition", model=f)
+    demo = out["styles"][out["elements"][w["demolish"].GlobalId]]
+    assert demo["cut"]["color"] == g.builtin("pen_sets")["Permit"]["pens"]["32"]["color"]  # Uruguay's pen
+    assert out["renovation_preset"] == "Uruguay"
+    # A project preset with a different look changes what the filter applies.
+    styles = g.builtin("renovation_styles")
+    styles["Office"] = {**styles["Uruguay"], "demolish": {"pen": 27, "line": "Dotted", "fill": 15}}
+    s.load({"renovation_styles": styles, "renovation_preset": "Office"})
+    out = g.resolve("Demolition", model=f)
+    demo = out["styles"][out["elements"][w["demolish"].GlobalId]]
+    assert demo["cut"]["color"] == g.builtin("pen_sets")["Permit"]["pens"]["27"]["color"]
+    assert demo["cut"]["dash"] == [0.3, 1.0]  # Dotted
+    assert out["renovation_preset"] == "Office"
+
+
+@pytest.mark.parametrize("value,message", [
+    ({"X": {"ruined": {"pen": 1}}}, "renovation style X: unknown status ruined"),
+    ({"X": {"new": {"pen": 300}}}, "renovation style X/new: pens are 1-255"),
+    ({"X": {"new": {"surface": "red"}}}, "renovation style X/new: colour must be #rrggbb"),
+    ({"X": {"new": {"glow": 1}}}, "renovation style X/new: unknown field glow"),
+])
+def test_renovation_style_validation(value, message):
+    assert g.validate("renovation_styles", value) == message
+
+
 def test_override_rules_apply_on_top_of_the_renovation_filter():
     f, w = _reno_model()
     s.load({"purposes": {**g.builtin("purposes"),

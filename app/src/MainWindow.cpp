@@ -589,6 +589,7 @@ void MainWindow::buildMenus()
     editor("actionVisibilitySets", tr("&Visibility sets..."), [this](const QJsonObject& r) { return new VisibilitySetsDialog(r, this); });
     editor("actionOverrides", tr("Graphic &overrides..."), [this](const QJsonObject& r) { return new OverridesDialog(r, this); });
     editor("actionRenovationFilters", tr("&Renovation filters..."), [this](const QJsonObject& r) { return new RenovationFiltersDialog(r, this); });
+    editor("actionRenovationStyles", tr("Renovation &styles..."), [this](const QJsonObject& r) { return new RenovationStylesDialog(r, this); });
     editor("actionLayerCombinations", tr("Layer &combinations..."), [this](const QJsonObject& r) {
         const QStringList layers = bridge("layer_members").value("layers").toObject().keys();
         return new LayerCombinationsDialog(r, layers, QStringList(m_hiddenLayers.begin(), m_hiddenLayers.end()),
@@ -5114,6 +5115,8 @@ void MainWindow::saveAsTemplateDialog()
 void MainWindow::projectSettingsDialog()
 {
     ProjectSettingsDialog dialog(m_settings, bridge("project_settings").value("kept").toBool(), this);
+    const QJsonObject tables = bridge("graphics_tables").value("tables").toObject();
+    dialog.setRenovationPresets(tables.value("renovation_styles").toObject().keys());
     if (dialog.exec() == QDialog::Accepted && !dialog.changes().isEmpty() && setProjectSettings(dialog.changes()))
         m_status->showMessage(tr("Project settings changed"));
 }

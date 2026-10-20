@@ -29,6 +29,8 @@ DEFAULTS = {
     "layer_combinations": {},
     "purposes": {},
     "renovation_filters": {},
+    "renovation_styles": {},  # D93: renovation look presets (pen, line, fill, colour) by status
+    "renovation_preset": "Uruguay",  # D93: the active renovation-styles preset
     "purpose": "",
     "current_pen": 23,
     "sheet_purposes": {},
@@ -133,6 +135,8 @@ def _error(key: str, value) -> str | None:
         return f"unknown renovation status {value}"
     if key == "ifc_status_default" and value not in ("existing", "demolish", "leave"):
         return f"unknown default for unmarked elements {value}"
+    if key == "renovation_preset" and not isinstance(value, str):
+        return "the renovation style preset is a name"
     if key == "schedules":  # schedule schemes by id (D77)
         from .schedules import table_error
 
