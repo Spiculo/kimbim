@@ -649,6 +649,15 @@ def _sync_one(tag, force=False, text=None):
 
     e = element_of(tag)
     if e is None:
+        from . import settings as S
+
+        if S.current().get("orphan_tags", "delete") == "keep":  # D92: keep it, showing "?"
+            data = N._read(tag)
+            if data is not None and data[1] != "?":
+                N._set(tag, data[0], "?", [tuple(p) for p in data[2]], extra={**N.extra_of(tag), "Element": ""})
+                tag.Name = "?"
+                return True
+            return False
         ifcopenshell.api.root.remove_product(B._model, product=tag)
         return True
     data = N._read(tag)

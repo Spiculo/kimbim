@@ -121,6 +121,24 @@ def test_a_tag_goes_with_its_element_and_comes_back_with_undo(flat):
     assert t in listed(flat["l1"]) and tags.element_of(b._model.by_guid(t)).GlobalId == flat["door"]
 
 
+def test_orphan_tags_are_deleted_or_kept(flat):
+    # D92: by default a tag whose element is gone goes too; the option keeps it, showing "?".
+    t = call("add_tag", flat["door"], "")["guid"]
+    assert call("set_project_settings", json.dumps({"orphan_tags": "keep"}))["ok"]
+    assert call("delete_elements", g(flat["door"]))["ok"]
+    assert t in listed(flat["l1"])
+    assert listed(flat["l1"])[t]["text"] == "?"
+    call("undo")
+    assert tags.element_of(b._model.by_guid(t)).GlobalId == flat["door"]
+
+
+def test_radius_decimals_are_a_project_setting(flat):
+    # D92: radius and diameter dimensions follow the project's radius decimals.
+    assert call("set_project_settings", json.dumps({"radius_decimals": 1}))["ok"]
+    assert symbols.radial_text("radius", [(0, 0), (2.0, 0)]) == "R 2.0"
+    assert symbols.radial_text("diameter", [(0, 0), (2.0, 0)]) == "Ø 4.0"
+
+
 def test_a_copied_tag_annotates_the_same_element(flat):
     t = call("add_tag", flat["walls"][1], "")["guid"]
     r = call("copy_elements", g(t), 0, 2, 0)

@@ -21,6 +21,9 @@ DEFAULTS = {
     "length_unit": "m",
     "length_decimals": 2,
     "area_unit": "m²",  # D92: how areas are shown (project setting)
+    "angle_decimals": 2,   # D92: decimals for angles in annotations
+    "radius_decimals": 2,  # D92: decimals for radii and diameters
+    "orphan_tags": "delete",  # D92: what a tag whose element is gone does: "delete" or "keep"
     "pen_sets": {},
     "line_types": {},
     "fill_patterns": {},  # D84: the project's fill patterns (empty: the built-ins)
@@ -131,6 +134,10 @@ def _error(key: str, value) -> str | None:
         return f"unknown length unit {value}"
     if key == "area_unit" and value not in AREA_UNITS:
         return f"unknown area unit {value}"
+    if key in ("angle_decimals", "radius_decimals") and not (isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 4):
+        return f"{key} must be between 0 and 4"
+    if key == "orphan_tags" and value not in ("delete", "keep"):
+        return f"unknown orphan tag choice {value}"
     if key == "length_decimals" and not (isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 4):
         return "decimals must be between 0 and 4"
     if key in ("hidden_layers", "locked_layers") and not (isinstance(value, list) and all(isinstance(x, str) for x in value)):
@@ -172,9 +179,10 @@ def _error(key: str, value) -> str | None:
     return None
 
 
-def format_length(metres: float, unit: bool = True) -> str:
+def format_length(metres: float, unit: bool = True, decimals: int | None = None) -> str:
     u = _current.get("length_unit", "m")
-    text = f"{metres * UNITS.get(u, 1.0):.{int(_current.get('length_decimals', 2))}f}"
+    d = int(_current.get("length_decimals", 2)) if decimals is None else int(decimals)
+    text = f"{metres * UNITS.get(u, 1.0):.{d}f}"
     return f"{text} {u}" if unit else text
 
 

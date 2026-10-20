@@ -231,8 +231,10 @@ def angle_frame(v, a, b, r_point):
 
 
 def angle_text(points) -> str:
+    from . import settings
+
     _start, sweep, _r = angle_frame(*points[:4])
-    return f"{math.degrees(sweep):.2f}°"
+    return f"{math.degrees(sweep):.{int(settings.current().get('angle_decimals', 2))}f}°"
 
 
 def _length(metres: float) -> str:
@@ -242,8 +244,12 @@ def _length(metres: float) -> str:
 
 
 def radial_text(kind, points) -> str:
+    from . import settings
+
     r = math.dist(points[0], points[1])
-    return ("R " + _length(r)) if kind == "radius" else ("Ø " + _length(2 * r))
+    decimals = int(settings.current().get("radius_decimals", 2))
+    text = settings.format_length(r if kind == "radius" else 2 * r, unit=False, decimals=decimals)
+    return ("R " + text) if kind == "radius" else ("Ø " + text)
 
 
 def elevation_text(z: float) -> str:
