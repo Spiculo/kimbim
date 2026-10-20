@@ -155,9 +155,14 @@ void DrawingView::contextMenuEvent(QContextMenuEvent* event)
     for (int i = int(m_placed.size()) - 1; i >= 0; --i)
         if (m_placed[i].rect.contains(mm)) {
             const QString guid = m_placed[i].guid;
+            const QString kind = m_placed[i].kind;
             QMenu menu(this);
+            QAction* edit = kind == QLatin1String("text") ? menu.addAction(tr("Edit text...")) : nullptr;
             QAction* remove = menu.addAction(tr("Remove from sheet"));
-            if (menu.exec(event->globalPos()) == remove)
+            QAction* chosen = menu.exec(event->globalPos());
+            if (chosen && chosen == edit)
+                emit placedEditRequested(guid);
+            else if (chosen == remove)
                 emit placedRemoveRequested(guid);
             return;
         }

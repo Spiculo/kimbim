@@ -60,6 +60,7 @@ SheetsPanel::SheetsPanel(QWidget* parent)
         menu.addAction(tr("Place north arrow"), this, [this, number] { emit symbolRequested(number, QStringLiteral("north")); });
         menu.addAction(tr("Place scale bar"), this, [this, number] { emit symbolRequested(number, QStringLiteral("scalebar")); });
         menu.addAction(tr("Place revision cloud"), this, [this, number] { emit symbolRequested(number, QStringLiteral("cloud")); });
+        menu.addAction(tr("Place text..."), this, [this, number] { emit symbolRequested(number, QStringLiteral("text")); });
         menu.exec(m_list->viewport()->mapToGlobal(at));
     });
     connect(remove, &QPushButton::clicked, this, [this] {

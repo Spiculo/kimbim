@@ -4130,6 +4130,20 @@ bool MainWindow::openSheet(const QString& number)
             m_status->showMessage(tr("Could not remove it: %1").arg(r.value("error").toString()));
         afterEdit(r);
     });
+    connect(view, &DrawingView::placedEditRequested, this, [this, number](const QString& drawing) {
+        if (!drawing.startsWith(QLatin1String("symbol:")))
+            return;
+        bool ok = false;
+        const QString text = QInputDialog::getMultiLineText(this, tr("Edit text"), tr("Text:"), QString(), &ok);
+        if (!ok)
+            return;
+        const QJsonObject r = bridge("set_sheet_symbol",
+            {number, drawing.mid(7), QString::fromUtf8(QJsonDocument(QJsonObject{{"text", text}}).toJson(QJsonDocument::Compact))});
+        if (!r.value("ok").toBool())
+            m_status->showMessage(tr("Could not change it: %1").arg(r.value("error").toString()));
+        afterEdit(r);
+        refreshSheets(true);
+    });
     m_drawingViews.insert(key, view);
     view->setStale(true);
     m_dock->addView(key, tr("Sheet %1").arg(number), view, true, newViewPlacement());
@@ -4166,10 +4180,11 @@ void MainWindow::refreshSheets(bool changed)
             placed.push_back({QStringLiteral("legend:") + l.value("id").toString(),
                 QRectF(l.value("x").toDouble(), l.value("y").toDouble(), l.value("w").toDouble(), l.value("h").toDouble())});
         }
-        for (const auto& sv : it->value("symbols").toArray()) { // D87: north arrows, scale bars, clouds
+        for (const auto& sv : it->value("symbols").toArray()) { // D87: north arrows, scale bars, clouds, texts
             const QJsonObject l = sv.toObject();
             placed.push_back({QStringLiteral("symbol:") + l.value("id").toString(),
-                QRectF(l.value("x").toDouble(), l.value("y").toDouble(), l.value("w").toDouble(), l.value("h").toDouble())});
+                QRectF(l.value("x").toDouble(), l.value("y").toDouble(), l.value("w").toDouble(), l.value("h").toDouble()),
+                l.value("kind").toString()});
         }
         view->setPlaced(placed);
         m_dock->setTitle(key, tr("Sheet %1").arg(it->value("number").toString()));

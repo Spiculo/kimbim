@@ -38,6 +38,7 @@ public:
     struct Placed {
         QString guid;
         QRectF rect; // millimetres on the sheet
+        QString kind; // "text" for a sheet text (D91): it can be edited
     };
     void setPlaced(const QVector<Placed>& placed) { m_placed = placed; }
     const QVector<Placed>& placed() const { return m_placed; } // drawings, and legends ("legend:<id>", D74)
@@ -47,6 +48,7 @@ signals:
     void regenerateRequested(const QString& guid);
     void placedMoved(const QString& drawing, QPointF topLeftMm);
     void placedRemoveRequested(const QString& drawing); // right-click > Remove from sheet
+    void placedEditRequested(const QString& drawing);   // right-click > Edit text (a sheet text)
 
 protected:
     void paintEvent(QPaintEvent* event) override;

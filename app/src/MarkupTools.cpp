@@ -4,6 +4,7 @@
 // and symbols are python/kimbim/tags.py's and symbols.py's (IfcAnnotation on the level), one undo
 // step each.
 #include <QComboBox>
+#include <QInputDialog>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QLineEdit>
@@ -278,7 +279,15 @@ int MainWindow::tagAll()
 
 bool MainWindow::placeSheetSymbol(const QString& number, const QString& kind)
 {
-    const QJsonObject r = bridge("place_sheet_symbol", {number, kind, QString()});
+    QString options;
+    if (kind == QLatin1String("text")) { // D91: free text on a sheet
+        bool ok = false;
+        const QString text = QInputDialog::getMultiLineText(this, tr("Place text"), tr("Text:"), QString(), &ok);
+        if (!ok || text.trimmed().isEmpty())
+            return false;
+        options = QString::fromUtf8(QJsonDocument(QJsonObject{{"text", text}}).toJson(QJsonDocument::Compact));
+    }
+    const QJsonObject r = bridge("place_sheet_symbol", {number, kind, options});
     if (!r.value("ok").toBool()) {
         m_status->showMessage(tr("Could not place it: %1").arg(r.value("error").toString()));
         return false;

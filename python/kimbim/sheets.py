@@ -535,7 +535,7 @@ def remove_legend(number: str, legend_id: str) -> str:
 # revision), "drawing" (the placed drawing a scale bar or north arrow belongs to; default the first)}.
 
 SYMBOL = "kimbim:symbol"
-SYMBOL_KINDS = ("north", "scalebar", "cloud")
+SYMBOL_KINDS = ("north", "scalebar", "cloud", "text")
 
 
 def _symbols(sheet):
@@ -569,6 +569,12 @@ def _symbol_geometry(sheet, data):
         geom = Sy.scale_bar((2.0, 6.0), scale, 1.0)
         width = max(p[0] for c in geom["curves"] for p in c) + 6.0
         return geom, width, 13.0
+    if kind == "text":  # D91: free text on a sheet, moved and edited like any placed item
+        text = str(data.get("text") or "")
+        size = float(data.get("size", 3.5))
+        geom = {"curves": [], "solids": [],
+                "labels": [{"text": text, "at": (0.0, size * 0.6), "size": size, "anchor": "start", "angle": 0.0}]}
+        return geom, max(1.8 * size * len(text), size), size * 1.4
     w, h = float(data.get("w", 60.0)), float(data.get("h", 40.0))
     return Sy.revision_cloud([(0, 0), (w, 0), (w, h), (0, h)], str(data.get("text") or ""), 2.5, 1.0), w, h
 
@@ -621,6 +627,13 @@ def place_sheet_symbol(number: str, kind: str, options_json: str = "") -> str:
             data.update(w=float(o.get("w", 60.0)), h=float(o.get("h", 40.0)), text=str(o.get("text") or ""))
             if data["w"] <= 0 or data["h"] <= 0:
                 return A._fail("bad size")
+        if kind == "text":
+            data["text"] = str(o.get("text") or "")
+            if not data["text"].strip():
+                return A._fail("the sheet text is empty")
+            data["size"] = float(o.get("size", 3.5))
+            if data["size"] <= 0:
+                return A._fail("bad size")
         if o.get("drawing"):
             data["drawing"] = str(o["drawing"])
         _geom, w, h = _symbol_geometry(sheet, data)
@@ -655,6 +668,10 @@ def set_sheet_symbol(number: str, symbol_id: str, changes_json: str) -> str:
         for k in ("x", "y", "w", "h"):
             if k in o:
                 data[k] = round(float(o[k]), 3)
+        if "size" in o:  # D91: a sheet text's size
+            data["size"] = round(float(o["size"]), 3)
+            if data["size"] <= 0:
+                return A._fail("bad size")
     except (TypeError, ValueError):
         return A._fail("bad input")
     if data.get("w", 1) <= 0 or data.get("h", 1) <= 0:
@@ -698,7 +715,8 @@ def _symbol_listing(sheet) -> list:
             continue
         _geom, w, h = _symbol_geometry(sheet, data)
         out.append({"id": _link(ref), "kind": data["kind"], "x": float(data.get("x", MARGIN)),
-                    "y": float(data.get("y", MARGIN)), "w": round(w, 3), "h": round(h, 3), "text": data.get("text", "")})
+                    "y": float(data.get("y", MARGIN)), "w": round(w, 3), "h": round(h, 3), "text": data.get("text", ""),
+                    "size": float(data.get("size", 0.0))})
     return out
 
 

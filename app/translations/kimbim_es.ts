@@ -1118,7 +1118,12 @@ Intro ejecuta, Mayús+Intro añade una línea, Arriba/Abajo recuperan entradas a
       <translation>Todavía no hay dibujo</translation>
     </message>
     <message>
-      <location filename="../src/DrawingView.cpp" line="159" />
+      <location filename="../src/DrawingView.cpp" line="160" />
+      <source>Edit text...</source>
+      <translation>Editar texto...</translation>
+    </message>
+    <message>
+      <location filename="../src/DrawingView.cpp" line="161" />
       <source>Remove from sheet</source>
       <translation>Quitar de la lámina</translation>
     </message>
@@ -2464,7 +2469,7 @@ Licencia: GPL-3.0 o posterior</translation>
       <translation>Abrir IFC</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5068" />
+      <location filename="../src/MainWindow.cpp" line="5083" />
       <location filename="../src/LibraryTools.cpp" line="104" />
       <source>IFC files (*.ifc)</source>
       <translation>Archivos IFC (*.ifc)</translation>
@@ -2619,7 +2624,7 @@ Licencia: GPL-3.0 o posterior</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="1130" />
-      <location filename="../src/MainWindow.cpp" line="5082" />
+      <location filename="../src/MainWindow.cpp" line="5097" />
       <source>New project</source>
       <translation>Proyecto nuevo</translation>
     </message>
@@ -2637,7 +2642,7 @@ Licencia: GPL-3.0 o posterior</translation>
     <message>
       <location filename="../src/MainWindow.cpp" line="1167" />
       <location filename="../src/MainWindow.cpp" line="2927" />
-      <location filename="../src/MainWindow.cpp" line="4295" />
+      <location filename="../src/MainWindow.cpp" line="4310" />
       <source>Name:</source>
       <translation>Nombre:</translation>
     </message>
@@ -3002,22 +3007,22 @@ Licencia: GPL-3.0 o posterior</translation>
       <translation>Haga clic en un muro para colocarlo</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4788" />
+      <location filename="../src/MainWindow.cpp" line="4803" />
       <source>Could not create the slab: %1</source>
       <translation>No se pudo crear la losa: %1</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4799" />
+      <location filename="../src/MainWindow.cpp" line="4814" />
       <source>Cannot make a slab from these walls</source>
       <translation>No se puede crear una losa con estos muros</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="4079" />
       <location filename="../src/MainWindow.cpp" line="4091" />
-      <location filename="../src/MainWindow.cpp" line="4559" />
-      <location filename="../src/MainWindow.cpp" line="4745" />
-      <location filename="../src/MainWindow.cpp" line="4822" />
-      <location filename="../src/MarkupTools.cpp" line="283" />
+      <location filename="../src/MainWindow.cpp" line="4574" />
+      <location filename="../src/MainWindow.cpp" line="4760" />
+      <location filename="../src/MainWindow.cpp" line="4837" />
+      <location filename="../src/MarkupTools.cpp" line="292" />
       <location filename="../src/LibraryTools.cpp" line="151" />
       <source>Could not place it: %1</source>
       <translation>No se pudo colocar: %1</translation>
@@ -3662,7 +3667,7 @@ Licencia: GPL-3.0 o posterior</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="2139" />
-      <location filename="../src/MainWindow.cpp" line="4305" />
+      <location filename="../src/MainWindow.cpp" line="4320" />
       <source>Room: click inside the walls that enclose it</source>
       <translation>Zona: haga clic dentro de los muros que la encierran</translation>
     </message>
@@ -4001,7 +4006,7 @@ Licencia: GPL-3.0 o posterior</translation>
     </message>
     <message numerus="yes">
       <location filename="../src/MainWindow.cpp" line="2340" />
-      <location filename="../src/MainWindow.cpp" line="4396" />
+      <location filename="../src/MainWindow.cpp" line="4411" />
       <source>%n element(s) copied</source>
       <translation>
         <numerusform>%n elemento copiado</numerusform>
@@ -4036,17 +4041,17 @@ Licencia: GPL-3.0 o posterior</translation>
       <translation type="vanished">Nueva opción...</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5037" />
+      <location filename="../src/MainWindow.cpp" line="5052" />
       <source>Initial import</source>
       <translation>Importación inicial</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5040" />
+      <location filename="../src/MainWindow.cpp" line="5055" />
       <source>Could not enable versioning</source>
       <translation>No se pudieron activar las versiones</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5044" />
+      <location filename="../src/MainWindow.cpp" line="5059" />
       <source>Versioning enabled: first version saved</source>
       <translation>Versiones activadas: primera versión guardada</translation>
     </message>
@@ -4055,7 +4060,7 @@ Licencia: GPL-3.0 o posterior</translation>
       <translation type="vanished">Este modelo ya tiene versiones</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5061" />
+      <location filename="../src/MainWindow.cpp" line="5076" />
       <source>Choose an empty folder for the project</source>
       <translation>Elija una carpeta vacía para el proyecto</translation>
     </message>
@@ -4151,7 +4156,7 @@ Licencia: GPL-3.0 o posterior</translation>
       <location filename="../src/MainWindow.cpp" line="3595" />
       <location filename="../src/MainWindow.cpp" line="3671" />
       <location filename="../src/MainWindow.cpp" line="4066" />
-      <location filename="../src/MarkupTools.cpp" line="245" />
+      <location filename="../src/MarkupTools.cpp" line="246" />
       <source>Could not add it: %1</source>
       <translation>No se pudo agregar: %1</translation>
     </message>
@@ -4162,7 +4167,7 @@ Licencia: GPL-3.0 o posterior</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="3614" />
-      <location filename="../src/MarkupTools.cpp" line="57" />
+      <location filename="../src/MarkupTools.cpp" line="58" />
       <source>Leader</source>
       <translation>Directriz</translation>
     </message>
@@ -4193,6 +4198,8 @@ Licencia: GPL-3.0 o posterior</translation>
     <message>
       <location filename="../src/MainWindow.cpp" line="3614" />
       <location filename="../src/MainWindow.cpp" line="3640" />
+      <location filename="../src/MainWindow.cpp" line="4137" />
+      <location filename="../src/MarkupTools.cpp" line="285" />
       <source>Text:</source>
       <translation>Texto:</translation>
     </message>
@@ -4695,74 +4702,74 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       <translation>No se pudo quitar: %1</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4135" />
-      <location filename="../src/MainWindow.cpp" line="4175" />
+      <location filename="../src/MainWindow.cpp" line="4149" />
+      <location filename="../src/MainWindow.cpp" line="4190" />
       <source>Sheet %1</source>
       <translation>Lámina %1</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4189" />
-      <location filename="../src/MainWindow.cpp" line="4197" />
+      <location filename="../src/MainWindow.cpp" line="4204" />
+      <location filename="../src/MainWindow.cpp" line="4212" />
       <source>Could not export the sheet</source>
       <translation>No se pudo exportar la lámina</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4200" />
+      <location filename="../src/MainWindow.cpp" line="4215" />
       <source>Sheet %1 exported to %2</source>
       <translation>Lámina %1 exportada a %2</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4210" />
+      <location filename="../src/MainWindow.cpp" line="4225" />
       <source>No sheet</source>
       <translation>No hay lámina</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4210" />
+      <location filename="../src/MainWindow.cpp" line="4225" />
       <source>Add a sheet in the Sheets panel first.</source>
       <translation>Primero agregue una lámina en el panel Láminas.</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4213" />
+      <location filename="../src/MainWindow.cpp" line="4228" />
       <source>Export sheet as PDF</source>
       <translation>Exportar lámina como PDF</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4213" />
+      <location filename="../src/MainWindow.cpp" line="4228" />
       <source>Export sheet as SVG</source>
       <translation>Exportar lámina como SVG</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4214" />
+      <location filename="../src/MainWindow.cpp" line="4229" />
       <source>PDF (*.pdf)</source>
       <translation>PDF (*.pdf)</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4214" />
+      <location filename="../src/MainWindow.cpp" line="4229" />
       <source>SVG (*.svg)</source>
       <translation>SVG (*.svg)</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4223" />
+      <location filename="../src/MainWindow.cpp" line="4238" />
       <source>Could not change the project info</source>
       <translation>No se pudo cambiar la información del proyecto</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4244" />
+      <location filename="../src/MainWindow.cpp" line="4259" />
       <source>Could not create the roof: %1</source>
       <translation>No se pudo crear la cubierta: %1</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4263" />
+      <location filename="../src/MainWindow.cpp" line="4278" />
       <source>Select a roof and the walls to trim to it</source>
       <translation>Seleccione una cubierta y los muros que se recortan a ella</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4269" />
+      <location filename="../src/MainWindow.cpp" line="4284" />
       <source>Could not trim the walls: %1</source>
       <translation>No se pudieron recortar los muros: %1</translation>
     </message>
     <message numerus="yes">
-      <location filename="../src/MainWindow.cpp" line="4273" />
+      <location filename="../src/MainWindow.cpp" line="4288" />
       <source>%n wall(s) trimmed to the roof</source>
       <translation>
         <numerusform>%n muro recortado a la cubierta</numerusform>
@@ -4770,13 +4777,13 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       </translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4295" />
-      <location filename="../src/MainWindow.cpp" line="4295" />
+      <location filename="../src/MainWindow.cpp" line="4310" />
+      <location filename="../src/MainWindow.cpp" line="4310" />
       <source>Room</source>
       <translation>Zona</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4301" />
+      <location filename="../src/MainWindow.cpp" line="4316" />
       <source>No room here: %1</source>
       <translation>No hay zona aquí: %1</translation>
     </message>
@@ -4833,172 +4840,172 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       <translation type="vanished">No se pudo exportar: %1</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4343" />
+      <location filename="../src/MainWindow.cpp" line="4358" />
       <source>Project info</source>
       <translation>Información del proyecto</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4347" />
+      <location filename="../src/MainWindow.cpp" line="4362" />
       <source>Project number:</source>
       <translation>Número de proyecto:</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4347" />
+      <location filename="../src/MainWindow.cpp" line="4362" />
       <source>Project name:</source>
       <translation>Nombre del proyecto:</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4347" />
+      <location filename="../src/MainWindow.cpp" line="4362" />
       <source>Client:</source>
       <translation>Cliente:</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4347" />
+      <location filename="../src/MainWindow.cpp" line="4362" />
       <source>Address:</source>
       <translation>Dirección:</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4386" />
+      <location filename="../src/MainWindow.cpp" line="4401" />
       <source>Could not copy: %1</source>
       <translation>No se pudo copiar: %1</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4406" />
+      <location filename="../src/MainWindow.cpp" line="4421" />
       <source>Could not paste: %1</source>
       <translation>No se pudo pegar: %1</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4410" />
+      <location filename="../src/MainWindow.cpp" line="4425" />
       <source>Pasted; drag the copies where they go</source>
       <translation>Pegado; arrastre las copias a su lugar</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4420" />
+      <location filename="../src/MainWindow.cpp" line="4435" />
       <source>Could not duplicate: %1</source>
       <translation>No se pudo duplicar: %1</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4435" />
+      <location filename="../src/MainWindow.cpp" line="4450" />
       <source>Could not mirror: %1</source>
       <translation>No se pudo hacer la simetría: %1</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4452" />
+      <location filename="../src/MainWindow.cpp" line="4467" />
       <source>Could not multiply: %1</source>
       <translation>No se pudo multiplicar: %1</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4465" />
+      <location filename="../src/MainWindow.cpp" line="4480" />
       <source>Could not offset: %1</source>
       <translation>No se pudo desfasar: %1</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4478" />
+      <location filename="../src/MainWindow.cpp" line="4493" />
       <source>Select what to multiply first</source>
       <translation>Primero seleccione lo que quiere multiplicar</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4482" />
+      <location filename="../src/MainWindow.cpp" line="4497" />
       <source>Multiply</source>
       <translation>Multiplicar</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4485" />
+      <location filename="../src/MainWindow.cpp" line="4500" />
       <source>Linear (move each copy by a distance)</source>
       <translation>Lineal (cada copia desplazada una distancia)</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4486" />
+      <location filename="../src/MainWindow.cpp" line="4501" />
       <source>Polar (rotate each copy around a centre)</source>
       <translation>Polar (cada copia girada alrededor de un centro)</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4499" />
+      <location filename="../src/MainWindow.cpp" line="4514" />
       <source>Kind:</source>
       <translation>Tipo:</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4500" />
+      <location filename="../src/MainWindow.cpp" line="4515" />
       <source>Number of copies:</source>
       <translation>Número de copias:</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4501" />
+      <location filename="../src/MainWindow.cpp" line="4516" />
       <source>Distance X (m):</source>
       <translation>Distancia X (m):</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4502" />
+      <location filename="../src/MainWindow.cpp" line="4517" />
       <source>Distance Y (m):</source>
       <translation>Distancia Y (m):</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4503" />
+      <location filename="../src/MainWindow.cpp" line="4518" />
       <source>Centre X (m):</source>
       <translation>Centro X (m):</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4504" />
+      <location filename="../src/MainWindow.cpp" line="4519" />
       <source>Centre Y (m):</source>
       <translation>Centro Y (m):</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4505" />
+      <location filename="../src/MainWindow.cpp" line="4520" />
       <source>Angle per copy (degrees):</source>
       <translation>Ángulo por copia (grados):</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4522" />
+      <location filename="../src/MainWindow.cpp" line="4537" />
       <source>Select walls or slabs to offset first</source>
       <translation>Primero seleccione muros o losas para desfasar</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4526" />
+      <location filename="../src/MainWindow.cpp" line="4541" />
       <source>Offset</source>
       <translation>Desfase</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4527" />
+      <location filename="../src/MainWindow.cpp" line="4542" />
       <source>Distance (m): walls get a parallel copy to the left of their axis (negative: right); slabs grow (negative: shrink)</source>
       <translation>Distancia (m): los muros reciben una copia paralela a la izquierda de su eje (negativa: a la derecha); las losas crecen (negativa: se achican)</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4537" />
+      <location filename="../src/MainWindow.cpp" line="4552" />
       <source>Could not create the model</source>
       <translation>No se pudo crear el modelo</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4542" />
+      <location filename="../src/MainWindow.cpp" line="4557" />
       <source>Draw the model here, then place it on levels with Place model (U)</source>
       <translation>Dibuje el modelo aquí y luego colóquelo en niveles con Colocar modelo (U)</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4549" />
+      <location filename="../src/MainWindow.cpp" line="4564" />
       <source>Choose a building level to place the model on</source>
       <translation>Elija un nivel del edificio donde colocar el modelo</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4579" />
+      <location filename="../src/MainWindow.cpp" line="4594" />
       <source>Update model instances</source>
       <translation>Actualizar instancias del modelo</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4579" />
+      <location filename="../src/MainWindow.cpp" line="4594" />
       <source>Model:</source>
       <translation>Modelo:</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4585" />
+      <location filename="../src/MainWindow.cpp" line="4600" />
       <source>There are no models yet</source>
       <translation>Todavía no hay modelos</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4590" />
+      <location filename="../src/MainWindow.cpp" line="4605" />
       <source>Could not update: %1</source>
       <translation>No se pudo actualizar: %1</translation>
     </message>
     <message numerus="yes">
-      <location filename="../src/MainWindow.cpp" line="4594" />
+      <location filename="../src/MainWindow.cpp" line="4609" />
       <source>%n instance(s) updated</source>
       <translation>
         <numerusform>%n instancia actualizada</numerusform>
@@ -5006,22 +5013,22 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       </translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4605" />
+      <location filename="../src/MainWindow.cpp" line="4620" />
       <source>Select a placed model first</source>
       <translation>Primero seleccione un modelo colocado</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4619" />
+      <location filename="../src/MainWindow.cpp" line="4634" />
       <source>Could not create the layer: %1</source>
       <translation>No se pudo crear la capa: %1</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4630" />
+      <location filename="../src/MainWindow.cpp" line="4645" />
       <source>Could not change the layer: %1</source>
       <translation>No se pudo cambiar la capa: %1</translation>
     </message>
     <message numerus="yes">
-      <location filename="../src/MainWindow.cpp" line="4634" />
+      <location filename="../src/MainWindow.cpp" line="4649" />
       <source>%n element(s) moved to %1</source>
       <translation>
         <numerusform>%n elemento movido a %1</numerusform>
@@ -5029,47 +5036,47 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       </translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4663" />
+      <location filename="../src/MainWindow.cpp" line="4678" />
       <source>New elements go on layer %1</source>
       <translation>Los elementos nuevos van a la capa %1</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4676" />
+      <location filename="../src/MainWindow.cpp" line="4691" />
       <source>Could not save the view: %1</source>
       <translation>No se pudo guardar la vista: %1</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4718" />
+      <location filename="../src/MainWindow.cpp" line="4733" />
       <source>View %1</source>
       <translation>Vista %1</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4766" />
+      <location filename="../src/MainWindow.cpp" line="4781" />
       <source>Could not create it: %1</source>
       <translation>No se pudo crear: %1</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4844" />
+      <location filename="../src/MainWindow.cpp" line="4859" />
       <source>Could not create the wall: %1</source>
       <translation>No se pudo crear el muro: %1</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4859" />
+      <location filename="../src/MainWindow.cpp" line="4874" />
       <source>Could not delete</source>
       <translation>No se pudo eliminar</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4889" />
+      <location filename="../src/MainWindow.cpp" line="4904" />
       <source>Could not update the 3D view</source>
       <translation>No se pudo actualizar la vista 3D</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4915" />
+      <location filename="../src/MainWindow.cpp" line="4930" />
       <source>The model may be inconsistent</source>
       <translation>El modelo puede estar inconsistente</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4916" />
+      <location filename="../src/MainWindow.cpp" line="4931" />
       <source>An edit failed and could not be undone. Save a copy if you need it, then reopen the file.</source>
       <translation>Una edición falló y no se pudo deshacer. Guarde una copia si la necesita y vuelva a abrir el archivo.</translation>
     </message>
@@ -5078,13 +5085,13 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       <translation type="vanished">Guardado desde KimBim</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4971" />
-      <location filename="../src/MainWindow.cpp" line="5005" />
+      <location filename="../src/MainWindow.cpp" line="4986" />
+      <location filename="../src/MainWindow.cpp" line="5020" />
       <source>Could not save</source>
       <translation>No se pudo guardar</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4995" />
+      <location filename="../src/MainWindow.cpp" line="5010" />
       <source>Saved %1</source>
       <translation>Guardado %1</translation>
     </message>
@@ -5094,7 +5101,7 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="3176" />
-      <location filename="../src/MainWindow.cpp" line="5250" />
+      <location filename="../src/MainWindow.cpp" line="5265" />
       <source>Unsaved changes</source>
       <translation>Cambios sin guardar</translation>
     </message>
@@ -5200,150 +5207,160 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       <translation>No se pudieron cambiar los gráficos</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="4988" />
+      <location filename="../src/MainWindow.cpp" line="4137" />
+      <source>Edit text</source>
+      <translation>Editar texto</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="4143" />
+      <source>Could not change it: %1</source>
+      <translation>No se pudo cambiar: %1</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="5003" />
       <source>Automatic version</source>
       <translation>Versión automática</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5003" />
-      <location filename="../src/MainWindow.cpp" line="5025" />
+      <location filename="../src/MainWindow.cpp" line="5018" />
+      <location filename="../src/MainWindow.cpp" line="5040" />
       <source>Saving %1...</source>
       <translation>Guardando %1...</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5017" />
+      <location filename="../src/MainWindow.cpp" line="5032" />
       <source>Save As</source>
       <translation>Guardar como</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5018" />
+      <location filename="../src/MainWindow.cpp" line="5033" />
       <source>KimBim project (*.kim);;IFC file (*.ifc)</source>
       <translation>Proyecto KimBim (*.kim);;Archivo IFC (*.ifc)</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5027" />
+      <location filename="../src/MainWindow.cpp" line="5042" />
       <source>Could not save the project folder</source>
       <translation>No se pudo guardar la carpeta del proyecto</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5038" />
+      <location filename="../src/MainWindow.cpp" line="5053" />
       <source>Saving the first version...</source>
       <translation>Guardando la primera versión...</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5052" />
+      <location filename="../src/MainWindow.cpp" line="5067" />
       <source>Could not export</source>
       <translation>No se pudo exportar</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5055" />
+      <location filename="../src/MainWindow.cpp" line="5070" />
       <source>Exported %1</source>
       <translation>Exportado %1</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5068" />
+      <location filename="../src/MainWindow.cpp" line="5083" />
       <source>Export IFC</source>
       <translation>Exportar IFC</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5084" />
+      <location filename="../src/MainWindow.cpp" line="5099" />
       <source>Start from a template:</source>
       <translation>Empezar desde una plantilla:</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5089" />
+      <location filename="../src/MainWindow.cpp" line="5104" />
       <source>KimBim default</source>
       <translation>Predeterminada de KimBim</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5108" />
       <location filename="../src/MainWindow.cpp" line="5123" />
+      <location filename="../src/MainWindow.cpp" line="5138" />
       <source>Save as template</source>
       <translation>Guardar como plantilla</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5108" />
+      <location filename="../src/MainWindow.cpp" line="5123" />
       <source>A template called %1 exists. Replace it?</source>
       <translation>Ya existe una plantilla llamada %1. ¿Reemplazarla?</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5113" />
+      <location filename="../src/MainWindow.cpp" line="5128" />
       <source>Could not save the template</source>
       <translation>No se pudo guardar la plantilla</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5116" />
+      <location filename="../src/MainWindow.cpp" line="5131" />
       <source>Template %1 saved</source>
       <translation>Plantilla %1 guardada</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5124" />
+      <location filename="../src/MainWindow.cpp" line="5139" />
       <source>Template name (saved in %1):</source>
       <translation>Nombre de la plantilla (se guarda en %1):</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5136" />
+      <location filename="../src/MainWindow.cpp" line="5151" />
       <source>Project settings changed</source>
       <translation>Configuración del proyecto cambiada</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5175" />
+      <location filename="../src/MainWindow.cpp" line="5190" />
       <source>Could not recover the work</source>
       <translation>No se pudo recuperar el trabajo</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5188" />
+      <location filename="../src/MainWindow.cpp" line="5203" />
       <source>an untitled project</source>
       <translation>un proyecto sin título</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5190" />
+      <location filename="../src/MainWindow.cpp" line="5205" />
       <source>Recover unsaved work</source>
       <translation>Recuperar trabajo sin guardar</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5191" />
+      <location filename="../src/MainWindow.cpp" line="5206" />
       <source>KimBim closed unexpectedly. Recover your work on %1 from %2?</source>
       <translation>KimBim se cerró inesperadamente. ¿Recuperar tu trabajo en %1 de %2?</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5251" />
+      <location filename="../src/MainWindow.cpp" line="5266" />
       <source>The model has unsaved changes. Save them?</source>
       <translation>El modelo tiene cambios sin guardar. ¿Guardarlos?</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5261" />
-      <location filename="../src/MainWindow.cpp" line="5265" />
+      <location filename="../src/MainWindow.cpp" line="5276" />
+      <location filename="../src/MainWindow.cpp" line="5280" />
       <source>Add property</source>
       <translation>Añadir propiedad</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5261" />
+      <location filename="../src/MainWindow.cpp" line="5276" />
       <source>Property name in %1:</source>
       <translation>Nombre de la propiedad en %1:</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5265" />
+      <location filename="../src/MainWindow.cpp" line="5280" />
       <source>Value:</source>
       <translation>Valor:</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5280" />
+      <location filename="../src/MainWindow.cpp" line="5295" />
       <source>Add property set</source>
       <translation>Añadir conjunto de propiedades</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5280" />
+      <location filename="../src/MainWindow.cpp" line="5295" />
       <source>Property set (standard or custom):</source>
       <translation>Conjunto de propiedades (estándar o propio):</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5304" />
+      <location filename="../src/MainWindow.cpp" line="5319" />
       <source>Loading %1 (%2)...</source>
       <translation>Cargando %1 (%2)...</translation>
     </message>
     <message numerus="yes">
-      <location filename="../src/MainWindow.cpp" line="5314" />
+      <location filename="../src/MainWindow.cpp" line="5329" />
       <source>Loading... %n element(s)</source>
       <translation>
         <numerusform>Cargando... %n elemento</numerusform>
@@ -5351,7 +5368,7 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       </translation>
     </message>
     <message numerus="yes">
-      <location filename="../src/MainWindow.cpp" line="5326" />
+      <location filename="../src/MainWindow.cpp" line="5341" />
       <source>%n element(s) loaded in %1 s</source>
       <translation>
         <numerusform>%n elemento cargado en %1 s</numerusform>
@@ -5359,7 +5376,7 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       </translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5337" />
+      <location filename="../src/MainWindow.cpp" line="5352" />
       <source>Could not open the model</source>
       <translation>No se pudo abrir el modelo</translation>
     </message>
@@ -5862,169 +5879,169 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       <translation>Calco %1 movido</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="46" />
+      <location filename="../src/MarkupTools.cpp" line="47" />
       <source>Tag style (project settings): Automatic takes the element's kind's</source>
       <translation>Estilo de etiqueta (ajustes del proyecto): Automático toma el del tipo de elemento</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="49" />
+      <location filename="../src/MarkupTools.cpp" line="50" />
       <source>The tag's frame</source>
       <translation>El marco de la etiqueta</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="50" />
+      <location filename="../src/MarkupTools.cpp" line="51" />
       <source>Style's frame</source>
       <translation>Marco del estilo</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="51" />
+      <location filename="../src/MarkupTools.cpp" line="52" />
       <source>No frame</source>
       <translation>Sin marco</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="52" />
+      <location filename="../src/MarkupTools.cpp" line="53" />
       <source>Circle</source>
       <translation>Círculo</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="53" />
+      <location filename="../src/MarkupTools.cpp" line="54" />
       <source>Box</source>
       <translation>Rectángulo</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="54" />
+      <location filename="../src/MarkupTools.cpp" line="55" />
       <source>Hexagon</source>
       <translation>Hexágono</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="59" />
+      <location filename="../src/MarkupTools.cpp" line="60" />
       <source>With a leader: click the element, then where the tag goes</source>
       <translation>Con línea de referencia: haga clic en el elemento y luego donde va la etiqueta</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="64" />
+      <location filename="../src/MarkupTools.cpp" line="65" />
       <source>Revision</source>
       <translation>Revisión</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="66" />
+      <location filename="../src/MarkupTools.cpp" line="67" />
       <source>The revision the cloud marks (shown in a triangle)</source>
       <translation>La revisión que marca la nube (en un triángulo)</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="90" />
+      <location filename="../src/MarkupTools.cpp" line="91" />
       <source>Automatic</source>
       <translation>Automático</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="99" />
+      <location filename="../src/MarkupTools.cpp" line="100" />
       <source>Radius</source>
       <translation>Radio</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="100" />
+      <location filename="../src/MarkupTools.cpp" line="101" />
       <source>Diameter</source>
       <translation>Diámetro</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="102" />
+      <location filename="../src/MarkupTools.cpp" line="103" />
       <source>Level dimension</source>
       <translation>Cota de nivel</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="103" />
+      <location filename="../src/MarkupTools.cpp" line="104" />
       <source>Spot elevation</source>
       <translation>Cota de punto</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="108" />
-      <location filename="../src/MarkupTools.cpp" line="149" />
+      <location filename="../src/MarkupTools.cpp" line="109" />
+      <location filename="../src/MarkupTools.cpp" line="150" />
       <source>Tag: click a door, window, wall, room or other element</source>
       <translation>Etiqueta: haga clic en una puerta, ventana, muro, local u otro elemento</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="111" />
+      <location filename="../src/MarkupTools.cpp" line="112" />
       <source>North arrow: click where it goes (it points to the project's true north)</source>
       <translation>Flecha de norte: haga clic donde va (apunta al norte geográfico del proyecto)</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="114" />
+      <location filename="../src/MarkupTools.cpp" line="115" />
       <source>Scale bar: click where its left end goes</source>
       <translation>Escala gráfica: haga clic donde va su extremo izquierdo</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="117" />
-      <location filename="../src/MarkupTools.cpp" line="255" />
+      <location filename="../src/MarkupTools.cpp" line="118" />
+      <location filename="../src/MarkupTools.cpp" line="256" />
       <source>Revision cloud: click its outline; click the first point or press Enter to close</source>
       <translation>Nube de revisión: haga clic en su contorno; haga clic en el primer punto o pulse Intro para cerrarla</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="120" />
+      <location filename="../src/MarkupTools.cpp" line="121" />
       <source>Angle: click the vertex</source>
       <translation>Ángulo: haga clic en el vértice</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="123" />
+      <location filename="../src/MarkupTools.cpp" line="124" />
       <source>Radius: click the centre (circle and arc centres snap)</source>
       <translation>Radio: haga clic en el centro (se ajusta a los centros de círculos y arcos)</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="126" />
+      <location filename="../src/MarkupTools.cpp" line="127" />
       <source>Level: click the point to measure</source>
       <translation>Nivel: haga clic en el punto que medir</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="154" />
+      <location filename="../src/MarkupTools.cpp" line="155" />
       <source>Nothing to tag there</source>
       <translation>No hay nada que etiquetar ahí</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="159" />
+      <location filename="../src/MarkupTools.cpp" line="160" />
       <source>Tag: click where the tag goes</source>
       <translation>Etiqueta: haga clic donde va la etiqueta</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="177" />
+      <location filename="../src/MarkupTools.cpp" line="178" />
       <source>Angle: click a point on the first side</source>
       <translation>Ángulo: haga clic en un punto del primer lado</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="178" />
+      <location filename="../src/MarkupTools.cpp" line="179" />
       <source>Angle: click a point on the second side</source>
       <translation>Ángulo: haga clic en un punto del segundo lado</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="178" />
+      <location filename="../src/MarkupTools.cpp" line="179" />
       <source>Angle: click where the arc goes</source>
       <translation>Ángulo: haga clic donde va el arco</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="183" />
+      <location filename="../src/MarkupTools.cpp" line="184" />
       <source>Click a point on the circle</source>
       <translation>Haga clic en un punto de la circunferencia</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="183" />
+      <location filename="../src/MarkupTools.cpp" line="184" />
       <source>Click where the text goes</source>
       <translation>Haga clic donde va el texto</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="185" />
+      <location filename="../src/MarkupTools.cpp" line="186" />
       <source>Spot elevation: click where the text goes</source>
       <translation>Cota de punto: haga clic donde va el texto</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="226" />
+      <location filename="../src/MarkupTools.cpp" line="227" />
       <source>Could not tag it: %1</source>
       <translation>No se pudo etiquetar: %1</translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="269" />
+      <location filename="../src/MarkupTools.cpp" line="270" />
       <source>Could not tag them: %1</source>
       <translation>No se pudieron etiquetar: %1</translation>
     </message>
     <message numerus="yes">
-      <location filename="../src/MarkupTools.cpp" line="275" />
+      <location filename="../src/MarkupTools.cpp" line="276" />
       <source>Tagged %n element(s)</source>
       <translation>
         <numerusform>%n elemento etiquetado</numerusform>
@@ -6032,9 +6049,14 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       </translation>
     </message>
     <message>
-      <location filename="../src/MarkupTools.cpp" line="275" />
+      <location filename="../src/MarkupTools.cpp" line="276" />
       <source>Everything shown is tagged already</source>
       <translation>Todo lo que se muestra ya está etiquetado</translation>
+    </message>
+    <message>
+      <location filename="../src/MarkupTools.cpp" line="285" />
+      <source>Place text</source>
+      <translation>Colocar texto</translation>
     </message>
     <message>
       <location filename="../src/LibraryTools.cpp" line="39" />
@@ -7752,12 +7774,17 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       <translation>Colocar nube de revisión</translation>
     </message>
     <message>
-      <location filename="../src/SheetsPanel.cpp" line="106" />
+      <location filename="../src/SheetsPanel.cpp" line="63" />
+      <source>Place text...</source>
+      <translation>Colocar texto...</translation>
+    </message>
+    <message>
+      <location filename="../src/SheetsPanel.cpp" line="107" />
       <source>Purpose</source>
       <translation>Propósito</translation>
     </message>
     <message>
-      <location filename="../src/SheetsPanel.cpp" line="108" />
+      <location filename="../src/SheetsPanel.cpp" line="109" />
       <source>Current (as the views)</source>
       <translation>Actual (como las vistas)</translation>
     </message>

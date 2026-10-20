@@ -252,6 +252,23 @@ def test_the_legend_lists_every_rule_when_it_fits(house):
     assert "To be demolished" in svg and "Temporary" in svg and "Auxiliary" in svg
 
 
+def test_a_sheet_text_can_be_placed_moved_edited_and_removed(house):
+    number = call("add_sheet", "A3", "Working")["number"]
+    r = call("place_sheet_symbol", number, "text", json.dumps({"text": "Hello", "x": 20, "y": 30}))
+    assert r["ok"], r
+    (sym,) = _sheet_of(number)["symbols"]
+    assert sym["kind"] == "text" and sym["text"] == "Hello" and (sym["x"], sym["y"]) == (20, 30)
+    assert "Hello" in call("sheet_svg", number)["svg"]
+    assert call("set_sheet_symbol", number, sym["id"], json.dumps({"text": "Bye", "x": 40}))["ok"]
+    svg = call("sheet_svg", number)["svg"]
+    assert "Bye" in svg and "Hello" not in svg  # D91: sheet texts are editable
+    assert call("move_sheet_symbol", number, sym["id"], 10, 10)["ok"]
+    assert _sheet_of(number)["symbols"][0]["x"] == 10
+    assert call("remove_sheet_symbol", number, sym["id"])["ok"]
+    assert _sheet_of(number)["symbols"] == []
+    assert not call("place_sheet_symbol", number, "text", json.dumps({"text": "  "}))["ok"]
+
+
 def test_legends_are_not_drawings(house):
     number = call("add_sheet", "A3", "L")["number"]
     assert call("place_legend", number)["ok"]
