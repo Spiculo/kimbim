@@ -840,6 +840,56 @@ def object_symbols(storey, to_paper, include=None, plan_symbols: bool = True) ->
     return out
 
 
+SHOW_ON_PSET = "KIMBIM_ShowOn"  # D91: which levels an element shows on
+
+
+def show_on_rule(element) -> str:
+    """The element's show-on rule, or "home" (only its own level)."""
+    data = ifcopenshell.util.element.get_pset(element, SHOW_ON_PSET, should_inherit=False) or {}
+    value = data.get("Levels")
+    return value.strip() if isinstance(value, str) and value.strip() else "home"
+
+
+def home_level(element):
+    """The element's own level: its container, or its aggregate's (a stair's part, an opening)."""
+    storey = ifcopenshell.util.element.get_container(element)
+    if storey is None:
+        aggregate = ifcopenshell.util.element.get_aggregate(element)
+        if aggregate is not None:
+            storey = ifcopenshell.util.element.get_container(aggregate)
+    return storey if storey is not None and storey.is_a("IfcBuildingStorey") else None
+
+
+def _show_on_matches(rule: str, d: int) -> bool:
+    rule = (rule or "home").strip().lower()
+    if rule in ("", "home", "0"):
+        return d == 0
+    if rule == "all":
+        return True
+    if rule.startswith("up"):
+        return 0 <= d <= int(rule[2:].lstrip(":") or 1)
+    if rule.startswith("down"):
+        return -int(rule[4:].lstrip(":") or 1) <= d <= 0
+    if rule.startswith("range"):
+        parts = rule[5:].lstrip(":").split("..")
+        return int(parts[0]) <= d <= int(parts[1]) if len(parts) == 2 else d == 0
+    try:  # an expression over d (and abs)
+        return bool(eval(rule, {"__builtins__": {}}, {"d": d, "abs": abs}))
+    except Exception:
+        return d == 0
+
+
+def shows_on(element, storey, storeys) -> bool:
+    """D91: whether `element` shows on `storey`; `storeys` are the building's levels, lowest first."""
+    home = home_level(element)
+    if home is None or home.GlobalId == storey.GlobalId:
+        return True
+    order = [s.GlobalId for s in storeys]
+    if home.GlobalId not in order or storey.GlobalId not in order:
+        return home.GlobalId == storey.GlobalId
+    return _show_on_matches(show_on_rule(element), order.index(storey.GlobalId) - order.index(home.GlobalId))
+
+
 def _tagged(kind: str, parts: list) -> list:
     """Overlay parts grouped by what they are, so graphics.style_svg can style them (D73)."""
     return [f'<g data-kind="{kind}">', *parts, "</g>"] if parts else []
@@ -915,10 +965,9 @@ def generate(f, drawing, include=None, bounds=None, plan_symbols: bool = True) -
     if s is not None and s["kind"] == "plan":
         storey = _storey(drawing, s)
         symbols = symbol_objects(f, plan_symbols)  # D86: drawn from their plan symbol (overlay), not cut
-        # a stair's flights and landings are on its level (D88: they are its parts, not contained)
-        products = [p for p in products if (ifcopenshell.util.element.get_container(p)
-                                            or ifcopenshell.util.element.get_container(
-                                                ifcopenshell.util.element.get_aggregate(p) or p)) == storey
+        # D91: an element shows on its own level by default; a rule widens that (one up, all, a range).
+        storeys = sorted(f.by_type("IfcBuildingStorey"), key=storey_elevation) if storey is not None else []
+        products = [p for p in products if (storey is not None and shows_on(p, storey, storeys))
                     and p.GlobalId not in symbols]
     if include is not None:
         wanted = set(include)

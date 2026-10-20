@@ -897,6 +897,7 @@ from . import underlays as _underlays  # noqa: E402
 from . import symbols as _symbols  # noqa: E402
 from . import tags as _tags  # noqa: E402
 from . import stairs as _stairs  # noqa: E402
+from . import showon as _showon  # noqa: E402
 
 _EXPORTS = {
     "authoring": (
@@ -1060,6 +1061,9 @@ _EXPORTS = {
         "rename_storey",
         "set_storey_elevation",
         "set_storey_shown",
+    ),
+    "showon": (
+        "set_show_on",
     ),
     "checks": (
         "_write_sample_house",
