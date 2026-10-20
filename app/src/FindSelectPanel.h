@@ -7,6 +7,7 @@
 #include <QWidget>
 
 class QComboBox;
+class QCheckBox;
 class QLabel;
 class QLineEdit;
 class QListWidget;
@@ -36,6 +37,7 @@ public:
     void setCriteria(const QJsonObject& criteria);
     QString scope() const; // "model", "level" or "selection"
     void setScope(const QString& scope);
+    bool includeHidden() const; // D92: find elements on hidden or locked layers too
     int rowCount() const { return int(m_rows.size()); }
     void addRow(const QString& field = QStringLiteral("ifc_class"), const QString& op = QStringLiteral("equals"),
         const QString& value = QString(), const QString& property = QString());
@@ -79,6 +81,7 @@ private:
 
     QComboBox* m_match;
     QComboBox* m_scope;
+    QCheckBox* m_includeHidden;
     QVBoxLayout* m_rowsLayout;
     QVector<Row> m_rows;
     QComboBox* m_saved;

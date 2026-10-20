@@ -35,6 +35,9 @@ public:
     bool titleBarLevels() const;
     bool titleBarCut() const;
     bool titleBarVersions() const;
+    // D92: selection
+    QString selectSimilarScope() const; // "class_predefined", "type" or "class"
+    QString boxSelection() const;       // "direction", "partial" or "entire"
     double largeIfcMb() const;
     bool askImportStatus() const;       // D74: opening an IFC offers to mark elements without a renovation status          // an IFC this large asks before making a .kim; 0: never asks
     // Drawing generation: how long to wait before giving up (seconds; 0 = no limit) and the

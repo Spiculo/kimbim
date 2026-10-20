@@ -57,6 +57,8 @@ QJsonObject Preferences::defaults()
         {"title_bar_levels", true},
         {"title_bar_cut", true},
         {"title_bar_versions", true},
+        {"select_similar_scope", "class_predefined"},
+        {"box_selection", "direction"},
         {"recent", QJsonArray()},
     };
 }
@@ -159,6 +161,18 @@ double Preferences::fieldOfView() const
 bool Preferences::titleBarLevels() const { return value("title_bar_levels").toBool(true); }
 bool Preferences::titleBarCut() const { return value("title_bar_cut").toBool(true); }
 bool Preferences::titleBarVersions() const { return value("title_bar_versions").toBool(true); }
+
+QString Preferences::selectSimilarScope() const
+{
+    const QString v = value("select_similar_scope").toString();
+    return v == QLatin1String("type") || v == QLatin1String("class") ? v : QStringLiteral("class_predefined");
+}
+
+QString Preferences::boxSelection() const
+{
+    const QString v = value("box_selection").toString();
+    return v == QLatin1String("partial") || v == QLatin1String("entire") ? v : QStringLiteral("direction");
+}
 
 bool Preferences::trueLineWeights() const
 {

@@ -95,10 +95,46 @@ bool MainWindow::selectSimilar(const QString& mode)
     return true;
 }
 
+QString MainWindow::toolElementClass(Tool tool)
+{
+    switch (tool) {
+    case Tool::Wall: return QStringLiteral("IfcWall");
+    case Tool::Slab: return QStringLiteral("IfcSlab");
+    case Tool::Door: return QStringLiteral("IfcDoor");
+    case Tool::Window: return QStringLiteral("IfcWindow");
+    case Tool::Column: return QStringLiteral("IfcColumn");
+    case Tool::Beam: return QStringLiteral("IfcBeam");
+    case Tool::Roof: return QStringLiteral("IfcRoof");
+    case Tool::Stair: return QStringLiteral("IfcStair");
+    case Tool::Railing: return QStringLiteral("IfcRailing");
+    case Tool::Object: return QStringLiteral("IfcBuildingElementProxy");
+    default: return {};
+    }
+}
+
+void MainWindow::selectAll()
+{
+    // D92: with a creation tool active, its elements; with no tool, everything (Archicad).
+    const QString cls = toolElementClass(m_tool);
+    QStringList guids = m_viewport->guids();
+    if (!cls.isEmpty()) {
+        QStringList filtered;
+        for (const QString& g : guids) {
+            const QString type = m_viewport->typeOf(g);
+            if (type == cls || type == cls + QLatin1String("StandardCase") || type == cls + QLatin1String("ElementedCase"))
+                filtered << g;
+        }
+        guids = filtered;
+    }
+    applySelection(guids, QStringLiteral("replace"));
+    m_status->showMessage(tr("%n element(s) selected", nullptr, int(m_selection.size())));
+}
+
 int MainWindow::findAndSelect(const QJsonObject& query, const QString& how)
 {
     QJsonObject q = query;
-    q.insert("skip_layers", QJsonArray::fromStringList(unselectableLayers()));
+    if (!(m_findSelect && m_findSelect->includeHidden())) // D92: hidden/locked layers are unselectable by default
+        q.insert("skip_layers", QJsonArray::fromStringList(unselectableLayers()));
     if (q.value("scope").toString() == QLatin1String("level"))
         q.insert("level", m_levels->activeStorey());
     if (q.value("scope").toString() == QLatin1String("selection"))

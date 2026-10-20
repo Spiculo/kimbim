@@ -441,10 +441,12 @@ void MainWindow::buildMenus()
     // D78: selection tools (Archicad's Find & Select; Revit's Select All Instances).
     editMenu->addSeparator();
     editAction(tr("Select &similar"), "actionSelectSimilar", QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_A),
-        [this] { selectSimilar(QStringLiteral("type")); })
-        ->setToolTip(tr("Select every element of the selected elements' types (untyped: same class and predefined type)"));
+        [this] { selectSimilar(m_prefs.selectSimilarScope()); })
+        ->setToolTip(tr("Select every element sharing the selected element's class and predefined type, its type object or its class (Edit ▸ Preferences)"));
     editAction(tr("Select all of this c&lass"), "actionSelectClass", QKeySequence(), [this] { selectSimilar(QStringLiteral("class")); })
         ->setToolTip(tr("Select every element of the selected elements' IFC classes"));
+    editAction(tr("Select &all"), "actionSelectAll", QKeySequence::SelectAll, [this] { selectAll(); })
+        ->setToolTip(tr("With a creation tool active, selects that tool's elements; otherwise everything"));
     editAction(tr("&Find && Select..."), "actionFindSelect", QKeySequence(Qt::CTRL | Qt::Key_F), [this] {
         findSelectPanel();
         m_dock->raisePanel(QStringLiteral("findselect"));
@@ -3566,6 +3568,7 @@ void MainWindow::setTrueLineWeights(bool on)
 void MainWindow::applyViewPreferences()
 {
     Viewport::setFieldOfView(m_prefs.fieldOfView()); // D92
+    Viewport::setBoxMode(Viewport::boxModeFrom(m_prefs.boxSelection())); // D92
     const QJsonArray home = m_prefs.value(QStringLiteral("home_view")).toArray();
     if (home.size() == 6)
         Viewport::setHomeView(gp_Dir(home.at(0).toDouble(), home.at(1).toDouble(), home.at(2).toDouble()),

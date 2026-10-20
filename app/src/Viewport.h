@@ -82,6 +82,12 @@ public:
     gp_Dir currentViewUp() const;
     static void setFieldOfView(double degrees); // the perspective camera's vertical field of view (D92)
     static double fieldOfView();
+    // D92: how a box selects: by drag direction (AutoCAD), or Archicad's partial (any touch) / entire
+    // (fully inside), whatever the direction.
+    enum class BoxMode { Direction, Partial, Entire };
+    static void setBoxMode(BoxMode mode);
+    static BoxMode boxMode();
+    static BoxMode boxModeFrom(const QString& preference); // "direction", "partial", "entire"
     // Perspective camera (D76), per view; plan views stay orthographic (the setting comes back in 3D).
     void setPerspective(bool on);
     bool isPerspective() const { return m_perspective; }
@@ -272,7 +278,15 @@ public:
     // D78: dragged right to left (x1 < x0) it is a crossing box (takes what it touches), left to right
     // a window box (only what is fully inside), as in AutoCAD and Revit.
     int selectInRectangle(int x0, int y0, int x1, int y1, AIS_SelectionScheme scheme, bool through = false);
-    static bool isCrossingBox(int startX, int endX) { return endX < startX; }
+    static bool isCrossingBox(int startX, int endX)
+    {
+        if (s_boxMode == BoxMode::Partial)
+            return true;
+        if (s_boxMode == BoxMode::Entire)
+            return false;
+        return endX < startX;
+    }
+    static BoxMode s_boxMode;
     void setSelectThrough(bool on) { m_selectThrough = on; }
     bool selectThrough() const { return m_selectThrough; }
     // Guids with at least one visible pixel in the rectangle (nullopt: cannot tell, e.g. no window).

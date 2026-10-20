@@ -35,7 +35,7 @@ FIELD_OPS = {
 }
 MATCH = ("all", "any")
 SCOPES = ("model", "level", "selection")
-SIMILAR = ("type", "class")
+SIMILAR = ("type", "class", "class_predefined")
 
 
 # ---------------------------------------------------------------- validation (project settings)
@@ -235,7 +235,8 @@ def _class_key(e) -> str:
 def similar(model, guids, mode: str = "type", skip_layers=()) -> list[str]:
     """Select similar (D78). "type": every element of the selected elements' IFC types; an untyped one
     brings the other untyped elements of its class and predefined type (annotations: and kind).
-    "class": every element of the selected elements' classes."""
+    "class": every element of the selected elements' classes. "class_predefined" (D92): every element of
+    the same IFC class and predefined type."""
     ctx = _Context(model)
     picked = []
     for g in guids:
@@ -248,7 +249,7 @@ def similar(model, guids, mode: str = "type", skip_layers=()) -> list[str]:
         t = ctx.type_of(e)
         if mode == "type" and t is not None:
             types.add(t.id())
-        elif mode == "type":
+        elif mode in ("type", "class_predefined"):
             keys.add(_untyped_key(e))
         classes.add(_class_key(e))
     skip = {_norm(n) for n in skip_layers or ()}
@@ -261,6 +262,9 @@ def similar(model, guids, mode: str = "type", skip_layers=()) -> list[str]:
             if mode == "type":
                 t = ctx.type_of(e)
                 if not (t.id() in types if t is not None else _untyped_key(e) in keys):
+                    continue
+            elif mode == "class_predefined":
+                if _untyped_key(e) not in keys:
                     continue
             if e.is_a("IfcAnnotation") and getattr(e, "ObjectType", None) == "DRAWING":
                 continue
@@ -341,7 +345,7 @@ def similar_elements(guids_json: str, mode: str = "type", skip_layers_json: str 
     if B._model is None:
         return _fail("no model open")
     if mode not in SIMILAR:
-        return _fail(f"unknown mode {mode} (type or class)")
+        return _fail(f"unknown mode {mode} (type, class or class_predefined)")
     t0 = time.perf_counter()
     try:
         out = similar(B._model, guids, mode, skip)

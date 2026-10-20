@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // D78: select similar, Find & Select and selection sets in the main window; crossing vs window box.
 #include <QAction>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QJsonArray>
 #include <QJsonObject>
@@ -169,6 +170,50 @@ private slots:
     {
         QVERIFY(kimbim::Viewport::isCrossingBox(100, 20));  // right to left: crossing
         QVERIFY(!kimbim::Viewport::isCrossingBox(20, 100)); // left to right: window
+    }
+
+    // D92: the box selection preference overrides the drag direction (Archicad partial/entire).
+    void boxModeOverridesTheDirection()
+    {
+        kimbim::Viewport::setBoxMode(kimbim::Viewport::BoxMode::Entire);
+        QVERIFY(!kimbim::Viewport::isCrossingBox(100, 20)); // always fully inside
+        QVERIFY(!kimbim::Viewport::isCrossingBox(20, 100));
+        kimbim::Viewport::setBoxMode(kimbim::Viewport::BoxMode::Partial);
+        QVERIFY(kimbim::Viewport::isCrossingBox(100, 20));
+        QVERIFY(kimbim::Viewport::isCrossingBox(20, 100)); // any touched element
+        kimbim::Viewport::setBoxMode(kimbim::Viewport::BoxMode::Direction);
+        QCOMPARE(kimbim::Viewport::boxModeFrom("entire"), kimbim::Viewport::BoxMode::Entire);
+        QCOMPARE(kimbim::Viewport::boxModeFrom("partial"), kimbim::Viewport::BoxMode::Partial);
+        QCOMPARE(kimbim::Viewport::boxModeFrom("nonsense"), kimbim::Viewport::BoxMode::Direction);
+    }
+
+    // D92: Ctrl+A selects the active tool's elements, or everything with no tool.
+    void selectAllTakesTheToolsElements()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        const QStringList made = build(w);
+        QStringList walls;
+        for (const QString& g : made)
+            if (w.viewport()->typeOf(g) == QLatin1String("IfcWall"))
+                walls << g;
+        QCOMPARE(action(w, "actionSelectAll")->shortcut(), QKeySequence(QKeySequence::SelectAll));
+        w.setTool(kimbim::MainWindow::Tool::Wall);
+        action(w, "actionSelectAll")->trigger();
+        QCOMPARE(sorted(w.selection()), sorted(walls));
+        w.setTool(kimbim::MainWindow::Tool::None);
+        action(w, "actionSelectAll")->trigger();
+        QCOMPARE(sorted(w.selection()), sorted(made));
+    }
+
+    // D92: Find & Select can include elements on hidden or locked layers.
+    void findCanIncludeHidden()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        kimbim::FindSelectPanel* panel = w.findSelectPanel();
+        QCheckBox* box = panel->findChild<QCheckBox*>(QStringLiteral("includeHidden"));
+        QVERIFY(box && !box->isChecked());
+        box->setChecked(true);
+        QVERIFY(panel->includeHidden());
     }
 };
 

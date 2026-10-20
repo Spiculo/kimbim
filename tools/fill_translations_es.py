@@ -1210,6 +1210,25 @@ ES = {
     " m²": " m²",
     "Openings smaller than this are not taken out of the host's areas (0: deduct all)":
         "Las aberturas menores que esto no se descuentan de las áreas del anfitrión (0: descontar todas)",
+    # D92: selection
+    "Select &all": "Seleccionar &todo",
+    "With a creation tool active, selects that tool's elements; otherwise everything":
+        "Con una herramienta de creación activa, selecciona sus elementos; si no, todo",
+    "Select similar by:": "Seleccionar similares por:",
+    "Same class and predefined type": "Misma clase y tipo predefinido",
+    "Same type object": "Mismo objeto de tipo",
+    "Same class": "Misma clase",
+    "What Select similar takes: elements sharing the selected element's class and predefined type, its type object, or its class":
+        "Qué toma Seleccionar similares: elementos que comparten la clase y el tipo predefinido del elemento seleccionado, su objeto de tipo o su clase",
+    "Select every element sharing the selected element's class and predefined type, its type object or its class (Edit ▸ Preferences)":
+        "Selecciona todos los elementos que comparten la clase y el tipo predefinido, el objeto de tipo o la clase del elemento seleccionado (Edición ▸ Preferencias)",
+    "Box selection:": "Selección por caja:",
+    "Drag direction (left window, right crossing)": "Dirección del arrastre (izquierda ventana, derecha cruce)",
+    "Any touched element (partial)": "Cualquier elemento tocado (parcial)",
+    "Only fully enclosed elements (entire)": "Solo elementos totalmente encerrados (completo)",
+    "How a box selects elements": "Cómo selecciona una caja",
+    "Include hidden": "Incluir ocultos",
+    "Find elements on hidden or locked layers too": "Buscar también elementos en capas ocultas o bloqueadas",
 }
 
 

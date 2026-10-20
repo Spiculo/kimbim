@@ -165,6 +165,17 @@ PreferencesDialog::PreferencesDialog(Preferences& prefs, QWidget* parent)
     chromeRow->addStretch(1);
     form->addRow(tr("Title bar shows:"), chromeRow);
 
+    // D92: selection behaviour.
+    m_selectSimilar = choice(this, "selectSimilarScope", {{tr("Same class and predefined type"), "class_predefined"},
+        {tr("Same type object"), "type"}, {tr("Same class"), "class"}}, prefs.selectSimilarScope());
+    m_selectSimilar->setToolTip(tr("What Select similar takes: elements sharing the selected element's class and predefined type, its type object, or its class"));
+    form->addRow(tr("Select similar by:"), m_selectSimilar);
+    m_boxSelection = choice(this, "boxSelection", {{tr("Drag direction (left window, right crossing)"), "direction"},
+        {tr("Any touched element (partial)"), "partial"}, {tr("Only fully enclosed elements (entire)"), "entire"}},
+        prefs.boxSelection());
+    m_boxSelection->setToolTip(tr("How a box selects elements"));
+    form->addRow(tr("Box selection:"), m_boxSelection);
+
     layout->addLayout(form);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
@@ -192,6 +203,8 @@ void PreferencesDialog::apply()
     m_prefs.setValue(QStringLiteral("title_bar_levels"), m_titleLevels->isChecked());
     m_prefs.setValue(QStringLiteral("title_bar_cut"), m_titleCut->isChecked());
     m_prefs.setValue(QStringLiteral("title_bar_versions"), m_titleVersions->isChecked());
+    m_prefs.setValue(QStringLiteral("select_similar_scope"), m_selectSimilar->currentData().toString());
+    m_prefs.setValue(QStringLiteral("box_selection"), m_boxSelection->currentData().toString());
 }
 
 void PreferencesDialog::accept()

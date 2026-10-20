@@ -130,6 +130,15 @@ def test_select_similar_by_type_and_untyped_fallback(house):
     assert not call("similar_elements", "[]", "colour")["ok"]
 
 
+def test_select_similar_by_class_and_predefined_type(house):
+    # D92: the default scope groups by IFC class and predefined type, not by the type object.
+    f, el, *_ = house
+    r = call("similar_elements", json.dumps([el["A"].GlobalId]), "class_predefined")
+    assert r["ok"] and names(f, r["guids"]) == ["A", "B", "C", "D"]  # all walls with the same predefined type
+    r = call("similar_elements", json.dumps([el["E"].GlobalId]), "class_predefined")
+    assert names(f, r["guids"]) == ["E", "F"]
+
+
 def test_class_kind_type_and_name(house):
     f, el, *_ = house
     assert names(f, find([{"field": "ifc_class", "op": "equals", "value": "IfcSlab"}])) == ["Floor"]

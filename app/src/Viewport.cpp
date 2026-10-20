@@ -75,6 +75,8 @@ double g_fieldOfView = 45.0;
 
 } // namespace
 
+Viewport::BoxMode Viewport::s_boxMode = Viewport::BoxMode::Direction;
+
 namespace {
 
 Aspect_VKeyMouse toButtons(Qt::MouseButtons b)
@@ -2412,6 +2414,25 @@ void Viewport::setFieldOfView(double degrees)
 double Viewport::fieldOfView()
 {
     return g_fieldOfView;
+}
+
+void Viewport::setBoxMode(BoxMode mode)
+{
+    s_boxMode = mode;
+}
+
+Viewport::BoxMode Viewport::boxMode()
+{
+    return s_boxMode;
+}
+
+Viewport::BoxMode Viewport::boxModeFrom(const QString& preference)
+{
+    if (preference == QLatin1String("partial"))
+        return BoxMode::Partial;
+    if (preference == QLatin1String("entire"))
+        return BoxMode::Entire;
+    return BoxMode::Direction;
 }
 
 void Viewport::setHomeView(const gp_Dir& dir, const gp_Dir& up)

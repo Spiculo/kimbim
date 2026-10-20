@@ -42,6 +42,8 @@ private:
     QCheckBox* m_titleLevels; // D92: which controls the title bar holds
     QCheckBox* m_titleCut;
     QCheckBox* m_titleVersions;
+    QComboBox* m_selectSimilar; // D92
+    QComboBox* m_boxSelection;
 };
 
 } // namespace kimbim

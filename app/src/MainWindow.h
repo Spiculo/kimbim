@@ -359,6 +359,8 @@ public:
     // returns how many elements matched (-1 if refused). Only what can be selected is taken: not on
     // hidden or locked layers, not hidden in the view. Criteria and selection sets are project settings.
     bool selectSimilar(const QString& mode);
+    void selectAll(); // D92: with a creation tool active, its elements; otherwise everything
+    static QString toolElementClass(Tool tool); // the IFC class a creation tool makes ("" if none)
     int findAndSelect(const QJsonObject& query, const QString& how = QStringLiteral("replace"));
     bool saveSelectionCriteria(const QString& name, const QJsonObject& criteria);
     bool deleteSelectionCriteria(const QString& name);
