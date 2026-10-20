@@ -2009,78 +2009,88 @@ Enter runs, Shift+Enter adds a line, Up/Down recall earlier input</source>
 <context>
     <name>kimbim::LevelsDialog</name>
     <message>
-        <location filename="../src/LevelsDialog.cpp" line="179"/>
+        <location filename="../src/LevelsDialog.cpp" line="189"/>
         <source>Levels</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LevelsDialog.cpp" line="183"/>
+        <location filename="../src/LevelsDialog.cpp" line="193"/>
         <source>Name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LevelsDialog.cpp" line="183"/>
+        <location filename="../src/LevelsDialog.cpp" line="193"/>
         <source>Elevation (%1)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LevelsDialog.cpp" line="183"/>
+        <location filename="../src/LevelsDialog.cpp" line="193"/>
         <source>Height to next (%1)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LevelsDialog.cpp" line="184"/>
+        <location filename="../src/LevelsDialog.cpp" line="194"/>
         <source>Show in level list</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LevelsDialog.cpp" line="184"/>
+        <location filename="../src/LevelsDialog.cpp" line="194"/>
         <source>Elements</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LevelsDialog.cpp" line="193"/>
+        <location filename="../src/LevelsDialog.cpp" line="203"/>
         <source>Highest level first. A new elevation moves that level and its elements; a new height to next moves every level above. Changes apply on OK, as one undo step.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LevelsDialog.cpp" line="198"/>
+        <location filename="../src/LevelsDialog.cpp" line="208"/>
         <source>Moving a level&apos;s elevation also moves the levels above it</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LevelsDialog.cpp" line="204"/>
+        <location filename="../src/LevelsDialog.cpp" line="214"/>
+        <source>Insert between the levels around the new level (fit between)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/LevelsDialog.cpp" line="217"/>
+        <source>Off: the levels above make room (Archicad)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/LevelsDialog.cpp" line="221"/>
         <source>Insert &amp;above</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LevelsDialog.cpp" line="206"/>
+        <location filename="../src/LevelsDialog.cpp" line="223"/>
         <source>Insert &amp;below</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LevelsDialog.cpp" line="208"/>
+        <location filename="../src/LevelsDialog.cpp" line="225"/>
         <source>&amp;Delete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LevelsDialog.cpp" line="281"/>
+        <location filename="../src/LevelsDialog.cpp" line="298"/>
         <source>new</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LevelsDialog.cpp" line="325"/>
-        <location filename="../src/LevelsDialog.cpp" line="333"/>
+        <location filename="../src/LevelsDialog.cpp" line="342"/>
+        <location filename="../src/LevelsDialog.cpp" line="350"/>
         <source>Level %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LevelsDialog.cpp" line="353"/>
+        <location filename="../src/LevelsDialog.cpp" line="370"/>
         <source>Delete level</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/LevelsDialog.cpp" line="354"/>
+        <location filename="../src/LevelsDialog.cpp" line="371"/>
         <source>%1 has %n element(s) on it.</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -2088,17 +2098,17 @@ Enter runs, Shift+Enter adds a line, Up/Down recall earlier input</source>
         </translation>
     </message>
     <message>
-        <location filename="../src/LevelsDialog.cpp" line="355"/>
+        <location filename="../src/LevelsDialog.cpp" line="372"/>
         <source>Delete them with the level, or move them to another level where they are?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LevelsDialog.cpp" line="356"/>
+        <location filename="../src/LevelsDialog.cpp" line="373"/>
         <source>Delete the elements too</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LevelsDialog.cpp" line="358"/>
+        <location filename="../src/LevelsDialog.cpp" line="375"/>
         <source>Move them to %1</source>
         <translation type="unfinished"></translation>
     </message>

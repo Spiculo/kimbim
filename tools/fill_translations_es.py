@@ -1274,6 +1274,8 @@ ES = {
     'Keep the imported shape and cut it': 'Mantener la forma importada y recortarla',
     "Splitting a wall imported from another program: rebuild it (so it edits and joins like one drawn here) or keep the other program's body and cut it": 'Al dividir un muro importado de otro programa: reconstruirlo (para que se edite y una como uno dibujado aquí) o mantener el cuerpo del otro programa y recortarlo',
     'Imported walls:': 'Muros importados:',
+    'Insert between the levels around the new level (fit between)': 'Insertar entre los niveles que rodean el nuevo nivel (encajar entre)',
+    'Off: the levels above make room (Archicad)': 'Desactivado: los niveles superiores hacen sitio (Archicad)',
     'Flag partly overlapping elements as duplicates': 'Marcar los elementos que se solapan parcialmente como duplicados',
     'Model checks: also report same-type elements that overlap by half or more without being exactly in the same place': 'Comprobaciones del modelo: informar también de elementos del mismo tipo que se solapan en la mitad o más sin estar exactamente en el mismo lugar',
 }

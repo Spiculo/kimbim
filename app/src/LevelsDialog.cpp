@@ -88,6 +88,11 @@ int LevelsTable::insertAbove(int i, const QString& name)
         return 0;
     }
     i = std::clamp(i, 0, count() - 1);
+    if (m_fitBetween && i + 1 < count()) { // D92 (Revit): the middle of the gap; nothing else moves
+        const double at = (m_rows[i].elevation + m_rows[i + 1].elevation) / 2;
+        m_rows.insert(i + 1, Row{QString(), name, at, true, 0, m_nextKey++});
+        return i + 1;
+    }
     const double h = heightToNext(i) > 0 ? heightToNext(i) : kDefaultHeight;
     for (int j = i + 1; j < count(); ++j)
         m_rows[j].elevation += h;
@@ -100,6 +105,11 @@ int LevelsTable::insertBelow(int i, const QString& name)
     if (count() == 0)
         return insertAbove(0, name);
     i = std::clamp(i, 0, count() - 1);
+    if (m_fitBetween && i > 0) { // D92 (Revit): the middle of the gap below; nothing else moves
+        const double at = (m_rows[i - 1].elevation + m_rows[i].elevation) / 2;
+        m_rows.insert(i, Row{QString(), name, at, true, 0, m_nextKey++});
+        return i;
+    }
     const double h = heightToNext(i) > 0 ? heightToNext(i) : kDefaultHeight;
     const double at = m_rows[i].elevation;
     for (int j = i; j < count(); ++j)
@@ -200,6 +210,13 @@ LevelsDialog::LevelsDialog(const QJsonArray& levels, const QString& unit, double
     m_moveAboveChk->setChecked(m_table.moveAbove());
     connect(m_moveAboveChk, &QCheckBox::toggled, this, [this](bool on) { m_table.setMoveAbove(on); });
     layout->addWidget(m_moveAboveChk);
+    // D92 (Revit): a level inserted by the buttons below goes in the middle of the gap it falls in.
+    m_fitBetweenChk = new QCheckBox(tr("Insert between the levels around the new level (fit between)"), this);
+    m_fitBetweenChk->setObjectName(QStringLiteral("fitBetween"));
+    m_fitBetweenChk->setChecked(m_table.fitBetween());
+    m_fitBetweenChk->setToolTip(tr("Off: the levels above make room (Archicad)"));
+    connect(m_fitBetweenChk, &QCheckBox::toggled, this, [this](bool on) { m_table.setFitBetween(on); });
+    layout->addWidget(m_fitBetweenChk);
     auto* row = new QHBoxLayout;
     auto* above = new QPushButton(tr("Insert &above"), this);
     above->setObjectName(QStringLiteral("insertAbove"));

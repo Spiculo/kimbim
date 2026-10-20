@@ -58,6 +58,10 @@ public:
     // behaviour is to move only that level and its elements).
     void setMoveAbove(bool on) { m_moveAbove = on; }
     bool moveAbove() const { return m_moveAbove; }
+    // D92 (Revit): a level inserted between two others goes in the middle of the gap and the
+    // levels around it stay; off (Archicad) the levels above make room.
+    void setFitBetween(bool on) { m_fitBetween = on; }
+    bool fitBetween() const { return m_fitBetween; }
 
 private:
     void sort();
@@ -65,6 +69,7 @@ private:
     QVector<Row> m_rows, m_original;
     QVector<Deleted> m_deleted;
     bool m_moveAbove = false;
+    bool m_fitBetween = false;
 };
 
 // Model > Levels... (and the level drop-down's menu): the table, edited in place.
@@ -93,6 +98,7 @@ private:
     QTableWidget* m_grid;
     QPushButton* m_delete;
     QCheckBox* m_moveAboveChk; // D92
+    QCheckBox* m_fitBetweenChk; // D92
     QString m_unit;
     double m_factor;
     int m_decimals;
