@@ -25,6 +25,7 @@ private:
     QComboBox* m_paper;
     QComboBox* m_unit;
     QSpinBox* m_decimals;
+    QComboBox* m_ifcStatus;
 };
 
 } // namespace kimbim

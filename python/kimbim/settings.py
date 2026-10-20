@@ -33,6 +33,7 @@ DEFAULTS = {
     "current_pen": 23,
     "sheet_purposes": {},
     "status_for_new": "new",
+    "ifc_status_default": "existing",  # D91: the status offered for unmarked elements of an opened IFC
     "schedules": {},  # schedule schemes by id: the project's own and its edited built-ins (D77)
     "selection_criteria": {},
     "selection_sets": {},
@@ -128,8 +129,10 @@ def _error(key: str, value) -> str | None:
         return "decimals must be between 0 and 4"
     if key in ("hidden_layers", "locked_layers") and not (isinstance(value, list) and all(isinstance(x, str) for x in value)):
         return f"{key} must be a list of layer names"
-    if key == "status_for_new" and value not in ("existing", "demolish", "new"):
+    if key == "status_for_new" and value not in ("existing", "demolish", "new", "temporary", "auxiliary"):
         return f"unknown renovation status {value}"
+    if key == "ifc_status_default" and value not in ("existing", "demolish", "leave"):
+        return f"unknown default for unmarked elements {value}"
     if key == "schedules":  # schedule schemes by id (D77)
         from .schedules import table_error
 

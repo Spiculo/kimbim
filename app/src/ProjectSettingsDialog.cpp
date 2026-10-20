@@ -49,6 +49,14 @@ ProjectSettingsDialog::ProjectSettingsDialog(const QJsonObject& settings, bool k
     m_decimals->setRange(0, 4);
     m_decimals->setValue(settings.value("length_decimals").toInt(2));
     form->addRow(tr("Decimals:"), m_decimals);
+    // D91: which status an opened IFC offers for its unmarked elements (default Existing).
+    m_ifcStatus = new QComboBox(this);
+    m_ifcStatus->setObjectName(QStringLiteral("ifcStatusDefault"));
+    m_ifcStatus->addItem(tr("Existing"), QStringLiteral("existing"));
+    m_ifcStatus->addItem(tr("To be demolished"), QStringLiteral("demolish"));
+    m_ifcStatus->addItem(tr("Leave them (they count as New)"), QStringLiteral("leave"));
+    m_ifcStatus->setCurrentIndex(std::max(0, m_ifcStatus->findData(settings.value("ifc_status_default").toString(QStringLiteral("existing")))));
+    form->addRow(tr("Unmarked elements in an opened IFC:"), m_ifcStatus);
     layout->addLayout(form);
     auto* note = new QLabel(tr("These settings aren't kept with a plain IFC file. Save as .kim to keep them."), this);
     note->setObjectName(QStringLiteral("notKeptNote"));
@@ -74,6 +82,8 @@ QJsonObject ProjectSettingsDialog::changes() const
         out.insert("length_unit", m_unit->currentText());
     if (m_decimals->value() != m_settings.value("length_decimals").toInt(2))
         out.insert("length_decimals", m_decimals->value());
+    if (m_ifcStatus->currentData().toString() != m_settings.value("ifc_status_default").toString(QStringLiteral("existing")))
+        out.insert("ifc_status_default", m_ifcStatus->currentData().toString());
     return out;
 }
 

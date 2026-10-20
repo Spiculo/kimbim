@@ -2206,11 +2206,15 @@ private slots:
     void projectSettingsDialogReportsOnlyChanges()
     {
         kimbim::ProjectSettingsDialog d({{"plan_cut_height", 1.2}, {"drawing_scale", 100}, {"sheet_paper", "A1"},
-                                         {"length_unit", "m"}, {"length_decimals", 2}}, /*kept=*/false, nullptr);
+                                         {"length_unit", "m"}, {"length_decimals", 2},
+                                         {"ifc_status_default", "existing"}}, /*kept=*/false, nullptr);
         QVERIFY(d.findChild<QLabel*>("notKeptNote")->isVisibleTo(&d));
         d.findChild<QComboBox*>("sheetPaper")->setCurrentText("A3");
         d.findChild<QSpinBox*>("drawingScale")->setValue(50);
-        QCOMPARE(d.changes(), QJsonObject({{"sheet_paper", "A3"}, {"drawing_scale", 50}}));
+        auto* ifcStatus = d.findChild<QComboBox*>("ifcStatusDefault");
+        QCOMPARE(ifcStatus->currentData().toString(), QStringLiteral("existing")); // D91 default
+        ifcStatus->setCurrentIndex(1); // To be demolished
+        QCOMPARE(d.changes(), QJsonObject({{"sheet_paper", "A3"}, {"drawing_scale", 50}, {"ifc_status_default", "demolish"}}));
     }
 
     // D72: an IFC edited directly keeps no settings, so showing or hiding a layer isn't unsaved work.

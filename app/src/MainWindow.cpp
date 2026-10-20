@@ -3444,6 +3444,8 @@ void MainWindow::askImportStatus()
     const int count = bridge("unmarked").value("count").toInt();
     if (count == 0)
         return;
+    // D91: the project's default for unmarked elements (Existing) is the offered answer.
+    const QString fallback = m_settings.value("ifc_status_default").toString(QStringLiteral("existing"));
     QString answer = m_importStatusAnswer;
     if (!m_quiet) {
         QMessageBox box(QMessageBox::Question, tr("Renovation status"),
@@ -3451,7 +3453,9 @@ void MainWindow::askImportStatus()
         QPushButton* existing = box.addButton(renovationLabel(QStringLiteral("existing")), QMessageBox::AcceptRole);
         QPushButton* demolish = box.addButton(renovationLabel(QStringLiteral("demolish")), QMessageBox::AcceptRole);
         QPushButton* leave = box.addButton(tr("Leave them (they count as New)"), QMessageBox::RejectRole);
-        box.setDefaultButton(leave);
+        box.setDefaultButton(fallback == QLatin1String("demolish") ? demolish
+                             : fallback == QLatin1String("existing") ? existing
+                                                                      : leave);
         box.setEscapeButton(leave);
         auto* again = new QCheckBox(tr("Don't ask again"), &box);
         box.setCheckBox(again);
