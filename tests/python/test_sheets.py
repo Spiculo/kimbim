@@ -274,3 +274,39 @@ def test_legends_are_not_drawings(house):
     assert call("place_legend", number)["ok"]
     sheet = _sheet_of(number)
     assert sheet["views"] == [] and len(sheet["legends"]) == 1
+
+
+def test_the_title_block_is_moved_and_its_fields_edited(house):
+    number = call("add_sheet", "A3", "Plans")["number"]
+    tb = _sheet_of(number)["title_block"]
+    assert (tb["w"], tb["h"]) == (180, 50)
+    assert (tb["x"], tb["y"]) == (420 - 10 - 180, 297 - 10 - 50)
+    assert tb["fields"]["title"] == "Plans" and tb["fields"]["sheet_number"] == number
+    assert call("move_title_block", number, 30, 40)["ok"]
+    assert (_sheet_of(number)["title_block"]["x"], _sheet_of(number)["title_block"]["y"]) == (30, 40)
+    fields = {"project": "Casa Lecot", "project_number": "2026-014", "client": "Familia Lecot",
+              "title": "Planta baja", "date": "2026-10-20", "issued": "Estudio"}
+    assert call("set_title_block", number, json.dumps({"fields": fields}))["ok"]
+    svg = call("sheet_svg", number)["svg"]
+    for value in fields.values():
+        assert f">{value}<" in svg, value
+    assert 'class="kimbim-title-block"' in svg
+    # Saved with the sheet, not with the project info.
+    assert "Casa Lecot" not in json.dumps(call("project_info"))
+    assert call("undo")["ok"]
+    assert "Planta baja" not in call("sheet_svg", number)["svg"]
+    # A field equal to the derived default is not an override, so project info changes still show.
+    assert call("set_title_block", number, json.dumps({"fields": {"title": "Plans"}}))["ok"]
+    assert call("set_title_block", number, json.dumps({"fields": {"title": ""}}))["ok"]
+    assert ">Plans<" not in call("sheet_svg", number)["svg"]
+
+
+def test_a_title_block_never_overlaps_a_drawing_placed_on_a_free_spot(house):
+    number = call("add_sheet", "A3", "Full")["number"]
+    assert call("move_title_block", number, 0, 0)["ok"]
+    spot = call("place_drawing", number, drawing("Level 1 Floor Plan"), -1, -1, 100)
+    assert spot["ok"], spot
+    (view,) = _sheet_of(number)["views"]
+    tb = _sheet_of(number)["title_block"]
+    assert not (view["x"] < tb["x"] + tb["w"] and tb["x"] < view["x"] + view["w"]
+                and view["y"] < tb["y"] + tb["h"] and tb["y"] < view["y"] + view["h"])

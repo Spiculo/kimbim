@@ -991,6 +991,7 @@ _EXPORTS = {
         "set_drawing_depth",
         "set_drawing_hlr",
         "set_drawing_timeout",
+        "set_view_depth",
     ),
     "sheets": (
         "add_sheet",
@@ -1009,6 +1010,8 @@ _EXPORTS = {
         "place_legend",
         "move_legend",
         "remove_legend",
+        "move_title_block",
+        "set_title_block",
         "place_sheet_symbol",
         "move_sheet_symbol",
         "set_sheet_symbol",
@@ -1063,7 +1066,9 @@ _EXPORTS = {
         "set_storey_shown",
     ),
     "showon": (
+        "set_element_view_depth",
         "set_show_on",
+        "visible_on",
     ),
     "checks": (
         "_write_sample_house",

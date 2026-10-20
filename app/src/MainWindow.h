@@ -290,6 +290,10 @@ public:
     DrawingView* sheetView(const QString& number) const { return m_drawingViews.value(QStringLiteral("sheet:") + number); }
     bool exportSheet(const QString& number, const QString& path); // .pdf or .svg
     bool setProjectInfo(const QJsonObject& info);
+    // D91: the sheet's title block, moved and its fields edited (saved with the sheet).
+    QJsonObject titleBlock(const QString& number);
+    bool setTitleBlock(const QString& number, const QJsonObject& changes);
+    void editTitleBlock(const QString& number);
     // How many elements the last generation sent to the serializer (-1: all, no visible pass).
     int lastDrawingVisibleCount() const { return m_lastDrawingVisible; }
     // Milliseconds the last drawing's visible-element pass spent on the GUI thread (before the worker).

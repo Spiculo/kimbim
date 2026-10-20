@@ -157,12 +157,13 @@ void DrawingView::contextMenuEvent(QContextMenuEvent* event)
             const QString guid = m_placed[i].guid;
             const QString kind = m_placed[i].kind;
             QMenu menu(this);
-            QAction* edit = kind == QLatin1String("text") ? menu.addAction(tr("Edit text...")) : nullptr;
-            QAction* remove = menu.addAction(tr("Remove from sheet"));
+            QAction* edit = kind == QLatin1String("text") ? menu.addAction(tr("Edit text..."))
+                : kind == QLatin1String("titleblock") ? menu.addAction(tr("Edit title block...")) : nullptr;
+            QAction* remove = kind == QLatin1String("titleblock") ? nullptr : menu.addAction(tr("Remove from sheet"));
             QAction* chosen = menu.exec(event->globalPos());
             if (chosen && chosen == edit)
                 emit placedEditRequested(guid);
-            else if (chosen == remove)
+            else if (chosen && chosen == remove)
                 emit placedRemoveRequested(guid);
             return;
         }

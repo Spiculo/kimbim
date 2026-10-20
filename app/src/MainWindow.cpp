@@ -4112,16 +4112,23 @@ bool MainWindow::openSheet(const QString& number)
     auto* view = new DrawingView(key);
     connect(view, &DrawingView::regenerateRequested, this, &MainWindow::regenerateDrawing);
     connect(view, &DrawingView::placedMoved, this, [this, number](const QString& drawing, QPointF topLeft) {
+        const bool titleBlock = drawing == QLatin1String("titleblock");
         const bool legend = drawing.startsWith(QLatin1String("legend:"));
         const bool symbol = drawing.startsWith(QLatin1String("symbol:")); // D87
-        const QJsonObject r = bridge(symbol ? "move_sheet_symbol" : legend ? "move_legend" : "move_placed",
-            {number, legend || symbol ? drawing.mid(7) : drawing,
-            QString::number(topLeft.x(), 'f', 1), QString::number(topLeft.y(), 'f', 1)});
+        const QJsonObject r = titleBlock
+            ? bridge("move_title_block", {number, QString::number(topLeft.x(), 'f', 1), QString::number(topLeft.y(), 'f', 1)})
+            : bridge(symbol ? "move_sheet_symbol" : legend ? "move_legend" : "move_placed",
+                {number, legend || symbol ? drawing.mid(7) : drawing,
+                QString::number(topLeft.x(), 'f', 1), QString::number(topLeft.y(), 'f', 1)});
         if (!r.value("ok").toBool())
             m_status->showMessage(tr("Could not move it: %1").arg(r.value("error").toString()));
         afterEdit(r);
+        if (titleBlock)
+            refreshSheets(true);
     });
     connect(view, &DrawingView::placedRemoveRequested, this, [this, number](const QString& drawing) {
+        if (drawing == QLatin1String("titleblock"))
+            return; // the title block belongs to the sheet: it can be moved, not removed
         const bool legend = drawing.startsWith(QLatin1String("legend:"));
         const bool symbol = drawing.startsWith(QLatin1String("symbol:")); // D87
         const QJsonObject r = bridge(symbol ? "remove_sheet_symbol" : legend ? "remove_legend" : "remove_placed",
@@ -4131,6 +4138,10 @@ bool MainWindow::openSheet(const QString& number)
         afterEdit(r);
     });
     connect(view, &DrawingView::placedEditRequested, this, [this, number](const QString& drawing) {
+        if (drawing == QLatin1String("titleblock")) {
+            editTitleBlock(number);
+            return;
+        }
         if (!drawing.startsWith(QLatin1String("symbol:")))
             return;
         bool ok = false;
@@ -4148,6 +4159,7 @@ bool MainWindow::openSheet(const QString& number)
     view->setStale(true);
     m_dock->addView(key, tr("Sheet %1").arg(number), view, true, newViewPlacement());
     m_dock->raise(key);
+    refreshSheets(false); // the title block and whatever is already placed can be dragged at once
     if (!m_generating.contains(key) && !view->hasDrawing())
         regenerateDrawing(key);
     return true;
@@ -4186,6 +4198,11 @@ void MainWindow::refreshSheets(bool changed)
                 QRectF(l.value("x").toDouble(), l.value("y").toDouble(), l.value("w").toDouble(), l.value("h").toDouble()),
                 l.value("kind").toString()});
         }
+        const QJsonObject tb = it->value("title_block").toObject(); // D91: dragged and its fields edited
+        if (!tb.isEmpty())
+            placed.push_back({QStringLiteral("titleblock"),
+                QRectF(tb.value("x").toDouble(), tb.value("y").toDouble(), tb.value("w").toDouble(), tb.value("h").toDouble()),
+                QStringLiteral("titleblock")});
         view->setPlaced(placed);
         m_dock->setTitle(key, tr("Sheet %1").arg(it->value("number").toString()));
         if (changed && !m_generating.contains(view->guid()) && view->hasDrawing()) {
@@ -4238,6 +4255,66 @@ bool MainWindow::setProjectInfo(const QJsonObject& info)
         showError(tr("Could not change the project info"), r.value("error").toString());
     afterEdit(r);
     return r.value("ok").toBool();
+}
+
+QJsonObject MainWindow::titleBlock(const QString& number)
+{
+    for (const auto& s : bridge("sheets").value("sheets").toArray())
+        if (s.toObject().value("number").toString() == number)
+            return s.toObject().value("title_block").toObject();
+    return {};
+}
+
+bool MainWindow::setTitleBlock(const QString& number, const QJsonObject& changes)
+{
+    const QJsonObject r = bridge("set_title_block",
+        {number, QString::fromUtf8(QJsonDocument(changes).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool())
+        showError(tr("Could not change the title block"), r.value("error").toString());
+    afterEdit(r);
+    refreshSheets(true);
+    return r.value("ok").toBool();
+}
+
+void MainWindow::editTitleBlock(const QString& number)
+{
+    const QJsonObject tb = titleBlock(number);
+    if (tb.isEmpty())
+        return;
+    const QJsonObject values = tb.value("fields").toObject();
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Title block"));
+    auto* form = new QFormLayout;
+    QVector<QPair<QString, QLineEdit*>> fields;
+    const QVector<QPair<QString, QString>> labels = {
+        {QStringLiteral("project"), tr("Project:")},
+        {QStringLiteral("project_number"), tr("Project number:")},
+        {QStringLiteral("client"), tr("Client:")},
+        {QStringLiteral("address"), tr("Address:")},
+        {QStringLiteral("title"), tr("Sheet title:")},
+        {QStringLiteral("sheet_number"), tr("Sheet number:")},
+        {QStringLiteral("scale"), tr("Scale:")},
+        {QStringLiteral("date"), tr("Date:")},
+        {QStringLiteral("issued"), tr("Issued by:")},
+    };
+    for (const auto& [key, label] : labels) {
+        auto* edit = new QLineEdit(values.value(key).toString(), &dialog);
+        edit->setObjectName(QStringLiteral("titleBlockField.") + key);
+        form->addRow(label, edit);
+        fields.push_back({key, edit});
+    }
+    auto* layout = new QVBoxLayout(&dialog);
+    layout->addLayout(form);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    layout->addWidget(buttons);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    QJsonObject edited;
+    for (const auto& [key, edit] : fields)
+        edited.insert(key, edit->text());
+    setTitleBlock(number, QJsonObject{{QStringLiteral("fields"), edited}});
 }
 
 void MainWindow::setRoofKind(const QString& kind, double pitch)
