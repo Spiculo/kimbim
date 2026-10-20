@@ -83,6 +83,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("guid")
     s.add_argument("--rev", default="HEAD")
     s.add_argument("-n", type=int, default=100)
+    s = sub.add_parser("run", help="run a Python script against an IFC model (batch jobs, D92)")
+    s.add_argument("script", help="the Python script to run")
+    s.add_argument("model", help="the IFC model it edits")
+    s.add_argument("-o", "--out", default="", help="write the changed model here (default: the model, in place)")
+    s.add_argument("--select", action="append", default=[], metavar="GLOBALID",
+                   help="elements the script sees as the selection (repeatable)")
     return p
 
 
@@ -92,6 +98,8 @@ def run(args) -> int:
         Project.init(target)
         print(f"Initialized KimBim project in {target.resolve()}")
         return 0
+    if args.cmd == "run":
+        return _run_script(args)
     proj = Project.open(args.project)
     if args.cmd == "commit":
         cid, changes = proj.commit(args.file, args.message)
@@ -171,6 +179,31 @@ def run(args) -> int:
             when = dt.datetime.fromtimestamp(c.time, dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
             first_line = (c.message.strip().splitlines() or [""])[0]
             print(f"{SYMBOL[kind]} {kind:<8}  {c.id[:10]}  {when}  {c.author_name}  {first_line}")
+    return 0
+
+
+def _run_script(args) -> int:
+    """`kimbim run script.py model.ifc` (D92): a headless batch job. The script runs in the console's
+    namespace (ifc, selection(), bridge...) against the model and the changed model is written back."""
+    from . import app_bridge, console
+
+    opened = json.loads(app_bridge.open_model(args.model))
+    if not opened.get("ok"):
+        raise KimbimError(opened.get("error", "could not open the model"))
+    console.reset()
+    result = json.loads(console.console_run_file(args.script, json.dumps(args.select)))
+    if not result.get("ok"):
+        raise KimbimError(result.get("error", "the script could not run"))
+    sys.stdout.write(result.get("output", ""))
+    if result.get("traceback"):
+        print(result["traceback"], file=sys.stderr)
+        return 1
+    if result.get("edited"):
+        out = args.out or args.model
+        saved = json.loads(app_bridge.save(out))
+        if not saved.get("ok"):
+            raise KimbimError(saved.get("error", "could not save the model"))
+        print(f"wrote {out}")
     return 0
 
 

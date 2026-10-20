@@ -316,6 +316,14 @@ def _follow_ups(count, geo_changed, geo_removed) -> tuple:
     return (count, geo_changed, geo_removed)
 
 
+def _end_step_without_change() -> None:
+    """Close a step whose transaction changed nothing and drop it from the history, so a run that made no
+    change leaves no empty undo step (D92)."""
+    _model.end_transaction()
+    _model.undo()
+    _model.future.pop()
+
+
 def _abort(failure: BaseException) -> None:
     """Roll back a half-applied step so the model and the history stay as they were. The caller re-raises."""
     global _base_id, _base_drawing_id, _inconsistent
