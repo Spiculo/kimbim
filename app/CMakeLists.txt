@@ -32,7 +32,7 @@ qt_add_library(kimbim_core STATIC
     src/ModifyTool.cpp src/ModifyTool.h src/ModifyEdits.cpp
     src/DraftTool.cpp src/DraftTool.h src/DraftTools.cpp src/MarkupTools.cpp src/StairTools.cpp
     src/ModelLoader.cpp src/ModelLoader.h
-    src/Cuts.cpp src/Cuts.h
+    src/Cuts.cpp src/Cuts.h src/CutPlanes.cpp src/CutPlanes.h
     src/DrawingsPanel.cpp src/DrawingsPanel.h
     src/DrawingView.cpp src/DrawingView.h
     src/SheetExport.cpp src/SheetExport.h
