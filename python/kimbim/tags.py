@@ -5,9 +5,10 @@ window markers and zone stamps). Same protocol as app_bridge.
 A tag is an IfcAnnotation TAG on its element's level (drawn by kimbim.symbols) assigned to the element
 with an IfcRelAssignsToProduct (IFC's way to say what an annotation annotates; the element's GlobalId
 is also kept in the tag's property set, so a copied tag finds it). Its text comes from a **template**
-such as "{Mark}" or "{Type}\\n{Width}×{Height}": each {field} is one of D77's schedule fields (Name,
-Mark, Type, Level, a quantity such as Area or Width, or Pset.Property); "{Mark|Name}" takes the first
-that has a value. A line whose fields are all empty is left out.
+such as "$mark$" or "$width$×$height$": each $field$ is one of D77's schedule fields (Name, Mark, Type,
+Level, a quantity such as Area, Width or Sill, or Pset.Property); "$mark|name$" takes the first that
+has a value. A line whose fields are all empty is left out. Each style defines its own keys (its
+template).
 
 Tags **follow their element**: after every edit (an AFTER_ACTION hook, inside the same undo step) each
 tag's text is resolved again and, when its element's anchor moved and the tag itself did not, the
@@ -42,17 +43,18 @@ from . import symbols as S
 
 KEY = "tag_styles"
 BUILTIN = {
-    "door": {"name": "Door marker", "classes": ["IfcDoor"], "template": "{Mark}\n{Width}×{Height}", "shape": "none",
+    # D93: the default door and window markers show just the code (Mark).
+    "door": {"name": "Door marker", "classes": ["IfcDoor"], "template": "$mark$", "shape": "none",
              "size": 2.0, "leader": False, "offset": [0.0, -0.5]},
-    "window": {"name": "Window marker", "classes": ["IfcWindow"], "template": "{Mark}\n{Width}×{Height}",
+    "window": {"name": "Window marker", "classes": ["IfcWindow"], "template": "$mark$",
                "shape": "none", "size": 2.0, "leader": False, "offset": [0.0, -0.5]},
-    "wall": {"name": "Wall tag", "classes": ["IfcWall"], "template": "{Type}", "shape": "box", "size": 2.0,
+    "wall": {"name": "Wall tag", "classes": ["IfcWall"], "template": "$type$", "shape": "box", "size": 2.0,
              "leader": False, "offset": [0.0, 0.4]},
-    "room": {"name": "Room stamp", "classes": ["IfcSpace"], "template": "{LongName}\n{Name}\n{Area}", "shape": "none",
+    "room": {"name": "Room stamp", "classes": ["IfcSpace"], "template": "$longname$\n$name$\n$area$", "shape": "none",
              "size": 2.5, "leader": False, "offset": [0.0, 0.0]},
-    "mark": {"name": "Mark", "classes": [], "template": "{Mark}", "shape": "hexagon", "size": 2.5, "leader": True,
+    "mark": {"name": "Mark", "classes": [], "template": "$mark$", "shape": "hexagon", "size": 2.5, "leader": True,
              "offset": [0.6, 0.6]},
-    "label": {"name": "Label", "classes": [], "template": "{Name}", "shape": "none", "size": 2.5, "leader": True,
+    "label": {"name": "Label", "classes": [], "template": "$name$", "shape": "none", "size": 2.5, "leader": True,
               "offset": [0.8, 0.8]},
 }
 AUTO_STYLES = ("door", "window", "wall")  # what Tag all places (rooms have their stamps)
@@ -61,7 +63,7 @@ _ATTRIBUTES = {"name": "Name", "mark": "Tag", "tag": "Tag", "number": "Name", "l
                "description": "Description", "objecttype": "ObjectType", "predefinedtype": "PredefinedType",
                "globalid": "GlobalId"}
 _INFO = {"class": "class", "type": "type", "level": "level"}
-_TOKEN = re.compile(r"\{([^{}]+)\}")
+_TOKEN = re.compile(r"\$([^$]+)\$")
 
 
 # ---------------------------------------------------------------- styles
@@ -123,7 +125,7 @@ def style_for(e, settings: dict | None = None) -> str:
 def effective(extra: dict, settings: dict | None = None) -> dict:
     """A tag's values with its template and shape filled in from its style when it has none of its own."""
     st = styles(settings).get(extra.get("Style") or "label") or BUILTIN["label"]
-    return {**extra, "Template": extra.get("Template") or st.get("template", "{Name}"),
+    return {**extra, "Template": extra.get("Template") or st.get("template", "$name$"),
             "Shape": extra.get("Shape") or st.get("shape", "none")}
 
 
@@ -430,7 +432,7 @@ def add_tag(element_guid: str, options_json: str = "") -> str:
         except (TypeError, ValueError, IndexError):
             return A._fail("bad position")
     template = str(o.get("template") or "")
-    text = text_of(e, template or st.get("template", "{Name}"))
+    text = text_of(e, template or st.get("template", "$name$"))
     made = {}
 
     def action():
@@ -480,7 +482,7 @@ def tag_all(storey_guid: str, guids_json: str = "", style: str = "") -> str:
                 todo.append((e, sid))
     if not todo:
         return B._dump({"ok": True, "changed": 0, "tagged": 0, "guids": []})
-    text = texts([(e, table[sid].get("template", "{Name}")) for e, sid in todo])
+    text = texts([(e, table[sid].get("template", "$name$")) for e, sid in todo])
     made = []
 
     def action():
@@ -489,7 +491,7 @@ def tag_all(storey_guid: str, guids_json: str = "", style: str = "") -> str:
             at, anchor = default_position(e, st)
             if anchor is None:
                 continue
-            made.append(_create(e, sid, st, at, anchor, text[e.GlobalId + "|" + st.get("template", "{Name}")]).GlobalId)
+            made.append(_create(e, sid, st, at, anchor, text[e.GlobalId + "|" + st.get("template", "$name$")]).GlobalId)
         return len(made), list(made), []
 
     r = B._run(action)
