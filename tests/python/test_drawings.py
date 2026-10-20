@@ -286,3 +286,38 @@ def test_drawing_bounds_lists_the_buildings_elements(house):
     assert "IfcAnnotation" not in classes
     assert D._building_cache, "cached for this model state"
     assert call("drawing_bounds")["guids"] == r["guids"]
+
+
+def test_a_plan_view_sees_a_depth_below_the_level(house):
+    from kimbim import drawgen, settings as S
+
+    assert S.DEFAULTS["view_depth"] == 0.5 and S.DEFAULTS["view_depth_levels"] == {}
+    plan = drawings()["Level 1 Floor Plan"]
+    assert plan["view_depth"] == 0.5  # the project default
+    # A view overrides it, then falls back to its level's override, then to the project's.
+    assert call("set_view_depth", plan["guid"], 1.3)["ok"]
+    assert drawing(plan["guid"])["view_depth"] == 1.3
+    assert call("set_project_settings", json.dumps({"view_depth_levels": {house: 0.9}}))["ok"]
+    assert call("set_view_depth", plan["guid"], -1)["ok"]
+    assert drawing(plan["guid"])["view_depth"] == 0.9
+    assert call("set_project_settings", json.dumps({"view_depth": 0.7}))["ok"]
+    assert call("set_project_settings", json.dumps({"view_depth_levels": {}}))["ok"]
+    assert drawing(plan["guid"])["view_depth"] == 0.7
+    # The depth reaches below the level in the camera (cut above + depth below).
+    storey = b._model.by_guid(house)
+    _m, (_w, _h, depth) = drawgen.plan_camera(storey, 1.2, drawgen.EMPTY_BOUNDS, 0.7)
+    assert depth == pytest.approx(1.2 + 0.7)
+
+
+def test_an_element_can_override_the_view_depth_below(house):
+    from kimbim import drawgen
+
+    plan = drawings()["Level 1 Floor Plan"]
+    guid = call("generate_drawing", plan["guid"], "")["svg"]
+    wall = b._model.by_type("IfcWall")[0]
+    assert f'ifc:guid="{wall.GlobalId}"' in guid
+    assert call("set_element_view_depth", json.dumps([wall.GlobalId]), 1.4)["ok"]
+    assert drawgen.element_view_depth(wall) == 1.4
+    assert call("set_element_view_depth", json.dumps([wall.GlobalId]), -1)["ok"]
+    assert drawgen.element_view_depth(wall) is None
+    assert not call("set_element_view_depth", json.dumps([wall.GlobalId]), "deep")["ok"]

@@ -13,7 +13,7 @@ PSET = "KIMBIM_ShowOn"
 DEFAULT = "home"
 
 # The rule parser and resolver live in drawgen (the drawing worker cannot import the package).
-from .drawgen import home_level, shows_on  # noqa: E402,F401  (re-exported for callers and tests)
+from .drawgen import element_view_depth, home_level, shows_on  # noqa: E402,F401  (re-exported)
 
 
 def set_show_on(guids_json: str, rule: str) -> str:
@@ -44,3 +44,68 @@ def set_show_on(guids_json: str, rule: str) -> str:
         return B._dump(B._run(action))
     except Exception as ex:
         return A._fail(f"{type(ex).__name__}: {ex}")
+
+
+def set_element_view_depth(guids_json: str, depth) -> str:
+    """D91: an element's own view depth below (metres); < 0 clears it (the view's applies)."""
+    import ifcopenshell.api.pset
+
+    from . import app_bridge as B
+    from . import authoring as A
+
+    if B._model is None:
+        return A._fail("no model open")
+    try:
+        depth = float(depth)
+    except (TypeError, ValueError):
+        return A._fail("bad depth")
+    if depth > 20:
+        return A._fail("bad depth")
+    try:
+        elements = B._elements(guids_json)
+    except Exception as ex:
+        return A._fail(f"{type(ex).__name__}: {ex}")
+    if not elements:
+        return A._fail("no elements selected")
+
+    def action():
+        for e in elements:
+            data = ifcopenshell.util.element.get_pset(e, PSET, should_inherit=False)
+            pset = e.file.by_id(data["id"]) if data else ifcopenshell.api.pset.add_pset(e.file, product=e, name=PSET)
+            ifcopenshell.api.pset.edit_pset(e.file, pset=pset, properties={"DepthBelow": depth})
+        return len(elements), [e.GlobalId for e in elements], []
+
+    try:
+        return B._dump(B._run(action))
+    except Exception as ex:
+        return A._fail(f"{type(ex).__name__}: {ex}")
+
+
+def visible_on(storey_guid: str) -> str:
+    """D91: the drawn elements a level's plan shows: its show-on rules plus elements below whose
+    own view depth (KIMBIM_ShowOn.DepthBelow) reaches the level. Also returns the deepest such
+    override, so the app's mesh pass can open the camera far enough."""
+    from . import app_bridge as B
+    from . import authoring as A
+    from . import drawgen as G
+
+    if B._model is None:
+        return A._fail("no model open")
+    storey = A._by_guid(storey_guid)
+    if storey is None or not storey.is_a("IfcBuildingStorey"):
+        return A._fail("unknown level")
+    storeys = sorted(B._model.by_type("IfcBuildingStorey"), key=G.storey_elevation)
+    guids, max_depth = [], 0.0
+    for p in G.drawn_products(B._model):
+        if G.shows_on(p, storey, storeys):
+            guids.append(p.GlobalId)
+            continue
+        own = G.element_view_depth(p)
+        home = G.home_level(p)
+        if own is None or home is None:
+            continue
+        max_depth = max(max_depth, own)
+        below = G.storey_elevation(storey) - G.storey_elevation(home)
+        if 0 <= below <= own:
+            guids.append(p.GlobalId)
+    return B._dump({"ok": True, "guids": guids, "max_depth": max_depth})

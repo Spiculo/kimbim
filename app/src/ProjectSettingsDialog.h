@@ -25,6 +25,7 @@ public:
 private:
     QJsonObject m_settings;
     QDoubleSpinBox* m_cut;
+    QDoubleSpinBox* m_viewDepth;
     QComboBox* m_scale;
     QComboBox* m_paper;
     QComboBox* m_unit;

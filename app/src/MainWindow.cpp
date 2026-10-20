@@ -3934,14 +3934,22 @@ void MainWindow::regenerateDrawing(const QString& guid)
             // slow on a detailed storey (measured ~0.5-1.5 s per element).
             const double elevation = d.value("elevation").toDouble();
             const double cut = d.value("cut").toDouble(1.10);
-            const auto seen = m_viewport->visibleFromPlan(bounds, elevation, cut, 0.5);
+            // D91: Revit's view range, plus any object whose own depth below reaches further.
+            const QJsonObject visible = bridge("visible_on", {d.value("storey").toString()});
+            double below = std::max(d.value("view_depth").toDouble(0.5), visible.value("max_depth").toDouble(0.0));
+            const auto seen = m_viewport->visibleFromPlan(bounds, elevation, cut, below);
             if (seen) {
-                planGuids = QStringList(seen->begin(), seen->end());
+                QSet<QString> allowed;
+                for (const auto& g : visible.value("guids").toArray())
+                    allowed.insert(g.toString());
+                for (const QString& g : *seen)
+                    if (allowed.isEmpty() || allowed.contains(g))
+                        planGuids << g;
                 planGuids.sort();
                 include = QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(planGuids)).toJson(QJsonDocument::Compact));
             }
             planCutZ = elevation + cut;
-            planFloorZ = elevation - 0.5;
+            planFloorZ = elevation - below;
             break;
         }
         double x0, y0, z0, x1, y1, z1;

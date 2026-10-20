@@ -30,6 +30,15 @@ ProjectSettingsDialog::ProjectSettingsDialog(const QJsonObject& settings, bool k
     m_cut->setSuffix(QStringLiteral(" m"));
     m_cut->setValue(settings.value("plan_cut_height").toDouble(1.2));
     form->addRow(tr("Plan cut height:"), m_cut);
+    // D91: how far below the level a plan still sees (Revit's view range).
+    m_viewDepth = new QDoubleSpinBox(this);
+    m_viewDepth->setObjectName(QStringLiteral("viewDepth"));
+    m_viewDepth->setRange(0.0, 20.0);
+    m_viewDepth->setDecimals(2);
+    m_viewDepth->setSingleStep(0.05);
+    m_viewDepth->setSuffix(QStringLiteral(" m"));
+    m_viewDepth->setValue(settings.value("view_depth").toDouble(0.5));
+    form->addRow(tr("Plan view depth below:"), m_viewDepth);
     // D93: the built-in scales (1:500, 1:100, 1:50, 1:20) plus the project's own; type a new one.
     m_scale = new QComboBox(this);
     m_scale->setObjectName(QStringLiteral("drawingScale"));
@@ -100,6 +109,8 @@ QJsonObject ProjectSettingsDialog::changes() const
     QJsonObject out;
     if (std::lround(m_cut->value() * 100) != std::lround(m_settings.value("plan_cut_height").toDouble(1.2) * 100))
         out.insert("plan_cut_height", m_cut->value());
+    if (std::lround(m_viewDepth->value() * 100) != std::lround(m_settings.value("view_depth").toDouble(0.5) * 100))
+        out.insert("view_depth", m_viewDepth->value());
     const int scale = m_scale->currentText().toInt();
     if (scale > 0 && scale != m_settings.value("drawing_scale").toInt(100))
         out.insert("drawing_scale", scale);

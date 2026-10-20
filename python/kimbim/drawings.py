@@ -67,6 +67,18 @@ def _drawing(guid: str):
     return d if d is not None and G.is_drawing(d) and G.settings_of(d) is not None else None
 
 
+def resolve_view_depth(storey_guid: str, s: dict) -> float:
+    """D91: the view's own depth below, else its level's, else the project setting."""
+    from . import settings as S
+
+    if s.get("view_depth") is not None:
+        return float(s["view_depth"])
+    levels = S.current().get("view_depth_levels", {})
+    if isinstance(levels, dict) and storey_guid in levels:
+        return float(levels[storey_guid])
+    return float(S.current().get("view_depth", G.PLAN_DEPTH))
+
+
 def drawings() -> str:
     """[{guid, name, kind, depth (metres, null = infinite), auto, points, look, stale}]"""
     out = []
@@ -80,7 +92,8 @@ def drawings() -> str:
             out.append({"guid": d.GlobalId, "name": d.Name or "", "kind": s["kind"], "depth": s["depth"],
                         "auto": s["auto"], "side": s.get("side") or "", "points": s["points"], "look": s["look"],
                         **({"storey": s["storey"], "elevation": round(G.storey_elevation(storey), 6),
-                            "cut": float(s.get("cut", G.PLAN_CUT))} if storey else {}),
+                            "cut": float(s.get("cut", G.PLAN_CUT)),
+                            "view_depth": resolve_view_depth(s["storey"], s)} if storey else {}),
                         "stale": not any(k[:2] == key for k in _cache.get(d.GlobalId, {}))})
         # Archicad's Project Map order: floor plans (by story height), sections, elevations.
         order = {"plan": 0, "section": 1, "elevation": 2}
@@ -278,6 +291,29 @@ def set_drawing_depth(guid: str, depth) -> str:
     return _edit(guid, change)
 
 
+def set_view_depth(guid: str, depth) -> str:
+    """D91: a plan's view depth below its level (metres); < 0 clears the view's own override."""
+    try:
+        depth = float(depth)
+    except (TypeError, ValueError):
+        return A._fail("bad depth")
+    if depth > 20:
+        return A._fail("bad depth")
+
+    def change(d):
+        s = G.settings_of(d)
+        if s is None or s.get("kind") != "plan":
+            raise ValueError("not a plan drawing")
+        s["view_depth"] = None if depth < 0 else depth
+        G.write_settings(B._model, d, s)
+        G.place(B._model, d, s, G.model_bounds(B._model), resolve_view_depth(s["storey"], s))
+
+    try:
+        return _edit(guid, change)
+    except ValueError as ex:
+        return A._fail(str(ex))
+
+
 def rename_drawing(guid: str, name: str) -> str:
     name = (name or "").strip()
     if not name:
@@ -470,7 +506,9 @@ def raw_drawing(guid: str, include_json: str = "", hidden=()) -> dict:
     include_json = _without_hidden(include_json, hidden)
     from . import settings as S
     plan_symbols = bool(S.current().get("plan_symbols", True))
-    key = (*_state_key(), include_json or "", plan_symbols)  # the state, the elements given, D91's choice
+    s = G.settings_of(d)
+    view_depth = resolve_view_depth(s.get("storey", ""), s) if s and s.get("kind") == "plan" else G.PLAN_DEPTH
+    key = (*_state_key(), include_json or "", plan_symbols, view_depth)  # state, elements, D91's choices
     hit = _cache.get(guid, {}).get(key)
     if hit is not None:
         return {"ok": True, "svg": _drafted(hit, d), "cached": True}
@@ -480,7 +518,7 @@ def raw_drawing(guid: str, include_json: str = "", hidden=()) -> dict:
             _stop_worker()
         snapshot = _snapshot()  # written once per state, shared by every drawing at that state
         job = {"drawing": guid, "include": json.loads(include_json) if include_json else None,
-               "bounds": _bounds_json(), "plan_symbols": plan_symbols}
+               "bounds": _bounds_json(), "plan_symbols": plan_symbols, "view_depth": view_depth}
         try:
             result = _worker_generate(snapshot, state, job)
         except Exception:  # the worker could not run: one process, one drawing

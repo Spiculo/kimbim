@@ -244,3 +244,19 @@ def test_clinic_level_edits_timing(tmp_path):
     print("clinic levels:", busiest["elements"], "elements on", busiest["name"],
           {k: round(v, 3) for k, v in timings.items()})
     assert timings["elevation"] < 30
+
+
+def test_an_element_depth_override_shows_it_below(house):
+    from kimbim import drawgen
+
+    s1, s2 = (b._model.by_guid(house[k]) for k in ("l1", "l2"))
+    order = sorted(b._model.by_type("IfcBuildingStorey"), key=drawgen.storey_elevation)
+    wall = b._model.by_guid(house["w1"])
+    assert not drawgen.shows_on(wall, s2, order)  # home only
+    assert call("set_element_view_depth", json.dumps([house["w1"]]), 4.0)["ok"]
+    assert drawgen.shows_in_view(wall, s2, order)
+    assert house["w1"] in call("visible_on", house["l2"])["guids"]
+    assert call("visible_on", house["l2"])["max_depth"] == 4.0
+    assert call("set_element_view_depth", json.dumps([house["w1"]]), 2.0)["ok"]  # 3 m below: out of reach
+    assert not drawgen.shows_in_view(wall, s2, order)
+    assert house["w1"] not in call("visible_on", house["l2"])["guids"]

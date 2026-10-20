@@ -40,6 +40,7 @@ PSET = "KIMBIM_Drawing"
 KINDS = ("section", "elevation", "plan")
 TARGET_VIEW = {"section": "SECTION_VIEW", "elevation": "ELEVATION_VIEW", "plan": "PLAN_VIEW"}
 PLAN_CUT = 1.10  # metres above the story: Archicad's default floor plan cut plane
+PLAN_DEPTH = 0.5  # metres below the story a plan still sees (D91: Revit's view range)
 TEXT_SIZE = 2.5  # millimetres on paper, the default for annotation text
 ANNOTATION_PSET = "KIMBIM_Annotation"
 SCALE = 100  # 1:100 until drawings get a scale setting
@@ -211,8 +212,10 @@ def settings_of(drawing) -> dict | None:
     if data.get("Kind") not in KINDS:
         return None
     if data["Kind"] == "plan":
+        depth = data.get("ViewDepth")
         return {"kind": "plan", "points": [], "look": [], "depth": None, "auto": True, "side": "",
-                "storey": data.get("Storey") or "", "cut": float(data.get("Cut") or PLAN_CUT)}
+                "storey": data.get("Storey") or "", "cut": float(data.get("Cut") or PLAN_CUT),
+                "view_depth": None if depth is None or depth < 0 else float(depth)}
     points, look = marker(drawing) or ([], [])
     depth = data.get("Depth")
     return {"kind": data["Kind"], "points": points, "look": look,
@@ -252,14 +255,14 @@ def storey_elevation(storey) -> float:
     return float(storey.Elevation or 0.0) * unit
 
 
-def plan_camera(storey, cut, bounds):
-    """A floor plan (Archicad): looking down from the cut plane, `cut` metres above the story, to just
-    below its floor, over the whole model's extent."""
+def plan_camera(storey, cut, bounds, depth_below=PLAN_DEPTH):
+    """A floor plan (Archicad): looking down from the cut plane, `cut` metres above the story, and
+    `depth_below` metres below it (D91: Revit's view range), over the whole model's extent."""
     lo, hi = bounds
     z = storey_elevation(storey)
     m = np.eye(4)
     m[:3, 3] = [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, z + cut]
-    return m, (hi[0] - lo[0] + 2 * MARGIN, hi[1] - lo[1] + 2 * MARGIN, cut + 0.3)
+    return m, (hi[0] - lo[0] + 2 * MARGIN, hi[1] - lo[1] + 2 * MARGIN, cut + max(0.0, float(depth_below)))
 
 
 def _storey(drawing, s):
@@ -269,7 +272,7 @@ def _storey(drawing, s):
         return None
 
 
-def place(f, drawing, s, bounds):
+def place(f, drawing, s, bounds, view_depth=PLAN_DEPTH):
     """Write the camera placement and box of `drawing` from its marker settings `s`."""
     unit = ifcopenshell.util.unit.calculate_unit_scale(f)
     if s["auto"] and s.get("side"):
@@ -278,7 +281,7 @@ def place(f, drawing, s, bounds):
         storey = _storey(drawing, s)
         if storey is None:
             raise ValueError("the drawing's story no longer exists")
-        m, (w, h, d) = plan_camera(storey, s["cut"], bounds)
+        m, (w, h, d) = plan_camera(storey, s["cut"], bounds, view_depth)
     else:
         m, (w, h, d) = camera(s["points"], s["look"], bounds, s["depth"])
     ifcopenshell.api.geometry.edit_object_placement(f, product=drawing, matrix=m, is_si=True)
@@ -304,7 +307,9 @@ def write_settings(f, drawing, s):
     ifcopenshell.api.pset.edit_pset(f, pset=pset, properties={
         "Kind": s["kind"], "Depth": -1.0 if s["depth"] is None else float(s["depth"]), "Auto": bool(s["auto"]),
         **({"Side": s["side"]} if s.get("side") else {}),
-        **({"Storey": s["storey"], "Cut": float(s["cut"])} if s["kind"] == "plan" else {})})
+        **({"Storey": s["storey"], "Cut": float(s["cut"]),
+            "ViewDepth": -1.0 if s.get("view_depth") is None else float(s["view_depth"])}
+           if s["kind"] == "plan" else {})})
     epset = ifcopenshell.util.element.get_pset(drawing, "EPset_Drawing")
     epset = f.by_id(epset["id"]) if epset else ifcopenshell.api.pset.add_pset(f, product=drawing, name="EPset_Drawing")
     ifcopenshell.api.pset.edit_pset(f, pset=epset, properties={
@@ -843,6 +848,17 @@ def object_symbols(storey, to_paper, include=None, plan_symbols: bool = True) ->
 SHOW_ON_PSET = "KIMBIM_ShowOn"  # D91: which levels an element shows on
 
 
+def element_view_depth(element):
+    """D91: an element's own view depth below, or None (the view's depth applies)."""
+    data = ifcopenshell.util.element.get_pset(element, SHOW_ON_PSET, should_inherit=False) or {}
+    value = data.get("DepthBelow")
+    try:
+        depth = float(value)
+    except (TypeError, ValueError):
+        return None
+    return depth if depth >= 0 else None
+
+
 def show_on_rule(element) -> str:
     """The element's show-on rule, or "home" (only its own level)."""
     data = ifcopenshell.util.element.get_pset(element, SHOW_ON_PSET, should_inherit=False) or {}
@@ -888,6 +904,19 @@ def shows_on(element, storey, storeys) -> bool:
     if home.GlobalId not in order or storey.GlobalId not in order:
         return home.GlobalId == storey.GlobalId
     return _show_on_matches(show_on_rule(element), order.index(storey.GlobalId) - order.index(home.GlobalId))
+
+
+def shows_in_view(element, storey, storeys, view_depth=PLAN_DEPTH) -> bool:
+    """D91: a plan shows an element by its level rule, or below the level within the element's own
+    view depth (KIMBIM_ShowOn.DepthBelow), which overrides the view's depth for that element."""
+    if shows_on(element, storey, storeys):
+        return True
+    own = element_view_depth(element)
+    home = home_level(element)
+    if own is None or home is None:
+        return False
+    below = storey_elevation(storey) - storey_elevation(home)
+    return 0 <= below <= own
 
 
 def _tagged(kind: str, parts: list) -> list:
@@ -950,7 +979,8 @@ def crop(svg: str, margin: float = 5.0) -> str:
                   svg, count=1)
 
 
-def generate(f, drawing, include=None, bounds=None, plan_symbols: bool = True) -> tuple[str, dict]:
+def generate(f, drawing, include=None, bounds=None, plan_symbols: bool = True,
+             view_depth: float = PLAN_DEPTH) -> tuple[str, dict]:
     """SVG of `drawing` (paper millimetres). `f` may be changed (a snapshot): infinite ranges and
     template elevations are re-fitted to the model first. `include`: GlobalIds of the elements to
     draw (the visible ones); default all drawn elements. `bounds`: the model's (lo, hi) in metres,
@@ -958,16 +988,19 @@ def generate(f, drawing, include=None, bounds=None, plan_symbols: bool = True) -
     where the full model is not present, so the caller passes the bounds)."""
     t0 = time.perf_counter()
     s = settings_of(drawing)
+    products = drawn_products(f)
+    if s is not None and s["kind"] == "plan":
+        # D91: an object's own depth below may reach further than the view's: open the camera for it.
+        view_depth = max([view_depth, *(d for d in (element_view_depth(p) for p in products) if d is not None)])
     if s is not None:
         if s["auto"] or s["depth"] is None:
-            place(f, drawing, s, bounds if bounds is not None else model_bounds(f))
-    products = drawn_products(f)
+            place(f, drawing, s, bounds if bounds is not None else model_bounds(f), view_depth)
     if s is not None and s["kind"] == "plan":
         storey = _storey(drawing, s)
         symbols = symbol_objects(f, plan_symbols)  # D86: drawn from their plan symbol (overlay), not cut
         # D91: an element shows on its own level by default; a rule widens that (one up, all, a range).
         storeys = sorted(f.by_type("IfcBuildingStorey"), key=storey_elevation) if storey is not None else []
-        products = [p for p in products if (storey is not None and shows_on(p, storey, storeys))
+        products = [p for p in products if (storey is not None and shows_in_view(p, storey, storeys, view_depth))
                     and p.GlobalId not in symbols]
     if include is not None:
         wanted = set(include)
@@ -1023,7 +1056,8 @@ def _one(f, job) -> dict:
     try:
         drawing = f.by_guid(job["drawing"])
         svg, timing = _with_big_stack(lambda: generate(f, drawing, job.get("include"), _bounds_of(job),
-                                                       bool(job.get("plan_symbols", True))))
+                                                       bool(job.get("plan_symbols", True)),
+                                                       float(job.get("view_depth", PLAN_DEPTH))))
         return {"ok": True, "svg": svg, "timing": timing}
     except Exception as ex:  # report, never a traceback on the app's console
         return {"ok": False, "error": f"{type(ex).__name__}: {ex}"}
