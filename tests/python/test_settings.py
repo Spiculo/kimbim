@@ -31,7 +31,8 @@ def test_bad_values_are_refused_and_change_nothing():
     assert call("new_project", "x")["ok"]
     for bad in ({"plan_cut_height": -1}, {"drawing_scale": 0}, {"sheet_paper": "B5"}, {"length_unit": "ft"},
                 {"length_decimals": 9}, {"hidden_layers": "A-WALL"}, {"area_unit": "ft²"},
-                {"angle_decimals": 9}, {"orphan_tags": "x"}):
+                {"angle_decimals": 9}, {"orphan_tags": "x"}, {"level_reference": "datum"},
+                {"sea_level": "high"}, {"north_arrow_style": "star"}, {"scale_bar_style": "zigzag"}):
         r = call("set_project_settings", json.dumps(bad))
         assert not r["ok"], bad
     assert call("project_settings")["settings"] == S.DEFAULTS and call("state")["dirty"] is False

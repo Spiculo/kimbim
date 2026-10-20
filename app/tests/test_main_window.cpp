@@ -2219,9 +2219,17 @@ private slots:
         kimbim::ProjectSettingsDialog d({{"plan_cut_height", 1.2}, {"drawing_scale", 100}, {"sheet_paper", "A1"},
                                          {"length_unit", "m"}, {"length_decimals", 2}}, /*kept=*/false, nullptr);
         QVERIFY(d.findChild<QLabel*>("notKeptNote")->isVisibleTo(&d));
+        auto* reference = d.findChild<QComboBox*>("levelReference"); // D92
+        auto* sea = d.findChild<QDoubleSpinBox*>("seaLevel");
+        QVERIFY(reference && sea);
+        QVERIFY(!sea->isEnabled()); // the datum only matters for the sea-level reference
         d.findChild<QComboBox*>("sheetPaper")->setCurrentText("A3");
         d.findChild<QSpinBox*>("drawingScale")->setValue(50);
-        QCOMPARE(d.changes(), QJsonObject({{"sheet_paper", "A3"}, {"drawing_scale", 50}}));
+        reference->setCurrentIndex(reference->findData("sea"));
+        QVERIFY(sea->isEnabled());
+        sea->setValue(120.5);
+        QCOMPARE(d.changes(), QJsonObject({{"sheet_paper", "A3"}, {"drawing_scale", 50},
+                                           {"level_reference", "sea"}, {"sea_level", 120.5}}));
     }
 
     // D72: an IFC edited directly keeps no settings, so showing or hiding a layer isn't unsaved work.

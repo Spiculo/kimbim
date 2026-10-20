@@ -50,6 +50,44 @@ ProjectSettingsDialog::ProjectSettingsDialog(const QJsonObject& settings, bool k
     m_areaUnit->addItems({QStringLiteral("m²"), QStringLiteral("cm²"), QStringLiteral("mm²")});
     m_areaUnit->setCurrentText(settings.value("area_unit").toString(QStringLiteral("m²")));
     form->addRow(tr("Areas in:"), m_areaUnit);
+    m_levelReference = new QComboBox(this); // D92
+    m_levelReference->setObjectName(QStringLiteral("levelReference"));
+    m_levelReference->addItem(tr("Project zero"), QStringLiteral("project"));
+    m_levelReference->addItem(tr("The level it is on"), QStringLiteral("level"));
+    m_levelReference->addItem(tr("Sea level"), QStringLiteral("sea"));
+    m_levelReference->setCurrentIndex(std::max(0, m_levelReference->findData(
+        settings.value("level_reference").toString(QStringLiteral("project")))));
+    m_levelReference->setToolTip(tr("What level and spot dimensions measure from"));
+    form->addRow(tr("Level dimensions from:"), m_levelReference);
+    m_seaLevel = new QDoubleSpinBox(this); // D92: the datum the sea-level reference needs
+    m_seaLevel->setObjectName(QStringLiteral("seaLevel"));
+    m_seaLevel->setRange(-10000.0, 10000.0);
+    m_seaLevel->setDecimals(2);
+    m_seaLevel->setSingleStep(0.5);
+    m_seaLevel->setSuffix(QStringLiteral(" m"));
+    m_seaLevel->setValue(settings.value("sea_level").toDouble(0.0));
+    m_seaLevel->setToolTip(tr("The project zero's elevation above sea level"));
+    m_seaLevel->setEnabled(m_levelReference->currentData().toString() == QLatin1String("sea"));
+    connect(m_levelReference, &QComboBox::currentIndexChanged, this,
+        [this] { m_seaLevel->setEnabled(m_levelReference->currentData().toString() == QLatin1String("sea")); });
+    form->addRow(tr("Sea level:"), m_seaLevel);
+    m_northStyle = new QComboBox(this); // D92
+    m_northStyle->setObjectName(QStringLiteral("northArrowStyle"));
+    m_northStyle->addItem(tr("Circle and arrow"), QStringLiteral("circle"));
+    m_northStyle->addItem(tr("Needle"), QStringLiteral("needle"));
+    m_northStyle->addItem(tr("Plain arrow"), QStringLiteral("arrow"));
+    m_northStyle->setCurrentIndex(std::max(0, m_northStyle->findData(
+        settings.value("north_arrow_style").toString(QStringLiteral("circle")))));
+    m_northStyle->setToolTip(tr("The north arrow the North arrow tool and the plan drawings place"));
+    form->addRow(tr("North arrow:"), m_northStyle);
+    m_scaleBarStyle = new QComboBox(this); // D92
+    m_scaleBarStyle->setObjectName(QStringLiteral("scaleBarStyle"));
+    m_scaleBarStyle->addItem(tr("Alternating bar"), QStringLiteral("bar"));
+    m_scaleBarStyle->addItem(tr("Line with ticks"), QStringLiteral("line"));
+    m_scaleBarStyle->setCurrentIndex(std::max(0, m_scaleBarStyle->findData(
+        settings.value("scale_bar_style").toString(QStringLiteral("bar")))));
+    m_scaleBarStyle->setToolTip(tr("The scale bar the Scale bar tool and the plan drawings place"));
+    form->addRow(tr("Scale bar:"), m_scaleBarStyle);
     m_importedWalls = new QComboBox(this); // D92
     m_importedWalls->setObjectName(QStringLiteral("importedWalls"));
     m_importedWalls->addItem(tr("Rebuild with KimBim's shape"), QStringLiteral("rebuild"));
@@ -92,6 +130,14 @@ QJsonObject ProjectSettingsDialog::changes() const
         out.insert("length_unit", m_unit->currentText());
     if (m_areaUnit->currentText() != m_settings.value("area_unit").toString(QStringLiteral("m²")))
         out.insert("area_unit", m_areaUnit->currentText());
+    if (m_levelReference->currentData().toString() != m_settings.value("level_reference").toString(QStringLiteral("project")))
+        out.insert("level_reference", m_levelReference->currentData().toString());
+    if (std::abs(m_seaLevel->value() - m_settings.value("sea_level").toDouble(0.0)) > 1e-9)
+        out.insert("sea_level", m_seaLevel->value());
+    if (m_northStyle->currentData().toString() != m_settings.value("north_arrow_style").toString(QStringLiteral("circle")))
+        out.insert("north_arrow_style", m_northStyle->currentData().toString());
+    if (m_scaleBarStyle->currentData().toString() != m_settings.value("scale_bar_style").toString(QStringLiteral("bar")))
+        out.insert("scale_bar_style", m_scaleBarStyle->currentData().toString());
     if (m_importedWalls->currentData().toString() != m_settings.value("imported_walls").toString(QStringLiteral("rebuild")))
         out.insert("imported_walls", m_importedWalls->currentData().toString());
     if (m_partialDups->isChecked() != m_settings.value("check_partial_duplicates").toBool(false))

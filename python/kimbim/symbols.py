@@ -139,20 +139,27 @@ def nice_length(target: float) -> tuple[float, int]:
     return k, 5
 
 
-def scale_bar(left, scale: float, metres_per_mm: float) -> dict:
+def scale_bar(left, scale: float, metres_per_mm: float, style: str = "bar") -> dict:
     """A scale bar for a drawing at 1:`scale`, its left end at `left`; sizes are paper mm ×
-    `metres_per_mm` (the drawing's own: the bar's metres are model metres)."""
+    `metres_per_mm` (the drawing's own: the bar's metres are model metres). D92 styles: `bar` (the
+    alternating filled bar) or `line` (a line with ticks, for drawings that stay black and white)."""
     total, segments = nice_length(SCALEBAR_LENGTH * scale / 1000.0)
     length = total * metres_per_mm * 1000.0 / scale  # model metres drawn for `total` metres
     bar = 1.5 * metres_per_mm
     x0, y0 = left
-    out = {"curves": [[[x0, y0], [x0 + length, y0], [x0 + length, y0 + bar], [x0, y0 + bar], [x0, y0]]],
-           "solids": [], "labels": []}
+    out = {"curves": [], "solids": [], "labels": []}
     step = length / segments
-    for i in range(segments):
-        if i % 2 == 0:
-            out["solids"].append([[x0 + i * step, y0], [x0 + (i + 1) * step, y0], [x0 + (i + 1) * step, y0 + bar],
-                                  [x0 + i * step, y0 + bar]])
+    if style == "line":
+        out["curves"].append([[x0, y0], [x0 + length, y0]])
+        for i in range(segments + 1):
+            tick = (2.0 if i % 2 == 0 else 1.0) * metres_per_mm
+            out["curves"].append([[x0 + i * step, y0 - tick / 2], [x0 + i * step, y0 + tick / 2]])
+    else:
+        out["curves"].append([[x0, y0], [x0 + length, y0], [x0 + length, y0 + bar], [x0, y0 + bar], [x0, y0]])
+        for i in range(segments):
+            if i % 2 == 0:
+                out["solids"].append([[x0 + i * step, y0], [x0 + (i + 1) * step, y0], [x0 + (i + 1) * step, y0 + bar],
+                                      [x0 + i * step, y0 + bar]])
     for i in range(segments + 1):
         value = f"{total * i / segments:g}" + (" m" if i == segments else "")
         out["labels"].append(_label(value, (x0 + i * step, y0 - 2.5 * metres_per_mm), 2.0))
@@ -160,18 +167,30 @@ def scale_bar(left, scale: float, metres_per_mm: float) -> dict:
     return out
 
 
-def north_arrow(centre, north, metres_per_mm: float) -> dict:
-    """A north arrow: a circle and an arrow pointing north (half filled), N beyond its tip."""
+def north_arrow(centre, north, metres_per_mm: float, style: str = "circle") -> dict:
+    """A north arrow. D92 styles: `circle` (a circle and a half-filled arrow, the default), `needle`
+    (a tapered needle) or `arrow` (a plain arrow). N sits beyond its tip."""
     n = _unit(north)
     e = (n[1], -n[0])  # east: north turned clockwise
     r = NORTH_RADIUS * metres_per_mm
     c = centre
+    label = _label("N", _add(c, n, r + 3.0 * metres_per_mm), 3.5)
+    if style == "arrow":
+        tail = _add(c, n, -0.7 * r)
+        tip = _add(c, n, r)
+        left = _add(_add(c, n, 0.35 * r), e, -0.32 * r)
+        right = _add(_add(c, n, 0.35 * r), e, 0.32 * r)
+        return {"curves": [[tail, tip], [left, tip, right]], "solids": [], "labels": [label]}
     tip, notch = _add(c, n, r), _add(c, n, -0.25 * r)
+    if style == "needle":
+        left = _add(_add(c, n, -0.8 * r), e, -0.28 * r)
+        right = _add(_add(c, n, -0.8 * r), e, 0.28 * r)
+        return {"curves": [[tip, right, left, tip]], "solids": [[tip, right, notch]], "labels": [label]}
     left = _add(_add(c, n, -0.6 * r), e, -0.42 * r)
     right = _add(_add(c, n, -0.6 * r), e, 0.42 * r)
     circle = _polygon(c, r, 48)
     return {"curves": [circle + [circle[0]], [tip, right, notch, left, tip]], "solids": [[tip, right, notch]],
-            "labels": [_label("N", _add(c, n, r + 3.0 * metres_per_mm), 3.5)]}
+            "labels": [label]}
 
 
 def revision_cloud(points, text, size, metres_per_mm: float) -> dict:
@@ -252,7 +271,18 @@ def radial_text(kind, points) -> str:
     return ("R " + text) if kind == "radius" else ("Ø " + text)
 
 
-def elevation_text(z: float) -> str:
+def elevation_text(z: float, storey=None) -> str:
+    """An elevation for a level or spot dimension. D92: the project's reference is project zero
+    (default), the level itself (when `storey` is given) or sea level (project zero's `sea_level`)."""
+    from . import settings
+
+    reference = settings.current().get("level_reference", "project")
+    if reference == "sea":
+        z += float(settings.current().get("sea_level", 0.0))
+    elif reference == "level" and storey is not None:
+        from . import authoring as A
+
+        z -= A._elevation(storey)
     if abs(z) < 5e-4:
         return "±" + _length(0.0)
     return ("+" if z > 0 else "-") + _length(abs(z))
@@ -282,9 +312,14 @@ def geometry(kind, pts, text, size, data, metres_per_mm, north=(0.0, 1.0)) -> di
                 out["curves"].append([anchor, end])
                 out["solids"].append(_polygon(anchor, 0.5 * metres_per_mm, 8))
     elif kind == "north" and pts:
-        out = north_arrow(pts[0], north, metres_per_mm)
+        from . import settings
+
+        out = north_arrow(pts[0], north, metres_per_mm, settings.current().get("north_arrow_style", "circle"))
     elif kind == "scalebar" and pts:
-        out = scale_bar(pts[0], float(data.get("Scale") or 100), metres_per_mm)
+        from . import settings
+
+        out = scale_bar(pts[0], float(data.get("Scale") or 100), metres_per_mm,
+                        settings.current().get("scale_bar_style", "bar"))
     elif kind == "cloud" and len(pts) >= 3:
         out = revision_cloud(pts, text, size, metres_per_mm)
     elif kind == "angle" and len(pts) >= 4:
@@ -560,7 +595,7 @@ def add_symbol(storey_guid: str, kind: str, points_json: str, options_json: str 
     if kind in ("level", "spot"):
         extra["Auto"] = not text
         if not text:
-            text = elevation_text(elevation_at(storey, points[0]))
+            text = elevation_text(elevation_at(storey, points[0]), storey)
     pen = o.get("pen")
     return N.add_shape(storey, kind, points, extra, pen=pen if isinstance(pen, int) else None, text=text,
                        name=NAMES[kind])
@@ -618,7 +653,11 @@ def drawing_parts(storey, to_paper, metres_per_mm, settings: dict | None = None)
         if data is None or data[0] not in KINDS:
             continue
         kind, text, _local, size, pen = data
-        geom = geometry(kind, N.world_points(a), text, size, N.extra_of(a, effective=True), metres_per_mm, north)
+        points = N.world_points(a)
+        if kind in ("level", "spot") and N.extra_of(a).get("Auto") and points:
+            # D92: the drawing follows the project's level reference like the plan view does.
+            text = elevation_text(elevation_at(storey, points[0]), storey)
+        geom = geometry(kind, points, text, size, N.extra_of(a, effective=True), metres_per_mm, north)
         attrs = f' data-pen="{int(pen)}"' if pen else ""
         out.append(f'<g data-kind="annotation" data-symbol="{kind}" ifc:guid="{a.GlobalId}"{attrs}>')
         out += svg_parts(geom, lambda p: to_paper(p[0], p[1], z))

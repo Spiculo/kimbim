@@ -7146,41 +7146,121 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
     </message>
     <message>
       <location filename="../src/ProjectSettingsDialog.cpp" line="55" />
+      <source>Project zero</source>
+      <translation>Cero del proyecto</translation>
+    </message>
+    <message>
+      <location filename="../src/ProjectSettingsDialog.cpp" line="56" />
+      <source>The level it is on</source>
+      <translation>El nivel en el que está</translation>
+    </message>
+    <message>
+      <location filename="../src/ProjectSettingsDialog.cpp" line="57" />
+      <source>Sea level</source>
+      <translation>Nivel del mar</translation>
+    </message>
+    <message>
+      <location filename="../src/ProjectSettingsDialog.cpp" line="60" />
+      <source>What level and spot dimensions measure from</source>
+      <translation>Desde dónde miden las cotas de nivel y de punto</translation>
+    </message>
+    <message>
+      <location filename="../src/ProjectSettingsDialog.cpp" line="61" />
+      <source>Level dimensions from:</source>
+      <translation>Cotas de nivel desde:</translation>
+    </message>
+    <message>
+      <location filename="../src/ProjectSettingsDialog.cpp" line="69" />
+      <source>The project zero's elevation above sea level</source>
+      <translation>La cota del cero del proyecto sobre el nivel del mar</translation>
+    </message>
+    <message>
+      <location filename="../src/ProjectSettingsDialog.cpp" line="73" />
+      <source>Sea level:</source>
+      <translation>Nivel del mar:</translation>
+    </message>
+    <message>
+      <location filename="../src/ProjectSettingsDialog.cpp" line="76" />
+      <source>Circle and arrow</source>
+      <translation>Círculo y flecha</translation>
+    </message>
+    <message>
+      <location filename="../src/ProjectSettingsDialog.cpp" line="77" />
+      <source>Needle</source>
+      <translation>Aguja</translation>
+    </message>
+    <message>
+      <location filename="../src/ProjectSettingsDialog.cpp" line="78" />
+      <source>Plain arrow</source>
+      <translation>Flecha simple</translation>
+    </message>
+    <message>
+      <location filename="../src/ProjectSettingsDialog.cpp" line="81" />
+      <source>The north arrow the North arrow tool and the plan drawings place</source>
+      <translation>La flecha norte que colocan la herramienta Flecha norte y los planos</translation>
+    </message>
+    <message>
+      <location filename="../src/ProjectSettingsDialog.cpp" line="82" />
+      <source>North arrow:</source>
+      <translation>Flecha norte:</translation>
+    </message>
+    <message>
+      <location filename="../src/ProjectSettingsDialog.cpp" line="85" />
+      <source>Alternating bar</source>
+      <translation>Barra alternada</translation>
+    </message>
+    <message>
+      <location filename="../src/ProjectSettingsDialog.cpp" line="86" />
+      <source>Line with ticks</source>
+      <translation>Línea con marcas</translation>
+    </message>
+    <message>
+      <location filename="../src/ProjectSettingsDialog.cpp" line="89" />
+      <source>The scale bar the Scale bar tool and the plan drawings place</source>
+      <translation>La escala gráfica que colocan la herramienta Escala gráfica y los planos</translation>
+    </message>
+    <message>
+      <location filename="../src/ProjectSettingsDialog.cpp" line="90" />
+      <source>Scale bar:</source>
+      <translation>Escala gráfica:</translation>
+    </message>
+    <message>
+      <location filename="../src/ProjectSettingsDialog.cpp" line="93" />
       <source>Rebuild with KimBim's shape</source>
       <translation>Reconstruir con la forma de KimBim</translation>
     </message>
     <message>
-      <location filename="../src/ProjectSettingsDialog.cpp" line="56" />
+      <location filename="../src/ProjectSettingsDialog.cpp" line="94" />
       <source>Keep the imported shape and cut it</source>
       <translation>Mantener la forma importada y recortarla</translation>
     </message>
     <message>
-      <location filename="../src/ProjectSettingsDialog.cpp" line="58" />
+      <location filename="../src/ProjectSettingsDialog.cpp" line="96" />
       <source>Splitting a wall imported from another program: rebuild it (so it edits and joins like one drawn here) or keep the other program's body and cut it</source>
       <translation>Al dividir un muro importado de otro programa: reconstruirlo (para que se edite y una como uno dibujado aquí) o mantener el cuerpo del otro programa y recortarlo</translation>
     </message>
     <message>
-      <location filename="../src/ProjectSettingsDialog.cpp" line="59" />
+      <location filename="../src/ProjectSettingsDialog.cpp" line="97" />
       <source>Imported walls:</source>
       <translation>Muros importados:</translation>
     </message>
     <message>
-      <location filename="../src/ProjectSettingsDialog.cpp" line="60" />
+      <location filename="../src/ProjectSettingsDialog.cpp" line="98" />
       <source>Flag partly overlapping elements as duplicates</source>
       <translation>Marcar los elementos que se solapan parcialmente como duplicados</translation>
     </message>
     <message>
-      <location filename="../src/ProjectSettingsDialog.cpp" line="63" />
+      <location filename="../src/ProjectSettingsDialog.cpp" line="101" />
       <source>Model checks: also report same-type elements that overlap by half or more without being exactly in the same place</source>
       <translation>Comprobaciones del modelo: informar también de elementos del mismo tipo que se solapan en la mitad o más sin estar exactamente en el mismo lugar</translation>
     </message>
     <message>
-      <location filename="../src/ProjectSettingsDialog.cpp" line="69" />
+      <location filename="../src/ProjectSettingsDialog.cpp" line="107" />
       <source>Decimals:</source>
       <translation>Decimales:</translation>
     </message>
     <message>
-      <location filename="../src/ProjectSettingsDialog.cpp" line="71" />
+      <location filename="../src/ProjectSettingsDialog.cpp" line="109" />
       <source>These settings aren't kept with a plain IFC file. Save as .kim to keep them.</source>
       <translation>Esta configuración no se guarda en un archivo IFC simple. Guárdalo como .kim para conservarla.</translation>
     </message>

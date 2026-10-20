@@ -1278,6 +1278,23 @@ ES = {
     'Off: the levels above make room (Archicad)': 'Desactivado: los niveles superiores hacen sitio (Archicad)',
     'Flag partly overlapping elements as duplicates': 'Marcar los elementos que se solapan parcialmente como duplicados',
     'Model checks: also report same-type elements that overlap by half or more without being exactly in the same place': 'Comprobaciones del modelo: informar también de elementos del mismo tipo que se solapan en la mitad o más sin estar exactamente en el mismo lugar',
+    'Project zero': 'Cero del proyecto',
+    'The level it is on': 'El nivel en el que está',
+    'Sea level': 'Nivel del mar',
+    'What level and spot dimensions measure from': 'Desde dónde miden las cotas de nivel y de punto',
+    'Level dimensions from:': 'Cotas de nivel desde:',
+    "The project zero's elevation above sea level": 'La cota del cero del proyecto sobre el nivel del mar',
+    'Sea level:': 'Nivel del mar:',
+    'Circle and arrow': 'Círculo y flecha',
+    'Needle': 'Aguja',
+    'Plain arrow': 'Flecha simple',
+    'The north arrow the North arrow tool and the plan drawings place': 'La flecha norte que colocan la herramienta Flecha norte y los planos',
+    'North arrow:': 'Flecha norte:',
+    'Alternating bar': 'Barra alternada',
+    'Line with ticks': 'Línea con marcas',
+    'The scale bar the Scale bar tool and the plan drawings place': 'La escala gráfica que colocan la herramienta Escala gráfica y los planos',
+    'Scale bar:': 'Escala gráfica:',
+
 }
 
 

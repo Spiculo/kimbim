@@ -26,6 +26,10 @@ private:
     QComboBox* m_paper;
     QComboBox* m_unit;
     QComboBox* m_areaUnit; // D92
+    QComboBox* m_levelReference; // D92: project zero, level or sea level
+    QDoubleSpinBox* m_seaLevel; // D92: project zero above sea level
+    QComboBox* m_northStyle; // D92: the north arrow and scale bar symbols
+    QComboBox* m_scaleBarStyle;
     QComboBox* m_importedWalls; // D92
     QCheckBox* m_partialDups; // D92: model checks
     QSpinBox* m_decimals;

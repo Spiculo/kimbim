@@ -277,7 +277,33 @@ def test_level_and_spot_elevations_measure_the_slab_below(flat):
     assert listed(l2)[up]["text"] == "+3.00"  # no slab: the level's elevation
 
 
+def test_level_dimensions_can_measure_from_the_level_or_sea_level(flat):
+    """D92: the level dimension reference is project zero (default), the level it is on, or sea level."""
+    l2 = call("add_storey", "Level 2", 3.0)["guid"]
+    up = call("add_symbol", l2, "level", json.dumps([[20, 20]]), "")["guid"]
+    assert listed(l2)[up]["text"] == "+3.00"
+    assert call("set_project_settings", json.dumps({"level_reference": "level"}))["ok"]
+    assert listed(l2)[up]["text"] == "±0.00"  # on its own level
+    assert call("set_project_settings", json.dumps({"level_reference": "sea", "sea_level": 100.0}))["ok"]
+    assert listed(l2)[up]["text"] == "+103.00"
+    assert call("set_project_settings", json.dumps({"level_reference": "project"}))["ok"]
+    assert listed(l2)[up]["text"] == "+3.00"
+
+
 # ---------------------------------------------------------------- drawings, sheets, DXF
+
+def test_north_arrow_and_scale_bar_symbols_are_selectable(flat):
+    """D92: the project picks the north arrow (circle/default, needle, plain arrow) and the scale
+    bar (alternating bar/default, line with ticks); the plan drawings follow."""
+    call("add_symbol", flat["l1"], "north", json.dumps([[15, 3]]), "")
+    call("add_symbol", flat["l1"], "scalebar", json.dumps([[15, 0]]), "")
+    circle = plan_svg()
+    assert call("set_project_settings", json.dumps({"north_arrow_style": "needle", "scale_bar_style": "line"}))["ok"]
+    other = plan_svg()
+    assert other != circle  # the needle and the line bar draw differently
+    assert call("set_project_settings", json.dumps({"north_arrow_style": "arrow"}))["ok"]
+    assert plan_svg() != other
+
 
 def test_plan_drawing_has_tags_stamps_and_symbols(flat, tmp_path):
     t = call("add_tag", flat["door"], "")["guid"]

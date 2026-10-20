@@ -717,7 +717,7 @@ def _sync(force_all=False) -> list:
         storey = ifcopenshell.util.element.get_container(a)
         if storey is None:
             continue
-        text = S.elevation_text(S.elevation_at(storey, N.world_points(a)[0]))
+        text = S.elevation_text(S.elevation_at(storey, N.world_points(a)[0]), storey)
         if text != data[1]:
             N._set(a, data[0], text, data[2])
             a.Name = text[:60]

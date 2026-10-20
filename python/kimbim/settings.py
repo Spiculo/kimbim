@@ -21,6 +21,10 @@ DEFAULTS = {
     "length_unit": "m",
     "length_decimals": 2,
     "area_unit": "m²",  # D92: how areas are shown (project setting)
+    "level_reference": "project",  # D92: level dimensions from project zero, the level or sea level
+    "north_arrow_style": "circle",  # D92: the plan north arrow's symbol
+    "scale_bar_style": "bar",  # D92: the plan scale bar's symbol
+    "sea_level": 0.0,  # D92: the project zero's elevation above sea level (m)
     "angle_decimals": 2,   # D92: decimals for angles in annotations
     "radius_decimals": 2,  # D92: decimals for radii and diameters
     "orphan_tags": "delete",  # D92: what a tag whose element is gone does: "delete" or "keep"
@@ -143,6 +147,14 @@ def _error(key: str, value) -> str | None:
         return f"unknown length unit {value}"
     if key == "area_unit" and value not in AREA_UNITS:
         return f"unknown area unit {value}"
+    if key == "level_reference" and value not in ("project", "level", "sea"):
+        return f"unknown level dimension reference {value}"
+    if key == "north_arrow_style" and value not in ("circle", "needle", "arrow"):
+        return f"unknown north arrow style {value}"
+    if key == "scale_bar_style" and value not in ("bar", "line"):
+        return f"unknown scale bar style {value}"
+    if key == "sea_level" and not (number and -10000 <= value <= 10000):
+        return "the sea level must be between -10000 and 10000 m"
     if key in ("angle_decimals", "radius_decimals") and not (isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 4):
         return f"{key} must be between 0 and 4"
     if key == "orphan_tags" and value not in ("delete", "keep"):
