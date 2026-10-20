@@ -14,6 +14,7 @@ from . import app_bridge as B
 
 DEFAULTS = {
     "plan_cut_height": 1.2,
+    "plan_cut_levels": {},  # D91: per-level overrides of the plan slice (level guid -> metres)
     "hidden_layers": [],
     "locked_layers": [],
     "drawing_scale": 100,
@@ -122,6 +123,10 @@ def _error(key: str, value) -> str | None:
     number = isinstance(value, (int, float)) and not isinstance(value, bool)
     if key == "plan_cut_height" and not (number and 0 < value <= 20):
         return "the plan cut height must be between 0 and 20 m"
+    if key == "plan_cut_levels" and not (isinstance(value, dict) and all(
+            isinstance(k, str) and isinstance(v, (int, float)) and not isinstance(v, bool) and 0 < v <= 20
+            for k, v in value.items())):
+        return "the per-level plan cut heights must be numbers between 0 and 20 m"
     if key == "drawing_scale" and not (isinstance(value, int) and not isinstance(value, bool) and value > 0):
         return "the drawing scale must be a whole number above 0"
     if key == "sheet_paper" and value not in PAPERS:

@@ -230,6 +230,25 @@ private slots:
         QCOMPARE(w.viewport(), plan);
     }
 
+    // D91: a plan tab's hidden slice is the project setting, overridable per level; it has no cut slider.
+    void planTabSliceAndNoCutSlider()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        action(w, "action3DView")->trigger();
+        QCOMPARE(w.planCutHeight(), 1.2); // the project default
+        QVERIFY2(w.currentViewShowsCutSlider(), qPrintable(w.currentViewKey())); // the 3D tab keeps the cut slider
+        const QString l1 = w.levelsBar()->activeStorey();
+        QVERIFY(w.setProjectSettings({{"plan_cut_levels", QJsonObject{{l1, 2.0}}}}));
+        kimbim::Viewport* plan = w.openPlanTab(l1);
+        QVERIFY(plan);
+        QCOMPARE(w.planCutHeight(), 2.0); // the level's own slice
+        QVERIFY(!w.currentViewShowsCutSlider()); // D91: a plan tab has no cut slider
+        action(w, "action3DView")->trigger();
+        QVERIFY(w.currentViewShowsCutSlider());
+        QVERIFY(w.close());
+    }
+
     void deletingTheActivePlanLevel()
     {
         kimbim::MainWindow w(nullptr, true);

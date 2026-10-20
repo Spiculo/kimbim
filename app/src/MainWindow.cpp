@@ -789,6 +789,14 @@ double MainWindow::planCutHeight() const
     return m_cutHeight->value();
 }
 
+double MainWindow::planCutForLevel(const QString& storey) const
+{
+    const QJsonObject levels = m_settings.value("plan_cut_levels").toObject();
+    if (levels.contains(storey))
+        return levels.value(storey).toDouble();
+    return m_settings.value("plan_cut_height").toDouble(1.2);
+}
+
 void MainWindow::updateCutSliderRange()
 {
     // From the level up to the next level (or 4 m), in centimetres.
@@ -3741,6 +3749,12 @@ QString MainWindow::currentViewKey() const
     return m_dock->current();
 }
 
+bool MainWindow::currentViewShowsCutSlider() const
+{
+    ViewHost* host = m_hosts.value(m_dock->current());
+    return host && host->showsCutColumn();
+}
+
 void MainWindow::activateView(const QString& key)
 {
     if (auto* view = qobject_cast<DrawingView*>(m_dock->view(key))) {
@@ -3764,7 +3778,8 @@ void MainWindow::activateView(const QString& key)
         m_cutHeight->setValue(cut.height);
         m_boxBounds = cut.bounds;
     }
-    host->adoptChrome(m_toolOptions, m_cutColumn);
+    // D91: a plan tab has no cut slider; the 3D tab keeps it.
+    host->adoptChrome(m_toolOptions, host->storey().isEmpty() ? m_cutColumn : nullptr);
     m_status->setZoom(m_viewport->zoomPercent());
     if (!host->storey().isEmpty() && host->storey() != m_levels->activeStorey())
         m_levels->setActive(host->storey()); // a plan tab's level is the active level
@@ -3831,7 +3846,7 @@ Viewport* MainWindow::openPlanTab(const QString& storey)
     view->setPlanView(elevation);
     CutSettings cut;
     cut.planCut = true; // a plan is a horizontal cut
-    cut.height = m_cutHeight->value();
+    cut.height = planCutForLevel(storey); // D91: the level's own slice, else the project setting
     m_cuts.insert(view, cut);
     m_dock->addView(key, tr("%1 plan").arg(name), host, true, newViewPlacement());
     m_dock->raise(key); // activateView(): the level, the cut, the chrome, the annotations

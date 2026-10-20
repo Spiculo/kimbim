@@ -29,8 +29,11 @@ void ViewHost::adoptChrome(QWidget* optionsStrip, QWidget* cutColumn)
 {
     if (optionsStrip && optionsStrip->parentWidget() != this)
         m_top->addWidget(optionsStrip); // reparents it from the previous tab
-    if (cutColumn && cutColumn->parentWidget() != this)
-        m_row->addWidget(cutColumn);
+    if (cutColumn) {
+        if (cutColumn->parentWidget() != this)
+            m_row->addWidget(cutColumn);
+        m_cutColumn = cutColumn; // a null cutColumn means "leave it alone" (a plan tab never adopts it)
+    }
 }
 
 } // namespace kimbim

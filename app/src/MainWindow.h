@@ -107,6 +107,8 @@ public:
     PropertiesPanel* propertiesPanel() const { return m_properties; }
     void setPlanCutHeight(double metres);
     double planCutHeight() const;
+    // D91: the plan slice for a level: its own override, else the project setting (1.20 m).
+    double planCutForLevel(const QString& storey) const;
 
     // Selection and editing (M2). Edits apply to every selected element as one undoable step.
     void setSelection(const QStringList& guids);
@@ -269,6 +271,7 @@ public:
     // guid or "sheet:<number>").
     DockLayout* dockLayout() const { return m_dock; }
     QString currentViewKey() const;
+    bool currentViewShowsCutSlider() const; // D91: false in plan tabs (no cut slider there)
     // A level's plan tab (D71): opened once, raised after; a view of the same model as the 3D tab.
     Viewport* openPlanTab(const QString& storey); // nullptr if it isn't a level of this model
     Viewport* modelView() const;                  // the 3D tab's view

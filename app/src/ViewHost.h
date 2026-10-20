@@ -22,11 +22,13 @@ public:
     void adoptChrome(QWidget* optionsStrip, QWidget* cutColumn); // moves them into this tab
     void setStorey(const QString& guid) { m_storey = guid; }      // a plan tab's level ("" for 3D)
     QString storey() const { return m_storey; }
+    bool showsCutColumn() const { return m_cutColumn != nullptr; } // D91: plan tabs have no cut slider
 
 private:
     QPointer<Viewport> m_view; // a closed plan tab's view is deleted before its host
     QVBoxLayout* m_top; // tool options strip
     QHBoxLayout* m_row; // view | cut column
+    QWidget* m_cutColumn = nullptr;
     QString m_storey;
 };
 
