@@ -186,6 +186,11 @@ PreferencesDialog::PreferencesDialog(Preferences& prefs, QWidget* parent)
     m_splitJoin->setChecked(prefs.splitJoin());
     form->addRow(QString(), m_splitJoin);
 
+    m_mergeProps = choice(this, "mergeProps", {{tr("Keep the first element's properties"), "keep"},
+        {tr("Refuse when their properties differ"), "refuse"}}, prefs.mergeProps());
+    m_mergeProps->setToolTip(tr("Merging two collinear walls (Join): the result keeps the first wall's properties, or the merge is refused if they differ"));
+    form->addRow(tr("Merging elements:"), m_mergeProps);
+
     // D92: snapping to element mesh vertices (slabs, roofs, ...), off by default.
     m_meshVertexSnaps = new QCheckBox(tr("Snap to element mesh vertices while drawing"), this);
     m_meshVertexSnaps->setObjectName(QStringLiteral("meshVertexSnaps"));
@@ -224,6 +229,7 @@ void PreferencesDialog::apply()
     m_prefs.setValue(QStringLiteral("select_similar_scope"), m_selectSimilar->currentData().toString());
     m_prefs.setValue(QStringLiteral("box_selection"), m_boxSelection->currentData().toString());
     m_prefs.setValue(QStringLiteral("split_join"), m_splitJoin->isChecked());
+    m_prefs.setValue(QStringLiteral("merge_props"), m_mergeProps->currentData().toString());
     m_prefs.setValue(QStringLiteral("mesh_vertex_snaps"), m_meshVertexSnaps->isChecked());
 }
 

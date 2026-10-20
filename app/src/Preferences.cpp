@@ -62,6 +62,7 @@ QJsonObject Preferences::defaults()
         {"select_similar_scope", "class_predefined"},
         {"box_selection", "direction"},
         {"split_join", true},
+        {"merge_props", "keep"},
         {"recent", QJsonArray()},
     };
 }
@@ -181,6 +182,12 @@ QString Preferences::boxSelection() const
 }
 
 bool Preferences::splitJoin() const { return value("split_join").toBool(true); }
+
+QString Preferences::mergeProps() const
+{
+    // D92: merging collinear walls keeps the first's properties (default) or refuses when they differ.
+    return value("merge_props").toString() == QLatin1String("refuse") ? QStringLiteral("refuse") : QStringLiteral("keep");
+}
 
 bool Preferences::trueLineWeights() const
 {

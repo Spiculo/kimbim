@@ -138,7 +138,7 @@ bool MainWindow::cornerElements(const QString& first, QPointF p1, const QString&
 
 bool MainWindow::joinElements(const QString& first, const QString& second)
 {
-    return modifyResult(bridge("join_elements", {first, second}), tr("Could not join: %1"));
+    return modifyResult(bridge("join_elements", {first, second, m_prefs.mergeProps()}), tr("Could not join: %1"));
 }
 
 bool MainWindow::unjoinElements(const QString& first, const QString& second)

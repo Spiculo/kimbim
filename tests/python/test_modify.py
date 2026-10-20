@@ -190,6 +190,20 @@ def test_merge_refuses_different_types(model):
     assert not r["ok"] and "type" in r["error"]
 
 
+def test_merge_keeps_the_first_properties_or_refuses_when_they_differ(model):
+    """D92: Merge keeps the first wall's properties (default); with "refuse" it stops if they differ."""
+    a = call("create_wall", model["l1"], model["type"], 20, 0, 24, 0, 3.0, "", "")["guid"]
+    c = call("create_wall", model["l1"], model["type"], 24, 0, 28, 0, 3.0, "", "")["guid"]
+    assert call("set_name", g(c), "Fire wall")["ok"]
+    before = b._model.by_guid(a).Name
+    r = call("join_elements", a, c, "refuse")
+    assert not r["ok"] and "properties" in r["error"], r
+    r = call("join_elements", a, c)  # default: keeps the first's properties
+    assert r["ok"] and r["merged"], r
+    assert b._model.by_guid(a).Name == before
+    assert valid() == []
+
+
 def test_modify_targets_lists_beams(model):
     beam_type = call("beam_types")["types"][0]["guid"]
     beam = call("create_beam", model["l1"], beam_type, 0, 3, 6, 3, 3.0)["guid"]
@@ -222,4 +236,33 @@ def test_an_imported_wall_gets_kimbim_shape_when_split(model):
         assert len([x for x in e.Representation.Representations if x.RepresentationIdentifier == "Body"]) == 1
         assert abs(authoring._wall_height(e) - 3.0) < 1e-6
     assert axis(r["piece"]) == [[0, 2], [0, 5]]
+    assert valid() == []
+
+
+def test_imported_wall_keeps_its_shape_and_is_cut(model):
+    """D92: with imported_walls "keep", a split keeps the imported body and cuts it in place."""
+    import ifcopenshell.geom
+    import ifcopenshell.util.representation as R
+    wall = b._model.by_guid(model["left"])
+    R.get_representation(wall, "Model", "Body", "MODEL_VIEW").ContextOfItems = R.get_context(b._model, "Model")
+    assert call("set_project_settings", json.dumps({"imported_walls": "keep"}))["ok"]
+    r = call("split_element", model["left"], 0, 2.0, "1")
+    assert r["ok"], r
+    for guid in (model["left"], r["piece"]):
+        e = b._model.by_guid(guid)
+        assert R.get_representation(e, "Model", "Body", "MODEL_VIEW") is None  # still the imported body
+    assert axis(model["left"]) == [[0, 0], [0, 2]]
+    assert axis(r["piece"]) == [[0, 2], [0, 5]]
+    # the bodies were cut: each piece's mesh spans its own half of the 5 m wall
+    settings_obj = ifcopenshell.geom.settings()
+    settings_obj.set("use-world-coords", True)
+    spans = []
+    for guid in (model["left"], r["piece"]):
+        verts = b._model.by_guid(guid)
+        shape = ifcopenshell.geom.create_shape(settings_obj, verts)
+        import numpy as np
+        pts = np.asarray(shape.geometry.verts).reshape(-1, 3)
+        spans.append((round(float(pts[:, 1].min()), 3), round(float(pts[:, 1].max()), 3)))
+    assert spans[0][1] == pytest.approx(2.0, abs=1e-3) and spans[1][0] == pytest.approx(2.0, abs=1e-3)
+    assert spans[1][1] > spans[0][0]  # the second piece is the far half
     assert valid() == []

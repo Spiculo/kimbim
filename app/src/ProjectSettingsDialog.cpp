@@ -49,6 +49,13 @@ ProjectSettingsDialog::ProjectSettingsDialog(const QJsonObject& settings, bool k
     m_areaUnit->addItems({QStringLiteral("m²"), QStringLiteral("cm²"), QStringLiteral("mm²")});
     m_areaUnit->setCurrentText(settings.value("area_unit").toString(QStringLiteral("m²")));
     form->addRow(tr("Areas in:"), m_areaUnit);
+    m_importedWalls = new QComboBox(this); // D92
+    m_importedWalls->setObjectName(QStringLiteral("importedWalls"));
+    m_importedWalls->addItem(tr("Rebuild with KimBim's shape"), QStringLiteral("rebuild"));
+    m_importedWalls->addItem(tr("Keep the imported shape and cut it"), QStringLiteral("keep"));
+    m_importedWalls->setCurrentIndex(m_importedWalls->findData(settings.value("imported_walls").toString(QStringLiteral("rebuild"))));
+    m_importedWalls->setToolTip(tr("Splitting a wall imported from another program: rebuild it (so it edits and joins like one drawn here) or keep the other program's body and cut it"));
+    form->addRow(tr("Imported walls:"), m_importedWalls);
     m_decimals = new QSpinBox(this);
     m_decimals->setObjectName(QStringLiteral("lengthDecimals"));
     m_decimals->setRange(0, 4);
@@ -79,6 +86,8 @@ QJsonObject ProjectSettingsDialog::changes() const
         out.insert("length_unit", m_unit->currentText());
     if (m_areaUnit->currentText() != m_settings.value("area_unit").toString(QStringLiteral("m²")))
         out.insert("area_unit", m_areaUnit->currentText());
+    if (m_importedWalls->currentData().toString() != m_settings.value("imported_walls").toString(QStringLiteral("rebuild")))
+        out.insert("imported_walls", m_importedWalls->currentData().toString());
     if (m_decimals->value() != m_settings.value("length_decimals").toInt(2))
         out.insert("length_decimals", m_decimals->value());
     return out;

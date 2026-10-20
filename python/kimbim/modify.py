@@ -10,6 +10,7 @@ coordinates). Same protocol as app_bridge: strings in, JSON out, never raise.
 """
 from __future__ import annotations
 
+import json
 import math
 
 import ifcopenshell.api.geometry
@@ -126,6 +127,84 @@ def _adopt(wall):
         for layer in dict.fromkeys(wall_layers):  # the wall stays on its layer
             if layer.id():
                 ifcopenshell.api.layer.assign_layer(f, items=[new], layer=layer)
+
+
+def _imported_policy() -> str:
+    """D92: splitting an imported wall either rebuilds it with KimBim's shape ("rebuild", default) or
+    keeps the other program's shape and cuts it ("keep")."""
+    from . import settings
+
+    return "keep" if settings.current().get("imported_walls") == "keep" else "rebuild"
+
+
+def _is_foreign(wall) -> bool:
+    """True for a wall whose body KimBim didn't make (e.g. a Revit export) and would have to adopt."""
+    return wall.is_a("IfcWall") and bool(_foreign_bodies(wall)) \
+        and ifcopenshell.util.representation.get_representation(wall, "Model", "Body", "MODEL_VIEW") is None
+
+
+def _local_axis(wall, p1, p2):
+    """An imported wall's axis from p1 to p2 (world metres) in its own frame, or None."""
+    s = A._scale()
+    try:
+        inv = np.linalg.inv(ifcopenshell.util.placement.get_local_placement(wall.ObjectPlacement))
+    except np.linalg.LinAlgError:
+        return None
+
+    def local(p):
+        v = inv @ np.array([p[0] * s, p[1] * s, 0.0, 1.0])
+        return (float(v[0]) / s, float(v[1]) / s)
+
+    return local(_vec(p1)), local(_vec(p2))
+
+
+def _set_axis_local(wall, p1, p2):
+    """Inside an action: give an imported wall an axis from p1 to p2 (world metres) without moving its
+    placement, so its imported body stays where the other program put it."""
+    f = B._model
+    ends = _local_axis(wall, p1, p2)
+    if ends is None:
+        return
+    context = ifcopenshell.util.representation.get_context(f, "Plan", "Axis", "GRAPH_VIEW")
+    if context is None:
+        plan = ifcopenshell.util.representation.get_context(f, "Plan") \
+            or ifcopenshell.api.context.add_context(f, context_type="Plan")
+        context = ifcopenshell.api.context.add_context(f, context_type="Plan", context_identifier="Axis",
+                                                       target_view="GRAPH_VIEW", parent=plan)
+    new_axis = ifcopenshell.api.geometry.add_axis_representation(f, context=context, axis=ends)
+    old_axis = ifcopenshell.util.representation.get_representation(wall, "Plan", "Axis", "GRAPH_VIEW")
+    if old_axis is not None:
+        ifcopenshell.api.geometry.unassign_representation(f, product=wall, representation=old_axis)
+        ifcopenshell.api.geometry.remove_representation(f, representation=old_axis)
+    ifcopenshell.api.geometry.assign_representation(f, product=wall, representation=new_axis)
+
+
+def _clip_body(wall, at, drop) -> bool:
+    """Inside an action: cut an imported wall's single extruded body with the plane through `at` (a
+    point on its axis, world metres), perpendicular to the axis, removing the material on `drop`'s
+    side. False when the body isn't a single extrusion (the caller rebuilds the wall instead)."""
+    rep = next((r for r in (wall.Representation.Representations if wall.Representation else ())
+                if r.RepresentationIdentifier == "Body"), None)
+    items = list(rep.Items) if rep is not None else []
+    if len(items) != 1 or not items[0].is_a("IfcExtrudedAreaSolid"):
+        return False
+    s = A._scale()
+    try:
+        inv = np.linalg.inv(ifcopenshell.util.placement.get_local_placement(wall.ObjectPlacement))
+    except np.linalg.LinAlgError:
+        return False
+    a, b = _vec(at), _vec(drop)
+    loc = (inv @ np.array([a[0] * s, a[1] * s, 0.0, 1.0]))[:3] / s
+    d = (inv @ np.array([b[0] - a[0], b[1] - a[1], 0.0, 0.0]))[:3]
+    n = float(np.linalg.norm(d))
+    if n < 1e-12:
+        return False
+    normal = d / n
+    result = ifcopenshell.api.geometry.clip_solid(B._model, item=items[0],
+        location=(float(loc[0]), float(loc[1]), float(loc[2])), normal=(float(normal[0]), float(normal[1]), float(normal[2])))
+    rep.RepresentationType = "Clipping"
+    rep.Items = (result,)
+    return True
 
 
 def _beam_solid(beam):
@@ -298,6 +377,14 @@ def _copy_piece(e):
     for identifier, context in (("Body", "Model"), ("Axis", "Plan")):
         if ifcopenshell.util.representation.get_representation(e, context, identifier):
             ifcopenshell.api.geometry.copy_representation(f, source=e, target=c, context_identifier=identifier)
+    if e.is_a("IfcWall") and ifcopenshell.util.representation.get_representation(c, "Model", "Body") is None:
+        # D92: an imported wall's body sits on the plain Model context, where copy_representation
+        # doesn't look: copy it by hand so "keep shape and cut" has something to cut.
+        for r in (e.Representation.Representations if e.Representation else ()):
+            if r.RepresentationIdentifier == "Body":
+                new_rep = ifcopenshell.util.element.copy_deep(f, r, exclude=["IfcGeometricRepresentationContext"])
+                ifcopenshell.api.geometry.assign_representation(f, product=c, representation=new_rep)
+                break
     layers.copy_layer(e, c)
     renovation.copy_status(e, c)
     return c
@@ -369,11 +456,13 @@ def split_element(guid: str, x, y, join="1") -> str:
             fills.append((opening, along > at))
         holes = [(opening, along > at) for opening, along in _bare_openings(e)]
     join = A._truthy(join)
+    keep_imported = _imported_policy() == "keep" and _is_foreign(e)  # D92
     made = {}
 
     def action():
         f = B._model
-        _adopt(e)
+        if not keep_imported:
+            _adopt(e)
         piece = _copy_piece(e)
         neighbours = []
         for rel in A._path_joins(e):
@@ -387,15 +476,26 @@ def split_element(guid: str, x, y, join="1") -> str:
             neighbours.append(_other(rel, e))
         rebuilt = []
         if e.is_a("IfcWall"):
-            A._reaxis(piece, point, p2)
+            if keep_imported:
+                _set_axis_local(piece, point, p2)
+            else:
+                A._reaxis(piece, point, p2)
             for opening, moves in fills + holes:
                 if moves:
                     _rehost(opening, piece)
-            A._reaxis(e, p1, point)
+            if keep_imported:
+                _set_axis_local(e, p1, point)
+            else:
+                A._reaxis(e, p1, point)
             if join:
                 ifcopenshell.api.geometry.connect_path(
                     f, relating_element=e, related_element=piece, relating_connection="ATEND", related_connection="ATSTART")
-            rebuilt = _regen([e, piece, *neighbours])
+            if keep_imported and _clip_body(e, point, p2) and _clip_body(piece, point, p1):
+                pass  # the imported shape was cut in place
+            else:  # no single extrusion to cut: rebuild both with KimBim's shape
+                _adopt(e)
+                _adopt(piece)
+                rebuilt = _regen([e, piece, *neighbours])
         else:
             a, b = _beam_axis(e)
             mid = a + (b - a) * t
@@ -623,14 +723,31 @@ def _collinear(a, b) -> bool:
     return all(_distance_to_line(p, *la) <= tol for p in lb)
 
 
-def _merge_plan(a, b):
-    """The merged extent along a's line (0..1 params) or an error."""
+def _properties(e) -> str:
+    """A comparable signature of what a merge keeps or clashes on (D92): the IFC attributes and the
+    element's own property sets (type properties are shared by the type check)."""
+    data = {"class": e.is_a()}
+    for attr in ("Name", "Description", "ObjectType", "Tag", "PredefinedType"):
+        if hasattr(e, attr):
+            data[attr] = getattr(e, attr)
+    try:
+        data["psets"] = ifcopenshell.util.element.get_psets(e, should_inherit=False)
+    except Exception:
+        data["psets"] = {}
+    return json.dumps(data, sort_keys=True, default=str)
+
+
+def _merge_plan(a, b, props="keep"):
+    """The merged extent along a's line (0..1 params) or an error. `props` (D92) is "keep" (the
+    default: the merged wall keeps the first's properties) or "refuse" when they differ."""
     la, lb = _line(a), _line(b)
     length = math.dist(*la)
     sb = sorted(_param(p, *la) for p in lb)
     gap = max(sb[0] - 1.0, 0.0 - sb[1], 0.0) * length
     if gap > TOUCH:
         return "they don't touch: stretch one to the other first"
+    if props == "refuse" and _properties(a) != _properties(b):
+        return "their properties differ (merge keeps the first's; turn that option off to merge)"
     if ifcopenshell.util.element.get_type(a) != ifcopenshell.util.element.get_type(b):
         return "only elements of the same type can be merged"
     if not _same_level(a, b):
@@ -709,10 +826,11 @@ def _touch_plan(a, b):
     return "these walls don't meet: use Trim to corner"
 
 
-def join_elements(guid1: str, guid2: str) -> str:
+def join_elements(guid1: str, guid2: str, props="keep") -> str:
     """Join two walls (or beams): collinear elements of the same type that touch are merged into
     the first (Archicad's Merge; it keeps its GlobalId, the second's doors/windows and joins);
-    two walls that meet get an L or T join, so they follow each other when edited (D54)."""
+    two walls that meet get an L or T join, so they follow each other when edited (D54). `props`
+    (D92) is "keep" (the merged wall keeps the first's properties) or "refuse" when they differ."""
     if B._model is None:
         return A._fail("no model open")
     a, b = A._by_guid(guid1), A._by_guid(guid2)
@@ -725,7 +843,7 @@ def join_elements(guid1: str, guid2: str) -> str:
     if a.is_a() != b.is_a() and not (a.is_a("IfcWall") and b.is_a("IfcWall")):
         return A._fail("a wall joins walls, a beam joins beams")
     if _collinear(a, b):
-        plan = _merge_plan(a, b)
+        plan = _merge_plan(a, b, str(props))
         if isinstance(plan, str):
             return A._fail(plan)
         lo, hi = plan

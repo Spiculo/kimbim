@@ -25,6 +25,7 @@ private:
     QComboBox* m_paper;
     QComboBox* m_unit;
     QComboBox* m_areaUnit; // D92
+    QComboBox* m_importedWalls; // D92
     QSpinBox* m_decimals;
 };
 

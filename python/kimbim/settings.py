@@ -48,6 +48,7 @@ DEFAULTS = {
     "check_tolerance": 0.002,   # D92: clash hard tolerance (m)
     "check_clearance": 0.05,    # D92: clash clearance (m)
     "check_ignore_joined": True,  # D92: walls joined to each other do not clash
+    "imported_walls": "rebuild",  # D92: splitting an imported wall rebuilds it (default) or keeps its shape and cuts it
 }
 UNITS = {"m": 1.0, "cm": 100.0, "mm": 1000.0}
 AREA_UNITS = {"m²": 1.0, "cm²": 10000.0, "mm²": 1000000.0}
@@ -168,6 +169,8 @@ def _error(key: str, value) -> str | None:
         return f"{key} must be between 0 and 10 m"
     if key == "check_ignore_joined" and not isinstance(value, bool):
         return "check_ignore_joined must be true or false"
+    if key == "imported_walls" and value not in ("rebuild", "keep"):
+        return f"unknown imported wall choice {value}"
     if key in ("ids_files", "clash_sets"):
         from . import checks
 
