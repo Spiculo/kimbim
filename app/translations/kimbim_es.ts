@@ -6944,11 +6944,16 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
     </message>
     <message>
       <location filename="../src/ProjectSettingsDialog.cpp" line="51" />
+      <source>Areas in:</source>
+      <translation>Áreas en:</translation>
+    </message>
+    <message>
+      <location filename="../src/ProjectSettingsDialog.cpp" line="56" />
       <source>Decimals:</source>
       <translation>Decimales:</translation>
     </message>
     <message>
-      <location filename="../src/ProjectSettingsDialog.cpp" line="53" />
+      <location filename="../src/ProjectSettingsDialog.cpp" line="58" />
       <source>These settings aren't kept with a plain IFC file. Save as .kim to keep them.</source>
       <translation>Esta configuración no se guarda en un archivo IFC simple. Guárdalo como .kim para conservarla.</translation>
     </message>

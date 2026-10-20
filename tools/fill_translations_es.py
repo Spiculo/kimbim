@@ -1229,6 +1229,8 @@ ES = {
     "How a box selects elements": "Cómo selecciona una caja",
     "Include hidden": "Incluir ocultos",
     "Find elements on hidden or locked layers too": "Buscar también elementos en capas ocultas o bloqueadas",
+    # D92: measure and levels
+    "Areas in:": "Áreas en:",
 }
 
 

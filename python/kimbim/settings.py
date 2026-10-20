@@ -20,6 +20,7 @@ DEFAULTS = {
     "sheet_paper": "A1",
     "length_unit": "m",
     "length_decimals": 2,
+    "area_unit": "m²",  # D92: how areas are shown (project setting)
     "pen_sets": {},
     "line_types": {},
     "fill_patterns": {},  # D84: the project's fill patterns (empty: the built-ins)
@@ -43,6 +44,7 @@ DEFAULTS = {
     "stair_rules": {},  # building-code limits for stair and ramp warnings (D88; empty: the defaults)
 }
 UNITS = {"m": 1.0, "cm": 100.0, "mm": 1000.0}
+AREA_UNITS = {"m²": 1.0, "cm²": 10000.0, "mm²": 1000000.0}
 
 _current: dict = copy.deepcopy(DEFAULTS)
 _saved: dict = copy.deepcopy(DEFAULTS)
@@ -124,6 +126,8 @@ def _error(key: str, value) -> str | None:
         return f"unknown paper size {value}"
     if key == "length_unit" and value not in UNITS:
         return f"unknown length unit {value}"
+    if key == "area_unit" and value not in AREA_UNITS:
+        return f"unknown area unit {value}"
     if key == "length_decimals" and not (isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 4):
         return "decimals must be between 0 and 4"
     if key in ("hidden_layers", "locked_layers") and not (isinstance(value, list) and all(isinstance(x, str) for x in value)):
@@ -164,6 +168,13 @@ def _error(key: str, value) -> str | None:
 def format_length(metres: float, unit: bool = True) -> str:
     u = _current.get("length_unit", "m")
     text = f"{metres * UNITS.get(u, 1.0):.{int(_current.get('length_decimals', 2))}f}"
+    return f"{text} {u}" if unit else text
+
+
+def format_area(square_metres: float, unit: bool = True) -> str:
+    """An area in the project's area unit (D92), like format_length for lengths."""
+    u = _current.get("area_unit", "m²")
+    text = f"{square_metres * AREA_UNITS.get(u, 1.0):.{int(_current.get('length_decimals', 2))}f}"
     return f"{text} {u}" if unit else text
 
 

@@ -92,6 +92,16 @@ def test_changing_an_elevation_moves_the_level_and_its_elements(house):
     assert world_z(house["w1"]) == pytest.approx(before["w1"]) and table()[0]["elevation"] == 0.0
 
 
+def test_an_elevation_change_can_move_the_levels_above(house):
+    # D92: off by default; with the option the levels above follow the edited one.
+    r = call("set_storey_elevation", house["l1"], 1.0, "true")
+    assert r["ok"], r
+    assert [row["elevation"] for row in table()] == pytest.approx([1.0, 4.0, 7.0])
+    assert world_z(house["w2"]) == pytest.approx(4.0)
+    assert call("undo")["ok"]
+    assert [row["elevation"] for row in table()] == pytest.approx([0.0, 3.0, 6.0])
+
+
 def test_elements_placed_absolutely_move_too_and_strangers_stay(house):
     """Imported files may place elements absolutely, or chain other things to a storey's placement."""
     wall, other = b._model.by_guid(house["w1"]), b._model.by_guid(house["w2"])
@@ -117,6 +127,15 @@ def test_insert_adds_a_level_with_its_floor_plan(house):
     assert "Mezzanine Floor Plan" in [d["name"] for d in call("drawings")["drawings"]]
     assert world_z(guid) == pytest.approx(1.5)
     assert call("undo")["ok"] and len(table()) == 3
+
+
+def test_insert_can_fit_between_two_levels(house):
+    # D92: fit between (Revit): the new level goes in the middle of the gap; the levels stay.
+    r = call("insert_storey", "Mezzanine", 2.0, "true")
+    assert r["ok"], r
+    guid = r["created"][0]
+    assert world_z(guid) == pytest.approx(1.5)
+    assert [row["elevation"] for row in table()] == pytest.approx([0.0, 1.5, 3.0, 6.0])
 
 
 def test_deleting_an_empty_level(house):

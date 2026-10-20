@@ -6752,11 +6752,16 @@ Open it read-only?</source>
     </message>
     <message>
         <location filename="../src/ProjectSettingsDialog.cpp" line="51"/>
+        <source>Areas in:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="56"/>
         <source>Decimals:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="53"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="58"/>
         <source>These settings aren&apos;t kept with a plain IFC file. Save as .kim to keep them.</source>
         <translation type="unfinished"></translation>
     </message>

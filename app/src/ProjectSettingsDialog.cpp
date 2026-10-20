@@ -44,6 +44,11 @@ ProjectSettingsDialog::ProjectSettingsDialog(const QJsonObject& settings, bool k
     m_unit->addItems({QStringLiteral("m"), QStringLiteral("cm"), QStringLiteral("mm")});
     m_unit->setCurrentText(settings.value("length_unit").toString(QStringLiteral("m")));
     form->addRow(tr("Lengths in:"), m_unit);
+    m_areaUnit = new QComboBox(this); // D92
+    m_areaUnit->setObjectName(QStringLiteral("areaUnit"));
+    m_areaUnit->addItems({QStringLiteral("m²"), QStringLiteral("cm²"), QStringLiteral("mm²")});
+    m_areaUnit->setCurrentText(settings.value("area_unit").toString(QStringLiteral("m²")));
+    form->addRow(tr("Areas in:"), m_areaUnit);
     m_decimals = new QSpinBox(this);
     m_decimals->setObjectName(QStringLiteral("lengthDecimals"));
     m_decimals->setRange(0, 4);
@@ -72,6 +77,8 @@ QJsonObject ProjectSettingsDialog::changes() const
         out.insert("sheet_paper", m_paper->currentText());
     if (m_unit->currentText() != m_settings.value("length_unit").toString(QStringLiteral("m")))
         out.insert("length_unit", m_unit->currentText());
+    if (m_areaUnit->currentText() != m_settings.value("area_unit").toString(QStringLiteral("m²")))
+        out.insert("area_unit", m_areaUnit->currentText());
     if (m_decimals->value() != m_settings.value("length_decimals").toInt(2))
         out.insert("length_decimals", m_decimals->value());
     return out;

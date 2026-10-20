@@ -30,11 +30,18 @@ def test_changing_a_setting_marks_the_model_unsaved_and_unknown_keys_are_kept():
 def test_bad_values_are_refused_and_change_nothing():
     assert call("new_project", "x")["ok"]
     for bad in ({"plan_cut_height": -1}, {"drawing_scale": 0}, {"sheet_paper": "B5"}, {"length_unit": "ft"},
-                {"length_decimals": 9}, {"hidden_layers": "A-WALL"}):
+                {"length_decimals": 9}, {"hidden_layers": "A-WALL"}, {"area_unit": "ft²"}):
         r = call("set_project_settings", json.dumps(bad))
         assert not r["ok"], bad
     assert call("project_settings")["settings"] == S.DEFAULTS and call("state")["dirty"] is False
     assert not call("set_project_settings", "not json")["ok"]
+
+
+def test_the_area_unit_formats_areas():
+    assert call("new_project", "x")["ok"]
+    assert call("set_project_settings", json.dumps({"area_unit": "cm²"}))["ok"]
+    assert S.format_area(1.5) == "15000.00 cm²"  # D92
+    assert S.format_area(1.5, unit=False) == "15000.00"
 
 
 def test_bytes_round_trip_is_canonical():

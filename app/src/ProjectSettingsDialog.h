@@ -24,6 +24,7 @@ private:
     QSpinBox* m_scale;
     QComboBox* m_paper;
     QComboBox* m_unit;
+    QComboBox* m_areaUnit; // D92
     QSpinBox* m_decimals;
 };
 

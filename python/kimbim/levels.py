@@ -220,6 +220,10 @@ def _rename(storey, name: str):
             d.Name = drawings.plan_name(storey)
 
 
+def _truthy(v) -> bool:
+    return v is True or str(v).strip().lower() in ("1", "true", "yes")
+
+
 def _number(value, what: str) -> float:
     try:
         x = float(value)
@@ -287,7 +291,7 @@ def _move_members(storey, target):
                 ifcopenshell.api.geometry.edit_object_placement(f, product=part, matrix=world, is_si=False)
 
 
-def _apply(rows, deletions) -> tuple:
+def _apply(rows, deletions, move_above: bool = False) -> tuple:
     """Inside an action: the whole table edit. Returns (count, geometry changed, removed, created)."""
     from . import drawings
 
@@ -302,14 +306,21 @@ def _apply(rows, deletions) -> tuple:
                 _set_shown(s, row["show"])
                 count += 1
     # Elevations: every level moves by its own difference (placements are independent, and
-    # anything chained to a moved level is put back by _shift).
+    # anything chained to a moved level is put back by _shift). With `move_above` (D92), the levels
+    # above a moved level go with it, as when one level's elevation is edited.
     for row in rows:
         if row["guid"]:
             s = B._model.by_guid(row["guid"])
-            dz = row["elevation"] - A._elevation(s)
+            orig = A._elevation(s)
+            dz = row["elevation"] - orig
             if abs(dz) > 1e-7:
                 changed += _shift(s, dz)
                 count += 1
+                if move_above:
+                    for above in B._model.by_type("IfcBuildingStorey"):
+                        if above.id() != s.id() and A._elevation(above) > orig + 1e-7:
+                            changed += _shift(above, dz)
+                            count += 1
     for row in rows:
         if not row["guid"]:
             s = A._make_storey(row["name"], row["elevation"])
@@ -355,7 +366,7 @@ def edit_storeys(changes_json: str) -> str:
     made = {}
 
     def action():
-        count, changed, removed, made["created"] = _apply(rows, deletions)
+        count, changed, removed, made["created"] = _apply(rows, deletions, bool(changes.get("move_above")))
         return count, changed, removed
 
     try:
@@ -371,28 +382,43 @@ def _row(storey) -> dict:
     return {"guid": storey.GlobalId, "name": storey.Name or "", "elevation": A._elevation(storey), "show": _shown(storey)}
 
 
-def _one(guid: str, **change) -> str:
+def _one(guid: str, _move_above: bool = False, **change) -> str:
     s = A._by_guid(guid) if B._model is not None else None
     if s is None or not s.is_a("IfcBuildingStorey"):
         return A._fail("unknown level")
-    return edit_storeys(json.dumps({"levels": [{**_row(s), **change}]}))
+    return edit_storeys(json.dumps({"levels": [{**_row(s), **change}], "move_above": _move_above}))
 
 
 def rename_storey(guid: str, name: str) -> str:
     return _one(guid, name=name)
 
 
-def set_storey_elevation(guid: str, elevation) -> str:
-    """Move a level to a new elevation (metres); its elements move with it (Archicad)."""
-    return _one(guid, elevation=elevation)
+def set_storey_elevation(guid: str, elevation, move_above=False) -> str:
+    """Move a level to a new elevation (metres); its elements move with it (Archicad). With
+    `move_above` (D92) the levels above it move too."""
+    return _one(guid, _move_above=_truthy(move_above), elevation=elevation)
 
 
 def set_storey_shown(guid: str, show) -> str:
     return _one(guid, show=bool(show) and str(show).lower() not in ("0", "false"))
 
 
-def insert_storey(name: str, elevation) -> str:
-    return edit_storeys(json.dumps({"levels": [{"guid": "", "name": name, "elevation": elevation, "show": True}]}))
+def insert_storey(name: str, elevation="", fit_between=False) -> str:
+    """Add a level at `elevation`. With `fit_between` (D92, Revit) it goes in the middle of the gap it
+    falls in and the levels around it stay; otherwise it is placed as given (Archicad's push above)."""
+    if not _truthy(fit_between):
+        return edit_storeys(json.dumps({"levels": [{"guid": "", "name": name, "elevation": elevation, "show": True}]}))
+    try:
+        z = _number(elevation, name)
+    except ValueError as ex:
+        return A._fail(str(ex))
+    if B._model is None:
+        return A._fail("no model open")
+    others = sorted(A._elevation(s) for s in B._model.by_type("IfcBuildingStorey"))
+    below = max((e for e in others if e <= z + 1e-7), default=None)
+    above = min((e for e in others if e >= z - 1e-7), default=None)
+    target = (below + above) / 2 if below is not None and above is not None and above - below > 1e-7 else z
+    return edit_storeys(json.dumps({"levels": [{"guid": "", "name": name, "elevation": target, "show": True}]}))
 
 
 def delete_storey(guid: str, elements: str = "refuse", move_to: str = "") -> str:
