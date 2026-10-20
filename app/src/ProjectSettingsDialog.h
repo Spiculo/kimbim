@@ -4,6 +4,7 @@
 #include <QDialog>
 #include <QJsonObject>
 
+class QCheckBox;
 class QComboBox;
 class QDoubleSpinBox;
 class QSpinBox;
@@ -26,6 +27,7 @@ private:
     QComboBox* m_unit;
     QComboBox* m_areaUnit; // D92
     QComboBox* m_importedWalls; // D92
+    QCheckBox* m_partialDups; // D92: model checks
     QSpinBox* m_decimals;
 };
 

@@ -386,6 +386,7 @@ public:
     ChecksPanel* checksPanel(); // created and docked on first use (Model > Check model...)
     bool runChecks(const QStringList& checks, const QJsonObject& options = {});
     bool addIdsFile(const QString& path);
+    bool linkIdsFile(const QString& path); // D92: keep the IDS as a path into a folder, not embedded
     bool removeIdsFile(const QString& name);
     bool exportIdsReport(const QString& path);
     bool saveClashSet(const QString& name, const QJsonObject& set, const QString& replaces = QString());

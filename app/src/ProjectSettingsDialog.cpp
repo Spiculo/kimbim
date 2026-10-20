@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "ProjectSettingsDialog.h"
 
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
@@ -56,6 +57,11 @@ ProjectSettingsDialog::ProjectSettingsDialog(const QJsonObject& settings, bool k
     m_importedWalls->setCurrentIndex(m_importedWalls->findData(settings.value("imported_walls").toString(QStringLiteral("rebuild"))));
     m_importedWalls->setToolTip(tr("Splitting a wall imported from another program: rebuild it (so it edits and joins like one drawn here) or keep the other program's body and cut it"));
     form->addRow(tr("Imported walls:"), m_importedWalls);
+    m_partialDups = new QCheckBox(tr("Flag partly overlapping elements as duplicates"), this); // D92
+    m_partialDups->setObjectName(QStringLiteral("partialDuplicates"));
+    m_partialDups->setChecked(settings.value("check_partial_duplicates").toBool(false));
+    m_partialDups->setToolTip(tr("Model checks: also report same-type elements that overlap by half or more without being exactly in the same place"));
+    form->addRow(QString(), m_partialDups);
     m_decimals = new QSpinBox(this);
     m_decimals->setObjectName(QStringLiteral("lengthDecimals"));
     m_decimals->setRange(0, 4);
@@ -88,6 +94,8 @@ QJsonObject ProjectSettingsDialog::changes() const
         out.insert("area_unit", m_areaUnit->currentText());
     if (m_importedWalls->currentData().toString() != m_settings.value("imported_walls").toString(QStringLiteral("rebuild")))
         out.insert("imported_walls", m_importedWalls->currentData().toString());
+    if (m_partialDups->isChecked() != m_settings.value("check_partial_duplicates").toBool(false))
+        out.insert("check_partial_duplicates", m_partialDups->isChecked());
     if (m_decimals->value() != m_settings.value("length_decimals").toInt(2))
         out.insert("length_decimals", m_decimals->value());
     return out;

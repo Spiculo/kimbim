@@ -65,8 +65,11 @@ def validate(key: str, value) -> str | None:
     if not isinstance(value, dict) or any(not isinstance(k, str) or not k.strip() for k in value):
         return f"{key} must map names to entries"
     if key == "ids_files":
-        for name, xml in value.items():
-            if not isinstance(xml, str) or "<" not in xml:
+        for name, entry in value.items():
+            if isinstance(entry, dict):  # D92: linked from a folder instead of embedded
+                if not (isinstance(entry.get("path"), str) and entry["path"].strip()):
+                    return f"IDS {name} link must be an object with a path"
+            elif not isinstance(entry, str) or "<" not in entry:
                 return f"IDS {name} must be the XML text of the .ids file"
     elif key == "clash_sets":
         for name, c in value.items():
@@ -267,8 +270,19 @@ def check_ids(model, options: dict) -> dict:
     issues, groups = [], []
     if not files:
         return {"issues": [], "groups": [], "detail": "no IDS files: add one in the Checks panel", "empty": "no_ids"}
-    for name, xml in files.items():
+    for name, entry in files.items():
         _poll()
+        if isinstance(entry, dict):  # D92: an IDS linked from a folder: read it now
+            import pathlib
+
+            path = str(entry.get("path", ""))
+            try:
+                xml = pathlib.Path(path).read_text(encoding="utf-8-sig")
+            except OSError as ex:
+                issues.append(_issue("error", f"{name}: the linked IDS file could not be read ({path}): {ex}", group=name))
+                continue
+        else:
+            xml = entry
         try:
             ids = parse_ids(xml)
         except Exception as ex:
@@ -547,7 +561,21 @@ def _fingerprint(x, memo: dict, budget: list):
     return x
 
 
-def _duplicates(model, elements, unit: float) -> list[dict]:
+def _element_box(e):
+    """The element's world axis-aligned box (min, max) as numpy arrays, or None."""
+    import ifcopenshell.geom
+    import numpy as np
+
+    s = ifcopenshell.geom.settings()
+    s.set("use-world-coords", True)
+    try:
+        v = np.asarray(ifcopenshell.geom.create_shape(s, e).geometry.verts, dtype=float).reshape(-1, 3)
+    except Exception:
+        return None
+    return (v.min(axis=0), v.max(axis=0)) if len(v) else None
+
+
+def _duplicates(model, elements, unit: float, partial: bool = False) -> list[dict]:
     from .queries import _Context
 
     ctx = _Context(model)
@@ -561,6 +589,7 @@ def _duplicates(model, elements, unit: float) -> list[dict]:
         t = ctx.type_of(e)
         buckets.setdefault((_class_key(e), t.id() if t is not None else None, place), []).append(e)
     issues = []
+    reported: set = set()
     for (cls, _t, _p), group in buckets.items():
         if len(group) < 2:
             continue
@@ -573,7 +602,51 @@ def _duplicates(model, elements, unit: float) -> list[dict]:
                 names = ", ".join(_label(e) for e in same[:4])
                 issues.append(_issue("warning", f"{len(same)} {cls} elements in the same place with the same shape: {names}",
                                      same, "Duplicate elements"))
+                for i in range(len(same)):
+                    for j in range(i + 1, len(same)):
+                        reported.add(frozenset((same[i].id(), same[j].id())))
+    if partial:
+        issues += _partial_duplicates(model, elements, ctx, reported)
     return issues
+
+
+def _partial_duplicates(model, elements, ctx, skip: set) -> list[dict]:
+    """D92: elements of the same class and type whose bodies largely overlap without being in exactly
+    the same place (the option is off by default)."""
+    import numpy as np
+
+    by_type: dict = {}
+    for e in elements:
+        _poll()
+        if e.Representation is None:
+            continue
+        t = ctx.type_of(e)
+        by_type.setdefault((_class_key(e), t.id() if t is not None else None), []).append(e)
+    out = []
+    for (cls, _t), group in by_type.items():
+        if len(group) < 2:
+            continue
+        boxes = [(e, _element_box(e)) for e in group]
+        boxes = [(e, b) for e, b in boxes if b is not None]
+        for i in range(len(boxes)):
+            for j in range(i + 1, len(boxes)):
+                ea, (loa, hia) = boxes[i]
+                eb, (lob, hib) = boxes[j]
+                if frozenset((ea.id(), eb.id())) in skip:
+                    continue
+                inter = np.minimum(hia, hib) - np.maximum(loa, lob)
+                if not np.all(inter > 1e-6):
+                    continue
+                vol_a = float(np.prod(np.maximum(hia - loa, 0.0)))
+                vol_b = float(np.prod(np.maximum(hib - lob, 0.0)))
+                smaller = min(vol_a, vol_b)
+                if smaller <= 0:
+                    continue
+                if float(np.prod(inter)) / smaller >= 0.5:  # overlapping by half of the smaller body
+                    out.append(_issue("warning",
+                        f"{_label(ea)} and {_label(eb)} overlap: possible duplicates",
+                        [ea, eb], "Duplicate elements"))
+    return out
 
 
 def _rooms(model) -> list[dict]:
@@ -662,13 +735,16 @@ def _no_host(model) -> list[dict]:
 
 
 def check_model(model, options: dict) -> dict:
+    from . import settings
+
     which = options.get("model_checks") or MODEL_CHECKS
     unit = ifcopenshell.util.unit.calculate_unit_scale(model)
     elements = [e for e in model.by_type("IfcElement") if _physical(e)]
+    partial = bool(options.get("partial_duplicates", settings.current().get("check_partial_duplicates", False)))
     issues, groups = [], []
     timings = {}
     for name, title, run in (
-        ("duplicates", "Duplicate elements", lambda: _duplicates(model, elements, unit)),
+        ("duplicates", "Duplicate elements", lambda: _duplicates(model, elements, unit, partial)),
         ("rooms", "Rooms without a number or name", lambda: _rooms(model)),
         ("zero_walls", "Walls with zero length", lambda: _zero_walls(model, unit)),
         ("not_on_level", "Elements not on a level", lambda: _not_on_level(model, elements)),
