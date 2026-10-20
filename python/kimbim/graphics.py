@@ -125,8 +125,10 @@ _BUILTINS = {
         "Crosshatch": {"lines": [{"angle": 45, "spacing": 2.0}, {"angle": 135, "spacing": 2.0}]},
         "Horizontal": {"lines": [{"angle": 0, "spacing": 2.0}]},
         "Brick": {"lines": [{"angle": 0, "spacing": 2.0}, {"angle": 90, "spacing": 2.0, "shift": 2.0, "dash": [2.0, 2.0]}]},
+        # D93: insulation defaults to loops; the zigzag is still available.
+        "Insulation": {"loops": True, "radius": 1.0, "spacing": 3.0},
         # zigzag rows 2 mm high, 2 mm period: two families of dashes that meet at the peaks
-        "Insulation": {"lines": [
+        "Zigzag": {"lines": [
             {"angle": 63.434949, "spacing": 0.894427, "shift": 1.788854, "dash": [2.236068, 2.236068]},
             {"angle": 116.565051, "spacing": 0.894427, "shift": -1.788854, "dash": [2.236068, 2.236068]}]},
         "Concrete": {"lines": [{"angle": 0, "spacing": 1.2, "shift": 0.6, "dash": [0.1, 1.1]},
@@ -333,10 +335,16 @@ def validate(key: str, value) -> str | None:
                 return f"line type {name}: at most 6 dash and gap pairs"
     elif key == "fill_patterns":
         for name, p in value.items():
-            if not isinstance(p, dict) or not isinstance(p.get("lines", []), list):
-                return f"fill pattern {name}: a list of hatch lines"
+            if not isinstance(p, dict):
+                return f"fill pattern {name}: expected an object"
             if "solid" in p and not isinstance(p["solid"], bool):
                 return f"fill pattern {name}: solid is true or false"
+            if p.get("loops"):  # D93: an insulation-style loop pattern
+                if not (_number(p.get("radius")) and p["radius"] > 0) or not (_number(p.get("spacing")) and p["spacing"] > 0):
+                    return f"fill pattern {name}: loops need a radius and a spacing above 0"
+                continue
+            if not isinstance(p.get("lines", []), list):
+                return f"fill pattern {name}: a list of hatch lines"
             if len(p.get("lines", [])) > 8:
                 return f"fill pattern {name}: at most 8 hatch line families"
             for line in p.get("lines", []):

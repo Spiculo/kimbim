@@ -169,6 +169,44 @@ def _dash_intervals(t0: float, t1: float, phase: float, dash):
     return out
 
 
+def _point_in_polygon(x: float, y: float, poly) -> bool:
+    inside = False
+    for (x0, y0), (x1, y1) in zip(poly, poly[1:] + poly[:1]):
+        if (y0 > y) != (y1 > y) and x < (x1 - x0) * (y - y0) / (y1 - y0) + x0:
+            inside = not inside
+    return inside
+
+
+def _loops_hatch(poly, pattern, metres_per_mm: float, limit: int):
+    """A row of tangent loops (D93's insulation style), flattened to segments and clipped by their
+    midpoints. [[]] when it would need more than `limit` segments."""
+    radius = float(pattern.get("radius", 1.0)) * metres_per_mm
+    spacing = float(pattern.get("spacing", 3.0)) * metres_per_mm
+    if radius <= 0 or spacing <= 0:
+        return []
+    xs, ys = [p[0] for p in poly], [p[1] for p in poly]
+    x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+    n = 10  # segments per loop
+    out = []
+    row = 0
+    y = y0 + spacing / 2
+    while y < y1 + radius:
+        x = x0 + (spacing / 2 if row % 2 else 0.0)
+        while x < x1 + radius:
+            for k in range(n):
+                a0, a1 = 2 * math.pi * k / n, 2 * math.pi * (k + 1) / n
+                p0 = (x + radius * math.cos(a0), y + radius * math.sin(a0))
+                p1 = (x + radius * math.cos(a1), y + radius * math.sin(a1))
+                if _point_in_polygon((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2, poly):
+                    out.append([p0[0], p0[1], p1[0], p1[1]])
+                    if len(out) > limit:
+                        return []
+            x += spacing
+        y += spacing
+        row += 1
+    return out
+
+
 def hatch(polygon, pattern: dict, metres_per_mm: float, limit: int = MAX_HATCH_SEGMENTS):
     """Hatch segments [[x1, y1, x2, y2], ...] (metres) of `pattern` clipped to `polygon`, anchored at
     the project origin so neighbouring fills line up. [] for solid or empty patterns, or when the
@@ -177,6 +215,8 @@ def hatch(polygon, pattern: dict, metres_per_mm: float, limit: int = MAX_HATCH_S
     poly = [tuple(p) for p in polygon]
     if len(poly) < 3:
         return out
+    if (pattern or {}).get("loops"):
+        return [[round(v, 6) for v in s] for s in _loops_hatch(poly, pattern, metres_per_mm, limit)]
     for family in (pattern or {}).get("lines", []) or []:
         spacing = float(family.get("spacing", 0)) * metres_per_mm
         if spacing <= 0:
