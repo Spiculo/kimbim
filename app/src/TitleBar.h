@@ -44,7 +44,7 @@ public:
     QMenuBar* menuBar() const { return m_menuBar; }
     QToolButton* menuButton() const { return m_menuButton; } // the menus, collapsed
     void addControl(QWidget* control);  // the level and cut controls, after the menus
-    void addControlSeparator();
+    QWidget* addControlSeparator();
     void setTrailing(QWidget* widget);  // before the window buttons (the Versions button)
     QString title() const;              // what the bar shows
     bool menusCollapsed() const;

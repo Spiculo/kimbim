@@ -1197,6 +1197,11 @@ ES = {
     "How wide the perspective view sees: 45° is a normal lens":
         "Cuánto abarca la vista en perspectiva: 45° es una lente normal",
     "°": "°",
+    # D92: window chrome
+    "Title bar shows:": "La barra de título muestra:",
+    "Plan cut": "Corte en planta",
+    "Save the current state as a new version (same as the Versions menu)":
+        "Guarda el estado actual como una versión nueva (igual que el menú Versiones)",
 }
 
 

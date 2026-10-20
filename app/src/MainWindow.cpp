@@ -202,6 +202,7 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     buildModelingToolbar();
     buildVersions();       // the Versions menu and the title bar's Versions button
     buildPalette();
+    applyTitleBarPreferences(); // D92: which title bar controls the preferences keep
     m_status->showMessage(tr("Ready"));
 
     m_loader->moveToThread(&m_thread);
@@ -333,6 +334,8 @@ MainWindow::~MainWindow()
 void MainWindow::buildMenus()
 {
     QMenu* file = m_menuBar->addMenu(tr("&File"));
+    file->setObjectName(QStringLiteral("fileMenu"));
+    m_fileMenu = file;
     QAction* newProjectAction = file->addAction(tr("&New project..."));
     newProjectAction->setObjectName(QStringLiteral("actionNewProject"));
     newProjectAction->setShortcut(QKeySequence::New);
@@ -362,6 +365,11 @@ void MainWindow::buildMenus()
     QAction* saveTemplate = file->addAction(tr("Save as &template..."));
     saveTemplate->setObjectName(QStringLiteral("actionSaveAsTemplate"));
     connect(saveTemplate, &QAction::triggered, this, &MainWindow::saveAsTemplateDialog);
+    // D92: Save version also in the File menu (the shortcut stays on the Versions menu's action).
+    QAction* saveVersionFile = file->addAction(tr("Save &version..."));
+    saveVersionFile->setObjectName(QStringLiteral("actionSaveVersionFile"));
+    saveVersionFile->setToolTip(tr("Save the current state as a new version (same as the Versions menu)"));
+    connect(saveVersionFile, &QAction::triggered, this, &MainWindow::saveVersionDialog);
     QAction* exportIfcAction = file->addAction(tr("&Export IFC..."));
     exportIfcAction->setObjectName(QStringLiteral("actionExportIfc"));
     connect(exportIfcAction, &QAction::triggered, this, &MainWindow::exportIfcDialog);
@@ -760,9 +768,10 @@ void MainWindow::buildCutsToolbar()
         b->setDefaultAction(action);
         b->setAutoRaise(true);
         m_titleBar->addControl(b);
+        return b;
     };
-    m_titleBar->addControlSeparator();
-    cutButton(m_planCut);
+    m_cutSeparator = m_titleBar->addControlSeparator();
+    m_planCutButton = cutButton(m_planCut);
     m_cutHeight = new QDoubleSpinBox(m_titleBar);
     m_cutHeight->setObjectName(QStringLiteral("planCutHeight"));
     m_cutHeight->setRange(-1000.0, 10000.0);
@@ -3567,6 +3576,20 @@ void MainWindow::applyViewPreferences()
         m_viewport->setPerspective(true); // re-apply the field of view to the open camera
 }
 
+void MainWindow::applyTitleBarPreferences()
+{
+    if (m_levels)
+        m_levels->setVisible(m_prefs.titleBarLevels());
+    if (m_planCutButton)
+        m_planCutButton->setVisible(m_prefs.titleBarCut());
+    if (m_cutHeight)
+        m_cutHeight->setVisible(m_prefs.titleBarCut());
+    if (m_cutSeparator)
+        m_cutSeparator->setVisible(m_prefs.titleBarCut());
+    if (m_versionsButton)
+        m_versionsButton->setVisible(m_prefs.titleBarVersions());
+}
+
 void MainWindow::refreshAnnotations()
 {
     QVector<Viewport::Annotation> list;
@@ -5150,6 +5173,7 @@ void MainWindow::preferencesDialog()
     m_prefs.save();
     Viewport::setScrollMode(Viewport::scrollModeFrom(m_prefs.scrollNavigation())); // D89
     applyViewPreferences(); // D92: the field of view and the home view
+    applyTitleBarPreferences(); // D92: which controls the title bar holds
     bridge("set_author", {m_prefs.authorName(), m_prefs.authorEmail()});
     applyDrawingPrefs();
     restartRecoveryTimer();

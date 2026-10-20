@@ -54,6 +54,9 @@ QJsonObject Preferences::defaults()
         {"drawing_hlr", "exact"},
         {"scroll_navigation", "auto"},
         {"field_of_view", 45.0},
+        {"title_bar_levels", true},
+        {"title_bar_cut", true},
+        {"title_bar_versions", true},
         {"recent", QJsonArray()},
     };
 }
@@ -152,6 +155,10 @@ double Preferences::fieldOfView() const
     const QJsonValue v = value("field_of_view");
     return v.isDouble() && v.toDouble() >= 5.0 && v.toDouble() <= 120.0 ? v.toDouble() : 45.0;
 }
+
+bool Preferences::titleBarLevels() const { return value("title_bar_levels").toBool(true); }
+bool Preferences::titleBarCut() const { return value("title_bar_cut").toBool(true); }
+bool Preferences::titleBarVersions() const { return value("title_bar_versions").toBool(true); }
 
 bool Preferences::trueLineWeights() const
 {

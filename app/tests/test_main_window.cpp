@@ -1712,6 +1712,17 @@ private slots:
         QVERIFY(action(w, "actionLinesOnly")->isCheckable());
     }
 
+    // D92: Save version is also in the File menu; the title bar controls are preferences.
+    void saveVersionIsAlsoInTheFileMenu()
+    {
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
+        QAction* a = action(w, "actionSaveVersionFile");
+        QVERIFY(a->shortcut().isEmpty()); // the shortcut stays on the Versions menu's action
+        QMenu* file = w.findChild<QMenu*>(QStringLiteral("fileMenu"));
+        QVERIFY(file && file->actions().contains(a));
+        QVERIFY(w.close());
+    }
+
     // D72: new views follow the "new_views" preference.
     void newViewsFollowThePreference()
     {

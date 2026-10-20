@@ -4,6 +4,7 @@
 #include <QJsonObject>
 #include <QTemporaryDir>
 #include <QComboBox>
+#include <QCheckBox>
 #include <QLabel>
 #include <QLineEdit>
 #include <QSpinBox>
@@ -95,6 +96,9 @@ private slots:
         QCOMPARE(p.fieldOfView(), 45.0); // D92
         p.setValue("field_of_view", 500);
         QCOMPARE(p.fieldOfView(), 45.0);
+        QVERIFY(p.titleBarLevels() && p.titleBarCut() && p.titleBarVersions()); // D92
+        p.setValue("title_bar_versions", false);
+        QVERIFY(!p.titleBarVersions());
     }
 
     void theDialogWritesWhatTheUserPicked()
@@ -112,6 +116,8 @@ private slots:
         d.findChild<QSpinBox*>("largeIfcMb")->setValue(20);
         d.findChild<QComboBox*>("scrollNavigation")->setCurrentIndex(2); // auto, zoom, pan (D89)
         d.findChild<QSpinBox*>("fieldOfView")->setValue(60); // D92
+        d.findChild<QCheckBox*>("titleBarVersions")->setChecked(false); // D92
+        d.findChild<QCheckBox*>("titleBarLevels")->setChecked(false);
         d.findChild<QLineEdit*>("authorName")->setText("Felipe");
         d.findChild<QLineEdit*>("templatesFolder")->setText("Z:/Plantillas");
         d.apply();
@@ -124,6 +130,7 @@ private slots:
         QCOMPARE(p.largeIfcMb(), 20.0);
         QCOMPARE(p.scrollNavigation(), QString("pan"));
         QCOMPARE(p.fieldOfView(), 60.0);
+        QVERIFY(!p.titleBarLevels() && !p.titleBarVersions());
         QCOMPARE(p.authorName(), QString("Felipe"));
         QCOMPARE(p.templatesFolder(), QString("Z:/Plantillas"));
     }

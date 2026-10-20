@@ -414,6 +414,7 @@ private:
     void clampWindowSize();
     void applyDrawingPrefs(); // the drawing timeout and hidden-line mode, from the preferences
     void applyViewPreferences(); // D92: the perspective field of view and the home view, from the preferences
+    void applyTitleBarPreferences(); // D92: which controls the title bar holds
     void showAbout();
     void openDialog();
     void stopLoading();
@@ -682,6 +683,9 @@ private:
     QAction* m_planCut = nullptr;
     QAction* m_sectionBox = nullptr;
     QDoubleSpinBox* m_cutHeight = nullptr;
+    QWidget* m_planCutButton = nullptr; // D92: the title bar controls the preferences can hide
+    QWidget* m_cutSeparator = nullptr;
+    QMenu* m_fileMenu = nullptr;
     Bnd_Box m_boxBounds; // captured when the section box is switched on
     // D85: underlays (Underlays.cpp): linework by file, page images by file/page/dpi/colour.
     QHash<QString, std::shared_ptr<const UnderlayLines>> m_underlayLines;

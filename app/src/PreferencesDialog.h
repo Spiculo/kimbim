@@ -4,6 +4,7 @@
 #include <QDialog>
 
 class QComboBox;
+class QCheckBox;
 class QLabel;
 class QLineEdit;
 class QSpinBox;
@@ -38,6 +39,9 @@ private:
     QComboBox* m_drawingHlr;
     QComboBox* m_scroll; // D89
     QSpinBox* m_fieldOfView; // D92
+    QCheckBox* m_titleLevels; // D92: which controls the title bar holds
+    QCheckBox* m_titleCut;
+    QCheckBox* m_titleVersions;
 };
 
 } // namespace kimbim

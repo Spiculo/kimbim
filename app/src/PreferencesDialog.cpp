@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "PreferencesDialog.h"
 
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFileDialog>
@@ -147,6 +148,23 @@ PreferencesDialog::PreferencesDialog(Preferences& prefs, QWidget* parent)
     m_fieldOfView->setToolTip(tr("How wide the perspective view sees: 45° is a normal lens"));
     form->addRow(tr("Perspective field of view:"), m_fieldOfView);
 
+    // D92: which controls the title bar holds.
+    auto* chromeRow = new QHBoxLayout;
+    m_titleLevels = new QCheckBox(tr("Levels"), this);
+    m_titleLevels->setObjectName(QStringLiteral("titleBarLevels"));
+    m_titleLevels->setChecked(prefs.titleBarLevels());
+    m_titleCut = new QCheckBox(tr("Plan cut"), this);
+    m_titleCut->setObjectName(QStringLiteral("titleBarCut"));
+    m_titleCut->setChecked(prefs.titleBarCut());
+    m_titleVersions = new QCheckBox(tr("Versions"), this);
+    m_titleVersions->setObjectName(QStringLiteral("titleBarVersions"));
+    m_titleVersions->setChecked(prefs.titleBarVersions());
+    chromeRow->addWidget(m_titleLevels);
+    chromeRow->addWidget(m_titleCut);
+    chromeRow->addWidget(m_titleVersions);
+    chromeRow->addStretch(1);
+    form->addRow(tr("Title bar shows:"), chromeRow);
+
     layout->addLayout(form);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
@@ -171,6 +189,9 @@ void PreferencesDialog::apply()
     m_prefs.setValue(QStringLiteral("drawing_hlr"), m_drawingHlr->currentData().toString());
     m_prefs.setValue(QStringLiteral("scroll_navigation"), m_scroll->currentData().toString());
     m_prefs.setValue(QStringLiteral("field_of_view"), double(m_fieldOfView->value()));
+    m_prefs.setValue(QStringLiteral("title_bar_levels"), m_titleLevels->isChecked());
+    m_prefs.setValue(QStringLiteral("title_bar_cut"), m_titleCut->isChecked());
+    m_prefs.setValue(QStringLiteral("title_bar_versions"), m_titleVersions->isChecked());
 }
 
 void PreferencesDialog::accept()

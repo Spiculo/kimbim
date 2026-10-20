@@ -31,6 +31,10 @@ public:
     bool trueLineWeights() const;
     QString scrollNavigation() const;   // D89: "auto", "zoom" (mouse wheel zooms) or "pan" (touchpad scroll pans)       // D73: View > True line weights
     double fieldOfView() const;         // D92: the perspective camera's vertical field of view, degrees (default 45)
+    // D92: which controls the title bar holds (all on by default).
+    bool titleBarLevels() const;
+    bool titleBarCut() const;
+    bool titleBarVersions() const;
     double largeIfcMb() const;
     bool askImportStatus() const;       // D74: opening an IFC offers to mark elements without a renovation status          // an IFC this large asks before making a .kim; 0: never asks
     // Drawing generation: how long to wait before giving up (seconds; 0 = no limit) and the
