@@ -432,6 +432,24 @@ def true_north(f=None):
     return (0.0, 1.0)
 
 
+def has_true_north(f=None) -> bool:
+    """Whether the model stores a true north (D92: the plan north arrow shows once it is set)."""
+    from . import app_bridge as B
+
+    f = f or B._model
+    if f is None:
+        return False
+    for context in f.by_type("IfcGeometricRepresentationContext"):
+        if context.is_a("IfcGeometricRepresentationSubContext") or context.ContextType != "Model":
+            continue
+        d = getattr(context, "TrueNorth", None)
+        if d is not None and len(d.DirectionRatios) >= 2:
+            x, y = float(d.DirectionRatios[0]), float(d.DirectionRatios[1])
+            if math.hypot(x, y) > 1e-12:
+                return True
+    return False
+
+
 def true_north_angle(f=None) -> float:
     """Degrees true north is turned from the plan's +Y, counter-clockwise (Archicad's project north)."""
     x, y = true_north(f)
@@ -580,7 +598,8 @@ def set_true_north(degrees) -> str:
 def get_true_north() -> str:
     from . import app_bridge as B
 
-    return B._dump({"ok": True, "degrees": true_north_angle(), "direction": list(true_north())})
+    return B._dump({"ok": True, "degrees": true_north_angle(), "direction": list(true_north()),
+                    "set": has_true_north()})
 
 
 # ---------------------------------------------------------------- plan drawings

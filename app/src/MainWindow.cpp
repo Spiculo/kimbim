@@ -3579,6 +3579,17 @@ void MainWindow::applyViewPreferences()
         Viewport::setHomeView(viewDirection(HomeOrientation), viewUp(HomeOrientation));
     if (m_viewport && m_viewport->isPerspective())
         m_viewport->setPerspective(true); // re-apply the field of view to the open camera
+    refreshNorthArrow();
+}
+
+// D92: the plan north arrow shows once true north is set (a preference turns it off).
+void MainWindow::refreshNorthArrow()
+{
+    if (!m_viewport)
+        return;
+    const QJsonObject north = bridge("get_true_north");
+    const bool on = m_prefs.northArrowPlans() && north.value("set").toBool();
+    m_viewport->setNorthArrow(on, north.value("degrees").toDouble());
 }
 
 void MainWindow::applyTitleBarPreferences()
@@ -3825,6 +3836,7 @@ void MainWindow::activateView(const QString& key)
         m_viewport->setWorkPlaneZ(m_levels->activeElevation());
         applyCuts();
         refreshAnnotations(); // this view's level notes, grid and markers
+        refreshNorthArrow();  // D92: the plan north indicator
         refreshDrawings();
         refreshSnapData();
     }
@@ -4954,6 +4966,7 @@ void MainWindow::afterEdit(const QJsonObject& result)
     { StepTimer _(m_timings, "refreshSnapData"); refreshSnapData(); } // undo/redo can add or remove walls and grid lines
     { StepTimer _(m_timings, "refreshLayers"); refreshLayers(); }
     { StepTimer _(m_timings, "refreshAnnotations"); refreshAnnotations(); }
+    { StepTimer _(m_timings, "refreshNorthArrow"); refreshNorthArrow(); }
     { StepTimer _(m_timings, "refreshDrawings"); refreshDrawings(); }
     { StepTimer _(m_timings, "refreshSheets"); refreshSheets(); }
     StepTimer stateTimer(m_timings, "stateAndNames");

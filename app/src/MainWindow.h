@@ -416,6 +416,7 @@ private:
     void clampWindowSize();
     void applyDrawingPrefs(); // the drawing timeout and hidden-line mode, from the preferences
     void applyViewPreferences(); // D92: the perspective field of view and the home view, from the preferences
+    void refreshNorthArrow(); // D92: the plan north indicator, from true north and the preference
     void applyTitleBarPreferences(); // D92: which controls the title bar holds
     void showAbout();
     void openDialog();

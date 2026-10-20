@@ -68,6 +68,26 @@ private slots:
         QCOMPARE(v.gestureFor(Aspect_VKeyMouse_MiddleButton, Aspect_VKeyFlags_SHIFT), AIS_MouseGesture_RotateOrbit);
     }
 
+    // D92: the north indicator shows only in plan views, and only when the option is on.
+    void northArrowShowsOnlyInPlanView()
+    {
+        kimbim::Viewport v;
+        v.resize(200, 200);
+        QVERIFY(!v.northArrowShown()); // 3D view: none
+        v.setNorthArrow(true, 90.0);
+        QVERIFY(!v.northArrowShown());
+        v.setPlanView(0.0);
+        QVERIFY(v.northArrowShown());
+        QCOMPARE(v.northArrowAngle(), 90.0);
+        v.setNorthArrow(false, 90.0);
+        QVERIFY(!v.northArrowShown());
+        v.setNorthArrow(true, 0.0);
+        QVERIFY(v.northArrowShown());
+        QCOMPARE(v.northArrowAngle(), 0.0);
+        v.set3DView();
+        QVERIFY(!v.northArrowShown()); // hidden again in 3D
+    }
+
     void pointOnPlaneNeedsAWindow()
     {
         kimbim::Viewport v;

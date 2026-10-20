@@ -148,6 +148,12 @@ PreferencesDialog::PreferencesDialog(Preferences& prefs, QWidget* parent)
     m_fieldOfView->setToolTip(tr("How wide the perspective view sees: 45° is a normal lens"));
     form->addRow(tr("Perspective field of view:"), m_fieldOfView);
 
+    // D92: the north indicator on plans (shown once true north is set).
+    m_northArrow = new QCheckBox(tr("Show a north arrow on plans (once true north is set)"), this);
+    m_northArrow->setObjectName(QStringLiteral("northArrow"));
+    m_northArrow->setChecked(prefs.northArrowPlans());
+    form->addRow(QString(), m_northArrow);
+
     // D92: which controls the title bar holds.
     auto* chromeRow = new QHBoxLayout;
     m_titleLevels = new QCheckBox(tr("Levels"), this);
@@ -204,6 +210,7 @@ void PreferencesDialog::apply()
     m_prefs.setValue(QStringLiteral("drawing_hlr"), m_drawingHlr->currentData().toString());
     m_prefs.setValue(QStringLiteral("scroll_navigation"), m_scroll->currentData().toString());
     m_prefs.setValue(QStringLiteral("field_of_view"), double(m_fieldOfView->value()));
+    m_prefs.setValue(QStringLiteral("north_arrow"), m_northArrow->isChecked());
     m_prefs.setValue(QStringLiteral("title_bar_levels"), m_titleLevels->isChecked());
     m_prefs.setValue(QStringLiteral("title_bar_cut"), m_titleCut->isChecked());
     m_prefs.setValue(QStringLiteral("title_bar_versions"), m_titleVersions->isChecked());

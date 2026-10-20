@@ -209,8 +209,10 @@ def test_north_arrow_follows_true_north(flat):
     assert n["ok"], n
     tip = listed(flat["l1"])[n["guid"]]["curves"][1][0]
     assert tip == pytest.approx([15, 3 + 0.6])  # 6 mm at 1:100, up
+    assert call("get_true_north")["set"] is False  # D92: nothing stored yet
     assert call("set_true_north", 90)["ok"]  # north turned 90 degrees counter-clockwise: to the west
     assert call("get_true_north")["degrees"] == pytest.approx(90)
+    assert call("get_true_north")["set"] is True
     tip = listed(flat["l1"])[n["guid"]]["curves"][1][0]
     assert tip == pytest.approx([15 - 0.6, 3])
     ctx = next(c for c in b._model.by_type("IfcGeometricRepresentationContext") if c.ContextType == "Model")

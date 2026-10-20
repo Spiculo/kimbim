@@ -42,6 +42,10 @@ public:
 // The home button beside the cube: a small house drawn on screen (2D, not selectable).
 Handle(AIS_InteractiveObject) makeHomeButton(double devicePixelRatio);
 
+// D92: the plan view's north indicator, a small compass at the view's bottom-left corner pointing at
+// the project's true north (`degrees` counter-clockwise from the plan's +Y). 2D, display only.
+Handle(AIS_InteractiveObject) makeNorthArrow(double devicePixelRatio, double degrees);
+
 // Where they are, in widget (logical) pixels, for a widget of this size.
 QRect viewCubeRect(const QSize& widget);
 QRect homeButtonRect(const QSize& widget);

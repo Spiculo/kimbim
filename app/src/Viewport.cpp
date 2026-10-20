@@ -157,6 +157,7 @@ void Viewport::setPlanView(double elevation)
     m_planElevation = elevation;
     AbortViewAnimation();
     eraseViewCube(); // D76: plans have no cube
+    ensureNorthArrow(); // D92: the plan north indicator
     m_view->Camera()->SetProjectionType(Graphic3d_Camera::Projection_Orthographic);
     m_view->SetProj(V3d_Zpos); // looking down, north (+Y) up
     applyNavigationPreset();
@@ -172,6 +173,7 @@ void Viewport::set3DView()
     const bool wasPlan = m_planView;
     m_planView = false;
     AbortViewAnimation();
+    eraseNorthArrow(); // D92: the north indicator belongs to plans
     m_view->SetProj(HomeOrientation);
     applyProjection(); // this view's perspective setting comes back
     applyNavigationPreset();
@@ -759,7 +761,7 @@ Viewport::~Viewport()
     // This view's own overlays leave the shared context; the elements stay for the other views.
     for (const Handle(AIS_InteractiveObject)& o :
          {Handle(AIS_InteractiveObject)(m_preview), Handle(AIS_InteractiveObject)(m_grid), Handle(AIS_InteractiveObject)(m_section),
-             Handle(AIS_InteractiveObject)(m_cube), m_home})
+             Handle(AIS_InteractiveObject)(m_cube), m_home, m_northArrow})
         if (!o.IsNull())
             m_context->Remove(o, false);
     for (const auto& a : std::as_const(m_annotations))
@@ -803,6 +805,7 @@ void Viewport::paintEvent(QPaintEvent*)
     // made every paint swap twice, waiting two vsyncs, so tool previews lagged behind the mouse;
     // not invalidating at all left the window blank after it was shown or uncovered.
     ensureViewCube();
+    ensureNorthArrow();
     m_view->Invalidate();
     FlushViewEvents(m_context, m_view, true);
     // Wheel zoom is applied while flushing the view events: report it after.
@@ -2171,6 +2174,7 @@ void Viewport::keepOverlaysHere()
     keepHere(m_section);
     keepHere(m_cube);
     keepHere(m_home);
+    keepHere(m_northArrow);
     for (const auto& a : std::as_const(m_annotations))
         keepHere(a);
     for (const auto& u : std::as_const(m_underlays))
@@ -2343,6 +2347,42 @@ void Viewport::eraseViewCube()
     for (const Handle(AIS_InteractiveObject)& o : {Handle(AIS_InteractiveObject)(m_cube), m_home})
         if (!o.IsNull() && m_context->IsDisplayed(o))
             m_context->Erase(o, false);
+}
+
+// D92: the plan view's north indicator (a preference; on once true north is set).
+void Viewport::setNorthArrow(bool show, double degrees)
+{
+    m_northWanted = show;
+    m_northDegrees = degrees;
+    if (m_planView)
+        ensureNorthArrow();
+    else
+        eraseNorthArrow();
+    update();
+}
+
+void Viewport::ensureNorthArrow()
+{
+    if (!m_planView || !m_northWanted || m_view->Window().IsNull())
+        return;
+    const double dpr = devicePixelRatioF();
+    if (m_northArrow.IsNull() || std::abs(dpr - m_northDpr) > 1e-3 || std::abs(m_northDegrees - m_northAngleShown) > 1e-9) {
+        if (!m_northArrow.IsNull() && m_context->IsDisplayed(m_northArrow))
+            m_context->Remove(m_northArrow, false);
+        m_northArrow = makeNorthArrow(dpr, m_northDegrees);
+        m_northDpr = dpr;
+        m_northAngleShown = m_northDegrees;
+    }
+    if (!m_context->IsDisplayed(m_northArrow)) {
+        m_context->Display(m_northArrow, 0, 0, false);
+        keepHere(m_northArrow);
+    }
+}
+
+void Viewport::eraseNorthArrow()
+{
+    if (!m_northArrow.IsNull() && m_context->IsDisplayed(m_northArrow))
+        m_context->Erase(m_northArrow, false);
 }
 
 QRect Viewport::viewCubeRect() const

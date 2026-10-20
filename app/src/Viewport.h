@@ -93,6 +93,11 @@ public:
     bool isPerspective() const { return m_perspective; }
     bool isAnimating() const;
     void setAnimationDuration(double seconds) { m_animationSeconds = seconds; }
+    // D92: the plan view's north indicator (a view option, on once true north is set). Display only;
+    // shown only in plan views. `degrees` is counter-clockwise from the plan's +Y.
+    void setNorthArrow(bool show, double degrees);
+    bool northArrowShown() const { return m_planView && m_northWanted; }
+    double northArrowAngle() const { return m_northDegrees; }
     // The view cube and its home button (D76), top right of 3D views; hidden in plan views.
     bool viewCubeShown() const { return !m_planView; }
     QRect viewCubeRect() const;   // widget pixels; clicks inside never reach selection
@@ -415,6 +420,14 @@ private:
     // D76: view cube, preset views, perspective.
     void ensureViewCube();
     void eraseViewCube();
+    // D92: the plan north compass.
+    void ensureNorthArrow();
+    void eraseNorthArrow();
+    Handle(AIS_InteractiveObject) m_northArrow;
+    double m_northDpr = 0.0;
+    double m_northAngleShown = -1.0;
+    bool m_northWanted = false;
+    double m_northDegrees = 0.0;
     void applyProjection();
     void goTo(const gp_Dir& dir, const gp_Dir& up, bool animate, bool fit);
     void animateTo(const Handle(Graphic3d_Camera)& end, bool animate);
