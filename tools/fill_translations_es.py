@@ -597,6 +597,7 @@ ES = {
     "Every rule when it fits": "Todas las reglas si caben",
     "Every rule": "Todas las reglas",
     "Only the rules used": "Solo las reglas usadas",
+    "Library objects show their plan symbol in plans": "Los objetos de biblioteca muestran su símbolo en planta",
     "Line pen": "Pluma de línea",
     "Fill pen": "Pluma de relleno",
     "3D colour": "Color 3D",

@@ -1169,6 +1169,7 @@ _EXPORTS = {
         "place_object",
         "set_library_paths",
         "set_object_parameter",
+        "set_plan_display",
     ),
 }
 _EXPORTED = {name: module for module, names in _EXPORTS.items() for name in names}

@@ -34,6 +34,7 @@ DEFAULTS = {
     "renovation_styles": {},  # D93: renovation look presets (pen, line, fill, colour) by status
     "renovation_preset": "Uruguay",  # D93: the active renovation-styles preset
     "legend_mode": "auto",  # D91: sheet legends: "auto" (all rules when they fit), "all" or "used"
+    "plan_symbols": True,  # D91: plans show library objects' 2D plan symbol (else the 3D body)
     "purpose": "",
     "current_pen": 23,
     "sheet_purposes": {},
@@ -149,6 +150,8 @@ def _error(key: str, value) -> str | None:
         return "the renovation style preset is a name"
     if key == "legend_mode" and value not in ("auto", "all", "used"):
         return f"unknown legend mode {value}"
+    if key == "plan_symbols" and not isinstance(value, bool):
+        return "plan symbols is true or false"
     if key == "schedules":  # schedule schemes by id (D77)
         from .schedules import table_error
 

@@ -6,6 +6,7 @@
 #include <QStringList>
 
 class QComboBox;
+class QCheckBox;
 class QDoubleSpinBox;
 class QSpinBox;
 
@@ -31,6 +32,7 @@ private:
     QComboBox* m_ifcStatus;
     QComboBox* m_renovationPreset;
     QComboBox* m_legendMode;
+    QCheckBox* m_planSymbols;
 };
 
 } // namespace kimbim

@@ -468,7 +468,9 @@ def raw_drawing(guid: str, include_json: str = "", hidden=()) -> dict:
     if mesh is not None:  # drawn from the meshes: reused here for sheets and size queries
         return {"ok": True, "svg": _drafted(mesh, d), "cached": True}
     include_json = _without_hidden(include_json, hidden)
-    key = (*_state_key(), include_json or "")  # the state and the elements given
+    from . import settings as S
+    plan_symbols = bool(S.current().get("plan_symbols", True))
+    key = (*_state_key(), include_json or "", plan_symbols)  # the state, the elements given, D91's choice
     hit = _cache.get(guid, {}).get(key)
     if hit is not None:
         return {"ok": True, "svg": _drafted(hit, d), "cached": True}
@@ -478,7 +480,7 @@ def raw_drawing(guid: str, include_json: str = "", hidden=()) -> dict:
             _stop_worker()
         snapshot = _snapshot()  # written once per state, shared by every drawing at that state
         job = {"drawing": guid, "include": json.loads(include_json) if include_json else None,
-               "bounds": _bounds_json()}
+               "bounds": _bounds_json(), "plan_symbols": plan_symbols}
         try:
             result = _worker_generate(snapshot, state, job)
         except Exception:  # the worker could not run: one process, one drawing

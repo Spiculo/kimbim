@@ -762,8 +762,19 @@ def _plan_symbol_map(t):
     return None
 
 
-def symbol_objects(f) -> dict:
-    """Library objects (D86) whose type has a plan symbol: GlobalId -> (element, representation map)."""
+def plan_display(e, plan_symbols: bool = True) -> str:
+    """D91: whether a plan shows this object's 2D plan symbol or its 3D body seen from above. The
+    object's own KIMBIM_LibraryObject.PlanDisplay wins over the project default (`plan_symbols`)."""
+    own = ifcopenshell.util.element.get_pset(e, LIBRARY_PSET, should_inherit=False) or {}
+    value = own.get("PlanDisplay")
+    if value in ("symbol", "body"):
+        return value
+    return "symbol" if plan_symbols else "body"
+
+
+def symbol_objects(f, plan_symbols: bool = True) -> dict:
+    """Library objects (D86) whose type has a plan symbol and whose display is the symbol (D91):
+    GlobalId -> (element, representation map)."""
     out = {}
     for t in f.by_type("IfcTypeProduct"):
         if not any(getattr(ps, "Name", None) == LIBRARY_PSET for ps in (getattr(t, "HasPropertySets", None) or ())):
@@ -772,7 +783,7 @@ def symbol_objects(f) -> dict:
         if rep_map is None:
             continue
         for e in ifcopenshell.util.element.get_types(t):
-            if e.ObjectPlacement is not None:
+            if e.ObjectPlacement is not None and plan_display(e, plan_symbols) == "symbol":
                 out[e.GlobalId] = (e, rep_map)
     return out
 
@@ -797,13 +808,13 @@ def _curves(item):
             yield "poly", [tuple(float(c) for c in t.Coordinates[:2]) for t in trims]
 
 
-def object_symbols(storey, to_paper, include=None) -> list:
+def object_symbols(storey, to_paper, include=None, plan_symbols: bool = True) -> list:
     """The plan symbols of the library objects on the story, one group per element (styled as its
     projection lines by graphics.style_svg)."""
     f = storey.file
     unit = ifcopenshell.util.unit.calculate_unit_scale(f)
     out = []
-    for guid, (e, rep_map) in symbol_objects(f).items():
+    for guid, (e, rep_map) in symbol_objects(f, plan_symbols).items():
         if ifcopenshell.util.element.get_container(e) != storey or (include is not None and guid not in include):
             continue
         m = ifcopenshell.util.placement.get_local_placement(e.ObjectPlacement)
@@ -834,7 +845,7 @@ def _tagged(kind: str, parts: list) -> list:
     return [f'<g data-kind="{kind}">', *parts, "</g>"] if parts else []
 
 
-def overlay(f, drawing, s, svg: str, include=None) -> str:
+def overlay(f, drawing, s, svg: str, include=None, plan_symbols: bool = True) -> str:
     to_paper = paper_mapping(svg)
     if to_paper is None:
         return svg
@@ -848,7 +859,7 @@ def overlay(f, drawing, s, svg: str, include=None) -> str:
             for e in f.by_type("IfcWindow"):
                 if ifcopenshell.util.element.get_container(e) == storey and e.ObjectPlacement is not None:
                     parts += _tagged("window", window_symbol(e, to_paper))
-            parts += object_symbols(storey, to_paper, include)  # D86, tagged per element
+            parts += object_symbols(storey, to_paper, include, plan_symbols)  # D86, tagged per element
             # Room stamps are drawn with the tags on every request (tags.add_to_drawing, D87): their text
             # is the room stamp tag style's, a project setting this process does not see.
             parts += _tagged("stair", stair_symbols_svg(storey, to_paper, s.get("cut", PLAN_CUT)))  # D88
@@ -889,7 +900,7 @@ def crop(svg: str, margin: float = 5.0) -> str:
                   svg, count=1)
 
 
-def generate(f, drawing, include=None, bounds=None) -> tuple[str, dict]:
+def generate(f, drawing, include=None, bounds=None, plan_symbols: bool = True) -> tuple[str, dict]:
     """SVG of `drawing` (paper millimetres). `f` may be changed (a snapshot): infinite ranges and
     template elevations are re-fitted to the model first. `include`: GlobalIds of the elements to
     draw (the visible ones); default all drawn elements. `bounds`: the model's (lo, hi) in metres,
@@ -903,7 +914,7 @@ def generate(f, drawing, include=None, bounds=None) -> tuple[str, dict]:
     products = drawn_products(f)
     if s is not None and s["kind"] == "plan":
         storey = _storey(drawing, s)
-        symbols = symbol_objects(f)  # D86: drawn from their plan symbol (overlay), not cut
+        symbols = symbol_objects(f, plan_symbols)  # D86: drawn from their plan symbol (overlay), not cut
         # a stair's flights and landings are on its level (D88: they are its parts, not contained)
         products = [p for p in products if (ifcopenshell.util.element.get_container(p)
                                             or ifcopenshell.util.element.get_container(
@@ -942,7 +953,7 @@ def generate(f, drawing, include=None, bounds=None) -> tuple[str, dict]:
     t3 = time.perf_counter()
     svg = buffer.get_value()
     if s is not None:
-        svg = overlay(f, drawing, s, svg, set(include) if include is not None else None)
+        svg = overlay(f, drawing, s, svg, set(include) if include is not None else None, plan_symbols)
     svg = crop(svg)
     return svg, {"elements": count, "prepare_s": round(t1 - t0, 3), "geometry_s": round(t2 - t1, 3),
                  "hlr_s": round(t3 - t2, 3), "total_s": round(time.perf_counter() - t0, 3)}
@@ -962,7 +973,8 @@ def _one(f, job) -> dict:
     """Generate one drawing on the already-open model `f`; {ok, svg, timing} or {ok: false, error}."""
     try:
         drawing = f.by_guid(job["drawing"])
-        svg, timing = _with_big_stack(lambda: generate(f, drawing, job.get("include"), _bounds_of(job)))
+        svg, timing = _with_big_stack(lambda: generate(f, drawing, job.get("include"), _bounds_of(job),
+                                                       bool(job.get("plan_symbols", True))))
         return {"ok": True, "svg": svg, "timing": timing}
     except Exception as ex:  # report, never a traceback on the app's console
         return {"ok": False, "error": f"{type(ex).__name__}: {ex}"}

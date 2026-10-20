@@ -887,6 +887,36 @@ def place_object(storey_guid: str, key: str, params_json: str, x, y, angle=0.0) 
     return B._dump({**r, "guid": made["element"].GlobalId, "type": made["type"].GlobalId})
 
 
+def set_plan_display(guids_json: str, value: str) -> str:
+    """D91: per object, whether its plan shows the 2D plan symbol or the 3D body seen from above."""
+    import ifcopenshell.api.pset
+    import ifcopenshell.util.element
+
+    from . import app_bridge as B
+    from . import authoring as A
+
+    if value not in ("symbol", "body"):
+        return A._fail(f"unknown plan display {value}")
+    if B._model is None:
+        return A._fail("no model open")
+    elements = B._elements(guids_json)
+    if not elements:
+        return A._fail("no elements selected")
+
+    def action():
+        for e in elements:
+            data = ifcopenshell.util.element.get_pset(e, PSET, should_inherit=False)
+            pset = e.file.by_id(data["id"]) if data else ifcopenshell.api.pset.add_pset(e.file, product=e, name=PSET)
+            ifcopenshell.api.pset.edit_pset(e.file, pset=pset, properties={"PlanDisplay": value})
+        return len(elements), [e.GlobalId for e in elements], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return A._fail(f"{type(ex).__name__}: {ex}")
+    return B._dump(r)
+
+
 def _object_of(e):
     """(Obj, values, type) of a placed library object, or None."""
     import ifcopenshell.util.element

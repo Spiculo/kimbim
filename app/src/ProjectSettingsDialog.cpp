@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "ProjectSettingsDialog.h"
 
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
@@ -77,6 +78,11 @@ ProjectSettingsDialog::ProjectSettingsDialog(const QJsonObject& settings, bool k
     m_legendMode->addItem(tr("Only the rules used"), QStringLiteral("used"));
     m_legendMode->setCurrentIndex(std::max(0, m_legendMode->findData(settings.value("legend_mode").toString(QStringLiteral("auto")))));
     form->addRow(tr("Sheet legend:"), m_legendMode);
+    // D91: plans show library objects' 2D plan symbol (else their 3D body seen from above).
+    m_planSymbols = new QCheckBox(tr("Library objects show their plan symbol in plans"), this);
+    m_planSymbols->setObjectName(QStringLiteral("planSymbols"));
+    m_planSymbols->setChecked(settings.value("plan_symbols").toBool(true));
+    form->addRow(QString(), m_planSymbols);
     layout->addLayout(form);
     auto* note = new QLabel(tr("These settings aren't kept with a plain IFC file. Save as .kim to keep them."), this);
     note->setObjectName(QStringLiteral("notKeptNote"));
@@ -114,6 +120,8 @@ QJsonObject ProjectSettingsDialog::changes() const
         out.insert("renovation_preset", m_renovationPreset->currentText());
     if (m_legendMode->currentData().toString() != m_settings.value("legend_mode").toString(QStringLiteral("auto")))
         out.insert("legend_mode", m_legendMode->currentData().toString());
+    if (m_planSymbols->isChecked() != m_settings.value("plan_symbols").toBool(true))
+        out.insert("plan_symbols", m_planSymbols->isChecked());
     return out;
 }
 

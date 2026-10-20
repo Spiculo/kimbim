@@ -121,6 +121,26 @@ def test_floor_plan_drawing_shows_the_symbol_not_the_cut(project):
         assert svg.count(f'ifc:guid="{guid}"') == 1  # the symbol only, not a cut of the body too
 
 
+def test_plan_symbol_or_3d_body_per_project_and_per_object(project):
+    wall_type = call("wall_types")["types"][0]["guid"]
+    call("create_wall", project, wall_type, -1, -1, 8, -1, 3.0, "", "")
+    table = call("place_object", project, "table", "", 0, 0, 0)["guid"]
+    chair = call("place_object", project, "chair", "", 3, 0, 0)["guid"]
+    plan = next(d for d in call("drawings")["drawings"] if d["kind"] == "plan")
+    svg = call("generate_drawing", plan["guid"], "")["svg"]
+    assert f'data-kind="object" ifc:guid="{table}"' in svg  # default: the plan symbol (D91)
+    # Per object: the chair shows its 3D body seen from above instead.
+    assert call("set_plan_display", json.dumps([chair]), "body")["ok"]
+    svg = call("generate_drawing", plan["guid"], "")["svg"]
+    assert f'data-kind="object" ifc:guid="{table}"' in svg
+    assert f'data-kind="object" ifc:guid="{chair}"' not in svg
+    assert f'ifc:guid="{chair}"' in svg  # drawn as the body instead
+    # Per project: turning plan symbols off shows every object's body.
+    assert call("set_project_settings", json.dumps({"plan_symbols": False}))["ok"]
+    svg = call("generate_drawing", plan["guid"], "")["svg"]
+    assert f'data-kind="object" ifc:guid="{table}"' not in svg
+
+
 def test_ifc2x3_classes(tmp_path):
     from kimbim import testing
 
