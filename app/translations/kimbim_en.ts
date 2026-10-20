@@ -6669,7 +6669,27 @@ Open it read-only?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="66"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="68"/>
+        <source>Every rule when it fits</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="69"/>
+        <source>Every rule</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="70"/>
+        <source>Only the rules used</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="72"/>
+        <source>Sheet legend:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="74"/>
         <source>These settings aren&apos;t kept with a plain IFC file. Save as .kim to keep them.</source>
         <translation type="unfinished"></translation>
     </message>

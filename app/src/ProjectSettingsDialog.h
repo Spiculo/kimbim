@@ -30,6 +30,7 @@ private:
     QSpinBox* m_decimals;
     QComboBox* m_ifcStatus;
     QComboBox* m_renovationPreset;
+    QComboBox* m_legendMode;
 };
 
 } // namespace kimbim

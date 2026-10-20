@@ -746,6 +746,34 @@ def resolve(purpose: str | None = None, model=None, settings: dict | None = None
         if src == "override":
             legend.append({"label": skey, "source": src, "key": skey, "style": style_no, "override": True})
             members.append(guids)
+    # D91: the full legend — every rule of the purpose (its overridden statuses and its override
+    # rules) — used when it fits on the sheet.
+    def _legend_add(label, source, key, then):
+        base = builtin_styles["other"]
+        cut_pen = then.get("cut_pen", then.get("pen", base["cut"]["pen"]))
+        proj_pen = then.get("projection_pen", then.get("pen", base["projection"]["pen"]))
+        line = then.get("line", base["cut"]["line"])
+        fill_pen = then.get("fill", base["fill"])
+        style = {"cut": _line(pens, line_types, cut_pen, line),
+                 "projection": _line(pens, line_types, proj_pen, line),
+                 "fill": pen(pens, fill_pen)["color"] if fill_pen is not None else None,
+                 "surface": then.get("surface"), "transparency": then.get("transparency")}
+        k = json.dumps(style, sort_keys=True)
+        if k not in index:
+            index[k] = len(styles)
+            styles.append(style)
+        legend_all.append({"label": label, "source": source, "key": key, "style": index[k], "override": True})
+        members_all.append([])
+
+    legend_all, members_all = [], []
+    for status in STATUS_KEYS:
+        t = flt.get(status)
+        if t and t.get("show") == "override":
+            _legend_add(_STATUS_LABELS[status], "renovation", status, {**palette.get(status, {}), **t})
+    for rule in rules:
+        then = rule.get("then", {})
+        if not then.get("hide"):
+            _legend_add(rule.get("name", ""), "override", rule.get("name", ""), then)
     ann = styles_by_kind.get("annotations") or builtin_styles["annotations"]
     out = {"purpose": name, "purposes": list(purposes), "pen_set": set_name, "visibility": vis_name or "", "overrides": ovr_name or "",
            "pens": {str(n): pen(pens, n) for n in range(1, 256)},
@@ -753,7 +781,9 @@ def resolve(purpose: str | None = None, model=None, settings: dict | None = None
            "current_pen": st.get("current_pen", 23), "annotation_pen": ann["projection"]["pen"],
            "styles": styles, "elements": elements, "hidden": hidden,
            "renovation": flt_name, "renovation_preset": preset_name, "renovation_presets": list(style_presets),
-           "legend": legend, "legend_members": members}
+           "legend": legend, "legend_members": members,
+           "legend_all": legend_all, "legend_members_all": members_all,
+           "legend_mode": st.get("legend_mode", "auto")}
     if len(_cache) > 8:
         _cache.clear()
     _cache[key] = (weakref.ref(model) if model is not None else (lambda: None), out)
@@ -773,7 +803,7 @@ def graphics_state() -> str:
     from . import settings as S
 
     st = S.current()
-    res = {k: v for k, v in resolve(settings=st).items() if k != "legend_members"}  # members stay in Python
+    res = {k: v for k, v in resolve(settings=st).items() if k not in ("legend_members", "legend_members_all")}  # members stay in Python
     return B._dump({"ok": True, **res, "hidden_layers": st.get("hidden_layers", []),
                     "locked_layers": st.get("locked_layers", [])})
 
@@ -948,15 +978,29 @@ def _xml(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def legend_svg(resolved: dict, guids=None) -> tuple:
+def legend_svg(resolved: dict, guids=None, mode=None, max_height=None) -> tuple:
     """The legend as SVG in paper mm (top-left 0,0): a title, then a swatch and a label per entry;
     returns (body, width, height). `guids`: only entries that apply to one of these elements (a sheet's
-    drawings). Renovation rows shown as is only explain an overridden one: without one they are left out."""
+    drawings). Renovation rows shown as is only explain an overridden one: without one they are left out.
+    D91: `mode` is "used" (only the rules the drawing uses), "all" (every rule of the purpose) or
+    "auto" (all of them when they fit in `max_height`, else only the used ones)."""
     styles = resolved.get("styles", [])
-    rows = [e for e, members in zip(resolved.get("legend", []), resolved.get("legend_members", []))
-            if guids is None or guids.intersection(members)]
-    if not any(e.get("override") for e in rows if e["source"] == "renovation"):
-        rows = [e for e in rows if e["source"] != "renovation"]
+    mode = mode or resolved.get("legend_mode", "auto")
+
+    def used_rows():
+        rows = [e for e, members in zip(resolved.get("legend", []), resolved.get("legend_members", []))
+                if guids is None or guids.intersection(members)]
+        if not any(e.get("override") for e in rows if e["source"] == "renovation"):
+            rows = [e for e in rows if e["source"] != "renovation"]
+        return rows
+
+    all_rows = list(resolved.get("legend_all", []))
+    if mode == "all":
+        rows = all_rows
+    elif mode == "auto" and max_height is not None and all_rows and _TITLE + _ROW * len(all_rows) <= max_height:
+        rows = all_rows
+    else:
+        rows = used_rows()
     parts = ['<text x="0" y="5" font-size="4" font-family="sans-serif">Legend</text>']
     y = _TITLE
     if not rows:

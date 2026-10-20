@@ -233,12 +233,23 @@ def test_a_legend_is_placed_moved_drawn_and_removed(house):
 
 
 def test_the_legend_only_lists_what_the_sheet_shows(house):
+    # D91: "used" lists only the rules the sheet's drawings use; the default "auto" lists them all.
+    assert call("set_project_settings", json.dumps({"legend_mode": "used"}))["ok"]
     number = call("add_sheet", "A3", "Demolition")["number"]  # nothing demolished
     assert call("place_drawing", number, drawing("Level 1 Floor Plan"), 10, 10, 100)["ok"]
     assert call("set_sheet_purpose", number, "Demolition")["ok"]
     assert call("place_legend", number)["ok"]
     svg = call("sheet_svg", number)["svg"]
     assert "To be demolished" not in svg and "Everything is drawn with its element styles" in svg
+
+
+def test_the_legend_lists_every_rule_when_it_fits(house):
+    number = call("add_sheet", "A3", "Demolition")["number"]  # nothing demolished
+    assert call("place_drawing", number, drawing("Level 1 Floor Plan"), 10, 10, 100)["ok"]
+    assert call("set_sheet_purpose", number, "Demolition")["ok"]
+    assert call("place_legend", number)["ok"]
+    svg = call("sheet_svg", number)["svg"]  # the default "auto": the full legend fits on an A3
+    assert "To be demolished" in svg and "Temporary" in svg and "Auxiliary" in svg
 
 
 def test_legends_are_not_drawings(house):

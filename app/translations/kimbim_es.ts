@@ -6857,7 +6857,27 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       <translation>Estilos de renovación:</translation>
     </message>
     <message>
-      <location filename="../src/ProjectSettingsDialog.cpp" line="66" />
+      <location filename="../src/ProjectSettingsDialog.cpp" line="68" />
+      <source>Every rule when it fits</source>
+      <translation>Todas las reglas si caben</translation>
+    </message>
+    <message>
+      <location filename="../src/ProjectSettingsDialog.cpp" line="69" />
+      <source>Every rule</source>
+      <translation>Todas las reglas</translation>
+    </message>
+    <message>
+      <location filename="../src/ProjectSettingsDialog.cpp" line="70" />
+      <source>Only the rules used</source>
+      <translation>Solo las reglas usadas</translation>
+    </message>
+    <message>
+      <location filename="../src/ProjectSettingsDialog.cpp" line="72" />
+      <source>Sheet legend:</source>
+      <translation>Leyenda de la lámina:</translation>
+    </message>
+    <message>
+      <location filename="../src/ProjectSettingsDialog.cpp" line="74" />
       <source>These settings aren't kept with a plain IFC file. Save as .kim to keep them.</source>
       <translation>Esta configuración no se guarda en un archivo IFC simple. Guárdalo como .kim para conservarla.</translation>
     </message>

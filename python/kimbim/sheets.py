@@ -445,12 +445,18 @@ def _sheet_resolved(number: str):
     return graphics.resolve(S.current().get("sheet_purposes", {}).get(number) or None)
 
 
+def _legend_max_height(sheet):
+    """How tall a legend may be on this sheet (D91: it lists every rule when it fits)."""
+    _, h = PAPERS.get(sheet.Scope or "A1", PAPERS["A1"])
+    return h - 2 * MARGIN
+
+
 def _legend_size(sheet):
     """The legend's size for listing and placing: from the whole model, so listing sheets never
     generates drawings (the composed legend, limited to the sheet's drawings, may have fewer rows)."""
     from . import graphics
 
-    _, w, h = graphics.legend_svg(_sheet_resolved(_number(sheet)))
+    _, w, h = graphics.legend_svg(_sheet_resolved(_number(sheet)), max_height=_legend_max_height(sheet))
     return w, h
 
 
@@ -464,7 +470,7 @@ def _legend_content(sheet, resolved):
         size, svg = _drawing_size(_link(ref), resolved["hidden"])
         if size is not None:
             guids.update(re.findall(r'ifc:guid="([^"]+)"', svg))
-    return graphics.legend_svg(resolved, guids if views else None)
+    return graphics.legend_svg(resolved, guids if views else None, max_height=_legend_max_height(sheet))
 
 
 def place_legend(number: str) -> str:

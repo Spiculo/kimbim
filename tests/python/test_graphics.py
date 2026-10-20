@@ -525,6 +525,21 @@ def test_legend_svg_rows_and_restriction():
     assert body.count('class="kimbim-legend-row"') == 2
 
 
+def test_legend_can_list_every_rule_of_the_purpose():
+    f, w = _reno_model()
+    out = g.resolve("Demolition", model=f)
+    used, _, _ = g.legend_svg(out, mode="used")
+    assert used.count("kimbim-legend-row") == 2  # existing (as is) and demolish (override)
+    everything, _, _ = g.legend_svg(out, mode="all")
+    assert everything.count("kimbim-legend-row") == 3  # the filter's overridden statuses
+    assert "Temporary" in everything and "Auxiliary" in everything
+    # "auto": the full list when it fits, else only the used ones.
+    assert g.legend_svg(out, mode="auto", max_height=6)[0].count("kimbim-legend-row") == 2
+    assert g.legend_svg(out, mode="auto", max_height=1000)[0].count("kimbim-legend-row") == 3
+    # The default (no mode) is the used list: no sheet height to fit into.
+    assert g.legend_svg(out)[0].count("kimbim-legend-row") == 2
+
+
 def test_a_lone_override_row_stays_in_the_legend():
     from kimbim import renovation as r
 

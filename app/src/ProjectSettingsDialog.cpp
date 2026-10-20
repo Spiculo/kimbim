@@ -62,6 +62,14 @@ ProjectSettingsDialog::ProjectSettingsDialog(const QJsonObject& settings, bool k
     m_renovationPreset->setObjectName(QStringLiteral("renovationPreset"));
     m_renovationPreset->addItem(settings.value("renovation_preset").toString(QStringLiteral("Uruguay")));
     form->addRow(tr("Renovation styles:"), m_renovationPreset);
+    // D91: what a sheet legend lists.
+    m_legendMode = new QComboBox(this);
+    m_legendMode->setObjectName(QStringLiteral("legendMode"));
+    m_legendMode->addItem(tr("Every rule when it fits"), QStringLiteral("auto"));
+    m_legendMode->addItem(tr("Every rule"), QStringLiteral("all"));
+    m_legendMode->addItem(tr("Only the rules used"), QStringLiteral("used"));
+    m_legendMode->setCurrentIndex(std::max(0, m_legendMode->findData(settings.value("legend_mode").toString(QStringLiteral("auto")))));
+    form->addRow(tr("Sheet legend:"), m_legendMode);
     layout->addLayout(form);
     auto* note = new QLabel(tr("These settings aren't kept with a plain IFC file. Save as .kim to keep them."), this);
     note->setObjectName(QStringLiteral("notKeptNote"));
@@ -91,6 +99,8 @@ QJsonObject ProjectSettingsDialog::changes() const
         out.insert("ifc_status_default", m_ifcStatus->currentData().toString());
     if (m_renovationPreset->currentText() != m_settings.value("renovation_preset").toString(QStringLiteral("Uruguay")))
         out.insert("renovation_preset", m_renovationPreset->currentText());
+    if (m_legendMode->currentData().toString() != m_settings.value("legend_mode").toString(QStringLiteral("auto")))
+        out.insert("legend_mode", m_legendMode->currentData().toString());
     return out;
 }
 
