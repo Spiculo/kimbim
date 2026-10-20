@@ -53,6 +53,7 @@ QJsonObject Preferences::defaults()
         {"drawing_timeout", 300},
         {"drawing_hlr", "exact"},
         {"scroll_navigation", "auto"},
+        {"field_of_view", 45.0},
         {"recent", QJsonArray()},
     };
 }
@@ -144,6 +145,12 @@ QString Preferences::scrollNavigation() const
 {
     const QString v = value("scroll_navigation").toString();
     return v == QLatin1String("zoom") || v == QLatin1String("pan") ? v : QStringLiteral("auto");
+}
+
+double Preferences::fieldOfView() const
+{
+    const QJsonValue v = value("field_of_view");
+    return v.isDouble() && v.toDouble() >= 5.0 && v.toDouble() <= 120.0 ? v.toDouble() : 45.0;
 }
 
 bool Preferences::trueLineWeights() const

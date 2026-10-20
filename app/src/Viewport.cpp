@@ -68,6 +68,15 @@ namespace kimbim {
 
 namespace {
 
+// D92: the home view and the perspective field of view, shared by every view (user preferences).
+gp_Dir g_homeDir = viewDirection(HomeOrientation);
+gp_Dir g_homeUp = viewUp(HomeOrientation);
+double g_fieldOfView = 45.0;
+
+} // namespace
+
+namespace {
+
 Aspect_VKeyMouse toButtons(Qt::MouseButtons b)
 {
     Aspect_VKeyMouse m = Aspect_VKeyMouse_NONE;
@@ -2384,15 +2393,49 @@ void Viewport::applyProjection()
 {
     const Handle(Graphic3d_Camera)& camera = m_view->Camera();
     const auto type = m_perspective && !m_planView ? Graphic3d_Camera::Projection_Perspective : Graphic3d_Camera::Projection_Orthographic;
-    if (camera->ProjectionType() == type)
-        return;
-    // Keep what is seen at the target: an orthographic scale becomes a perspective distance and back.
-    const double scale = camera->Scale();
-    camera->SetProjectionType(type);
+    if (camera->ProjectionType() != type) {
+        // Keep what is seen at the target: an orthographic scale becomes a perspective distance and back.
+        const double scale = camera->Scale();
+        camera->SetProjectionType(type);
+        camera->SetScale(scale);
+    }
     if (type == Graphic3d_Camera::Projection_Perspective)
-        camera->SetFOVy(45.0); // a normal lens (about 70 degrees across a wide window)
-    camera->SetScale(scale);
+        camera->SetFOVy(g_fieldOfView); // D92: the preference (45° by default)
     m_view->Invalidate();
+}
+
+void Viewport::setFieldOfView(double degrees)
+{
+    g_fieldOfView = degrees;
+}
+
+double Viewport::fieldOfView()
+{
+    return g_fieldOfView;
+}
+
+void Viewport::setHomeView(const gp_Dir& dir, const gp_Dir& up)
+{
+    g_homeDir = dir;
+    g_homeUp = up;
+}
+
+gp_Dir Viewport::homeDir() { return g_homeDir; }
+gp_Dir Viewport::homeUp() { return g_homeUp; }
+
+gp_Dir Viewport::currentViewDirection() const
+{
+    return m_view->Camera()->Direction().Reversed(); // target -> eye, as preset views
+}
+
+gp_Dir Viewport::currentViewUp() const
+{
+    return m_view->Camera()->Up();
+}
+
+void Viewport::useCurrentViewAsHome()
+{
+    setHomeView(currentViewDirection(), currentViewUp());
 }
 
 void Viewport::setPerspective(bool on)
@@ -2406,13 +2449,13 @@ void Viewport::setPerspective(bool on)
 void Viewport::setStandardView(V3d_TypeOfOrientation orientation, bool animate)
 {
     if (!m_planView)
-        goTo(orientation, animate, false);
+        goTo(viewDirection(orientation), viewUp(orientation), animate, false);
 }
 
 void Viewport::homeView(bool animate)
 {
     if (!m_planView)
-        goTo(HomeOrientation, animate, true);
+        goTo(g_homeDir, g_homeUp, animate, true);
 }
 
 namespace {
@@ -2440,7 +2483,7 @@ bool boxInView(const Handle(Graphic3d_Camera)& camera, const Bnd_Box& box)
 
 } // namespace
 
-void Viewport::goTo(V3d_TypeOfOrientation orientation, bool animate, bool fit)
+void Viewport::goTo(const gp_Dir& dir, const gp_Dir& up, bool animate, bool fit)
 {
     AbortViewAnimation();
     const Handle(Graphic3d_Camera)& camera = m_view->Camera();
@@ -2448,8 +2491,8 @@ void Viewport::goTo(V3d_TypeOfOrientation orientation, bool animate, bool fit)
     Handle(Graphic3d_Camera) end = new Graphic3d_Camera();
     end->Copy(camera);
     const gp_Pnt center = end->Center();
-    end->SetEyeAndCenter(center.Translated(gp_Vec(viewDirection(orientation)) * end->Distance()), center);
-    end->SetUp(viewUp(orientation));
+    end->SetEyeAndCenter(center.Translated(gp_Vec(dir) * end->Distance()), center);
+    end->SetUp(up);
     end->OrthogonalizeUp();
     const Bnd_Box box = boundsOf({});
     if (!box.IsVoid() && (fit || !boxInView(end, box))) {

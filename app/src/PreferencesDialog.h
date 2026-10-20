@@ -37,6 +37,7 @@ private:
     QSpinBox* m_drawingTimeout;
     QComboBox* m_drawingHlr;
     QComboBox* m_scroll; // D89
+    QSpinBox* m_fieldOfView; // D92
 };
 
 } // namespace kimbim

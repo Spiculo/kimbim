@@ -138,6 +138,15 @@ PreferencesDialog::PreferencesDialog(Preferences& prefs, QWidget* parent)
     m_scroll->setToolTip(tr("Two-finger scroll with Shift orbits the 3D view"));
     form->addRow(tr("Scroll and touchpad:"), m_scroll);
 
+    // D92: the perspective camera's field of view.
+    m_fieldOfView = new QSpinBox(this);
+    m_fieldOfView->setObjectName(QStringLiteral("fieldOfView"));
+    m_fieldOfView->setRange(5, 120);
+    m_fieldOfView->setSuffix(tr("°"));
+    m_fieldOfView->setValue(qRound(prefs.fieldOfView()));
+    m_fieldOfView->setToolTip(tr("How wide the perspective view sees: 45° is a normal lens"));
+    form->addRow(tr("Perspective field of view:"), m_fieldOfView);
+
     layout->addLayout(form);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
@@ -161,6 +170,7 @@ void PreferencesDialog::apply()
     m_prefs.setValue(QStringLiteral("drawing_timeout"), m_drawingTimeout->value());
     m_prefs.setValue(QStringLiteral("drawing_hlr"), m_drawingHlr->currentData().toString());
     m_prefs.setValue(QStringLiteral("scroll_navigation"), m_scroll->currentData().toString());
+    m_prefs.setValue(QStringLiteral("field_of_view"), double(m_fieldOfView->value()));
 }
 
 void PreferencesDialog::accept()

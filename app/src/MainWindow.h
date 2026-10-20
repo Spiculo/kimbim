@@ -413,6 +413,7 @@ private:
     // A corrupt saved layout/geometry can ask for a multi-gigabyte window; reset it after show.
     void clampWindowSize();
     void applyDrawingPrefs(); // the drawing timeout and hidden-line mode, from the preferences
+    void applyViewPreferences(); // D92: the perspective field of view and the home view, from the preferences
     void showAbout();
     void openDialog();
     void stopLoading();

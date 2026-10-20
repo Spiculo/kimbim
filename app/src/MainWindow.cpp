@@ -139,6 +139,7 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     , m_loader(new ModelLoader(chunkSize))
 {
     m_prefs.load();
+    applyViewPreferences(); // D92: the field of view and the home view, before any view is used
     qRegisterMetaType<kimbim::MeshChunk>();
     // D71: the bottom bar (pen, layers, zoom, selection, messages) replaces the status bar.
     m_status = new StatusStrip(this);
@@ -516,6 +517,20 @@ void MainWindow::buildMenus()
         connect(home, &QAction::triggered, this, [this] {
             if (m_viewport)
                 m_viewport->homeView();
+        });
+        // D92: the user can make the current view the home view (kept in the preferences).
+        QAction* setHome = views->addAction(tr("Set current view as &home"));
+        setHome->setObjectName(QStringLiteral("actionSetHomeView"));
+        setHome->setToolTip(tr("The Home view button and shortcut turn to this direction from now on"));
+        connect(setHome, &QAction::triggered, this, [this] {
+            if (!m_viewport || m_viewport->isPlanView())
+                return;
+            m_viewport->useCurrentViewAsHome();
+            const gp_Dir d = m_viewport->currentViewDirection(), u = m_viewport->currentViewUp();
+            m_prefs.setValue(QStringLiteral("home_view"),
+                QJsonArray{d.X(), d.Y(), d.Z(), u.X(), u.Y(), u.Z()});
+            m_prefs.save();
+            m_status->showMessage(tr("The current view is now the home view"));
         });
         QAction* perspective = view->addAction(tr("P&erspective"));
         perspective->setObjectName(QStringLiteral("actionPerspective"));
@@ -3539,6 +3554,19 @@ void MainWindow::setTrueLineWeights(bool on)
     refreshAnnotations();
 }
 
+void MainWindow::applyViewPreferences()
+{
+    Viewport::setFieldOfView(m_prefs.fieldOfView()); // D92
+    const QJsonArray home = m_prefs.value(QStringLiteral("home_view")).toArray();
+    if (home.size() == 6)
+        Viewport::setHomeView(gp_Dir(home.at(0).toDouble(), home.at(1).toDouble(), home.at(2).toDouble()),
+            gp_Dir(home.at(3).toDouble(), home.at(4).toDouble(), home.at(5).toDouble()));
+    else
+        Viewport::setHomeView(viewDirection(HomeOrientation), viewUp(HomeOrientation));
+    if (m_viewport && m_viewport->isPerspective())
+        m_viewport->setPerspective(true); // re-apply the field of view to the open camera
+}
+
 void MainWindow::refreshAnnotations()
 {
     QVector<Viewport::Annotation> list;
@@ -5121,6 +5149,7 @@ void MainWindow::preferencesDialog()
         return;
     m_prefs.save();
     Viewport::setScrollMode(Viewport::scrollModeFrom(m_prefs.scrollNavigation())); // D89
+    applyViewPreferences(); // D92: the field of view and the home view
     bridge("set_author", {m_prefs.authorName(), m_prefs.authorEmail()});
     applyDrawingPrefs();
     restartRecoveryTimer();

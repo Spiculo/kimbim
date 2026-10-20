@@ -7,6 +7,7 @@
 #include <AIS_InteractiveContext.hxx>
 #include <AIS_ViewCube.hxx>
 #include <AIS_ViewController.hxx>
+#include <gp_Dir.hxx>
 #include <gp_Pnt.hxx>
 #include <QColor>
 #include <QHash>
@@ -70,7 +71,17 @@ public:
     // Preset views (D76): the camera turns (~250 ms) to look from that side or corner, keeping its
     // target and zoom; it fits all when the model would be off-screen. Not in plan views.
     void setStandardView(V3d_TypeOfOrientation orientation, bool animate = true);
-    void homeView(bool animate = true); // the default south-east isometric, fitted
+    // Home view (D76, D92): south-east isometric by default; the user can set the current view as home
+    // (a preference, applied to every viewport).
+    void homeView(bool animate = true);
+    static void setHomeView(const gp_Dir& dir, const gp_Dir& up);
+    static gp_Dir homeDir();
+    static gp_Dir homeUp();
+    void useCurrentViewAsHome();           // capture this view's camera direction and up as home
+    gp_Dir currentViewDirection() const;
+    gp_Dir currentViewUp() const;
+    static void setFieldOfView(double degrees); // the perspective camera's vertical field of view (D92)
+    static double fieldOfView();
     // Perspective camera (D76), per view; plan views stay orthographic (the setting comes back in 3D).
     void setPerspective(bool on);
     bool isPerspective() const { return m_perspective; }
@@ -391,7 +402,7 @@ private:
     void ensureViewCube();
     void eraseViewCube();
     void applyProjection();
-    void goTo(V3d_TypeOfOrientation orientation, bool animate, bool fit);
+    void goTo(const gp_Dir& dir, const gp_Dir& up, bool animate, bool fit);
     void animateTo(const Handle(Graphic3d_Camera)& end, bool animate);
     void orbitBy(double dx, double dy); // dragging the cube: turntable around the view's target
     enum class CubePress { None, Cube, Home };

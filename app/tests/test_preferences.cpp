@@ -92,6 +92,9 @@ private slots:
         QCOMPARE(p.scrollNavigation(), QString("auto")); // D89
         p.setValue("scroll_navigation", "sideways");
         QCOMPARE(p.scrollNavigation(), QString("auto"));
+        QCOMPARE(p.fieldOfView(), 45.0); // D92
+        p.setValue("field_of_view", 500);
+        QCOMPARE(p.fieldOfView(), 45.0);
     }
 
     void theDialogWritesWhatTheUserPicked()
@@ -108,6 +111,7 @@ private slots:
         d.findChild<QSpinBox*>("recoveryMinutes")->setValue(0);
         d.findChild<QSpinBox*>("largeIfcMb")->setValue(20);
         d.findChild<QComboBox*>("scrollNavigation")->setCurrentIndex(2); // auto, zoom, pan (D89)
+        d.findChild<QSpinBox*>("fieldOfView")->setValue(60); // D92
         d.findChild<QLineEdit*>("authorName")->setText("Felipe");
         d.findChild<QLineEdit*>("templatesFolder")->setText("Z:/Plantillas");
         d.apply();
@@ -119,6 +123,7 @@ private slots:
         QCOMPARE(p.recoveryMinutes(), 0);
         QCOMPARE(p.largeIfcMb(), 20.0);
         QCOMPARE(p.scrollNavigation(), QString("pan"));
+        QCOMPARE(p.fieldOfView(), 60.0);
         QCOMPARE(p.authorName(), QString("Felipe"));
         QCOMPARE(p.templatesFolder(), QString("Z:/Plantillas"));
     }

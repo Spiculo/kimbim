@@ -134,6 +134,29 @@ private slots:
         QVERIFY(sameDir(eyeDir(v), kimbim::viewDirection(kimbim::HomeOrientation)));
     }
 
+    // D92: the user can set the current view as home; the field of view is a preference.
+    void theUserCanSetTheHomeView()
+    {
+        kimbim::Viewport v;
+        v.setStandardView(V3d_Xpos, false);
+        const gp_Dir dir = v.currentViewDirection();
+        v.useCurrentViewAsHome();
+        v.setStandardView(V3d_Zpos, false);
+        v.homeView(false);
+        QVERIFY(sameDir(v.currentViewDirection(), dir));
+        kimbim::Viewport::setHomeView(kimbim::viewDirection(kimbim::HomeOrientation), kimbim::viewUp(kimbim::HomeOrientation));
+    }
+
+    void fieldOfViewIsAPreference()
+    {
+        QCOMPARE(kimbim::Viewport::fieldOfView(), 45.0);
+        kimbim::Viewport::setFieldOfView(60.0);
+        kimbim::Viewport v;
+        v.setPerspective(true);
+        QCOMPARE(v.view()->Camera()->FOVy(), 60.0);
+        kimbim::Viewport::setFieldOfView(45.0);
+    }
+
     // Plans look straight down: presets and perspective wait for the 3D view.
     void planViewsIgnorePresetsAndStayOrthographic()
     {

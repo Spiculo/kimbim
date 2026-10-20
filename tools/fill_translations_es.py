@@ -1188,6 +1188,15 @@ ES = {
     "&Icons only": "Solo &iconos",
     "Icons and &labels": "Iconos y &nombres",
     "&List": "&Lista",
+    # D92: view cube (home view, field of view)
+    "Set current view as &home": "Usar la vista actual como &inicio",
+    "The Home view button and shortcut turn to this direction from now on":
+        "El botón y el atajo de la vista de inicio apuntarán a esta dirección desde ahora",
+    "The current view is now the home view": "La vista actual es ahora la vista de inicio",
+    "Perspective field of view:": "Campo de visión en perspectiva:",
+    "How wide the perspective view sees: 45° is a normal lens":
+        "Cuánto abarca la vista en perspectiva: 45° es una lente normal",
+    "°": "°",
 }
 
 
