@@ -43,6 +43,7 @@ INFO = ["class", "type", "level"]
 QUANTITIES = {
     "length": ("length", True), "height": ("length", False), "width": ("length", False),
     "thickness": ("length", False), "perimeter": ("length", True),
+    "inside_face_length": ("length", True), "outside_face_length": ("length", True),
     "area": ("area", True), "gross_area": ("area", True),
     "gross_side_area": ("area", True), "net_side_area": ("area", True), "opening_area": ("area", True),
     "volume": ("volume", True), "gross_volume": ("volume", True), "count": ("count", True),
@@ -54,6 +55,7 @@ LABELS = {  # English labels; the app translates these (custom labels show as ty
     "info:class": "Class", "info:type": "Type", "info:level": "Level",
     "quantity:length": "Length", "quantity:height": "Height", "quantity:width": "Width",
     "quantity:thickness": "Thickness", "quantity:perimeter": "Perimeter", "quantity:area": "Area",
+    "quantity:inside_face_length": "Inside face length", "quantity:outside_face_length": "Outside face length",
     "quantity:gross_area": "Gross area", "quantity:gross_side_area": "Gross side area",
     "quantity:net_side_area": "Net side area", "quantity:opening_area": "Opening area",
     "quantity:volume": "Volume", "quantity:gross_volume": "Gross volume", "quantity:count": "Count",
@@ -93,6 +95,7 @@ BUILTIN = [
      "group_by": ["info:type", "quantity:width", "quantity:height"]},
     {"id": "walls", "name": "Walls", "classes": ["IfcWall"],
      "fields": [A_("Tag"), A_("Name"), I_("type"), I_("level"), Q_("length"), Q_("height"), Q_("thickness"),
+                Q_("inside_face_length"), Q_("outside_face_length"),
                 Q_("gross_side_area"), Q_("opening_area"), Q_("net_side_area"), Q_("volume"),
                 P_("Pset_WallCommon", "IsExternal"), P_("Pset_WallCommon", "LoadBearing")],
      "group_by": ["info:type"]},
@@ -174,6 +177,11 @@ def scheme_error(s) -> str | None:
     group = s.get("group_by", [])
     if not (isinstance(group, list) and all(isinstance(g, str) for g in group)):
         return "group_by must be a list of field keys"
+    mo = s.get("min_opening_area", 0)
+    if not (isinstance(mo, (int, float)) and not isinstance(mo, bool) and mo >= 0):
+        return "min_opening_area must be a number of square metres, 0 or more"
+    if s.get("unit", "") not in ("", "m", "cm", "mm"):
+        return f"unknown schedule unit {s.get('unit')}"
     return None
 
 
@@ -213,6 +221,8 @@ class _Ctx:
         self.elevations: dict = {}
         self._types: dict | None = None
         self._type_defs: dict = {}
+        # D92: openings smaller than this are not deducted (schedule setting, 0 by default).
+        self.min_opening_area = 0.0
 
     def type_of(self, e):
         """The element's type object, from one pass over the (few) type relations."""
@@ -423,6 +433,16 @@ def _opening_area(opening, s) -> float:
     return 0.0
 
 
+def _deducted_openings(e, s, ctx: _Ctx) -> float:
+    """The area of the host's openings that count: those at least `min_opening_area` (D92)."""
+    total = 0.0
+    for o in _openings(e):
+        area = _opening_area(o, s)
+        if area >= ctx.min_opening_area:
+            total += area
+    return total
+
+
 def _layers_thickness(layer_set, s) -> float:
     return sum(float(layer.LayerThickness or 0.0) for layer in layer_set.MaterialLayers) * s
 
@@ -443,9 +463,12 @@ def _parametric(e, family: str, ctx: _Ctx) -> dict:
             layer_set = A._layer_set(e)
             if length is not None:
                 q["length"] = length
+                # KimBim walls have square ends: both faces run the axis length (joins are a later refinement).
+                q["inside_face_length"] = length
+                q["outside_face_length"] = length
             if layer_set is not None:
                 q["thickness"] = _layers_thickness(layer_set, s)
-            q["opening_area"] = sum(_opening_area(o, s) for o in _openings(e))
+            q["opening_area"] = _deducted_openings(e, s, ctx)
             # A wall cut by a roof (or any clipping) is not a box: its height and areas come from its shape.
             solids = _body_solids(e)
             if solids:
@@ -475,7 +498,7 @@ def _parametric(e, family: str, ctx: _Ctx) -> dict:
                 else:
                     q["thickness"] = thickness
                 if gross is not None:
-                    holes = sum(_opening_area(o, s) for o in _openings(e)) if family == "IfcSlab" else 0.0
+                    holes = _deducted_openings(e, s, ctx) if family == "IfcSlab" else 0.0
                     net = max(gross - holes, 0.0)
                     q.update(gross_area=gross, area=net)
                     if family == "IfcSlab":
@@ -545,6 +568,10 @@ def _geometry(elements) -> dict:
 def _collect(scheme, ctx: _Ctx) -> list[dict]:
     """One record per element: {guid, values: {field key: value}, sort: {...}}."""
     _values_cache.clear()  # entity ids are reused after edits
+    try:
+        ctx.min_opening_area = float(scheme.get("min_opening_area") or 0.0)  # D92
+    except (TypeError, ValueError):
+        ctx.min_opening_area = 0.0
     seen, elements = set(), []
     for cls in scheme["classes"]:
         try:
@@ -690,7 +717,8 @@ def compute(scheme, merge: bool = False) -> dict:
     if (err := scheme_error(scheme)) is not None:
         return {"ok": False, "error": err}
     if B._model is None:
-        return {"ok": True, "scheme": scheme, "columns": _columns(scheme), "rows": [], "totals": [], "count": 0, "seconds": 0.0}
+        return {"ok": True, "scheme": scheme, "columns": _columns(scheme), "rows": [], "totals": [], "count": 0,
+                "seconds": 0.0, "unit": scheme.get("unit") or "m"}
     columns = _columns(scheme)
     keys = [c["key"] for c in columns]
     # The same schedule of the same model state (merging toggled, the window reopened, a row clicked)
@@ -742,8 +770,16 @@ def compute(scheme, merge: bool = False) -> dict:
     for i, c in enumerate(columns):
         nums = [r["values"][i] for r in rows if isinstance(r["values"][i], (int, float)) and not isinstance(r["values"][i], bool)]
         totals.append(_round(float(sum(nums))) if c["sum"] and nums else None)
+    # D92: the schedule's own unit (metres by default): scale the values and report it for the suffix.
+    unit = scheme.get("unit") or "m"
+    if unit != "m":
+        factors = [_kind_factor(c["kind"], unit) for c in columns]
+        rows = [{**r, "values": [round(v * f, 6) if isinstance(v, (int, float)) and not isinstance(v, bool) else v
+                                 for v, f in zip(r["values"], factors)]} for r in rows]
+        totals = [round(t * f, 6) if isinstance(t, (int, float)) and not isinstance(t, bool) else t
+                  for t, f in zip(totals, factors)]
     return {"ok": True, "scheme": {k: v for k, v in scheme.items()}, "columns": columns, "rows": rows,
-            "totals": totals, "count": len(records), "merged": bool(merge),
+            "totals": totals, "count": len(records), "merged": bool(merge), "unit": unit,
             "seconds": round(time.perf_counter() - started, 4)}
 
 
@@ -762,13 +798,34 @@ def _cell_text(v, kind: str) -> str:
 UNITS = {"length": " (m)", "area": " (m²)", "volume": " (m³)"}
 
 
+def _unit_factor(unit: str) -> float:
+    return {"m": 1.0, "cm": 100.0, "mm": 1000.0}.get(unit, 1.0)
+
+
+def _kind_factor(kind: str, unit: str) -> float:
+    f = _unit_factor(unit)
+    return f if kind == "length" else f * f if kind == "area" else f * f * f if kind == "volume" else 1.0
+
+
+def unit_suffix(kind: str, unit: str) -> str:
+    """The column header's unit (D92: the schedule's own unit, metres by default)."""
+    if kind == "length":
+        return f" ({unit})"
+    if kind == "area":
+        return f" ({unit}²)"
+    if kind == "volume":
+        return f" ({unit}³)"
+    return ""
+
+
 def export(scheme, merge: bool, path: str) -> dict:
     """CSV (UTF-8, comma-separated) or XLSX (by the file's extension), with a header and a total row."""
     data = compute(scheme, merge)
     if not data.get("ok"):
         return data
     columns = data["columns"]
-    header = [c["label"] + UNITS.get(c["kind"], "") for c in columns] + (["Count"] if merge else [])
+    unit = data.get("unit") or "m"
+    header = [c["label"] + unit_suffix(c["kind"], unit) for c in columns] + (["Count"] if merge else [])
     body = [r["values"] + ([r["count"]] if merge else []) for r in data["rows"]]
     totals = list(data["totals"]) + ([data["count"]] if merge else [])
     if totals and totals[0] is None:
@@ -841,7 +898,7 @@ def save_schedule_scheme(scheme_json: str) -> str:
     if (err := scheme_error(s)) is not None:
         return B._dump({"ok": False, "error": err})
     sid = s.get("id") or _slug(s["name"])
-    body = {k: v for k, v in s.items() if k in ("name", "classes", "fields", "group_by")}
+    body = {k: v for k, v in s.items() if k in ("name", "classes", "fields", "group_by", "min_opening_area", "unit")}
     r = json.loads(settings.set_project_settings(json.dumps({KEY: {**_stored(), sid: body}})))
     return B._dump({**r, "id": sid}) if r.get("ok") else B._dump(r)
 

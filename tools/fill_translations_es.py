@@ -1202,6 +1202,14 @@ ES = {
     "Plan cut": "Corte en planta",
     "Save the current state as a new version (same as the Versions menu)":
         "Guarda el estado actual como una versión nueva (igual que el menú Versiones)",
+    # D92: schedules
+    "Inside face length": "Longitud de la cara interior",
+    "Outside face length": "Longitud de la cara exterior",
+    "Units:": "Unidades:",
+    "Smallest opening to deduct:": "Abertura mínima a descontar:",
+    " m²": " m²",
+    "Openings smaller than this are not taken out of the host's areas (0: deduct all)":
+        "Las aberturas menores que esto no se descuentan de las áreas del anfitrión (0: descontar todas)",
 }
 
 

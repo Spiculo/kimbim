@@ -7073,312 +7073,342 @@ Open it read-only?</source>
 <context>
     <name>kimbim::ScheduleSchemeDialog</name>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="426"/>
+        <location filename="../src/SchedulesDialog.cpp" line="430"/>
         <source>Schedule scheme</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="462"/>
+        <location filename="../src/SchedulesDialog.cpp" line="466"/>
         <source>Fields in column order. Ticked fields are what identical items share when merging; double-click a field to rename its column</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="464"/>
+        <location filename="../src/SchedulesDialog.cpp" line="468"/>
         <source>Double-click a field to add it</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="466"/>
+        <location filename="../src/SchedulesDialog.cpp" line="470"/>
         <source>Add →</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="467"/>
+        <location filename="../src/SchedulesDialog.cpp" line="471"/>
         <source>Remove</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="468"/>
+        <location filename="../src/SchedulesDialog.cpp" line="472"/>
         <source>Up</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="469"/>
+        <location filename="../src/SchedulesDialog.cpp" line="473"/>
         <source>Down</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="477"/>
+        <location filename="../src/SchedulesDialog.cpp" line="481"/>
         <source>Classes:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="480"/>
+        <location filename="../src/SchedulesDialog.cpp" line="484"/>
         <source>Available fields:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="483"/>
+        <location filename="../src/SchedulesDialog.cpp" line="487"/>
         <source>Schedule fields:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="490"/>
+        <location filename="../src/SchedulesDialog.cpp" line="494"/>
         <source>Name:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SchedulesDialog.cpp" line="507"/>
+        <source> m²</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SchedulesDialog.cpp" line="509"/>
+        <source>Openings smaller than this are not taken out of the host&apos;s areas (0: deduct all)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SchedulesDialog.cpp" line="510"/>
+        <source>Units:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SchedulesDialog.cpp" line="511"/>
+        <source>Smallest opening to deduct:</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
     <name>kimbim::SchedulesDialog</name>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="70"/>
+        <location filename="../src/SchedulesDialog.cpp" line="71"/>
         <source>Name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="70"/>
+        <location filename="../src/SchedulesDialog.cpp" line="71"/>
         <source>Mark</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="71"/>
+        <location filename="../src/SchedulesDialog.cpp" line="72"/>
         <source>Long name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="71"/>
+        <location filename="../src/SchedulesDialog.cpp" line="72"/>
         <source>Description</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="72"/>
+        <location filename="../src/SchedulesDialog.cpp" line="73"/>
         <source>Object type</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="72"/>
+        <location filename="../src/SchedulesDialog.cpp" line="73"/>
         <source>Predefined type</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="73"/>
+        <location filename="../src/SchedulesDialog.cpp" line="74"/>
         <source>Class</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="73"/>
+        <location filename="../src/SchedulesDialog.cpp" line="74"/>
         <source>Type</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="73"/>
+        <location filename="../src/SchedulesDialog.cpp" line="74"/>
         <source>Level</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="74"/>
+        <location filename="../src/SchedulesDialog.cpp" line="75"/>
         <source>Length</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="74"/>
+        <location filename="../src/SchedulesDialog.cpp" line="75"/>
         <source>Height</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="74"/>
+        <location filename="../src/SchedulesDialog.cpp" line="75"/>
         <source>Width</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="75"/>
+        <location filename="../src/SchedulesDialog.cpp" line="76"/>
         <source>Thickness</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="75"/>
+        <location filename="../src/SchedulesDialog.cpp" line="76"/>
         <source>Perimeter</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="76"/>
+        <location filename="../src/SchedulesDialog.cpp" line="77"/>
         <source>Area</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="76"/>
+        <location filename="../src/SchedulesDialog.cpp" line="77"/>
         <source>Gross area</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="77"/>
+        <location filename="../src/SchedulesDialog.cpp" line="78"/>
         <source>Net area</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="77"/>
+        <location filename="../src/SchedulesDialog.cpp" line="78"/>
         <source>Section area</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="78"/>
+        <location filename="../src/SchedulesDialog.cpp" line="79"/>
         <source>Gross side area</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="78"/>
+        <location filename="../src/SchedulesDialog.cpp" line="79"/>
         <source>Net side area</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="79"/>
-        <source>Opening area</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SchedulesDialog.cpp" line="79"/>
-        <source>Volume</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../src/SchedulesDialog.cpp" line="80"/>
-        <source>Gross volume</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SchedulesDialog.cpp" line="80"/>
-        <location filename="../src/SchedulesDialog.cpp" line="266"/>
-        <source>Count</source>
+        <source>Inside face length</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/SchedulesDialog.cpp" line="81"/>
+        <source>Outside face length</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SchedulesDialog.cpp" line="82"/>
+        <source>Opening area</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SchedulesDialog.cpp" line="82"/>
+        <source>Volume</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SchedulesDialog.cpp" line="83"/>
+        <source>Gross volume</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SchedulesDialog.cpp" line="83"/>
+        <location filename="../src/SchedulesDialog.cpp" line="270"/>
+        <source>Count</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SchedulesDialog.cpp" line="84"/>
         <source>Number</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="89"/>
+        <location filename="../src/SchedulesDialog.cpp" line="92"/>
         <source>Doors</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="89"/>
+        <location filename="../src/SchedulesDialog.cpp" line="92"/>
         <source>Windows</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="90"/>
+        <location filename="../src/SchedulesDialog.cpp" line="93"/>
         <source>Walls</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="90"/>
+        <location filename="../src/SchedulesDialog.cpp" line="93"/>
         <source>Slabs</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="91"/>
+        <location filename="../src/SchedulesDialog.cpp" line="94"/>
         <source>Columns</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="91"/>
+        <location filename="../src/SchedulesDialog.cpp" line="94"/>
         <source>Beams</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="92"/>
+        <location filename="../src/SchedulesDialog.cpp" line="95"/>
         <source>Rooms</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="100"/>
+        <location filename="../src/SchedulesDialog.cpp" line="103"/>
         <source>&amp;Merge identical items</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="103"/>
-        <location filename="../src/SchedulesDialog.cpp" line="217"/>
+        <location filename="../src/SchedulesDialog.cpp" line="106"/>
+        <location filename="../src/SchedulesDialog.cpp" line="220"/>
         <source>&amp;Delete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="106"/>
+        <location filename="../src/SchedulesDialog.cpp" line="109"/>
         <source>Schedules</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="111"/>
+        <location filename="../src/SchedulesDialog.cpp" line="114"/>
         <source>One row per group of elements that share the scheme&apos;s group fields, with their quantities summed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="118"/>
+        <location filename="../src/SchedulesDialog.cpp" line="121"/>
         <source>Click rows to select their elements; double-click a name, mark or property to edit it</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="121"/>
+        <location filename="../src/SchedulesDialog.cpp" line="124"/>
         <source>&amp;New...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="122"/>
+        <location filename="../src/SchedulesDialog.cpp" line="125"/>
         <source>&amp;Edit...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="123"/>
+        <location filename="../src/SchedulesDialog.cpp" line="126"/>
         <source>&amp;Refresh</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="124"/>
+        <location filename="../src/SchedulesDialog.cpp" line="127"/>
         <source>E&amp;xport...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="127"/>
+        <location filename="../src/SchedulesDialog.cpp" line="130"/>
         <source>Schedule:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="217"/>
+        <location filename="../src/SchedulesDialog.cpp" line="220"/>
         <source>Re&amp;set</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="230"/>
+        <location filename="../src/SchedulesDialog.cpp" line="233"/>
         <source>The model changed: Refresh to update the schedule</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="250"/>
+        <location filename="../src/SchedulesDialog.cpp" line="253"/>
         <source>Could not make the schedule: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="279"/>
+        <location filename="../src/SchedulesDialog.cpp" line="283"/>
         <source>Yes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="279"/>
+        <location filename="../src/SchedulesDialog.cpp" line="283"/>
         <source>No</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="299"/>
+        <location filename="../src/SchedulesDialog.cpp" line="303"/>
         <source>(varies)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="323"/>
+        <location filename="../src/SchedulesDialog.cpp" line="327"/>
         <source>Total</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/SchedulesDialog.cpp" line="332"/>
+        <location filename="../src/SchedulesDialog.cpp" line="336"/>
         <source>%n element(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -7386,7 +7416,7 @@ Open it read-only?</source>
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/SchedulesDialog.cpp" line="333"/>
+        <location filename="../src/SchedulesDialog.cpp" line="337"/>
         <source>%n row(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -7394,42 +7424,42 @@ Open it read-only?</source>
         </translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="348"/>
+        <location filename="../src/SchedulesDialog.cpp" line="352"/>
         <source>Could not change it</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="365"/>
+        <location filename="../src/SchedulesDialog.cpp" line="369"/>
         <source>New schedule</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="385"/>
+        <location filename="../src/SchedulesDialog.cpp" line="389"/>
         <source>Could not save the schedule</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="405"/>
+        <location filename="../src/SchedulesDialog.cpp" line="409"/>
         <source>Export schedule</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="406"/>
+        <location filename="../src/SchedulesDialog.cpp" line="410"/>
         <source>Excel workbooks (*.xlsx)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="406"/>
+        <location filename="../src/SchedulesDialog.cpp" line="410"/>
         <source>CSV files (*.csv)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="411"/>
+        <location filename="../src/SchedulesDialog.cpp" line="415"/>
         <source>Schedule saved to %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="412"/>
+        <location filename="../src/SchedulesDialog.cpp" line="416"/>
         <source>Could not export it: %1</source>
         <translation type="unfinished"></translation>
     </message>
