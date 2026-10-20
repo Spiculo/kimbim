@@ -128,6 +128,8 @@ private slots:
         d.findChild<QComboBox*>("selectSimilarScope")->setCurrentIndex(1); // class_predefined, type, class
         d.findChild<QComboBox*>("boxSelection")->setCurrentIndex(2); // direction, partial, entire
         d.findChild<QCheckBox*>("splitJoin")->setChecked(false);
+        d.findChild<QComboBox*>("objectEditScope")->setCurrentIndex(1); // D92: selection, ask
+        d.findChild<QCheckBox*>("keepRectangles")->setChecked(true);
         d.findChild<QLineEdit*>("authorName")->setText("Felipe");
         d.findChild<QLineEdit*>("templatesFolder")->setText("Z:/Plantillas");
         d.apply();
@@ -142,6 +144,8 @@ private slots:
         QCOMPARE(p.fieldOfView(), 60.0);
         QVERIFY(!p.titleBarLevels() && !p.titleBarVersions());
         QCOMPARE(p.selectSimilarScope(), QString("type"));
+        QCOMPARE(p.objectEditScope(), QString("ask"));
+        QVERIFY(p.keepRectanglesRectangular());
         QCOMPARE(p.boxSelection(), QString("entire"));
         QVERIFY(!p.splitJoin());
         QCOMPARE(p.authorName(), QString("Felipe"));

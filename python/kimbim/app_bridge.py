@@ -1219,6 +1219,7 @@ _EXPORTS = {
     ),
     "library": (
         "library_objects",
+        "object_parameter_usage",
         "object_symbol",
         "place_object",
         "set_library_paths",

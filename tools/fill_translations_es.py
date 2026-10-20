@@ -1304,6 +1304,16 @@ ES = {
     'Keep rectangles rectangular when a corner is dragged': 'Mantener los rectángulos rectangulares al arrastrar una esquina',
     'On: the two sides next to the dragged corner follow it; off: the corner moves freely': 'Activado: los dos lados junto a la esquina arrastrada la siguen; desactivado: la esquina se mueve libremente',
 
+    "Change the object's type": 'Cambiar el tipo del objeto',
+    "This object's type has %n placement(s) in the model.": ('El tipo de este objeto tiene %n colocación en el modelo.', 'El tipo de este objeto tiene %n colocaciones en el modelo.'),
+    'Change every placement of the type, or only the %n selected one(s)?': ('¿Cambiar todas las colocaciones del tipo o solo la %n seleccionada?', '¿Cambiar todas las colocaciones del tipo o solo las %n seleccionadas?'),
+    'Change every placement': 'Cambiar todas las colocaciones',
+    'Only the selection': 'Solo la selección',
+    'Change only the selection': 'Cambiar solo la selección',
+    "Ask when the object's type is shared": 'Preguntar cuando el tipo del objeto es compartido',
+    "Editing a library object's parameters: change the selected placements only, or ask whether to change every placement of its type": 'Al editar los parámetros de un objeto de biblioteca: cambiar solo las colocaciones seleccionadas o preguntar si cambiar todas las del tipo',
+    'Library object parameters:': 'Parámetros de objetos de biblioteca:',
+
 }
 
 

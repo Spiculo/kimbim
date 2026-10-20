@@ -68,6 +68,7 @@ QJsonObject Preferences::defaults()
         {"box_selection", "direction"},
         {"split_join", true},
         {"merge_props", "keep"},
+        {"object_edit_scope", "selection"},
         {"recent", QJsonArray()},
     };
 }
@@ -199,6 +200,11 @@ QString Preferences::boxSelection() const
 }
 
 bool Preferences::splitJoin() const { return value("split_join").toBool(true); }
+
+QString Preferences::objectEditScope() const
+{
+    return value("object_edit_scope").toString() == QLatin1String("ask") ? QStringLiteral("ask") : QStringLiteral("selection");
+}
 
 QString Preferences::mergeProps() const
 {

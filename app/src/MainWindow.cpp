@@ -1026,9 +1026,28 @@ bool MainWindow::applyPropertyEdit(const QString& pset, const QString& prop, con
     }
     const bool dimension = pset == QLatin1String("Dimensions");
     const bool parameter = pset == QLatin1String("Parameters"); // D86: a library object's (its type follows)
+    QString scope; // D92: edit the selection (default) or ask when the type is shared
+    if (parameter && !m_quiet && m_prefs.objectEditScope() == QLatin1String("ask")) {
+        const QJsonObject usage = bridge("object_parameter_usage", {jsonList(m_selection), prop});
+        if (usage.value("shared").toBool()) {
+            QMessageBox box(QMessageBox::Question, tr("Change the object's type"),
+                tr("This object's type has %n placement(s) in the model.", nullptr, usage.value("elements").toInt()),
+                QMessageBox::NoButton, this);
+            box.setInformativeText(tr("Change every placement of the type, or only the %n selected one(s)?", nullptr,
+                                      usage.value("selected").toInt()));
+            QPushButton* whole = box.addButton(tr("Change every placement"), QMessageBox::AcceptRole);
+            QPushButton* only = box.addButton(tr("Only the selection"), QMessageBox::AcceptRole);
+            box.setDefaultButton(only);
+            box.exec();
+            scope = box.clickedButton() == whole ? QStringLiteral("type") : QStringLiteral("selection");
+        }
+    }
     const QJsonObject r = dimension || parameter
-        ? bridge(parameter ? "set_object_parameter" : "set_dimension", {jsonList(m_selection), prop,
-              value.isDouble() ? QString::number(value.toDouble(), 'g', 17) : value.toString()})
+        ? bridge(parameter ? "set_object_parameter" : "set_dimension",
+              parameter ? QStringList{jsonList(m_selection), prop,
+                  value.isDouble() ? QString::number(value.toDouble(), 'g', 17) : value.toString(), scope}
+                        : QStringList{jsonList(m_selection), prop,
+                              value.isDouble() ? QString::number(value.toDouble(), 'g', 17) : value.toString()})
         : bridge("set_property", {jsonList(m_selection), pset, prop, jsonValue(value)});
     if (!r.value("ok").toBool())
         showError(tr("Could not change %1").arg(prop), r.value("error").toString());
