@@ -593,7 +593,8 @@ def _products(model):
 
 def _line(pens, line_types, pen_no, line_name) -> dict:
     p = pen(pens, pen_no)
-    return {"color": p["color"], "weight": p["weight"], "dash": dash(line_types, line_name)}
+    # "pen" (D92): the pen number, so an export can name a layer per pen.
+    return {"color": p["color"], "weight": p["weight"], "dash": dash(line_types, line_name), "pen": pen_no}
 
 
 def resolve(purpose: str | None = None, model=None, settings: dict | None = None) -> dict:

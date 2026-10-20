@@ -187,6 +187,10 @@ def test_dxf_layer_scheme_poche_and_colour_modes(house, tmp_path):
     assert not any(name.endswith("-PATT") for name in {e.dxf.layer for e in no_poche.modelspace()})
     aci = read(call("export_drawing_dxf", plan, str(tmp_path / "aci.dxf"), json.dumps({"colour": "aci"}))["path"])
     assert all(not e.dxf.hasattr("true_color") for e in aci.modelspace() if e.dxftype() in ("LINE", "LWPOLYLINE"))
+    # D92: "per pen": every drawn pen gets its own layer, named PEN-nn.
+    pen = read(call("export_drawing_dxf", plan, str(tmp_path / "pen.dxf"), json.dumps({"layers": "pen"}))["path"])
+    names = {e.dxf.layer for e in pen.modelspace()}
+    assert any(name.startswith("PEN-") for name in names) and "A-WALL" not in names, names
 
 
 def test_dimensions_can_be_exploded(house, tmp_path):

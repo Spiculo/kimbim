@@ -198,6 +198,27 @@ PreferencesDialog::PreferencesDialog(Preferences& prefs, QWidget* parent)
     m_meshVertexSnaps->setToolTip(tr("Adds the corners of slabs, roofs and other elements to the snap points"));
     form->addRow(QString(), m_meshVertexSnaps);
 
+    // D92: the defaults a new underlay gets.
+    m_underlayOpacity = new QSpinBox(this);
+    m_underlayOpacity->setObjectName(QStringLiteral("underlayOpacity"));
+    m_underlayOpacity->setRange(5, 100);
+    m_underlayOpacity->setSuffix(tr(" %"));
+    m_underlayOpacity->setValue(qRound(prefs.underlayOpacity() * 100));
+    form->addRow(tr("New underlay opacity:"), m_underlayOpacity);
+    m_underlayGrey = new QCheckBox(tr("Show new underlays in grey"), this);
+    m_underlayGrey->setObjectName(QStringLiteral("underlayGrey"));
+    m_underlayGrey->setChecked(prefs.underlayGreyscale());
+    form->addRow(QString(), m_underlayGrey);
+    m_underlayTint = new QLineEdit(prefs.underlayTint(), this);
+    m_underlayTint->setObjectName(QStringLiteral("underlayTint"));
+    m_underlayTint->setPlaceholderText(QStringLiteral("#rrggbb"));
+    m_underlayTint->setToolTip(tr("Tint new underlays this colour (leave empty for none)"));
+    form->addRow(tr("New underlay tint:"), m_underlayTint);
+    m_underlayLayerPerFile = new QCheckBox(tr("Put each new underlay on its own layer, named after the file"), this);
+    m_underlayLayerPerFile->setObjectName(QStringLiteral("underlayLayerPerFile"));
+    m_underlayLayerPerFile->setChecked(prefs.underlayLayerPerFile());
+    form->addRow(QString(), m_underlayLayerPerFile);
+
     layout->addLayout(form);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
@@ -231,6 +252,10 @@ void PreferencesDialog::apply()
     m_prefs.setValue(QStringLiteral("split_join"), m_splitJoin->isChecked());
     m_prefs.setValue(QStringLiteral("merge_props"), m_mergeProps->currentData().toString());
     m_prefs.setValue(QStringLiteral("mesh_vertex_snaps"), m_meshVertexSnaps->isChecked());
+    m_prefs.setValue(QStringLiteral("underlay_opacity"), double(m_underlayOpacity->value()) / 100.0);
+    m_prefs.setValue(QStringLiteral("underlay_greyscale"), m_underlayGrey->isChecked());
+    m_prefs.setValue(QStringLiteral("underlay_tint"), m_underlayTint->text().trimmed());
+    m_prefs.setValue(QStringLiteral("underlay_layer_per_file"), m_underlayLayerPerFile->isChecked());
 }
 
 void PreferencesDialog::accept()

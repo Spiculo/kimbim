@@ -46,7 +46,7 @@ from . import drawings as D
 SVG = "{http://www.w3.org/2000/svg}"
 IFC = "{http://www.ifcopenshell.org/ns}"
 DXF_VERSION = "R2013"
-LAYER_MODES = ("layer", "kind", "iso")
+LAYER_MODES = ("layer", "kind", "iso", "pen")
 DIMENSION_MODES = ("native", "exploded")
 COLOUR_MODES = ("exact", "aci", "lineweight")
 LINEWEIGHTS = (0, 5, 9, 13, 15, 18, 20, 25, 30, 35, 40, 50, 53, 60, 70, 80, 90, 100, 106, 120, 140, 158, 200, 211)
@@ -664,9 +664,14 @@ class Styler:
         except RuntimeError:
             return None
 
-    def layer_of(self, guid: str, kind_layer: str | None = None) -> str:
-        if guid in self._layer_of:
-            return self._layer_of[guid]
+    def pen_layer(self, n) -> str:
+        """D92 "per pen" layer scheme: one layer per pen number, e.g. PEN-23."""
+        return f"PEN-{int(n):02d}"
+
+    def layer_of(self, guid: str, kind_layer: str | None = None, pen=None) -> str:
+        key = (guid, int(pen)) if self.layers == "pen" and pen is not None else guid
+        if key in self._layer_of:
+            return self._layer_of[key]
         from . import graphics, layers
 
         e = self.element(guid)
@@ -674,11 +679,13 @@ class Styler:
         if e is not None and self.layers == "layer":
             layer = layers.element_layer(e)
             name = layer.Name if layer is not None and layer.Name else None
+        if name is None and self.layers == "pen" and pen is not None:
+            name = self.pen_layer(pen)
         if name is None:
             kind = graphics.kind_of(e) if e is not None else "other"
             table = ISO_LAYERS if self.layers == "iso" else KIND_LAYERS
             name = kind_layer or table.get(kind, "A-GENM")
-        self._layer_of[guid] = name
+        self._layer_of[key] = name
         return name
 
     def pen(self, n) -> dict:
@@ -694,18 +701,18 @@ class Styler:
                 return None
             if kind == "annotation":
                 pm = element.get("data-pen")
-                p = self.pen(int(pm) if pm and pm.isdigit() else self.resolved.get("annotation_pen", 23))
+                n = int(pm) if pm and pm.isdigit() else int(self.resolved.get("annotation_pen", 23))
+                p = self.pen(n)
                 e = self.element(guid)
                 data = ifcopenshell.util.element.get_pset(e, G.ANNOTATION_PSET) or {} if e is not None else {}
                 is_dim = data.get("Kind") == "dimension"
                 if is_dim and self.native_dims:
-                    self.dimension_groups.append((guid, p))
+                    self.dimension_groups.append((guid, p, n))
                     return None
-                layer = self.layer_of(guid, DIMENSION_LAYER if is_dim else None)
+                layer = self.layer_of(guid, DIMENSION_LAYER if is_dim else None, pen=n)
                 dash = [float(v) for v in (element.get("data-dash") or "").split()]  # D84: a drafting line type
                 return {**ctx, "layer": layer, "color": p["color"], "weight": p["weight"], "dash": dash,
                         "fill": None, "text_color": p["color"], "lock_text": True}
-            layer = self.layer_of(guid)
             if guid in self.elements:
                 st = self.styles[self.elements[guid]]
                 cls = element.get("class") or ""
@@ -713,11 +720,13 @@ class Styler:
                     line, fill = st["projection"], None
                 else:
                     line, fill = st["cut"], st["fill"]
+                layer = self.layer_of(guid, pen=line.get("pen"))
                 return {**ctx, "layer": layer, "color": line["color"], "weight": line["weight"],
                         "dash": line["dash"], "fill": fill}
             from . import graphics
 
             fb = graphics.FALLBACK_PEN
+            layer = self.layer_of(guid)
             return {**ctx, "layer": layer, "color": fb["color"], "weight": fb["weight"], "dash": [], "fill": None}
         if kind in OVERLAY_LAYERS:
             return {**ctx, "layer": OVERLAY_LAYERS[kind]}
@@ -729,7 +738,7 @@ def write_dimensions(doc: Doc, target, styler: Styler, u: float, offset=None) ->
     the chain's dimension line, the segment's label as the text (empty: the measured value)."""
     count = 0
     style = doc.dimension_style() if styler.dimension_groups else None
-    for guid, p in styler.dimension_groups:
+    for guid, p, pen_no in styler.dimension_groups:
         a = styler.element(guid)
         if a is None or a.ObjectPlacement is None:
             continue
@@ -753,7 +762,7 @@ def write_dimensions(doc: Doc, target, styler: Styler, u: float, offset=None) ->
         angle = math.degrees(math.atan2(by - ay, bx - ax))
         labels = G.segment_labels(data.get("Text") or "", len(measured) - 1)
         size = float(data.get("Size") or G.TEXT_SIZE)
-        layer = doc.layer(styler.layer_of(guid, DIMENSION_LAYER))
+        layer = doc.layer(styler.layer_of(guid, DIMENSION_LAYER, pen=pen_no))
         color, lw = aci(p["color"]), lineweight(p["weight"])
         for (p1, p2), label in zip(zip(measured, measured[1:]), labels):
             dim = target.add_linear_dim(base=through, p1=p1, p2=p2, angle=angle, text=label or "<>", dimstyle=style,

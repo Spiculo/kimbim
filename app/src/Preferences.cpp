@@ -56,6 +56,10 @@ QJsonObject Preferences::defaults()
         {"field_of_view", 45.0},
         {"north_arrow", true},
         {"mesh_vertex_snaps", false},
+        {"underlay_opacity", 0.5},
+        {"underlay_greyscale", false},
+        {"underlay_tint", ""},
+        {"underlay_layer_per_file", false},
         {"title_bar_levels", true},
         {"title_bar_cut", true},
         {"title_bar_versions", true},
@@ -164,6 +168,17 @@ double Preferences::fieldOfView() const
 
 bool Preferences::northArrowPlans() const { return value("north_arrow").toBool(true); }
 bool Preferences::meshVertexSnaps() const { return value("mesh_vertex_snaps").toBool(false); }
+
+// D92: the defaults a new underlay gets.
+double Preferences::underlayOpacity() const
+{
+    const QJsonValue v = value("underlay_opacity");
+    return v.isDouble() && v.toDouble() >= 0.05 && v.toDouble() <= 1.0 ? v.toDouble() : 0.5;
+}
+
+bool Preferences::underlayGreyscale() const { return value("underlay_greyscale").toBool(false); }
+QString Preferences::underlayTint() const { return value("underlay_tint").toString().trimmed(); }
+bool Preferences::underlayLayerPerFile() const { return value("underlay_layer_per_file").toBool(false); }
 
 bool Preferences::titleBarLevels() const { return value("title_bar_levels").toBool(true); }
 bool Preferences::titleBarCut() const { return value("title_bar_cut").toBool(true); }

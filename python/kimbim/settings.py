@@ -76,6 +76,13 @@ def mark_saved() -> None:
     _saved = copy.deepcopy(_current)
 
 
+def restore(data: dict) -> None:
+    """Put back a snapshot of `current()` (D92: undo/redo of a settings-only step, e.g. an underlay
+    edit). `_saved` is left alone, so the dirty state follows."""
+    global _current
+    _current = copy.deepcopy(data)
+
+
 def is_dirty() -> bool:
     return _current != _saved
 

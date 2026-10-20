@@ -33,6 +33,11 @@ public:
     double fieldOfView() const;         // D92: the perspective camera's vertical field of view, degrees (default 45)
     bool northArrowPlans() const;       // D92: show the plan north indicator (on once true north is set)
     bool meshVertexSnaps() const;       // D92: snap to element mesh vertices while drawing (off)
+    // D92: the defaults a new underlay gets.
+    double underlayOpacity() const;
+    bool underlayGreyscale() const;
+    QString underlayTint() const;       // "#rrggbb" or "" (none)
+    bool underlayLayerPerFile() const;  // put each new underlay on its own layer, named after the file
     // D92: which controls the title bar holds (all on by default).
     bool titleBarLevels() const;
     bool titleBarCut() const;

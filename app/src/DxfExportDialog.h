@@ -36,7 +36,7 @@ public:
 
     QString folder() const;
     void setFolder(const QString& folder);
-    QString layerMode() const; // "layer" or "kind"
+    QString layerMode() const; // "layer", "kind", "iso" or "pen"
     void setLayerMode(const QString& mode);
     // [{"drawing": guid} | {"sheet": number}, ...] in list order.
     QJsonArray checkedItems() const;
@@ -75,6 +75,8 @@ private:
     QLineEdit* m_folder;
     QPushButton* m_browse;
     QComboBox* m_layers;
+    QComboBox* m_colour;   // D92: exact / ACI / lineweight
+    QCheckBox* m_poche;    // D92: fills on the element layer instead of -PATT
     QCheckBox* m_dimensions;
     QProgressBar* m_progress;
     QLabel* m_status;

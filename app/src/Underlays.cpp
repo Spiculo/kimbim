@@ -135,7 +135,10 @@ void MainWindow::placeUnderlayDialog(const QString& given)
     QStringList layers;
     for (const auto& v : bridge("layers").value("layers").toArray())
         layers << v.toObject().value("name").toString();
-    PlaceUnderlayDialog dialog(path, probe, layers, this);
+    // D92: a preference can put each underlay on its own layer, named after the file.
+    const QString defaultLayer = m_prefs.underlayLayerPerFile()
+        ? QFileInfo(path).completeBaseName().trimmed() : QStringLiteral("Underlays");
+    PlaceUnderlayDialog dialog(path, probe, layers, defaultLayer, this);
     if (dialog.exec() != QDialog::Accepted)
         return;
     const QJsonObject r = placeUnderlay(path, dialog.options());
@@ -153,6 +156,13 @@ QJsonObject MainWindow::placeUnderlay(const QString& path, const QJsonObject& op
     QJsonObject o = options;
     if (!o.contains("storey"))
         o.insert("storey", m_levels->activeStorey());
+    // D92: the preferences' new-underlay defaults (the dialog or a caller can still override them).
+    if (!o.contains("opacity"))
+        o.insert("opacity", m_prefs.underlayOpacity());
+    if (!o.contains("greyscale"))
+        o.insert("greyscale", m_prefs.underlayGreyscale());
+    if (!o.contains("tint") && !m_prefs.underlayTint().isEmpty())
+        o.insert("tint", m_prefs.underlayTint());
     const QJsonObject r = m_quiet ? bridge("add_underlay", {path, compact(o)})
                                   : bridgeInBackground("add_underlay", {path, compact(o)}, tr("Placing %1...").arg(QFileInfo(path).fileName()));
     if (r.value("ok").toBool()) {

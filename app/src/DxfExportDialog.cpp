@@ -35,6 +35,8 @@ DxfExportDialog::DxfExportDialog(const QJsonObject& targets, Bridge run, QWidget
     , m_folder(new QLineEdit(this))
     , m_browse(new QPushButton(tr("Browse..."), this))
     , m_layers(new QComboBox(this))
+    , m_colour(new QComboBox(this))
+    , m_poche(new QCheckBox(tr("Fills on the element's layer (no -PATT layer)"), this))
     , m_dimensions(new QCheckBox(tr("Dimensions as DIMENSION entities"), this))
     , m_progress(new QProgressBar(this))
     , m_status(new QLabel(this))
@@ -81,7 +83,17 @@ DxfExportDialog::DxfExportDialog(const QJsonObject& targets, Bridge run, QWidget
     m_layers->setObjectName(QStringLiteral("dxfLayers"));
     m_layers->addItem(tr("By KimBim layer"), QStringLiteral("layer"));
     m_layers->addItem(tr("By element kind (A-WALL, A-DOOR...)"), QStringLiteral("kind"));
+    m_layers->addItem(tr("US NCS (A-WALL-FULL)"), QStringLiteral("iso"));  // D92: the ISO 13567 scheme
+    m_layers->addItem(tr("One layer per pen (PEN-nn)"), QStringLiteral("pen"));
     m_layers->setToolTip(tr("Elements without a KimBim layer go on the layer of their kind"));
+    m_colour->setObjectName(QStringLiteral("dxfColour"));
+    m_colour->addItem(tr("Exact colours"), QStringLiteral("exact"));
+    m_colour->addItem(tr("Nearest ACI index"), QStringLiteral("aci"));
+    m_colour->addItem(tr("Grey by lineweight"), QStringLiteral("lineweight"));
+    m_colour->setToolTip(tr("How element colours are written: true colour, the nearest AutoCAD colour index, or a grey shade by pen weight (for plotters)"));
+    m_poche->setObjectName(QStringLiteral("dxfPoche"));
+    m_poche->setChecked(true);
+    m_poche->setToolTip(tr("On: fills go on a -PATT layer beside the element's; off: on the element's own layer"));
     m_dimensions->setObjectName(QStringLiteral("dxfDimensions"));
     m_dimensions->setChecked(true);
     m_dimensions->setToolTip(tr("Off: dimensions as lines and text"));
@@ -98,6 +110,8 @@ DxfExportDialog::DxfExportDialog(const QJsonObject& targets, Bridge run, QWidget
     auto* form = new QFormLayout;
     form->addRow(tr("Folder:"), folderRow);
     form->addRow(tr("Layers:"), m_layers);
+    form->addRow(tr("Colours:"), m_colour);
+    form->addRow(QString(), m_poche);
     form->addRow(QString(), m_dimensions);
     auto* buttons = new QDialogButtonBox(this);
     m_export = buttons->addButton(tr("Export"), QDialogButtonBox::AcceptRole);
@@ -183,6 +197,8 @@ void DxfExportDialog::setAllChecked(bool checked)
 QJsonObject DxfExportDialog::options() const
 {
     return {{"layers", layerMode()},
+        {"colour", m_colour->currentData().toString()},
+        {"poche", m_poche->isChecked()},
         {"dimensions", m_dimensions->isChecked() ? QStringLiteral("native") : QStringLiteral("exploded")}};
 }
 
@@ -197,6 +213,8 @@ void DxfExportDialog::setBusy(bool busy)
     m_folder->setEnabled(!busy);
     m_browse->setEnabled(!busy);
     m_layers->setEnabled(!busy);
+    m_colour->setEnabled(!busy);
+    m_poche->setEnabled(!busy);
     m_dimensions->setEnabled(!busy);
     m_close->setText(busy ? tr("Cancel") : tr("Close"));
     updateButtons();

@@ -29,13 +29,15 @@ namespace kimbim {
 class PlaceUnderlayDialog : public QDialog {
     Q_OBJECT
 public:
-    PlaceUnderlayDialog(const QString& fileName, const QJsonObject& probe, const QStringList& layers, QWidget* parent = nullptr);
+    PlaceUnderlayDialog(const QString& fileName, const QJsonObject& probe, const QStringList& layers,
+        const QString& defaultLayer = QStringLiteral("Underlays"), QWidget* parent = nullptr);
     QJsonObject options() const; // for app_bridge.add_underlay (storey added by the caller)
     QComboBox* unitBox() const { return m_unit; }
     QSpinBox* pageBox() const { return m_page; }
     QSpinBox* scaleBox() const { return m_scale; }
     QDoubleSpinBox* dpiBox() const { return m_dpi; }
     QComboBox* layerBox() const { return m_layer; }
+    QComboBox* placementBox() const { return m_placement; } // D92: centred or survey coordinates
     // Metres per drawing unit for a drawing scale 1:n: PDF points are 1/72 inch, image pixels 1/dpi.
     static double rasterScale(const QString& kind, int n, double dpi);
 
@@ -49,6 +51,7 @@ private:
     QDoubleSpinBox* m_y = nullptr;
     QDoubleSpinBox* m_rotation = nullptr;
     QComboBox* m_layer = nullptr;
+    QComboBox* m_placement = nullptr; // D92
 };
 
 // D85: File > Underlays...: every underlay of the project (by level), its display (shown, locked, in 3D,
