@@ -44,6 +44,7 @@ private:
     QCheckBox* m_titleVersions;
     QComboBox* m_selectSimilar; // D92
     QComboBox* m_boxSelection;
+    QCheckBox* m_splitJoin; // D92
 };
 
 } // namespace kimbim

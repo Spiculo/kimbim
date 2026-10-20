@@ -90,7 +90,7 @@ void ModifyTool::move(QPointF p)
 
 void ModifyTool::click(QPointF p, Qt::KeyboardModifiers mods)
 {
-    const bool join = !(mods & Qt::ControlModifier);
+    const bool join = m_joinDefault != bool(mods & Qt::ControlModifier); // D92: Ctrl inverts the preference
     const bool boundary = m_mode == Mode::Trim && !m_first;
     const std::optional<Target> t = pick(p, boundary);
     if (!t)

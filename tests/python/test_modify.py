@@ -129,6 +129,24 @@ def test_trimming_off_a_door_is_refused(model):
     assert not r["ok"] and "cut off" in r["error"]
 
 
+def test_trimming_off_a_door_can_delete_it(model):
+    # D92: the option deletes the door the trim would leave outside the wall.
+    r = call("trim_extend", model["w"], 9, 0, "", 4, -5, 4, 5, "1", "delete")
+    assert r["ok"], r
+    assert model["door"] in r["geometry"]["removed"]
+    with pytest.raises(RuntimeError):
+        b._model.by_guid(model["door"])
+    assert axis(model["w"]) == [[4, 0], [10, 0]]
+
+
+def test_trimming_off_a_door_can_keep_it(model):
+    # D92: the option keeps the door where it is and trims the wall anyway.
+    r = call("trim_extend", model["w"], 9, 0, "", 4, -5, 4, 5, "1", "keep")
+    assert r["ok"], r
+    assert axis(model["w"]) == [[4, 0], [10, 0]]
+    assert host(model["door"]) == model["w"]
+
+
 def test_corner_meets_two_walls_in_an_l(model):
     a = call("create_wall", model["l1"], model["type"], 20, 0, 24, 0, 3.0, "", "")["guid"]
     c = call("create_wall", model["l1"], model["type"], 26, 1, 26, 6, 3.0, "", "")["guid"]

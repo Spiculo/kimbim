@@ -59,6 +59,7 @@ QJsonObject Preferences::defaults()
         {"title_bar_versions", true},
         {"select_similar_scope", "class_predefined"},
         {"box_selection", "direction"},
+        {"split_join", true},
         {"recent", QJsonArray()},
     };
 }
@@ -173,6 +174,8 @@ QString Preferences::boxSelection() const
     const QString v = value("box_selection").toString();
     return v == QLatin1String("partial") || v == QLatin1String("entire") ? v : QStringLiteral("direction");
 }
+
+bool Preferences::splitJoin() const { return value("split_join").toBool(true); }
 
 bool Preferences::trueLineWeights() const
 {

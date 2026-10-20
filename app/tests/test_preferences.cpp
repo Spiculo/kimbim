@@ -103,6 +103,9 @@ private slots:
         QCOMPARE(p.boxSelection(), QString("direction"));
         p.setValue("box_selection", "sideways");
         QCOMPARE(p.boxSelection(), QString("direction"));
+        QVERIFY(p.splitJoin()); // D92
+        p.setValue("split_join", false);
+        QVERIFY(!p.splitJoin());
     }
 
     void theDialogWritesWhatTheUserPicked()
@@ -124,6 +127,7 @@ private slots:
         d.findChild<QCheckBox*>("titleBarLevels")->setChecked(false);
         d.findChild<QComboBox*>("selectSimilarScope")->setCurrentIndex(1); // class_predefined, type, class
         d.findChild<QComboBox*>("boxSelection")->setCurrentIndex(2); // direction, partial, entire
+        d.findChild<QCheckBox*>("splitJoin")->setChecked(false);
         d.findChild<QLineEdit*>("authorName")->setText("Felipe");
         d.findChild<QLineEdit*>("templatesFolder")->setText("Z:/Plantillas");
         d.apply();
@@ -139,6 +143,7 @@ private slots:
         QVERIFY(!p.titleBarLevels() && !p.titleBarVersions());
         QCOMPARE(p.selectSimilarScope(), QString("type"));
         QCOMPARE(p.boxSelection(), QString("entire"));
+        QVERIFY(!p.splitJoin());
         QCOMPARE(p.authorName(), QString("Felipe"));
         QCOMPARE(p.templatesFolder(), QString("Z:/Plantillas"));
     }

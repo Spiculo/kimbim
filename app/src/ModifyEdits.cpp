@@ -33,6 +33,7 @@ QString flag(bool on)
 void MainWindow::setupModifyTools(ToolOptionsBar* bar)
 {
     m_modifyTool = new ModifyTool(this);
+    m_modifyTool->setJoinDefault(m_prefs.splitJoin()); // D92
     m_modifyMode = new QComboBox(bar);
     m_modifyMode->setObjectName(QStringLiteral("modifyMode"));
     m_modifyMode->setToolTip(tr("What the tool does"));

@@ -1231,6 +1231,9 @@ ES = {
     "Find elements on hidden or locked layers too": "Buscar también elementos en capas ocultas o bloqueadas",
     # D92: measure and levels
     "Areas in:": "Áreas en:",
+    # D92: split, trim, join
+    "Join split and trimmed pieces (hold Ctrl to leave them apart)":
+        "Unir las piezas divididas y recortadas (mantenga Ctrl para dejarlas separadas)",
 }
 
 

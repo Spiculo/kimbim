@@ -175,6 +175,10 @@ PreferencesDialog::PreferencesDialog(Preferences& prefs, QWidget* parent)
         prefs.boxSelection());
     m_boxSelection->setToolTip(tr("How a box selects elements"));
     form->addRow(tr("Box selection:"), m_boxSelection);
+    m_splitJoin = new QCheckBox(tr("Join split and trimmed pieces (hold Ctrl to leave them apart)"), this);
+    m_splitJoin->setObjectName(QStringLiteral("splitJoin"));
+    m_splitJoin->setChecked(prefs.splitJoin());
+    form->addRow(QString(), m_splitJoin);
 
     layout->addLayout(form);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
@@ -205,6 +209,7 @@ void PreferencesDialog::apply()
     m_prefs.setValue(QStringLiteral("title_bar_versions"), m_titleVersions->isChecked());
     m_prefs.setValue(QStringLiteral("select_similar_scope"), m_selectSimilar->currentData().toString());
     m_prefs.setValue(QStringLiteral("box_selection"), m_boxSelection->currentData().toString());
+    m_prefs.setValue(QStringLiteral("split_join"), m_splitJoin->isChecked());
 }
 
 void PreferencesDialog::accept()

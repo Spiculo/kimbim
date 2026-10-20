@@ -3569,6 +3569,8 @@ void MainWindow::applyViewPreferences()
 {
     Viewport::setFieldOfView(m_prefs.fieldOfView()); // D92
     Viewport::setBoxMode(Viewport::boxModeFrom(m_prefs.boxSelection())); // D92
+    if (m_modifyTool)
+        m_modifyTool->setJoinDefault(m_prefs.splitJoin()); // D92: split/trim pieces joined
     const QJsonArray home = m_prefs.value(QStringLiteral("home_view")).toArray();
     if (home.size() == 6)
         Viewport::setHomeView(gp_Dir(home.at(0).toDouble(), home.at(1).toDouble(), home.at(2).toDouble()),

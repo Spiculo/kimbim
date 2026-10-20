@@ -35,6 +35,7 @@ public:
     void setTargets(QVector<Target> targets) { m_targets = std::move(targets); }
     Snapper& snapper() { return m_snapper; }
     void setTolerance(double metres) { m_tolerance = metres; }
+    void setJoinDefault(bool on) { m_joinDefault = on; } // D92: split/trim pieces are joined unless Ctrl
 
     void setMode(Mode mode);
     Mode mode() const { return m_mode; }
@@ -64,6 +65,7 @@ private:
     Snapper m_snapper;
     QVector<Target> m_targets;
     double m_tolerance = 0.1;
+    bool m_joinDefault = true;
     Mode m_mode = Mode::Split;
     std::optional<Target> m_first;
     QPointF m_firstPoint;

@@ -427,8 +427,10 @@ def _end_to(e, line, t, keep_t):
     return 1 if keep_t < t else 0
 
 
-def _plan_end(e, line, t, keep_t, holes_ok=False):
-    """(end index, new p1, new p2) or an error string."""
+def _plan_end(e, line, t, keep_t, holes="refuse"):
+    """(end index, new p1, new p2, doomed) or an error string. `holes` (D92) decides what happens to a
+    door, window or opening the trim would leave outside the wall: "refuse" (default), "delete" it, or
+    "keep" it where it is."""
     k = _end_to(e, line, t, keep_t)
     p1, p2 = _vec(line[0]), _vec(line[1])
     q = p1 + (p2 - p1) * t
@@ -436,16 +438,23 @@ def _plan_end(e, line, t, keep_t, holes_ok=False):
     length = float(np.linalg.norm(new[1] - new[0]))
     if length < A.MIN_WALL_LENGTH:
         return "the element would have no length"
+    doomed = []
     if e.is_a("IfcWall"):
         full = math.dist(*line)
         lo, hi = (t * full, full) if k == 0 else (0.0, t * full)
         for fill, opening, along, width in _hosted_fills(e):
             if along - width / 2 < lo - EPS or along + width / 2 > hi + EPS:
-                return f"{fill.Name or 'a door or window'} would be cut off: move or delete it first"
+                if holes == "refuse":
+                    return f"{fill.Name or 'a door or window'} would be cut off: move or delete it first"
+                if holes == "delete":
+                    doomed.append(fill)
         for opening, along in _bare_openings(e):
             if not lo - EPS <= along <= hi + EPS:
-                return "an opening would be cut off: delete it first"
-    return k, new[0], new[1]
+                if holes == "refuse":
+                    return "an opening would be cut off: delete it first"
+                if holes == "delete":
+                    doomed.append(opening)
+    return k, new[0], new[1], doomed
 
 
 def _apply_end(e, line, k, p1, p2, t):
@@ -482,14 +491,18 @@ def _join_end(e, k, other, point):
                                            relating_connection=mine, related_connection=theirs)
 
 
-def trim_extend(guid: str, x, y, boundary_guid: str = "", bx1=0, by1=0, bx2=0, by2=0, join="1") -> str:
+def trim_extend(guid: str, x, y, boundary_guid: str = "", bx1=0, by1=0, bx2=0, by2=0, join="1",
+                holes="refuse") -> str:
     """Trim or extend a wall or beam to a boundary (Revit's Trim/Extend to element): the boundary
     is a wall or beam (`boundary_guid`) or a line (bx1, by1)-(bx2, by2), e.g. a grid line. When
     the boundary crosses the element, the side clicked at (x, y) stays; otherwise the nearer end
     reaches the boundary. A wall that reaches a wall is joined to it unless `join` is false; the
-    joins at the end that moved are dropped (as when stretching)."""
+    joins at the end that moved are dropped (as when stretching). `holes` (D92) decides an opening
+    the trim would leave outside: "refuse" (default), "delete" it or "keep" it."""
     if B._model is None:
         return A._fail("no model open")
+    if holes not in ("refuse", "delete", "keep"):
+        return A._fail(f"unknown opening choice {holes}")
     e = A._by_guid(guid)
     error = _check(e)
     if error:
@@ -513,10 +526,10 @@ def trim_extend(guid: str, x, y, boundary_guid: str = "", bx1=0, by1=0, bx2=0, b
     t = _intersect(line[0], line[1], b1, b2)
     if t is None:
         return A._fail("the element is parallel to the boundary")
-    plan = _plan_end(e, line, t, _param((x, y), *line))
+    plan = _plan_end(e, line, t, _param((x, y), *line), holes)
     if isinstance(plan, str):
         return A._fail(plan)
-    k, p1, p2 = plan
+    k, p1, p2, doomed = plan
     join = A._truthy(join)
 
     def action():
@@ -525,18 +538,25 @@ def trim_extend(guid: str, x, y, boundary_guid: str = "", bx1=0, by1=0, bx2=0, b
         lost = _apply_end(e, line, k, p1, p2, t)
         if join:
             _join_end(e, k, boundary, p1 if k == 0 else p2)
+        removed = []
+        deleted = []
+        if doomed:
+            _, deleted, removed = A._delete_cascade(list(dict.fromkeys(doomed)))
         rebuilt = _regen([e, *lost, *old_neighbours, *([boundary] if boundary is not None else [])])
-        return 1, _visible([e]) + rebuilt, []
+        return 1, _visible([e]) + rebuilt + deleted, removed
 
     return _finish(action, {})
 
 
-def trim_corner(guid1: str, x1, y1, guid2: str, x2, y2, join="1") -> str:
+def trim_corner(guid1: str, x1, y1, guid2: str, x2, y2, join="1", holes="refuse") -> str:
     """Trim/extend two walls or beams to their corner (Revit's Trim/Extend to corner, Archicad's
     Intersect): both reach the point where their lines cross, each keeping the side it was clicked
-    on (x1, y1 / x2, y2), and two walls are joined there in an L unless `join` is false."""
+    on (x1, y1 / x2, y2), and two walls are joined there in an L unless `join` is false. `holes`
+    (D92) decides an opening the trim would leave outside: "refuse", "delete" or "keep"."""
     if B._model is None:
         return A._fail("no model open")
+    if holes not in ("refuse", "delete", "keep"):
+        return A._fail(f"unknown opening choice {holes}")
     a, b = A._by_guid(guid1), A._by_guid(guid2)
     for e, what in ((a, "the first element"), (b, "the second element")):
         error = _check(e, what)
@@ -554,7 +574,7 @@ def trim_corner(guid1: str, x1, y1, guid2: str, x2, y2, join="1") -> str:
         return A._fail("the two are parallel: they never meet")
     plans = []
     for e, line, t, click in ((a, la, ta, (x1, y1)), (b, lb, tb, (x2, y2))):
-        plan = _plan_end(e, line, t, _param(click, *line))
+        plan = _plan_end(e, line, t, _param(click, *line), holes)
         if isinstance(plan, str):
             return A._fail(plan)
         plans.append((e, line, t, plan))
@@ -563,11 +583,13 @@ def trim_corner(guid1: str, x1, y1, guid2: str, x2, y2, join="1") -> str:
     def action():
         f = B._model
         touched = []
+        doomed = []
         _adopt(a)
         _adopt(b)
-        for e, line, t, (k, p1, p2) in plans:
+        for e, line, t, (k, p1, p2, holes_out) in plans:
             touched += [_other(r, e) for r in A._path_joins(e)]
             touched += _apply_end(e, line, k, p1, p2, t)
+            doomed += holes_out
         for rel in _joined(a, b):
             f.remove(rel)
         if join and a.is_a("IfcWall") and b.is_a("IfcWall"):
@@ -575,8 +597,12 @@ def trim_corner(guid1: str, x1, y1, guid2: str, x2, y2, join="1") -> str:
             ifcopenshell.api.geometry.connect_path(
                 f, relating_element=a, related_element=b,
                 relating_connection="ATSTART" if ka == 0 else "ATEND", related_connection="ATSTART" if kb == 0 else "ATEND")
+        removed = []
+        deleted = []
+        if doomed:
+            _, deleted, removed = A._delete_cascade(list(dict.fromkeys(doomed)))
         rebuilt = _regen([a, b, *touched])
-        return 2, _visible([a, b]) + rebuilt, []
+        return 2, _visible([a, b]) + rebuilt + deleted, removed
 
     return _finish(action, {})
 
