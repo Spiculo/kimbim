@@ -142,6 +142,7 @@ private slots:
         d.findChild<QComboBox*>("angleMode")->setCurrentIndex(2); // absolute, relative, bearing
         d.findChild<QComboBox*>("typedLengthUnit")->setCurrentIndex(1); // metres, project
         d.findChild<QCheckBox*>("tabAnnotations")->setChecked(false);
+        d.findChild<QCheckBox*>("panelsShrinkFirst")->setChecked(true);
         d.findChild<QLineEdit*>("authorName")->setText("Felipe");
         d.findChild<QLineEdit*>("templatesFolder")->setText("Z:/Plantillas");
         d.apply();
@@ -162,6 +163,8 @@ private slots:
         QCOMPARE(p.angleMode(), QString("bearing"));
         QCOMPARE(p.typedLengthUnit(), QString("project"));
         QVERIFY(!p.tabAnnotations());
+        QVERIFY(p.panelsShrinkFirst());
+        QVERIFY(p.pinnedPanels().isEmpty());
         QCOMPARE(p.boxSelection(), QString("entire"));
         QVERIFY(!p.splitJoin());
         QCOMPARE(p.authorName(), QString("Felipe"));

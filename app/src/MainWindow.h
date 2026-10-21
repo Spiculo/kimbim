@@ -681,7 +681,8 @@ private:
     QMenu* m_recentMenu = nullptr;
     int m_savesSinceVersion = 0; // D72: automatic versions every N saves...
     QElapsedTimer m_sinceVersion; // ...or N minutes
-    QJsonObject m_document;       // the last document_state
+    QJsonObject m_document;
+    bool m_panelsShrunk = false; // D92: the panels are at their smaller width
     QJsonObject m_settings;       // the project settings (D72)
     QTimer m_recoveryTimer;       // D72: the recovery copy
     QLineEdit* m_lengthInput = nullptr;

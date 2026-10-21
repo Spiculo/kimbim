@@ -2214,6 +2214,45 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // D92: related tools share a flyout button.
+    void relatedToolsShareFlyouts()
+    {
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        auto* p = w.toolPalette();
+        auto act = [&w](const char* name) { return w.findChild<QAction*>(QLatin1String(name)); };
+        QAction* split = act("actionSplitTool");
+        QAction* trim = act("actionTrimTool");
+        QAction* join = act("actionJoinTool");
+        QAction* slab = act("actionSlabTool");
+        QAction* opening = act("actionSlabOpeningTool");
+        QVERIFY(split && trim && join && slab && opening);
+        QVERIFY(p->buttonFor(split) == p->buttonFor(trim) && p->buttonFor(trim) == p->buttonFor(join));
+        QVERIFY(p->buttonFor(slab) == p->buttonFor(opening));
+        QVERIFY(p->buttonFor(split)->menu() && p->buttonFor(split)->menu()->actions().size() == 3);
+        QVERIFY(p->buttonFor(slab)->menu() && p->buttonFor(slab)->menu()->actions().size() == 2);
+    }
+
+    // D92: on a small screen the side panels shrink first, when asked.
+    void panelsShrinkFirstWhenAsked()
+    {
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        QSignalSpy widths(w.dockLayout(), &kimbim::DockLayout::sideWidthsChanged);
+        w.show(); // resize events are delivered once the window is shown (offscreen here)
+        QApplication::processEvents();
+        w.preferences().setValue(QStringLiteral("panels_shrink_first"), true);
+        w.resize(900, 700);
+        QApplication::processEvents();
+        QVERIFY(widths.count() >= 1);
+        QCOMPARE(widths.last().at(0).toInt(), 168); // the tool palette shrinks first
+        QCOMPARE(widths.last().at(1).toInt(), 220); // and the panels
+        w.resize(1300, 800);
+        QApplication::processEvents();
+        QCOMPARE(widths.last().at(0).toInt(), 216); // back to their normal width
+        QCOMPARE(widths.last().at(1).toInt(), 280);
+    }
+
     void projectSettingsDialogReportsOnlyChanges()
     {
         kimbim::ProjectSettingsDialog d({{"plan_cut_height", 1.2}, {"drawing_scale", 100}, {"sheet_paper", "A1"},

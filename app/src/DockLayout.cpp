@@ -341,10 +341,33 @@ bool DockLayout::isPanelShown(const QString& key) const
     return dock && !dock->isClosed() && dock->isCurrentTab();
 }
 
+QList<int> DockLayout::splitterSizes() const
+{
+    return m_center ? m_manager->splitterSizes(m_center) : QList<int>{};
+}
+
+void DockLayout::setPanelPinned(const QString& key, bool pinned)
+{
+    auto* dock = m_manager->findDockWidget(key);
+    if (!dock || key == QLatin1String("tools") || key.startsWith(QLatin1String("plan:")))
+        return;
+    if (pinned)
+        m_pinned.insert(key);
+    else
+        m_pinned.remove(key);
+    dock->setFeature(ads::CDockWidget::DockWidgetClosable, !pinned);
+    if (QAction* toggle = dock->toggleViewAction()) {
+        toggle->setEnabled(!pinned);
+        if (pinned && !dock->isVisible())
+            dock->toggleView(true); // a permanent tab is always there
+    }
+}
+
 void DockLayout::setSideWidths(int left, int right)
 {
     if (!m_center)
         return;
+    emit sideWidthsChanged(left, right);
     // The root splitter holds [left column,] the center [, right column], in that order.
     const QList<int> now = m_manager->splitterSizes(m_center);
     int total = 0;

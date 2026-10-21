@@ -54,6 +54,7 @@ private:
     QComboBox* m_angleMode;
     QComboBox* m_typedLength;
     QCheckBox* m_tabAnnotations;
+    QCheckBox* m_panelsShrink;
     QSpinBox* m_underlayOpacity; // D92: new underlay defaults
     QCheckBox* m_underlayGrey;
     QLineEdit* m_underlayTint;

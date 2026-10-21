@@ -34,6 +34,8 @@ public:
     QString angleMode() const;          // D92: "absolute", "relative" or "bearing"
     QString typedLengthUnit() const;    // D92: typed lengths in metres ("metres") or the project unit
     bool tabAnnotations() const;        // D92: Tab cycling reaches annotations (on)
+    QStringList pinnedPanels() const;   // D92: panels pinned as permanent tabs
+    bool panelsShrinkFirst() const;     // D92: on a small screen the panels shrink before the views (off)
     double fieldOfView() const;         // D92: the perspective camera's vertical field of view, degrees (default 45)
     bool northArrowPlans() const;       // D92: show the plan north indicator (on once true north is set)
     bool meshVertexSnaps() const;       // D92: snap to element mesh vertices while drawing (off)

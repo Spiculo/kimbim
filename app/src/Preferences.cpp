@@ -57,6 +57,8 @@ QJsonObject Preferences::defaults()
         {"angle_mode", "absolute"},
         {"typed_length_unit", "metres"},
         {"tab_annotations", true},
+        {"pinned_panels", QJsonArray()},
+        {"panels_shrink_first", false},
         {"field_of_view", 45.0},
         {"north_arrow", true},
         {"mesh_vertex_snaps", false},
@@ -186,6 +188,17 @@ QString Preferences::typedLengthUnit() const
 }
 
 bool Preferences::tabAnnotations() const { return value("tab_annotations").toBool(true); }
+
+QStringList Preferences::pinnedPanels() const
+{
+    QStringList out;
+    for (const auto& v : value("pinned_panels").toArray())
+        if (v.isString())
+            out << v.toString();
+    return out;
+}
+
+bool Preferences::panelsShrinkFirst() const { return value("panels_shrink_first").toBool(false); }
 
 double Preferences::fieldOfView() const
 {

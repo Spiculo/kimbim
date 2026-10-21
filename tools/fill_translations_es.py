@@ -1346,6 +1346,9 @@ ES = {
     'Typed lengths in:': 'Longitudes escritas en:',
     'Tab also cycles through annotations and 2D drafting': 'Tab también recorre las anotaciones y el dibujo 2D',
 
+    'Pin %1': 'Fijar %1',
+    'Shrink the panels first on small screens': 'Reducir primero los paneles en pantallas pequeñas',
+
 }
 
 

@@ -314,6 +314,14 @@ void MainWindow::resizeEvent(QResizeEvent* event)
     const QRect avail = s ? s->availableGeometry() : QRect(0, 0, 1920, 1080);
     if (event->size().width() > avail.width() * 4 || event->size().height() > avail.height() * 4)
         clampWindowSize();
+    // D92: on a small screen the side panels shrink first (off by default: the views take it).
+    if (m_dock && m_prefs.panelsShrinkFirst()) {
+        const bool small = width() < 1100;
+        if (small != m_panelsShrunk) {
+            m_panelsShrunk = small;
+            m_dock->setSideWidths(small ? 168 : 216, small ? 220 : 280);
+        }
+    }
 }
 
 MainWindow::~MainWindow()
@@ -2569,6 +2577,8 @@ void MainWindow::buildPalette()
         tool(Tool::Rectangle)});
     m_palette->addFlyout(QStringLiteral("plane"), {tool(Tool::NorthArrow), tool(Tool::ScaleBar), tool(Tool::Cloud)});
     m_palette->addFlyout(QStringLiteral("view"), {tool(Tool::Section), tool(Tool::Elevation)});
+    m_palette->addFlyout(QStringLiteral("edit"), {tool(Tool::Split), tool(Tool::Trim), tool(Tool::Join)}); // D92
+    m_palette->addFlyout(QStringLiteral("3d"), {tool(Tool::Slab), tool(Tool::SlabOpening)});
     m_palette->setMode(ToolPalette::modeFromKey(m_prefs.value(QStringLiteral("palette_mode")).toString()));
     connect(m_palette, &ToolPalette::modeChanged, this, [this](ToolPalette::Mode mode) {
         m_prefs.setValue(QStringLiteral("palette_mode"), ToolPalette::modeKey(mode));
@@ -2583,13 +2593,36 @@ void MainWindow::buildPalette()
     QAction* hideTools = m_palette->contextMenu()->addAction(tr("&Auto-hide"));
     hideTools->setObjectName(QStringLiteral("actionAutoHideTools"));
     connect(hideTools, &QAction::triggered, toolsDock, [toolsDock] { toolsDock->setAutoHide(!toolsDock->isAutoHide()); });
-    // View > Panels: a panel closed with its x comes back from here (D71).
+    // View > Panels: a panel closed with its x comes back from here (D71); D92: pin any as a
+    // permanent tab (no close button, always shown), remembered in the preferences.
     m_viewMenu->addSeparator();
     QMenu* panels = m_viewMenu->addMenu(tr("&Panels"));
     panels->setObjectName(QStringLiteral("panelsMenu"));
     for (const char* key : {"tools", "tree", "properties", "layers", "history", "drawings", "sheets"})
-        if (ads::CDockWidget* d = m_dock->manager()->findDockWidget(QLatin1String(key)))
+        if (ads::CDockWidget* d = m_dock->manager()->findDockWidget(QLatin1String(key))) {
+            const QString k = QLatin1String(key);
+            const bool pinned = m_prefs.pinnedPanels().contains(k);
+            m_dock->setPanelPinned(k, pinned);
             panels->addAction(d->toggleViewAction());
+            if (k != QLatin1String("tools")) {
+                auto* pin = panels->addAction(tr("Pin %1").arg(d->windowTitle()));
+                pin->setObjectName(QStringLiteral("pinPanel_") + k);
+                pin->setCheckable(true);
+                pin->setChecked(pinned);
+                connect(pin, &QAction::toggled, this, [this, k, pin](bool on) {
+                    m_dock->setPanelPinned(k, on);
+                    QStringList pinnedPanels = m_prefs.pinnedPanels();
+                    if (on && !pinnedPanels.contains(k))
+                        pinnedPanels << k;
+                    else if (!on)
+                        pinnedPanels.removeAll(k);
+                    m_prefs.setValue(QStringLiteral("pinned_panels"), QJsonArray::fromStringList(pinnedPanels));
+                    if (!m_quiet)
+                        m_prefs.save();
+                    Q_UNUSED(pin);
+                });
+            }
+        }
     // D90: the panels used now and then cost no tab until opened (then closable): from here, the
     // Panels button of the panel area and their own commands.
     panels->addSeparator();

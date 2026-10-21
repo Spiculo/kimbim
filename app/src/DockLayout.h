@@ -2,10 +2,13 @@
 #pragma once
 
 #include <QByteArray>
+#include <QList>
 #include <QObject>
 #include <QPointer>
+#include <QSet>
 #include <QStringList>
 
+class QAction;
 class QMainWindow;
 class QMenu;
 class QWidget;
@@ -51,6 +54,10 @@ public:
     bool isPanelShown(const QString& key) const;
     // The side columns' widths (pixels); the center views get the rest (the point of D71: room).
     void setSideWidths(int left, int right);
+    QList<int> splitterSizes() const; // the root splitter's sizes (tests, diagnostics)
+    // D92: pin a side panel as a permanent tab (no close button, cannot be hidden).
+    void setPanelPinned(const QString& key, bool pinned);
+    bool isPanelPinned(const QString& key) const { return m_pinned.contains(key); }
 
     // Layout memory.
     QByteArray saveLayout() const;
@@ -62,6 +69,7 @@ public:
 
 signals:
     void currentChanged(const QString& key);
+    void sideWidthsChanged(int left, int right); // D92: the panels' widths were set (tests, diagnostics)
     void closeRequested(const QString& key);
 
 private:
@@ -73,6 +81,7 @@ private:
     QPointer<ads::CDockAreaWidget> m_center, m_panels, m_left;
     QStringList m_views;
     QStringList m_panelKeys;
+    QSet<QString> m_pinned; // D92: panels that stay visible as permanent tabs
     QPointer<QMenu> m_panelsMenu;
     QString m_current;
     QByteArray m_default;

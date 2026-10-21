@@ -156,6 +156,10 @@ PreferencesDialog::PreferencesDialog(Preferences& prefs, QWidget* parent)
     m_tabAnnotations->setObjectName(QStringLiteral("tabAnnotations"));
     m_tabAnnotations->setChecked(prefs.tabAnnotations());
     form->addRow(QString(), m_tabAnnotations);
+    m_panelsShrink = new QCheckBox(tr("Shrink the panels first on small screens"), this);
+    m_panelsShrink->setObjectName(QStringLiteral("panelsShrinkFirst"));
+    m_panelsShrink->setChecked(prefs.panelsShrinkFirst());
+    form->addRow(QString(), m_panelsShrink);
 
     // D92: the perspective camera's field of view.
     m_fieldOfView = new QSpinBox(this);
@@ -275,6 +279,7 @@ void PreferencesDialog::apply()
     m_prefs.setValue(QStringLiteral("angle_mode"), m_angleMode->currentData().toString());
     m_prefs.setValue(QStringLiteral("typed_length_unit"), m_typedLength->currentData().toString());
     m_prefs.setValue(QStringLiteral("tab_annotations"), m_tabAnnotations->isChecked());
+    m_prefs.setValue(QStringLiteral("panels_shrink_first"), m_panelsShrink->isChecked());
     m_prefs.setValue(QStringLiteral("field_of_view"), double(m_fieldOfView->value()));
     m_prefs.setValue(QStringLiteral("north_arrow"), m_northArrow->isChecked());
     m_prefs.setValue(QStringLiteral("title_bar_levels"), m_titleLevels->isChecked());

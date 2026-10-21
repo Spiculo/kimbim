@@ -19,6 +19,25 @@
 class TestDockLayout : public QObject {
     Q_OBJECT
 private slots:
+    // D92: a panel can be pinned as a permanent tab: no close button, cannot be hidden.
+    void panelsCanBePinnedAsPermanentTabs()
+    {
+        QMainWindow w;
+        kimbim::DockLayout layout(&w);
+        layout.addView("3d", "3D", new QLabel, false);
+        layout.addPanel("tree", "Model", new QLabel);
+        auto* dock = layout.manager()->findDockWidget("tree");
+        QVERIFY(dock->features().testFlag(ads::CDockWidget::DockWidgetClosable));
+        layout.setPanelPinned("tree", true);
+        QVERIFY(layout.isPanelPinned("tree"));
+        QVERIFY(!dock->features().testFlag(ads::CDockWidget::DockWidgetClosable));
+        QVERIFY(!dock->toggleViewAction()->isEnabled());
+        layout.setPanelPinned("tree", false);
+        QVERIFY(!layout.isPanelPinned("tree"));
+        QVERIFY(dock->features().testFlag(ads::CDockWidget::DockWidgetClosable));
+        QVERIFY(dock->toggleViewAction()->isEnabled());
+    }
+
     void viewsAreKeyedTabsInTheCenter()
     {
         QMainWindow w;
