@@ -1605,6 +1605,10 @@ ES = {
         "Parámetros de %1 tomados: seleccione otros elementos e inyéctelos (Ctrl+Alt+V)",
     "Pick up an element's settings first (Ctrl+Alt+C)": "Primero tome los parámetros de un elemento (Ctrl+Alt+C)",
     "%n element(s) took the settings": ("%n elemento tomó los parámetros", "%n elementos tomaron los parámetros"),
+    "Each column or beam its own (Archicad)": "Cada columna o viga el suyo (Archicad)",
+    "Every column or beam of the type (Revit)": "Todas las columnas o vigas del tipo (Revit)",
+    "What changing a column's or beam's building material changes": "Qué cambia al modificar el material de construcción de una columna o viga",
+    "Column and beam material:": "Material de columnas y vigas:",
 }
 
 

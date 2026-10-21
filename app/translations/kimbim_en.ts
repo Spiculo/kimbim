@@ -8426,91 +8426,111 @@ Open it read-only?</source>
     </message>
     <message>
         <location filename="../src/ProjectSettingsDialog.cpp" line="154"/>
-        <source>Rebuild with KimBim&apos;s shape</source>
+        <source>Each column or beam its own (Archicad)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/ProjectSettingsDialog.cpp" line="155"/>
-        <source>Keep the imported shape and cut it</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="157"/>
-        <source>Splitting a wall imported from another program: rebuild it (so it edits and joins like one drawn here) or keep the other program&apos;s body and cut it</source>
+        <source>Every column or beam of the type (Revit)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/ProjectSettingsDialog.cpp" line="158"/>
-        <source>Imported walls:</source>
+        <source>What changing a column&apos;s or beam&apos;s building material changes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/ProjectSettingsDialog.cpp" line="159"/>
-        <source>Flag partly overlapping elements as duplicates</source>
+        <source>Column and beam material:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/ProjectSettingsDialog.cpp" line="162"/>
+        <source>Rebuild with KimBim&apos;s shape</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="163"/>
+        <source>Keep the imported shape and cut it</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="165"/>
+        <source>Splitting a wall imported from another program: rebuild it (so it edits and joins like one drawn here) or keep the other program&apos;s body and cut it</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="166"/>
+        <source>Imported walls:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="167"/>
+        <source>Flag partly overlapping elements as duplicates</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="170"/>
         <source>Model checks: also report same-type elements that overlap by half or more without being exactly in the same place</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="168"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="176"/>
         <source>Decimals:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="172"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="180"/>
         <source>Existing</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="173"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="181"/>
         <source>To be demolished</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="174"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="182"/>
         <source>Leave them (they count as New)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="176"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="184"/>
         <source>Unmarked elements in an opened IFC:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="181"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="189"/>
         <source>Renovation styles:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="185"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="193"/>
         <source>Every rule when it fits</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="186"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="194"/>
         <source>Every rule</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="187"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="195"/>
         <source>Only the rules used</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="189"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="197"/>
         <source>Sheet legend:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="191"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="199"/>
         <source>Library objects show their plan symbol in plans</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="196"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="204"/>
         <source>These settings aren&apos;t kept with a plain IFC file. Save as .kim to keep them.</source>
         <translation type="unfinished"></translation>
     </message>

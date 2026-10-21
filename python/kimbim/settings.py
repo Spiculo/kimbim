@@ -73,6 +73,7 @@ DEFAULTS = {
     "construction_grid": {"spacing": 1.0, "subdivisions": 4, "angle": 0.0, "origin": [0.0, 0.0]},  # D98
     "wall_reference_line": "Outside face",
     "layers_in_3d": True,
+    "member_material_scope": "element",  # D97: a column's or beam's material: its own (Archicad) or its type's (Revit)
     "wall_profiles": {},  # D97: complex wall sections by name: [[across, up], ...] metres from the base line  # D96: walls and slabs show each layer on their ends and tops in 3D  # D97: where a new wall's clicked line is (Archicad default)
 }
 UNITS = {"m": 1.0, "cm": 100.0, "mm": 1000.0}
@@ -266,6 +267,8 @@ def _error(key: str, value) -> str | None:
         from . import configure
 
         return configure.profiles_error(value)
+    if key == "member_material_scope" and value not in ("element", "type"):
+        return "member_material_scope must be element or type"
     if key == "layers_in_3d" and not isinstance(value, bool):
         return "layers_in_3d must be true or false"
     if key == "wall_reference_line":

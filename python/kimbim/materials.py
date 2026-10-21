@@ -1247,9 +1247,32 @@ def _style_on_items(f, style) -> bool:
     return False
 
 
-def assign_material(guids_json: str, kind: str, name: str) -> str:
+def _own_profile_set(f, e, current, material):
+    """A column's or beam's own profile set (D97, Archicad: material per element): the type's profiles,
+    `material` for each, used by this occurrence alone (the type and its other occurrences keep theirs)."""
+    t = ifcopenshell.util.element.get_type(e)
+    shared = t is not None and ifcopenshell.util.element.get_material(t, should_skip_usage=True) == current
+    if not shared:  # already its own: change it in place
+        for profile in current.MaterialProfiles or ():
+            profile.Material = material
+        return
+    usage = ifcopenshell.util.element.get_material(e, should_skip_usage=False)
+    cardinal = usage.CardinalPoint if usage is not None and usage.is_a("IfcMaterialProfileSetUsage") else None
+    own = f.createIfcMaterialProfileSet(current.Name, current.Description, [
+        f.createIfcMaterialProfile(p.Name, p.Description, material, p.Profile, p.Priority, p.Category)
+        for p in current.MaterialProfiles or ()], current.CompositeProfile)
+    ifcopenshell.api.material.unassign_material(f, products=[e])
+    rel = ifcopenshell.api.material.assign_material(f, products=[e], type="IfcMaterialProfileSetUsage", material=own)
+    new_usage = rel.RelatingMaterial if rel is not None else None
+    if new_usage is not None and new_usage.is_a("IfcMaterialProfileSetUsage") and cardinal is not None:
+        new_usage.CardinalPoint = cardinal
+
+
+def assign_material(guids_json: str, kind: str, name: str, scope: str = "") -> str:
     """Give elements a building material (kind 'material') or a composite (kind 'composite': walls and
-    slabs change to the composite's type, whose thickness they take)."""
+    slabs change to the composite's type, whose thickness they take). A column's or beam's material is
+    its own (scope 'element', Archicad) or its type's, which all of the type's occurrences follow
+    (scope 'type', Revit); without a scope, the project's member_material_scope decides."""
     if B._model is None:
         return _fail("no model open")
     try:
@@ -1278,6 +1301,12 @@ def assign_material(guids_json: str, kind: str, name: str) -> str:
             return _fail(f"the composite {name} is for {allowed.get(t.is_a(), '?')[3:].lower()}s only")
     else:
         return _fail(f"unknown kind {kind}")
+    if not scope:
+        from . import settings
+
+        scope = settings.current().get("member_material_scope") or "element"
+    if scope not in ("element", "type"):
+        return _fail(f"unknown scope {scope}")
 
     def action():
         touched: set = set()
@@ -1285,10 +1314,13 @@ def assign_material(guids_json: str, kind: str, name: str) -> str:
             for e in elements:
                 current = ifcopenshell.util.element.get_material(e, should_skip_usage=True)
                 if current is not None and current.is_a("IfcMaterialProfileSet"):
-                    # D97: a column's or beam's material is its profile's (its type's: all of them follow)
-                    for profile in current.MaterialProfiles or ():
-                        profile.Material = m
-                    touched.update(_users_of_material(f, m))
+                    if scope == "type":  # D97: the type's profiles: every occurrence of it follows
+                        for profile in current.MaterialProfiles or ():
+                            profile.Material = m
+                        touched.update(_users_of_material(f, m))
+                    else:
+                        _own_profile_set(f, e, current, m)
+                        touched.add(e)
                     continue
                 ifcopenshell.api.material.unassign_material(f, products=[e])
                 ifcopenshell.api.material.assign_material(f, products=[e], material=m)

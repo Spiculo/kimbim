@@ -41,6 +41,7 @@ private:
     QComboBox* m_stairArrow;
     QCheckBox* m_stairNumbers;
     QCheckBox* m_layers3d; // D96
+    QComboBox* m_memberMaterial; // D97: a column's or beam's material, its own or its type's
     QComboBox* m_importedWalls; // D92
     QCheckBox* m_partialDups; // D92: model checks
     QSpinBox* m_decimals;

@@ -149,6 +149,14 @@ ProjectSettingsDialog::ProjectSettingsDialog(const QJsonObject& settings, bool k
     m_layers3d->setObjectName(QStringLiteral("layersIn3d"));
     m_layers3d->setChecked(settings.value("layers_in_3d").toBool(true));
     form->addRow(QString(), m_layers3d);
+    m_memberMaterial = new QComboBox(this); // D97
+    m_memberMaterial->setObjectName(QStringLiteral("memberMaterialScope"));
+    m_memberMaterial->addItem(tr("Each column or beam its own (Archicad)"), QStringLiteral("element"));
+    m_memberMaterial->addItem(tr("Every column or beam of the type (Revit)"), QStringLiteral("type"));
+    m_memberMaterial->setCurrentIndex(std::max(0, m_memberMaterial->findData(
+        settings.value("member_material_scope").toString(QStringLiteral("element")))));
+    m_memberMaterial->setToolTip(tr("What changing a column's or beam's building material changes"));
+    form->addRow(tr("Column and beam material:"), m_memberMaterial);
     m_importedWalls = new QComboBox(this); // D92
     m_importedWalls->setObjectName(QStringLiteral("importedWalls"));
     m_importedWalls->addItem(tr("Rebuild with KimBim's shape"), QStringLiteral("rebuild"));
@@ -243,6 +251,9 @@ QJsonObject ProjectSettingsDialog::changes() const
         out.insert("stair_arrow", m_stairArrow->currentData().toString());
     if (m_stairNumbers->isChecked() != m_settings.value("stair_riser_numbers").toBool(false))
         out.insert("stair_riser_numbers", m_stairNumbers->isChecked());
+    if (m_memberMaterial->currentData().toString()
+        != m_settings.value("member_material_scope").toString(QStringLiteral("element")))
+        out.insert("member_material_scope", m_memberMaterial->currentData().toString());
     if (m_layers3d->isChecked() != m_settings.value("layers_in_3d").toBool(true))
         out.insert("layers_in_3d", m_layers3d->isChecked());
     if (m_importedWalls->currentData().toString() != m_settings.value("imported_walls").toString(QStringLiteral("rebuild")))

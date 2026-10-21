@@ -253,6 +253,33 @@ def test_assign_building_material_to_a_column(project):
     assert hexes(palette, idx) == {M.CATALOGUE["Timber"]["colour"]}
 
 
+def test_column_material_is_per_element_or_per_type(project):
+    t = call("column_types")["types"][0]["guid"]
+    a = call("create_column", project["level"], t, 1, 1, 3.0)["guid"]
+    b2 = call("create_column", project["level"], t, 4, 1, 3.0)["guid"]
+    before = call("element_material", b2)["name"]
+    assert call("assign_material", json.dumps([a]), "material", "Timber")["ok"]  # Archicad: this one only
+    assert call("element_material", a)["name"] == "Timber" and call("element_material", b2)["name"] == before
+    assert call("assign_material", json.dumps([a]), "material", "Steel")["ok"]  # its own set, changed in place
+    assert call("element_material", a)["name"] == "Steel"
+    assert call("element_material", b2)["name"] == before
+    assert call("assign_material", json.dumps([b2]), "material", "Stone", "type")["ok"]  # Revit: the type
+    assert call("element_material", b2)["name"] == "Stone"
+    c3 = call("create_column", project["level"], t, 7, 1, 3.0)["guid"]
+    assert call("element_material", c3)["name"] == "Stone" and call("element_material", a)["name"] == "Steel"
+    palette, idx, _, _ = colours(a)
+    assert hexes(palette, idx) == {M.CATALOGUE["Steel"]["colour"]}
+    assert not call("assign_material", json.dumps([a]), "material", "Steel", "nope")["ok"]
+    call("undo"); call("undo"); call("undo"); call("undo")
+    assert call("element_material", a)["name"] == before
+    from kimbim import settings
+
+    assert json.loads(settings.set_project_settings(json.dumps({"member_material_scope": "type"})))["ok"]
+    assert call("assign_material", json.dumps([a]), "material", "Timber")["ok"]  # the setting: the type
+    assert call("element_material", b2)["name"] == "Timber"
+    assert not json.loads(settings.set_project_settings(json.dumps({"member_material_scope": "x"})))["ok"]
+
+
 def test_assign_material_to_furniture_like_element(project):
     f = b._model
     e = ifcopenshell.api.root.create_entity(f, ifc_class="IfcFurniture", name="Table")
