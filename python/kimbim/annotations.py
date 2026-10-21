@@ -240,10 +240,10 @@ def annotations(storey_guid: str) -> str:
             if kind in ("level", "spot") and extra_of(a).get("Auto") and points:
                 # D92: an automatic elevation follows the project's reference without a model edit.
                 text = S.elevation_text(S.elevation_at(storey, points[0]), storey)
-            item = {"guid": a.GlobalId, "kind": kind, "text": text, "points": points, "size": size, "pen": pen,
-                    "rect": bool(extra_of(a).get("Rect"))}  # D92: a rectangle stays a rectangle
+            item = {"guid": a.GlobalId, "kind": kind, "text": text, "points": points, "size": size, "pen": pen}
             if kind in D.KINDS:
                 item.update(D.shape_data(kind, points, extra_of(a), DRAWING_SCALE / 1000.0))
+                item["rect"] = bool(extra_of(a).get("Rect"))  # D92: a rectangle stays a rectangle
             elif kind in S.KINDS:  # D87: what to draw, from the same description as the drawings
                 item.update(S.round_geometry(S.geometry(kind, points, text or S.measured_text(kind, points), size,
                                                         extra_of(a, effective=True), DRAWING_SCALE / 1000.0, north)))
