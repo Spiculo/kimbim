@@ -240,6 +240,44 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // D98: Trace & Reference: the level below's plan under the active level's.
+    void traceTheLevelBelow()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        auto& py = kimbim::PythonEngine::instance();
+        const QString l1 = w.levelsBar()->activeStorey();
+        w.setTool(kimbim::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({6, 0});
+        w.wallTool()->finish();
+        w.setTool(kimbim::MainWindow::Tool::None);
+        QVERIFY(w.addLevel(QStringLiteral("Upper"), 30.0));
+        QString l2;
+        for (const auto& v : py.callJson("storeys", {}, nullptr).object().value("storeys").toArray())
+            if (v.toObject().value("name").toString() == QLatin1String("Upper"))
+                l2 = v.toObject().value("guid").toString();
+        QVERIFY(!l2.isEmpty());
+        w.levelsBar()->setActive(l1);
+        QVERIFY(w.levelsBar()->step(1)); // the next level up (the top one may be another)
+        QVERIFY(w.levelsBar()->activeStorey() != l1);
+        w.levelsBar()->setActive(l1);
+        w.findChild<QAction*>(QStringLiteral("actionLevelUp"))->trigger(); // D98: Ctrl+Up
+        const QString above = w.levelsBar()->activeStorey();
+        QVERIFY(above != l1);
+        w.findChild<QAction*>(QStringLiteral("actionLevelDown"))->trigger();
+        QCOMPARE(w.levelsBar()->activeStorey(), l1);
+        QVERIFY(!w.levelsBar()->step(-1)); // the bottom
+        QCOMPARE(w.traceSegments(l2), 0); // off by default
+        w.setTraceMode(QStringLiteral("below"));
+        QVERIFY(w.findChild<QAction*>(QStringLiteral("actionTraceBelow"))->isChecked());
+        QVERIFY(w.traceSegments(l2) > 0);
+        QCOMPARE(w.traceSegments(l1), 0); // nothing below the lowest level
+        w.setTraceMode(QString());
+        QCOMPARE(w.traceSegments(l2), 0);
+        QVERIFY(w.close());
+    }
+
     // D97: Fit to walls: an object dropped by a wall stands against its face, its back to the wall.
     void objectsFitToWalls()
     {

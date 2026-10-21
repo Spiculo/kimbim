@@ -823,3 +823,68 @@ def place_figure(storey: str, path: str, width, x=0.0, y=0.0, page=0) -> str:
         return _fail(str(ex))
     options = {"storey": storey, "x": x, "y": y, "scale": width / units, "opacity": 1.0, "page": page}
     return add_underlay(str(p), json.dumps(options))
+
+
+# ---------------------------------------------------------------- trace (D98)
+# Archicad's Trace & Reference: another level's plan shown faintly under the one being drawn, to
+# draw over (the level below by default, or the one above). Built from that level's plan drawing,
+# exported as DXF (model space, real size), so it is the plan as printed.
+
+TRACE_SKIPPED_LAYERS = ("A-ANNO", "A-AREA")  # annotation and room-label layers (dxf layer names)
+
+
+def trace_reference(storey_guid: str, mode: str = "below"):
+    """The level a plan traces: the one below or above `storey_guid` (worksheets have none)."""
+    from . import app_bridge as B
+    from . import drawgen, worksheets
+
+    if B._model is None:
+        return None
+    try:
+        storey = B._model.by_guid(storey_guid)
+    except RuntimeError:
+        return None
+    if worksheets.is_worksheet(storey):
+        return None
+    order = sorted((s for s in B._model.by_type("IfcBuildingStorey") if not worksheets.is_worksheet(s)),
+                   key=drawgen.storey_elevation)
+    if storey not in order:
+        return None
+    i = order.index(storey) + (1 if mode == "above" else -1)
+    return order[i] if 0 <= i < len(order) else None
+
+
+def trace_lines(storey_guid: str, mode: str = "below"):
+    """(meta JSON, coords, colours) as underlay_lines gives them, for the plan of the level that
+    `storey_guid`'s plan traces; meta has "units" (metres per drawing unit) and "reference" (its name)."""
+    import tempfile
+
+    from . import app_bridge as B
+    from . import drawings, dxf
+
+    ref = trace_reference(storey_guid, mode)
+    if ref is None:
+        return (B._dump({"ok": False, "error": f"no level {'above' if mode == 'above' else 'below'} to trace"}), b"", b"")
+    plan = next((d for d in json.loads(drawings.drawings())["drawings"]
+                 if d["kind"] == "plan" and d.get("storey") == ref.GlobalId), None)
+    if plan is None:
+        return (B._dump({"ok": False, "error": f"{ref.Name} has no floor plan"}), b"", b"")
+    try:
+        doc, stats = dxf.drawing_document(plan["guid"], dxf._options(""))
+        if doc is None:
+            return (B._dump({"ok": False, "error": str(stats)}), b"", b"")
+        msp = doc.modelspace()  # the building only: no markers, notes, room labels or dimensions
+        for e in list(msp):
+            layer = e.dxf.get("layer", "")
+            if layer.startswith(TRACE_SKIPPED_LAYERS) or e.dxftype() in ("DIMENSION", "TEXT", "MTEXT", "HATCH"):
+                msp.delete_entity(e)
+        with tempfile.TemporaryDirectory() as folder:
+            path = pathlib.Path(folder) / "trace.dxf"
+            doc.saveas(str(path))
+            d = read_dxf(path)
+    except Exception as ex:
+        return (B._dump({"ok": False, "error": f"{type(ex).__name__}: {ex}"}), b"", b"")
+    meta = {"ok": True, "count": int(len(d["coords"])), "origin": list(d["origin"]), "extents": d["extents"],
+            "units": d["units"] or 1.0, "reference": ref.Name or "", "reference_guid": ref.GlobalId}
+    return (B._dump(meta), np.ascontiguousarray(d["coords"], dtype="<f4").tobytes(),
+            np.ascontiguousarray(d["colours"]).tobytes())

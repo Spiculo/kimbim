@@ -1255,6 +1255,7 @@ _EXPORTS = {
         "place_figure",
         "remove_underlay",
         "set_underlay",
+        "trace_lines",
         "underlay_lines",
         "underlay_probe",
         "underlay_raster",

@@ -79,6 +79,7 @@ class MeasureController;
 class UnderlayPicker;
 class UnderlaySnapIndex;
 struct UnderlayLines;
+struct Underlay;
 class ModifyTool;
 class DraftTool;
 struct WallSegment;
@@ -222,6 +223,9 @@ public:
     bool setConstructionGrid(double spacing, int subdivisions, double angleDegrees, QPointF origin);
     bool saveWallProfile(const QString& shapeGuid, const QString& name); // D97: a complex wall section
     void setSpecialSnapPoints(int divisions, double distance); // D98: user preference, every tool's snapper
+    void setTraceMode(const QString& mode); // D98: "below", "above" or "" (off): Trace & Reference
+    QString traceMode() const { return m_traceMode; }
+    int traceSegments(const QString& storey); // D98: the shown trace's segment count (0: none)
     bool pickUpSettings(); // D97: Archicad's eyedropper, from the one selected element
     bool injectSettings(); // and syringe, into the selection
     // D98: Archicad's Grid System on the active level (one undo step).
@@ -703,6 +707,16 @@ private:
     QAction* m_gridSnap = nullptr; // D98: View > Grid snap
     QCheckBox* m_objectGravity = nullptr; // D97: objects land on the slab under them
     QCheckBox* m_objectFit = nullptr;     // D97: objects stand against the wall they are dropped by
+    // D98: Trace & Reference: the mode, and the traced plans by "storey|mode" (rebuilt after edits)
+    QString m_traceMode;
+    struct TraceEntry {
+        std::shared_ptr<const UnderlayLines> lines;
+        double units = 1.0;
+        QString reference;
+    };
+    QHash<QString, TraceEntry> m_traceCache;
+    QTimer* m_traceTimer = nullptr;
+    bool traceUnderlay(const QString& storey, Underlay* u, std::shared_ptr<const UnderlayLines>* lines);
     QComboBox* m_roofKind = nullptr;
     QDoubleSpinBox* m_roofPitch = nullptr;
     bool m_warnedInconsistent = false;

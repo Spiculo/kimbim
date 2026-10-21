@@ -359,3 +359,24 @@ def test_kim_round_trip_keeps_the_underlay(tmp_path, data_dir):
     assert len(got) == 1 and (got[0]["x"], got[0]["rotation"], got[0]["opacity"]) == (3.0, 15.0, 0.3)
     assert not got[0]["missing"] and open(got[0]["path"], "rb").read() == png.read_bytes()
     assert call("close_document")["ok"]
+
+
+def test_trace_shows_the_level_below():
+    """D98: Archicad's Trace & Reference: the plan of the level below (or above) as linework."""
+    assert json.loads(b.new_project("Trace"))["ok"]
+    storeys = json.loads(b.storeys())["storeys"]
+    if len(storeys) < 2:
+        assert json.loads(b.add_storey("Level 2", 3.0))["ok"]
+        storeys = json.loads(b.storeys())["storeys"]
+    l1, l2 = sorted(storeys, key=lambda s: s["elevation"])[:2]
+    t = json.loads(b.wall_types())["types"][0]["guid"]
+    assert json.loads(b.create_wall(l1["guid"], t, 0, 0, 6, 0, 3.0, "", ""))["ok"]
+    meta, coords, colours = U.trace_lines(l2["guid"], "below")
+    meta = json.loads(meta)
+    assert meta["ok"] and meta["reference"] == l1["name"] and meta["count"] > 0
+    xy = np.frombuffer(coords, dtype="<f4").reshape(-1, 4) * meta["units"]
+    ox, oy = (np.array(meta["origin"]) * meta["units"])
+    xs = np.concatenate([xy[:, 0], xy[:, 2]]) + ox
+    assert np.abs(xs - 6.0).min() < 0.02 and np.abs(xs).min() < 0.02  # the wall's ends, real size, in place
+    assert len(colours) == 3 * meta["count"]
+    assert not json.loads(U.trace_lines(l1["guid"], "below")[0])["ok"]  # nothing below the lowest level

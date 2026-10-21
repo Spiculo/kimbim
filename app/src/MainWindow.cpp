@@ -613,6 +613,45 @@ void MainWindow::buildMenus()
     QAction* gridOptions = view->addAction(tr("Grid &options..."));
     gridOptions->setObjectName(QStringLiteral("actionGridOptions"));
     connect(gridOptions, &QAction::triggered, this, &MainWindow::gridOptionsDialog);
+    // D98: Archicad's Go to story above/below.
+    QAction* up = view->addAction(tr("Level a&bove"));
+    up->setObjectName(QStringLiteral("actionLevelUp"));
+    up->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Up));
+    connect(up, &QAction::triggered, this, [this] {
+        if (!m_levels->step(1))
+            m_status->showMessage(tr("This is the top level"));
+    });
+    QAction* down = view->addAction(tr("Level be&low"));
+    down->setObjectName(QStringLiteral("actionLevelDown"));
+    down->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Down));
+    connect(down, &QAction::triggered, this, [this] {
+        if (!m_levels->step(-1))
+            m_status->showMessage(tr("This is the bottom level"));
+    });
+    { // D98: Archicad's Trace & Reference: another level's plan, faint, under the active one.
+        QMenu* trace = view->addMenu(tr("&Trace reference"));
+        trace->setObjectName(QStringLiteral("menuTrace"));
+        auto* group = new QActionGroup(trace);
+        const std::pair<const char*, QString> modes[] = {{"actionTraceOff", QString()},
+            {"actionTraceBelow", QStringLiteral("below")}, {"actionTraceAbove", QStringLiteral("above")}};
+        const QString labels[] = {tr("&Off"), tr("Level &below"), tr("Level &above")};
+        for (int i = 0; i < 3; ++i) {
+            QAction* a = trace->addAction(labels[i]);
+            a->setObjectName(QLatin1String(modes[i].first));
+            a->setData(modes[i].second);
+            a->setCheckable(true);
+            a->setChecked(i == 0);
+            group->addAction(a);
+            connect(a, &QAction::triggered, this, [this, mode = modes[i].second] { setTraceMode(mode); });
+        }
+        m_traceTimer = new QTimer(this);
+        m_traceTimer->setSingleShot(true);
+        m_traceTimer->setInterval(600);
+        connect(m_traceTimer, &QTimer::timeout, this, [this] {
+            m_traceCache.clear();
+            refreshUnderlays();
+        });
+    }
     // D98: Archicad's special snap points: a wall's divisions and a distance from its ends.
     QAction* special = view->addAction(tr("Special snap &points..."));
     special->setObjectName(QStringLiteral("actionSpecialSnapPoints"));
@@ -6193,6 +6232,8 @@ void MainWindow::afterEdit(const QJsonObject& result)
     QMetaObject::invokeMethod(this, &MainWindow::refreshProperties, Qt::QueuedConnection);
     if (m_schedules)
         m_schedules->modelChanged();
+    if (!m_traceMode.isEmpty() && m_traceTimer) // D98: the traced plan follows the model, after a pause
+        m_traceTimer->start();
 }
 
 bool MainWindow::nativeEvent(const QByteArray& eventType, void* message, qintptr* result)

@@ -28,6 +28,7 @@ Branch `parity-materials`. Spec: [2026-10-21-archicad-parity-materials-design](.
 
 ### D98 tooling
 - Construction grid + grid snap (`Snapper::setSnapGrid`, `Viewport::setConstructionGrid`), Zoom to selection.
+- Trace & Reference (View › Trace reference: off, level below, level above): the reference level's plan as exported to DXF (no annotations), tinted and faded under the active plan, rebuilt 0.6 s after edits (`underlays.trace_lines`). View › Level above/below (Ctrl+Up/Down).
 - Special snap points (View › Special snap points...): walls' equal divisions and a distance from their ends (`Snapper::setSpecialPoints`, user preferences `snap_divisions`, `snap_distance`).
 - Grid system (`authoring.add_grid_system`).
 - Worksheets (`kimbim/worksheets.py`), figures embedded in worksheet drawings (`underlays.figures_svg`),

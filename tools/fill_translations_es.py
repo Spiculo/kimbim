@@ -1637,6 +1637,18 @@ ES = {
     "Fit to walls": "Ajustar a muros",
     "Near a wall, the object turns its back to the wall and stands against it":
         "Cerca de un muro, el objeto se gira de espaldas al muro y se apoya contra él",
+    "&Trace reference": "&Calco de referencia",
+    "&Off": "&Desactivado",
+    "Level &below": "Nivel &inferior",
+    "Level &above": "Nivel &superior",
+    "Trace: %1": "Calco: %1",
+    "Trace off": "Calco desactivado",
+    "Tracing the level below": "Calcando el nivel inferior",
+    "Tracing the level above": "Calcando el nivel superior",
+    "Level a&bove": "Nivel s&uperior",
+    "Level be&low": "Nivel i&nferior",
+    "This is the top level": "Este es el nivel más alto",
+    "This is the bottom level": "Este es el nivel más bajo",
 }
 
 

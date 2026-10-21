@@ -235,6 +235,66 @@ void MainWindow::underlaysDialog()
     dialog->show();
 }
 
+int MainWindow::traceSegments(const QString& storey)
+{
+    Underlay u;
+    std::shared_ptr<const UnderlayLines> lines;
+    return traceUnderlay(storey, &u, &lines) ? lines->count() : 0;
+}
+
+bool MainWindow::traceUnderlay(const QString& storey, Underlay* out, std::shared_ptr<const UnderlayLines>* lines)
+{
+    // D98: Archicad's Trace & Reference: the level below's (or above's) plan, faint and tinted.
+    if (m_traceMode.isEmpty() || storey.isEmpty())
+        return false;
+    const QString key = storey + QLatin1Char('|') + m_traceMode;
+    if (!m_traceCache.contains(key)) {
+        TraceEntry entry;
+        QList<QByteArray> parts;
+        bool none = false;
+        QString error;
+        if (PythonEngine::instance().callParts("trace_lines", {storey, m_traceMode}, &parts, &none, &error) && !none
+            && !parts.isEmpty()) {
+            const QJsonObject meta = QJsonDocument::fromJson(parts.first()).object();
+            if (meta.value("ok").toBool()) {
+                entry.lines = UnderlayLines::fromParts(parts, &error);
+                entry.units = meta.value("units").toDouble(1.0);
+                entry.reference = meta.value("reference").toString();
+            }
+        }
+        m_traceCache.insert(key, entry);
+    }
+    const TraceEntry& entry = m_traceCache[key];
+    if (!entry.lines)
+        return false;
+    Underlay u;
+    u.id = QStringLiteral("trace");
+    u.name = tr("Trace: %1").arg(entry.reference);
+    u.kind = QStringLiteral("dxf");
+    u.file = QStringLiteral("trace:") + key;
+    u.storey = storey;
+    u.placement.scale = entry.units;
+    u.opacity = 0.45;
+    u.tint = QStringLiteral("#2f6fd0"); // Archicad draws the reference in a colour of its own
+    *out = u;
+    *lines = entry.lines;
+    return true;
+}
+
+void MainWindow::setTraceMode(const QString& mode)
+{
+    m_traceMode = mode == QLatin1String("below") || mode == QLatin1String("above") ? mode : QString();
+    m_traceCache.clear();
+    for (const char* name : {"actionTraceOff", "actionTraceBelow", "actionTraceAbove"})
+        if (auto* a = findChild<QAction*>(QLatin1String(name)))
+            a->setChecked(a->data().toString() == m_traceMode);
+    refreshUnderlays();
+    if (m_status)
+        m_status->showMessage(m_traceMode.isEmpty() ? tr("Trace off")
+                : m_traceMode == QLatin1String("below") ? tr("Tracing the level below")
+                                                        : tr("Tracing the level above"));
+}
+
 void MainWindow::refreshUnderlays()
 {
     if (!m_underlayPicker || !m_levels)
@@ -305,6 +365,10 @@ void MainWindow::refreshUnderlays()
             for (const Underlay& u : std::as_const(all))
                 if (u.storey == storey)
                     shown.push_back(view(u, vp->planElevation()));
+            Underlay trace;
+            std::shared_ptr<const UnderlayLines> traceLines;
+            if (traceUnderlay(storey, &trace, &traceLines)) // D98: Trace & Reference, under the level's own
+                shown.prepend(Viewport::UnderlayView{trace, traceLines, {}, vp->planElevation()});
         } else {
             for (const Underlay& u : std::as_const(all))
                 if (u.show3d && elevations.contains(u.storey))

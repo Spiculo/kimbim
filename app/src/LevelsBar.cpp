@@ -124,6 +124,24 @@ void LevelsBar::setActive(const QString& guid)
         m_combo->setCurrentIndex(index);
 }
 
+bool LevelsBar::step(int direction)
+{
+    // building levels only (not models or worksheets), listed by elevation
+    auto level = [this](int i) {
+        return m_combo->itemData(i, GuidRole).isValid() && !m_combo->itemData(i, ModelRole).toBool()
+            && !m_combo->itemData(i, WorksheetRole).toBool();
+    };
+    const int current = m_combo->currentIndex();
+    if (current < 0 || !level(current))
+        return false;
+    for (int i = current + (direction > 0 ? 1 : -1); i >= 0 && i < m_combo->count(); i += direction > 0 ? 1 : -1)
+        if (level(i)) {
+            m_combo->setCurrentIndex(i);
+            return true;
+        }
+    return false;
+}
+
 QString LevelsBar::activeStorey() const
 {
     return m_combo->currentData(GuidRole).toString();

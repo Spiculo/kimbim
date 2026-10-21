@@ -27,6 +27,8 @@ public:
     bool activeIsWorksheet() const; // D98
     QString activeName() const;
     void setActive(const QString& guid);
+    // D98: Archicad's Go to story above/below: the next building level up (+1) or down (-1); false at the end.
+    bool step(int direction);
     QString activeStorey() const;
     double activeElevation() const;
     int count() const;
