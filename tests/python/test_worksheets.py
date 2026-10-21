@@ -145,3 +145,18 @@ def test_rename_and_delete_a_worksheet(project, tmp_path):
     assert any(u.get("storey") == ws["guid"] for u in settings.current()["underlays"])
     level = next(s["guid"] for s in call("storeys")["storeys"] if s["name"] == "Level 1")
     assert not call("delete_worksheet", level)["ok"]  # a level is not a worksheet
+
+
+def test_figures_are_placed_at_a_typed_width(project, tmp_path):
+    import re
+
+    ws = call("create_worksheet", "Pictures")
+    r = call("place_figure", ws["guid"], str(_png(tmp_path, w=40, h=20)), 2.0, 1.0, 1.0)
+    assert r["ok"], r
+    u = r["underlay"]
+    assert u["opacity"] == 1.0 and u["scale"] == pytest.approx(0.05)  # 40 px across 2 m
+    geometry = {"cut": [], "proj": [], "bounds": [0, 0, 3, 3]}
+    svg = call("generate_plan_drawing", ws["drawing"], json.dumps(geometry))["svg"]
+    a = float(re.search(r'data-figure="[^"]+"[^>]*transform="matrix\(([-\d.e]+)', svg).group(1))
+    assert a * 40 == pytest.approx(20.0)  # 2 m at 1:100 = 20 mm on paper
+    assert not call("place_figure", ws["guid"], str(_png(tmp_path)), 0, 0, 0)["ok"]

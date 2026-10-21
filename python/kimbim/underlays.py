@@ -786,3 +786,27 @@ def figures_svg(storey_guid: str, to_paper) -> list[str]:
                    f'transform="matrix({a:.6g} {b:.6g} {cc:.6g} {d:.6g} {p00[0]:.4f} {p00[1]:.4f})" '
                    f'xlink:href="{href}" href="{href}"/>')
     return out
+
+
+def place_figure(storey: str, path: str, width, x=0.0, y=0.0, page=0) -> str:
+    """Archicad's Figure tool (D98): a picture (PNG, JPEG or a PDF page) placed `width` metres wide with
+    its bottom left corner at (x, y), fully opaque (not a faded underlay). On a worksheet it prints."""
+    p = pathlib.Path(path)
+    kind = KINDS.get(p.suffix.lower())
+    if kind not in ("image", "pdf"):
+        return _fail("choose a PNG, JPEG or PDF file")
+    try:
+        width, x, y, page = float(width), float(x), float(y), int(page)
+        if width <= 0:
+            return _fail("the picture's width must be more than 0")
+        if kind == "image":
+            units = float(_image_size(p)[0])  # pixels across
+        else:
+            pages = _pdf_pages(p)
+            if not 0 <= page < len(pages):
+                return _fail(f"the PDF has {len(pages)} page(s)")
+            units = float(pages[page]["width"])  # points across
+    except (OSError, ValueError, TypeError) as ex:
+        return _fail(str(ex))
+    options = {"storey": storey, "x": x, "y": y, "scale": width / units, "opacity": 1.0, "page": page}
+    return add_underlay(str(p), json.dumps(options))

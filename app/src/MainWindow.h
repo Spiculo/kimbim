@@ -360,6 +360,7 @@ public:
     int tagAll();
     bool placeSheetSymbol(const QString& number, const QString& kind);
     bool placeSheetImage(const QString& number, const QString& path); // D98
+    bool placeFigure(const QString& path, double widthMetres, QPointF bottomLeft); // D98: File > Place picture
     bool splitElement(const QString& guid, QPointF at, bool join = true);
     bool trimElement(const QString& guid, QPointF keep, const QString& boundary, QPointF b1, QPointF b2, bool join = true);
     bool cornerElements(const QString& first, QPointF p1, const QString& second, QPointF p2, bool join = true);

@@ -1239,6 +1239,7 @@ _EXPORTS = {
     ),
     "underlays": (
         "add_underlay",
+        "place_figure",
         "remove_underlay",
         "set_underlay",
         "underlay_lines",

@@ -281,6 +281,9 @@ private slots:
         QVERIFY(logo.save(path));
         QVERIFY(w.placeSheetImage(number, path));
         QVERIFY(!w.placeSheetImage(number, dir.filePath(QStringLiteral("missing.png"))));
+        QVERIFY(w.createWorksheet(QStringLiteral("Renders"))); // D98: a figure on a worksheet
+        QVERIFY(w.placeFigure(path, 3.0, QPointF(1, 1)));
+        QVERIFY(!w.placeFigure(path, 0.0, QPointF(1, 1)));
         const QJsonObject r = kimbim::PythonEngine::instance().callJson("sheets", {}, nullptr).object();
         int images = 0;
         for (const auto& sv : r.value("sheets").toArray())

@@ -1578,6 +1578,12 @@ ES = {
     "Seat material": "Material del asiento",
     "Could not resize it: %1": "No se pudo cambiar su tamaño: %1",
     "Grid snap": "Imán de cuadrícula",
+    "Place &picture...": "Colocar &imagen...",
+    "A photo, render or logo on the active level or worksheet, at the width you type":
+        "Una foto, render o logo en el nivel u hoja de trabajo activos, con el ancho que escriba",
+    "Pictures (*.png *.jpg *.jpeg *.pdf)": "Imágenes (*.png *.jpg *.jpeg *.pdf)",
+    "Width (m):": "Ancho (m):",
+    "Placed picture %1 (move or rotate it in File > Underlays)": "Imagen %1 colocada (muévala o gírela en Archivo > Calcos)",
 }
 
 

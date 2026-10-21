@@ -42,5 +42,4 @@ Branch `parity-materials`. Spec: [2026-10-21-archicad-parity-materials-design](.
 - Double-slanted and complex-profile walls; per-layer surfaces on edges (the core's surface is used).
 - Composite editor for **profiles** (columns, beams) — they show their material read-only.
 - The construction grid's extent is computed when shown (it follows the model on the next refresh).
-- Worksheets cannot be renamed or deleted from the UI yet (the levels table excludes them); figures on a
-  worksheet are calibrated like underlays (two points) rather than by a typed size.
+- Figures: File › Place picture (typed width, opaque) or Place underlay (calibrated). 

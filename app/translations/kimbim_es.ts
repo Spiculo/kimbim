@@ -226,8 +226,8 @@
   <context>
     <name>QObject</name>
     <message>
-      <location filename="../tests/test_main_window.cpp" line="585" />
-      <location filename="../tests/test_main_window.cpp" line="795" />
+      <location filename="../tests/test_main_window.cpp" line="588" />
+      <location filename="../tests/test_main_window.cpp" line="798" />
       <source>Untitled</source>
       <translation>Sin título</translation>
     </message>
@@ -2820,7 +2820,7 @@ Licencia: GPL-3.0 o posterior</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="3251" />
-      <location filename="../tests/test_main_window.cpp" line="1163" />
+      <location filename="../tests/test_main_window.cpp" line="1166" />
       <source>Versions</source>
       <translation>Versiones</translation>
     </message>
@@ -3220,7 +3220,7 @@ Licencia: GPL-3.0 o posterior</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="2868" />
-      <location filename="../tests/test_main_window.cpp" line="520" />
+      <location filename="../tests/test_main_window.cpp" line="523" />
       <source>Wall: click the start point</source>
       <translation>Muro: haga clic en el punto inicial</translation>
     </message>
@@ -3252,6 +3252,7 @@ Licencia: GPL-3.0 o posterior</translation>
       <location filename="../src/MainWindow.cpp" line="5850" />
       <location filename="../src/MarkupTools.cpp" line="332" />
       <location filename="../src/MarkupTools.cpp" line="358" />
+      <location filename="../src/Underlays.cpp" line="196" />
       <location filename="../src/LibraryTools.cpp" line="153" />
       <source>Could not place it: %1</source>
       <translation>No se pudo colocar: %1</translation>
@@ -6641,90 +6642,115 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       <translation>Un levantamiento DXF, una página PDF o una imagen escaneada en el nivel activo, para calcar encima</translation>
     </message>
     <message>
-      <location filename="../src/Underlays.cpp" line="75" />
+      <location filename="../src/Underlays.cpp" line="76" />
+      <source>Place &amp;picture...</source>
+      <translation>Colocar &amp;imagen...</translation>
+    </message>
+    <message>
+      <location filename="../src/Underlays.cpp" line="78" />
+      <source>A photo, render or logo on the active level or worksheet, at the width you type</source>
+      <translation>Una foto, render o logo en el nivel u hoja de trabajo activos, con el ancho que escriba</translation>
+    </message>
+    <message>
+      <location filename="../src/Underlays.cpp" line="81" />
+      <source>Pictures (*.png *.jpg *.jpeg *.pdf)</source>
+      <translation>Imágenes (*.png *.jpg *.jpeg *.pdf)</translation>
+    </message>
+    <message>
+      <location filename="../src/Underlays.cpp" line="85" />
+      <source>Width (m):</source>
+      <translation>Ancho (m):</translation>
+    </message>
+    <message>
+      <location filename="../src/Underlays.cpp" line="89" />
       <source>U&amp;nderlays...</source>
       <translation>Ca&amp;lcos...</translation>
     </message>
     <message>
-      <location filename="../src/Underlays.cpp" line="77" />
+      <location filename="../src/Underlays.cpp" line="91" />
       <source>Show, hide, fade, calibrate, move or remove underlays</source>
       <translation>Mostrar, ocultar, atenuar, calibrar, mover o quitar calcos</translation>
     </message>
     <message>
-      <location filename="../src/Underlays.cpp" line="113" />
+      <location filename="../src/Underlays.cpp" line="127" />
       <source>Underlay: cancelled</source>
       <translation>Calco: cancelado</translation>
     </message>
     <message>
-      <location filename="../src/Underlays.cpp" line="121" />
-      <location filename="../src/Underlays.cpp" line="125" />
-      <location filename="../src/Underlays.cpp" line="132" />
+      <location filename="../src/Underlays.cpp" line="135" />
+      <location filename="../src/Underlays.cpp" line="139" />
       <location filename="../src/Underlays.cpp" line="146" />
+      <location filename="../src/Underlays.cpp" line="160" />
       <source>Place underlay</source>
       <translation>Colocar calco</translation>
     </message>
     <message>
-      <location filename="../src/Underlays.cpp" line="121" />
+      <location filename="../src/Underlays.cpp" line="135" />
       <source>Open a model with a level first.</source>
       <translation>Abra primero un modelo con un nivel.</translation>
     </message>
     <message>
-      <location filename="../src/Underlays.cpp" line="126" />
+      <location filename="../src/Underlays.cpp" line="140" />
       <source>Underlays (*.dxf *.pdf *.png *.jpg *.jpeg);;DXF drawings (*.dxf);;PDF files (*.pdf);;Images (*.png *.jpg *.jpeg)</source>
       <translation>Calcos (*.dxf *.pdf *.png *.jpg *.jpeg);;Dibujos DXF (*.dxf);;Archivos PDF (*.pdf);;Imágenes (*.png *.jpg *.jpeg)</translation>
     </message>
     <message>
-      <location filename="../src/Underlays.cpp" line="130" />
+      <location filename="../src/Underlays.cpp" line="144" />
       <source>Reading %1...</source>
       <translation>Leyendo %1...</translation>
     </message>
     <message>
-      <location filename="../src/Underlays.cpp" line="151" />
+      <location filename="../src/Underlays.cpp" line="165" />
       <source>Placed %1. To set its scale, use File &gt; Underlays... &gt; Calibrate.</source>
       <translation>%1 colocado. Para fijar su escala, use Archivo &gt; Calcos... &gt; Calibrar.</translation>
     </message>
     <message>
-      <location filename="../src/Underlays.cpp" line="167" />
+      <location filename="../src/Underlays.cpp" line="181" />
       <source>Placing %1...</source>
       <translation>Colocando %1...</translation>
     </message>
     <message>
-      <location filename="../src/Underlays.cpp" line="172" />
+      <location filename="../src/Underlays.cpp" line="186" />
       <source>Placed underlay %1</source>
       <translation>Calco %1 colocado</translation>
     </message>
     <message>
-      <location filename="../src/Underlays.cpp" line="236" />
+      <location filename="../src/Underlays.cpp" line="202" />
+      <source>Placed picture %1 (move or rotate it in File &gt; Underlays)</source>
+      <translation>Imagen %1 colocada (muévala o gírela en Archivo &gt; Calcos)</translation>
+    </message>
+    <message>
+      <location filename="../src/Underlays.cpp" line="266" />
       <source>Could not read underlay %1: %2</source>
       <translation>No se pudo leer el calco %1: %2</translation>
     </message>
     <message>
-      <location filename="../src/Underlays.cpp" line="251" />
+      <location filename="../src/Underlays.cpp" line="281" />
       <source>Could not show underlay %1: %2</source>
       <translation>No se pudo mostrar el calco %1: %2</translation>
     </message>
     <message>
-      <location filename="../src/Underlays.cpp" line="355" />
+      <location filename="../src/Underlays.cpp" line="385" />
       <source>Calibrate: the two points are the same</source>
       <translation>Calibrar: los dos puntos son el mismo</translation>
     </message>
     <message>
-      <location filename="../src/Underlays.cpp" line="362" />
+      <location filename="../src/Underlays.cpp" line="392" />
       <source>Calibrate underlay</source>
       <translation>Calibrar calco</translation>
     </message>
     <message>
-      <location filename="../src/Underlays.cpp" line="363" />
+      <location filename="../src/Underlays.cpp" line="393" />
       <source>Real distance between the two points (%1):</source>
       <translation>Distancia real entre los dos puntos (%1):</translation>
     </message>
     <message>
-      <location filename="../src/Underlays.cpp" line="384" />
+      <location filename="../src/Underlays.cpp" line="414" />
       <source>Underlay %1 calibrated</source>
       <translation>Calco %1 calibrado</translation>
     </message>
     <message>
-      <location filename="../src/Underlays.cpp" line="384" />
+      <location filename="../src/Underlays.cpp" line="414" />
       <source>Underlay %1 moved</source>
       <translation>Calco %1 movido</translation>
     </message>
@@ -6915,6 +6941,8 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
     </message>
     <message>
       <location filename="../src/MarkupTools.cpp" line="344" />
+      <location filename="../src/Underlays.cpp" line="80" />
+      <location filename="../src/Underlays.cpp" line="85" />
       <source>Place picture</source>
       <translation>Colocar imagen</translation>
     </message>

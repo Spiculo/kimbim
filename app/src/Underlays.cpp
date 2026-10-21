@@ -72,6 +72,20 @@ void MainWindow::addUnderlayActions(QMenu* file)
     place->setObjectName(QStringLiteral("actionPlaceUnderlay"));
     place->setToolTip(tr("A DXF survey, a PDF page or a scanned image on the active level, to trace over"));
     connect(place, &QAction::triggered, this, [this] { placeUnderlayDialog(); });
+    // D98: Archicad's Figure tool: a picture at a typed width, opaque (on a worksheet it prints).
+    QAction* figure = file->addAction(tr("Place &picture..."));
+    figure->setObjectName(QStringLiteral("actionPlaceFigure"));
+    figure->setToolTip(tr("A photo, render or logo on the active level or worksheet, at the width you type"));
+    connect(figure, &QAction::triggered, this, [this] {
+        const QString path = QFileDialog::getOpenFileName(this, tr("Place picture"), QString(),
+            tr("Pictures (*.png *.jpg *.jpeg *.pdf)"));
+        if (path.isEmpty())
+            return;
+        bool ok = false;
+        const double width = QInputDialog::getDouble(this, tr("Place picture"), tr("Width (m):"), 2.0, 0.01, 10000.0, 3, &ok);
+        if (ok)
+            placeFigure(path, width, QPointF(0, 0));
+    });
     QAction* manage = file->addAction(tr("U&nderlays..."));
     manage->setObjectName(QStringLiteral("actionUnderlays"));
     manage->setToolTip(tr("Show, hide, fade, calibrate, move or remove underlays"));
@@ -172,6 +186,22 @@ QJsonObject MainWindow::placeUnderlay(const QString& path, const QJsonObject& op
         m_status->showMessage(tr("Placed underlay %1").arg(r.value("underlay").toObject().value("name").toString()));
     }
     return r;
+}
+
+bool MainWindow::placeFigure(const QString& path, double widthMetres, QPointF bottomLeft)
+{
+    const QJsonObject r = bridge("place_figure", {m_levels->activeStorey(), path, QString::number(widthMetres, 'g', 17),
+        QString::number(bottomLeft.x(), 'g', 17), QString::number(bottomLeft.y(), 'g', 17)});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(tr("Could not place it: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    loadProjectSettings();
+    setWindowModified(isDirty());
+    refreshLayers(); // also refreshes the underlays
+    m_status->showMessage(tr("Placed picture %1 (move or rotate it in File > Underlays)")
+                              .arg(r.value("underlay").toObject().value("name").toString()));
+    return true;
 }
 
 void MainWindow::underlaysDialog()
