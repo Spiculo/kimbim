@@ -752,10 +752,14 @@ def _regenerate(f, wall, **kwargs):
     if curved_walls.is_curved(wall):  # D97: its arc's body, rebuilt from its layers
         return curved_walls.rebuild(wall)
     if configure.is_double_slanted(wall):  # D97: its own swept section, rebuilt at the new length
-        return configure.rebuild_double_slant(wall, kwargs.get("length"))
+        done = configure.rebuild_double_slant(wall, kwargs.get("length"))
+        _refit_openings(wall)
+        return done
     _body_context()  # the regenerator needs the Body/MODEL_VIEW context
     _patch_regenerator()
-    return ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=wall, **kwargs)
+    body = ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=wall, **kwargs)
+    _refit_openings(wall)  # D97: doors and windows follow the body (reference line, flip, composite)
+    return body
 
 
 def _replace_body(product, representation):
@@ -823,8 +827,9 @@ def insert_opening(kind: str, wall_guid: str, type_guid: str, along, width, heig
         opening_rep = ifcopenshell.api.geometry.add_wall_representation(
             f, context=context, length=width, height=height, thickness=thickness + 0.02)
         ifcopenshell.api.geometry.assign_representation(f, product=opening, representation=opening_rep)
+        side = _body_centre(wall) - thickness / 2  # D97: the body's side, wherever its reference line is
         ifcopenshell.api.geometry.edit_object_placement(
-            f, product=opening, matrix=placed(along - width / 2, -(thickness / 2 + 0.01), sill), is_si=False)
+            f, product=opening, matrix=placed(along - width / 2, side - 0.01, sill), is_si=False)
         ifcopenshell.api.feature.add_feature(f, feature=opening, element=wall)
 
         element = ifcopenshell.api.root.create_entity(f, ifc_class=element_class, name=opening_type.Name,
@@ -834,7 +839,7 @@ def insert_opening(kind: str, wall_guid: str, type_guid: str, along, width, heig
         representation = _filling_representation(kind, opening_type, width, height)
         ifcopenshell.api.geometry.assign_representation(f, product=element, representation=representation)
         ifcopenshell.api.geometry.edit_object_placement(
-            f, product=element, matrix=placed(along - width / 2, -thickness / 2, sill), is_si=False)
+            f, product=element, matrix=placed(along - width / 2, side, sill), is_si=False)
         ifcopenshell.api.feature.add_filling(f, opening=opening, element=element)
         container = ifcopenshell.util.element.get_container(wall)
         if container is not None:
@@ -1463,15 +1468,62 @@ def _apply_opening_edit(element, opening, wall, along, width, height, sill):
     s = _scale()
     thickness = _thickness(_layer_set(wall))
     kind = "door" if element.is_a("IfcDoor") else "window"
+    _replace_body(element, _filling_representation(kind, ifcopenshell.util.element.get_type(element), width, height))
+    _place_opening(element, opening, wall, along, width, height, sill)
+    element.OverallWidth, element.OverallHeight = width / s, height / s
+
+
+def _place_opening(element, opening, wall, along, width, height, sill):
+    """Inside an action: an opening through the wall's body as it is now (its thickness and where it lies
+    from the reference line, D97) and its door/window in it, `along` its axis and `sill` up."""
+    f = B._model
+    thickness = _thickness(_layer_set(wall))
+    side = _body_centre(wall) - thickness / 2
     placed = _wall_frame(wall)
     _replace_body(opening, ifcopenshell.api.geometry.add_wall_representation(
         f, context=_body_context(), length=width, height=height, thickness=thickness + 0.02))
     ifcopenshell.api.geometry.edit_object_placement(
-        f, product=opening, matrix=placed(along - width / 2, -(thickness / 2 + 0.01), sill), is_si=False)
-    _replace_body(element, _filling_representation(kind, ifcopenshell.util.element.get_type(element), width, height))
+        f, product=opening, matrix=placed(along - width / 2, side - 0.01, sill), is_si=False)
     ifcopenshell.api.geometry.edit_object_placement(
-        f, product=element, matrix=placed(along - width / 2, -thickness / 2, sill), is_si=False)
-    element.OverallWidth, element.OverallHeight = width / s, height / s
+        f, product=element, matrix=placed(along - width / 2, side, sill), is_si=False)
+
+
+def _refit_openings(wall):
+    """Inside an action: a wall's doors and windows follow its body after a change of reference line,
+    flip or composite (the opening's depth and side), each keeping its place along the wall."""
+    if _layer_set(wall) is None:
+        return
+    for void in list(getattr(wall, "HasOpenings", ()) or ()):
+        opening = void.RelatedOpeningElement
+        fill = next((r.RelatedBuildingElement for r in getattr(opening, "HasFillings", ()) or ()), None)
+        info = _opening_info(fill) if fill is not None else None
+        if info is None:
+            continue
+        _, _, along, width, height, sill = info
+        if not _opening_fits(fill, opening, wall, along, width, sill):
+            _place_opening(fill, opening, wall, along, width, height, sill)
+
+
+def _opening_fits(element, opening, wall, along, width, sill) -> bool:
+    """True when an opening already goes through the wall's body as it is (depth and side) and its
+    door/window sits in it: nothing to redo (most regenerations)."""
+    thickness = _thickness(_layer_set(wall))
+    side = _body_centre(wall) - thickness / 2
+    placed = _wall_frame(wall)
+    want_opening = placed(along - width / 2, side - 0.01, sill)[:3, 3]
+    want_element = placed(along - width / 2, side, sill)[:3, 3]
+    have_opening = ifcopenshell.util.placement.get_local_placement(opening.ObjectPlacement)[:3, 3]
+    have_element = ifcopenshell.util.placement.get_local_placement(element.ObjectPlacement)[:3, 3]
+    tol = 1e-6 / _scale()
+    if not (np.allclose(want_opening, have_opening, atol=tol) and np.allclose(want_element, have_element, atol=tol)):
+        return False
+    body = ifcopenshell.util.representation.get_representation(opening, "Model", "Body", "MODEL_VIEW")
+    for item in (body.Items if body is not None else ()):
+        curve = getattr(getattr(item, "SweptArea", None), "OuterCurve", None)
+        if curve is not None and curve.is_a("IfcPolyline"):
+            ys = [float(p.Coordinates[1]) for p in curve.Points]
+            return abs((max(ys) - min(ys)) * _scale() - (thickness + 0.02)) < 1e-6
+    return False
 
 
 def edit_opening(guid: str, along, width, height, sill) -> str:
