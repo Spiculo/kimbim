@@ -13,7 +13,7 @@ import pytest
 
 from kimbim import app_bridge as b
 from kimbim import materials as M
-from kimbim.testing import _set_owner
+from kimbim.testing import _reset_owner, _set_owner
 
 
 def call(fn, *args):
@@ -80,11 +80,14 @@ def test_ensure_reuses_and_creates():
 def test_ifc2x3_materials_get_surfaces_through_style_assignments():
     f = ifcopenshell.file(schema="IFC2X3")
     _set_owner(f)
-    ifcopenshell.api.root.create_entity(f, ifc_class="IfcProject", name="P")
-    m = M.ensure("Glass", f)
-    look = M.surface_look(M.surface_of(m))
-    assert look["colour"] == M.CATALOGUE["Glass"]["colour"] and look["transparency"] == pytest.approx(0.6)
-    assert M.properties(m)["pen"] == 12
+    try:
+        ifcopenshell.api.root.create_entity(f, ifc_class="IfcProject", name="P")
+        m = M.ensure("Glass", f)
+        look = M.surface_look(M.surface_of(m))
+        assert look["colour"] == M.CATALOGUE["Glass"]["colour"] and look["transparency"] == pytest.approx(0.6)
+        assert M.properties(m)["pen"] == 12
+    finally:
+        _reset_owner()
 
 
 def test_surface_look_reads_shine_and_reflectance():
@@ -470,3 +473,15 @@ def test_material_takeoff_schedule(project):
     walls = schedules.compute({"id": "x", "name": "x", "classes": ["IfcWall"],
                                "fields": [{"source": "info", "name": "material"}]})
     assert walls["rows"][0]["values"] == ["Block"]  # the core
+
+
+def test_ifc2x3_catalogue_textures():
+    f = ifcopenshell.file(schema="IFC2X3")
+    _set_owner(f)
+    try:
+        ifcopenshell.api.root.create_entity(f, ifc_class="IfcProject", name="P")
+        m = M.ensure("Brick", f)
+        look = M.surface_look(M.surface_of(m))
+        assert look["texture"].endswith(".png") and look["texture_size"] == [0.5, 0.26]
+    finally:
+        _reset_owner()

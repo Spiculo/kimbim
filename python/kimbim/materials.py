@@ -131,12 +131,13 @@ def texture_of(style) -> dict:
         if not item.is_a("IfcSurfaceStyleWithTextures"):
             continue
         for tex in item.Textures or ():
-            if tex.is_a("IfcImageTexture") and tex.URLReference:
+            url = getattr(tex, "URLReference", None) or getattr(tex, "UrlReference", None) if tex.is_a("IfcImageTexture") else None
+            if url:
                 size = [1.0, 1.0]
                 op = getattr(tex, "TextureTransform", None)
                 if op is not None and op.Scale:
                     size = [float(op.Scale), float(getattr(op, "Scale2", None) or op.Scale)]
-                return {"texture": tex.URLReference, "texture_size": size}
+                return {"texture": url, "texture_size": size}
     return {}
 
 
@@ -177,8 +178,12 @@ def _write_texture(f, style, look: dict):
         raise ValueError("a texture's size must be positive")
     op = f.createIfcCartesianTransformationOperator2DnonUniform(
         None, None, f.createIfcCartesianPoint((0.0, 0.0)), w, h)
-    kind = {"TextureType": "TEXTURE"} if f.schema == "IFC2X3" else {"Mode": "MODULATE"}
-    tex = f.create_entity("IfcImageTexture", RepeatS=True, RepeatT=True, TextureTransform=op, URLReference=name, **kind)
+    if f.schema == "IFC2X3":  # IFC2X3 spells it UrlReference and names the texture's use
+        tex = f.create_entity("IfcImageTexture", RepeatS=True, RepeatT=True, TextureType="TEXTURE",
+                              TextureTransform=op, UrlReference=name)
+    else:
+        tex = f.create_entity("IfcImageTexture", RepeatS=True, RepeatT=True, Mode="MODULATE",
+                              TextureTransform=op, URLReference=name)
     style.Styles = list(style.Styles or ()) + [f.createIfcSurfaceStyleWithTextures([tex])]
 
 
