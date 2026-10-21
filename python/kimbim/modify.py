@@ -432,8 +432,6 @@ def split_element(guid: str, x, y, join="1") -> str:
     at the far end go to the new piece, and the two pieces are joined unless `join` is false."""
     from . import curved_walls
 
-    if (why := curved_walls.refusal_of(guid)) is not None:  # D97: straight walls only
-        return A._fail(why)
     if B._model is None:
         return A._fail("no model open")
     e = A._by_guid(guid)
@@ -444,6 +442,8 @@ def split_element(guid: str, x, y, join="1") -> str:
         x, y = _num(x, y)
     except (TypeError, ValueError) as ex:
         return A._fail(str(ex))
+    if e.is_a("IfcWall") and curved_walls.is_curved(e):  # D97: two arcs of the same circle
+        return _split_curved(e, (x, y))
     line = _line(e)
     length = math.dist(*line)
     t = _param((x, y), *line)
@@ -507,6 +507,48 @@ def split_element(guid: str, x, y, join="1") -> str:
             _set_beam_axis(e, a, mid)
         made["piece"] = piece.GlobalId
         return 1, _visible([e, piece]) + rebuilt, []
+
+    return _finish(action, made)
+
+
+def _split_curved(e, point) -> str:
+    """Split a curved wall where `point` (world metres) is nearest on its arc: it keeps the part from
+    its start, a copy gets the rest; doors and windows go with their piece (D97)."""
+    from . import configure, curved_walls
+
+    (cx, cy), radius, a0, sweep = curved_walls.frame(*curved_walls.arc_of(e))
+    m = ifcopenshell.util.placement.get_local_placement(e.ObjectPlacement)
+    s = A._scale()
+    local = (np.linalg.inv(m) @ np.array([point[0] / s, point[1] / s, 0.0, 1.0]))[:2] * s
+    turn = 1.0 if sweep > 0 else -1.0
+    turned = ((math.atan2(local[1] - cy, local[0] - cx) - a0) * turn) % (2 * math.pi)
+    length = abs(sweep) * radius
+    at = turned * radius
+    if at < END_MARGIN or at > length - END_MARGIN:
+        return A._fail("split inside the element, not at its end")
+    fills = []
+    for fill, opening, along, width in _hosted_fills(e):
+        if along - width / 2 - EPS < at < along + width / 2 + EPS:
+            return A._fail(f"the split point is inside {fill.Name or 'a door or window'}: split beside it")
+        fills.append((opening, along > at))
+    point_at = lambda a: [cx + radius * math.cos(a), cy + radius * math.sin(a)]  # noqa: E731
+    cut = a0 + turn * turned
+    first = [point_at(a0), point_at(cut), point_at((a0 + cut) / 2)]
+    second = [point_at(cut), point_at(a0 + sweep), point_at((cut + a0 + sweep) / 2)]
+    made = {}
+
+    def action():
+        piece = _copy_piece(e)
+        configure._write_pset(e, curved_walls.WALL_PSET, {"Arc": json.dumps(first)})
+        configure._write_pset(piece, curved_walls.WALL_PSET, {"Arc": json.dumps(second)})
+        for opening, moves in fills:
+            if moves:
+                _rehost(opening, piece)
+        for w in (e, piece):
+            curved_walls.rebuild(w)
+            A._refit_openings(w)
+        made["piece"] = piece.GlobalId
+        return 1, _visible([e, piece]), []
 
     return _finish(action, made)
 

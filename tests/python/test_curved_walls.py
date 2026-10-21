@@ -87,7 +87,6 @@ def test_straight_only_edits_refuse_curved_walls(project):
     assert dims["Length"] == pytest.approx(5.0, abs=1e-6)
     assert call("set_dimension", json.dumps([g]), "Length", str(math.pi * 2))["ok"]
     assert not call("set_dimension", json.dumps([g]), "Length", "13")["ok"]  # more than the whole circle
-    assert not call("split_element", g, 2, 2)["ok"]
     # height works, and the length shown is the arc's (a half circle of radius 2)
     assert call("set_dimension", json.dumps([g]), "Height", "4.5")["ok"]
     _, _, v = radii(g, (2.0, 0.0))
@@ -237,3 +236,24 @@ def test_stretching_a_curved_wall_keeps_its_circle(project):
     assert call("set_wall_axis", g, a[0] + 1, a[1], e[0] + 1, e[1])["ok"]
     _, _, v = radii(g, (1, 0))
     assert np.hypot(v[:, 0] - 1, v[:, 1]).max() == pytest.approx(5.15, abs=0.01)
+
+
+def test_splitting_a_curved_wall(project):
+    r = call("create_curved_wall", project["level"], project["Exterior 300"], 5, 0, 0, 5, -5, 0, 3.0, "Outside face")
+    g = r["guid"]
+    door = call("opening_types", "door")["types"][0]
+    d = call("insert_opening", "door", g, door["guid"], 12.0, door["width"], door["height"], door["sill"])["guid"]
+    s = call("split_element", g, 0.0, 5.0)  # at the top
+    assert s["ok"], s
+    piece = s["piece"]
+    for guid in (g, piece):
+        dims = {k: e["value"] for k, e in call("properties_multi", json.dumps([guid]))["psets"]["Dimensions"].items()}
+        assert dims["Length"] == pytest.approx(math.pi * 2.5, abs=1e-6)
+    host = b._model.by_guid(d).FillsVoids[0].RelatingOpeningElement.VoidsElements[0].RelatingBuildingElement
+    assert host.GlobalId == piece  # the door went with the second half
+    lo, hi, _ = radii(piece)
+    assert lo == pytest.approx(4.7, abs=0.01) and hi == pytest.approx(5.0, abs=0.01)  # the same layers
+    from kimbim import authoring
+
+    assert authoring._opening_info(b._model.by_guid(d))[2] == pytest.approx(12.0 - math.pi * 2.5, abs=1e-6)
+    assert not call("split_element", g, 5.0, 0.0)["ok"]  # at its start
