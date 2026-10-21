@@ -682,8 +682,10 @@ def _material_fill(element, cache: dict, fallback):
 def _layer_fills(element, cache: dict, fallback, pens) -> dict | None:
     """A layered element's layer bands with each layer's fill colour (its material's pen, else the
     element style's), or None (one layer, or not layered)."""
-    from . import materials
+    from . import configure, materials
 
+    if configure.profile_of(element):  # D97: a complex profile is cut as one fill, not by its layers
+        return None
     try:
         bands = materials.layer_bands(element)
     except Exception:  # odd placements or usages: drawn as one fill

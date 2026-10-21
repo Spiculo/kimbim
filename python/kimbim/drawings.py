@@ -575,9 +575,11 @@ def _layer_pieces(guid, loops, to_world):
     """D96: an element's cut loops split into its layers, [(layer index, polygon)], or None when it is
     not layered (or its layers do not cross this cut). `to_world(x, y)` -> world (x, y, z) in metres;
     loops are in the drawing's 2D coordinates."""
-    from . import materials
+    from . import configure, materials
 
     try:
+        if configure.profile_of(B._model.by_guid(guid)):  # D97: one fill for a complex profile
+            return None
         bands = materials.layer_bands(B._model.by_guid(guid))
     except Exception:
         return None

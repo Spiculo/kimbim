@@ -284,6 +284,9 @@ def test_complex_profile_walls(project):
     assert v[:, 1].max() == pytest.approx(0.4, abs=1e-3) and v[:, 2].max() == pytest.approx(3.0, abs=1e-3)
     top = v[v[:, 2] > 2.999]
     assert top[:, 1].max() == pytest.approx(0.2, abs=1e-3)  # the upper part is the narrow one
+    from kimbim import graphics
+
+    assert g not in graphics.resolve()["layers"]  # cut as one fill, not by the composite's layers
     assert call("set_dimension", json.dumps([g]), "Length", "6")["ok"]  # a stretch keeps the profile
     _, _, v, _ = mesh(g)
     assert v[:, 0].max() - v[:, 0].min() == pytest.approx(6.0, abs=1e-3)
