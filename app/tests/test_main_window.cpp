@@ -11,6 +11,7 @@
 #include <QTemporaryDir>
 #include <QStandardPaths>
 #include <QToolButton>
+#include <QImage>
 #include <QtTest>
 
 #include <cmath>
@@ -254,6 +255,29 @@ private slots:
         QVERIFY(sheet != level && sheet->isPlanView());
         QCOMPARE(sheet->markerCount(), 0);
         QVERIFY(!w.createWorksheet(QStringLiteral("Details"))); // unique names
+        QVERIFY(w.close());
+    }
+
+    // D98: a picture on a sheet (Archicad's Figure on a layout): placed, listed, removable.
+    void picturesOnSheets()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        const QString number = w.addSheet(QStringLiteral("A3"), QStringLiteral("Cover"));
+        QVERIFY(!number.isEmpty());
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("logo.png"));
+        QImage logo(40, 20, QImage::Format_RGB32);
+        logo.fill(QColor(30, 90, 160));
+        QVERIFY(logo.save(path));
+        QVERIFY(w.placeSheetImage(number, path));
+        QVERIFY(!w.placeSheetImage(number, dir.filePath(QStringLiteral("missing.png"))));
+        const QJsonObject r = kimbim::PythonEngine::instance().callJson("sheets", {}, nullptr).object();
+        int images = 0;
+        for (const auto& sv : r.value("sheets").toArray())
+            for (const auto& sym : sv.toObject().value("symbols").toArray())
+                images += sym.toObject().value("kind").toString() == QLatin1String("image");
+        QCOMPARE(images, 1);
         QVERIFY(w.close());
     }
 

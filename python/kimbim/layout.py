@@ -66,4 +66,7 @@ def referenced_files(settings: bytes | None) -> set[str]:
         name = u.get("file", "") if isinstance(u, dict) else ""
         if isinstance(name, str) and _FILE_NAME.fullmatch(name):
             names.add(f"{FILES_DIR}/{name}")
+    for name in (data.get("sheet_files") or ()) if isinstance(data, dict) else ():  # D98: pictures on sheets
+        if isinstance(name, str) and _FILE_NAME.fullmatch(name):
+            names.add(f"{FILES_DIR}/{name}")
     return names

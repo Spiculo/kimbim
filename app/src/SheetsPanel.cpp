@@ -61,6 +61,8 @@ SheetsPanel::SheetsPanel(QWidget* parent)
         menu.addAction(tr("Place scale bar"), this, [this, number] { emit symbolRequested(number, QStringLiteral("scalebar")); });
         menu.addAction(tr("Place revision cloud"), this, [this, number] { emit symbolRequested(number, QStringLiteral("cloud")); });
         menu.addAction(tr("Place text..."), this, [this, number] { emit symbolRequested(number, QStringLiteral("text")); });
+        // D98: Archicad's Figure on a layout: a logo, a render, a photo
+        menu.addAction(tr("Place picture..."), this, [this, number] { emit symbolRequested(number, QStringLiteral("image")); });
         menu.exec(m_list->viewport()->mapToGlobal(at));
     });
     connect(remove, &QPushButton::clicked, this, [this] {

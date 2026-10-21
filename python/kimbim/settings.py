@@ -56,6 +56,7 @@ DEFAULTS = {
     "ids_files": {},  # IDS files by name: their XML, kept in the project so it is versioned (D81)
     "clash_sets": {},  # clash detection sets by name (D81)
     "underlays": [],  # DXF, PDF and image underlays on levels: file, placement, display (D85)
+    "sheet_files": [],  # D98: the picture files placed on sheets (so versions and .kim files keep them)
     "tag_styles": {},  # tag styles by id: the project's own and its edited built-ins (D87)
     "stair_rules": {},  # building-code limits for stair and ramp warnings (D88; empty: the defaults)
     "check_tolerance": 0.002,   # D92: clash hard tolerance (m)
@@ -218,6 +219,8 @@ def _error(key: str, value) -> str | None:
         from . import underlays
 
         return underlays.validate(value)
+    if key == "sheet_files" and not (isinstance(value, list) and all(isinstance(v, str) for v in value)):
+        return "sheet_files is a list of file names"
     if key == "stair_rules":
         from . import stairs
 

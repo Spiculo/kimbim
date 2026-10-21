@@ -358,6 +358,7 @@ public:
     bool addCloud(const QVector<QPointF>& points);
     int tagAll();
     bool placeSheetSymbol(const QString& number, const QString& kind);
+    bool placeSheetImage(const QString& number, const QString& path); // D98
     bool splitElement(const QString& guid, QPointF at, bool join = true);
     bool trimElement(const QString& guid, QPointF keep, const QString& boundary, QPointF b1, QPointF b2, bool join = true);
     bool cornerElements(const QString& first, QPointF p1, const QString& second, QPointF p2, bool join = true);

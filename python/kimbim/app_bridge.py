@@ -1083,6 +1083,7 @@ _EXPORTS = {
         "remove_legend",
         "move_title_block",
         "set_title_block",
+        "place_sheet_image",
         "place_sheet_symbol",
         "move_sheet_symbol",
         "set_sheet_symbol",

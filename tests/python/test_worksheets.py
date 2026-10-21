@@ -92,3 +92,31 @@ def test_png_writer_makes_a_valid_png(tmp_path):
 
     p = _png(tmp_path, w=3, h=5)
     assert underlays._image_size(p)[:2] == (3, 5)
+
+
+def test_pictures_on_sheets(project, tmp_path):
+    from kimbim import settings
+
+    sheet = call("add_sheet", "A3", "Presentation")
+    assert sheet["ok"], sheet
+    number = sheet["number"]
+    pic = _png(tmp_path, "logo.png", w=40, h=10)
+    r = call("place_sheet_image", number, str(pic), json.dumps({"x": 20, "y": 30, "w": 60}))
+    assert r["ok"], r
+    item = next(s for s in next(s for s in call("sheets")["sheets"] if s["number"] == number)["symbols"]
+                if s["kind"] == "image")
+    assert (item["x"], item["y"], item["w"], item["h"]) == pytest.approx((20, 30, 60, 15))  # proportions kept
+    svg = call("sheet_svg", number)["svg"]
+    assert 'xmlns:xlink="http://www.w3.org/1999/xlink"' in svg and 'data-symbol="image"' in svg
+    assert "data:image/png;base64," in svg
+    files = settings.current()["sheet_files"]
+    assert len(files) == 1 and files[0].endswith(".png")
+    assert call("set_sheet_symbol", number, r["id"], json.dumps({"w": 120}))["ok"]
+    item = next(s for s in next(s for s in call("sheets")["sheets"] if s["number"] == number)["symbols"]
+                if s["kind"] == "image")
+    assert item["h"] == pytest.approx(30)
+    assert call("remove_sheet_symbol", number, r["id"])["ok"]
+    assert settings.current()["sheet_files"] == []
+    call("undo")  # the picture and its file come back together
+    assert len(settings.current()["sheet_files"]) == 1
+    assert not call("place_sheet_image", number, str(tmp_path / "nope.png"), "")["ok"]

@@ -5,6 +5,7 @@
 // step each.
 #include <QCheckBox>
 #include <QComboBox>
+#include <QFileDialog>
 #include <QInputDialog>
 #include <QDialog>
 #include <QDialogButtonBox>
@@ -324,8 +325,26 @@ int MainWindow::tagAll()
     return n;
 }
 
+bool MainWindow::placeSheetImage(const QString& number, const QString& path)
+{
+    const QJsonObject r = bridge("place_sheet_image", {number, path, QString()});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(tr("Could not place it: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    openSheet(number);
+    refreshSheets(true);
+    return true;
+}
+
 bool MainWindow::placeSheetSymbol(const QString& number, const QString& kind)
 {
+    if (kind == QLatin1String("image")) { // D98: a picture on the sheet
+        const QString path = QFileDialog::getOpenFileName(this, tr("Place picture"), QString(),
+            tr("Pictures (*.png *.jpg *.jpeg)"));
+        return !path.isEmpty() && placeSheetImage(number, path);
+    }
     QString options;
     if (kind == QLatin1String("text")) { // D91: free text on a sheet
         bool ok = false;
