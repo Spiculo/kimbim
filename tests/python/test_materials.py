@@ -416,3 +416,21 @@ def test_surface_textures(project, tmp_path):
     logger = ifcopenshell.validate.json_logger()
     ifcopenshell.validate.validate(b._model, logger)
     assert [x for x in logger.statements if x.get("level") == "error"] == []
+
+
+def test_dxf_exports_composite_cuts_with_pattern_hatches(project, tmp_path):
+    import ezdxf
+
+    from kimbim import drawings, dxf
+
+    g = wall(project)
+    plan = next(d for d in call("drawings")["drawings"] if d["name"] == "Level 1 Floor Plan")
+    loop = [[0, -0.15], [5, -0.15], [5, 0.15], [0, 0.15]]
+    geometry = {"cut": [{"guid": g, "loops": [loop]}], "proj": [], "bounds": [0, -0.15, 5, 0.15]}
+    assert json.loads(drawings.generate_plan_drawing(plan["guid"], json.dumps(geometry)))["ok"]
+    out = tmp_path / "plan.dxf"
+    r = json.loads(dxf.export_drawing_dxf(plan["guid"], str(out)))
+    assert r["ok"], r
+    doc = ezdxf.readfile(str(out))
+    names = {h.dxf.pattern_name for h in doc.modelspace().query("HATCH") if not h.dxf.solid_fill}
+    assert {"BRICK", "CROSSHATCH"} <= names  # brick and block layers; insulation loops have no line families
