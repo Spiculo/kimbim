@@ -63,10 +63,10 @@ release notes, so check before relying on a single cell.
 | Saved views (layers, level, plan/3D, cut) | AC RV VW BB | ✅ | P1 | D57 |
 | Lines-only / hidden-line display | all | ✅ | — | L |
 | Visual styles: shaded, textured, sketch, X-ray | all | 🟡 | new | Shaded and lines only |
-| Shadows and sun position | AC RV VW SU | ⬜ | new | |
+| Shadows and sun position | AC RV VW SU | 🟡 | new | D96: View › Sun shadows (a fixed sun), White model; no sun position yet |
 | Hover info (name, type, level) | AC RV VW | ✅ | — | |
 | Colour by property, class or type | AC RV VW BB | ✅ | P1 | D73 override rules (property, class, kind, layer, material) |
-| Show multiple levels at once (ghost story / underlay) | AC RV VW | ⬜ | new | Archicad Trace & Reference, Revit underlay |
+| Show multiple levels at once (ghost story / underlay) | AC RV VW | ✅ | new | D98: View › Trace reference (level below or above, snappable); Level above/below Ctrl+Up/Down |
 | Split views / several windows side by side | AC RV VW | ⬜ | new | |
 | Navigator / project browser (tree of views, sheets) | AC RV VW | 🟡 | new | Model tree, levels, views; no sheets |
 
@@ -81,7 +81,7 @@ release notes, so check before relying on a single cell.
 | Find & Select / query (by property values) | AC RV VW BB | ✅ | P0 | D78: Ctrl+F panel; class, kind, type, property, layer, level, status, material; AND/OR; saved criteria |
 | Selection sets (saved selections) | AC VW BB | ✅ | new | D78: in the project settings (versioned) |
 | Marquee (area selection for 2D export or editing) | AC | ⬜ | new | |
-| Magic wand (pick a shape from existing lines or edges) | AC VW | ⬜ | new | |
+| Magic wand (pick a shape from existing lines or edges) | AC VW | 🟡 | new | D84: fill from a closed shape or the area clicked in (fill_at) |
 | Tab cycling through overlapping elements | RV AC | ✅ | new | D89: Tab / Shift+Tab, the click selects the highlighted one |
 
 ## 4. Editing tools (general)
@@ -102,7 +102,7 @@ release notes, so check before relying on a single cell.
 | Align (to an edge or face) | RV VW | ⬜ | new | |
 | Elevate (change vertical position) | AC RV | 🟡 | new | Wall height; no general elevate |
 | Resize / scale | AC VW SU | ⬜ | new | |
-| Pick up and inject settings (eyedropper / match properties) | AC RV VW | ⬜ | new | |
+| Pick up and inject settings (eyedropper / match properties) | AC RV VW | ✅ | new | D97: Edit › Pick up / Inject settings (Ctrl+Alt+C / V) |
 | Edit by polygon points (add, move, delete vertices; curve an edge) | AC RV VW | ⬜ | new | Archicad pet palette |
 | Solid element operations (subtract, intersect, add) | AC RV VW | ⬜ | new | |
 | Lock / pin elements | AC RV VW | 🟡 | new | Layers can be locked; elements cannot |
@@ -127,7 +127,7 @@ release notes, so check before relying on a single cell.
 | Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Walls: straight, layered, L/T joins | all | ✅ | P0 | |
-| Walls: curved | all | ⬜ | new | |
+| Walls: curved | all | 🟡 | new | D97: Wall tool › Curved (3 points), layered, doors/windows, stretch, split, fillet; no angled joins yet |
 | Walls: slanted, trapezoid, custom profile | AC RV VW | 🟡 | new | D97: slant angle; no double-slanted or complex profiles yet |
 | Wall flip, reference line (core / face) | all | ✅ | P0 | D97: six reference lines (outside face default), Model › Flip walls |
 | Junction priorities (which layers run through) | AC RV | ✅ | new | D97: building-material priority → `IfcMaterialLayer.Priority`, used by the wall regenerator |
@@ -278,7 +278,7 @@ release notes, so check before relying on a single cell.
 
 | Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
-| Real-time textured 3D | all | ⬜ | new | |
+| Real-time textured 3D | all | ✅ | new | D96: surface pictures box-mapped; drawn defaults for brick, timber, tiles, stone, roof tiles |
 | Photorealistic rendering | AC RV VW | ⬜ | new | Archicad CineRender, Revit cloud render, Twinmotion link. Could export to Blender |
 | AI visualiser (sketch to image) | AC VW | 🔮 | new | |
 | Sun / shadow studies, animations | all | ⬜ | new | |
