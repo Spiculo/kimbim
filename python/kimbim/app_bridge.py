@@ -1246,6 +1246,8 @@ _EXPORTS = {
     ),
     "worksheets": (
         "create_worksheet",
+        "delete_worksheet",
+        "rename_worksheet",
         "worksheets",
     ),
     "configure": (

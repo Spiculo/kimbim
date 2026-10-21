@@ -1558,6 +1558,12 @@ ES = {
     "Place picture": "Colocar imagen",
     "Pictures (*.png *.jpg *.jpeg)": "Imágenes (*.png *.jpg *.jpeg)",
     "Place picture...": "Colocar imagen...",
+    "Rename worksheet...": "Cambiar nombre de la hoja de trabajo...",
+    "Delete worksheet": "Eliminar hoja de trabajo",
+    "Rename worksheet": "Cambiar nombre de la hoja de trabajo",
+    "Delete the worksheet %1 with everything drawn on it? (Undo brings it back.)":
+        "¿Eliminar la hoja de trabajo %1 con todo lo dibujado en ella? (Deshacer la recupera.)",
+    "Worksheet": "Hoja de trabajo",
 }
 
 

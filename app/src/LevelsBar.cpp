@@ -14,7 +14,7 @@
 namespace kimbim {
 
 namespace {
-enum Role { GuidRole = Qt::UserRole, ElevationRole, ModelRole, WorksheetRole };
+enum Role { GuidRole = Qt::UserRole, ElevationRole, ModelRole, WorksheetRole, NameRole };
 } // namespace
 
 LevelsBar::LevelsBar(QWidget* parent)
@@ -24,6 +24,8 @@ LevelsBar::LevelsBar(QWidget* parent)
     , m_add(new QAction(tr("Add level..."), this))
     , m_newModel(new QAction(tr("New model..."), this))
     , m_newWorksheet(new QAction(tr("New worksheet..."), this))
+    , m_renameWorksheet(new QAction(tr("Rename worksheet..."), this))
+    , m_deleteWorksheet(new QAction(tr("Delete worksheet"), this))
     , m_levels(new QAction(tr("&Levels..."), this))
 {
     m_combo->setObjectName(QStringLiteral("levelCombo"));
@@ -41,6 +43,14 @@ LevelsBar::LevelsBar(QWidget* parent)
     menu->addAction(m_levels);
     menu->addAction(m_newModel);
     menu->addAction(m_newWorksheet);
+    menu->addAction(m_renameWorksheet);
+    menu->addAction(m_deleteWorksheet);
+    m_renameWorksheet->setObjectName(QStringLiteral("actionRenameWorksheet"));
+    m_deleteWorksheet->setObjectName(QStringLiteral("actionDeleteWorksheet"));
+    connect(menu, &QMenu::aboutToShow, this, [this] {
+        m_renameWorksheet->setEnabled(activeIsWorksheet());
+        m_deleteWorksheet->setEnabled(activeIsWorksheet());
+    });
     m_menu->setObjectName(QStringLiteral("levelMenu"));
     m_menu->setToolTip(tr("Levels and models"));
     m_menu->setAutoRaise(true);
@@ -55,6 +65,8 @@ LevelsBar::LevelsBar(QWidget* parent)
     layout->addWidget(m_menu);
     connect(m_newModel, &QAction::triggered, this, &LevelsBar::newModelRequested);
     connect(m_newWorksheet, &QAction::triggered, this, &LevelsBar::newWorksheetRequested);
+    connect(m_renameWorksheet, &QAction::triggered, this, [this] { emit renameWorksheetRequested(activeStorey()); });
+    connect(m_deleteWorksheet, &QAction::triggered, this, [this] { emit deleteWorksheetRequested(activeStorey()); });
     connect(m_combo, &QComboBox::currentIndexChanged, this, &LevelsBar::onIndexChanged);
     connect(m_add, &QAction::triggered, this, &LevelsBar::addLevelRequested);
     connect(m_levels, &QAction::triggered, this, &LevelsBar::levelsDialogRequested);
@@ -92,6 +104,7 @@ void LevelsBar::setStoreys(const QJsonArray& storeys)
                 : model ? tr("Model: %1").arg(s.value("name").toString())
                         : QStringLiteral("%1 (%2 m)").arg(s.value("name").toString(), QLocale().toString(elevation, 'f', 2)));
         m_combo->setItemData(m_combo->count() - 1, worksheet, WorksheetRole);
+        m_combo->setItemData(m_combo->count() - 1, s.value("name").toString(), NameRole);
         m_combo->setItemData(m_combo->count() - 1, s.value("guid").toString(), GuidRole);
         m_combo->setItemData(m_combo->count() - 1, elevation, ElevationRole);
         m_combo->setItemData(m_combo->count() - 1, model, ModelRole);
@@ -132,6 +145,11 @@ int LevelsBar::count() const
 bool LevelsBar::activeIsModel() const
 {
     return m_combo->currentData(ModelRole).toBool();
+}
+
+QString LevelsBar::activeName() const
+{
+    return m_combo->currentData(NameRole).toString();
 }
 
 bool LevelsBar::activeIsWorksheet() const

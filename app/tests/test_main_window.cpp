@@ -255,6 +255,12 @@ private slots:
         QVERIFY(sheet != level && sheet->isPlanView());
         QCOMPARE(sheet->markerCount(), 0);
         QVERIFY(!w.createWorksheet(QStringLiteral("Details"))); // unique names
+        QCOMPARE(w.levelsBar()->activeName(), QString("Details"));
+        const QString guid = w.levelsBar()->activeStorey();
+        QVERIFY(w.worksheetCommand("rename_worksheet", {guid, QStringLiteral("Window details")}));
+        QCOMPARE(w.levelsBar()->activeName(), QString("Window details"));
+        QVERIFY(w.worksheetCommand("delete_worksheet", {guid}));
+        QVERIFY(!w.levelsBar()->activeIsWorksheet());
         QVERIFY(w.close());
     }
 

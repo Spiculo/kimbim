@@ -120,3 +120,28 @@ def test_pictures_on_sheets(project, tmp_path):
     call("undo")  # the picture and its file come back together
     assert len(settings.current()["sheet_files"]) == 1
     assert not call("place_sheet_image", number, str(tmp_path / "nope.png"), "")["ok"]
+
+
+def test_rename_and_delete_a_worksheet(project, tmp_path):
+    from kimbim import settings
+
+    ws = call("create_worksheet", "Sketch")
+    assert call("add_drafting", ws["guid"], "line", json.dumps([[0, 0], [1, 1]]))["ok"]
+    assert call("add_underlay", str(_png(tmp_path)), json.dumps({"storey": ws["guid"]}))["ok"]
+    sheet = call("add_sheet", "A3", "Details")["number"]
+    assert call("place_drawing", sheet, ws["drawing"], 50, 50, 100)["ok"]
+    assert call("rename_worksheet", ws["guid"], "Details 1")["ok"]
+    assert {w["name"] for w in call("worksheets")["worksheets"]} == {"Details 1"}
+    assert "Details 1" in {d["name"] for d in call("drawings")["drawings"]}
+    assert not call("rename_worksheet", ws["guid"], "Level 1")["ok"]
+    r = call("delete_worksheet", ws["guid"])
+    assert r["ok"], r
+    assert call("worksheets")["worksheets"] == []
+    assert not any(u.get("storey") == ws["guid"] for u in settings.current()["underlays"])
+    views = next(s for s in call("sheets")["sheets"] if s["number"] == sheet)["views"]
+    assert views == []
+    call("undo")
+    assert [w["name"] for w in call("worksheets")["worksheets"]] == ["Details 1"]
+    assert any(u.get("storey") == ws["guid"] for u in settings.current()["underlays"])
+    level = next(s["guid"] for s in call("storeys")["storeys"] if s["name"] == "Level 1")
+    assert not call("delete_worksheet", level)["ok"]  # a level is not a worksheet

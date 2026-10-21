@@ -25,6 +25,7 @@ public:
     void setStoreys(const QJsonArray& storeys);
     bool activeIsModel() const;
     bool activeIsWorksheet() const; // D98
+    QString activeName() const;
     void setActive(const QString& guid);
     QString activeStorey() const;
     double activeElevation() const;
@@ -42,6 +43,8 @@ signals:
     void addLevelRequested();
     void newModelRequested();
     void newWorksheetRequested(); // D98
+    void renameWorksheetRequested(const QString& guid);
+    void deleteWorksheetRequested(const QString& guid);
     void levelsDialogRequested();
 
 private:
@@ -52,6 +55,8 @@ private:
     QAction* m_add;
     QAction* m_newModel;
     QAction* m_newWorksheet;
+    QAction* m_renameWorksheet;
+    QAction* m_deleteWorksheet;
     QAction* m_levels;
     QString m_active;
     bool m_filling = false;

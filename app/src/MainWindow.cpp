@@ -879,6 +879,19 @@ void MainWindow::buildCutsToolbar()
         if (ok && !name.trimmed().isEmpty())
             createWorksheet(name.trimmed());
     });
+    connect(m_levels, &LevelsBar::renameWorksheetRequested, this, [this](const QString& guid) {
+        bool ok = false;
+        const QString current = m_levels->activeName();
+        const QString name = QInputDialog::getText(this, tr("Rename worksheet"), tr("Name:"), QLineEdit::Normal, current, &ok);
+        if (ok && !name.trimmed().isEmpty() && name.trimmed() != current)
+            worksheetCommand("rename_worksheet", {guid, name.trimmed()});
+    });
+    connect(m_levels, &LevelsBar::deleteWorksheetRequested, this, [this](const QString& guid) {
+        if (QMessageBox::question(this, tr("Delete worksheet"),
+                tr("Delete the worksheet %1 with everything drawn on it? (Undo brings it back.)").arg(m_levels->activeName()))
+            == QMessageBox::Yes)
+            worksheetCommand("delete_worksheet", {guid});
+    });
     connect(m_levels, &LevelsBar::activeStoreyChanged, this, [this](const QString& storey, double elevation) {
         if (ViewHost* host = m_hosts.value(m_dock->current()); host && !host->storey().isEmpty() && host->storey() != storey) {
             openPlanTab(storey); // a plan tab shows one level: another level is another tab
@@ -5475,6 +5488,18 @@ void MainWindow::offsetDialog()
         0.5, -1000, 1000, 3, &ok);
     if (ok)
         offsetSelection(distance);
+}
+
+bool MainWindow::worksheetCommand(const char* command, const QStringList& args)
+{
+    const QJsonObject r = bridge(command, args);
+    if (!r.value("ok").toBool()) {
+        showError(tr("Worksheet"), r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
+    refreshSheets(true);
+    return true;
 }
 
 bool MainWindow::createWorksheet(const QString& name)

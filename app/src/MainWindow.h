@@ -278,6 +278,7 @@ public:
     LayersPanel* layersPanel() const { return m_layersPanel; }
     // Models (Slice 12, owner feedback): a unit drawn once and placed on many levels.
     bool createWorksheet(const QString& name); // D98
+    bool worksheetCommand(const char* command, const QStringList& args); // rename_worksheet, delete_worksheet
     bool createModel(const QString& name);
     bool placeModelAt(QPointF p, bool turned);
     bool updateModelInstances();
