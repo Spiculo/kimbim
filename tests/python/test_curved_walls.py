@@ -257,3 +257,4 @@ def test_splitting_a_curved_wall(project):
 
     assert authoring._opening_info(b._model.by_guid(d))[2] == pytest.approx(12.0 - math.pi * 2.5, abs=1e-6)
     assert not call("split_element", g, 5.0, 0.0)["ok"]  # at its start
+

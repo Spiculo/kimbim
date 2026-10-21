@@ -1666,6 +1666,13 @@ ES = {
     "Save current settings as...": "Guardar parámetros actuales como...",
     "Favourite %1 saved": "Favorito %1 guardado",
     "Favourite %1": "Favorito %1",
+    "&Dimension selected walls...": "A&cotar muros seleccionados...",
+    "A dimension chain along each selected wall: its ends and its doors' and windows' edges":
+        "Una cadena de cotas a lo largo de cada muro seleccionado: sus extremos y los bordes de sus puertas y ventanas",
+    "Dimension selected walls": "Acotar muros seleccionados",
+    "Distance of the dimension line from the wall's outside face (m):": "Distancia de la línea de cota a la cara exterior del muro (m):",
+    "Select the walls to dimension": "Seleccione los muros a acotar",
+    "%n dimension chain(s) added": ("%n cadena de cotas agregada", "%n cadenas de cotas agregadas"),
 }
 
 

@@ -240,7 +240,7 @@ release notes, so check before relying on a single cell.
 | Marks (circle with a tag) | AC | ✅ | P1 | |
 | Dimension chains, overall dimensions | all | 🟡 | P1 | Slice 15: chains (Shift+click); no overall dimension yet |
 | Snap dimensions to wall faces, openings and layers | all | 🟡 | P1 | Slice 15: wall faces; openings and layer lines later |
-| Automatic dimensioning of walls and openings | AC RV VW | ⬜ | new | |
+| Automatic dimensioning of walls and openings | AC RV VW | 🟡 | new | D98: Model › Dimension selected walls (a chain per straight wall: ends and openings); no overall or grid chains yet |
 | Angle, radius, arc-length, level and spot-elevation dimensions | all | 🟡 | P1 | D87: angle, radius, diameter, level (plan: slab top or level; sections: story levels) and spot elevation; no arc length yet |
 | Associative labels and tags (show a property, follow the element) | all | ✅ | P1 | D87: Tag tool and Tag all; templates of schedule fields; styles (door/window marker, wall tag, room stamp, mark, label) in project settings; IfcRelAssignsToProduct |
 | Leaders and arrows | all | ✅ | P1 | Slice 15: Leader tool (Shift+A) |

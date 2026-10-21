@@ -2188,6 +2188,17 @@ void MainWindow::buildModelingToolbar()
         if (!m_levels->activeStorey().isEmpty())
             tagAll();
     });
+    // D98: Archicad's Automatic Dimensioning: the selected walls' ends and openings, outside their faces.
+    QAction* autoDims = model->addAction(tr("&Dimension selected walls..."));
+    autoDims->setObjectName(QStringLiteral("actionAutoDimension"));
+    autoDims->setToolTip(tr("A dimension chain along each selected wall: its ends and its doors' and windows' edges"));
+    connect(autoDims, &QAction::triggered, this, [this] {
+        bool ok = false;
+        const double offset = QInputDialog::getDouble(this, tr("Dimension selected walls"),
+            tr("Distance of the dimension line from the wall's outside face (m):"), 0.8, 0.0, 100.0, 2, &ok);
+        if (ok)
+            autoDimension(offset);
+    });
     model->addSeparator();
     model->addAction(m_levels->addLevelAction()); // D75: also in the level drop-down
     model->addAction(m_levels->levelsAction());   // D79: the levels table, also in the drop-down
@@ -6281,6 +6292,22 @@ bool MainWindow::deleteFavourite(const QString& name)
         return false;
     m_settings = r.value("settings").toObject();
     setWindowModified(isDirty());
+    return true;
+}
+
+bool MainWindow::autoDimension(double offset)
+{
+    if (m_selection.isEmpty()) {
+        m_status->showMessage(tr("Select the walls to dimension"));
+        return false;
+    }
+    const QJsonObject r = bridge("auto_dimension", {jsonList(m_selection), QString::number(offset, 'g', 17)});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
+    m_status->showMessage(tr("%n dimension chain(s) added", nullptr, r.value("guids").toArray().size()));
     return true;
 }
 

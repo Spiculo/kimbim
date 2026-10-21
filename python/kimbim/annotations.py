@@ -203,20 +203,88 @@ def add_annotation(storey_guid: str, kind: str, points_json: str, text: str) -> 
     made = {}
 
     def action():
-        f = B._model
-        annotation = ifcopenshell.api.root.create_entity(f, ifc_class="IfcAnnotation", name=text[:60])
-        annotation.ObjectType = kind.upper()
-        ifcopenshell.api.spatial.assign_container(f, products=[annotation], relating_structure=storey)
-        matrix = np.eye(4)
-        matrix[0][3], matrix[1][3], matrix[2][3] = origin[0], origin[1], A._elevation(storey)
-        ifcopenshell.api.geometry.edit_object_placement(f, product=annotation, matrix=matrix, is_si=True)
-        _set(annotation, kind, text, local, pen=settings.current().get("current_pen"))
-        layers.assign_active(annotation)
+        annotation = _new(storey, kind, text, origin, local)
         made["guid"] = annotation.GlobalId
         return 1, [annotation.GlobalId], []
 
     r = B._run(action)
     return B._dump({**r, "guid": made["guid"]})
+
+
+def _new(storey, kind: str, text: str, origin, local):
+    """Inside an action: an annotation on a level at `origin` (world metres), its points relative to it."""
+    f = B._model
+    annotation = ifcopenshell.api.root.create_entity(f, ifc_class="IfcAnnotation", name=text[:60])
+    annotation.ObjectType = kind.upper()
+    ifcopenshell.api.spatial.assign_container(f, products=[annotation], relating_structure=storey)
+    matrix = np.eye(4)
+    matrix[0][3], matrix[1][3], matrix[2][3] = origin[0], origin[1], A._elevation(storey)
+    ifcopenshell.api.geometry.edit_object_placement(f, product=annotation, matrix=matrix, is_si=True)
+    _set(annotation, kind, text, local, pen=settings.current().get("current_pen"))
+    layers.assign_active(annotation)
+    return annotation
+
+
+def auto_dimension(guids_json: str, offset=0.8) -> str:
+    """Archicad's Automatic Dimensioning (D98): a dimension chain along each selected straight wall's
+    first-layer face (its outside, by the composites' convention), through its ends and its doors' and
+    windows' edges, the dimension line `offset` metres out from that face (one undo step)."""
+    from . import curved_walls, materials
+
+    if B._model is None:
+        return A._fail("no model open")
+    try:
+        offset = float(offset)
+    except (TypeError, ValueError) as ex:
+        return A._fail(str(ex))
+    walls = [w for w in B._elements(guids_json) if w.is_a("IfcWall") and A._axis_world(w) is not None
+             and not curved_walls.is_curved(w)]
+    if not walls:
+        return A._fail("select straight walls to dimension")
+    chains = []
+    for w in walls:
+        a, b = (np.array(p, dtype=float) for p in A._axis_world(w))
+        u = (b - a) / np.linalg.norm(b - a)
+        left = np.array([-u[1], u[0]])
+        bands = materials.layer_bands(w)
+        if bands is not None:
+            sides = bands["bounds"]
+            outside, inside = sides[0], sides[-1]
+        else:
+            centre, t = A._body_centre(w), A._thickness(A._layer_set(w)) if A._layer_set(w) else 0.0
+            outside, inside = centre - t / 2, centre + t / 2
+        out = 1.0 if outside >= inside else -1.0  # which way is out, across the axis
+        stops = [0.0, float(np.linalg.norm(b - a))]
+        for fill, _opening, along, width in _fills(w):
+            stops += [along - width / 2, along + width / 2]
+        stops = sorted({round(x, 6) for x in stops})
+        face = [tuple(a + u * x + left * outside) for x in stops]
+        through = tuple(a + u * stops[0] + left * (outside + out * offset))
+        storey = ifcopenshell.util.element.get_container(w)
+        chains.append((storey, face + [through]))
+    made = []
+
+    def action():
+        for storey, points in chains:
+            origin = points[0]
+            local = [(x - origin[0], y - origin[1]) for x, y in points]
+            made.append(_new(storey, "dimension", _measure(local), origin, local).GlobalId)
+        return len(made), list(made), []
+
+    r = B._run(action)
+    return B._dump({**r, "guids": made})
+
+
+def _fills(wall):
+    """(door/window, opening, along, width) in a wall."""
+    out = []
+    for rel in getattr(wall, "HasOpenings", ()) or ():
+        opening = rel.RelatedOpeningElement
+        for fill in getattr(opening, "HasFillings", ()) or ():
+            info = A._opening_info(fill.RelatedBuildingElement)
+            if info is not None:
+                out.append((fill.RelatedBuildingElement, opening, info[2], info[3]))
+    return out
 
 
 def annotations(storey_guid: str) -> str:

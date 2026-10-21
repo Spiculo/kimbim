@@ -234,6 +234,7 @@ public:
     bool applyFavourite(const QString& name);
     bool deleteFavourite(const QString& name);
     QStringList favouriteNames(bool forThisTool = true) const;
+    bool autoDimension(double offset); // D98: the selected walls, `offset` metres out from their faces
     bool pickUpSettings(); // D97: Archicad's eyedropper, from the one selected element
     bool injectSettings(); // and syringe, into the selection
     // D98: Archicad's Grid System on the active level (one undo step).

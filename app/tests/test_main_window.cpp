@@ -241,6 +241,28 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // D98: Automatic Dimensioning of the selected walls.
+    void autoDimensionWalls()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        QVERIFY(!w.autoDimension(0.8)); // nothing selected
+        w.setTool(kimbim::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({5, 0});
+        w.wallTool()->click({5, 4});
+        w.wallTool()->finish();
+        w.setTool(kimbim::MainWindow::Tool::None);
+        w.setSelection(w.viewport()->guids());
+        QVERIFY(w.autoDimension(0.8));
+        int dims = 0;
+        for (const auto& v : kimbim::PythonEngine::instance().callJson("annotations", {w.levelsBar()->activeStorey()},
+                 nullptr).object().value("annotations").toArray())
+            dims += v.toObject().value("kind").toString() == QLatin1String("dimension");
+        QCOMPARE(dims, 2);
+        QVERIFY(w.close());
+    }
+
     // D97: Archicad's Favourites: the Wall tool's settings saved by name and applied again.
     void favourites()
     {
