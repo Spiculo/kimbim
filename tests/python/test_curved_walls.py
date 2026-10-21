@@ -82,8 +82,11 @@ def test_curved_walls_are_valid_ifc_and_move(project):
 def test_straight_only_edits_refuse_curved_walls(project):
     r = call("create_curved_wall", project["level"], project["Exterior 300"], 0, 0, 2, 2, 4, 0, 3.0, "")
     g = r["guid"]
-    assert not call("set_wall_axis", g, 0, 0, 5, 0)["ok"]
-    assert not call("set_dimension", json.dumps([g]), "Length", "9")["ok"]
+    assert call("set_dimension", json.dumps([g]), "Length", "5")["ok"]  # the end goes round its circle
+    dims = {k: e["value"] for k, e in call("properties_multi", json.dumps([g]))["psets"]["Dimensions"].items()}
+    assert dims["Length"] == pytest.approx(5.0, abs=1e-6)
+    assert call("set_dimension", json.dumps([g]), "Length", str(math.pi * 2))["ok"]
+    assert not call("set_dimension", json.dumps([g]), "Length", "13")["ok"]  # more than the whole circle
     assert not call("split_element", g, 2, 2)["ok"]
     # height works, and the length shown is the arc's (a half circle of radius 2)
     assert call("set_dimension", json.dumps([g]), "Height", "4.5")["ok"]
@@ -205,3 +208,32 @@ def test_snap_data_describes_the_arc(project):
     w = next(x for x in call("snap_data", project["level"])["walls"] if x["guid"] == r["guid"])
     assert w["arc"]["cx"] == pytest.approx(0) and w["arc"]["cy"] == pytest.approx(0) and w["arc"]["r"] == pytest.approx(5)
     assert w["arc"]["a0"] == pytest.approx(0) and w["arc"]["sweep"] == pytest.approx(math.pi)
+
+
+def test_stretching_a_curved_wall_keeps_its_circle(project):
+    """D97: an end dragged goes round the wall's circle (Archicad); doors stay where they were."""
+    from kimbim import authoring
+
+    r = call("create_curved_wall", project["level"], project["Exterior 300"], 5, 0, 0, 5, -5, 0, 3.0, "")
+    g = r["guid"]
+    door = call("opening_types", "door")["types"][0]
+    d = call("insert_opening", "door", g, door["guid"], math.pi * 2.5, door["width"], door["height"], door["sill"])["guid"]
+    # the end at (-5, 0) dragged towards (-3, -6): it goes round to the circle's point that way
+    s = call("set_wall_axis", g, 5, 0, -3, -6)
+    assert s["ok"], s
+    lo, hi, v = radii(g)
+    assert lo == pytest.approx(4.85, abs=0.01) and hi == pytest.approx(5.15, abs=0.01)
+    assert v[:, 1].min() < -3.5  # it now runs on past (-5, 0) and round underneath
+    dims = {k: e["value"] for k, e in call("properties_multi", json.dumps([g]))["psets"]["Dimensions"].items()}
+    expected = 5 * (math.pi + math.atan2(6, 3))  # counter-clockwise from (5, 0) round to the direction (-3, -6)
+    assert dims["Length"] == pytest.approx(expected, abs=1e-3)
+    assert authoring._opening_info(b._model.by_guid(d))[2] == pytest.approx(math.pi * 2.5, abs=1e-6)  # same place
+    # the start dragged past the door: refused, the wall unchanged
+    assert not call("set_wall_axis", g, 0, 5.5, -3, -6)["ok"]
+    # both ends moved alike: the wall moves
+    from kimbim import curved_walls
+
+    a, e = curved_walls.ends_world(b._model.by_guid(g))
+    assert call("set_wall_axis", g, a[0] + 1, a[1], e[0] + 1, e[1])["ok"]
+    _, _, v = radii(g, (1, 0))
+    assert np.hypot(v[:, 0] - 1, v[:, 1]).max() == pytest.approx(5.15, abs=0.01)

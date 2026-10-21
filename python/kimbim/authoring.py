@@ -1352,12 +1352,12 @@ def set_wall_axis(wall_guid: str, x1, y1, x2, y2) -> str:
         return _fail("not a wall with an axis")
     from . import curved_walls
 
-    if (why := curved_walls.refusal([wall])) is not None:
-        return _fail(why)
     try:
         p1, p2 = np.array([float(x1), float(y1)]), np.array([float(x2), float(y2)])
     except (TypeError, ValueError) as ex:
         return _fail(str(ex))
+    if curved_walls.is_curved(wall):  # D97: its ends move round its circle
+        return curved_walls.set_ends(wall, p1, p2)
     length = float(np.linalg.norm(p2 - p1))
     if length < MIN_WALL_LENGTH:
         return _fail("the wall has no length")
@@ -1854,7 +1854,7 @@ def element_dimensions(e) -> list[tuple[str, float, bool]]:
 
     if e.is_a("IfcWall") and curved_walls.is_curved(e):  # D97: the arc's length, set by its points
         layer_set = _layer_set(e)
-        return [("Length", curved_walls.length(e), False), ("Height", _wall_height(e), True),
+        return [("Length", curved_walls.length(e), True), ("Height", _wall_height(e), True),
                 ("Thickness", _thickness(layer_set) if layer_set else 0.0, False)]
     if e.is_a("IfcWall") and _axis_world(e) is not None:
         a, b = _axis_world(e)
@@ -1909,6 +1909,8 @@ def set_dimension(guids_json: str, name: str, value) -> str:
     from . import stairs
 
     elements = stairs.drop_parts(B._elements(guids_json))
+    from . import curved_walls
+
     parametric = stairs.set_dimension(elements, name, metres)  # D88: stairs, ramps, railings
     if isinstance(parametric, str):
         return _fail(parametric)
@@ -1933,6 +1935,10 @@ def set_dimension(guids_json: str, name: str, value) -> str:
             if error:
                 return _fail(error)
             plan.append(("opening", e, (opening, wall, along, width, height, sill)))
+        elif e.is_a("IfcWall") and name == "Length" and curved_walls.is_curved(e):
+            if len(elements) > 1:
+                return _fail("change a curved wall's length on its own")
+            return curved_walls.set_length(e, metres)  # D97: its end goes round its circle
         elif e.is_a("IfcWall") and name == "Length":
             a, b = (np.array(p, dtype=float) for p in _axis_world(e))
             p2 = a + (b - a) / np.linalg.norm(b - a) * metres

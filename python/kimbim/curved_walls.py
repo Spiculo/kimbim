@@ -237,3 +237,75 @@ def create_curved_wall(storey_guid: str, type_guid: str, x1, y1, xm, ym, x2, y2,
     except Exception as ex:
         return _fail(str(ex) if isinstance(ex, ValueError) else f"{type(ex).__name__}: {ex}")
     return B._dump({**r, "guid": made["wall"].GlobalId})
+
+
+def ends_world(wall):
+    """The arc's start and end in world metres."""
+    from . import authoring as A
+
+    start, end, _through = arc_of(wall)
+    m = ifcopenshell.util.placement.get_local_placement(wall.ObjectPlacement)
+    s = A._scale()
+    return [(m @ np.array([x / s, y / s, 0.0, 1.0]))[:2] * s for x, y in (start, end)]
+
+
+def set_ends(wall, p1, p2) -> str:
+    """Stretch a curved wall (D97, Archicad): its ends go round its circle to where p1 and p2 (world
+    metres) point from its centre, keeping the radius and the way it turns; both ends moved by the
+    same amount move the whole wall. Its doors and windows keep their place (one undo step)."""
+    from . import authoring as A
+
+    a, b = ends_world(wall)
+    d1, d2 = np.asarray(p1, dtype=float) - a, np.asarray(p2, dtype=float) - b
+    m = ifcopenshell.util.placement.get_local_placement(wall.ObjectPlacement)
+    s = A._scale()
+    inverse = np.linalg.inv(m)
+    (cx, cy), radius, a0, sweep = frame(*arc_of(wall))
+    if np.linalg.norm(d1) > 1e-9 and np.allclose(d1, d2, atol=1e-9):  # the whole wall, its doors with it
+        return A.move_elements(json.dumps([wall.GlobalId]), float(d1[0]), float(d1[1]))
+    local = [(inverse @ np.array([q[0] / s, q[1] / s, 0.0, 1.0]))[:2] * s for q in (p1, p2)]
+    turn = 1.0 if sweep > 0 else -1.0
+    s0 = math.atan2(local[0][1] - cy, local[0][0] - cx)
+    s1 = math.atan2(local[1][1] - cy, local[1][0] - cx)
+    new_sweep = ((s1 - s0) * turn) % (2 * math.pi) * turn
+    if abs(new_sweep) * radius < A.MIN_WALL_LENGTH:
+        return A._fail("the wall has no length")
+    at = lambda angle: (cx + radius * math.cos(angle), cy + radius * math.sin(angle))  # noqa: E731
+    start, end, through = at(s0), at(s0 + new_sweep), at(s0 + new_sweep / 2)
+    old = _pset(wall).get("Arc")
+
+    def action():
+        from . import configure
+
+        configure._write_pset(wall, WALL_PSET, {"Arc": json.dumps([list(start), list(end), list(through)])})
+        rebuild(wall)
+        for e in A._hosted(wall):  # each door or window where it was, if it is still on the wall
+            info = A._opening_info(e) if not e.is_a("IfcOpeningElement") else None
+            if info is not None and A._opening_fit_error(wall, *info[2:]):
+                configure._write_pset(wall, WALL_PSET, {"Arc": old})
+                raise ValueError(f"{e.Name or 'a door or window'} would be off the wall")
+        A._refit_openings(wall)
+        return 1, [wall.GlobalId, *(e.GlobalId for e in A._hosted(wall) if not e.is_a("IfcOpeningElement"))], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return A._fail(str(ex) if isinstance(ex, ValueError) else f"{type(ex).__name__}: {ex}")
+    return B._dump(r)
+
+
+def set_length(wall, metres: float) -> str:
+    """A curved wall's arc made `metres` long from its start (D97): its end goes round the circle."""
+    from . import authoring as A
+
+    (cx, cy), radius, a0, sweep = frame(*arc_of(wall))
+    turned = metres / radius
+    if turned >= 2 * math.pi - 1e-6:
+        return A._fail("a curved wall can't go all the way round its circle")
+    m = ifcopenshell.util.placement.get_local_placement(wall.ObjectPlacement)
+    s = A._scale()
+    angle = a0 + (turned if sweep > 0 else -turned)
+    local = (cx + radius * math.cos(angle), cy + radius * math.sin(angle))
+    end = (m @ np.array([local[0] / s, local[1] / s, 0.0, 1.0]))[:2] * s
+    start, _old_end = ends_world(wall)
+    return set_ends(wall, start, end)
