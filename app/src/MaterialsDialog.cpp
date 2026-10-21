@@ -6,6 +6,8 @@
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
+#include <QFileDialog>
+#include <QFileInfo>
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -369,6 +371,34 @@ void MaterialsDialog::buildSurfaces(QWidget* page)
     for (int i = 0; i < kReflectance.size(); ++i)
         m_sReflectance->addItem(labels[i], kReflectance[i]);
     form->addRow(tr("Reflectance:"), m_sReflectance);
+    auto* texRow = new QHBoxLayout;
+    m_sTexture = new QPushButton(page);
+    m_sTexture->setObjectName(QStringLiteral("surfaceTexture"));
+    m_sTexture->setToolTip(tr("A picture repeated over the surface in 3D (PNG or JPEG)"));
+    m_sTextureClear = new QPushButton(tr("Remove"), page);
+    m_sTextureClear->setObjectName(QStringLiteral("surfaceTextureClear"));
+    texRow->addWidget(m_sTexture, 1);
+    texRow->addWidget(m_sTextureClear);
+    form->addRow(tr("Texture:"), texRow);
+    auto* sizeRow = new QHBoxLayout;
+    for (QDoubleSpinBox** box : {&m_sTexW, &m_sTexH}) {
+        *box = new QDoubleSpinBox(page);
+        (*box)->setRange(0.01, 100.0);
+        (*box)->setDecimals(3);
+        (*box)->setSuffix(QStringLiteral(" m"));
+        (*box)->setValue(1.0);
+        sizeRow->addWidget(*box);
+        connect(*box, &QDoubleSpinBox::valueChanged, this, &MaterialsDialog::storeSurface);
+    }
+    m_sTexW->setObjectName(QStringLiteral("surfaceTextureWidth"));
+    m_sTexH->setObjectName(QStringLiteral("surfaceTextureHeight"));
+    form->addRow(tr("Texture size (width x height):"), sizeRow);
+    connect(m_sTexture, &QPushButton::clicked, this, [this] {
+        const QString path = QFileDialog::getOpenFileName(this, tr("Texture"), QString(), tr("Pictures (*.png *.jpg *.jpeg)"));
+        if (!path.isEmpty())
+            setSurfaceTexture(path);
+    });
+    connect(m_sTextureClear, &QPushButton::clicked, this, [this] { setSurfaceTexture(QString()); });
     m_sUsed = new QLabel(page);
     form->addRow(QString(), m_sUsed);
     static_cast<QHBoxLayout*>(page->layout())->addLayout(form, 1);
@@ -403,7 +433,26 @@ void MaterialsDialog::loadSurface(int i)
     const int r = m_sReflectance->findData(o.value("reflectance").toString(QStringLiteral("NOTDEFINED")));
     m_sReflectance->setCurrentIndex(r >= 0 ? r : m_sReflectance->count() - 1);
     m_sUsed->setText(i >= 0 ? tr("Used by %n element(s)", nullptr, o.value("used_by").toInt()) : QString());
+    m_texture = o.value("texture").toString();
+    m_texturePath = o.value("texture_path").toString();
+    const QJsonArray size = o.value("texture_size").toArray();
+    m_sTexW->setValue(size.size() == 2 ? size[0].toDouble(1.0) : 1.0);
+    m_sTexH->setValue(size.size() == 2 ? size[1].toDouble(1.0) : 1.0);
+    const bool has = !m_texture.isEmpty() || !m_texturePath.isEmpty();
+    m_sTexture->setText(!m_texturePath.isEmpty() ? QFileInfo(m_texturePath).fileName() : has ? tr("Picture") : tr("Choose picture..."));
+    m_sTextureClear->setEnabled(i >= 0 && has);
+    m_sTexture->setEnabled(i >= 0);
     m_loading = false;
+}
+
+void MaterialsDialog::setSurfaceTexture(const QString& path)
+{
+    m_texturePath = path;
+    if (path.isEmpty())
+        m_texture.clear();
+    m_sTexture->setText(path.isEmpty() ? tr("Choose picture...") : QFileInfo(path).fileName());
+    m_sTextureClear->setEnabled(!path.isEmpty());
+    storeSurface();
 }
 
 void MaterialsDialog::storeSurface()
@@ -418,9 +467,11 @@ void MaterialsDialog::storeSurface()
         if (isVisible())
             QMessageBox::warning(this, tr("Materials"), err);
     }
-    m_edits.setItem(MaterialsEdits::Surfaces, i, {{"name", name}, {"colour", m_colour},
+    QJsonObject fields{{"name", name}, {"colour", m_colour},
         {"transparency", m_sTransparency->value() / 100.0}, {"shine", m_sShine->value() / 100.0},
-        {"reflectance", m_sReflectance->currentData().toString()}});
+        {"reflectance", m_sReflectance->currentData().toString()}, {"texture", m_texture},
+        {"texture_size", QJsonArray{m_sTexW->value(), m_sTexH->value()}}, {"texture_path", m_texturePath}};
+    m_edits.setItem(MaterialsEdits::Surfaces, i, fields);
     if (QListWidgetItem* it = m_lists[MaterialsEdits::Surfaces]->currentItem()) {
         it->setText(name);
         it->setIcon(chip(m_colour));

@@ -82,12 +82,18 @@ std::optional<MeshChunk> MeshChunk::parse(const QByteArray& metaJson, const QByt
     }
     for (const auto& row : meta.value("palette").toArray()) {
         const QJsonArray a = row.toArray();
-        if (a.size() != 4) {
-            fail(error, QStringLiteral("mesh chunk: a palette row is not [r, g, b, transparency]"));
+        if (a.size() != 4 && a.size() != 7) {
+            fail(error, QStringLiteral("mesh chunk: a palette row is not [r, g, b, transparency(, texture, w, h)]"));
             return std::nullopt;
         }
-        c.palette.push_back({float(a[0].toDouble()), float(a[1].toDouble()), float(a[2].toDouble()),
-            float(std::clamp(a[3].toDouble(), 0.0, 1.0))});
+        Surface s{float(a[0].toDouble()), float(a[1].toDouble()), float(a[2].toDouble()),
+            float(std::clamp(a[3].toDouble(), 0.0, 1.0))};
+        if (a.size() == 7) { // D96: a textured surface
+            s.texture = a[4].toString();
+            s.texW = float(std::max(a[5].toDouble(1.0), 1e-3));
+            s.texH = float(std::max(a[6].toDouble(1.0), 1e-3));
+        }
+        c.palette.push_back(s);
     }
     if (!colors.isEmpty()) {
         if (size_t(colors.size()) != size_t(nt) * sizeof(uint16_t)) {

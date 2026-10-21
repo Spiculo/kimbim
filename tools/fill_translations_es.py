@@ -1564,6 +1564,13 @@ ES = {
     "Delete the worksheet %1 with everything drawn on it? (Undo brings it back.)":
         "¿Eliminar la hoja de trabajo %1 con todo lo dibujado en ella? (Deshacer la recupera.)",
     "Worksheet": "Hoja de trabajo",
+    "A picture repeated over the surface in 3D (PNG or JPEG)": "Una imagen repetida sobre la superficie en 3D (PNG o JPEG)",
+    "Remove": "Quitar",
+    "Texture:": "Textura:",
+    "Texture size (width x height):": "Tamaño de la textura (ancho x alto):",
+    "Texture": "Textura",
+    "Picture": "Imagen",
+    "Choose picture...": "Elegir imagen...",
 }
 
 

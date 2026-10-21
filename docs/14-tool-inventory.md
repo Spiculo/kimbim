@@ -204,7 +204,7 @@ release notes, so check before relying on a single cell.
 | Pen sets / line weights by scale | AC RV VW | 🟡 | new | D73: pen sets (255 pens), element styles, purposes; weights don't change with the scale yet |
 | Graphic overrides and model view options (visibility by kind, rules) | AC RV VW | ✅ | new | D73: visibility sets, override rules (property, layer, material), layer combinations in purposes |
 | Line types and fill patterns (hatches) | all | 🟡 | new | D73: line types (dash patterns in mm); cut fills are solid, no hatches yet |
-| Surfaces / textures for 3D and rendering | all | 🟡 | new | D96: surfaces (colour, transparency, shine) per face in 3D, per-side overrides (D97); no textures yet |
+| Surfaces / textures for 3D and rendering | all | ✅ | new | D96: surfaces (colour, transparency, shine, picture texture, box-mapped) per face in 3D, per-side overrides (D97); no rendering |
 | Attribute manager (import/export standards between projects) | AC RV VW | ⬜ | new | |
 
 ## 11. Drawings (views made from the model)

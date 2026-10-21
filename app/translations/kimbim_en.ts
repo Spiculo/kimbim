@@ -233,12 +233,12 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="88"/>
+        <location filename="../src/MaterialsDialog.cpp" line="90"/>
         <source>A name is needed.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="91"/>
+        <location filename="../src/MaterialsDialog.cpp" line="93"/>
         <source>The name %1 is already used.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -6777,116 +6777,146 @@ Open it read-only?</source>
 <context>
     <name>kimbim::MaterialsDialog</name>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="243"/>
-        <location filename="../src/MaterialsDialog.cpp" line="419"/>
-        <location filename="../src/MaterialsDialog.cpp" line="552"/>
-        <location filename="../src/MaterialsDialog.cpp" line="723"/>
-        <location filename="../src/MaterialsDialog.cpp" line="776"/>
+        <location filename="../src/MaterialsDialog.cpp" line="245"/>
+        <location filename="../src/MaterialsDialog.cpp" line="468"/>
+        <location filename="../src/MaterialsDialog.cpp" line="603"/>
+        <location filename="../src/MaterialsDialog.cpp" line="774"/>
+        <location filename="../src/MaterialsDialog.cpp" line="827"/>
         <source>Materials</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="250"/>
+        <location filename="../src/MaterialsDialog.cpp" line="252"/>
         <source>Surfaces</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="250"/>
+        <location filename="../src/MaterialsDialog.cpp" line="252"/>
         <source>Building materials</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="250"/>
+        <location filename="../src/MaterialsDialog.cpp" line="252"/>
         <source>Composites</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="257"/>
+        <location filename="../src/MaterialsDialog.cpp" line="259"/>
         <source>Search</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="273"/>
+        <location filename="../src/MaterialsDialog.cpp" line="275"/>
         <source>Add</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="274"/>
+        <location filename="../src/MaterialsDialog.cpp" line="276"/>
         <source>Duplicate</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="275"/>
-        <location filename="../src/MaterialsDialog.cpp" line="781"/>
+        <location filename="../src/MaterialsDialog.cpp" line="277"/>
+        <location filename="../src/MaterialsDialog.cpp" line="832"/>
         <source>Delete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="354"/>
-        <location filename="../src/MaterialsDialog.cpp" line="452"/>
-        <location filename="../src/MaterialsDialog.cpp" line="580"/>
+        <location filename="../src/MaterialsDialog.cpp" line="356"/>
+        <location filename="../src/MaterialsDialog.cpp" line="503"/>
+        <location filename="../src/MaterialsDialog.cpp" line="631"/>
         <source>Name:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="357"/>
+        <location filename="../src/MaterialsDialog.cpp" line="359"/>
         <source>Colour:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="361"/>
+        <location filename="../src/MaterialsDialog.cpp" line="363"/>
         <source>Transparency (%):</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="365"/>
+        <location filename="../src/MaterialsDialog.cpp" line="367"/>
         <source>Shine (%):</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="368"/>
+        <location filename="../src/MaterialsDialog.cpp" line="370"/>
         <source>Matt</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="368"/>
+        <location filename="../src/MaterialsDialog.cpp" line="370"/>
         <source>Plastic</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="368"/>
+        <location filename="../src/MaterialsDialog.cpp" line="370"/>
         <source>Metal</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="368"/>
+        <location filename="../src/MaterialsDialog.cpp" line="370"/>
         <source>Glass</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="368"/>
+        <location filename="../src/MaterialsDialog.cpp" line="370"/>
         <source>Mirror</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="368"/>
+        <location filename="../src/MaterialsDialog.cpp" line="370"/>
         <source>Not defined</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="371"/>
+        <location filename="../src/MaterialsDialog.cpp" line="373"/>
         <source>Reflectance:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="376"/>
+        <location filename="../src/MaterialsDialog.cpp" line="377"/>
+        <source>A picture repeated over the surface in 3D (PNG or JPEG)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="378"/>
+        <source>Remove</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="382"/>
+        <source>Texture:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="395"/>
+        <source>Texture size (width x height):</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="397"/>
+        <source>Texture</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="397"/>
+        <source>Pictures (*.png *.jpg *.jpeg)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="406"/>
         <source>Surface colour</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/MaterialsDialog.cpp" line="405"/>
-        <location filename="../src/MaterialsDialog.cpp" line="538"/>
-        <location filename="../src/MaterialsDialog.cpp" line="708"/>
+        <location filename="../src/MaterialsDialog.cpp" line="435"/>
+        <location filename="../src/MaterialsDialog.cpp" line="589"/>
+        <location filename="../src/MaterialsDialog.cpp" line="759"/>
         <source>Used by %n element(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -6894,176 +6924,187 @@ Open it read-only?</source>
         </translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="436"/>
+        <location filename="../src/MaterialsDialog.cpp" line="442"/>
+        <source>Picture</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="442"/>
+        <location filename="../src/MaterialsDialog.cpp" line="453"/>
+        <source>Choose picture...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="487"/>
         <source>None</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="453"/>
+        <location filename="../src/MaterialsDialog.cpp" line="504"/>
         <source>ID:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="454"/>
+        <location filename="../src/MaterialsDialog.cpp" line="505"/>
         <source>Category:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="455"/>
+        <location filename="../src/MaterialsDialog.cpp" line="506"/>
         <source>Manufacturer:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="456"/>
+        <location filename="../src/MaterialsDialog.cpp" line="507"/>
         <source>Description:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="459"/>
+        <location filename="../src/MaterialsDialog.cpp" line="510"/>
         <source>Surface:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="462"/>
+        <location filename="../src/MaterialsDialog.cpp" line="513"/>
         <source>(element style)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="465"/>
+        <location filename="../src/MaterialsDialog.cpp" line="516"/>
         <source>Cut fill:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="471"/>
+        <location filename="../src/MaterialsDialog.cpp" line="522"/>
         <source>Fill pen:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="473"/>
+        <location filename="../src/MaterialsDialog.cpp" line="524"/>
         <source>Background:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="476"/>
+        <location filename="../src/MaterialsDialog.cpp" line="527"/>
         <source>Cut fill pens:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="480"/>
+        <location filename="../src/MaterialsDialog.cpp" line="531"/>
         <source>Intersection priority: where elements meet, the higher number runs through</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="481"/>
+        <location filename="../src/MaterialsDialog.cpp" line="532"/>
         <source>Intersection priority:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="488"/>
+        <location filename="../src/MaterialsDialog.cpp" line="539"/>
         <source>Not set</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="492"/>
+        <location filename="../src/MaterialsDialog.cpp" line="543"/>
         <source>Density:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="493"/>
+        <location filename="../src/MaterialsDialog.cpp" line="544"/>
         <source>Thermal conductivity:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="494"/>
+        <location filename="../src/MaterialsDialog.cpp" line="545"/>
         <source>Heat capacity:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="523"/>
+        <location filename="../src/MaterialsDialog.cpp" line="574"/>
         <source>(none)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="582"/>
-        <location filename="../src/MaterialsDialog.cpp" line="743"/>
+        <location filename="../src/MaterialsDialog.cpp" line="633"/>
+        <location filename="../src/MaterialsDialog.cpp" line="794"/>
         <source>For:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="586"/>
+        <location filename="../src/MaterialsDialog.cpp" line="637"/>
         <source>Building material</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="586"/>
+        <location filename="../src/MaterialsDialog.cpp" line="637"/>
         <source>Thickness</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="586"/>
+        <location filename="../src/MaterialsDialog.cpp" line="637"/>
         <source>Core</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="599"/>
+        <location filename="../src/MaterialsDialog.cpp" line="650"/>
         <source>Add layer</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="608"/>
+        <location filename="../src/MaterialsDialog.cpp" line="659"/>
         <source>Remove layer</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="629"/>
+        <location filename="../src/MaterialsDialog.cpp" line="680"/>
         <source>Up</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="630"/>
+        <location filename="../src/MaterialsDialog.cpp" line="681"/>
         <source>Down</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="695"/>
+        <location filename="../src/MaterialsDialog.cpp" line="746"/>
         <source>Total thickness: %1 mm</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="705"/>
-        <location filename="../src/MaterialsDialog.cpp" line="742"/>
+        <location filename="../src/MaterialsDialog.cpp" line="756"/>
+        <location filename="../src/MaterialsDialog.cpp" line="793"/>
         <source>Walls</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="706"/>
-        <location filename="../src/MaterialsDialog.cpp" line="742"/>
+        <location filename="../src/MaterialsDialog.cpp" line="757"/>
+        <location filename="../src/MaterialsDialog.cpp" line="793"/>
         <source>Slabs</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="737"/>
+        <location filename="../src/MaterialsDialog.cpp" line="788"/>
         <source>New surface</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="739"/>
+        <location filename="../src/MaterialsDialog.cpp" line="790"/>
         <source>New material</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="743"/>
-        <location filename="../src/MaterialsDialog.cpp" line="750"/>
+        <location filename="../src/MaterialsDialog.cpp" line="794"/>
+        <location filename="../src/MaterialsDialog.cpp" line="801"/>
         <source>New composite</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MaterialsDialog.cpp" line="776"/>
+        <location filename="../src/MaterialsDialog.cpp" line="827"/>
         <source>%1 is in use and there is nothing to replace it with.</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/MaterialsDialog.cpp" line="782"/>
+        <location filename="../src/MaterialsDialog.cpp" line="833"/>
         <source>%1 is used by %n element(s). Replace it with:</source>
         <translation type="unfinished">
             <numerusform></numerusform>

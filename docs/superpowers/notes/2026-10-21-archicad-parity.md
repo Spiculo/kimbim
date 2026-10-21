@@ -34,7 +34,8 @@ Branch `parity-materials`. Spec: [2026-10-21-archicad-parity-materials-design](.
 - Splines (`drafting.spline_points`, `DraftTool::splinePoints`).
 
 ## Follow-ups (not done)
-- **Textures** in 3D (`IfcSurfaceStyleWithTextures`, UVs in the mesh chunk) and a render-style view.
+- Textures are done (surface picture + size, `IfcSurfaceStyleWithTextures`, box-mapped in 3D, files in
+  `texture_files`); the catalogue ships no default pictures yet, and there is no render-style view.
 - Cut fill patterns are hatched on screen and in printed drawings/PDF (the material's pattern in its fill
   pen over its background pen, at 1:25 so wall layers show them); DXF still exports element cuts as solid
   hatches.

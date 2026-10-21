@@ -237,6 +237,10 @@ int runRealOpen(const SelfTestOptions& options, const QString& path)
         settle(500);
         result.insert(QStringLiteral("screenshot"), window.screen()->grabWindow(window.winId()).save(options.screenshot)
                 ? options.screenshot : QString());
+        // The window grab cannot read the OpenGL view: the view's own image beside it.
+        QString view = options.screenshot;
+        view.replace(QStringLiteral(".png"), QStringLiteral("-viewport.png"));
+        result.insert(QStringLiteral("viewport_screenshot"), window.viewport()->dumpImage(view) ? view : QString());
     }
     window.close();
     std::printf("%s\n", QJsonDocument(result).toJson(QJsonDocument::Compact).constData());

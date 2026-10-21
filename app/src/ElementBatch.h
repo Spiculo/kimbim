@@ -138,6 +138,11 @@ public:
     // material), else the class colour.
     Quantity_Color triangleColor(int i, uint32_t t) const;
     double triangleTransparency(int i, uint32_t t) const;
+    // D96: the palette index of triangle t's textured surface, or -1 (none, or an override colours it).
+    int triangleTexture(int i, uint32_t t) const;
+    // Box-mapped texture coordinates of a point on a face with this normal (Archicad's default mapping):
+    // the two world axes the face is most parallel to, in texture repeats.
+    static std::pair<double, double> boxTexel(const gp_Pnt& p, const gp_Dir& normal, double w, double h);
     // The visible elements' border lines grouped by style (one OCCT group each); `fallback` colours the
     // unstyled ones (1 px, solid).
     struct LineBucket {
@@ -173,7 +178,8 @@ public:
 private:
     // Appends element i's triangles; with `onlyAlpha` only those whose transparency is that value.
     void addElement(Graphic3d_ArrayOfTriangles& out, int i, bool withColors, const Quantity_Color* fixed = nullptr,
-        std::optional<double> onlyAlpha = std::nullopt) const;
+        std::optional<double> onlyAlpha = std::nullopt, bool skipTextured = false) const;
+    void addTexturedGroup(const Handle(Prs3d_Presentation)& prs, double alpha, int paletteIndex, int tris); // D96
 
     MeshChunk m_chunk;
     QHash<QString, int> m_index;

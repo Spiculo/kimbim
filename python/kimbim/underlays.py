@@ -128,7 +128,8 @@ def file_path(name: str) -> pathlib.Path | None:
 
 def referenced(settings: dict) -> list[str]:
     names = {u.get("file", "") for u in settings.get("underlays") or () if FILE_NAME.fullmatch(u.get("file", ""))}
-    names |= {n for n in settings.get("sheet_files") or () if isinstance(n, str) and FILE_NAME.fullmatch(n)}  # D98
+    names |= {n for n in [*(settings.get("sheet_files") or ()), *(settings.get("texture_files") or ())]
+              if isinstance(n, str) and FILE_NAME.fullmatch(n)}  # D98 sheet pictures, D96 textures
     return sorted(names)
 
 

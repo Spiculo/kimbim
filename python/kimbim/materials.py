@@ -119,7 +119,86 @@ def surface_look(style) -> dict | None:
         if hl is not None and hl.is_a("IfcSpecularRoughness"):
             look["shine"] = max(0.0, min(1.0, 1.0 - float(hl.wrappedValue)))
         look["reflectance"] = sh.ReflectanceMethod or "NOTDEFINED"
+    look.update(texture_of(style))
     return look
+
+
+def texture_of(style) -> dict:
+    """{texture (a project file name), texture_size [w, h] metres} of a surface's image texture, or {}."""
+    for item in getattr(style, "Styles", None) or ():
+        if not item.is_a("IfcSurfaceStyleWithTextures"):
+            continue
+        for tex in item.Textures or ():
+            if tex.is_a("IfcImageTexture") and tex.URLReference:
+                size = [1.0, 1.0]
+                op = getattr(tex, "TextureTransform", None)
+                if op is not None and op.Scale:
+                    size = [float(op.Scale), float(getattr(op, "Scale2", None) or op.Scale)]
+                return {"texture": tex.URLReference, "texture_size": size}
+    return {}
+
+
+def _write_texture(f, style, look: dict):
+    """D96: the surface's image texture (Archicad's surface texture): an IfcSurfaceStyleWithTextures with
+    an IfcImageTexture naming a file in the project's store, repeated every `texture_size` metres.
+    `texture_path` (a picture to copy in), `texture` (a stored name) or neither (no texture)."""
+    import pathlib
+    import shutil
+
+    from . import underlays
+
+    name = look.get("texture") or ""
+    src = look.get("texture_path") or ""
+    if src:
+        p = pathlib.Path(src)
+        if not p.is_file():
+            raise ValueError(f"no such picture: {src}")
+        underlays._image_size(p)  # a PNG or JPEG, or it raises
+        data = p.read_bytes()
+        name = underlays.blob_name(data, ".png" if data[:4] == b"\x89PNG" else ".jpg")
+        store = underlays.store_dir()
+        store.mkdir(parents=True, exist_ok=True)
+        if not (store / name).is_file():
+            shutil.copyfile(p, store / name)
+    for item in list(style.Styles or ()):
+        if item.is_a("IfcSurfaceStyleWithTextures"):
+            style.Styles = [s for s in style.Styles if s != item]
+            for tex in item.Textures or ():
+                if getattr(tex, "TextureTransform", None) is not None:
+                    f.remove(tex.TextureTransform)
+                f.remove(tex)
+            f.remove(item)
+    if not name:
+        return
+    w, h = (float(v) for v in (look.get("texture_size") or [1.0, 1.0])[:2])
+    if w <= 0 or h <= 0:
+        raise ValueError("a texture's size must be positive")
+    op = f.createIfcCartesianTransformationOperator2DnonUniform(
+        None, None, f.createIfcCartesianPoint((0.0, 0.0)), w, h)
+    kind = {"TextureType": "TEXTURE"} if f.schema == "IFC2X3" else {"Mode": "MODULATE"}
+    tex = f.create_entity("IfcImageTexture", RepeatS=True, RepeatT=True, TextureTransform=op, URLReference=name, **kind)
+    style.Styles = list(style.Styles or ()) + [f.createIfcSurfaceStyleWithTextures([tex])]
+
+
+def texture_files(f=None) -> list:
+    """Every texture file the model's surfaces use (kept in the settings, so versions and .kim files carry them)."""
+    f = B._model if f is None else f
+    names = set()
+    for st in f.by_type("IfcSurfaceStyle"):
+        t = texture_of(st).get("texture")
+        if t:
+            names.add(t)
+    return sorted(names)
+
+
+def _sync_texture_files():
+    from . import settings as S
+
+    names = texture_files()
+    if S.current().get("texture_files", []) != names:
+        st = S.current()
+        st["texture_files"] = names
+        S.restore(st)
 
 
 def _styles_of_item(item):
@@ -185,7 +264,8 @@ def properties(material) -> dict:
 # ---------------------------------------------------------------- face colours (3D)
 
 class Palette:
-    """The colours of one mesh chunk: [r, g, b, transparency] rows, deduplicated."""
+    """The colours of one mesh chunk: [r, g, b, transparency] rows (plus [texture path, width m, height m]
+    for a textured surface, D96), deduplicated."""
 
     def __init__(self):
         self.rows: list = []
@@ -197,6 +277,13 @@ class Palette:
             return NO_COLOUR
         r, g, b = _rgb(look["colour"])
         row = [round(r, 4), round(g, 4), round(b, 4), round(float(look.get("transparency") or 0.0), 4)]
+        if look.get("texture"):
+            from . import underlays
+
+            p = underlays.file_path(look["texture"])
+            if p is not None:
+                w, h = (look.get("texture_size") or [1.0, 1.0])[:2]
+                row += [str(p), float(w), float(h)]
         key = tuple(row)
         if key not in self._index:
             if len(self.rows) >= NO_COLOUR:
@@ -356,6 +443,8 @@ def _write_look(f, style, look: dict):
     sh.Transparency = max(0.0, min(1.0, float(look.get("transparency") or 0.0)))
     sh.ReflectanceMethod = reflectance
     sh.SpecularHighlight = f.createIfcSpecularRoughness(1.0 - max(0.0, min(1.0, float(look.get("shine") or 0.0))))
+    if "texture" in look or "texture_path" in look:
+        _write_texture(f, style, look)
     return style
 
 
@@ -880,11 +969,12 @@ def apply_materials(changes_json: str) -> str:
             _delete_material(f, d.get("key"), d.get("replace"), touched)
         for key in deleted.get("surfaces") or ():
             _delete_surface(f, key, touched)
+        _sync_texture_files()  # D96
         guids = [e.GlobalId for e in touched if getattr(e, "GlobalId", None)]
         return max(1, len(guids)), guids, []
 
     try:
-        r = B._run(action)
+        r = B._run_settings(action)
     except Exception as ex:
         return _fail(f"{type(ex).__name__}: {ex}" if not isinstance(ex, ValueError) else str(ex))
     return B._dump(r)

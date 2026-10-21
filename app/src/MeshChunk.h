@@ -28,6 +28,8 @@ struct MeshChunk {
     struct Surface {
         float r = 0, g = 0, b = 0; // sRGB 0-1
         float transparency = 0;    // 0 opaque - 1 invisible
+        QString texture;           // D96: an image file repeated every texW x texH metres; "" = none
+        float texW = 1, texH = 1;
     };
     static constexpr uint16_t kNoColor = 0xFFFF;
     std::vector<uint16_t> faceColors;

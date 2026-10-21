@@ -105,6 +105,15 @@ private:
     QComboBox* m_sReflectance = nullptr;
     QLabel* m_sUsed = nullptr;
     QString m_colour;
+    QPushButton* m_sTexture = nullptr;      // D96: the surface's picture
+    QPushButton* m_sTextureClear = nullptr;
+    QDoubleSpinBox* m_sTexW = nullptr;      // metres one repeat covers
+    QDoubleSpinBox* m_sTexH = nullptr;
+    QString m_texture, m_texturePath;       // the stored name, or a newly chosen picture
+public:
+    // D96: choose a picture for the current surface (tests call it; the button asks for a file).
+    void setSurfaceTexture(const QString& path);
+private:
     // building materials
     QLineEdit* m_mName = nullptr;
     QLineEdit* m_mId = nullptr;

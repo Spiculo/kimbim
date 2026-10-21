@@ -390,3 +390,29 @@ def test_cut_patterns_and_backgrounds_come_with_the_state(project):
     col = call("create_column", project["level"], call("column_types")["types"][0]["guid"], 1, 1, 3.0)["guid"]
     style = r and graphics.resolve()["styles"][graphics.resolve()["elements"][col]]
     assert style.get("pattern") in ("Concrete", "Solid", None)
+
+
+def test_surface_textures(project, tmp_path):
+    from kimbim import settings, underlays
+
+    pic = tmp_path / "bricks.png"
+    pic.write_bytes(underlays.png_bytes(8, 4, [bytes([180, 80, 60] * 8)] * 4))
+    g = wall(project)
+    brick = by_name(state()["surfaces"], "Brick")
+    r = call("apply_materials", json.dumps({"surfaces": [{**brick, "texture_path": str(pic), "texture_size": [0.5, 0.25]}]}))
+    assert r["ok"], r
+    s = by_name(state()["surfaces"], "Brick")
+    assert s["texture"].endswith(".png") and s["texture_size"] == [0.5, 0.25]
+    assert settings.current()["texture_files"] == [s["texture"]]
+    palette, idx, _, _ = colours(g)
+    textured = [row for row in palette if len(row) == 7]
+    assert textured and textured[0][5:] == [0.5, 0.25] and textured[0][4].endswith(s["texture"])
+    r = call("apply_materials", json.dumps({"surfaces": [{**s, "texture": ""}]}))
+    assert r["ok"], r
+    assert "texture" not in by_name(state()["surfaces"], "Brick")
+    assert settings.current()["texture_files"] == []
+    call("undo")
+    assert by_name(state()["surfaces"], "Brick")["texture"] == s["texture"]
+    logger = ifcopenshell.validate.json_logger()
+    ifcopenshell.validate.validate(b._model, logger)
+    assert [x for x in logger.statements if x.get("level") == "error"] == []

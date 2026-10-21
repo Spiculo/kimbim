@@ -255,6 +255,26 @@ private slots:
         QVERIFY(kimbim::MeshChunk::parse(meta, verts, tris, &error)->faceColors.empty()); // colours are optional
     }
 
+    // D96: textured surfaces: the palette row names the picture and its size; faces map from the box.
+    void texturedSurfaces()
+    {
+        kimbim::MeshChunk c = threeElements();
+        c.palette = {{1, 0, 0, 0}};
+        c.palette[0].texture = QStringLiteral("brick.png");
+        c.palette[0].texW = 0.5f;
+        c.faceColors = {0, kimbim::MeshChunk::kNoColor, 0};
+        Handle(kimbim::ElementBatch) b = new kimbim::ElementBatch(c);
+        QCOMPARE(b->triangleTexture(0, 0), 0);
+        QCOMPARE(b->triangleTexture(1, 1), -1);
+        b->setSurface(2, Quantity_Color(0, 1, 0, Quantity_TOC_RGB)); // an override colours it plainly
+        QCOMPARE(b->triangleTexture(2, 2), -1);
+        auto uv = kimbim::ElementBatch::boxTexel(gp_Pnt(1.0, 2.0, 3.0), gp_Dir(0, -1, 0), 0.5, 0.25); // a wall facing -y
+        QCOMPARE(uv.first, 2.0);  // x / 0.5
+        QCOMPARE(uv.second, 12.0); // z / 0.25
+        uv = kimbim::ElementBatch::boxTexel(gp_Pnt(1.0, 2.0, 3.0), gp_Dir(0, 0, 1), 1.0, 1.0); // a floor
+        QCOMPARE(uv.second, 2.0);
+    }
+
     void acceptsShadedIdAndLinesModes()
     {
         Handle(kimbim::ElementBatch) b = new kimbim::ElementBatch(unitCube());

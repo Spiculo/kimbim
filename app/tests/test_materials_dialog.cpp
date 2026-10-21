@@ -155,6 +155,23 @@ private slots:
         QCOMPARE(glass.value("reflectance").toString(), QString("GLASS"));
     }
 
+    // D96: a surface's texture: a chosen picture travels as texture_path with its size; Remove clears it.
+    void surfaceTextures()
+    {
+        kimbim::MaterialsDialog d(state(), {});
+        d.showTab(MaterialsEdits::Surfaces);
+        d.findChild<QListWidget*>("materialsList0")->setCurrentRow(0); // Brick
+        d.findChild<QDoubleSpinBox*>("surfaceTextureWidth")->setValue(0.5);
+        d.setSurfaceTexture(QStringLiteral("C:/pictures/brick.png"));
+        QJsonObject brick = d.edits().changes().value("surfaces").toArray().at(0).toObject();
+        QCOMPARE(brick.value("texture_path").toString(), QString("C:/pictures/brick.png"));
+        QCOMPARE(brick.value("texture_size").toArray().at(0).toDouble(), 0.5);
+        d.setSurfaceTexture(QString());
+        brick = d.edits().changes().value("surfaces").toArray().at(0).toObject();
+        QVERIFY(brick.value("texture_path").toString().isEmpty());
+        QCOMPARE(brick.value("texture").toString(), QString());
+    }
+
     void newCompositeIsAWallComposite()
     {
         kimbim::MaterialsDialog d(state(), {});
