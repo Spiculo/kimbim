@@ -217,6 +217,23 @@ def set_double_slant(wall, reference: float, opposite: float):
                                   "SlantOpposite": float(opposite), "Height": float(height)})
 
 
+def rebuild_double_slant(wall, length=None):
+    """A double-slanted wall after a stretch or a move (D97): its axis line takes `length` (metres) when
+    given and its section is swept again along it, the angles and height kept."""
+    from . import authoring as A
+
+    if length is not None:
+        rep = ifcopenshell.util.representation.get_representation(wall, "Plan", "Axis", "GRAPH_VIEW")
+        k = 1.0 / A._scale()
+        for item in (rep.Items if rep is not None else ()):
+            if item.is_a("IfcPolyline") and len(item.Points) >= 2:
+                first = item.Points[0].Coordinates
+                item.Points[-1].Coordinates = (float(first[0]) + float(length) * k, float(first[1]))
+    p = _pset(wall, WALL_PSET)
+    set_double_slant(wall, float(p["SlantReference"]), float(p["SlantOpposite"]))
+    return True
+
+
 def clear_double_slant(wall):
     """Back to a wall the regenerator builds: a plain vertical body of the same height, then regenerated."""
     from . import authoring as A

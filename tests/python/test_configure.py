@@ -254,3 +254,15 @@ def test_double_slanted_walls(project):
     assert props(g)[C.GEOMETRY]["Opposite slant angle"]["value"] == pytest.approx(90.0)
     call("undo")
     assert props(g)[C.GEOMETRY]["Opposite slant angle"]["value"] == pytest.approx(85.0)
+
+
+def test_double_slanted_walls_follow_a_stretch(project):
+    g = wall(project, "Outside face", x2=5.0)
+    assert call("set_element_setting", json.dumps([g]), C.GEOMETRY, "Opposite slant angle", "85")["ok"]
+    r = call("set_dimension", json.dumps([g]), "Length", "7")
+    assert r["ok"], r
+    _, _, v, _ = mesh(g)
+    assert v[:, 0].max() - v[:, 0].min() == pytest.approx(7.0, abs=1e-3)
+    assert props(g)[C.GEOMETRY]["Opposite slant angle"]["value"] == pytest.approx(85.0)
+    top = v[v[:, 2] > 2.999]
+    assert top[:, 1].max() == pytest.approx(0.3 - 3.0 * np.tan(np.radians(5)), abs=1e-3)
