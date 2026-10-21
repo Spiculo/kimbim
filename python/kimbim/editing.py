@@ -329,6 +329,40 @@ def _set_slab_outline(slab, outline):
     A._replace_body(slab, representation)
 
 
+def slab_outlines(storey_guid: str) -> str:
+    """[{guid, points}]: the outlines of a level's slabs (world metres), for editing their corners."""
+    storey = A._by_guid(storey_guid) if B._model is not None else None
+    out = []
+    for e in (A._contained(storey) if storey is not None else ()):
+        if e.is_a("IfcSlab") and (pts := _slab_outline_world(e)):
+            out.append({"guid": e.GlobalId, "points": [[round(x, 6), round(y, 6)] for x, y in pts]})
+    return B._dump({"slabs": out})
+
+
+def set_slab_outline(guid: str, points_json: str) -> str:
+    """A slab's outline from new points (world metres, D98: a corner moved, added or deleted), its
+    thickness and level kept (one undo step). At least three points, not crossing itself."""
+    from . import drafting
+
+    slab = A._by_guid(guid) if B._model is not None else None
+    if slab is None or not slab.is_a("IfcSlab") or not _slab_outline_world(slab):
+        return A._fail("not a slab with an outline")
+    try:
+        points = [(float(x), float(y)) for x, y in json.loads(points_json)]
+    except (TypeError, ValueError) as ex:
+        return A._fail(f"bad points: {ex}")
+    if len(points) < 3:
+        return A._fail("a slab needs at least three corners")
+    if not drafting.is_simple(points) or abs(drafting.area(points)) < 1e-6:
+        return A._fail("the outline would cross itself")
+
+    def action():
+        _set_slab_outline(slab, points)
+        return 1, [slab.GlobalId], []
+
+    return B._dump(B._run(action))
+
+
 def slab_outline(guid: str) -> str:
     slab = A._by_guid(guid) if B._model is not None else None
     if slab is None or not slab.is_a("IfcSlab"):

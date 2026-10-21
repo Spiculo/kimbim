@@ -241,6 +241,27 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // D98: a slab's corners with the Stretch tool: move one, add one on an edge, delete one.
+    void slabCornersByStretch()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        auto& py = kimbim::PythonEngine::instance();
+        const QString floor = py.callJson("slab_types", {}, nullptr).object().value("types").toArray().first()
+            .toObject().value("guid").toString();
+        const QString slab = py.callJson("create_slab", {w.levelsBar()->activeStorey(), floor,
+            QStringLiteral("[[0,0],[4,0],[4,4],[0,4]]"), QStringLiteral("0")}, nullptr).object().value("guid").toString();
+        auto corners = [&] {
+            return py.callJson("slab_outline", {slab}, nullptr).object().value("points").toArray().size();
+        };
+        QVERIFY(w.draftGripClick({2, 0}, 0.1, false)); // the bottom edge's middle: a new corner, picked up
+        QVERIFY(w.draftGripClick({2, -1}, 0.1, false)); // put down below
+        QCOMPARE(corners(), 5);
+        QVERIFY(w.draftGripClick({2, -1}, 0.1, false, true)); // Ctrl+click: deleted
+        QCOMPARE(corners(), 4);
+        QVERIFY(w.close());
+    }
+
     // D96: the sun's place drives the 3D light.
     void sunPosition()
     {

@@ -368,7 +368,10 @@ public:
     QJsonObject draftOptions(const QString& kind) const;
     // Stretch tool on a drafting shape (D84 grips): a click near one of its points picks it up, the
     // next click puts it down. False when nothing was near (the wall stretch goes on).
-    bool draftGripClick(QPointF p, double tolerance, bool ortho);
+    // The Stretch tool on outlines (drafting shapes, D84; slabs, D98, Archicad's pet palette): a click on a
+    // point picks it up and the next puts it down; Ctrl+click on a point deletes it; a click on the middle
+    // of an edge adds a point there and picks it up.
+    bool draftGripClick(QPointF p, double tolerance, bool ortho, bool remove = false);
     bool draftGripActive() const { return m_gripIndex >= 0; }
     // D87: the annotation pack (MarkupTools.cpp). Tag: click an element (with the leader on, then where
     // the text goes); north arrow, scale bar, revision cloud (drawn like a fill), angle (vertex, a point
@@ -686,6 +689,7 @@ private:
     QSpinBox* m_draftOutline = nullptr; // D92: -1 the fill's pen, 0 none
     QComboBox* m_draftPatternScale = nullptr; // D92: paper or model
     bool m_gripRect = false; // D92: the gripped shape is a rectangle (stays rectangular when asked)
+    bool m_gripSlab = false; // D98: the gripped outline is a slab's
     QComboBox* m_tagStyle = nullptr;   // D87: Automatic (by kind) or a tag style
     QComboBox* m_tagShape = nullptr;   // the style's, or none / circle / box / hexagon
     QToolButton* m_tagLeader = nullptr;

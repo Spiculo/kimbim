@@ -216,3 +216,13 @@ def test_resize_scales_lengths_and_keeps_thicknesses(room):
     call("undo")
     assert axis(room["w1"]) == [[0, 0], [6, 0]]
     assert not valid()
+
+
+def test_slab_outline_points(room):
+    """D98: a slab's corners moved, added and deleted (Archicad's pet palette)."""
+    assert call("set_slab_outline", room["slab"], json.dumps([[0, 0], [6, 0], [6, 4], [3, 5], [2, 4]]))["ok"]
+    assert call("slab_outline", room["slab"])["points"] == [[0, 0], [6, 0], [6, 4], [3, 5], [2, 4]]
+    assert not call("set_slab_outline", room["slab"], json.dumps([[0, 0], [6, 0]]))["ok"]
+    assert not call("set_slab_outline", room["slab"], json.dumps([[0, 0], [6, 4], [6, 0], [0, 4]]))["ok"]  # crossed
+    call("undo")
+    assert len(call("slab_outline", room["slab"])["points"]) == 4

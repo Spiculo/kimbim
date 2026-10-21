@@ -227,8 +227,8 @@
 <context>
     <name>QObject</name>
     <message>
-        <location filename="../tests/test_main_window.cpp" line="884"/>
-        <location filename="../tests/test_main_window.cpp" line="1094"/>
+        <location filename="../tests/test_main_window.cpp" line="905"/>
+        <location filename="../tests/test_main_window.cpp" line="1115"/>
         <source>Untitled</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4487,7 +4487,7 @@ License: GPL-3.0-or-later</source>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="3487"/>
-        <location filename="../tests/test_main_window.cpp" line="1462"/>
+        <location filename="../tests/test_main_window.cpp" line="1483"/>
         <source>Versions</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4931,7 +4931,7 @@ Editing the IFC directly opens it at once, without version history, options, com
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="3104"/>
-        <location filename="../tests/test_main_window.cpp" line="819"/>
+        <location filename="../tests/test_main_window.cpp" line="840"/>
         <source>Wall: click the start point</source>
         <translation type="unfinished"></translation>
     </message>
@@ -6853,12 +6853,17 @@ Open it read-only?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="297"/>
+        <location filename="../src/DraftTools.cpp" line="280"/>
         <source>Could not move the point: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="327"/>
+        <location filename="../src/DraftTools.cpp" line="370"/>
+        <source>It needs the points it has</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/DraftTools.cpp" line="384"/>
         <source>Click the point&apos;s new position (Esc: leave it)</source>
         <translation type="unfinished"></translation>
     </message>

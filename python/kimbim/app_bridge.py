@@ -1114,7 +1114,9 @@ _EXPORTS = {
         "mirror_elements",
         "resize_elements",
         "offset_elements",
+        "set_slab_outline",
         "slab_outline",
+        "slab_outlines",
     ),
     "modify": (
         "join_elements",

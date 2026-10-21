@@ -1694,6 +1694,7 @@ ES = {
     "Date and time:": "Fecha y hora:",
     "Hours from UTC:": "Horas respecto a UTC:",
     "Sun at %1° azimuth, %2° altitude": "Sol a %1° de acimut y %2° de altura",
+    "It needs the points it has": "Necesita los puntos que tiene",
 }
 
 

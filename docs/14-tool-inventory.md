@@ -103,7 +103,7 @@ release notes, so check before relying on a single cell.
 | Elevate (change vertical position) | AC RV | 🟡 | new | Wall height; no general elevate |
 | Resize / scale | AC VW SU | ✅ | new | D98: Edit › Resize (about the selection's middle) |
 | Pick up and inject settings (eyedropper / match properties) | AC RV VW | ✅ | new | D97: Edit › Pick up / Inject settings (Ctrl+Alt+C / V) |
-| Edit by polygon points (add, move, delete vertices; curve an edge) | AC RV VW | ⬜ | new | Archicad pet palette |
+| Edit by polygon points (add, move, delete vertices; curve an edge) | AC RV VW | 🟡 | new | D98: Stretch tool on slabs and 2D shapes: move, add at an edge's middle, Ctrl+click delete; no curved edges |
 | Solid element operations (subtract, intersect, add) | AC RV VW | ⬜ | new | |
 | Lock / pin elements | AC RV VW | 🟡 | new | Layers can be locked; elements cannot |
 | Group / ungroup | AC VW SU | 🟡 | P1 | Models (D58) do the repeated-unit job; no plain groups |
