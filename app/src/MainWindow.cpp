@@ -59,6 +59,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QLineEdit>
+#include <QLineF>
 #include <QTreeWidgetItem>
 #include <QJsonObject>
 #include <QMenuBar>
@@ -82,6 +83,9 @@
 #include "Graphics.h"
 #include "GraphicsDialogs.h"
 #include "PenGrid.h"
+#include "CutPlaneOverlay.h"
+#include "CutPlanes.h"
+#include "CutPlanesPanel.h"
 #include "Cuts.h"
 #include "DrawingView.h"
 #include "DrawingsPanel.h"
@@ -242,6 +246,35 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
             m_status->setZoom(z);
     }); });
     onEachView([this](Viewport* v) { connect(v, &Viewport::dragReleased, this, &MainWindow::dragFinished); });
+    onEachView([this](Viewport* v) {
+        connect(v, &Viewport::cutPlaneDragStarted, this, [this] {
+            const CutSettings& s = m_cuts[modelView()];
+            m_cutDragBase = s.selectedPlane >= 0 && s.selectedPlane < s.planes.size()
+                ? QVector<CutPlane>{s.planes[s.selectedPlane]}
+                : QVector<CutPlane>{};
+        });
+        connect(v, &Viewport::cutPlaneDragged, this, [this](double metres) {
+            CutSettings& s = m_cuts[modelView()];
+            if (m_cutDragBase.isEmpty() || s.selectedPlane < 0 || s.selectedPlane >= s.planes.size())
+                return;
+            CutPlane p = m_cutDragBase.first();
+            p.translate(metres);
+            s.planes[s.selectedPlane] = p;
+            applyCutsTo(modelView(), s);
+            pushCutPlanesToPanel();
+        });
+        connect(v, &Viewport::cutPlaneDragFinished, this, [this] {
+            m_cutDragBase.clear();
+            pushCutPlanesToPanel();
+        });
+    });
+    onEachView([this](Viewport* v) { connect(v, &Viewport::facePicked, this,
+        [this](double x, double y, double z, double nx, double ny, double nz) {
+            if (m_cutTool != CutTool::Face)
+                return;
+            if (addFaceCut(gp_Pnt(x, y, z), gp_Dir(nx, ny, nz)))
+                m_status->showMessage(tr("Click another face, or Esc to finish"));
+        }); });
     onEachView([this](Viewport* v) { connect(v, &Viewport::hovered, this, [this](const QString& guid, const QPoint& at) {
         const QString hint = guid.isEmpty() ? QString() : m_tree->hintFor(guid);
         if (hint.isEmpty())
@@ -600,6 +633,21 @@ void MainWindow::buildMenus()
         }
         applyCuts();
     });
+    // D95: cut planes of any direction (Archicad's 3D Cutaway).
+    m_cutPlanesMenu = view->addMenu(tr("Cut &planes"));
+    m_cutPlanesMenu->setObjectName(QStringLiteral("menuCutPlanes"));
+    auto cutAction = [this](const char* name, const QString& text, auto slot) {
+        QAction* a = m_cutPlanesMenu->addAction(text);
+        a->setObjectName(QLatin1String(name));
+        connect(a, &QAction::triggered, this, slot);
+        return a;
+    };
+    cutAction("actionCutVertical", tr("&Vertical cut"), [this] { startCutTool(CutTool::Vertical); });
+    cutAction("actionCutHorizontal", tr("&Horizontal cut..."), [this] { horizontalCutDialog(); });
+    cutAction("actionCutOblique", tr("&Oblique cut..."), [this] { startCutTool(CutTool::Oblique); });
+    cutAction("actionCutFromFace", tr("From a &face"), [this] { startCutTool(CutTool::Face); });
+    m_cutPlanesMenu->addSeparator();
+    cutAction("actionCutPlanesPanel", tr("Cut planes &panel..."), [this] { m_dock->raisePanel(QStringLiteral("cutplanes")); });
 
     // D73: pens, line types, element styles, visibility, overrides, layer combinations and purposes.
     QMenu* graphics = m_menuBar->addMenu(tr("&Graphics"));
@@ -642,12 +690,26 @@ void MainWindow::buildDocks()
     // D71: the panels are tabs in one area on the right (it can auto-hide or float).
     m_history = new HistoryPanel(this);
     m_layersPanel = new LayersPanel(this);
+    m_cutPlanesPanel = new CutPlanesPanel(this);
     m_drawingsPanel = new DrawingsPanel(this);
     m_sheetsPanel = new SheetsPanel(this);
     m_dock->addPanel(QStringLiteral("tree"), tr("Model"), m_tree);
     m_dock->addPanel(QStringLiteral("properties"), tr("Properties"), m_properties);
     m_dock->addPanel(QStringLiteral("layers"), tr("Layers"), m_layersPanel);
+    m_dock->addPanel(QStringLiteral("cutplanes"), tr("Cut planes"), m_cutPlanesPanel);
     m_dock->addPanel(QStringLiteral("history"), tr("History"), m_history);
+    connect(m_cutPlanesPanel, &CutPlanesPanel::addVerticalRequested, this, [this] { startCutTool(CutTool::Vertical); });
+    connect(m_cutPlanesPanel, &CutPlanesPanel::addHorizontalRequested, this, &MainWindow::horizontalCutDialog);
+    connect(m_cutPlanesPanel, &CutPlanesPanel::addObliqueRequested, this, [this] { startCutTool(CutTool::Oblique); });
+    connect(m_cutPlanesPanel, &CutPlanesPanel::addFaceRequested, this, [this] { startCutTool(CutTool::Face); });
+    connect(m_cutPlanesPanel, &CutPlanesPanel::enabledChanged, this, &MainWindow::setCutPlaneEnabled);
+    connect(m_cutPlanesPanel, &CutPlanesPanel::offsetChanged, this, &MainWindow::setCutPlaneOffset);
+    connect(m_cutPlanesPanel, &CutPlanesPanel::angleChanged, this, &MainWindow::setCutPlaneAngle);
+    connect(m_cutPlanesPanel, &CutPlanesPanel::flipRequested, this, &MainWindow::flipCutPlane);
+    connect(m_cutPlanesPanel, &CutPlanesPanel::deleteRequested, this, &MainWindow::removeCutPlane);
+    connect(m_cutPlanesPanel, &CutPlanesPanel::planeSelected, this, [this](int row) {
+        selectCutPlane(row); // -1 clears the translucent rectangle
+    });
     m_dock->addPanel(QStringLiteral("drawings"), tr("Drawings"), m_drawingsPanel);
     m_dock->addPanel(QStringLiteral("sheets"), tr("Sheets"), m_sheetsPanel);
     connect(m_history, &HistoryPanel::compareRequested, this, [this](const QString& a, const QString& b) { compareWith(a, b); });
@@ -778,6 +840,11 @@ void MainWindow::buildCutsToolbar()
         auto* b = new QToolButton(m_titleBar);
         b->setDefaultAction(action);
         b->setAutoRaise(true);
+        if (action == m_planCut && m_cutPlanesMenu) { // D95: the plan cut button's flyout
+            b->setMenu(m_cutPlanesMenu);
+            b->setPopupMode(QToolButton::MenuButtonPopup);
+            b->setObjectName(QStringLiteral("planCutButton"));
+        }
         m_titleBar->addControl(b);
         return b;
     };
@@ -831,6 +898,259 @@ double MainWindow::planCutForLevel(const QString& storey) const
     return m_settings.value("plan_cut_height").toDouble(1.2);
 }
 
+// ---------------------------------------------------------------- D95: 3D cut planes
+
+QVector<CutPlane> MainWindow::cutPlanes() const
+{
+    return m_cuts.value(modelView()).planes;
+}
+
+int MainWindow::selectedCutPlane() const
+{
+    return m_cuts.value(modelView()).selectedPlane;
+}
+
+int MainWindow::availableCutPlaneSlots() const
+{
+    const CutSettings& s = m_cuts[modelView()];
+    int limit = modelView()->clipPlaneLimit();
+    if (limit <= 0)
+        limit = 32; // headless: the driver cannot be asked
+    const int room = maxUserPlanes(limit, s.planCut, s.box && !s.bounds.IsVoid());
+    int used = 0;
+    for (const CutPlane& p : s.planes)
+        if (p.enabled)
+            ++used;
+    return std::max(0, room - used);
+}
+
+int MainWindow::addCutPlaneTo3D(const CutPlane& plane)
+{
+    CutSettings& s = m_cuts[modelView()];
+    if (availableCutPlaneSlots() <= 0) {
+        m_status->showMessage(tr("This view's graphics driver has no clip plane left: turn off or delete another cut plane first"));
+        return -1;
+    }
+    s.planes.push_back(plane);
+    s.selectedPlane = int(s.planes.size()) - 1;
+    try {
+        applyCutsTo(modelView(), s);
+    } catch (const Standard_Failure& ex) {
+        qWarning("cut plane failed: %s", ex.GetMessageString());
+        s.planes.pop_back();
+        s.selectedPlane = -1;
+        try {
+            applyCutsTo(modelView(), s);
+        } catch (const Standard_Failure&) {
+        }
+        return -1;
+    }
+    if (m_viewport != modelView())
+        applyCuts(); // a plan tab keeps its own cut; the 3D view got the new plane
+    pushCutPlanesToPanel();
+    return s.selectedPlane;
+}
+
+bool MainWindow::addVerticalCut(const QPointF& a, const QPointF& b, const QPointF& keep, double baseZ)
+{
+    if (QLineF(a, b).length() < 1e-6)
+        return false;
+    const QString name = tr("Vertical cut %1").arg(m_cuts.value(modelView()).planes.size() + 1);
+    return addCutPlaneTo3D(verticalCutPlane(name, a, b, keep, baseZ)) >= 0;
+}
+
+bool MainWindow::addHorizontalCut(double z)
+{
+    const QString name = tr("Horizontal cut %1").arg(m_cuts.value(modelView()).planes.size() + 1);
+    return addCutPlaneTo3D(horizontalCutPlane(name, z)) >= 0;
+}
+
+bool MainWindow::addObliqueCut(const QPointF& a, const QPointF& b, const QPointF& keep, double degrees, double baseZ)
+{
+    if (QLineF(a, b).length() < 1e-6)
+        return false;
+    const QString name = tr("Oblique cut %1").arg(m_cuts.value(modelView()).planes.size() + 1);
+    return addCutPlaneTo3D(obliqueCutPlane(name, a, b, keep, degrees, baseZ)) >= 0;
+}
+
+bool MainWindow::addFaceCut(const gp_Pnt& point, const gp_Dir& normal)
+{
+    const QString name = tr("Face cut %1").arg(m_cuts.value(modelView()).planes.size() + 1);
+    const gp_Pnt eye = point.Translated(gp_Vec(normal) * -10.0); // keep the supplied side
+    return addCutPlaneTo3D(faceCutPlane(name, point, normal, eye)) >= 0;
+}
+
+bool MainWindow::selectCutPlane(int index)
+{
+    CutSettings& s = m_cuts[modelView()];
+    if (index < -1 || index >= s.planes.size())
+        return false;
+    s.selectedPlane = index;
+    applyCutsTo(modelView(), s);
+    pushCutPlanesToPanel();
+    return true;
+}
+
+bool MainWindow::setCutPlaneEnabled(int index, bool on)
+{
+    CutSettings& s = m_cuts[modelView()];
+    if (index < 0 || index >= s.planes.size())
+        return false;
+    if (on && !s.planes[index].enabled) { // would the switch fit beside the others?
+        int limit = modelView()->clipPlaneLimit();
+        if (limit <= 0)
+            limit = 32; // headless: the driver cannot be asked
+        const int room = maxUserPlanes(limit, s.planCut, s.box && !s.bounds.IsVoid());
+        int used = 0;
+        for (int i = 0; i < s.planes.size(); ++i)
+            if (i != index && s.planes[i].enabled)
+                ++used;
+        if (used + 1 > room) {
+            m_status->showMessage(tr("This view's graphics driver has no clip plane left: turn off or delete another cut plane first"));
+            pushCutPlanesToPanel();
+            return false;
+        }
+    }
+    s.planes[index].enabled = on;
+    applyCutsTo(modelView(), s);
+    pushCutPlanesToPanel();
+    return true;
+}
+
+bool MainWindow::setCutPlaneOffset(int index, double offset)
+{
+    CutSettings& s = m_cuts[modelView()];
+    if (index < 0 || index >= s.planes.size())
+        return false;
+    s.planes[index].setOffset(offset);
+    applyCutsTo(modelView(), s);
+    pushCutPlanesToPanel();
+    return true;
+}
+
+bool MainWindow::setCutPlaneAngle(int index, double degrees)
+{
+    CutSettings& s = m_cuts[modelView()];
+    if (index < 0 || index >= s.planes.size() || s.planes[index].kind != CutPlane::Kind::Oblique)
+        return false;
+    s.planes[index].setAngle(degrees);
+    applyCutsTo(modelView(), s);
+    pushCutPlanesToPanel();
+    return true;
+}
+
+bool MainWindow::flipCutPlane(int index)
+{
+    CutSettings& s = m_cuts[modelView()];
+    if (index < 0 || index >= s.planes.size())
+        return false;
+    s.planes[index].flip();
+    applyCutsTo(modelView(), s);
+    pushCutPlanesToPanel();
+    return true;
+}
+
+bool MainWindow::removeCutPlane(int index)
+{
+    CutSettings& s = m_cuts[modelView()];
+    if (index < 0 || index >= s.planes.size())
+        return false;
+    s.planes.remove(index);
+    if (s.selectedPlane == index)
+        s.selectedPlane = -1;
+    else if (s.selectedPlane > index)
+        --s.selectedPlane;
+    applyCutsTo(modelView(), s);
+    pushCutPlanesToPanel();
+    return true;
+}
+
+void MainWindow::pushCutPlanesToPanel()
+{
+    if (m_cutPlanesPanel)
+        m_cutPlanesPanel->setPlanes(cutPlanes(), selectedCutPlane());
+}
+
+void MainWindow::startCutTool(CutTool tool)
+{
+    if (m_levels->activeStorey().isEmpty()) {
+        showError(tr("Cannot cut"), tr("The model has no level. Add a level first."));
+        return;
+    }
+    setTool(Tool::None);
+    m_cutTool = tool;
+    m_cutPoints.clear();
+    if (tool == CutTool::Face) {
+        m_viewport->setDrawingMode(false);
+        m_viewport->setFacePickMode(true);
+        m_viewport->setFocus();
+        m_status->showMessage(tr("Cut from a face: click a model face; the kept side is away from the camera"));
+    } else {
+        m_viewport->setFacePickMode(false);
+        m_viewport->setDrawingMode(true, m_levels->activeElevation());
+        m_viewport->setFocus();
+        m_status->showMessage(tool == CutTool::Vertical ? tr("Vertical cut: click where the cut line starts")
+                                                         : tr("Oblique cut: click where the cut line starts"));
+    }
+}
+
+void MainWindow::endCutTool()
+{
+    m_cutTool = CutTool::None;
+    m_cutPoints.clear();
+    if (m_viewport) {
+        m_viewport->setFacePickMode(false);
+        m_viewport->setDrawingMode(false);
+    }
+    m_status->clearMessage();
+}
+
+void MainWindow::cutPlaneClick(const QPointF& p)
+{
+    m_cutPoints << p;
+    if (m_cutPoints.size() == 1) {
+        m_status->showMessage(tr("Click where the cut line ends"));
+        return;
+    }
+    if (m_cutPoints.size() == 2) {
+        m_status->showMessage(tr("Click the side the cut keeps"));
+        return;
+    }
+    const QPointF a = m_cutPoints[0], b = m_cutPoints[1], keep = m_cutPoints[2];
+    m_cutPoints.clear();
+    const double z = m_levels->activeElevation();
+    bool ok = false;
+    if (m_cutTool == CutTool::Vertical) {
+        ok = addVerticalCut(a, b, keep, z);
+    } else {
+        double degrees = 30.0;
+        if (!m_quiet) {
+            bool accepted = false;
+            degrees = QInputDialog::getDouble(this, tr("Oblique cut"), tr("Tilt about the line (degrees):"),
+                30.0, -89.0, 89.0, 1, &accepted);
+            if (!accepted)
+                return;
+        }
+        ok = addObliqueCut(a, b, keep, degrees, z);
+    }
+    m_status->showMessage(ok ? tr("Click where the next cut line starts")
+                             : tr("The cut line is too short, or the view has no clip plane left"));
+}
+
+void MainWindow::horizontalCutDialog()
+{
+    double z = (m_levels ? m_levels->activeElevation() : 0.0) + m_cutHeight->value();
+    if (!m_quiet) {
+        bool accepted = false;
+        z = QInputDialog::getDouble(this, tr("Horizontal cut"), tr("Height above the project zero (m):"), z,
+            -1000.0, 10000.0, 2, &accepted);
+        if (!accepted)
+            return;
+    }
+    if (addHorizontalCut(z))
+        m_status->showMessage(tr("Horizontal cut at %1 m").arg(QString::number(z, 'f', 2)));
+}
+
 void MainWindow::updateCutSliderRange()
 {
     // From the level up to the next level (or 4 m), in centimetres.
@@ -846,15 +1166,69 @@ void MainWindow::applyCuts()
     mine.box = m_sectionBox->isChecked();
     mine.height = m_cutHeight->value();
     mine.bounds = m_boxBounds;
+    applyCutsTo(m_viewport, mine);
+}
+
+void MainWindow::applyCutsTo(Viewport* view, CutSettings& settings)
+{
     CutState state;
-    state.planCut = m_planCut->isChecked();
+    state.planCut = settings.planCut;
     // The cut height is measured from the active level (like a plan's view range).
-    state.height = (m_levels ? m_levels->activeElevation() : 0.0) + m_cutHeight->value();
-    state.box = m_sectionBox->isChecked();
-    state.bounds = m_boxBounds;
-    m_viewport->clearClipPlanes();
-    m_viewport->addClipPlanes(makePlanes(state));
-    m_viewport->setSectionHeight(state.planCut ? std::optional<double>(state.height) : std::nullopt);
+    state.height = (m_levels ? m_levels->activeElevation() : 0.0) + settings.height;
+    state.box = settings.box;
+    state.bounds = settings.bounds;
+    state.planes.assign(settings.planes.begin(), settings.planes.end());
+    int limit = view->clipPlaneLimit();
+    if (limit <= 0)
+        limit = 32; // headless views cannot ask: assume room for the documented minimum
+
+    view->clearClipPlanes();
+    view->addClipPlanes(makePlanes(state, limit));
+
+    // Poché: the plan cut and each user plane that actually got a clip plane. Every section is
+    // clipped against the other cut half-spaces, so intersecting cuts meet cleanly.
+    std::vector<gp_Pln> keep, sections;
+    if (state.planCut) {
+        const gp_Pln plan(gp_Pnt(0, 0, state.height), gp_Dir(0, 0, -1)); // keep below
+        keep.push_back(plan);
+        sections.push_back(plan);
+    }
+    if (state.box && !state.bounds.IsVoid()) {
+        double x0, y0, z0, x1, y1, z1;
+        state.bounds.Get(x0, y0, z0, x1, y1, z1);
+        keep.emplace_back(gp_Pnt(x0, 0, 0), gp_Dir(1, 0, 0));
+        keep.emplace_back(gp_Pnt(x1, 0, 0), gp_Dir(-1, 0, 0));
+        keep.emplace_back(gp_Pnt(0, y0, 0), gp_Dir(0, 1, 0));
+        keep.emplace_back(gp_Pnt(0, y1, 0), gp_Dir(0, -1, 0));
+        keep.emplace_back(gp_Pnt(0, 0, z0), gp_Dir(0, 0, 1));
+        keep.emplace_back(gp_Pnt(0, 0, z1), gp_Dir(0, 0, -1));
+    }
+    const int room = maxUserPlanes(limit, state.planCut, state.box && !state.bounds.IsVoid());
+    int used = 0;
+    for (const CutPlane& p : std::as_const(settings.planes)) {
+        if (!p.enabled)
+            continue;
+        if (used >= room)
+            break; // beyond the driver's limit: no clip plane, so no section either
+        ++used;
+        keep.push_back(p.plane());
+        sections.push_back(p.plane());
+    }
+    view->setSectionPlanes(keep, sections);
+
+    // The selected user plane's rectangle and normal handle belong to the 3D view only.
+    if (view == modelView() && settings.selectedPlane >= 0 && settings.selectedPlane < settings.planes.size()) {
+        const Bnd_Box box = view->boundsOf({});
+        double half = 1.5;
+        if (!box.IsVoid()) {
+            double x0, y0, z0, x1, y1, z1;
+            box.Get(x0, y0, z0, x1, y1, z1);
+            half = std::max(0.75, 0.45 * gp_Pnt(x0, y0, z0).Distance(gp_Pnt(x1, y1, z1)));
+        }
+        view->setCutPlaneOverlay(settings.planes[settings.selectedPlane].plane(), half);
+    } else {
+        view->clearCutPlaneOverlay();
+    }
 }
 
 void MainWindow::showAbout()
@@ -1649,6 +2023,10 @@ void MainWindow::buildModelingToolbar()
         }
     }); });
     onEachView([this](Viewport* v) { connect(v, &Viewport::workPointClicked, this, [this, v](QPointF p, double tolerance, Qt::KeyboardModifiers mods) {
+        if (m_cutTool != CutTool::None) { // D95: a cut line's two points and its kept side
+            cutPlaneClick(p);
+            return;
+        }
         const bool ortho = mods & Qt::ShiftModifier;
         switch (m_tool) {
         case Tool::Wall:
@@ -1775,6 +2153,10 @@ void MainWindow::buildModelingToolbar()
     }); });
     onEachView([this](Viewport* v) { connect(v, &Viewport::drawingEnded, this, [this] {
         // Esc / right click: stop the current shape, or leave the tool when nothing is in progress.
+        if (m_cutTool != CutTool::None) {
+            endCutTool();
+            return;
+        }
         if (m_tool == Tool::Wall && m_wallTool->isDrawing())
             m_wallTool->finish();
         else if ((m_tool == Tool::Slab || m_tool == Tool::SlabOpening || m_tool == Tool::Roof) && m_polygonTool->isDrawing())
@@ -2076,6 +2458,12 @@ void MainWindow::showSnap(const Snap& snap)
 
 void MainWindow::setTool(Tool tool)
 {
+    if (m_cutTool != CutTool::None) { // D95: choosing a tool leaves the cut-plane tool
+        m_cutTool = CutTool::None;
+        m_cutPoints.clear();
+        if (m_viewport)
+            m_viewport->setFacePickMode(false);
+    }
     // However setTool ends, the options strip shows only while a tool is active (D71).
     struct ShowOptions {
         MainWindow* w;
@@ -2607,7 +2995,7 @@ void MainWindow::buildPalette()
     m_viewMenu->addSeparator();
     QMenu* panels = m_viewMenu->addMenu(tr("&Panels"));
     panels->setObjectName(QStringLiteral("panelsMenu"));
-    for (const char* key : {"tools", "tree", "properties", "layers", "history", "drawings", "sheets"})
+    for (const char* key : {"tools", "tree", "properties", "layers", "cutplanes", "history", "drawings", "sheets"})
         if (ads::CDockWidget* d = m_dock->manager()->findDockWidget(QLatin1String(key))) {
             const QString k = QLatin1String(key);
             const bool pinned = m_prefs.pinnedPanels().contains(k);
@@ -4913,10 +5301,14 @@ bool MainWindow::setActiveLayer(const QString& layer)
 
 bool MainWindow::saveView(const QString& name)
 {
+    QJsonArray planes;
+    for (const CutPlane& p : std::as_const(m_cuts[modelView()].planes))
+        planes.append(cutPlaneToJson(p));
     QJsonObject data{{"hidden", QJsonArray::fromStringList(QStringList(m_hiddenLayers.begin(), m_hiddenLayers.end()))},
         {"locked", QJsonArray::fromStringList(QStringList(m_lockedLayers.begin(), m_lockedLayers.end()))},
         {"level", m_levels->activeStorey()}, {"plan", m_viewport->isPlanView()},
         {"cut", m_planCut->isChecked() ? QJsonValue(m_cutHeight->value()) : QJsonValue()},
+        {"planes", planes},
         {"linesOnly", m_viewport->linesOnly()}, {"purpose", m_viewport->graphics().purpose()}};
     const QJsonObject r = bridge("save_view", {name, QString::fromUtf8(QJsonDocument(data).toJson(QJsonDocument::Compact))});
     if (!r.value("ok").toBool()) {
@@ -4954,9 +5346,29 @@ bool MainWindow::applyView(const QString& name)
         } else if (data.contains("cut")) {
             m_planCut->setChecked(false);
         }
+        { // D95: the 3D view's user cut planes travel with the view
+            CutSettings& three = m_cuts[modelView()];
+            three.planes.clear();
+            for (const auto& v : data.value("planes").toArray()) {
+                bool ok = false;
+                const CutPlane p = cutPlaneFromJson(v.toObject(), &ok);
+                if (ok)
+                    three.planes.append(p);
+            }
+            three.selectedPlane = -1;
+            if (data.value("cut").isDouble()) {
+                three.planCut = true;
+                three.height = data.value("cut").toDouble();
+            } else if (data.contains("cut")) {
+                three.planCut = false;
+            }
+            if (m_viewport != modelView())
+                applyCutsTo(modelView(), three);
+        }
         if (data.contains("plan"))
             setPlanView(data.value("plan").toBool());
         applyCuts();
+        pushCutPlanesToPanel();
         m_currentView = name;
         saveLayerStates();
         refreshLayers();

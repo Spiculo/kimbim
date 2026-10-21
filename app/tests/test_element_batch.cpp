@@ -122,6 +122,32 @@ private slots:
         QCOMPARE(int(p.size()), 4); // collinear points from the triangulation are merged
     }
 
+
+    // D95: the same outline pass on any plane: a vertical cut through a cube is a square, an
+    // oblique one a closed loop whose points lie on the plane.
+    void sectionOfACubeOnAnyPlane()
+    {
+        const auto vertical = kimbim::ElementBatch::sectionLoopsPlane(unitCube(), 0,
+            gp_Pln(gp_Pnt(0.5, 0, 0), gp_Dir(1, 0, 0)));
+        QCOMPARE(int(vertical.size()), 1);
+        QVERIFY(vertical.front().size() >= 4);
+        double area = 0;
+        for (size_t i = 0; i < vertical.front().size(); ++i) {
+            const gp_Pnt& p = vertical.front()[i];
+            QVERIFY(std::abs(p.X() - 0.5) < 1e-9);
+            const gp_Pnt& q = vertical.front()[(i + 1) % vertical.front().size()];
+            area += p.Y() * q.Z() - q.Y() * p.Z();
+        }
+        QVERIFY(std::abs(std::abs(area) / 2 - 1.0) < 1e-9);
+
+        const gp_Pln oblique(gp_Pnt(0.5, 0.5, 0.5), gp_Dir(1, 0.4, 0.3));
+        const auto loops = kimbim::ElementBatch::sectionLoopsPlane(unitCube(), 0, oblique);
+        QCOMPARE(int(loops.size()), 1);
+        QVERIFY(loops.front().size() >= 4);
+        for (const gp_Pnt& p : loops.front())
+            QVERIFY(std::abs(gp_Vec(oblique.Location(), p).Dot(gp_Vec(oblique.Axis().Direction()))) < 1e-9);
+    }
+
     // Slice 11: layers can hide elements (separately from the user's H/I hiding) and lock them
     // (locked elements can't be selected).
     void layerHiddenAndLockedElements()
