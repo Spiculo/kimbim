@@ -355,6 +355,30 @@ def _layer_axis(element, usage):
     return axis / length * (-1.0 if usage.DirectionSense == "NEGATIVE" else 1.0)
 
 
+def _curved_side(element, usage, verts, faces):
+    """Per triangle, its normal along the layer axis at that point of a curved wall's arc (the axis'
+    left there, signed by the layer direction), like the straight wall's normal . axis; or None."""
+    from . import authoring, curved_walls
+
+    arc = curved_walls.arc_of(element)
+    fr = curved_walls.frame(*arc) if arc else None
+    if fr is None or element.ObjectPlacement is None:
+        return None
+    centre, _r, _a0, sweep = fr
+    m = ifcopenshell.util.placement.get_local_placement(element.ObjectPlacement)
+    s = authoring._scale()
+    c = (m @ np.array([centre[0] / s, centre[1] / s, 0.0, 1.0]))[:3] * s
+    v = verts.reshape(-1, 3).astype(float)
+    tri = faces.reshape(-1, 3)
+    mid = v[tri].mean(axis=1)
+    radial = mid[:, :2] - c[:2]
+    radial /= np.maximum(np.linalg.norm(radial, axis=1, keepdims=True), 1e-12)
+    left = -radial if sweep > 0 else radial  # counter-clockwise arcs have the centre on their left
+    sense = -1.0 if usage.DirectionSense == "NEGATIVE" else 1.0
+    n = _normals(verts, faces)
+    return (n[:, 0] * left[:, 0] + n[:, 1] * left[:, 1]) * sense
+
+
 def face_colours(element, geometry, verts: np.ndarray, faces: np.ndarray, palette: Palette, overrides=None) -> np.ndarray:
     """One palette index per triangle of `element` (D96). `verts`/`faces` are the iterator's arrays."""
     n = len(faces) // 3
@@ -368,7 +392,14 @@ def face_colours(element, geometry, verts: np.ndarray, faces: np.ndarray, palett
         layers = list(layer_set.MaterialLayers)
         core = core_layer(layer_set)
         out[:] = palette.of_material(core.Material if core else None)
-        if axis is not None:
+        from . import curved_walls
+
+        if curved_walls.is_curved(element):  # D97: the layer axis turns along the arc
+            d = _curved_side(element, usage, verts, faces)
+            if d is not None:
+                out[d < -SIDE] = palette.of_material(layers[0].Material)
+                out[d > SIDE] = palette.of_material(layers[-1].Material)
+        elif axis is not None:
             d = _normals(verts, faces) @ axis
             out[d < -SIDE] = palette.of_material(layers[0].Material)
             out[d > SIDE] = palette.of_material(layers[-1].Material)
@@ -393,6 +424,10 @@ def layer_bands(element) -> dict | None:
     the layers, in layer order), materials (one per layer)}, or None for fewer than two layers."""
     usage = ifcopenshell.util.element.get_material(element, should_skip_usage=False)
     if usage is None or not usage.is_a("IfcMaterialLayerSetUsage") or element.ObjectPlacement is None:
+        return None
+    from . import curved_walls
+
+    if curved_walls.is_curved(element):  # D97: no straight layer axis (cut as one fill)
         return None
     layers = list(usage.ForLayerSet.MaterialLayers or ())
     column = {"AXIS1": 0, "AXIS2": 1, "AXIS3": 2}.get(usage.LayerSetDirection)

@@ -430,6 +430,10 @@ def split_element(guid: str, x, y, join="1") -> str:
     and the part from its start; a new element of the same type, properties, layer and status gets
     the rest. Doors/windows go with the piece they are in (a split through one is refused), joins
     at the far end go to the new piece, and the two pieces are joined unless `join` is false."""
+    from . import curved_walls
+
+    if (why := curved_walls.refusal_of(guid)) is not None:  # D97: straight walls only
+        return A._fail(why)
     if B._model is None:
         return A._fail("no model open")
     e = A._by_guid(guid)
@@ -599,6 +603,10 @@ def trim_extend(guid: str, x, y, boundary_guid: str = "", bx1=0, by1=0, bx2=0, b
     reaches the boundary. A wall that reaches a wall is joined to it unless `join` is false; the
     joins at the end that moved are dropped (as when stretching). `holes` (D92) decides an opening
     the trim would leave outside: "refuse" (default), "delete" it or "keep" it."""
+    from . import curved_walls
+
+    if (why := curved_walls.refusal_of(guid)) is not None:  # D97: straight walls only
+        return A._fail(why)
     if B._model is None:
         return A._fail("no model open")
     if holes not in ("refuse", "delete", "keep"):
@@ -653,6 +661,10 @@ def trim_corner(guid1: str, x1, y1, guid2: str, x2, y2, join="1", holes="refuse"
     Intersect): both reach the point where their lines cross, each keeping the side it was clicked
     on (x1, y1 / x2, y2), and two walls are joined there in an L unless `join` is false. `holes`
     (D92) decides an opening the trim would leave outside: "refuse", "delete" or "keep"."""
+    from . import curved_walls
+
+    if (why := curved_walls.refusal_of(guid1, guid2)) is not None:  # D97: straight walls only
+        return A._fail(why)
     if B._model is None:
         return A._fail("no model open")
     if holes not in ("refuse", "delete", "keep"):

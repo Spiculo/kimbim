@@ -541,7 +541,8 @@ def set_element_setting(guids_json: str, group: str, name: str, value) -> str:
             return _fail(f"not a number: {value}")
         if not SLANT_MIN <= degrees <= SLANT_MAX:
             return _fail(f"the slant angle must be between {SLANT_MIN:g} and {SLANT_MAX:g} degrees")
-        walls = [e for e in elements if e.is_a("IfcWall") and _usage(e) is not None]
+        walls = [e for e in elements if e.is_a("IfcWall") and _usage(e) is not None
+                 and not _pset(e, WALL_PSET).get("Arc")]  # curved walls stay upright, on their arc
 
         def action():
             for w in walls:
@@ -564,7 +565,8 @@ def set_element_setting(guids_json: str, group: str, name: str, value) -> str:
     elif group == GEOMETRY and name == "Profile":
         if value != NO_PROFILE and value not in profiles():
             return _fail(f"unknown wall profile {value}")
-        walls = [e for e in elements if e.is_a("IfcWall") and _usage(e) is not None]
+        walls = [e for e in elements if e.is_a("IfcWall") and _usage(e) is not None
+                 and not _pset(e, WALL_PSET).get("Arc")]  # curved walls stay upright, on their arc
 
         def action():
             for w in walls:

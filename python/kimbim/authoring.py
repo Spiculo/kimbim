@@ -290,7 +290,11 @@ def create_wall(storey_guid: str, type_guid: str, x1, y1, x2, y2, height, join_s
 
     if reference and reference not in configure.REFERENCES:
         return _fail(f"unknown reference line {reference}")
-    joins = [(guid, point) for guid, point in ((join_start_guid, p1), (join_end_guid, p2)) if guid]
+    from . import curved_walls
+
+    # D97: curved walls are not joined (the regenerator's joins are straight)
+    joins = [(guid, point) for guid, point in ((join_start_guid, p1), (join_end_guid, p2))
+             if guid and not ((w := _by_guid(guid)) is not None and w.is_a("IfcWall") and curved_walls.is_curved(w))]
     for guid, _ in joins:
         other = _by_guid(guid)
         if other is None or not other.is_a("IfcWall"):
@@ -732,8 +736,10 @@ def _regenerate(f, wall, **kwargs):
               if r.RepresentationIdentifier == "Body"]
     if ours is None and bodies:
         return None
-    from . import configure
+    from . import configure, curved_walls
 
+    if curved_walls.is_curved(wall):  # D97: its arc's body, rebuilt from its layers
+        return curved_walls.rebuild(wall)
     if configure.is_double_slanted(wall):  # D97: its own swept section, rebuilt at the new length
         return configure.rebuild_double_slant(wall, kwargs.get("length"))
     _body_context()  # the regenerator needs the Body/MODEL_VIEW context
@@ -774,6 +780,10 @@ def insert_opening(kind: str, wall_guid: str, type_guid: str, along, width, heig
     wall, opening_type = _by_guid(wall_guid), _by_guid(type_guid)
     if wall is None or not wall.is_a("IfcWall"):
         return _fail("not a wall")
+    from . import curved_walls
+
+    if (why := curved_walls.refusal([wall])) is not None:  # D97: openings follow straight axes
+        return _fail(why)
     if opening_type is None or not opening_type.is_a(type_class):
         return _fail(f"not a {kind} type")
     try:
@@ -1300,6 +1310,10 @@ def set_wall_axis(wall_guid: str, x1, y1, x2, y2) -> str:
     wall = _by_guid(wall_guid)
     if wall is None or not wall.is_a("IfcWall") or _axis_world(wall) is None:
         return _fail("not a wall with an axis")
+    from . import curved_walls
+
+    if (why := curved_walls.refusal([wall])) is not None:
+        return _fail(why)
     try:
         p1, p2 = np.array([float(x1), float(y1)]), np.array([float(x2), float(y2)])
     except (TypeError, ValueError) as ex:
@@ -1703,6 +1717,12 @@ def _extrusion_depth(element) -> float:
 
 def element_dimensions(e) -> list[tuple[str, float, bool]]:
     """(name, metres, editable) shown in the Properties panel's Dimensions group."""
+    from . import curved_walls
+
+    if e.is_a("IfcWall") and curved_walls.is_curved(e):  # D97: the arc's length, set by its points
+        layer_set = _layer_set(e)
+        return [("Length", curved_walls.length(e), False), ("Height", _wall_height(e), True),
+                ("Thickness", _thickness(layer_set) if layer_set else 0.0, False)]
     if e.is_a("IfcWall") and _axis_world(e) is not None:
         a, b = _axis_world(e)
         layer_set = _layer_set(e)
@@ -1767,6 +1787,10 @@ def set_dimension(guids_json: str, name: str, value) -> str:
         if name not in current:
             continue
         if not current[name][1]:
+            from . import curved_walls
+
+            if name == "Length" and (why := curved_walls.refusal([e])) is not None:
+                return _fail(why)
             return _fail(f"{name} can't be changed here (it comes from the type)")
         if e.is_a("IfcDoor") or e.is_a("IfcWindow"):
             opening, wall, along, width, height, sill = _opening_info(e)
@@ -1781,6 +1805,10 @@ def set_dimension(guids_json: str, name: str, value) -> str:
             p2 = a + (b - a) / np.linalg.norm(b - a) * metres
             plan.append(("wall-length", e, (a, p2, _stretch_plan(e, a, p2))))
         elif e.is_a("IfcWall"):
+            from . import configure
+
+            if configure.profile_of(e):
+                return _fail(f"{e.Name or 'the wall'} takes its height from its profile")
             plan.append(("wall-height", e, metres))
         elif e.is_a("IfcColumn") or e.is_a("IfcBeam"):
             element_type = ifcopenshell.util.element.get_type(e)
@@ -1813,6 +1841,14 @@ def set_dimension(guids_json: str, name: str, value) -> str:
                 changed += [e.GlobalId, *(n.GlobalId for n in neighbours),
                             *(x.GlobalId for x in _hosted(e) if not x.is_a("IfcOpeningElement"))]
             elif kind == "wall-height":
+                from . import configure
+
+                if configure.is_double_slanted(e) or configure._pset(e, configure.WALL_PSET).get("Arc"):
+                    # D97: swept and curved walls keep their height themselves (the depth is their length)
+                    configure._write_pset(e, configure.WALL_PSET, {"Height": float(data)})
+                    _regenerate(f, e, height=data)
+                    changed.append(e.GlobalId)
+                    continue
                 body = ifcopenshell.util.representation.get_representation(e, "Model", "Body", "MODEL_VIEW")
                 for solid in (f.traverse(body) if body is not None else ()):
                     if solid.is_a("IfcExtrudedAreaSolid"):
