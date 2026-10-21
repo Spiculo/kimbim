@@ -12,6 +12,7 @@
 
 #include "CutPlanesPanel.h"
 #include "DockLayout.h"
+#include "LevelsBar.h"
 #include "MainWindow.h"
 #include "WallTool.h"
 #include "Viewport.h"
@@ -145,6 +146,66 @@ private slots:
         QTableWidget* table = dock->widget()->findChild<QTableWidget*>(QStringLiteral("cutPlanesTable"));
         QVERIFY(table);
         QCOMPARE(table->rowCount(), 2);
+    }
+
+
+    void theViewMenuToolsCreateThePlanes()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+
+        // Vertical cut: two clicks for the line, a third for the kept side.
+        w.findChild<QAction*>(QStringLiteral("actionCutVertical"))->trigger();
+        QVERIFY(w.viewport()->isDrawingMode());
+        w.viewport()->workPointClicked(QPointF(0, 0), 0.01, Qt::NoModifier);
+        w.viewport()->workPointClicked(QPointF(0, 6), 0.01, Qt::NoModifier);
+        QCOMPARE(w.cutPlanes().size(), 0);
+        w.viewport()->workPointClicked(QPointF(1, 3), 0.01, Qt::NoModifier);
+        QCOMPARE(w.cutPlanes().size(), 1);
+        QCOMPARE(w.cutPlanes().front().kind, kimbim::CutPlane::Kind::Vertical);
+        QVERIFY(w.cutPlanes().front().contains(gp_Pnt(1, 3, 1)));
+        QVERIFY(w.viewport()->isDrawingMode()); // the tool stays for the next cut
+
+        // Oblique cut: the same three clicks, tilted about the line (30 deg in quiet mode).
+        w.findChild<QAction*>(QStringLiteral("actionCutOblique"))->trigger();
+        w.viewport()->workPointClicked(QPointF(3, 0), 0.01, Qt::NoModifier);
+        w.viewport()->workPointClicked(QPointF(3, 6), 0.01, Qt::NoModifier);
+        w.viewport()->workPointClicked(QPointF(4, 3), 0.01, Qt::NoModifier);
+        QCOMPARE(w.cutPlanes().size(), 2);
+        QCOMPARE(w.cutPlanes()[1].kind, kimbim::CutPlane::Kind::Oblique);
+        QVERIFY(std::abs(w.cutPlanes()[1].angle - 30) < 1e-9);
+
+        // Esc leaves the cut tool.
+        w.viewport()->drawingEnded();
+        QVERIFY(!w.viewport()->isDrawingMode());
+        QCOMPARE(w.tool(), kimbim::MainWindow::Tool::None);
+
+        // Horizontal cut at the plan-cut height (no dialog in quiet mode).
+        w.setPlanCutHeight(1.6);
+        w.findChild<QAction*>(QStringLiteral("actionCutHorizontal"))->trigger();
+        QCOMPARE(w.cutPlanes().size(), 3);
+        QCOMPARE(w.cutPlanes()[2].kind, kimbim::CutPlane::Kind::Horizontal);
+        QVERIFY(std::abs(w.cutPlanes()[2].point.Z() - (w.levelsBar()->activeElevation() + 1.6)) < 1e-9);
+
+        // From a face: the view's picked point and normal add the plane (kept side as given).
+        w.findChild<QAction*>(QStringLiteral("actionCutFromFace"))->trigger();
+        w.viewport()->facePicked(2.0, 3.0, 2.0, 0.0, 0.0, 1.0);
+        QCOMPARE(w.cutPlanes().size(), 4);
+        QCOMPARE(w.cutPlanes()[3].kind, kimbim::CutPlane::Kind::Horizontal);
+        QVERIFY(w.cutPlanes()[3].normal.Z() > 0.99);
+        w.viewport()->drawingEnded(); // Esc leaves face picking
+    }
+
+    void planTabsKeepTheirOwnPlanCut()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        QVERIFY(w.addVerticalCut({0, 0}, {0, 6}, {1, 0}, 0));
+        kimbim::Viewport* plan = w.openPlanTab(w.levelsBar()->activeStorey());
+        QVERIFY(plan);
+        QCOMPARE(plan->clipPlaneCount(), 1); // its plan cut, not the 3D view's user plane
+        QCOMPARE(plan->sectionPlaneCount(), 0);
+        QCOMPARE(w.cutPlanes().size(), 1); // the 3D view's list is unchanged
     }
 
     void thePlanCutButtonHasTheCutPlanesFlyout()

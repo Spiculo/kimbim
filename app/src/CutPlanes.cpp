@@ -76,8 +76,6 @@ CutPlane faceCutPlane(const QString& name, const gp_Pnt& point, const gp_Dir& fa
     else {
         p.kind = CutPlane::Kind::Oblique;
         p.angle = std::asin(std::clamp(p.normal.Z(), -1.0, 1.0)) * 180.0 / M_PI;
-        if (p.angle < 0)
-            p.angle += 180.0; // keep the tilt readable, the normal still carries the side
     }
     return p;
 }
