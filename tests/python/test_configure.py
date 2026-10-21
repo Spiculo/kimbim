@@ -298,3 +298,29 @@ def test_complex_profile_walls(project):
     assert not call("save_wall_profile", d["guid"], "")["ok"]
     line = call("add_drafting", project["level"], "line", json.dumps([[0, 0], [1, 0]]))
     assert not call("save_wall_profile", line["guid"], "Open")["ok"]
+
+
+def test_pick_up_and_inject(project):
+    a = wall(project, "Core centre", x2=4.0)
+    assert call("set_element_setting", json.dumps([a]), C.SURFACES, "Edges", "Steel")["ok"]
+    b2 = call("create_wall", project["level"], project["Generic 200"], 0, 5, 4, 5, 3.0, "", "", "Outside face")["guid"]
+    picked = call("pick_up", a)
+    assert picked["ok"] and picked["kind"] == "wall" and picked["settings"]["composite"] == "Exterior 300"
+    r = call("inject", json.dumps([b2]), json.dumps(picked))
+    assert r["ok"], r
+    geometry = props(b2)[C.GEOMETRY]
+    assert geometry["Reference line"]["value"] == "Core centre"
+    assert props(b2)[C.SURFACES]["Edges"]["value"] == "Steel"
+    assert call("element_material", b2)["name"] == "Exterior 300"
+    _, _, v, _ = mesh(b2)
+    assert v[:, 1].max() - v[:, 1].min() == pytest.approx(0.3, abs=1e-3)  # it took the composite's thickness
+    col = call("create_column", project["level"], call("column_types")["types"][0]["guid"], 1, 1, 3.0)["guid"]
+    assert not call("inject", json.dumps([col]), json.dumps(picked))["ok"]  # a column is not a wall
+    t1 = call("place_object", project["level"], "table", json.dumps({"width": 2.0, "mat_legs": "Aluminium"}), 0, 8, 0, "")
+    t2 = call("place_object", project["level"], "table", "", 3, 8, 0, "")
+    r = call("inject", json.dumps([t2["guid"]]), json.dumps(call("pick_up", t1["guid"])))
+    assert r["ok"], r
+    from kimbim import library
+
+    group = props(t2["guid"])[library.PARAMETERS]
+    assert group["Width"]["value"] == pytest.approx(2.0) and group["Legs material"]["value"] == "Aluminium"

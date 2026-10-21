@@ -43,3 +43,4 @@ Branch `parity-materials`. Spec: [2026-10-21-archicad-parity-materials-design](.
 - Columns and beams change material through their type's profile set (every column of the type follows); no per-occurrence material yet.
 - The construction grid's extent is computed when shown (it follows the model on the next refresh).
 - Figures: File › Place picture (typed width, opaque) or Place underlay (calibrated). 
+- Pick Up / Inject (Edit menu, Ctrl+Alt+C / Ctrl+Alt+V): walls carry composite, reference line, slant, profile and surface overrides; slabs and others their composite or material and surfaces; library objects their parameters (one undo step per parameter).

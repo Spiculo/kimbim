@@ -1598,6 +1598,13 @@ ES = {
     "Profile name:": "Nombre del perfil:",
     "Wall profile %1 saved: choose it in a wall's Properties > Geometry > Profile":
         "Perfil de muro %1 guardado: elíjalo en Propiedades > Geometry > Profile de un muro",
+    "Pick &up settings": "&Tomar parámetros",
+    "&Inject settings": "&Inyectar parámetros",
+    "Select one element to pick up its settings": "Seleccione un elemento para tomar sus parámetros",
+    "Picked up the settings of %1: select others and inject them (Ctrl+Alt+V)":
+        "Parámetros de %1 tomados: seleccione otros elementos e inyéctelos (Ctrl+Alt+V)",
+    "Pick up an element's settings first (Ctrl+Alt+C)": "Primero tome los parámetros de un elemento (Ctrl+Alt+C)",
+    "%n element(s) took the settings": ("%n elemento tomó los parámetros", "%n elementos tomaron los parámetros"),
 }
 
 

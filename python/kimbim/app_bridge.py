@@ -1267,6 +1267,8 @@ _EXPORTS = {
     ),
     "configure": (
         "flip_walls",
+        "inject",
+        "pick_up",
         "save_wall_profile",
         "set_junctions",
         "set_element_setting",

@@ -18,7 +18,9 @@ import json
 import math
 
 import ifcopenshell
+import ifcopenshell.api.material
 import ifcopenshell.api.pset
+import ifcopenshell.api.type
 import ifcopenshell.util.element
 import ifcopenshell.util.representation
 import numpy as np
@@ -626,3 +628,112 @@ def wall_options() -> str:
     st = settings.current()
     return B._dump({"ok": True, "references": list(REFERENCES),
                     "default": st.get("wall_reference_line", "Outside face")})
+
+
+# ---------------------------------------------------------------- pick up and inject (D97)
+# Archicad's Pick Up / Inject Parameters (the eyedropper and the syringe): one element's settings,
+# applied to others of the same kind in one undo step.
+
+def _kind(e) -> str:
+    from . import library
+
+    if e.is_a("IfcWall"):
+        return "wall"
+    if e.is_a("IfcSlab"):
+        return "slab"
+    if library.is_object(e):
+        return "object"
+    return "element"
+
+
+def pick_up(guid: str) -> str:
+    """{ok, kind, settings}: what Inject gives other elements of this kind."""
+    from . import library, materials
+
+    if B._model is None:
+        return _fail("no model open")
+    try:
+        e = B._model.by_guid(guid)
+    except RuntimeError:
+        return _fail(f"unknown element {guid}")
+    kind = _kind(e)
+    st = {"surfaces": surface_overrides(e)}
+    info = materials._info(e)
+    if info["kind"] == "composite":
+        st["composite"] = info["name"]
+    elif info["editable"] and info["name"]:
+        st["material"] = info["name"]
+    if kind == "wall" and _usage(e) is not None:
+        st.update(reference=reference_of(e), slant=slant_of(e), opposite=opposite_slant_of(e), profile=profile_of(e))
+    if kind == "object":
+        obj, values, _t = library._object_of(e)
+        st.update(object=obj.key, parameters=values)
+    return B._dump({"ok": True, "kind": kind, "name": e.Name or e.is_a(), "settings": st})
+
+
+def inject(guids_json: str, picked_json: str) -> str:
+    """Give the picked-up settings to the selected elements of the same kind: one undo step (library
+    objects: one per parameter, through set_object_parameter, so their types follow)."""
+    from . import library, materials
+
+    if B._model is None:
+        return _fail("no model open")
+    try:
+        picked = json.loads(picked_json)
+        st, kind = picked["settings"], picked["kind"]
+    except (ValueError, KeyError, TypeError):
+        return _fail("nothing picked up")
+    targets = [e for e in B._elements(guids_json) if _kind(e) == kind]
+    if not targets:
+        return _fail(f"select {kind}s to inject into")
+    f = B._model
+
+    def action():
+        touched = set(targets)
+        for e in targets:
+            if st.get("composite") and materials._info(e).get("kind") == "composite":
+                ls = next((x for x in f.by_type("IfcMaterialLayerSet") if x.LayerSetName == st["composite"]), None)
+                t = materials._composite_type(ls) if ls is not None else None
+                if t is not None and ifcopenshell.util.element.get_type(e) != t:
+                    ifcopenshell.api.type.assign_type(f, related_objects=[e], relating_type=t)
+                    materials._reshape(f, e, touched)
+            if st.get("material") and kind not in ("wall", "slab", "object"):
+                m = materials._material_by_name(f, st["material"])
+                if m is not None:
+                    ifcopenshell.api.material.unassign_material(f, products=[e])
+                    ifcopenshell.api.material.assign_material(f, products=[e], material=m)
+            if kind == "wall" and _usage(e) is not None:
+                if st.get("profile") and st["profile"] in profiles():
+                    set_profile(e, st["profile"])
+                else:
+                    if st.get("reference") in REFERENCES:
+                        apply_reference(e, st["reference"])
+                    if abs(float(st.get("opposite", 90)) - float(st.get("slant", 90))) > 1e-6:
+                        set_double_slant(e, float(st["slant"]), float(st["opposite"]))
+                    else:
+                        if is_double_slanted(e):
+                            clear_double_slant(e)
+                        if st.get("slant") is not None:
+                            set_slant(e, float(st["slant"]))
+            sides = sides_of(e)
+            over = {side: st.get("surfaces", {}).get(side) for side in sides}
+            _write_pset(e, SURFACE_PSET, {side: (name or None) for side, name in over.items()})
+        if kind == "wall":
+            touched.update(_regenerate_with_neighbours([e for e in targets if _usage(e) is not None]))
+        return len(targets), [e.GlobalId for e in touched], []
+
+    try:
+        if kind == "object":  # the parameters (sizes, part materials): the object's own command per value
+            obj_key = st.get("object")
+            same = [e for e in targets if library._object_of(e) and library._object_of(e)[0].key == obj_key]
+            if not same:
+                return _fail("select objects of the same kind to inject into")
+            for name, value in (st.get("parameters") or {}).items():
+                r = json.loads(library.set_object_parameter(json.dumps([e.GlobalId for e in same]), name, value, "selection"))
+                if not r.get("ok"):
+                    return B._dump(r)
+            return B._dump({"ok": True, "changed": len(same), "geometry": {"changed": [e.GlobalId for e in same], "removed": []}})
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(str(ex) if isinstance(ex, ValueError) else f"{type(ex).__name__}: {ex}")
+    return B._dump(r)

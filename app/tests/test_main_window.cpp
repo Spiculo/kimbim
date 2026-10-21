@@ -232,6 +232,29 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // D97: pick up one wall's settings and inject them into another (Archicad's eyedropper and syringe).
+    void pickUpAndInject()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        w.setTool(kimbim::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({5, 0});
+        w.wallTool()->finish();
+        w.wallTool()->click({0, 3});
+        w.wallTool()->click({5, 3});
+        w.wallTool()->finish();
+        w.setTool(kimbim::MainWindow::Tool::None);
+        const QStringList walls = w.viewport()->guids();
+        QCOMPARE(walls.size(), 2);
+        QVERIFY(!w.injectSettings()); // nothing picked up yet
+        w.setSelection({walls[0]});
+        QVERIFY(w.pickUpSettings());
+        w.setSelection({walls[1]});
+        QVERIFY(w.injectSettings());
+        QVERIFY(w.close());
+    }
+
     // D97: a closed shape saved as a wall profile (Archicad's Profile Manager) lands in the project settings.
     void wallProfilesFromShapes()
     {

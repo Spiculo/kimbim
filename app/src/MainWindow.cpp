@@ -482,6 +482,11 @@ void MainWindow::buildMenus()
         return a;
     };
     editAction(tr("&Copy"), "actionCopy", QKeySequence::Copy, [this] { copyToClipboard(); });
+    // D97: Archicad's Pick Up / Inject Parameters (the eyedropper and the syringe).
+    editAction(tr("Pick &up settings"), "actionPickUp", QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_C),
+        [this] { pickUpSettings(); });
+    editAction(tr("&Inject settings"), "actionInject", QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_V),
+        [this] { injectSettings(); });
     editAction(tr("&Paste"), "actionPaste", QKeySequence::Paste, [this] { paste(); });
     editAction(tr("D&uplicate"), "actionDuplicate", QKeySequence(Qt::CTRL | Qt::Key_D), [this] { duplicateSelection(); });
     editAction(tr("&Mirror"), "actionMirror", QKeySequence(Qt::CTRL | Qt::Key_M), [this](bool on) { setTool(on ? Tool::Mirror : Tool::None); })
@@ -5922,6 +5927,42 @@ bool MainWindow::saveWallProfile(const QString& shapeGuid, const QString& name)
     setWindowModified(isDirty());
     refreshProperties();
     m_status->showMessage(tr("Wall profile %1 saved: choose it in a wall's Properties > Geometry > Profile").arg(name));
+    return true;
+}
+
+bool MainWindow::pickUpSettings()
+{
+    if (m_selection.size() != 1) {
+        m_status->showMessage(tr("Select one element to pick up its settings"));
+        return false;
+    }
+    const QJsonObject r = bridge("pick_up", {m_selection.first()});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(r.value("error").toString());
+        return false;
+    }
+    m_pickedUp = r;
+    m_status->showMessage(tr("Picked up the settings of %1: select others and inject them (Ctrl+Alt+V)")
+                              .arg(r.value("name").toString()));
+    return true;
+}
+
+bool MainWindow::injectSettings()
+{
+    if (m_pickedUp.isEmpty()) {
+        m_status->showMessage(tr("Pick up an element's settings first (Ctrl+Alt+C)"));
+        return false;
+    }
+    if (m_selection.isEmpty())
+        return false;
+    const QJsonObject r = bridge("inject", {jsonList(m_selection),
+        QString::fromUtf8(QJsonDocument(m_pickedUp).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
+    m_status->showMessage(tr("%n element(s) took the settings", nullptr, r.value("changed").toInt()));
     return true;
 }
 

@@ -221,6 +221,8 @@ public:
     // D98: the construction grid's geometry (a project setting); the view and snapping follow.
     bool setConstructionGrid(double spacing, int subdivisions, double angleDegrees, QPointF origin);
     bool saveWallProfile(const QString& shapeGuid, const QString& name); // D97: a complex wall section
+    bool pickUpSettings(); // D97: Archicad's eyedropper, from the one selected element
+    bool injectSettings(); // and syringe, into the selection
     // D98: Archicad's Grid System on the active level (one undo step).
     bool addGridSystem(QPointF corner, double angleDegrees, const QJsonArray& across, const QJsonArray& along,
         double extension);
@@ -688,6 +690,7 @@ private:
     QDoubleSpinBox* m_wallHeight = nullptr;
     QComboBox* m_wallReference = nullptr; // D97: the Wall tool's reference line location
     QAction* m_gridShow = nullptr; // D98: View > Construction grid
+    QJsonObject m_pickedUp;         // D97: the picked-up settings (pick_up's reply)
     QAction* m_gridSnap = nullptr; // D98: View > Grid snap
     QCheckBox* m_objectGravity = nullptr; // D97: objects land on the slab under them
     QComboBox* m_roofKind = nullptr;
