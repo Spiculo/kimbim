@@ -1,109 +1,131 @@
 # Settings sweep (Track B, D92) — 2026-10-20
 
-Branch `settings-sweep`. One commit per backlog item, tests first where they were practical. The
-items below are in the order of the D92 list in `docs/open-questions.md`.
+Branch `settings-sweep`. One commit per backlog item; tests were written with each change. The D92
+list in `docs/open-questions.md`, "Resolved (2026-10-20)", is the backlog; this file records what is
+built and what is deliberately left open.
 
-## What I built
+## What is built
 
-### 1. Python console — done (`6b7e803`)
+### 1. Python console — done (`6b7e803`, `380551c`)
 - Every console run is one undo step: `console._execute_all` opens one step, bridge commands and
   direct edits join it, a run that changed nothing leaves no empty step
-  (`app_bridge._end_step_without_change`), and a failed or stopped run rolls back. `edit()` now
-  simply joins the run's step (it still works stand-alone).
-- Headless CLI: `kimbim run script.py model.ifc [-o OUT] [--select GUID]` opens the model, runs the
-  script in the console namespace and writes the changed model back.
-- Tests: `tests/python/test_console.py`, `tests/python/test_cli.py`.
+  (`app_bridge._end_step_without_change`), and a failed or stopped run rolls back. `edit()` joins
+  the run's step (it still works stand-alone).
+- A run with **no model open** opens no step (a script may build its own model, as `make_house.py`
+  does): this was a round-2 fix found by `test_console`.
+- Headless CLI: `kimbim run script.py model.ifc [-o OUT] [--select GUID]`.
+- Tests: `tests/python/test_console.py`, `tests/python/test_cli.py`, `app/tests/test_console.cpp`.
 
-### 2. View cube — partial (`572b6f8`)
-- Home view: `Viewport::setHomeView`/`useCurrentViewAsHome`; a Views-menu action "Set current view
-  as home" stores the direction in the `home_view` preference (default south-east iso).
-- Perspective field of view: `field_of_view` preference (default 45°), `Viewport::setFieldOfView`,
-  a Preferences row.
-- Not done: the north arrow on plans (a per-view option, on once true north is set). It needs a
-  view-option store and a viewport/drawing north indicator that do not exist yet.
+### 2. View cube — done (`572b6f8`, `fffcbaa`, `0d5dc63`, `0453f4c`)
+- Home view (`Viewport::useCurrentViewAsHome`, `home_view` preference, south-east iso default).
+- Perspective field of view (`field_of_view`, 45° default).
+- North arrow on plans (view option, shown once true north is set).
+- Mesh-vertex snaps preference (off) and the engine's `snap_data(..., mesh_vertices)`.
+- The Levels dialog and Measure readout offer the new options: move-above on an elevation change,
+  insert fit-between (Levels dialog), and the project area unit.
 
 ### 3. Window chrome — done (`75005fa`)
-- `title_bar_levels`, `title_bar_cut`, `title_bar_versions` preferences with Preferences
-  checkboxes; `MainWindow::applyTitleBarPreferences` shows/hides the controls.
-- Save version also in the File menu (`actionSaveVersionFile`; the shortcut stays on the Versions
-  menu's action).
+- `title_bar_levels`, `title_bar_cut`, `title_bar_versions` preferences; Save version in File too.
 
 ### 4. Schedules — done (`659fc4e`)
-- Walls schedule gains inside/outside face length columns (the axis length for KimBim's straight
-  walls; joins are not accounted for yet).
-- Per-schedule `min_opening_area` (default 0: deduct every opening) and `unit` (m/cm/mm, default m),
-  applied to values, headers and export; both editable in the schedule-scheme dialog.
-- Group-by fields already existed per schedule.
+- Inside/outside face length columns; per-schedule `min_opening_area` (0) and `unit` (m/cm/mm);
+  group-by fields per schedule (already existed per scheme).
 
 ### 5. Selection — done (`3f218f2`)
-- `select_similar_scope` preference (default "class and predefined type"; also type object or class);
-  `queries.similar` gained the `class_predefined` mode.
-- Ctrl+A (`actionSelectAll`): with a creation tool active selects that tool's class, otherwise
-  everything.
-- `box_selection` preference (drag direction default, or Archicad's partial/entire).
-- Find & Select "Include hidden" checkbox: the query drops the hidden/locked-layer filter.
+- Select similar scope preference; Ctrl+A with a tool selects that tool's class, otherwise all;
+  box mode (by direction or Archicad partial/entire); Find & Select "Include hidden".
 
-### 6. Measure and levels — partial (`b861b0c`)
-- `area_unit` project setting (m²/cm²/mm²) with `settings.format_area` and a Project settings row.
-- A level's elevation change can move the levels above (`move_above`, off by default).
-- Inserting a level can fit between two levels (`fit_between`) instead of pushing up.
-- Not done: mesh-vertex snaps (a new Snapper kind), and the C++ LevelsDialog/measure wiring for the
-  new options and the area unit (the engine + settings exist; the dialogs do not offer them yet).
+### 6. Measure, levels and tags — done (`b861b0c`, `0d5dc63`, `0453f4c`, `cf54556`, `005c870`)
+- Area unit project setting; mesh-vertex snaps; elevation moves levels above; fit-between insert;
+  Levels dialog offers both insert policies.
+- Level dimension reference: project zero (default), the level it is on, sea level (project zero's
+  `sea_level` datum). Automatic level/spot dimensions follow it immediately, in plan views,
+  drawings and DXF.
+- North arrow (circle/needle/plain arrow) and scale bar (bar/line) symbols are project settings,
+  settable in Project settings.
+- Tag all asks for categories (defaults: doors, windows, walls; OK is disabled with none checked);
+  orphan tags delete or keep with "?"; angle and radius decimals.
+- Marker/tag templates themselves are Track A's.
 
-### 7. Split, trim, join — partial (`b8b6ff1`)
-- Trim that would leave a door, window or opening outside: `holes` = refuse (default), delete or
-  keep, on `trim_extend` and `trim_corner`.
-- `split_join` preference: split/trim pieces are joined unless the preference is off (Ctrl inverts).
-- Not done: the merge keep-first/refuse option (`join_elements` still refuses on geometry mismatch)
-  and imported walls "keep shape and cut" (`_adopt` still always rebuilds).
+### 7. Split, trim, join — done (`b8b6ff1`, `f63e5e6`)
+- Trim that would drop an opening: refuse (default), delete or keep inside.
+- Split/trim pieces joined unless the preference is off (Ctrl inverts).
+- Merge keeps the first element's properties (default) or refuses when they differ.
+- Imported walls: rebuild with KimBim's shape (default) or keep the imported body and cut it.
 
-### 8. Checks — partial (`0cc19df`)
-- `check_tolerance` (2 mm) and `check_clearance` (50 mm) project settings used when a clash set does
-  not override them.
-- `check_ignore_joined` (on): walls joined to each other are ignored in clashes.
-- Not done: partial-overlap duplicates (only exact duplicates are found), IDS linked from a shared
-  folder (only embedded XML is supported).
+### 8. Checks — done (`0cc19df`, `47169bf`)
+- Check tolerance (2 mm) and clearance (50 mm) in project settings; ignore joined walls (on).
+- Partial-overlap duplicates (off); IDS embedded (default) or linked from a shared folder.
 
-### 9. DXF export and underlays — partial (`27027c6`)
-- DXF export options: `layers` "iso" (ISO 13567 names) besides by-KimBim-layer and NCS kind;
-  `poche` (fills on the element layer instead of `-PATT`); `colour` "aci" or "lineweight" (exact by
-  default).
-- Not done: "per pen" layer naming, placement centred vs survey coordinates, the DXF export dialog
-  rows for the new options, and the underlay preferences (opacity/grey/tint defaults, layer per
-  underlay) and undoable underlay edits.
+### 9. DXF export and underlays — done (`27027c6`, `aea239d`)
+- Layer scheme: US NCS, ISO 13567 or one layer per pen; poché layer option; colour mode exact/ACI/
+  lineweight; all in the export dialog.
+- Underlay placement centred (default) or survey coordinates; opacity/grey/tint defaults in
+  Preferences; a layer per underlay; underlay edits are undo steps.
 
-### 11. Tags and dimensions — partial (`dd54d84`)
-- `orphan_tags` setting: a tag whose element is gone is deleted (default) or kept showing "?".
-- `radius_decimals` (and `angle_decimals`) project settings used by radius/diameter and angle
-  dimensions.
-- Not done: Tag all asking for categories, the level-dimension reference (project zero/level/sea
-  level), and the north-arrow/scale-bar symbol pickers.
+### 10. 2D drafting — done (`5827451`)
+- "Keep rectangles rectangular" preference (off): dragging a corner follows the two adjacent sides.
+- A fill's outline pen can be its own pen or none (plan view, drawings and DXF); the fill keeps its
+  pattern/background.
+- Pattern scale per fill: paper (default) or model.
 
-## What I skipped (with reasons)
+### 11. Object library — done (`56f838d`)
+- Editing a parameter changes the selection (default) or asks when the object's type has other
+  placements; `scope="type"` changes every placement.
+- A library object can declare its own insertion origin (`library.define(..., origin=(x, y))`); the
+  library default remains the left front corner.
 
-- **10. 2D drafting** — not started. "Keep rectangles rectangular" is a grip/edit change, and the
-  fill outline pen and paper/model pattern scale need new annotation-extra fields threaded through
-  `drafting.py`, the drawing generator and DXF; too big for the time left.
-- **12. Object library** — not started. "Edit selection or ask about the type" is a preference plus
-  a prompt in `set_object_parameter`; "origin per object" and per-object plan-symbol overrides need
-  new per-object data.
-- **13. Stairs** — not started. Extending `stair_rules` with a tread mode and riser target, the
-  editable flight split/well width, the headroom-only floor opening and the plan arrow/riser-number
-  drawing settings all touch `stairs.py` and the drawing generator.
-- **14. Tracker and navigation** — not started (C++): tracker always/typing/off, angle
-  absolute/relative/bearing, typed-length unit, Tab cycling to annotations, navigation presets.
-- **15. Tool palette** — not started (C++): the Split/Trim/Join and Slab/Slab-opening flyouts,
-  pinning a panel as a permanent tab, and the panels-shrink-first option.
+### 12. Stairs — done (`3ba4508`)
+- Project defaults: riser target, fixed tread or from 2R+G (625 mm minus twice the riser, never
+  under the code minimum's tread).
+- Flight split (risers in the first flight) and U-stair well width are per stair, readable and
+  editable in Properties; `set_stair_params` accepts both.
+- Floor opening: whole outline (default) or headroom only (the part of the footprint less than
+  2.0 m below the upper floor).
+- Drawing settings: plan arrow at the top (default), bottom or both; riser numbers on or off. They
+  are kept in each stair's plan data and refreshed when the settings change.
+
+### 13. Tracker and navigation — done (`cde5a36`)
+- Tracker always (default), while typing, or off (off leaves the length field's old typing path).
+- Angle input absolute from east (default), relative to the previous segment, or bearing clockwise
+  from north (live and typed).
+- Typed lengths in metres (default) or the project unit (tracker, length field and drafting's
+  typed input such as `4<90` and `width;height`).
+- Tab cycling reaches annotations and drafting shapes (on).
+- Navigation presets: automatic, mouse, Mac trackpad, precision touchpad (the last pans more finely).
+
+### 14. Tool palette — done (`1e7518d`)
+- Split/Trim/Join and Slab/Slab opening share flyout buttons.
+- Any side panel can be pinned from View > Panels as a permanent tab (no close button, cannot be
+  hidden); pins are remembered in preferences.
+- "Shrink the panels first on small screens" preference (off): below 1100 px the side panels step
+  down to 168/220 px before the views take the space.
+
+## What was skipped or left narrow
+
+- **Tag/marker templates** (wall tag by property, stamp fields, marker styles) are Track A's.
+- **Stair headroom opening** is a plan-footprint approximation (2.0 m clearance per flight and
+  landing), not a swept 3D headroom volume.
+- **North arrow/scale bar symbol choice** is project-wide; there is no per-view or per-symbol
+  override yet.
+- **Object origins** are a library-definition value: the bundled library stays left front, office
+  Python objects can set one, but there is no UI to edit an origin.
+- **Pinned panels** cover the side panels; the rare dialogs (Find & Select, Checks, Library,
+  Schedules) are not dock panels, so they cannot be pinned.
+- **Tab cycling** includes annotations for selection; the Tab highlight is still drawn for model
+  elements only (annotations select correctly when clicked after cycling).
+- **PDF/DXF underlay** display itself and explode/clip remain as before (explode/clip is backlog).
 
 ## Tests
 
-Ran the touched Python suites (`test_console`, `test_cli`, `test_schedules`, `test_queries`,
-`test_levels`, `test_settings`, `test_modify`, `test_checks`, `test_dxf`, `test_tags`) and the
-touched Qt tests (`test_navigation`, `test_preferences`, `test_selection_tools`, `test_modify_tool`,
-`test_main_window`) as I went; all passed. Translations were refilled with
-`tools/fill_translations_es.py` and `check-translations` passes.
+- Full Python suite: `pixi run test` → **605 passed, 82 deselected**.
+- Full Qt suite: `pixi run app-test` → **56/56 passed** (including the self-test screenshots).
+- Translations: `pixi run cmake --build build/app --target update_translations`, then
+  `python tools/fill_translations_es.py`; `python tools/check_translations.py` → translations OK.
+- `test_console` (Qt) exposed a round-1 regression: with no model open the console tried to open an
+  undo transaction; fixed in `380551c`.
 
 ## Environment note
 
-`pixi install` / `pixi run build` / `pixi run app-build` all succeed on this worktree; the app test
-binaries run under `pixi run ctest` (they need the pixi environment's DLLs).
+`pixi install`, `pixi run build` and `pixi run app-build` succeed in this worktree. Qt tests run
+through `pixi run ctest` (they need the pixi environment's DLLs).
