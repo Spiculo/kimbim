@@ -720,6 +720,10 @@ def _regenerate(f, wall, **kwargs):
               if r.RepresentationIdentifier == "Body"]
     if ours is None and bodies:
         return None
+    from .configure import is_double_slanted
+
+    if is_double_slanted(wall):  # D97: its own swept section, kept (its placement still moves)
+        return None
     _body_context()  # the regenerator needs the Body/MODEL_VIEW context
     _patch_regenerator()
     return ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=wall, **kwargs)

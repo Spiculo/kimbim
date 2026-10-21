@@ -232,3 +232,25 @@ def test_junction_overrides(project):
     assert not call("set_junctions", json.dumps([a]), "sideways")["ok"]
     _, _, vb, _ = mesh(b2)
     assert len(vb) > 0
+
+
+def test_double_slanted_walls(project):
+    g = wall(project, "Outside face")  # 300 mm from y=0 to y=0.3, 3 m high
+    r = call("set_element_setting", json.dumps([g]), C.GEOMETRY, "Opposite slant angle", "85")
+    assert r["ok"], r
+    geometry = props(g)[C.GEOMETRY]
+    assert geometry["Slant angle"]["value"] == pytest.approx(90.0)
+    assert geometry["Opposite slant angle"]["value"] == pytest.approx(85.0)
+    _, _, v, _ = mesh(g)
+    top = v[v[:, 2] > 2.999]
+    assert top[:, 1].min() == pytest.approx(0.0, abs=1e-3)  # the reference face stays vertical
+    assert top[:, 1].max() == pytest.approx(0.3 - 3.0 * np.tan(np.radians(5)), abs=1e-3)  # the other leans in
+    assert v[:, 2].max() == pytest.approx(3.0, abs=1e-3)
+    assert not call("set_element_setting", json.dumps([g]), C.GEOMETRY, "Opposite slant angle", "50")["ok"]  # crossing
+    r = call("set_element_setting", json.dumps([g]), C.GEOMETRY, "Opposite slant angle", "90")
+    assert r["ok"], r
+    _, _, v, _ = mesh(g)
+    assert v[:, 1].max() == pytest.approx(0.3, abs=1e-3) and v[:, 2].max() == pytest.approx(3.0, abs=1e-3)
+    assert props(g)[C.GEOMETRY]["Opposite slant angle"]["value"] == pytest.approx(90.0)
+    call("undo")
+    assert props(g)[C.GEOMETRY]["Opposite slant angle"]["value"] == pytest.approx(85.0)

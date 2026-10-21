@@ -166,8 +166,87 @@ def _body_solids(wall) -> list:
     return out
 
 
+def is_double_slanted(wall) -> bool:
+    return bool(_pset(wall, WALL_PSET).get("DoubleSlant"))
+
+
+def opposite_slant_of(wall) -> float:
+    """The opposite face's angle (D97): its own for a double-slanted wall, else the wall's slant."""
+    p = _pset(wall, WALL_PSET)
+    return float(p["SlantOpposite"]) if p.get("DoubleSlant") else slant_of(wall)
+
+
+def set_double_slant(wall, reference: float, opposite: float):
+    """Archicad's double-slanted wall (D97): the reference side leans at `reference` degrees from the floor,
+    the opposite side at `opposite`; the body is the trapezoid section swept along the wall (joins keep it)."""
+    from . import authoring as A
+
+    import ifcopenshell.api.geometry
+
+    f = B._model
+    usage = _usage(wall)
+    axis = A._axis_world(wall)
+    if usage is None or axis is None:
+        raise ValueError(f"{wall.Name or 'the wall'} is not a layered wall drawn by KimBim")
+    p = _pset(wall, WALL_PSET)
+    if p.get("DoubleSlant"):
+        height = float(p["Height"])
+    else:  # the extrusion's rise (a slanted wall's depth is longer than its height)
+        solids = _body_solids(wall)
+        z = np.asarray(solids[0].ExtrudedDirection.DirectionRatios, dtype=float) if solids else np.array([0, 0, 1.0])
+        height = A._wall_height(wall) * float(z[2] / np.linalg.norm(z))
+    length = math.dist(*axis)
+    s = A._scale()
+    total = sum(float(l.LayerThickness or 0.0) for l in usage.ForLayerSet.MaterialLayers) * s
+    off = float(usage.OffsetFromReferenceLine or 0.0) * s
+    y0, y1 = (off, off + total) if usage.DirectionSense != "NEGATIVE" else (off - total, off)
+    top0 = y0 + height / math.tan(math.radians(reference))   # the -y face leans in for angles under 90
+    top1 = y1 - height / math.tan(math.radians(opposite))
+    if top1 - top0 < 0.005:
+        raise ValueError("the two faces would cross below the top: choose angles nearer 90 degrees")
+    k = 1.0 / s
+    pts = [(y0, 0.0), (y1, 0.0), (top1, height), (top0, height)]
+    profile = f.createIfcArbitraryClosedProfileDef("AREA", None, f.createIfcPolyline(
+        [f.createIfcCartesianPoint((y * k, z * k)) for y, z in pts + pts[:1]]))
+    position = f.createIfcAxis2Placement3D(f.createIfcCartesianPoint((0.0, 0.0, 0.0)),
+                                           f.createIfcDirection((1.0, 0.0, 0.0)), f.createIfcDirection((0.0, 1.0, 0.0)))
+    solid = f.createIfcExtrudedAreaSolid(profile, position, f.createIfcDirection((0.0, 0.0, 1.0)), length * k)
+    rep = f.createIfcShapeRepresentation(A._body_context(), "Body", "SweptSolid", [solid])
+    A._replace_body(wall, rep)
+    _write_pset(wall, WALL_PSET, {"DoubleSlant": True, "SlantReference": float(reference),
+                                  "SlantOpposite": float(opposite), "Height": float(height)})
+
+
+def clear_double_slant(wall):
+    """Back to a wall the regenerator builds: a plain vertical body of the same height, then regenerated."""
+    from . import authoring as A
+
+    p = _pset(wall, WALL_PSET)
+    if not p.get("DoubleSlant"):
+        return
+    f = B._model
+    height = float(p.get("Height") or 3.0)
+    usage = _usage(wall)
+    s = A._scale()
+    length = math.dist(*A._axis_world(wall))
+    total = sum(float(l.LayerThickness or 0.0) for l in usage.ForLayerSet.MaterialLayers) * s
+    off = float(usage.OffsetFromReferenceLine or 0.0) * s
+    y0 = off if usage.DirectionSense != "NEGATIVE" else off - total
+    k = 1.0 / s
+    profile = f.createIfcRectangleProfileDef("AREA", None, f.createIfcAxis2Placement2D(
+        f.createIfcCartesianPoint((length / 2 * k, (y0 + total / 2) * k)), None), length * k, total * k)
+    solid = f.createIfcExtrudedAreaSolid(profile, f.createIfcAxis2Placement3D(f.createIfcCartesianPoint((0.0, 0.0, 0.0)), None, None),
+                                         f.createIfcDirection((0.0, 0.0, 1.0)), height * k)
+    A._replace_body(wall, f.createIfcShapeRepresentation(A._body_context(), "Body", "SweptSolid", [solid]))
+    _write_pset(wall, WALL_PSET, {"DoubleSlant": None, "SlantReference": None, "SlantOpposite": None, "Height": None})
+    A._regenerate(f, wall, length=length, height=height)
+
+
 def slant_of(wall) -> float:
     """Archicad's slant angle in degrees: 90 for a vertical wall, less when it leans to its +Y side."""
+    p = _pset(wall, WALL_PSET)
+    if p.get("DoubleSlant"):
+        return float(p["SlantReference"])
     solids = _body_solids(wall)
     if not solids:
         return 90.0
@@ -254,9 +333,11 @@ def groups(elements) -> dict:
     if walls and len(walls) == len(elements):
         refs = {reference_of(w) for w in walls}
         slants = {round(slant_of(w), 3) for w in walls}
+        opposite = {round(opposite_slant_of(w), 3) for w in walls}
         out[GEOMETRY] = {
             "Reference line": _entry(refs, list(REFERENCES) + ([CUSTOM] if CUSTOM in refs else []), "IfcLabel"),
             "Slant angle": _entry(slants, None, "IfcPlaneAngleMeasure"),
+            "Opposite slant angle": _entry(opposite, None, "IfcPlaneAngleMeasure"),  # D97: double slanted
         }
     things = [e for e in elements if e.is_a("IfcElement") and not e.is_a("IfcOpeningElement")]
     if things and len(things) == len(elements):
@@ -297,7 +378,7 @@ def set_element_setting(guids_json: str, group: str, name: str, value) -> str:
                 apply_reference(w, value)
             touched = _regenerate_with_neighbours(walls)
             return len(walls), [w.GlobalId for w in touched], []
-    elif group == GEOMETRY and name == "Slant angle":
+    elif group == GEOMETRY and name in ("Slant angle", "Opposite slant angle"):
         try:
             degrees = float(str(value).replace(",", "."))
         except ValueError:
@@ -308,7 +389,20 @@ def set_element_setting(guids_json: str, group: str, name: str, value) -> str:
 
         def action():
             for w in walls:
-                set_slant(w, degrees)
+                if name == "Slant angle":  # the whole wall leans (or a double-slanted wall's reference face)
+                    if is_double_slanted(w):
+                        set_double_slant(w, degrees, opposite_slant_of(w))
+                    else:
+                        set_slant(w, degrees)
+                    continue
+                ref = slant_of(w)  # the opposite face: its own angle makes the wall double slanted
+                if abs(degrees - ref) < 1e-6:
+                    if is_double_slanted(w):
+                        clear_double_slant(w)
+                        if abs(ref - 90.0) > 1e-6:
+                            set_slant(w, ref)
+                else:
+                    set_double_slant(w, ref, degrees)
             touched = _regenerate_with_neighbours(walls)
             return len(walls), [w.GlobalId for w in touched], []
     elif group == SURFACES:
