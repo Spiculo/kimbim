@@ -131,8 +131,12 @@ def rebuild(wall) -> bool:
         raise ValueError("the wall is thicker than its arc's radius")
     height = float(_pset(wall).get("Height") or 3.0)
     k = 1.0 / A._scale()
-    outer = _curve(f, centre, ra, a0, sweep)
-    inner = _curve(f, centre, rb, a0, sweep, reverse=True)
+    mitres = {end: m for end, m in ((j["end"], mitre(wall, j)) for j in arc_joins(wall)) if m is not None}
+    reach = 3 * abs(y1 - y0) / max(min(ra, rb), 0.01)  # past a joined end, for its mitre to cut back
+    b0 = a0 - left * (reach if "start" in mitres else 0.0)
+    bsweep = sweep + left * (reach if "start" in mitres else 0.0) + left * (reach if "end" in mitres else 0.0)
+    outer = _curve(f, centre, ra, b0, bsweep)
+    inner = _curve(f, centre, rb, b0, bsweep, reverse=True)
     pts = outer + inner
     if f.schema == "IFC2X3":
         curve = f.createIfcPolyline([f.createIfcCartesianPoint((x * k, y * k)) for x, y in pts + pts[:1]])
@@ -150,7 +154,22 @@ def rebuild(wall) -> bool:
     profile = f.createIfcArbitraryClosedProfileDef("AREA", None, curve)
     solid = f.createIfcExtrudedAreaSolid(profile, f.createIfcAxis2Placement3D(f.createIfcCartesianPoint((0.0, 0.0, 0.0)), None, None),
                                          f.createIfcDirection((0.0, 0.0, 1.0)), height * k)
-    A._replace_body(wall, f.createIfcShapeRepresentation(A._body_context(), "Body", "SweptSolid", [solid]))
+    m = ifcopenshell.util.placement.get_local_placement(wall.ObjectPlacement)
+    inverse = np.linalg.inv(m)
+    s = A._scale()
+    for end, (q0, q1, away) in mitres.items():  # cut back to each mitre, on the side away from the arc
+        lq0, lq1 = ((inverse @ np.array([q[0] / s, q[1] / s, 0.0, 1.0]))[:2] for q in (q0, q1))
+        laway = (inverse[:2, :2] @ np.asarray(away, dtype=float))
+        d = lq1 - lq0
+        n = np.array([d[1], -d[0]]) / np.linalg.norm(d)
+        if n @ laway < 0:
+            n = -n
+        plane = f.createIfcPlane(f.createIfcAxis2Placement3D(f.createIfcCartesianPoint((float(lq0[0]), float(lq0[1]), 0.0)),
+                                                             f.createIfcDirection((float(n[0]), float(n[1]), 0.0)),
+                                                             f.createIfcDirection((0.0, 0.0, 1.0))))
+        solid = f.createIfcBooleanClippingResult("DIFFERENCE", solid, f.createIfcHalfSpaceSolid(plane, False))
+    A._replace_body(wall, f.createIfcShapeRepresentation(A._body_context(), "Body",
+                                                         "Clipping" if mitres else "SweptSolid", [solid]))
     axis_rep = f.createIfcShapeRepresentation(_axis_context(), "Axis", "Curve2D", [axis_curve])
     old = ifcopenshell.util.representation.get_representation(wall, "Plan", "Axis", "GRAPH_VIEW")
     if old is not None:
@@ -278,7 +297,7 @@ def set_ends(wall, p1, p2) -> str:
         from . import configure
 
         configure._write_pset(wall, WALL_PSET, {"Arc": json.dumps([list(start), list(end), list(through)])})
-        rebuild(wall)
+        A._regenerate(B._model, wall)  # its body, and the walls mitred into it
         for e in A._hosted(wall):  # each door or window where it was, if it is still on the wall
             info = A._opening_info(e) if not e.is_a("IfcOpeningElement") else None
             if info is not None and A._opening_fit_error(wall, *info[2:]):
@@ -309,3 +328,155 @@ def set_length(wall, metres: float) -> str:
     end = (m @ np.array([local[0] / s, local[1] / s, 0.0, 1.0]))[:2] * s
     start, _old_end = ends_world(wall)
     return set_ends(wall, start, end)
+
+
+# ---------------------------------------------------------------- joins with straight walls (D97)
+# A straight wall drawn to or from a curved wall's end meets it in a mitre, as Archicad's walls do:
+# the line through where their outside faces meet and where their inside faces meet (the arc's faces
+# taken along its tangent there). The regenerator knows only lines, so KimBim keeps these joins in
+# KIMBIM_Wall.ArcJoins on both walls ([{wall, end}]: the other wall, and which end of this one) and
+# recomputes the mitre from both walls as they are whenever either is rebuilt.
+
+def arc_joins(wall) -> list:
+    raw = _pset(wall).get("ArcJoins")
+    return [j for j in (json.loads(raw) if raw else []) if _partner(j) is not None]
+
+
+def _partner(join):
+    try:
+        return B._model.by_guid(join["wall"])
+    except (RuntimeError, KeyError, TypeError):
+        return None
+
+
+def _ends(wall):
+    """(start, end) of a wall's axis in world metres: the arc's or the line's."""
+    from . import authoring as A
+
+    if is_curved(wall):
+        return tuple(np.asarray(p, dtype=float) for p in ends_world(wall))
+    return tuple(np.asarray(p, dtype=float) for p in A._axis_world(wall))
+
+
+def _leaving(wall, end):
+    """(unit direction from the end into the wall, unit normal to the wall's left there), world."""
+    from . import authoring as A
+
+    if is_curved(wall):
+        (cx, cy), radius, a0, sweep = frame(*arc_of(wall))
+        m = ifcopenshell.util.placement.get_local_placement(wall.ObjectPlacement)
+        turn = 1.0 if sweep > 0 else -1.0
+        angle = a0 if end == "start" else a0 + sweep
+        tangent = np.array([-math.sin(angle), math.cos(angle)]) * turn  # along the arc's travel
+        tangent = m[:2, :2] @ tangent
+        tangent /= np.linalg.norm(tangent)
+        left = np.array([-tangent[1], tangent[0]])
+        return (tangent if end == "start" else -tangent), left
+    a, b = _ends(wall)
+    u = (b - a) / np.linalg.norm(b - a)
+    return (u if end == "start" else -u), np.array([-u[1], u[0]])
+
+
+def _sides(wall):
+    """(y0, y1) of the wall's body across its axis (to its left, metres)."""
+    from . import authoring as A
+
+    usage = ifcopenshell.util.element.get_material(wall, should_skip_usage=False)
+    if usage is None or not usage.is_a("IfcMaterialLayerSetUsage"):
+        t = A._thickness(A._layer_set(wall)) if A._layer_set(wall) else 0.0
+        return -t / 2, t / 2
+    return _offsets(wall)
+
+
+def mitre(wall, join):
+    """(q0, q1, away) of a join's mitre, world metres: the line through q0 and q1, and the direction
+    across it into the other wall (the side this wall is cut back from); None when the walls no
+    longer meet there or run on in line (nothing to cut)."""
+    other = _partner(join)
+    if other is None:
+        return None
+    mine = join["end"]
+    point = _ends(wall)[0 if mine == "start" else 1]
+    theirs = min(("start", "end"), key=lambda e: np.linalg.norm(_ends(other)[0 if e == "start" else 1] - point))
+    if np.linalg.norm(_ends(other)[0 if theirs == "start" else 1] - point) > 0.02:
+        return None  # one of them moved away: no longer joined
+    d1, n1 = _leaving(wall, mine)
+    d2, n2 = _leaving(other, theirs)
+    if abs(d1[0] * d2[1] - d1[1] * d2[0]) < 1e-6:
+        return None  # in line: they meet square
+    s1, s2 = _sides(wall), _sides(other)
+    # walking through the corner, the walls' left sides match when one arrives and the other leaves
+    same = (mine == "end") != (theirs == "end")
+    pairs = [(s1[0], s2[0] if same else -s2[0]), (s1[1], s2[1] if same else -s2[1])]
+    qs = []
+    for y1, y2 in pairs:
+        p1, p2 = point + n1 * y1, point + n2 * y2
+        den = d1[0] * d2[1] - d1[1] * d2[0]
+        t = ((p2[0] - p1[0]) * d2[1] - (p2[1] - p1[1]) * d2[0]) / den
+        qs.append(p1 + d1 * t)
+    if np.linalg.norm(qs[1] - qs[0]) < 1e-6:
+        return None
+    return qs[0], qs[1], d2
+
+
+def adjust_straight(wall):
+    """Inside an action, after the regenerator built a straight wall: its ends joined to curved walls
+    reach their mitres (the footprint's corners there slide along the wall to the mitre line)."""
+    from . import authoring as A
+
+    joins = [(j, mitre(wall, j)) for j in arc_joins(wall)]
+    joins = [(j, m) for j, m in joins if m is not None]
+    if not joins:
+        return
+    rep = ifcopenshell.util.representation.get_representation(wall, "Model", "Body", "MODEL_VIEW")
+    solids = []
+    for item in (rep.Items if rep is not None else ()):
+        while item.is_a("IfcBooleanResult"):
+            item = item.FirstOperand
+        if item.is_a("IfcExtrudedAreaSolid"):
+            solids.append(item)
+    m = ifcopenshell.util.placement.get_local_placement(wall.ObjectPlacement)
+    inverse = np.linalg.inv(m)
+    s = A._scale()
+    for solid in solids:
+        curve = getattr(solid.SweptArea, "OuterCurve", None)
+        if curve is None:
+            continue
+        place = ifcopenshell.util.placement.get_axis2placement(solid.Position) if solid.Position else np.eye(4)
+        if curve.is_a("IfcPolyline"):
+            coords = [list(p.Coordinates) for p in curve.Points]
+        elif curve.is_a("IfcIndexedPolyCurve"):
+            coords = [list(c) for c in curve.Points.CoordList]
+        else:
+            continue
+        xs = [float(c[0]) for c in coords]
+        for join, (q0, q1, _away) in joins:
+            # the mitre in the profile's own coordinates
+            to_profile = np.linalg.inv(place) @ inverse
+            lq0, lq1 = ((to_profile @ np.array([q[0] / s, q[1] / s, 0.0, 1.0]))[:2] for q in (q0, q1))
+            target = min(xs) if join["end"] == "start" else max(xs)
+            for c in coords:
+                if abs(float(c[0]) - target) < 1e-6 and abs(lq1[1] - lq0[1]) > 1e-12:
+                    c[0] = float(lq0[0] + (lq1[0] - lq0[0]) * (float(c[1]) - lq0[1]) / (lq1[1] - lq0[1]))
+        f = B._model
+        if curve.is_a("IfcPolyline"):
+            for p, c in zip(curve.Points, coords):
+                p.Coordinates = tuple(float(v) for v in c)
+        else:
+            curve.Points = f.createIfcCartesianPointList2D([tuple(float(v) for v in c[:2]) for c in coords])
+
+
+def join_to_curved(straight, curved, point) -> bool:
+    """Inside an action: record a mitred join between a straight wall's end at `point` and a curved
+    wall's end there (both walls rebuilt by the caller); False if neither of its ends is there."""
+    from . import configure
+
+    s_end = min(("start", "end"), key=lambda e: np.linalg.norm(_ends(straight)[0 if e == "start" else 1] - point))
+    c_end = min(("start", "end"), key=lambda e: np.linalg.norm(_ends(curved)[0 if e == "start" else 1] - point))
+    if np.linalg.norm(_ends(curved)[0 if c_end == "start" else 1] - np.asarray(point)) > 0.02:
+        return False
+    for wall, end, other in ((straight, s_end, curved), (curved, c_end, straight)):
+        joins = [j for j in arc_joins(wall) if j["end"] != end]
+        joins.append({"wall": other.GlobalId, "end": end})
+        configure._write_pset(wall, WALL_PSET, {"ArcJoins": json.dumps(joins)})
+    return True

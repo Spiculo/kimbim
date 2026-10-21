@@ -258,3 +258,39 @@ def test_splitting_a_curved_wall(project):
     assert authoring._opening_info(b._model.by_guid(d))[2] == pytest.approx(12.0 - math.pi * 2.5, abs=1e-6)
     assert not call("split_element", g, 5.0, 0.0)["ok"]  # at its start
 
+
+
+def _on_line(points, q0, q1, tol=2e-3):
+    d = np.asarray(q1) - np.asarray(q0)
+    n = np.array([d[1], -d[0]]) / np.linalg.norm(d)
+    return [p for p in points if abs((np.asarray(p[:2]) - q0) @ n) < tol]
+
+
+def test_a_straight_wall_meets_a_curved_one_in_a_mitre(project):
+    """D97: a straight wall drawn from a curved wall's end at an angle: both are cut on one mitre line."""
+    from kimbim import curved_walls
+
+    c = call("create_curved_wall", project["level"], project["Exterior 300"], 5, 0, 0, 5, -5, 0, 3.0, "")["guid"]
+    s = call("create_wall", project["level"], project["Exterior 300"], 8, -3, 5, 0, 3.0, "", c)
+    assert s["ok"], s
+    straight, curved = b._model.by_guid(s["guid"]), b._model.by_guid(c)
+    assert curved_walls.arc_joins(straight) and curved_walls.arc_joins(curved)
+    q0, q1, _ = curved_walls.mitre(straight, curved_walls.arc_joins(straight)[0])
+    _, _, vs = radii(s["guid"])
+    _, _, vc = radii(c)
+    # each wall has its corner edges on the mitre line, and nothing beyond it
+    assert len(_on_line(vs[vs[:, 2] < 1e-3], q0, q1)) >= 2
+    assert len(_on_line(vc[vc[:, 2] < 1e-3], q0, q1)) >= 2
+    d = np.asarray(q1) - np.asarray(q0)
+    n = np.array([d[1], -d[0]])
+    side_s = np.sign((vs[:, :2] - q0) @ n)
+    side_c = np.sign((vc[:, :2] - q0) @ n)
+    assert set(side_s[np.abs((vs[:, :2] - q0) @ n) > 1e-3]) != set(side_c[np.abs((vc[:, :2] - q0) @ n) > 1e-3])
+    # stretching the curved wall's other end keeps the corner
+    assert call("set_wall_axis", c, 5, 0, 0, -5)["ok"]
+    assert curved_walls.mitre(straight, curved_walls.arc_joins(straight)[0]) is not None
+    # the straight wall moved away: no longer mitred
+    assert call("set_wall_axis", s["guid"], 9, -3, 6, -1)["ok"]
+    assert curved_walls.mitre(b._model.by_guid(s["guid"]), curved_walls.arc_joins(b._model.by_guid(s["guid"]))[0]) is None
+    lo, hi, _ = radii(c)
+    assert hi == pytest.approx(5.15, abs=0.01)

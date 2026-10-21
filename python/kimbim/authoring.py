@@ -292,9 +292,11 @@ def create_wall(storey_guid: str, type_guid: str, x1, y1, x2, y2, height, join_s
         return _fail(f"unknown reference line {reference}")
     from . import curved_walls
 
-    # D97: curved walls are not joined (the regenerator's joins are straight)
+    # D97: a curved wall is joined in KimBim's own mitre (the regenerator's joins are straight)
+    curved_joins = [(w, point) for guid, point in ((join_start_guid, p1), (join_end_guid, p2))
+                    if guid and (w := _by_guid(guid)) is not None and w.is_a("IfcWall") and curved_walls.is_curved(w)]
     joins = [(guid, point) for guid, point in ((join_start_guid, p1), (join_end_guid, p2))
-             if guid and not ((w := _by_guid(guid)) is not None and w.is_a("IfcWall") and curved_walls.is_curved(w))]
+             if guid and not any(w.GlobalId == guid for w, _ in curved_joins)]
     for guid, _ in joins:
         other = _by_guid(guid)
         if other is None or not other.is_a("IfcWall"):
@@ -311,6 +313,11 @@ def create_wall(storey_guid: str, type_guid: str, x1, y1, x2, y2, height, join_s
             neighbours.append(other)
         for w in [wall, *neighbours]:
             _regenerate(f, w, length=length, height=height)
+        for curved, point in curved_joins:
+            if curved_walls.join_to_curved(wall, curved, np.asarray(point, dtype=float)):
+                _regenerate(f, wall, length=length, height=height)
+                curved_walls.rebuild(curved)
+                neighbours.append(curved)
         layers.assign_active(wall)
         renovation.stamp_new(wall)
         made["wall"] = wall
@@ -787,6 +794,10 @@ def _regenerate(f, wall, **kwargs):
     if curved_walls.is_curved(wall):  # D97: its arc's body, rebuilt from its layers
         done = curved_walls.rebuild(wall)
         _refit_openings(wall)
+        for j in curved_walls.arc_joins(wall):  # the straight walls mitred into it follow
+            partner = curved_walls._partner(j)
+            if not curved_walls.is_curved(partner):
+                _regenerate(f, partner, length=_wall_length(partner), height=_wall_height(partner) or 3.0)
         return done
     if configure.is_double_slanted(wall):  # D97: its own swept section, rebuilt at the new length
         done = configure.rebuild_double_slant(wall, kwargs.get("length"))
@@ -795,6 +806,11 @@ def _regenerate(f, wall, **kwargs):
     _body_context()  # the regenerator needs the Body/MODEL_VIEW context
     _patch_regenerator()
     body = ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=wall, **kwargs)
+    if curved_walls.arc_joins(wall):  # D97: mitred into curved walls; they follow this wall
+        curved_walls.adjust_straight(wall)
+        for j in curved_walls.arc_joins(wall):
+            curved_walls.rebuild(curved_walls._partner(j))
+            _refit_openings(curved_walls._partner(j))
     _refit_openings(wall)  # D97: doors and windows follow the body (reference line, flip, composite)
     return body
 

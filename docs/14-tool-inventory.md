@@ -127,7 +127,7 @@ release notes, so check before relying on a single cell.
 | Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Walls: straight, layered, L/T joins | all | ✅ | P0 | |
-| Walls: curved | all | 🟡 | new | D97: Wall tool › Curved (3 points), layered, doors/windows, stretch, split, fillet; no angled joins yet |
+| Walls: curved | all | ✅ | new | D97: Wall tool › Curved (3 points), layered, doors/windows, stretch, split, fillet, mitred joins with straight walls (not curved-to-curved yet) |
 | Walls: slanted, trapezoid, custom profile | AC RV VW | 🟡 | new | D97: slant angle; no double-slanted or complex profiles yet |
 | Wall flip, reference line (core / face) | all | ✅ | P0 | D97: six reference lines (outside face default), Model › Flip walls |
 | Junction priorities (which layers run through) | AC RV | ✅ | new | D97: building-material priority → `IfcMaterialLayer.Priority`, used by the wall regenerator |
@@ -137,7 +137,7 @@ release notes, so check before relying on a single cell.
 | Sloped slabs, slab edges | AC RV VW | ⬜ | new | |
 | Doors and windows in walls (parametric) | all | ✅ | P0 | Basic types |
 | Door/window variety: sliding, double, corner window, skylight, storefront | all | ⬜ | new | |
-| Door swing and window symbols in plan | all | ⬜ | new | Check what the plan draws today |
+| Door swing and window symbols in plan | all | ✅ | new | Door leaves and swing arcs in plan drawings (drawgen.door_swings) |
 | Generic opening (wall or slab hole without a filling) | AC RV VW | 🟡 | new | Slab openings only |
 | Columns, beams from profiles | all | ✅ | P0 | |
 | Slanted, tapered, segmented columns and beams | AC RV | ⬜ | new | |
