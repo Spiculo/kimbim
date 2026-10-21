@@ -146,6 +146,7 @@ Snap Snapper::snap(QPointF p, double tolerance, const QPointF* from, bool ortho)
             case Snap::UnderlayEnd:
             case Snap::UnderlayMid:
             case Snap::UnderlayCross:
+            case Snap::Division:
                 m_aids->hover(InputAids::Guide{s.point, wallDirection(s.wallGuid)});
                 break;
             default:
@@ -361,6 +362,30 @@ Snap Snapper::compute(QPointF p, double tolerance, const QPointF* from, bool ort
         });
     if (s.kind == Snap::None || s.kind == Snap::Midpoint)
         s = points(Snap::Midpoint, s);
+    if (s.kind == Snap::None && (m_divisions > 2 || m_distance > 0)) // D98: special snap points
+        s = best(Snap::Division, [&](const SnapWall& w, QPointF* q) {
+            const QPointF d = w.b - w.a;
+            const double len = std::hypot(d.x(), d.y());
+            if (len < 1e-9)
+                return false;
+            double bestD = std::numeric_limits<double>::max();
+            auto consider = [&](double t) {
+                if (t <= 0 || t >= 1)
+                    return;
+                const QPointF c = w.a + d * t;
+                if (dist(p, c) < bestD) {
+                    bestD = dist(p, c);
+                    *q = c;
+                }
+            };
+            for (int k = 1; m_divisions > 2 && k < m_divisions; ++k)
+                consider(double(k) / m_divisions);
+            if (m_distance > 0) {
+                consider(m_distance / len);
+                consider(1.0 - m_distance / len);
+            }
+            return bestD < std::numeric_limits<double>::max();
+        });
     if (s.kind == Snap::None)
         s = points(Snap::Centre, s);
     if (s.kind == Snap::None && m_underlays) { // D85: tracing a survey

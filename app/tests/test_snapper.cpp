@@ -95,6 +95,25 @@ private slots:
         QCOMPARE(w.snap(QPointF(3.98, 0.02), 0.1).kind, Snap::Endpoint);
     }
 
+    // D98: Archicad's special snap points: divisions of a wall and a distance from its ends.
+    void specialSnapPoints()
+    {
+        Snapper s = withWalls(); // A: (0,0)-(4,0)
+        QVERIFY(s.snap(QPointF(1.0, 0.05), 0.1).kind != Snap::Division); // off by default
+        s.setSpecialPoints(4, 0.0);
+        Snap d = s.snap(QPointF(1.03, 0.05), 0.1);
+        QCOMPARE(d.kind, Snap::Division);
+        QVERIFY(near(d.point, QPointF(1.0, 0.0)));
+        QCOMPARE(d.wallGuid, QStringLiteral("A"));
+        QCOMPARE(s.snap(QPointF(2.02, 0.0), 0.1).kind, Snap::Midpoint); // the middle stays a midpoint
+        s.setSpecialPoints(0, 0.6);
+        d = s.snap(QPointF(3.38, 0.02), 0.1);
+        QCOMPARE(d.kind, Snap::Division);
+        QVERIFY(near(d.point, QPointF(3.4, 0.0)));
+        QVERIFY(near(s.snap(QPointF(0.62, 0.0), 0.1).point, QPointF(0.6, 0.0)));
+        QCOMPARE(s.snap(QPointF(3.98, 0.02), 0.1).kind, Snap::Endpoint); // ends still win
+    }
+
     void anglesSnapTo15DegreesAndOrthoForcesRightAngles()
     {
         Snapper s;

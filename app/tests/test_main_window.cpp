@@ -232,6 +232,19 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // D98: special snap points reach the drawing tools' snappers.
+    void specialSnapPointsReachTheTools()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        w.setSpecialSnapPoints(3, 0.5);
+        QCOMPARE(w.wallTool()->snapper().divisions(), 3);
+        QCOMPARE(w.wallTool()->snapper().specialDistance(), 0.5);
+        w.setSpecialSnapPoints(2, 0.0);
+        QCOMPARE(w.wallTool()->snapper().divisions(), 0);
+        QVERIFY(w.close());
+    }
+
     // D97: pick up one wall's settings and inject them into another (Archicad's eyedropper and syringe).
     void pickUpAndInject()
     {

@@ -38,7 +38,8 @@ struct SnapPoint {
 struct Snap {
     enum Kind { None, Endpoint, Midpoint, Perpendicular, OnWall, Angle, Grid, GridCross, GridLine, FaceEnd, OnFace, Centre,
         UnderlayEnd, UnderlayMid, UnderlayCross, OnUnderlay, // D85: DXF underlay linework
-        Intersection, GuideCross, GuideLine, Parallel, Tracked, Typed }; // D89: input aids
+        Intersection, GuideCross, GuideLine, Parallel, Tracked, Typed, // D89: input aids
+        Division }; // D98: Archicad's special snap points (divisions, a distance from the ends)
     QPointF point;
     Kind kind = None;
     QString wallGuid; // the wall an object snap landed on
@@ -76,6 +77,15 @@ public:
         m_snapStep = step;
     }
     double snapGridStep() const { return m_snapStep; }
+    // D98: Archicad's special snap points on walls: `divisions` equal parts (3 and up; the middle is
+    // always there) and `distance` metres from each end (0: none), after the midpoints.
+    void setSpecialPoints(int divisions, double distance)
+    {
+        m_divisions = divisions;
+        m_distance = distance;
+    }
+    int divisions() const { return m_divisions; }
+    double specialDistance() const { return m_distance; }
     // D85: the active level's DXF underlay linework (shared by every tool's snapper); null: none.
     void setUnderlays(std::shared_ptr<const UnderlaySnapIndex> index) { m_underlays = std::move(index); }
     const std::shared_ptr<const UnderlaySnapIndex>& underlays() const { return m_underlays; }
@@ -105,6 +115,8 @@ private:
     QPointF m_gridOrigin{0, 0};
     double m_gridAngle = 0.0;
     double m_snapStep = 0.0; // D98: grid snap off
+    int m_divisions = 0;      // D98: special snap points off
+    double m_distance = 0.0;
     bool m_faces = false;
     std::shared_ptr<const UnderlaySnapIndex> m_underlays;
     std::shared_ptr<InputAids> m_aids;

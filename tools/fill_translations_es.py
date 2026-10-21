@@ -1609,6 +1609,16 @@ ES = {
     "Every column or beam of the type (Revit)": "Todas las columnas o vigas del tipo (Revit)",
     "What changing a column's or beam's building material changes": "Qué cambia al modificar el material de construcción de una columna o viga",
     "Column and beam material:": "Material de columnas y vigas:",
+    "Special snap &points...": "&Puntos de referencia especiales...",
+    "Snap to equal divisions of walls and to a distance from their ends":
+        "Referencia a divisiones iguales de los muros y a una distancia de sus extremos",
+    "Special snap points": "Puntos de referencia especiales",
+    "Off (middle only)": "Desactivado (solo el punto medio)",
+    "Divide walls into:": "Dividir muros en:",
+    "Off": "Desactivado",
+    "Distance from the ends:": "Distancia desde los extremos:",
+    "Special snap points: %1 divisions, %2 m from the ends": "Puntos especiales: %1 divisiones, %2 m desde los extremos",
+    "Special snap points off": "Puntos de referencia especiales desactivados",
 }
 
 

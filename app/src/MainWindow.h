@@ -221,6 +221,7 @@ public:
     // D98: the construction grid's geometry (a project setting); the view and snapping follow.
     bool setConstructionGrid(double spacing, int subdivisions, double angleDegrees, QPointF origin);
     bool saveWallProfile(const QString& shapeGuid, const QString& name); // D97: a complex wall section
+    void setSpecialSnapPoints(int divisions, double distance); // D98: user preference, every tool's snapper
     bool pickUpSettings(); // D97: Archicad's eyedropper, from the one selected element
     bool injectSettings(); // and syringe, into the selection
     // D98: Archicad's Grid System on the active level (one undo step).

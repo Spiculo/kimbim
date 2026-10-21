@@ -600,6 +600,35 @@ void MainWindow::buildMenus()
     QAction* gridOptions = view->addAction(tr("Grid &options..."));
     gridOptions->setObjectName(QStringLiteral("actionGridOptions"));
     connect(gridOptions, &QAction::triggered, this, &MainWindow::gridOptionsDialog);
+    // D98: Archicad's special snap points: a wall's divisions and a distance from its ends.
+    QAction* special = view->addAction(tr("Special snap &points..."));
+    special->setObjectName(QStringLiteral("actionSpecialSnapPoints"));
+    special->setToolTip(tr("Snap to equal divisions of walls and to a distance from their ends"));
+    connect(special, &QAction::triggered, this, [this] {
+        QDialog dialog(this);
+        dialog.setWindowTitle(tr("Special snap points"));
+        auto* form = new QFormLayout(&dialog);
+        auto* divisions = new QSpinBox(&dialog);
+        divisions->setObjectName(QStringLiteral("snapDivisions"));
+        divisions->setRange(2, 50);
+        divisions->setSpecialValueText(tr("Off (middle only)"));
+        divisions->setValue(std::max(2, m_prefs.value(QStringLiteral("snap_divisions")).toInt(2)));
+        form->addRow(tr("Divide walls into:"), divisions);
+        auto* distance = new QDoubleSpinBox(&dialog);
+        distance->setObjectName(QStringLiteral("snapDistance"));
+        distance->setRange(0.0, 100.0);
+        distance->setDecimals(3);
+        distance->setSuffix(QStringLiteral(" m"));
+        distance->setSpecialValueText(tr("Off"));
+        distance->setValue(m_prefs.value(QStringLiteral("snap_distance")).toDouble(0.0));
+        form->addRow(tr("Distance from the ends:"), distance);
+        auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+        connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+        connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+        form->addRow(buttons);
+        if (dialog.exec() == QDialog::Accepted)
+            setSpecialSnapPoints(divisions->value(), distance->value());
+    });
     { // D76: preset views and perspective for the active view (the view cube lives in Viewport).
         QMenu* views = view->addMenu(tr("&Views"));
         views->setObjectName(QStringLiteral("menuViews"));
@@ -1801,7 +1830,11 @@ void MainWindow::refreshConstructionGrid()
     for (Snapper* s : {&m_wallTool->snapper(), &m_polygonTool->snapper(), &m_twoPointTool->snapper(),
              &m_rotateTool->snapper(), &m_gripTool->snapper(), &m_measure->tool()->snapper(), &m_modifyTool->snapper(),
              &m_draftTool->snapper()})
+    {
         s->setSnapGrid(origin, angle, snap ? spacing / subdivisions : 0.0);
+        s->setSpecialPoints(m_prefs.value(QStringLiteral("snap_divisions")).toInt(0),
+            m_prefs.value(QStringLiteral("snap_distance")).toDouble(0.0)); // D98
+    }
     Viewport::ConstructionGrid grid;
     grid.show = m_gridShow && m_gridShow->isChecked();
     grid.spacing = spacing;
@@ -1812,6 +1845,17 @@ void MainWindow::refreshConstructionGrid()
     grid.z = (m_levels ? m_levels->activeElevation() : 0.0) + 0.003;
     if (m_viewport)
         m_viewport->setConstructionGrid(grid);
+}
+
+void MainWindow::setSpecialSnapPoints(int divisions, double distance)
+{
+    m_prefs.setValue(QStringLiteral("snap_divisions"), divisions > 2 ? divisions : 0);
+    m_prefs.setValue(QStringLiteral("snap_distance"), std::max(0.0, distance));
+    m_prefs.save();
+    refreshConstructionGrid();
+    m_status->showMessage(divisions > 2 || distance > 0
+            ? tr("Special snap points: %1 divisions, %2 m from the ends").arg(divisions > 2 ? divisions : 2).arg(distance)
+            : tr("Special snap points off"));
 }
 
 void MainWindow::gridOptionsDialog()
