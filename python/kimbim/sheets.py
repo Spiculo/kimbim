@@ -808,7 +808,7 @@ def _title_block(sheet, width, height, info) -> list:
     rows = [
         (3, 8, 5.0, fields["project"]),
         (3, 14, 3.0, fields["project_number"]),
-        (3, 19, 3.0, fields["client"]),
+        (3, 19, 3.0, f'Client: {fields["client"]}' if fields["client"] else ""),
         (3, 24, 3.0, fields["address"]),
         (3, 36, 4.5, fields["title"]),
         (3, 45, 2.5, fields["date"]),

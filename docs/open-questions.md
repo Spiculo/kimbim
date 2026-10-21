@@ -18,7 +18,7 @@ Resolve these, then record the answer in [decisions.md](decisions.md).
 
 The owner answered the plan tab, renovation and view cube lists (D91) and set the rule for the rest: **make most
 behaviour configurable, the agent decides what** (D92). Below, "setting" means the current behaviour stays the
-default and becomes a setting at the scope in brackets. None of this is built yet; it is the backlog.
+default and becomes a setting at the scope in brackets. Built 2026-10-20 except the items marked backlog; what was left narrow is listed in the track notes ([plans and renovation](superpowers/notes/2026-10-20-plans-renovation.md), [settings sweep](superpowers/notes/2026-10-20-settings-sweep.md)).
 
 **Plan tabs** (D91, owner): slice at 1.20 m [project, per level, per view] · which levels an element shows on:
 ranges, rules, expressions [object, view] · view depth below [view, per object] · ceilings follow the same settings,

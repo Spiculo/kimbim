@@ -288,8 +288,9 @@ def test_the_title_block_is_moved_and_its_fields_edited(house):
               "title": "Planta baja", "date": "2026-10-20", "issued": "Estudio"}
     assert call("set_title_block", number, json.dumps({"fields": fields}))["ok"]
     svg = call("sheet_svg", number)["svg"]
-    for value in fields.values():
-        assert f">{value}<" in svg, value
+    for key, value in fields.items():
+        shown = f"Client: {value}" if key == "client" else value  # the client keeps its label
+        assert f">{shown}<" in svg, value
     assert 'class="kimbim-title-block"' in svg
     # Saved with the sheet, not with the project info.
     assert "Casa Lecot" not in json.dumps(call("project_info"))
