@@ -275,13 +275,14 @@ private slots:
         QCOMPARE(uv.second, 2.0);
     }
 
-    void acceptsShadedIdAndLinesModes()
+    void acceptsShadedIdLinesAndWhiteModes()
     {
         Handle(kimbim::ElementBatch) b = new kimbim::ElementBatch(unitCube());
         QVERIFY(b->AcceptDisplayMode(kimbim::ElementBatch::Shaded));
         QVERIFY(b->AcceptDisplayMode(kimbim::ElementBatch::Ids));
         QVERIFY(b->AcceptDisplayMode(kimbim::ElementBatch::LinesOnly));
-        QVERIFY(!b->AcceptDisplayMode(3));
+        QVERIFY(b->AcceptDisplayMode(kimbim::ElementBatch::White)); // D96
+        QVERIFY(!b->AcceptDisplayMode(4));
     }
 
     void indexesElementsByGuid()
