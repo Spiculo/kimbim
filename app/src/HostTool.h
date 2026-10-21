@@ -17,7 +17,7 @@ namespace kimbim {
 struct Host {
     QString wallGuid;
     double along = 0;
-    QPointF centre;
+    QPointF centre; // the opening's middle on the wall body (plan, metres)
     double angle = 0;
     double thickness = 0;
 };

@@ -40,14 +40,44 @@ QPointF project(QPointF p, QPointF a, QPointF b, bool* inside)
 
 } // namespace
 
+QPointF SnapArc::at(double t) const
+{
+    const double a = a0 + sweep * t;
+    return c + QPointF(std::cos(a), std::sin(a)) * r;
+}
+
+bool SnapArc::project(QPointF p, QPointF* q, double* t) const
+{
+    const double a = std::atan2(p.y() - c.y(), p.x() - c.x());
+    double turned = (a - a0) * (sweep >= 0 ? 1.0 : -1.0);
+    turned = std::fmod(std::fmod(turned, 2 * M_PI) + 2 * M_PI, 2 * M_PI);
+    const double f = turned / std::abs(sweep);
+    if (f > 1.0 + 1e-9)
+        return false;
+    if (q)
+        *q = at(f);
+    if (t)
+        *t = f;
+    return true;
+}
+
 QVector<SnapWall> Snapper::parse(const QJsonObject& snapData)
 {
     QVector<SnapWall> out;
     for (const auto& v : snapData.value("walls").toArray()) {
         const QJsonObject w = v.toObject();
-        out.push_back({w.value("guid").toString(), QPointF(w.value("x1").toDouble(), w.value("y1").toDouble()),
+        SnapWall wall{w.value("guid").toString(), QPointF(w.value("x1").toDouble(), w.value("y1").toDouble()),
             QPointF(w.value("x2").toDouble(), w.value("y2").toDouble()), w.value("thickness").toDouble(),
-            w.value("centre").toDouble()});
+            w.value("centre").toDouble(), std::nullopt};
+        if (w.contains("arc")) { // D97: a curved wall, its ends from the arc
+            const QJsonObject a = w.value("arc").toObject();
+            SnapArc arc{QPointF(a.value("cx").toDouble(), a.value("cy").toDouble()), a.value("r").toDouble(),
+                a.value("a0").toDouble(), a.value("sweep").toDouble()};
+            wall.a = arc.at(0.0);
+            wall.b = arc.at(1.0);
+            wall.arc = arc;
+        }
+        out.push_back(wall);
     }
     return out;
 }
@@ -217,7 +247,7 @@ bool Snapper::guideSnap(QPointF p, double tolerance, const QPointF* from, bool l
         guideLines.push_back({*from, QPointF(0, 1), -1, {}});
     }
     for (const SnapWall& w : m_walls)
-        if (distanceToSegment(p, w.a, w.b) <= tolerance)
+        if (!w.arc && distanceToSegment(p, w.a, w.b) <= tolerance)
             guideLines.push_back({w.a, w.b - w.a, -2, w.guid});
     double bestDistance = tolerance;
     bool found = false;
@@ -317,7 +347,7 @@ Snap Snapper::compute(QPointF p, double tolerance, const QPointF* from, bool ort
         };
         QVector<Seg> near;
         for (const SnapWall& w : m_walls)
-            if (distanceToSegment(p, w.a, w.b) <= tolerance)
+            if (!w.arc && distanceToSegment(p, w.a, w.b) <= tolerance)
                 near.push_back({w.a, w.b, w.guid});
         for (const SnapLine& l : m_lines)
             if (distanceToSegment(p, l.a, l.b) <= tolerance)
@@ -349,6 +379,8 @@ Snap Snapper::compute(QPointF p, double tolerance, const QPointF* from, bool ort
     };
     if (s.kind == Snap::None && m_faces)
         s = best(Snap::FaceEnd, [&](const SnapWall& w, QPointF* q) {
+            if (w.arc)
+                return false; // D97: a curved wall's faces are arcs, not lines
             double bestD = std::numeric_limits<double>::max();
             for (const auto& [a, b] : faces(w))
                 for (const QPointF& c : {a, b})
@@ -360,7 +392,7 @@ Snap Snapper::compute(QPointF p, double tolerance, const QPointF* from, bool ort
         });
     if (s.kind == Snap::None)
         s = best(Snap::Midpoint, [&](const SnapWall& w, QPointF* q) {
-            *q = (w.a + w.b) / 2;
+            *q = w.arc ? w.arc->at(0.5) : (w.a + w.b) / 2; // D97: an arc's middle
             return true;
         });
     if (s.kind == Snap::None || s.kind == Snap::Midpoint)
@@ -368,14 +400,14 @@ Snap Snapper::compute(QPointF p, double tolerance, const QPointF* from, bool ort
     if (s.kind == Snap::None && (m_divisions > 2 || m_distance > 0)) // D98: special snap points
         s = best(Snap::Division, [&](const SnapWall& w, QPointF* q) {
             const QPointF d = w.b - w.a;
-            const double len = std::hypot(d.x(), d.y());
+            const double len = w.arc ? w.arc->length() : std::hypot(d.x(), d.y()); // D97: along an arc too
             if (len < 1e-9)
                 return false;
             double bestD = std::numeric_limits<double>::max();
             auto consider = [&](double t) {
                 if (t <= 0 || t >= 1)
                     return;
-                const QPointF c = w.a + d * t;
+                const QPointF c = w.arc ? w.arc->at(t) : w.a + d * t;
                 if (dist(p, c) < bestD) {
                     bestD = dist(p, c);
                     *q = c;
@@ -405,11 +437,15 @@ Snap Snapper::compute(QPointF p, double tolerance, const QPointF* from, bool ort
     if (s.kind == Snap::None && from)
         s = best(Snap::Perpendicular, [&](const SnapWall& w, QPointF* q) {
             bool inside = false;
+            if (w.arc)
+                return false; // D97: no perpendicular to an arc (its nearest point is "on wall")
             *q = project(*from, w.a, w.b, &inside);
             return inside;
         });
     if (s.kind == Snap::None && m_faces)
         s = best(Snap::OnFace, [&](const SnapWall& w, QPointF* q) {
+            if (w.arc)
+                return false;
             double bestD = std::numeric_limits<double>::max();
             bool any = false;
             for (const auto& [a, b] : faces(w)) {
@@ -426,6 +462,8 @@ Snap Snapper::compute(QPointF p, double tolerance, const QPointF* from, bool ort
     if (s.kind == Snap::None)
         s = best(Snap::OnWall, [&](const SnapWall& w, QPointF* q) {
             bool inside = false;
+            if (w.arc) // D97: anywhere on the arc
+                return w.arc->project(p, q);
             *q = project(p, w.a, w.b, &inside);
             return inside;
         });

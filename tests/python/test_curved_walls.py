@@ -82,8 +82,6 @@ def test_curved_walls_are_valid_ifc_and_move(project):
 def test_straight_only_edits_refuse_curved_walls(project):
     r = call("create_curved_wall", project["level"], project["Exterior 300"], 0, 0, 2, 2, 4, 0, 3.0, "")
     g = r["guid"]
-    door = call("opening_types", "door")["types"][0]
-    assert not call("insert_opening", "door", g, door["guid"], 1.0, door["width"], door["height"], door["sill"])["ok"]
     assert not call("set_wall_axis", g, 0, 0, 5, 0)["ok"]
     assert not call("set_dimension", json.dumps([g]), "Length", "9")["ok"]
     assert not call("split_element", g, 2, 2)["ok"]
@@ -148,3 +146,62 @@ def test_chamfering_a_wall_corner(project):
     assert sorted(tuple(round(v, 6) for v in p) for p in new) == [(5.0, 0.0), (6.0, 1.0)]
     assert not call("fillet_corners", json.dumps([a, b2]), 50.0, "fillet")["ok"]  # too big
     assert not call("fillet_corners", json.dumps([a]), 1.0, "fillet")["ok"]  # one wall
+
+
+def _radial_hits(guid, centre, angle, z=1.0):
+    """Where a ray from the arc's centre outwards at `angle` meets the wall's faces (radius, metres)."""
+    _, _, v, t = mesh(guid)
+    p = np.array([centre[0], centre[1], z])
+    d = np.array([math.cos(angle), math.sin(angle), 0.0])
+    out = []
+    for a, b_, c_ in v[t]:
+        e1, e2 = b_ - a, c_ - a
+        h = np.cross(d, e2)
+        det = e1 @ h
+        if abs(det) < 1e-12:
+            continue
+        f = 1 / det
+        s = p - a
+        u = f * (s @ h)
+        q = np.cross(s, e1)
+        w = f * (d @ q)
+        if u < 0 or w < 0 or u + w > 1:
+            continue
+        if f * (e2 @ q) > 1e-6:
+            out.append(round(float(f * (e2 @ q)), 3))
+    return sorted(set(out))
+
+
+@pytest.mark.parametrize("reference", ["Outside face", "Centre", "Inside face"])
+def test_doors_and_windows_in_curved_walls(project, reference):
+    """D97: a straight door or window square to the arc, its opening through the curved body."""
+    r = call("create_curved_wall", project["level"], project["Exterior 300"], 5, 0, 0, 5, -5, 0, 3.0, reference)
+    g = r["guid"]
+    door = call("opening_types", "door")["types"][0]
+    along = math.pi * 5 / 2  # the middle of the half circle: the top, at (0, 5)
+    d = call("insert_opening", "door", g, door["guid"], along, door["width"], door["height"], door["sill"])
+    assert d["ok"], d
+    assert _radial_hits(g, (0, 0), math.pi / 2) == []  # nothing left in the doorway
+    for edge in (-1, 1):  # nor at its sides, where the arc bends away from the straight door
+        # (rays from the centre spread: within the straight door's width out to the outer face, 5.3 m)
+        assert _radial_hits(g, (0, 0), math.pi / 2 + edge * math.asin((door["width"] / 2 - 0.02) / 5.3)) == []
+    assert len(_radial_hits(g, (0, 0), math.pi / 4)) == 2  # the wall beside it is solid
+    from kimbim import authoring
+
+    info = authoring._opening_info(b._model.by_guid(d["guid"]))
+    assert info[2] == pytest.approx(along, abs=1e-6)
+    assert call("edit_opening", d["guid"], 3.0, door["width"], door["height"], door["sill"])["ok"]
+    assert authoring._opening_info(b._model.by_guid(d["guid"]))[2] == pytest.approx(3.0, abs=1e-6)
+    assert not call("insert_opening", "door", g, door["guid"], 0.1, door["width"], door["height"], door["sill"])["ok"]
+    w = call("opening_types", "window")["types"][0]
+    assert call("insert_opening", "window", g, w["guid"], 12.0, w["width"], w["height"], w["sill"])["ok"]
+    # a reference change takes them along
+    assert call("set_element_setting", json.dumps([g]), C.GEOMETRY, "Reference line", "Core centre")["ok"]
+    assert _radial_hits(g, (0, 0), 3.0 / 5) == []
+
+
+def test_snap_data_describes_the_arc(project):
+    r = call("create_curved_wall", project["level"], project["Exterior 300"], 5, 0, 0, 5, -5, 0, 3.0, "")
+    w = next(x for x in call("snap_data", project["level"])["walls"] if x["guid"] == r["guid"])
+    assert w["arc"]["cx"] == pytest.approx(0) and w["arc"]["cy"] == pytest.approx(0) and w["arc"]["r"] == pytest.approx(5)
+    assert w["arc"]["a0"] == pytest.approx(0) and w["arc"]["sweep"] == pytest.approx(math.pi)
