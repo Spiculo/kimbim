@@ -33,6 +33,7 @@ Branch `parity-materials`. Spec: [2026-10-21-archicad-parity-materials-design](.
 - Worksheets (`kimbim/worksheets.py`), figures embedded in worksheet drawings (`underlays.figures_svg`),
   pictures on sheets (`sheets.place_sheet_image`, `sheet_files` setting).
 - Splines (`drafting.spline_points`, `DraftTool::splinePoints`).
+- Fillet/Chamfer (Edit menu): slab outlines, polylines and fills (`editing.round_corners`; arcs as 10° segments, like splines).
 
 ## Follow-ups (not done)
 - Textures are done (surface picture + size, `IfcSurfaceStyleWithTextures`, box-mapped in 3D, files in

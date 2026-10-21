@@ -360,6 +360,92 @@ def _offset_polygon(points, distance):
     return out
 
 
+FILLET_STEP_DEGREES = 10.0  # a fillet's arc as segments of at most this angle
+
+
+def round_corners(points, closed: bool, size: float, mode: str = "fillet"):
+    """Archicad's Fillet/Chamfer: every corner of a polyline (both ends kept when open) rounded with an
+    arc of radius `size` (segments) or cut `size` back along each edge. A corner whose edges are too
+    short takes the largest size that fits (half of each edge); straight corners are left alone."""
+    pts = [np.array(p, dtype=float) for p in points]
+    n = len(pts)
+    out = []
+    for i in range(n):
+        if not closed and (i == 0 or i == n - 1):
+            out.append(tuple(pts[i]))
+            continue
+        p, a, b = pts[i], pts[i - 1], pts[(i + 1) % n]
+        la, lb = np.linalg.norm(a - p), np.linalg.norm(b - p)
+        if la < 1e-9 or lb < 1e-9:
+            out.append(tuple(p))
+            continue
+        u, v = (a - p) / la, (b - p) / lb
+        turn = math.acos(max(-1.0, min(1.0, float(u @ v))))  # the corner's inside angle
+        if turn > math.pi - 1e-6 or turn < 1e-6:
+            out.append(tuple(p))
+            continue
+        if mode == "chamfer":
+            t = min(size, la / 2, lb / 2)
+            out += [tuple(p + u * t), tuple(p + v * t)]
+            continue
+        t = min(size / math.tan(turn / 2), la / 2, lb / 2)  # the tangent points' distance from the corner
+        r = t * math.tan(turn / 2)
+        bis = (u + v) / np.linalg.norm(u + v)
+        centre = p + bis * (r / math.sin(turn / 2))
+        s0, s1 = p + u * t - centre, p + v * t - centre
+        a0, a1 = math.atan2(s0[1], s0[0]), math.atan2(s1[1], s1[0])
+        sweep = (a1 - a0 + math.pi) % (2 * math.pi) - math.pi  # the short way round
+        steps = max(1, math.ceil(abs(math.degrees(sweep)) / FILLET_STEP_DEGREES))
+        out += [tuple(centre + r * np.array([math.cos(a0 + sweep * k / steps), math.sin(a0 + sweep * k / steps)]))
+                for k in range(steps + 1)]
+    return [(round(float(x), 6), round(float(y), 6)) for x, y in out]
+
+
+def fillet_corners(guids_json: str, size, mode: str = "fillet") -> str:
+    """Fillet or chamfer the corners of the selected slabs and 2D polylines and fills (one undo step)."""
+    from . import annotations as N
+
+    if B._model is None:
+        return A._fail("no model open")
+    if mode not in ("fillet", "chamfer"):
+        return A._fail(f"unknown mode {mode}")
+    try:
+        size = float(size)
+    except (TypeError, ValueError) as ex:
+        return A._fail(str(ex))
+    if size <= 0:
+        return A._fail("the radius or distance must be more than zero")
+    slabs, shapes = [], []
+    for e in B._elements(guids_json):
+        if e.is_a("IfcSlab") and _slab_outline_world(e):
+            slabs.append(e)
+        elif e.is_a("IfcAnnotation"):
+            data = N._read(e)
+            if data and data[0] in ("polyline", "fill"):
+                shapes.append((e, data[0] == "fill" or bool(N.extra_of(e).get("Closed"))))
+    if not slabs and not shapes:
+        return A._fail("select slabs, polylines or fills")
+
+    def action():
+        changed = []
+        for slab in slabs:
+            _set_slab_outline(slab, round_corners(_slab_outline_world(slab), True, size, mode))
+            changed.append(slab.GlobalId)
+        for a, closed in shapes:
+            world = [(float(p[0]), float(p[1])) for p in N.world_points(a)]
+            if closed and len(world) > 1 and np.allclose(world[0], world[-1]):
+                world = world[:-1]
+            N.replace_points(a, round_corners(world, closed, size, mode))
+            changed.append(a.GlobalId)
+        return len(changed), changed, []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return A._fail(f"{type(ex).__name__}: {ex}")
+    return B._dump(r)
+
+
 def offset_elements(guids_json: str, distance) -> str:
     """Offset (Archicad): walls get a parallel copy `distance` metres to the left of their axis
     (negative: to the right); slabs grow (shrink if negative) their outline in place."""

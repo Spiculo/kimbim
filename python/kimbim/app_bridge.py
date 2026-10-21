@@ -1107,6 +1107,7 @@ _EXPORTS = {
         "array_elements",
         "copy_elements",
         "duplicate_elements",
+        "fillet_corners",
         "mirror_elements",
         "offset_elements",
         "slab_outline",

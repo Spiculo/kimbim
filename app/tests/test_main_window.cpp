@@ -232,6 +232,25 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // D98: Fillet/Chamfer on a slab's corners from the window.
+    void filletSlabCorners()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        auto& py = kimbim::PythonEngine::instance();
+        const QString floor = py.callJson("slab_types", {}, nullptr).object().value("types").toArray().first()
+            .toObject().value("guid").toString();
+        const QJsonObject slab = py.callJson("create_slab", {w.levelsBar()->activeStorey(), floor,
+            QStringLiteral("[[0,0],[4,0],[4,4],[0,4]]"), QStringLiteral("0")}, nullptr).object();
+        QVERIFY(slab.value("ok").toBool());
+        w.setSelection({slab.value("guid").toString()});
+        QVERIFY(w.filletSelection(0.5, QStringLiteral("chamfer")));
+        QCOMPARE(py.callJson("slab_outline", {slab.value("guid").toString()}, nullptr).object()
+            .value("points").toArray().size(), 8);
+        QVERIFY(!w.filletSelection(0.5, QStringLiteral("nope")));
+        QVERIFY(w.close());
+    }
+
     // D98: special snap points reach the drawing tools' snappers.
     void specialSnapPointsReachTheTools()
     {

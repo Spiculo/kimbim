@@ -338,6 +338,7 @@ public:
     bool mirrorSelection(QPointF a, QPointF b, bool copy); // Ctrl+M tool: two clicks; Ctrl copies
     bool multiplySelection(const QString& kind, const QJsonObject& params); // Ctrl+U: linear / polar
     bool offsetSelection(double distance);
+    bool filletSelection(double size, const QString& mode); // D98: "fillet" or "chamfer"
     // D80: split, trim/extend (to a boundary or a corner), join/merge and unjoin walls and beams
     // (ModifyEdits.cpp). Ctrl (join = false) leaves the elements unjoined.
     ModifyTool* modifyTool() const { return m_modifyTool; }
@@ -506,6 +507,7 @@ private:
     void afterCopy(const QJsonObject& result);
     void multiplyDialog();
     void offsetDialog();
+    void filletDialog();
     void refreshDrawings();
     void refreshSheets(bool changed = true); // changed: the model changed, sheets need composing again
     void projectInfoDialog();

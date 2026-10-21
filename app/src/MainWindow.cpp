@@ -493,6 +493,8 @@ void MainWindow::buildMenus()
         ->setToolTip(tr("Mirror the selection: click two points of the mirror line (hold Ctrl on the second click to mirror a copy)"));
     editAction(tr("Multi&ply..."), "actionMultiply", QKeySequence(Qt::CTRL | Qt::Key_U), [this] { multiplyDialog(); });
     editAction(tr("&Offset..."), "actionOffset", QKeySequence(), [this] { offsetDialog(); });
+    editAction(tr("&Fillet/Chamfer..."), "actionFillet", QKeySequence(), [this] { filletDialog(); }) // D98
+        ->setToolTip(tr("Round or cut the corners of the selected slabs, polylines and fills"));
     // D78: selection tools (Archicad's Find & Select; Revit's Select All Instances).
     editMenu->addSeparator();
     editAction(tr("Select &similar"), "actionSelectSimilar", QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_A),
@@ -5581,6 +5583,54 @@ void MainWindow::offsetDialog()
         0.5, -1000, 1000, 3, &ok);
     if (ok)
         offsetSelection(distance);
+}
+
+bool MainWindow::filletSelection(double size, const QString& mode)
+{
+    if (m_selection.isEmpty())
+        return false;
+    const QJsonObject r = bridge("fillet_corners", {jsonList(m_selection), QString::number(size, 'g', 17), mode});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(tr("Could not fillet: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    return true;
+}
+
+void MainWindow::filletDialog()
+{
+    // D98: Archicad's Fillet/Chamfer for slab, polyline and fill corners.
+    if (m_selection.isEmpty()) {
+        m_status->showMessage(tr("Select slabs, polylines or fills first"));
+        return;
+    }
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Fillet/Chamfer"));
+    auto* form = new QFormLayout(&dialog);
+    auto* mode = new QComboBox(&dialog);
+    mode->setObjectName(QStringLiteral("filletMode"));
+    mode->addItem(tr("Fillet (round)"), QStringLiteral("fillet"));
+    mode->addItem(tr("Chamfer (cut)"), QStringLiteral("chamfer"));
+    mode->setCurrentIndex(std::max(0, mode->findData(m_prefs.value(QStringLiteral("fillet_mode")).toString())));
+    form->addRow(tr("Corners:"), mode);
+    auto* size = new QDoubleSpinBox(&dialog);
+    size->setObjectName(QStringLiteral("filletSize"));
+    size->setRange(0.001, 1000.0);
+    size->setDecimals(3);
+    size->setSuffix(QStringLiteral(" m"));
+    size->setValue(m_prefs.value(QStringLiteral("fillet_size")).toDouble(0.5));
+    form->addRow(tr("Radius or distance:"), size);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    form->addRow(buttons);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    m_prefs.setValue(QStringLiteral("fillet_mode"), mode->currentData().toString());
+    m_prefs.setValue(QStringLiteral("fillet_size"), size->value());
+    m_prefs.save();
+    filletSelection(size->value(), mode->currentData().toString());
 }
 
 bool MainWindow::worksheetCommand(const char* command, const QStringList& args)

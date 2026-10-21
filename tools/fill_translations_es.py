@@ -1619,6 +1619,16 @@ ES = {
     "Distance from the ends:": "Distancia desde los extremos:",
     "Special snap points: %1 divisions, %2 m from the ends": "Puntos especiales: %1 divisiones, %2 m desde los extremos",
     "Special snap points off": "Puntos de referencia especiales desactivados",
+    "&Fillet/Chamfer...": "&Empalme/Chaflán...",
+    "Round or cut the corners of the selected slabs, polylines and fills":
+        "Redondear o cortar las esquinas de las losas, polilíneas y rellenos seleccionados",
+    "Could not fillet: %1": "No se pudo empalmar: %1",
+    "Select slabs, polylines or fills first": "Primero seleccione losas, polilíneas o rellenos",
+    "Fillet/Chamfer": "Empalme/Chaflán",
+    "Fillet (round)": "Empalme (redondear)",
+    "Chamfer (cut)": "Chaflán (cortar)",
+    "Corners:": "Esquinas:",
+    "Radius or distance:": "Radio o distancia:",
 }
 
 
