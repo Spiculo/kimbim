@@ -982,6 +982,7 @@ from . import showon as _showon  # noqa: E402
 from . import materials as _materials  # noqa: E402
 from . import configure as _configure  # noqa: E402
 from . import curved_walls as _curved_walls  # noqa: E402
+from . import sun as _sun  # noqa: E402
 from . import worksheets as _worksheets  # noqa: E402
 
 _EXPORTS = {
@@ -1271,6 +1272,7 @@ _EXPORTS = {
         "worksheets",
     ),
     "curved_walls": ("create_curved_wall",),
+    "sun": ("sun_state",),
     "configure": (
         "flip_walls",
         "inject",

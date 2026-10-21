@@ -63,7 +63,7 @@ release notes, so check before relying on a single cell.
 | Saved views (layers, level, plan/3D, cut) | AC RV VW BB | ✅ | P1 | D57 |
 | Lines-only / hidden-line display | all | ✅ | — | L |
 | Visual styles: shaded, textured, sketch, X-ray | all | 🟡 | new | Shaded and lines only |
-| Shadows and sun position | AC RV VW SU | 🟡 | new | D96: View › Sun shadows (a fixed sun), White model; no sun position yet |
+| Shadows and sun position | AC RV VW SU | ✅ | new | D96: View › Sun shadows, View › Sun... (azimuth/altitude or place, date, time), White model |
 | Hover info (name, type, level) | AC RV VW | ✅ | — | |
 | Colour by property, class or type | AC RV VW BB | ✅ | P1 | D73 override rules (property, class, kind, layer, material) |
 | Show multiple levels at once (ghost story / underlay) | AC RV VW | ✅ | new | D98: View › Trace reference (level below or above, snappable); Level above/below Ctrl+Up/Down |

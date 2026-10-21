@@ -40,7 +40,7 @@ Branch `parity-materials`. Spec: [2026-10-21-archicad-parity-materials-design](.
 
 ## Follow-ups (not done)
 - Textures are done (surface picture + size, `IfcSurfaceStyleWithTextures`, box-mapped in 3D, files in
-  `texture_files`); the catalogue's brick, timber, tiles, stone and roof tiles come with drawn pictures. 3D styles: View › White model (study model, contours and glass kept) and Sun shadows (OCCT shadow map from the fixed sun); no photorealistic rendering.
+  `texture_files`); the catalogue's brick, timber, tiles, stone and roof tiles come with drawn pictures. 3D styles: View › White model (study model, contours and glass kept) and Sun shadows (OCCT shadow map); View › Sun... places the sun by azimuth and altitude or by place, date and time (`sun.py`, NOAA's equations, turned by true north; project setting `sun`); no photorealistic rendering.
 - Cut fill patterns are hatched on screen, in printed drawings/PDF and in DXF (pattern HATCHes; the
   insulation loops as short lines on the -PATT layer).
 - Junctions: the layers' priorities decide (regenerator); Model › Wall junctions overrides per wall (run through / stop / by materials) via IfcRelConnectsPathElements priorities (KimBim patches the regenerator's override handling).

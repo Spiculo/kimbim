@@ -241,6 +241,18 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // D96: the sun's place drives the 3D light.
+    void sunPosition()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        QVERIFY(w.setSun(QJsonObject{{"mode", "custom"}, {"azimuth", 90.0}, {"altitude", 30.0}}));
+        const gp_Dir d = w.viewport()->scene()->sunDirection(); // light travels from the east, downwards
+        QVERIFY(d.X() < -0.8 && std::abs(d.Y()) < 1e-6 && d.Z() < -0.4);
+        QVERIFY(!w.setSun(QJsonObject{{"altitude", 120.0}}));
+        QVERIFY(w.close());
+    }
+
     // D98: Resize the selection about its middle.
     void resizeSelection()
     {

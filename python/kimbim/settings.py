@@ -75,7 +75,8 @@ DEFAULTS = {
     "layers_in_3d": True,
     "member_material_scope": "element",  # D97: a column's or beam's material: its own (Archicad) or its type's (Revit)
     "wall_profiles": {},
-    "favourites": {},  # D97: Archicad's Favourites, by name: {tool, fields {object name: value}, object?}  # D97: complex wall sections by name: [[across, up], ...] metres from the base line  # D96: walls and slabs show each layer on their ends and tops in 3D  # D97: where a new wall's clicked line is (Archicad default)
+    "favourites": {},
+    "sun": {},  # D96: the sun for 3D light and shadows (sun.DEFAULT fills it in)  # D97: Archicad's Favourites, by name: {tool, fields {object name: value}, object?}  # D97: complex wall sections by name: [[across, up], ...] metres from the base line  # D96: walls and slabs show each layer on their ends and tops in 3D  # D97: where a new wall's clicked line is (Archicad default)
 }
 UNITS = {"m": 1.0, "cm": 100.0, "mm": 1000.0}
 AREA_UNITS = {"m²": 1.0, "cm²": 10000.0, "mm²": 1000000.0}
@@ -264,6 +265,10 @@ def _error(key: str, value) -> str | None:
         o = g.get("origin")
         if not (isinstance(o, list) and len(o) == 2 and all(num(v) for v in o)):
             return "the grid origin is [x, y]"
+    if key == "sun":
+        from . import sun
+
+        return sun.error(value)
     if key == "favourites":
         if not isinstance(value, dict) or not all(
                 isinstance(k, str) and k.strip() and isinstance(v, dict) and isinstance(v.get("tool"), str)

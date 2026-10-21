@@ -1681,6 +1681,19 @@ ES = {
     "Scale the selection: walls, slabs and 2D shapes take new lengths, other elements move":
         "Escalar la selección: muros, losas y formas 2D cambian de longitud, los demás elementos se desplazan",
     "Could not resize: %1": "No se pudo redimensionar: %1",
+    "S&un...": "S&ol...",
+    "Where the sun is: an azimuth and altitude, or a place, date and time": "Dónde está el sol: acimut y altura, o lugar, fecha y hora",
+    "Sun": "Sol",
+    "By azimuth and altitude": "Por acimut y altura",
+    "By place, date and time": "Por lugar, fecha y hora",
+    "Sun:": "Sol:",
+    "Azimuth (clockwise from north):": "Acimut (horario desde el norte):",
+    "Altitude:": "Altura:",
+    "Latitude:": "Latitud:",
+    "Longitude:": "Longitud:",
+    "Date and time:": "Fecha y hora:",
+    "Hours from UTC:": "Horas respecto a UTC:",
+    "Sun at %1° azimuth, %2° altitude": "Sol a %1° de acimut y %2° de altura",
 }
 
 

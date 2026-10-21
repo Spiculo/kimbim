@@ -236,6 +236,9 @@ public:
     QStringList favouriteNames(bool forThisTool = true) const;
     bool autoDimension(double offset); // D98: the selected walls, `offset` metres out from their faces
     bool resizeSelection(double factor); // D98: Archicad's Resize, about the selection's middle
+    bool setSun(const QJsonObject& sun);  // D96: the project's sun (sun.py's setting), applied to the 3D light
+    void applySun();
+    void sunDialog();
     bool pickUpSettings(); // D97: Archicad's eyedropper, from the one selected element
     bool injectSettings(); // and syringe, into the selection
     // D98: Archicad's Grid System on the active level (one undo step).

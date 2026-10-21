@@ -40,6 +40,7 @@
 #include <QListWidget>
 #include <QDir>
 #include <QFormLayout>
+#include <QDateTimeEdit>
 #include <QDialogButtonBox>
 #include <QDialog>
 #include <QMenu>
@@ -599,6 +600,10 @@ void MainWindow::buildMenus()
     shadows->setCheckable(true);
     shadows->setToolTip(tr("The sun casts shadows in the 3D views"));
     connect(shadows, &QAction::toggled, m_viewport, &Viewport::setShadows);
+    QAction* sunAction = view->addAction(tr("S&un...")); // D96: Archicad's Sun settings
+    sunAction->setObjectName(QStringLiteral("actionSun"));
+    sunAction->setToolTip(tr("Where the sun is: an azimuth and altitude, or a place, date and time"));
+    connect(sunAction, &QAction::triggered, this, &MainWindow::sunDialog);
     QAction* trueWeights = view->addAction(tr("&True line weights"));
     trueWeights->setObjectName(QStringLiteral("actionTrueLineWeights"));
     trueWeights->setCheckable(true);
@@ -6763,6 +6768,7 @@ void MainWindow::loadProjectSettings()
     const QSignalBlocker block(m_cutHeight);
     m_cutHeight->setValue(m_settings.value("plan_cut_height").toDouble(1.2));
     m_cutLabel->setText(formatLength(m_cutHeight->value()));
+    applySun(); // D96: the project's sun
     if (m_draftTool) { // D92: typed lengths (and a rectangle's width;height) in the project unit
         const QString unit = m_settings.value("length_unit").toString(QStringLiteral("m"));
         const double intoMetres = unit == QLatin1String("mm") ? 0.001 : unit == QLatin1String("cm") ? 0.01 : 1.0;
@@ -6781,6 +6787,86 @@ bool MainWindow::setProjectSettings(const QJsonObject& changes)
     m_settings = r.value("settings").toObject();
     setWindowModified(isDirty());
     refreshGraphics();
+    if (changes.contains("sun"))
+        applySun();
+    return true;
+}
+
+void MainWindow::applySun()
+{
+    const QJsonObject s = bridge("sun_state");
+    const QJsonArray d = s.value("direction").toArray();
+    if (d.size() == 3 && m_viewport)
+        m_viewport->scene()->setSunDirection(d[0].toDouble(), d[1].toDouble(), d[2].toDouble());
+}
+
+void MainWindow::sunDialog()
+{
+    // D96: Archicad's Sun: by azimuth and altitude, or for a place, date and time.
+    const QJsonObject current = m_settings.value("sun").toObject();
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Sun"));
+    dialog.setObjectName(QStringLiteral("sunDialog"));
+    auto* form = new QFormLayout(&dialog);
+    auto* mode = new QComboBox(&dialog);
+    mode->setObjectName(QStringLiteral("sunMode"));
+    mode->addItem(tr("By azimuth and altitude"), QStringLiteral("custom"));
+    mode->addItem(tr("By place, date and time"), QStringLiteral("time"));
+    mode->setCurrentIndex(std::max(0, mode->findData(current.value("mode").toString(QStringLiteral("custom")))));
+    form->addRow(tr("Sun:"), mode);
+    auto number = [&](const char* name, double value, double lo, double hi, int decimals, const QString& suffix) {
+        auto* s = new QDoubleSpinBox(&dialog);
+        s->setObjectName(QLatin1String(name));
+        s->setRange(lo, hi);
+        s->setDecimals(decimals);
+        s->setSuffix(suffix);
+        s->setValue(value);
+        return s;
+    };
+    auto* azimuth = number("sunAzimuth", current.value("azimuth").toDouble(135), 0, 360, 1, QStringLiteral(" °"));
+    auto* altitude = number("sunAltitude", current.value("altitude").toDouble(40), 0, 90, 1, QStringLiteral(" °"));
+    auto* latitude = number("sunLatitude", current.value("latitude").toDouble(-34.9), -90, 90, 4, QStringLiteral(" °"));
+    auto* longitude = number("sunLongitude", current.value("longitude").toDouble(-56.2), -180, 180, 4, QStringLiteral(" °"));
+    auto* offset = number("sunUtcOffset", current.value("utc_offset").toDouble(-3), -14, 14, 1, QStringLiteral(" h"));
+    auto* when = new QDateTimeEdit(QDateTime(QDate::fromString(current.value("date").toString(QStringLiteral("2026-12-21")), Qt::ISODate),
+        QTime::fromString(current.value("time").toString(QStringLiteral("15:00")), QStringLiteral("HH:mm"))), &dialog);
+    when->setObjectName(QStringLiteral("sunWhen"));
+    when->setDisplayFormat(QStringLiteral("yyyy-MM-dd HH:mm"));
+    form->addRow(tr("Azimuth (clockwise from north):"), azimuth);
+    form->addRow(tr("Altitude:"), altitude);
+    form->addRow(tr("Latitude:"), latitude);
+    form->addRow(tr("Longitude:"), longitude);
+    form->addRow(tr("Date and time:"), when);
+    form->addRow(tr("Hours from UTC:"), offset);
+    auto show = [&] {
+        const bool custom = mode->currentData().toString() == QLatin1String("custom");
+        for (QWidget* w : {static_cast<QWidget*>(azimuth), static_cast<QWidget*>(altitude)})
+            form->setRowVisible(w, custom);
+        for (QWidget* w : {static_cast<QWidget*>(latitude), static_cast<QWidget*>(longitude),
+                 static_cast<QWidget*>(when), static_cast<QWidget*>(offset)})
+            form->setRowVisible(w, !custom);
+    };
+    connect(mode, &QComboBox::currentIndexChanged, &dialog, show);
+    show();
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    form->addRow(buttons);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    setSun(QJsonObject{{"mode", mode->currentData().toString()}, {"azimuth", azimuth->value()},
+        {"altitude", altitude->value()}, {"latitude", latitude->value()}, {"longitude", longitude->value()},
+        {"date", when->date().toString(Qt::ISODate)}, {"time", when->time().toString(QStringLiteral("HH:mm"))},
+        {"utc_offset", offset->value()}});
+}
+
+bool MainWindow::setSun(const QJsonObject& sun)
+{
+    if (!setProjectSettings(QJsonObject{{"sun", sun}}))
+        return false;
+    const QJsonObject s = bridge("sun_state");
+    m_status->showMessage(tr("Sun at %1° azimuth, %2° altitude").arg(s.value("azimuth").toDouble(), 0, 'f', 1)
+                              .arg(s.value("altitude").toDouble(), 0, 'f', 1));
     return true;
 }
 
