@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "Viewport.h"
+#include "CutPlaneOverlay.h"
 #include "CutPlanes.h"
 #include "Graphics.h"
 #include "PolygonTool.h"
@@ -749,7 +750,7 @@ Viewport::~Viewport()
     // This view's own overlays leave the shared context; the elements stay for the other views.
     for (const Handle(AIS_InteractiveObject)& o :
          {Handle(AIS_InteractiveObject)(m_preview), Handle(AIS_InteractiveObject)(m_grid),
-             Handle(AIS_InteractiveObject)(m_cube), m_home})
+             Handle(AIS_InteractiveObject)(m_cutOverlay), Handle(AIS_InteractiveObject)(m_cube), m_home})
         if (!o.IsNull())
             m_context->Remove(o, false);
     for (const auto& a : std::as_const(m_annotations))
@@ -1673,6 +1674,27 @@ void Viewport::mousePressEvent(QMouseEvent* e)
     }
     if (cycleClick(e))
         return; // D89: the element Tab highlighted
+    if (m_facePickMode && e->button() == Qt::LeftButton) { // D95: the plane of the clicked face
+        gp_Pnt point;
+        gp_Dir normal;
+        if (facePlaneAt(e->position(), &point, &normal))
+            emit facePicked(point.X(), point.Y(), point.Z(), normal.X(), normal.Y(), normal.Z());
+        return;
+    }
+    if (!m_drawingMode && e->button() == Qt::LeftButton && cutPlaneHandleAt(e->position())) {
+        m_cutDragCandidate = true;
+        m_cutDragging = false;
+        m_cutDragPress = e->position();
+        QPointF centre, tip;
+        Handle(CutPlaneOverlay) overlay = Handle(CutPlaneOverlay)::DownCast(m_cutOverlay);
+        if (!overlay.IsNull() && worldToWidget(overlay->centre(), &centre)
+            && worldToWidget(overlay->handleTip(), &tip))
+            m_cutDragScreenDir = tip - centre;
+        else
+            m_cutDragScreenDir = QPointF(0, -1);
+        emit cutPlaneDragStarted();
+        return;
+    }
     if (m_drawingMode && (e->button() == Qt::LeftButton || e->button() == Qt::RightButton)) {
         if (e->button() == Qt::RightButton) {
             emit drawingEnded();
@@ -1719,6 +1741,11 @@ void Viewport::mouseReleaseEvent(QMouseEvent* e)
         m_cubeDragging = false;
         return;
     }
+    if (m_cutDragCandidate && e->button() == Qt::LeftButton) {
+        m_cutDragCandidate = m_cutDragging = false;
+        emit cutPlaneDragFinished();
+        return;
+    }
     if (m_dragCandidate && e->button() == Qt::LeftButton) {
         QPointF p;
         double tolerance = 0;
@@ -1761,6 +1788,17 @@ void Viewport::mouseMoveEvent(QMouseEvent* e)
             }
             return;
         }
+    }
+    if (m_cutDragCandidate) {
+        if (!m_cutDragging && (e->position() - m_cutDragPress).manhattanLength() < 3)
+            return;
+        m_cutDragging = true;
+        const QPointF d = e->position() - m_cutDragPress;
+        const double len2 = m_cutDragScreenDir.x() * m_cutDragScreenDir.x()
+            + m_cutDragScreenDir.y() * m_cutDragScreenDir.y();
+        if (len2 > 1e-9)
+            emit cutPlaneDragged((d.x() * m_cutDragScreenDir.x() + d.y() * m_cutDragScreenDir.y()) / len2);
+        return;
     }
     if (m_dragCandidate) {
         if (!m_dragging && (e->position() - m_dragPressPos).manhattanLength() < 5)
@@ -1855,6 +1893,7 @@ void Viewport::clear()
     m_sections.clear(); // RemoveAll above took them
     m_sectionElements = 0;
     m_sectionPlaneCount = 0;
+    m_cutOverlay.Nullify();
     m_preview.Nullify();
     m_scene->nextIdBase = 0;
     m_scene->changed();
@@ -2225,6 +2264,127 @@ int Viewport::viewClipPlaneCount() const
     return m_view->ClipPlanes().IsNull() ? 0 : m_view->ClipPlanes()->Size();
 }
 
+int Viewport::clipPlaneLimit() const
+{
+    const Handle(Graphic3d_GraphicDriver)& driver = m_view->Viewer()->Driver();
+    return driver.IsNull() ? 0 : driver->InquirePlaneLimit();
+}
+
+void Viewport::setCutPlaneOverlay(const std::optional<gp_Pln>& plane, double halfSize)
+{
+    if (!m_cutOverlay.IsNull()) {
+        m_context->Remove(m_cutOverlay, false);
+        m_cutOverlay.Nullify();
+    }
+    if (!plane) {
+        update();
+        return;
+    }
+    m_cutOverlayPlane = *plane;
+    m_cutOverlayHalfSize = halfSize > 1e-6 ? halfSize : 1.0;
+    m_cutOverlay = new CutPlaneOverlay(*plane, m_cutOverlayHalfSize);
+    m_context->Display(m_cutOverlay, 0, -1, false); // shown, never selectable
+    keepHere(m_cutOverlay);
+    update();
+}
+
+bool Viewport::worldToWidget(const gp_Pnt& point, QPointF* out) const
+{
+    if (m_view->Window().IsNull())
+        return false;
+    int x = 0, y = 0;
+    m_view->Convert(point.X(), point.Y(), point.Z(), x, y);
+    const double dpr = devicePixelRatioF();
+    *out = QPointF(x / dpr, height() - y / dpr);
+    return true;
+}
+
+namespace {
+
+double pointSegmentDistance(const QPointF& p, const QPointF& a, const QPointF& b)
+{
+    const QPointF d = b - a;
+    const double len2 = d.x() * d.x() + d.y() * d.y();
+    if (len2 < 1e-9)
+        return QLineF(p, a).length();
+    double t = ((p.x() - a.x()) * d.x() + (p.y() - a.y()) * d.y()) / len2;
+    t = std::clamp(t, 0.0, 1.0);
+    return QLineF(p, a + d * t).length();
+}
+
+} // namespace
+
+bool Viewport::cutPlaneHandleAt(const QPointF& widgetPos) const
+{
+    if (m_cutOverlay.IsNull())
+        return false;
+    Handle(CutPlaneOverlay) overlay = Handle(CutPlaneOverlay)::DownCast(m_cutOverlay);
+    if (overlay.IsNull())
+        return false;
+    QPointF centre, tip;
+    if (!worldToWidget(overlay->centre(), &centre) || !worldToWidget(overlay->handleTip(), &tip))
+        return false;
+    return pointSegmentDistance(widgetPos, centre, tip) <= 10.0 || QLineF(widgetPos, tip).length() <= 12.0;
+}
+
+void Viewport::setFacePickMode(bool on)
+{
+    m_facePickMode = on;
+    setCursor(on ? Qt::CrossCursor : Qt::ArrowCursor);
+}
+
+bool Viewport::facePlaneAt(const QPointF& widgetPos, gp_Pnt* point, gp_Dir* normal)
+{
+    if (!ensureWindow())
+        return false;
+    const NCollection_Vec2<int> px = toPixels(widgetPos);
+    const Handle(SelectMgr_ViewerSelector)& selector = m_context->MainSelector();
+    selector->Pick(px.x(), px.y(), m_view);
+    for (int i = 1; i <= selector->NbPicked(); ++i) {
+        Handle(ElementOwner) owner = Handle(ElementOwner)::DownCast(selector->Picked(i));
+        if (owner.IsNull() || !owner->batch())
+            continue;
+        const gp_Pnt picked = selector->PickedPoint(i);
+        const kimbim::MeshChunk& c = owner->batch()->chunk();
+        const size_t e = size_t(owner->index());
+        gp_Dir bestNormal;
+        double best = 1e30;
+        const gp_Vec toEye(picked, m_view->Camera()->Eye());
+        auto vtx = [&](uint32_t idx) {
+            return gp_Pnt(c.verts[3 * size_t(idx)], c.verts[3 * size_t(idx) + 1], c.verts[3 * size_t(idx) + 2]);
+        };
+        for (uint32_t t = c.toff[e]; t < c.toff[e + 1]; ++t) {
+            const gp_Pnt a = vtx(c.tris[3 * size_t(t)]), b = vtx(c.tris[3 * size_t(t) + 1]),
+                         d = vtx(c.tris[3 * size_t(t) + 2]);
+            const gp_Vec ab(a, b), ac(a, d);
+            gp_Vec n = ab.Crossed(ac);
+            if (n.Magnitude() < 1e-12)
+                continue;
+            n.Normalize();
+            const double dist = std::abs(gp_Vec(a, picked).Dot(n));
+            if (dist > 1e-3 || dist >= best)
+                continue;
+            // Barycentric coordinates of the picked point in the triangle (projected by its normal).
+            const double area = ab.Crossed(ac).Dot(gp_Vec(n));
+            const double w0 = gp_Vec(b, picked).Crossed(gp_Vec(b, d)).Dot(gp_Vec(n)) / area;
+            const double w1 = gp_Vec(d, picked).Crossed(gp_Vec(d, a)).Dot(gp_Vec(n)) / area;
+            const double w2 = 1.0 - w0 - w1;
+            if (w0 < -1e-3 || w1 < -1e-3 || w2 < -1e-3)
+                continue;
+            best = dist;
+            bestNormal = gp_Dir(n);
+        }
+        if (best > 1e29)
+            continue;
+        if (gp_Vec(bestNormal).Dot(toEye) > 0) // keep the side away from the camera
+            bestNormal.Reverse();
+        *point = picked;
+        *normal = bestNormal;
+        return true;
+    }
+    return false;
+}
+
 // Overlays (grid, annotations, markers, poché, previews) belong to this view only.
 void Viewport::keepHere(const Handle(AIS_InteractiveObject)& obj)
 {
@@ -2238,6 +2398,7 @@ void Viewport::keepOverlaysHere()
 {
     keepHere(m_preview);
     keepHere(m_grid);
+    keepHere(m_cutOverlay);
     for (const auto& s : std::as_const(m_sections))
         keepHere(s);
     keepHere(m_cube);

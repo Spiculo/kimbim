@@ -232,6 +232,17 @@ public:
     void clearClipPlanes();
     int clipPlaneCount() const { return int(m_clipPlanes.size()); }
     int viewClipPlaneCount() const; // the cut planes on this view's V3d_View
+    int clipPlaneLimit() const;     // the graphics driver's limit (0 when it cannot tell)
+    // D95: the selected cut plane (translucent rectangle and normal handle); nullopt removes it.
+    void setCutPlaneOverlay(const std::optional<gp_Pln>& plane, double halfSize = 0);
+    void clearCutPlaneOverlay() { setCutPlaneOverlay(std::nullopt); }
+    bool hasCutPlaneOverlay() const { return !m_cutOverlay.IsNull(); }
+    gp_Pln cutPlaneOverlay() const { return m_cutOverlayPlane; }
+    bool cutPlaneHandleAt(const QPointF& widgetPos) const; // the drag handle under a point
+    bool worldToWidget(const gp_Pnt& point, QPointF* out) const;
+    // D95: from a face: the picked surface's triangle plane, kept side away from the camera.
+    void setFacePickMode(bool on);
+    bool facePlaneAt(const QPointF& widgetPos, gp_Pnt* point, gp_Dir* normal);
     // Overlays belong to their view (D71); for tests.
     bool showsOverlay(const Handle(AIS_InteractiveObject)& obj, const Handle(V3d_View)& view) const;
     Handle(AIS_InteractiveObject) gridObject() const { return m_grid; }
@@ -289,6 +300,13 @@ public:
     QJsonObject finishViewGeometry(const gp_Ax3& ax3, const QJsonArray& proj, const gp_Pln* section) const;
 
 signals:
+    // D95: the selected plane's handle was dragged along its normal (live, metres since the press).
+    void cutPlaneDragStarted();
+    void cutPlaneDragged(double metres);
+    void cutPlaneDragFinished();
+    // From a face (D95): the clicked surface's point and normal.
+    void facePicked(double x, double y, double z, double nx, double ny, double nz);
+
     void selectionChanged(const QStringList& guids);
     // Drawing mode. tolerance = ~10 screen pixels in metres at that point.
     void workPointMoved(QPointF point, double tolerance, Qt::KeyboardModifiers modifiers);
@@ -364,6 +382,14 @@ private:
     double m_workZ = 0.0;
     Handle(ElementBatch) m_preview;
     Handle(AIS_InteractiveObject) m_toolOverlay;
+    Handle(AIS_InteractiveObject) m_cutOverlay;
+    gp_Pln m_cutOverlayPlane;
+    double m_cutOverlayHalfSize = 1.0;
+    bool m_cutDragCandidate = false;
+    bool m_cutDragging = false;
+    QPointF m_cutDragPress;
+    QPointF m_cutDragScreenDir;
+    bool m_facePickMode = false;
     QPointF m_pointer;
     Handle(AIS_InteractiveObject) m_grid;
     QVector<Annotation> m_annotationData;

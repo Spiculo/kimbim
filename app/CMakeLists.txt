@@ -33,6 +33,7 @@ qt_add_library(kimbim_core STATIC
     src/DraftTool.cpp src/DraftTool.h src/DraftTools.cpp src/MarkupTools.cpp src/StairTools.cpp
     src/ModelLoader.cpp src/ModelLoader.h
     src/Cuts.cpp src/Cuts.h src/CutPlanes.cpp src/CutPlanes.h
+    src/CutPlaneOverlay.cpp src/CutPlaneOverlay.h src/CutPlanesPanel.cpp src/CutPlanesPanel.h
     src/DrawingsPanel.cpp src/DrawingsPanel.h
     src/DrawingView.cpp src/DrawingView.h
     src/SheetExport.cpp src/SheetExport.h
@@ -93,6 +94,7 @@ kimbim_test(test_model_tree)
 kimbim_test(test_visibility)
 kimbim_test(test_main_window)
 kimbim_test(test_cuts)
+kimbim_test(test_cut_planes)
 kimbim_test(test_model_loader)
 kimbim_test(test_navigation)
 kimbim_test(test_selection)

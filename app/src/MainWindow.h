@@ -20,6 +20,7 @@
 #include <QJsonObject>
 #include <QMainWindow>
 
+#include "Cuts.h"
 #include "DockLayout.h"
 #include "Preferences.h"
 #include <QThread>
@@ -28,6 +29,8 @@
 
 class QAction;
 namespace kimbim {
+
+class CutPlanesPanel;
 class InputAidsController;
 class Tracker;
 }
@@ -107,6 +110,20 @@ public:
     PropertiesPanel* propertiesPanel() const { return m_properties; }
     void setPlanCutHeight(double metres);
     double planCutHeight() const;
+    // D95: 3D cut planes, a view state of the 3D view (saved with views; plan tabs unaffected).
+    bool addVerticalCut(const QPointF& a, const QPointF& b, const QPointF& keep, double baseZ = 0);
+    bool addHorizontalCut(double z);
+    bool addObliqueCut(const QPointF& a, const QPointF& b, const QPointF& keep, double degrees, double baseZ = 0);
+    bool addFaceCut(const gp_Pnt& point, const gp_Dir& normal);
+    QVector<CutPlane> cutPlanes() const;
+    int selectedCutPlane() const;
+    bool selectCutPlane(int index);
+    bool setCutPlaneEnabled(int index, bool on);
+    bool setCutPlaneOffset(int index, double offset);
+    bool setCutPlaneAngle(int index, double degrees);
+    bool flipCutPlane(int index);
+    bool removeCutPlane(int index);
+    int availableCutPlaneSlots() const;
 
     // Selection and editing (M2). Edits apply to every selected element as one undoable step.
     void setSelection(const QStringList& guids);
@@ -527,6 +544,19 @@ private:
     void showSnap(const Snap& snap);
     void buildCutsToolbar();
     void applyCuts();
+    struct CutSettings;
+    void applyCutsTo(Viewport* view, CutSettings& settings);
+    int addCutPlaneTo3D(const CutPlane& plane);
+    void pushCutPlanesToPanel();
+    enum class CutTool { None, Vertical, Oblique, Face };
+    void startCutTool(CutTool tool);
+    void endCutTool();
+    void cutPlaneClick(const QPointF& p);
+    void horizontalCutDialog();
+    CutTool m_cutTool = CutTool::None;
+    QVector<QPointF> m_cutPoints;
+    QVector<CutPlane> m_cutDragBase;
+    QMenu* m_cutPlanesMenu = nullptr;
 
     void applySelection(const QStringList& guids, const QString& how); // D78
     QStringList unselectableLayers() const;
@@ -642,6 +672,8 @@ private:
         bool box = false;
         double height = 1.2;
         Bnd_Box bounds;
+        QVector<CutPlane> planes; // D95: user planes (the 3D view's; plan tabs keep them empty)
+        int selectedPlane = -1;
     };
     QHash<Viewport*, CutSettings> m_cuts;
     DrawingsPanel* m_drawingsPanel = nullptr;
@@ -680,6 +712,7 @@ private:
     QAction* m_redo = nullptr;
     QAction* m_planCut = nullptr;
     QAction* m_sectionBox = nullptr;
+    CutPlanesPanel* m_cutPlanesPanel = nullptr;
     QDoubleSpinBox* m_cutHeight = nullptr;
     Bnd_Box m_boxBounds; // captured when the section box is switched on
     // D85: underlays (Underlays.cpp): linework by file, page images by file/page/dpi/colour.
