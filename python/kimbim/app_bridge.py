@@ -1290,6 +1290,7 @@ _EXPORTS = {
         "assign_material",
         "element_material",
         "materials_state",
+        "place_picture_3d",
         "purge_materials",
     ),
     "library": (

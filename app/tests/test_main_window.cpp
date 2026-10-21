@@ -262,6 +262,23 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // D98: a picture standing in the model, its picture on its faces.
+    void pictureIn3d()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("tree.png"));
+        QImage img(20, 40, QImage::Format_RGB32);
+        img.fill(Qt::darkGreen);
+        QVERIFY(img.save(path));
+        const int before = w.viewport()->elementCount();
+        QVERIFY(w.placePicture3d(path, 2.0, QPointF(1, 1)));
+        QCOMPARE(w.viewport()->elementCount(), before + 1);
+        QCOMPARE(w.selection().size(), 1);
+        QVERIFY(w.close());
+    }
+
     // D96: the sun's place drives the 3D light.
     void sunPosition()
     {

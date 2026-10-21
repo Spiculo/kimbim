@@ -1695,6 +1695,13 @@ ES = {
     "Hours from UTC:": "Horas respecto a UTC:",
     "Sun at %1° azimuth, %2° altitude": "Sol a %1° de acimut y %2° de altura",
     "It needs the points it has": "Necesita los puntos que tiene",
+    "Place picture in &3D...": "Colocar imagen en &3D...",
+    "A picture standing in the model at the origin of the active level: move it into place":
+        "Una imagen de pie en el modelo, en el origen del nivel activo: muévala a su lugar",
+    "Place picture in 3D": "Colocar imagen en 3D",
+    "Could not place the picture": "No se pudo colocar la imagen",
+    "Picture placed: move it into place (it faces south; rotate it to turn it)":
+        "Imagen colocada: muévala a su lugar (mira al sur; gírela para orientarla)",
 }
 
 

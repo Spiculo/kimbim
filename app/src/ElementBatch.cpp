@@ -210,14 +210,16 @@ int ElementBatch::triangleTexture(int i, uint32_t t) const
     return k < m_chunk.palette.size() && !m_chunk.palette[k].texture.isEmpty() ? int(k) : -1;
 }
 
-std::pair<double, double> ElementBatch::boxTexel(const gp_Pnt& p, const gp_Dir& n, double w, double h)
+std::pair<double, double> ElementBatch::boxTexel(const gp_Pnt& p, const gp_Dir& n, double w, double h, const gp_Pnt& origin)
 {
     const double ax = std::abs(n.X()), ay = std::abs(n.Y()), az = std::abs(n.Z());
+    const double dx = p.X() - origin.X(), dy = p.Y() - origin.Y(), dz = p.Z() - origin.Z();
     if (az >= ax && az >= ay)
-        return {p.X() / w, p.Y() / h}; // floors and roofs: plan x, y
-    if (ax >= ay)
-        return {p.Y() / w, p.Z() / h}; // faces looking along x
-    return {p.X() / w, p.Z() / h};     // faces looking along y
+        return {dx / w + 0.5, dy / h + 0.5}; // floors and roofs: plan x, y
+    // a vertical face: across it from left to right as seen from where it faces, and up
+    const double len = std::hypot(n.X(), n.Y());
+    const double tx = -n.Y() / len, ty = n.X() / len;
+    return {(dx * tx + dy * ty) / w + 0.5, dz / h};
 }
 
 namespace {
@@ -770,6 +772,15 @@ void ElementBatch::addTexturedGroup(const Handle(Prs3d_Presentation)& prs, doubl
     for (int i = 0; i < elementCount(); ++i) {
         if (isHidden(i))
             continue;
+        // the element's middle in plan and its base: where its pictures are measured from
+        double x0 = 1e300, y0 = 1e300, z0 = 1e300, x1 = -1e300, y1 = -1e300;
+        for (uint32_t v = m_chunk.voff[size_t(i)]; v < m_chunk.voff[size_t(i) + 1]; ++v) {
+            const gp_Pnt q = vertex(m_chunk, v);
+            x0 = std::min(x0, q.X()), x1 = std::max(x1, q.X());
+            y0 = std::min(y0, q.Y()), y1 = std::max(y1, q.Y());
+            z0 = std::min(z0, q.Z());
+        }
+        const gp_Pnt origin((x0 + x1) / 2, (y0 + y1) / 2, z0);
         for (uint32_t t = m_chunk.toff[size_t(i)]; t < m_chunk.toff[size_t(i) + 1]; ++t) {
             if (triangleTexture(i, t) != paletteIndex || triangleTransparency(i, t) != alpha)
                 continue;
@@ -779,7 +790,7 @@ void ElementBatch::addTexturedGroup(const Handle(Prs3d_Presentation)& prs, doubl
             gp_Vec n = gp_Vec(a, b).Crossed(gp_Vec(a, c));
             const gp_Dir dir = n.Magnitude() > 1e-12 ? gp_Dir(n) : gp_Dir(0, 0, 1);
             for (const gp_Pnt& p : {a, b, c}) {
-                const auto [u, v] = boxTexel(p, dir, s.texW, s.texH);
+                const auto [u, v] = boxTexel(p, dir, s.texW, s.texH, origin);
                 arr->AddVertex(p, dir, gp_Pnt2d(u, v));
             }
         }

@@ -86,6 +86,20 @@ void MainWindow::addUnderlayActions(QMenu* file)
         if (ok)
             placeFigure(path, width, QPointF(0, 0));
     });
+    // D98: Archicad's Picture object: an image standing in the model (a person, a tree, a backdrop).
+    QAction* picture3d = file->addAction(tr("Place picture in &3D..."));
+    picture3d->setObjectName(QStringLiteral("actionPlacePicture3d"));
+    picture3d->setToolTip(tr("A picture standing in the model at the origin of the active level: move it into place"));
+    connect(picture3d, &QAction::triggered, this, [this] {
+        const QString path = QFileDialog::getOpenFileName(this, tr("Place picture in 3D"), QString(),
+            tr("Pictures (*.png *.jpg *.jpeg)"));
+        if (path.isEmpty())
+            return;
+        bool ok = false;
+        const double width = QInputDialog::getDouble(this, tr("Place picture in 3D"), tr("Width (m):"), 1.0, 0.01, 1000.0, 3, &ok);
+        if (ok)
+            placePicture3d(path, width, QPointF(0, 0));
+    });
     QAction* manage = file->addAction(tr("U&nderlays..."));
     manage->setObjectName(QStringLiteral("actionUnderlays"));
     manage->setToolTip(tr("Show, hide, fade, calibrate, move or remove underlays"));
@@ -186,6 +200,21 @@ QJsonObject MainWindow::placeUnderlay(const QString& path, const QJsonObject& op
         m_status->showMessage(tr("Placed underlay %1").arg(r.value("underlay").toObject().value("name").toString()));
     }
     return r;
+}
+
+bool MainWindow::placePicture3d(const QString& path, double widthMetres, QPointF at)
+{
+    const QJsonObject r = bridge("place_picture_3d", {m_levels->activeStorey(), path, QString::number(widthMetres, 'g', 17),
+        QString::number(at.x(), 'g', 17), QString::number(at.y(), 'g', 17), QStringLiteral("0"), QStringLiteral("0")});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not place the picture"), r.value("error").toString());
+        return false;
+    }
+    loadProjectSettings(); // its file is kept with the project
+    afterEdit(r);
+    setSelection({r.value("guid").toString()});
+    m_status->showMessage(tr("Picture placed: move it into place (it faces south; rotate it to turn it)"));
+    return true;
 }
 
 bool MainWindow::placeFigure(const QString& path, double widthMetres, QPointF bottomLeft)

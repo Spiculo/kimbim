@@ -227,8 +227,8 @@
 <context>
     <name>QObject</name>
     <message>
-        <location filename="../tests/test_main_window.cpp" line="905"/>
-        <location filename="../tests/test_main_window.cpp" line="1115"/>
+        <location filename="../tests/test_main_window.cpp" line="922"/>
+        <location filename="../tests/test_main_window.cpp" line="1132"/>
         <source>Untitled</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4487,7 +4487,7 @@ License: GPL-3.0-or-later</source>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="3487"/>
-        <location filename="../tests/test_main_window.cpp" line="1483"/>
+        <location filename="../tests/test_main_window.cpp" line="1500"/>
         <source>Versions</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4931,7 +4931,7 @@ Editing the IFC directly opens it at once, without version history, options, com
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="3104"/>
-        <location filename="../tests/test_main_window.cpp" line="840"/>
+        <location filename="../tests/test_main_window.cpp" line="857"/>
         <source>Wall: click the start point</source>
         <translation type="unfinished"></translation>
     </message>
@@ -6257,7 +6257,7 @@ Open it read-only?</source>
         <location filename="../src/MainWindow.cpp" line="6139"/>
         <location filename="../src/MarkupTools.cpp" line="332"/>
         <location filename="../src/MarkupTools.cpp" line="358"/>
-        <location filename="../src/Underlays.cpp" line="196"/>
+        <location filename="../src/Underlays.cpp" line="225"/>
         <location filename="../src/LibraryTools.cpp" line="198"/>
         <source>Could not place it: %1</source>
         <translation type="unfinished"></translation>
@@ -6912,119 +6912,146 @@ Open it read-only?</source>
     </message>
     <message>
         <location filename="../src/Underlays.cpp" line="85"/>
+        <location filename="../src/Underlays.cpp" line="99"/>
         <source>Width (m):</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="89"/>
+        <location filename="../src/Underlays.cpp" line="90"/>
+        <source>Place picture in &amp;3D...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/Underlays.cpp" line="92"/>
+        <source>A picture standing in the model at the origin of the active level: move it into place</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/Underlays.cpp" line="94"/>
+        <location filename="../src/Underlays.cpp" line="99"/>
+        <source>Place picture in 3D</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/Underlays.cpp" line="103"/>
         <source>U&amp;nderlays...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="91"/>
+        <location filename="../src/Underlays.cpp" line="105"/>
         <source>Show, hide, fade, calibrate, move or remove underlays</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="127"/>
+        <location filename="../src/Underlays.cpp" line="141"/>
         <source>Underlay: cancelled</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="135"/>
-        <location filename="../src/Underlays.cpp" line="139"/>
-        <location filename="../src/Underlays.cpp" line="146"/>
+        <location filename="../src/Underlays.cpp" line="149"/>
+        <location filename="../src/Underlays.cpp" line="153"/>
         <location filename="../src/Underlays.cpp" line="160"/>
+        <location filename="../src/Underlays.cpp" line="174"/>
         <source>Place underlay</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="135"/>
+        <location filename="../src/Underlays.cpp" line="149"/>
         <source>Open a model with a level first.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="140"/>
+        <location filename="../src/Underlays.cpp" line="154"/>
         <source>Underlays (*.dxf *.pdf *.png *.jpg *.jpeg);;DXF drawings (*.dxf);;PDF files (*.pdf);;Images (*.png *.jpg *.jpeg)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="144"/>
+        <location filename="../src/Underlays.cpp" line="158"/>
         <source>Reading %1...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="165"/>
+        <location filename="../src/Underlays.cpp" line="179"/>
         <source>Placed %1. To set its scale, use File &gt; Underlays... &gt; Calibrate.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="181"/>
+        <location filename="../src/Underlays.cpp" line="195"/>
         <source>Placing %1...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="186"/>
+        <location filename="../src/Underlays.cpp" line="200"/>
         <source>Placed underlay %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="202"/>
+        <location filename="../src/Underlays.cpp" line="210"/>
+        <source>Could not place the picture</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/Underlays.cpp" line="216"/>
+        <source>Picture placed: move it into place (it faces south; rotate it to turn it)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/Underlays.cpp" line="231"/>
         <source>Placed picture %1 (move or rotate it in File &gt; Underlays)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="272"/>
+        <location filename="../src/Underlays.cpp" line="301"/>
         <source>Trace: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="293"/>
+        <location filename="../src/Underlays.cpp" line="322"/>
         <source>Trace off</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="294"/>
+        <location filename="../src/Underlays.cpp" line="323"/>
         <source>Tracing the level below</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="295"/>
+        <location filename="../src/Underlays.cpp" line="324"/>
         <source>Tracing the level above</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="326"/>
+        <location filename="../src/Underlays.cpp" line="355"/>
         <source>Could not read underlay %1: %2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="341"/>
+        <location filename="../src/Underlays.cpp" line="370"/>
         <source>Could not show underlay %1: %2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="457"/>
+        <location filename="../src/Underlays.cpp" line="486"/>
         <source>Calibrate: the two points are the same</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="464"/>
+        <location filename="../src/Underlays.cpp" line="493"/>
         <source>Calibrate underlay</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="465"/>
+        <location filename="../src/Underlays.cpp" line="494"/>
         <source>Real distance between the two points (%1):</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="486"/>
+        <location filename="../src/Underlays.cpp" line="515"/>
         <source>Underlay %1 calibrated</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="486"/>
+        <location filename="../src/Underlays.cpp" line="515"/>
         <source>Underlay %1 moved</source>
         <translation type="unfinished"></translation>
     </message>
@@ -7222,6 +7249,7 @@ Open it read-only?</source>
     </message>
     <message>
         <location filename="../src/MarkupTools.cpp" line="345"/>
+        <location filename="../src/Underlays.cpp" line="95"/>
         <source>Pictures (*.png *.jpg *.jpeg)</source>
         <translation type="unfinished"></translation>
     </message>
