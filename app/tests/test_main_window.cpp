@@ -2228,8 +2228,11 @@ private slots:
         reference->setCurrentIndex(reference->findData("sea"));
         QVERIFY(sea->isEnabled());
         sea->setValue(120.5);
+        d.findChild<QComboBox*>("stairArrow")->setCurrentIndex(2); // D92: both ends
+        d.findChild<QCheckBox*>("stairRiserNumbers")->setChecked(true);
         QCOMPARE(d.changes(), QJsonObject({{"sheet_paper", "A3"}, {"drawing_scale", 50},
-                                           {"level_reference", "sea"}, {"sea_level", 120.5}}));
+                                           {"level_reference", "sea"}, {"sea_level", 120.5},
+                                           {"stair_arrow", "both"}, {"stair_riser_numbers", true}}));
     }
 
     // D72: an IFC edited directly keeps no settings, so showing or hiding a layer isn't unsaved work.

@@ -30,6 +30,11 @@ private:
     QDoubleSpinBox* m_seaLevel; // D92: project zero above sea level
     QComboBox* m_northStyle; // D92: the north arrow and scale bar symbols
     QComboBox* m_scaleBarStyle;
+    QDoubleSpinBox* m_stairRiser; // D92: stair defaults and drawing settings
+    QDoubleSpinBox* m_stairTread;
+    QComboBox* m_stairTreadMode;
+    QComboBox* m_stairArrow;
+    QCheckBox* m_stairNumbers;
     QComboBox* m_importedWalls; // D92
     QCheckBox* m_partialDups; // D92: model checks
     QSpinBox* m_decimals;

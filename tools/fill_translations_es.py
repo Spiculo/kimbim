@@ -1314,6 +1314,19 @@ ES = {
     "Editing a library object's parameters: change the selected placements only, or ask whether to change every placement of its type": 'Al editar los parámetros de un objeto de biblioteca: cambiar solo las colocaciones seleccionadas o preguntar si cambiar todas las del tipo',
     'Library object parameters:': 'Parámetros de objetos de biblioteca:',
 
+    "A new stair's target riser height": 'La altura objetivo de contrahuella de una escalera nueva',
+    'Stair riser target:': 'Contrahuella objetivo de escalera:',
+    'Fixed tread': 'Huella fija',
+    'From 2 risers + tread = 625 mm': 'Desde 2 contrahuellas + huella = 625 mm',
+    "A new stair's tread: a fixed depth, or computed from the 2R+G rule": 'La huella de una escalera nueva: una profundidad fija o calculada con la regla 2C+H',
+    'Stair tread:': 'Huella de escalera:',
+    'At the top': 'Arriba',
+    'At the bottom': 'Abajo',
+    'At both ends': 'En ambos extremos',
+    "Where the plan symbol's arrow sits": 'Dónde se sitúa la flecha del símbolo en planta',
+    'Stair plan arrow:': 'Flecha de escalera en planta:',
+    'Number the risers on the plan': 'Numerar las contrahuellas en planta',
+
 }
 
 

@@ -7120,42 +7120,102 @@ Open it read-only?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="93"/>
-        <source>Rebuild with KimBim&apos;s shape</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="94"/>
-        <source>Keep the imported shape and cut it</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="96"/>
-        <source>Splitting a wall imported from another program: rebuild it (so it edits and joins like one drawn here) or keep the other program&apos;s body and cut it</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="97"/>
-        <source>Imported walls:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../src/ProjectSettingsDialog.cpp" line="98"/>
-        <source>Flag partly overlapping elements as duplicates</source>
+        <source>A new stair&apos;s target riser height</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="101"/>
-        <source>Model checks: also report same-type elements that overlap by half or more without being exactly in the same place</source>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="99"/>
+        <source>Stair riser target:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="102"/>
+        <source>Fixed tread</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="103"/>
+        <source>From 2 risers + tread = 625 mm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="106"/>
+        <source>A new stair&apos;s tread: a fixed depth, or computed from the 2R+G rule</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/ProjectSettingsDialog.cpp" line="107"/>
+        <source>Stair tread:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="121"/>
+        <source>At the top</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="122"/>
+        <source>At the bottom</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="123"/>
+        <source>At both ends</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="126"/>
+        <source>Where the plan symbol&apos;s arrow sits</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="127"/>
+        <source>Stair plan arrow:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="128"/>
+        <source>Number the risers on the plan</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="134"/>
+        <source>Rebuild with KimBim&apos;s shape</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="135"/>
+        <source>Keep the imported shape and cut it</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="137"/>
+        <source>Splitting a wall imported from another program: rebuild it (so it edits and joins like one drawn here) or keep the other program&apos;s body and cut it</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="138"/>
+        <source>Imported walls:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="139"/>
+        <source>Flag partly overlapping elements as duplicates</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="142"/>
+        <source>Model checks: also report same-type elements that overlap by half or more without being exactly in the same place</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="148"/>
         <source>Decimals:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="109"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="150"/>
         <source>These settings aren&apos;t kept with a plain IFC file. Save as .kim to keep them.</source>
         <translation type="unfinished"></translation>
     </message>

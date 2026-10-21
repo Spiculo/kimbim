@@ -88,6 +88,47 @@ ProjectSettingsDialog::ProjectSettingsDialog(const QJsonObject& settings, bool k
         settings.value("scale_bar_style").toString(QStringLiteral("bar")))));
     m_scaleBarStyle->setToolTip(tr("The scale bar the Scale bar tool and the plan drawings place"));
     form->addRow(tr("Scale bar:"), m_scaleBarStyle);
+    m_stairRiser = new QDoubleSpinBox(this); // D92: stairs
+    m_stairRiser->setObjectName(QStringLiteral("stairRiser"));
+    m_stairRiser->setRange(0.05, 0.5);
+    m_stairRiser->setDecimals(3);
+    m_stairRiser->setSingleStep(0.005);
+    m_stairRiser->setSuffix(QStringLiteral(" m"));
+    m_stairRiser->setValue(settings.value("stair_riser").toDouble(0.175));
+    m_stairRiser->setToolTip(tr("A new stair's target riser height"));
+    form->addRow(tr("Stair riser target:"), m_stairRiser);
+    m_stairTreadMode = new QComboBox(this);
+    m_stairTreadMode->setObjectName(QStringLiteral("stairTreadMode"));
+    m_stairTreadMode->addItem(tr("Fixed tread"), QStringLiteral("fixed"));
+    m_stairTreadMode->addItem(tr("From 2 risers + tread = 625 mm"), QStringLiteral("blondel"));
+    m_stairTreadMode->setCurrentIndex(std::max(0, m_stairTreadMode->findData(
+        settings.value("stair_tread_mode").toString(QStringLiteral("fixed")))));
+    m_stairTreadMode->setToolTip(tr("A new stair's tread: a fixed depth, or computed from the 2R+G rule"));
+    form->addRow(tr("Stair tread:"), m_stairTreadMode);
+    m_stairTread = new QDoubleSpinBox(this);
+    m_stairTread->setObjectName(QStringLiteral("stairTread"));
+    m_stairTread->setRange(0.05, 1.0);
+    m_stairTread->setDecimals(3);
+    m_stairTread->setSingleStep(0.005);
+    m_stairTread->setSuffix(QStringLiteral(" m"));
+    m_stairTread->setValue(settings.value("stair_tread").toDouble(0.28));
+    m_stairTread->setEnabled(m_stairTreadMode->currentData().toString() == QLatin1String("fixed"));
+    connect(m_stairTreadMode, &QComboBox::currentIndexChanged, this,
+        [this] { m_stairTread->setEnabled(m_stairTreadMode->currentData().toString() == QLatin1String("fixed")); });
+    form->addRow(QString(), m_stairTread);
+    m_stairArrow = new QComboBox(this);
+    m_stairArrow->setObjectName(QStringLiteral("stairArrow"));
+    m_stairArrow->addItem(tr("At the top"), QStringLiteral("top"));
+    m_stairArrow->addItem(tr("At the bottom"), QStringLiteral("bottom"));
+    m_stairArrow->addItem(tr("At both ends"), QStringLiteral("both"));
+    m_stairArrow->setCurrentIndex(std::max(0, m_stairArrow->findData(
+        settings.value("stair_arrow").toString(QStringLiteral("top")))));
+    m_stairArrow->setToolTip(tr("Where the plan symbol's arrow sits"));
+    form->addRow(tr("Stair plan arrow:"), m_stairArrow);
+    m_stairNumbers = new QCheckBox(tr("Number the risers on the plan"), this);
+    m_stairNumbers->setObjectName(QStringLiteral("stairRiserNumbers"));
+    m_stairNumbers->setChecked(settings.value("stair_riser_numbers").toBool(false));
+    form->addRow(QString(), m_stairNumbers);
     m_importedWalls = new QComboBox(this); // D92
     m_importedWalls->setObjectName(QStringLiteral("importedWalls"));
     m_importedWalls->addItem(tr("Rebuild with KimBim's shape"), QStringLiteral("rebuild"));
@@ -138,6 +179,16 @@ QJsonObject ProjectSettingsDialog::changes() const
         out.insert("north_arrow_style", m_northStyle->currentData().toString());
     if (m_scaleBarStyle->currentData().toString() != m_settings.value("scale_bar_style").toString(QStringLiteral("bar")))
         out.insert("scale_bar_style", m_scaleBarStyle->currentData().toString());
+    if (std::abs(m_stairRiser->value() - m_settings.value("stair_riser").toDouble(0.175)) > 1e-9)
+        out.insert("stair_riser", m_stairRiser->value());
+    if (std::abs(m_stairTread->value() - m_settings.value("stair_tread").toDouble(0.28)) > 1e-9)
+        out.insert("stair_tread", m_stairTread->value());
+    if (m_stairTreadMode->currentData().toString() != m_settings.value("stair_tread_mode").toString(QStringLiteral("fixed")))
+        out.insert("stair_tread_mode", m_stairTreadMode->currentData().toString());
+    if (m_stairArrow->currentData().toString() != m_settings.value("stair_arrow").toString(QStringLiteral("top")))
+        out.insert("stair_arrow", m_stairArrow->currentData().toString());
+    if (m_stairNumbers->isChecked() != m_settings.value("stair_riser_numbers").toBool(false))
+        out.insert("stair_riser_numbers", m_stairNumbers->isChecked());
     if (m_importedWalls->currentData().toString() != m_settings.value("imported_walls").toString(QStringLiteral("rebuild")))
         out.insert("imported_walls", m_importedWalls->currentData().toString());
     if (m_partialDups->isChecked() != m_settings.value("check_partial_duplicates").toBool(false))

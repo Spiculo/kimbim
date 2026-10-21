@@ -54,6 +54,11 @@ DEFAULTS = {
     "check_ignore_joined": True,  # D92: walls joined to each other do not clash
     "check_partial_duplicates": False,  # D92: also flag elements that only partly overlap
     "imported_walls": "rebuild",  # D92: splitting an imported wall rebuilds it (default) or keeps its shape and cuts it
+    "stair_riser": 0.175,  # D92: a new stair's target riser (m)
+    "stair_tread": 0.28,  # D92: a new stair's tread when fixed (m)
+    "stair_tread_mode": "fixed",  # D92: a new stair's tread is fixed or from 2 risers + tread = 625 mm
+    "stair_arrow": "top",  # D92: the plan symbol's arrow: top (default), bottom or both
+    "stair_riser_numbers": False,  # D92: number the risers on the plan
 }
 UNITS = {"m": 1.0, "cm": 100.0, "mm": 1000.0}
 AREA_UNITS = {"m²": 1.0, "cm²": 10000.0, "mm²": 1000000.0}
@@ -193,6 +198,16 @@ def _error(key: str, value) -> str | None:
         return "check_partial_duplicates must be true or false"
     if key == "imported_walls" and value not in ("rebuild", "keep"):
         return f"unknown imported wall choice {value}"
+    if key == "stair_riser" and not (number and 0.05 <= value <= 0.5):
+        return "the stair riser target must be between 0.05 and 0.5 m"
+    if key == "stair_tread" and not (number and 0.05 <= value <= 1.0):
+        return "the stair tread must be between 0.05 and 1.0 m"
+    if key == "stair_tread_mode" and value not in ("fixed", "blondel"):
+        return f"unknown stair tread mode {value}"
+    if key == "stair_arrow" and value not in ("top", "bottom", "both"):
+        return f"unknown stair arrow position {value}"
+    if key == "stair_riser_numbers" and not isinstance(value, bool):
+        return "stair_riser_numbers must be true or false"
     if key in ("ids_files", "clash_sets"):
         from . import checks
 
@@ -239,4 +254,8 @@ def set_project_settings(changes_json: str) -> str:
         if (err := _error(k, v)) is not None:
             return B._dump({"ok": False, "error": err})
     _current = {**_current, **copy.deepcopy(changes)}
+    if {"stair_arrow", "stair_riser_numbers"} & set(changes):  # D92: stairs keep their plan data current
+        from . import stairs
+
+        stairs.refresh_plan_settings()
     return B._dump({"ok": True, "settings": current(), "dirty": B._dirty()})
