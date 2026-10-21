@@ -1180,6 +1180,13 @@ def assign_material(guids_json: str, kind: str, name: str) -> str:
         touched: set = set()
         if kind == "material":
             for e in elements:
+                current = ifcopenshell.util.element.get_material(e, should_skip_usage=True)
+                if current is not None and current.is_a("IfcMaterialProfileSet"):
+                    # D97: a column's or beam's material is its profile's (its type's: all of them follow)
+                    for profile in current.MaterialProfiles or ():
+                        profile.Material = m
+                    touched.update(_users_of_material(f, m))
+                    continue
                 ifcopenshell.api.material.unassign_material(f, products=[e])
                 ifcopenshell.api.material.assign_material(f, products=[e], material=m)
                 touched.add(e)
@@ -1217,7 +1224,8 @@ def _info(e) -> dict:
     else:
         mm = main_material(e)
         name = mm.Name if mm is not None else ""
-    return {"kind": "material", "name": name or "", "choices": choices, "editable": m is None or m.is_a("IfcMaterial"),
+    return {"kind": "material", "name": name or "", "choices": choices,
+            "editable": m is None or m.is_a("IfcMaterial") or m.is_a("IfcMaterialProfileSet"),
             "for": ""}
 
 

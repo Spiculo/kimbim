@@ -242,7 +242,12 @@ def test_assign_building_material_to_a_column(project):
     c = call("create_column", project["level"], types[0]["guid"], 1, 1, 3.0)
     assert c["ok"], c
     em = call("element_material", c["guid"])
-    assert em["kind"] == "material" and em["name"] in ("Concrete", "Steel") and not em["editable"]
+    assert em["kind"] == "material" and em["name"] in ("Concrete", "Steel") and em["editable"]
+    r = call("assign_material", json.dumps([c["guid"]]), "material", "Timber")  # D97: through its profile
+    assert r["ok"], r
+    assert call("element_material", c["guid"])["name"] == "Timber"
+    palette, idx, _, _ = colours(c["guid"])
+    assert hexes(palette, idx) == {M.CATALOGUE["Timber"]["colour"]}
 
 
 def test_assign_material_to_furniture_like_element(project):

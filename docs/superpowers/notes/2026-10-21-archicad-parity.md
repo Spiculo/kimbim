@@ -40,6 +40,6 @@ Branch `parity-materials`. Spec: [2026-10-21-archicad-parity-materials-design](.
   insulation loops have no line families, so DXF leaves those layers unhatched.
 - **Layer-by-layer junctions** are the regenerator's (priority 0–100); no per-junction override UI.
 - Double-slanted and complex-profile walls; per-layer surfaces on edges (the core's surface is used).
-- Composite editor for **profiles** (columns, beams) — they show their material read-only.
+- Columns and beams change material through their type's profile set (every column of the type follows); no per-occurrence material yet.
 - The construction grid's extent is computed when shown (it follows the model on the next refresh).
 - Figures: File › Place picture (typed width, opaque) or Place underlay (calibrated). 
