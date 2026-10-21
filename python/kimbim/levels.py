@@ -349,6 +349,9 @@ def _apply(rows, deletions, move_above: bool = False) -> tuple:
             ifcopenshell.api.root.remove_product(B._model, product=d)
         ifcopenshell.api.root.remove_product(B._model, product=storey)
         count += 1
+    from . import configure
+
+    changed += configure.relink_tops()  # D97: walls linked to a level above follow it
     gone = set(removed)
     return count, [g for g in dict.fromkeys(changed) if g not in gone], removed, created
 

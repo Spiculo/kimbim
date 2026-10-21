@@ -1506,6 +1506,23 @@ def _opening_fit_error(wall, along, width, height, sill) -> str:
     return ""
 
 
+def _set_wall_height(e, metres: float):
+    """Inside an action: a wall `metres` high (its body's depth; swept and curved walls keep theirs)."""
+    from . import configure
+
+    f = B._model
+    if configure.is_double_slanted(e) or configure._pset(e, configure.WALL_PSET).get("Arc"):
+        # D97: swept and curved walls keep their height themselves (the depth is their length)
+        configure._write_pset(e, configure.WALL_PSET, {"Height": float(metres)})
+        _regenerate(f, e, height=metres)
+        return
+    body = ifcopenshell.util.representation.get_representation(e, "Model", "Body", "MODEL_VIEW")
+    for solid in (f.traverse(body) if body is not None else ()):
+        if solid.is_a("IfcExtrudedAreaSolid"):
+            solid.Depth = metres / _scale()
+    _regenerate(f, e, height=metres)
+
+
 def _apply_opening_edit(element, opening, wall, along, width, height, sill):
     """Inside an action: re-place and resize a door/window and its opening."""
     f = B._model
@@ -1982,17 +1999,8 @@ def set_dimension(guids_json: str, name: str, value) -> str:
             elif kind == "wall-height":
                 from . import configure
 
-                if configure.is_double_slanted(e) or configure._pset(e, configure.WALL_PSET).get("Arc"):
-                    # D97: swept and curved walls keep their height themselves (the depth is their length)
-                    configure._write_pset(e, configure.WALL_PSET, {"Height": float(data)})
-                    _regenerate(f, e, height=data)
-                    changed.append(e.GlobalId)
-                    continue
-                body = ifcopenshell.util.representation.get_representation(e, "Model", "Body", "MODEL_VIEW")
-                for solid in (f.traverse(body) if body is not None else ()):
-                    if solid.is_a("IfcExtrudedAreaSolid"):
-                        solid.Depth = data / _scale()
-                _regenerate(f, e, height=data)
+                configure._write_pset(e, configure.WALL_PSET, {"TopLink": None})  # typed: no longer linked
+                _set_wall_height(e, data)
                 changed.append(e.GlobalId)
             else:  # column height / beam length: a new extrusion of the type's profile
                 profile, metres_, beam = data

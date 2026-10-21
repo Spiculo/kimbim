@@ -116,6 +116,60 @@ def apply_reference(wall, reference: str):
     _write_pset(wall, WALL_PSET, {"ReferenceLine": reference})
 
 
+# ---------------------------------------------------------------- top link (D97)
+# Archicad's wall top linked to a story above: the height follows the levels (KIMBIM_Wall.TopLink:
+# how many levels up, 0 or none = unlinked; TopOffset metres above it).
+
+TOP_LINKS = {"Unlinked": 0, "Level above": 1, "Two levels above": 2}
+
+
+def top_link_of(wall) -> int:
+    return int(_pset(wall, WALL_PSET).get("TopLink") or 0)
+
+
+def top_offset_of(wall) -> float:
+    return float(_pset(wall, WALL_PSET).get("TopOffset") or 0.0)
+
+
+def linked_height(wall, steps: int, offset: float):
+    """The height a wall linked `steps` levels up (plus `offset`) takes, or None without that level."""
+    from . import authoring as A
+    from . import drawgen, worksheets
+
+    home = ifcopenshell.util.element.get_container(wall)
+    if home is None or not home.is_a("IfcBuildingStorey"):
+        return None
+    order = sorted((s for s in B._model.by_type("IfcBuildingStorey")
+                    if not worksheets.is_worksheet(s) and not A._is_model(s)), key=drawgen.storey_elevation)
+    if home not in order or order.index(home) + steps >= len(order):
+        return None
+    height = A._elevation(order[order.index(home) + steps]) - A._elevation(home) + offset
+    return height if height > 0.01 else None
+
+
+def apply_top(wall) -> bool:
+    """Inside an action: a linked wall takes its linked height; False when unlinked or unchanged."""
+    from . import authoring as A
+
+    steps = top_link_of(wall)
+    if not steps:
+        return False
+    height = linked_height(wall, steps, top_offset_of(wall))
+    if height is None or abs(height - (A._wall_height(wall) or 0.0)) < 1e-7:
+        return False
+    A._set_wall_height(wall, height)
+    return True
+
+
+def relink_tops() -> list:
+    """Inside an action, after levels changed: every linked wall's height again (their GlobalIds)."""
+    out = []
+    for wall in B._model.by_type("IfcWall"):
+        if top_link_of(wall) and apply_top(wall):
+            out.append(wall.GlobalId)
+    return out
+
+
 def set_usage(wall, offset: float, sense: str, reference: str = ""):
     """Give a wall layers placed like another's (D97, a wall continuing it): the direction sense, then
     the named reference line (or the raw offset, metres, when it has none)."""
@@ -524,6 +578,10 @@ def groups(elements) -> dict:
             "Slant angle": _entry(slants, None, "IfcPlaneAngleMeasure"),
             "Opposite slant angle": _entry(opposite, None, "IfcPlaneAngleMeasure"),  # D97: double slanted
             "Profile": _entry({profile_of(w) or NO_PROFILE for w in walls}, [NO_PROFILE, *profiles()], "IfcLabel"),
+            # D97: the top linked to a level above (the height follows the levels)
+            "Top link": _entry({next(k for k, v in TOP_LINKS.items() if v == min(top_link_of(w), 2)) for w in walls},
+                               list(TOP_LINKS), "IfcLabel"),
+            "Top offset": _entry({round(top_offset_of(w), 6) for w in walls}, None, "IfcLengthMeasure"),
         }
     things = [e for e in elements if e.is_a("IfcElement") and not e.is_a("IfcOpeningElement")]
     if things and len(things) == len(elements):
@@ -590,6 +648,28 @@ def set_element_setting(guids_json: str, group: str, name: str, value) -> str:
                             set_slant(w, ref)
                 else:
                     set_double_slant(w, ref, degrees)
+            touched = _regenerate_with_neighbours(walls)
+            return len(walls), [w.GlobalId for w in touched], []
+    elif group == GEOMETRY and name in ("Top link", "Top offset"):
+        walls = [e for e in elements if e.is_a("IfcWall")]
+        if name == "Top link":
+            if value not in TOP_LINKS:
+                return _fail(f"unknown top link {value}")
+            change = {"TopLink": TOP_LINKS[value] or None}
+        else:
+            try:
+                change = {"TopOffset": float(str(value).replace(",", "."))}
+            except ValueError:
+                return _fail(f"not a number: {value}")
+        for w in walls:
+            steps = change.get("TopLink", top_link_of(w)) if "TopLink" in change else top_link_of(w)
+            if steps and linked_height(w, steps, change.get("TopOffset", top_offset_of(w))) is None:
+                return _fail(f"{w.Name or 'a wall'}'s level has no level {'two levels' if steps == 2 else 'one level'} above")
+
+        def action():
+            for w in walls:
+                _write_pset(w, WALL_PSET, change)
+                apply_top(w)
             touched = _regenerate_with_neighbours(walls)
             return len(walls), [w.GlobalId for w in touched], []
     elif group == GEOMETRY and name == "Profile":
