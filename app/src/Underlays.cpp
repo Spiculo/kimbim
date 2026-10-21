@@ -382,6 +382,12 @@ void MainWindow::refreshUnderlays()
         if (!u.isRaster() && u.storey == m_levels->activeStorey() && lines.contains(u.file))
             key += u.id + compact(u.placementJson()) + QString::number(u.placement.base.x(), 'g', 17)
                 + QString::number(u.placement.base.y(), 'g', 17) + QLatin1Char(';');
+    Underlay trace; // D98: the traced level's lines snap too (Archicad's Trace & Reference)
+    std::shared_ptr<const UnderlayLines> traceLines;
+    const bool traced = traceUnderlay(m_levels->activeStorey(), &trace, &traceLines);
+    if (traced)
+        key += trace.file + QLatin1Char('#') + QString::number(traceLines->count())
+            + QString::number(quintptr(traceLines.get())) + QLatin1Char(';');
     if (key != m_underlaySnapKey) {
         std::shared_ptr<UnderlaySnapIndex> index;
         if (!key.isEmpty()) {
@@ -389,6 +395,8 @@ void MainWindow::refreshUnderlays()
             for (const Underlay& u : std::as_const(all))
                 if (!u.isRaster() && u.storey == m_levels->activeStorey() && lines.contains(u.file))
                     index->add(*lines.value(u.file), u.placement);
+            if (traced)
+                index->add(*traceLines, trace.placement);
             index->build();
         }
         m_underlaySnap = index;

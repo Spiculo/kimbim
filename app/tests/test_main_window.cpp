@@ -272,6 +272,11 @@ private slots:
         w.setTraceMode(QStringLiteral("below"));
         QVERIFY(w.findChild<QAction*>(QStringLiteral("actionTraceBelow"))->isChecked());
         QVERIFY(w.traceSegments(l2) > 0);
+        w.levelsBar()->setActive(l2); // drawing on the upper level snaps to the traced wall's ends
+        QVERIFY(w.wallTool()->snapper().underlays());
+        QPointF end;
+        QVERIFY(w.wallTool()->snapper().underlays()->endpoint(QPointF(6.01, 0.01), 0.3, &end));
+        w.levelsBar()->setActive(l1);
         QCOMPARE(w.traceSegments(l1), 0); // nothing below the lowest level
         w.setTraceMode(QString());
         QCOMPARE(w.traceSegments(l2), 0);
