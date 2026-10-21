@@ -441,7 +441,9 @@ def test_dxf_exports_composite_cuts_with_pattern_hatches(project, tmp_path):
     assert r["ok"], r
     doc = ezdxf.readfile(str(out))
     names = {h.dxf.pattern_name for h in doc.modelspace().query("HATCH") if not h.dxf.solid_fill}
-    assert {"BRICK", "CROSSHATCH"} <= names  # brick and block layers; insulation loops have no line families
+    assert {"BRICK", "CROSSHATCH"} <= names  # brick and block layers
+    insulation = [e for e in doc.modelspace().query("LINE") if e.dxf.layer.endswith("-PATT")]
+    assert insulation  # the insulation's loops, as short lines
 
 
 def test_catalogue_surfaces_come_with_pictures(project):

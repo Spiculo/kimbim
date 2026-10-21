@@ -555,6 +555,14 @@ class Writer:
                     if ctx.get("background"):
                         self._solid_hatch(loops, ctx["background"], hatch_attribs)
                     definition = _pattern_definition(pattern, self.map.size * PRINT_PATTERN_FACTOR)
+                    if pattern.get("loops"):  # D93's insulation loops: no DXF pattern can say it, so lines
+                        lattribs = _attribs(self.doc, {**ctx, "color": ctx["fill"], "dash": []}, self.ltscale)
+                        for loop in loops:
+                            poly = [(x, y) for x, y, _ in loop]
+                            for x1, y1, x2, y2 in drafting.hatch(poly, pattern, self.map.size * PRINT_PATTERN_FACTOR):
+                                e = self.target.add_line((x1, y1), (x2, y2), dxfattribs={**lattribs, **hatch_attribs})
+                                _colour(e, ctx["fill"])
+                                self.count += 1
                     if definition:
                         hatch = self.target.add_hatch(color=aci(ctx["fill"]), dxfattribs=hatch_attribs)
                         hatch.set_pattern_fill(layer_name(ctx["pattern"]).upper()[:31] or "KimBim", color=aci(ctx["fill"]),
