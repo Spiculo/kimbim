@@ -111,7 +111,7 @@ def test_bad_shapes_are_refused(plan):
     assert not call("add_drafting", plan["l1"], "arc", pts((0, 0), (1, 0), (2, 0)), "")["ok"]  # in a line
     assert not call("add_drafting", plan["l1"], "fill", pts((0, 0), (2, 2), (2, 0), (0, 2)), "")["ok"]  # crossing
     assert not call("add_drafting", plan["l1"], "rectangle", pts((0, 0), (2, 0)), "")["ok"]
-    assert not call("add_drafting", plan["l1"], "spline", pts((0, 0), (2, 0)), "")["ok"]
+    assert not call("add_drafting", plan["l1"], "bezier", pts((0, 0), (2, 0)), "")["ok"]
     assert not call("add_drafting", plan["l1"], "line", pts((0, 0), (2, 0)), json.dumps({"line_type": "Nope"}))["ok"]
     assert not call("add_drafting", plan["l1"], "fill", pts((0, 0), (2, 0), (2, 2)), json.dumps({"pattern": "Nope"}))["ok"]
     assert not call("add_annotation", plan["l1"], "line", pts((0, 0), (2, 0)), "x")["ok"]  # not through add_annotation
