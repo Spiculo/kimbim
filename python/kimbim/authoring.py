@@ -655,12 +655,15 @@ def _wall_frame(wall):
 def _filling_representation(kind, element_type, width, height):
     f, s = B._model, _scale()
     if kind == "door":
-        return ifcopenshell.api.geometry.add_door_representation(
+        representation = ifcopenshell.api.geometry.add_door_representation(
             f, context=_body_context(), overall_height=height / s, overall_width=width / s,
             operation_type=getattr(element_type, "OperationType", None) or "SINGLE_SWING_LEFT")
-    return ifcopenshell.api.geometry.add_window_representation(
-        f, context=_body_context(), overall_height=height / s, overall_width=width / s,
-        partition_type=getattr(element_type, "PartitioningType", None) or "SINGLE_PANEL")
+    else:
+        representation = ifcopenshell.api.geometry.add_window_representation(
+            f, context=_body_context(), overall_height=height / s, overall_width=width / s,
+            partition_type=getattr(element_type, "PartitioningType", None) or "SINGLE_PANEL")
+    materials.style_filling(kind, representation, element_type)  # D96: frame, glass, leaf in 3D
+    return representation
 
 
 def _regenerate(f, wall, **kwargs):

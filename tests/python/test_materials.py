@@ -348,3 +348,29 @@ def test_plan_drawings_cut_composites_layer_by_layer(project):
     fills = re.findall(r'<path fill="([^"]+)" stroke-width="[^"]+" d=', group)
     assert len(fills) == 3  # brick, insulation, block
     assert group.count('fill="none"') == 1  # the outline over them
+
+
+def test_windows_show_aluminium_frames_and_glass(project):
+    g = wall(project)
+    t = call("opening_types", "window")["types"][0]
+    r = call("insert_opening", "window", g, t["guid"], 2.0, 1.2, 1.2, 0.9)
+    assert r["ok"], r
+    palette, idx, _, _ = colours(r["guid"])
+    looks = {(M._hex(palette[i][:3]), palette[i][3]) for i in set(idx.tolist())}
+    assert looks == {(M.CATALOGUE["Aluminium"]["colour"], 0.0), (M.CATALOGUE["Glass"]["colour"], 0.6)}
+    wtype = ifcopenshell.util.element.get_type(b._model.by_guid(r["guid"]))
+    cs = ifcopenshell.util.element.get_material(wtype)
+    assert cs.is_a("IfcMaterialConstituentSet") and {c.Name for c in cs.MaterialConstituents} == {"Framing", "Glazing"}
+
+
+def test_doors_are_timber_and_roofs_tiled(project):
+    g = wall(project)
+    t = call("opening_types", "door")["types"][0]
+    d = call("insert_opening", "door", g, t["guid"], 2.0, 0.9, 2.1, 0.0)
+    assert d["ok"], d
+    palette, idx, _, _ = colours(d["guid"])
+    assert hexes(palette, idx) == {M.CATALOGUE["Timber - finish"]["colour"]}
+    roof = call("create_roof", project["level"], json.dumps([[0, 0], [5, 0], [5, 4], [0, 4]]), "flat", 0, 0.2, 3.0)
+    assert roof["ok"], roof
+    palette, idx, _, _ = colours(roof["guid"])
+    assert hexes(palette, idx) == {M.CATALOGUE["Roof tiles"]["colour"]}

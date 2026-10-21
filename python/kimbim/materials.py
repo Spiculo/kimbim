@@ -60,6 +60,7 @@ CATALOGUE = {
     "Air gap": dict(colour="#ffffff", transparency=0.0, pen=12, pattern="Empty", priority=0, density=1.2, conductivity=0.025, heat=1000, category="Air"),
     "Membrane": dict(colour="#3c3c3c", pen=12, pattern="Solid", priority=150, density=1100, conductivity=0.2, heat=1000, category="Membrane"),
     "Soil": dict(colour="#8a6a4a", pen=12, pattern="Diagonal", priority=50, density=1600, conductivity=1.5, heat=1200, category="Earth"),
+    "Roof tiles": dict(colour="#a8553a", pen=15, pattern="Diagonal", priority=650, density=1900, conductivity=1.0, heat=800, category="Roofing"),
     "Paint - white": dict(colour="#fbfbf8", pen=12, pattern="Solid", priority=100, density=1200, conductivity=0.2, heat=1000, category="Finish"),
 }
 
@@ -416,6 +417,58 @@ def _apply_spec(f, material, name: str, spec: dict):
         "reflectance": spec.get("reflectance", "MATT")})
     attach_surface(f, material, style)
     _write_properties(f, material, {k: spec.get(k) for k in ("pen", "pattern", "priority", "density", "conductivity", "heat")})
+
+
+# ---------------------------------------------------------------- doors, windows and roofs
+
+FILLING_MATERIALS = {"door": {"Lining": "Timber - finish", "Panel": "Timber - finish"},
+                     "window": {"Framing": "Aluminium", "Glazing": "Glass"}}
+ROOF_MATERIAL = "Roof tiles"
+GLASS_MAX = 0.015  # metres: a solid without holes this thin in a window is its glass
+
+
+def _is_glass(item, scale: float) -> bool:
+    area = getattr(item, "SweptArea", None)
+    if area is None or not item.is_a("IfcExtrudedAreaSolid"):
+        return False
+    return not getattr(area, "InnerCurves", None) and float(item.Depth) * scale <= GLASS_MAX
+
+
+def style_filling(kind: str, representation, element_type=None) -> None:
+    """D96: a door or window body shows its materials in 3D (and in other viewers): each solid gets
+    its material's surface as an item style, glass by its shape (thin, no hole). The type gets a
+    constituent set naming the parts, unless it already has a material."""
+    from . import authoring
+
+    f = B._model
+    parts = FILLING_MATERIALS.get(kind)
+    if parts is None or representation is None:
+        return
+    scale = authoring._scale()
+    mats = {part: ensure(name, f) for part, name in parts.items()}
+    for item in representation.Items or ():
+        if kind == "window":
+            part = "Glazing" if _is_glass(item, scale) else "Framing"
+        else:
+            part = "Panel"
+        style = surface_of(mats[part])
+        if style is not None:
+            ifcopenshell.api.style.assign_item_style(f, item=item, style=style)
+    if element_type is not None and ifcopenshell.util.element.get_material(element_type) is None:
+        if kind == "window" and _ifc4(f):
+            cs = ifcopenshell.api.material.add_material_set(f, name=element_type.Name or "Window",
+                                                            set_type="IfcMaterialConstituentSet")
+            for part, m in mats.items():
+                ifcopenshell.api.material.add_constituent(f, constituent_set=cs, material=m, name=part)
+            ifcopenshell.api.material.assign_material(f, products=[element_type], material=cs)
+        else:
+            ifcopenshell.api.material.assign_material(f, products=[element_type], material=mats[next(iter(parts))])
+
+
+def give_roof_material(roof) -> None:
+    """A new roof is roof tiles (Archicad's default roof composite is tiled), shown in 3D and cut."""
+    if ifcopenshell.util.element.get_material(roof) is None:
+        ifcopenshell.api.material.assign_material(B._model, products=[roof], material=ensure(ROOF_MATERIAL))
 
 
 # ---------------------------------------------------------------- state for the dialog
