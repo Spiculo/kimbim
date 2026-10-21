@@ -1111,6 +1111,7 @@ _EXPORTS = {
         "duplicate_elements",
         "fillet_corners",
         "mirror_elements",
+        "resize_elements",
         "offset_elements",
         "slab_outline",
     ),

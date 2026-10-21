@@ -101,7 +101,7 @@ release notes, so check before relying on a single cell.
 | Trim, extend to boundary, split, join | all | 🟡 | new | D80: walls and beams (split, trim/extend to an element, a grid line or a corner, join/merge, unjoin; Shift+S, Shift+T, Shift+J). Not yet: 2D lines, curved walls |
 | Align (to an edge or face) | RV VW | ⬜ | new | |
 | Elevate (change vertical position) | AC RV | 🟡 | new | Wall height; no general elevate |
-| Resize / scale | AC VW SU | ⬜ | new | |
+| Resize / scale | AC VW SU | ✅ | new | D98: Edit › Resize (about the selection's middle) |
 | Pick up and inject settings (eyedropper / match properties) | AC RV VW | ✅ | new | D97: Edit › Pick up / Inject settings (Ctrl+Alt+C / V) |
 | Edit by polygon points (add, move, delete vertices; curve an edge) | AC RV VW | ⬜ | new | Archicad pet palette |
 | Solid element operations (subtract, intersect, add) | AC RV VW | ⬜ | new | |

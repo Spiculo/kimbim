@@ -196,3 +196,23 @@ def test_fillet_slabs_and_drafting(room):
         call("undo")
     assert len(call("slab_outline", room["slab"])["points"]) == 4
     assert not valid()
+
+
+def test_resize_scales_lengths_and_keeps_thicknesses(room):
+    """D98: Archicad's Resize: the selection scaled about a point; thicknesses, heights and door sizes stay."""
+    door_before = authoring._opening_info(b._model.by_guid(room["door"]))
+    dim = call("add_annotation", room["l1"], "dimension", json.dumps([[0, -1], [6, -1], [0, -2]]), "")["guid"]
+    r = call("resize_elements", g(room["w1"], room["w2"], room["slab"], dim), 0, 0, 2.0)
+    assert r["ok"], r
+    assert axis(room["w1"]) == [[0, 0], [12, 0]]
+    assert axis(room["w2"]) == [[12, 0], [12, 8]]
+    assert call("slab_outline", room["slab"])["points"] == [[0, 0], [12, 0], [12, 8], [4, 8]]
+    door = authoring._opening_info(b._model.by_guid(room["door"]))
+    assert door[2] == pytest.approx(door_before[2] * 2) and door[3] == pytest.approx(door_before[3])
+    assert authoring._thickness(authoring._layer_set(b._model.by_guid(room["w1"]))) == pytest.approx(0.3)
+    a = next(x for x in call("annotations", room["l1"])["annotations"] if x["guid"] == dim)
+    assert a["text"] == "12.00"
+    assert not call("resize_elements", g(room["w1"]), 0, 0, 1)["ok"]
+    call("undo")
+    assert axis(room["w1"]) == [[0, 0], [6, 0]]
+    assert not valid()

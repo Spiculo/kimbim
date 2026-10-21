@@ -35,6 +35,7 @@ Branch `parity-materials`. Spec: [2026-10-21-archicad-parity-materials-design](.
 - Worksheets (`kimbim/worksheets.py`), figures embedded in worksheet drawings (`underlays.figures_svg`),
   pictures on sheets (`sheets.place_sheet_image`, `sheet_files` setting).
 - Splines (`drafting.spline_points`, `DraftTool::splinePoints`).
+- Resize (Edit menu): the selection scaled about its middle (`editing.resize_elements`, or about a given point): walls, curved walls, slabs, 2D shapes and dimensions (re-measured) take new lengths, doors keep their size, others move.
 - Fillet/Chamfer (Edit menu): two walls meeting at a corner (both pulled back, a tangent curved wall or a straight one between, its layers continuing the first wall's), slab outlines, polylines and fills (`editing.round_corners`; arcs as 10° segments, like splines).
 
 ## Follow-ups (not done)

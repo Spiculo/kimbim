@@ -241,6 +241,26 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // D98: Resize the selection about its middle.
+    void resizeSelection()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        w.setTool(kimbim::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({4, 0});
+        w.wallTool()->finish();
+        w.setTool(kimbim::MainWindow::Tool::None);
+        w.setSelection(w.viewport()->guids());
+        QVERIFY(w.resizeSelection(1.5));
+        const QJsonObject dims = kimbim::PythonEngine::instance().callJson("properties_multi",
+            {QStringLiteral("[\"%1\"]").arg(w.viewport()->guids().first())}, nullptr).object().value("psets").toObject()
+            .value("Dimensions").toObject();
+        QVERIFY(std::abs(dims.value("Length").toObject().value("value").toDouble() - 6.0) < 1e-6);
+        QVERIFY(!w.resizeSelection(1.0));
+        QVERIFY(w.close());
+    }
+
     // D98: Automatic Dimensioning of the selected walls.
     void autoDimensionWalls()
     {

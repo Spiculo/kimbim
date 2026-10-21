@@ -1673,6 +1673,14 @@ ES = {
     "Distance of the dimension line from the wall's outside face (m):": "Distancia de la línea de cota a la cara exterior del muro (m):",
     "Select the walls to dimension": "Seleccione los muros a acotar",
     "%n dimension chain(s) added": ("%n cadena de cotas agregada", "%n cadenas de cotas agregadas"),
+    "Resi&ze...": "Redimen&sionar...",
+    "Select what to resize first": "Primero seleccione lo que desea redimensionar",
+    "Resize": "Redimensionar",
+    "Scale factor (lengths and positions, about the selection's middle; thicknesses and door sizes stay):":
+        "Factor de escala (longitudes y posiciones, respecto al centro de la selección; espesores y tamaños de puertas se mantienen):",
+    "Scale the selection: walls, slabs and 2D shapes take new lengths, other elements move":
+        "Escalar la selección: muros, losas y formas 2D cambian de longitud, los demás elementos se desplazan",
+    "Could not resize: %1": "No se pudo redimensionar: %1",
 }
 
 

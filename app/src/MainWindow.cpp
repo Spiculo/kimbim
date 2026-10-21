@@ -517,6 +517,18 @@ void MainWindow::buildMenus()
         ->setToolTip(tr("Mirror the selection: click two points of the mirror line (hold Ctrl on the second click to mirror a copy)"));
     editAction(tr("Multi&ply..."), "actionMultiply", QKeySequence(Qt::CTRL | Qt::Key_U), [this] { multiplyDialog(); });
     editAction(tr("&Offset..."), "actionOffset", QKeySequence(), [this] { offsetDialog(); });
+    editAction(tr("Resi&ze..."), "actionResize", QKeySequence(), [this] { // D98: Archicad's Resize
+        if (m_selection.isEmpty()) {
+            m_status->showMessage(tr("Select what to resize first"));
+            return;
+        }
+        bool ok = false;
+        const double factor = QInputDialog::getDouble(this, tr("Resize"),
+            tr("Scale factor (lengths and positions, about the selection's middle; thicknesses and door sizes stay):"),
+            1.0, 0.01, 100.0, 3, &ok);
+        if (ok)
+            resizeSelection(factor);
+    })->setToolTip(tr("Scale the selection: walls, slabs and 2D shapes take new lengths, other elements move"));
     editAction(tr("&Fillet/Chamfer..."), "actionFillet", QKeySequence(), [this] { filletDialog(); }) // D98
         ->setToolTip(tr("Round or cut the corners of the selected slabs, polylines and fills, or of two walls meeting at a corner"));
     // D78: selection tools (Archicad's Find & Select; Revit's Select All Instances).
@@ -6292,6 +6304,18 @@ bool MainWindow::deleteFavourite(const QString& name)
         return false;
     m_settings = r.value("settings").toObject();
     setWindowModified(isDirty());
+    return true;
+}
+
+bool MainWindow::resizeSelection(double factor)
+{
+    const QJsonObject r = bridge("resize_elements", {jsonList(m_selection), QString(), QString(),
+        QString::number(factor, 'g', 17)});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(tr("Could not resize: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
     return true;
 }
 
