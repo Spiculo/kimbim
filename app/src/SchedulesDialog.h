@@ -8,6 +8,7 @@
 
 class QCheckBox;
 class QComboBox;
+class QDoubleSpinBox;
 class QLabel;
 class QLineEdit;
 class QListWidget;
@@ -90,6 +91,8 @@ private:
     QListWidget* m_classes;
     QListWidget* m_available;
     QListWidget* m_fields;
+    QComboBox* m_unit = nullptr;             // D92: the schedule's own unit
+    QDoubleSpinBox* m_minOpeningArea = nullptr; // D92: openings smaller than this are not deducted
 };
 
 } // namespace kimbim

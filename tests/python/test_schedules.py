@@ -47,6 +47,36 @@ def test_builtin_schemes(house):
     assert ids == ["doors", "windows", "walls", "slabs", "columns", "beams", "rooms"]
 
 
+def test_wall_face_lengths(house):
+    # D92: the walls schedule shows the inside and outside face lengths (the axis length for straight walls).
+    _, walls, _ = table("walls")
+    for w in walls:
+        assert w["quantity:inside_face_length"] == pytest.approx(w["quantity:length"])
+        assert w["quantity:outside_face_length"] == pytest.approx(w["quantity:length"])
+
+
+def test_minimum_opening_area_to_deduct(house):
+    # D92: by default (0) every opening is deducted; above a threshold, none is.
+    _, walls, _ = table("walls")
+    l1 = [w for w in walls if w["info:level"] == "Level 1"]
+    assert sum(w["quantity:opening_area"] for w in l1) == pytest.approx(0.9 * 2.1 + 4 * 1.44)
+    scheme = {"name": "No small openings", "classes": ["IfcWall"],
+              "fields": [{"source": "quantity", "name": "opening_area"}], "min_opening_area": 10.0}
+    d = json.loads(b.schedule(json.dumps(scheme)))
+    assert d["ok"] and all(r["values"][0] == 0.0 for r in d["rows"])
+
+
+def test_schedule_units(house, tmp_path):
+    # D92: a schedule can show its quantities in its own unit (metres by default).
+    scheme = {"name": "Walls in cm", "classes": ["IfcWall"],
+              "fields": [{"source": "quantity", "name": "length"}], "unit": "cm"}
+    d = json.loads(b.schedule(json.dumps(scheme)))
+    assert d["unit"] == "cm" and max(r["values"][0] for r in d["rows"]) == pytest.approx(1000.0)
+    out = tmp_path / "walls.csv"
+    assert S.export(scheme, False, str(out))["ok"]
+    assert out.read_text(encoding="utf-8").splitlines()[0].startswith("Length (cm)")
+
+
 def test_door_and_window_sizes(house):
     _, doors, totals = table("doors")
     assert len(doors) == 2 and [d["info:level"] for d in doors] == ["Level 1", "Level 2"]  # sorted by level
@@ -144,7 +174,7 @@ def test_custom_scheme_in_the_project_settings(house):
     assert call("save_schedule_scheme", json.dumps({**walls, "fields": walls["fields"][:3]}))["ok"]
     assert next(s for s in call("schedule_schemes")["schemes"] if s["id"] == "walls")["modified"]
     assert call("delete_schedule_scheme", "walls")["ok"] and call("delete_schedule_scheme", "openings-by-type")["ok"]
-    assert len(next(s for s in call("schedule_schemes")["schemes"] if s["id"] == "walls")["fields"]) == 13
+    assert len(next(s for s in call("schedule_schemes")["schemes"] if s["id"] == "walls")["fields"]) == 15
     assert "openings-by-type" not in settings.current()["schedules"]
 
 

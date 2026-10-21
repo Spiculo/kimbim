@@ -76,6 +76,14 @@ ChecksPanel* MainWindow::checksPanel()
         for (const QString& p : paths)
             addIdsFile(p);
     });
+    connect(m_checks, &ChecksPanel::linkIdsRequested, this, [this] { // D92: link an IDS kept in a folder
+        if (m_quiet)
+            return;
+        const QString path = QFileDialog::getOpenFileName(this, tr("Link IDS files"), QString(),
+            tr("Information Delivery Specification (*.ids *.xml)"));
+        if (!path.isEmpty())
+            linkIdsFile(path);
+    });
     connect(m_checks, &ChecksPanel::removeIdsRequested, this, &MainWindow::removeIdsFile);
     connect(m_checks, &ChecksPanel::exportReportRequested, this, [this] {
         if (m_quiet)
@@ -192,6 +200,25 @@ bool MainWindow::addIdsFile(const QString& path)
     if (ok)
         m_status->showMessage(tr("IDS file %1 added to the project (%n specification(s))", nullptr,
             r.value("specifications").toInt()).arg(r.value("name").toString()));
+    refreshChecks();
+    return ok;
+}
+
+bool MainWindow::linkIdsFile(const QString& path)
+{
+    // D92: keep the IDS as a path into a (shared) folder; the check reads it when it runs, so editing
+    // it there updates the check without re-adding it. Read once now to validate it and get its name.
+    const QJsonObject r = bridge("read_ids_file", {path});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(tr("Could not link the IDS file: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    QJsonObject table = m_settings.value("ids_files").toObject();
+    table.insert(r.value("name").toString(), QJsonObject{{"path", path}});
+    const bool ok = setProjectSettings({{"ids_files", table}});
+    if (ok)
+        m_status->showMessage(tr("IDS file %1 linked from %2 (%n specification(s))", nullptr,
+            r.value("specifications").toInt()).arg(r.value("name").toString(), path));
     refreshChecks();
     return ok;
 }

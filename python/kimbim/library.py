@@ -128,11 +128,13 @@ def rounded_rect(x, y, dx, dy, r, n=4):
 
 class Obj:
     """A library object: `ifc` maps a schema family ("IFC4", "IFC2X3") to (type class, predefined
-    type or None, element type text or None)."""
+    type or None, element type text or None). `origin` (D92): where the object's insertion point sits
+    in its own coordinates (metres, from its left front corner, the library's default)."""
 
-    def __init__(self, key, name, category, ifc, params, build, library="bundled"):
+    def __init__(self, key, name, category, ifc, params, build, library="bundled", origin=None):
         self.key, self.name, self.category, self.ifc = key, name, category, ifc
         self.params, self.build, self.library = params, build, library
+        self.origin = tuple(float(v) for v in (origin or (0.0, 0.0)))
 
     def param(self, key_or_label: str):
         k = (key_or_label or "").strip().lower()
@@ -153,6 +155,10 @@ class Obj:
     def shape(self, values) -> Shape:
         s = Shape()
         self.build(s, dict(values))
+        ox, oy = self.origin
+        if abs(ox) > 1e-12 or abs(oy) > 1e-12:  # D92: the object's own origin goes to (0, 0)
+            s.solids = [_shift_solid(solid, -ox, -oy) for solid in s.solids]
+            s.curves = [_shift_curve(curve, -ox, -oy) for curve in s.curves]
         return s
 
     def type_name(self, values) -> str:
@@ -169,12 +175,41 @@ class Obj:
 OBJECTS: dict = {}
 
 
-def define(key, name, category, ifc, params, build, library="bundled"):
-    """Add an object to the library (the office library's Python files call this too)."""
+def define(key, name, category, ifc, params, build, library="bundled", origin=None):
+    """Add an object to the library (the office library's Python files call this too). `origin` (D92)
+    is where its insertion point sits, in object metres from the left front corner (the default)."""
     if isinstance(ifc, (tuple, list)):
         ifc = {"IFC4": tuple(ifc)}
-    OBJECTS[key] = Obj(key, name, category, dict(ifc), list(params), build, library)
+    OBJECTS[key] = Obj(key, name, category, dict(ifc), list(params), build, library, origin)
     return OBJECTS[key]
+
+
+def _shift_point(p, dx, dy):
+    return (p[0] + dx, p[1] + dy)
+
+
+def _shift_solid(solid, dx, dy):
+    kind = solid[0]
+    if kind == "box":
+        return (kind, solid[1] + dx, solid[2] + dy, *solid[3:])
+    if kind == "prism":
+        return (kind, [_shift_point(p, dx, dy) for p in solid[1]], *solid[2:])
+    if kind == "cylinder":
+        return (kind, solid[1] + dx, solid[2] + dy, *solid[3:])
+    if kind == "side":  # a polygon in (y, z), extruded along x
+        return (kind, [(p[0] + dy, p[1]) for p in solid[1]], solid[2] + dx, solid[3])
+    if kind == "side_cylinder":  # along x: cy, cz, x, r, dx
+        return (kind, solid[1] + dy, solid[2], solid[3] + dx, *solid[4:])
+    return solid
+
+
+def _shift_curve(curve, dx, dy):
+    kind = curve[0]
+    if kind == "poly":
+        return (kind, [_shift_point(p, dx, dy) for p in curve[1]])
+    if kind == "circle":
+        return (kind, curve[1] + dx, curve[2] + dy, *curve[3:])
+    return curve
 
 
 W = lambda d=1.0: Param("width", "Width", d)  # noqa: E731
@@ -977,10 +1012,32 @@ def _regenerate_type(t, obj: Obj, values: dict) -> None:
     _write_pset(t, obj.key, values, obj.library)
 
 
-def set_object_parameter(guids_json: str, name: str, value) -> str:
+def object_parameter_usage(guids_json: str, name: str) -> str:
+    """Whether editing `name` on these objects would also touch other placements: {"elements": all
+    placements of their types, "selected": those selected, "shared": any placement is not selected}."""
+    import ifcopenshell.util.element
+
+    from . import app_bridge as B
+    from . import authoring as A
+
+    if B._model is None:
+        return A._fail("no model open")
+    selected, everyone = 0, set()
+    for e in B._elements(guids_json):
+        found = _object_of(e)
+        if found is None or found[0].param(name) is None:
+            continue
+        selected += 1
+        everyone.update(ifcopenshell.util.element.get_types(found[2]))
+    return B._dump({"ok": True, "elements": len(everyone), "selected": selected,
+                    "shared": len(everyone) > selected})
+
+
+def set_object_parameter(guids_json: str, name: str, value, scope: str = "") -> str:
     """Change a parameter of the selected library objects. If they are every placement of their
     type, the type changes in place (keeping its GlobalId); otherwise only the selected ones move to
-    the type with the new value (found or made) and the others keep theirs. One undo step."""
+    the type with the new value (found or made) and the others keep theirs. `scope` (D92): "selection"
+    (the default behaviour) or "type" (every placement of their types changes). One undo step."""
     import ifcopenshell.api.type
     import ifcopenshell.util.element
 
@@ -1015,8 +1072,14 @@ def set_object_parameter(guids_json: str, name: str, value) -> str:
         changed = []
         for t, obj, new_values, elements in groups.values():
             everyone = set(ifcopenshell.util.element.get_types(t))
-            if everyone <= set(elements) and _find_type(f, obj.key, new_values) is None:
+            whole_type = scope == "type" or (scope != "selection" and everyone <= set(elements))
+            if whole_type and _find_type(f, obj.key, new_values) is None:
                 _regenerate_type(t, obj, new_values)
+                changed += [o.GlobalId for o in everyone]
+            elif whole_type:
+                target = _type_for(obj, new_values)  # every placement moves to the existing type
+                ifcopenshell.api.type.assign_type(f, related_objects=list(everyone), relating_type=target)
+                _remove_type_if_unused(t)
                 changed += [o.GlobalId for o in everyone]
             else:
                 target = _type_for(obj, new_values)

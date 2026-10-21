@@ -460,7 +460,7 @@ def _crossing(walk, cut):
     return None
 
 
-def stair_symbol(plan: dict, cut: float, upper: bool = False):
+def stair_symbol(plan: dict, cut: float, upper: bool = False, arrow: str = "top", riser_numbers: bool = False):
     """The plan symbol of a stair or ramp (D88, Archicad's): the walking line from a small circle at its
     start to an arrow at its top, solid up to the break line at the plan cut and dashed above it, the
     stair's lines above the cut dashed, and UP. `upper`: the level it arrives at, showing the part above
@@ -494,12 +494,21 @@ def stair_symbol(plan: dict, cut: float, upper: bool = False):
             dashed.append(above_walk)
         x0, y0 = flat[0]
         solid.append([(x0 + 0.06 * math.cos(a * math.pi / 6), y0 + 0.06 * math.sin(a * math.pi / 6)) for a in range(13)])
-    # The arrow at the top of the walking line, in the style of the part it ends.
+    # The arrow of the walking line, in the style of the part it ends (D92: top, bottom or both).
     (xa, ya), (xb, yb) = flat[-2], flat[-1]
     n = math.hypot(xb - xa, yb - ya) or 1.0
     ux, uy = (xb - xa) / n, (yb - ya) / n
-    head = [(xb - ux * 0.25 - uy * 0.12, yb - uy * 0.25 + ux * 0.12), (xb, yb), (xb - ux * 0.25 + uy * 0.12, yb - uy * 0.25 - ux * 0.12)]
-    (dashed if above_walk and not upper else solid).append(head)
+    if arrow in ("top", "both"):
+        head = [(xb - ux * 0.25 - uy * 0.12, yb - uy * 0.25 + ux * 0.12), (xb, yb),
+                (xb - ux * 0.25 + uy * 0.12, yb - uy * 0.25 - ux * 0.12)]
+        (dashed if above_walk and not upper else solid).append(head)
+    if arrow in ("bottom", "both") and len(flat) >= 2:
+        (x0, y0), (x1, y1) = flat[0], flat[1]
+        n0 = math.hypot(x1 - x0, y1 - y0) or 1.0
+        dx, dy = (x1 - x0) / n0, (y1 - y0) / n0  # pointing down the stairs, away from the walk
+        down = [(x0 + dx * 0.25 - dy * 0.12, y0 + dy * 0.25 + dx * 0.12), (x0, y0),
+                (x0 + dx * 0.25 + dy * 0.12, y0 + dy * 0.25 - dx * 0.12)]
+        solid.append(down)
     if cross is not None:  # the break line: slanted across the flight, with a zigzag in its middle
         _, (px, py), (dx, dy) = cross
         nx, ny = -dy, dx
@@ -516,6 +525,12 @@ def stair_symbol(plan: dict, cut: float, upper: bool = False):
         (x1, y1) = flat[1]
         n0 = math.hypot(x1 - flat[0][0], y1 - flat[0][1]) or 1.0
         labels.append((flat[0][0] - (x1 - flat[0][0]) / n0 * 0.35, flat[0][1] - (y1 - flat[0][1]) / n0 * 0.35, "UP", 0.0))
+    if riser_numbers:  # D92: the risers below the cut, numbered along the stair
+        for x, y, z, number, dx, dy in plan.get("risers") or []:
+            if z > cut + 1e-6:
+                continue
+            nx, ny = -dy, dx
+            labels.append((x + nx * 0.18, y + ny * 0.18, str(int(number)), 0.0))
     return solid, dashed, labels
 
 
@@ -547,7 +562,8 @@ def stair_symbols_svg(storey, to_paper, cut):
                 plan = json.loads(data["Plan"])
             except ValueError:
                 continue
-            solid, dashed, labels = stair_symbol(plan, (cut - (base - z)) if not upper else cut_here, upper)
+            solid, dashed, labels = stair_symbol(plan, (cut - (base - z)) if not upper else cut_here, upper,
+                                                 plan.get("arrow") or "top", bool(plan.get("numbers")))
             m = ifcopenshell.util.placement.get_local_placement(e.ObjectPlacement)
 
             def P(x, y):

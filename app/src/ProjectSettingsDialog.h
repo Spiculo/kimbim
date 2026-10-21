@@ -5,6 +5,7 @@
 #include <QJsonObject>
 #include <QStringList>
 
+class QCheckBox;
 class QComboBox;
 class QCheckBox;
 class QDoubleSpinBox;
@@ -29,6 +30,18 @@ private:
     QComboBox* m_scale;
     QComboBox* m_paper;
     QComboBox* m_unit;
+    QComboBox* m_areaUnit; // D92
+    QComboBox* m_levelReference; // D92: project zero, level or sea level
+    QDoubleSpinBox* m_seaLevel; // D92: project zero above sea level
+    QComboBox* m_northStyle; // D92: the north arrow and scale bar symbols
+    QComboBox* m_scaleBarStyle;
+    QDoubleSpinBox* m_stairRiser; // D92: stair defaults and drawing settings
+    QDoubleSpinBox* m_stairTread;
+    QComboBox* m_stairTreadMode;
+    QComboBox* m_stairArrow;
+    QCheckBox* m_stairNumbers;
+    QComboBox* m_importedWalls; // D92
+    QCheckBox* m_partialDups; // D92: model checks
     QSpinBox* m_decimals;
     QComboBox* m_ifcStatus;
     QComboBox* m_renovationPreset;

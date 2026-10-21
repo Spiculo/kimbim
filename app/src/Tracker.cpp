@@ -127,9 +127,14 @@ double Tracker::live(Field f) const
     const QPointF d = m_cursor - a;
     switch (f) {
     case Length:
-        return std::hypot(d.x(), d.y());
+        return std::hypot(d.x(), d.y()) / m_lengthFactor;
     case Angle: {
         double deg = std::atan2(d.y(), d.x()) * 180.0 / kPi;
+        if (m_angleMode == RelativeAngle && m_reference)
+            deg -= *m_reference * 180.0 / kPi;
+        else if (m_angleMode == Bearing)
+            deg = 90.0 - deg; // clockwise from north
+        deg = std::fmod(deg, 360.0);
         if (deg < 0)
             deg += 360.0;
         return std::abs(deg - 360.0) < 1e-9 ? 0.0 : deg;
@@ -156,9 +161,17 @@ InputAids::Locks Tracker::locks() const
     if (const auto y = value(Y))
         l.y = absolute() ? *y : a.y() + *y;
     if (m_anchor) {
-        if (const auto deg = value(Angle))
-            l.angle = *deg * kPi / 180.0;
+        if (const auto deg = value(Angle)) {
+            double radians = *deg * kPi / 180.0;
+            if (m_angleMode == RelativeAngle)
+                radians += m_reference.value_or(0.0);
+            else if (m_angleMode == Bearing)
+                radians = kPi / 2.0 - radians;
+            l.angle = radians;
+        }
         l.length = value(Length);
+        if (l.length)
+            *l.length *= m_lengthFactor;
     }
     return l;
 }

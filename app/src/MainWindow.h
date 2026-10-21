@@ -126,7 +126,7 @@ public:
     // D72: office templates. "builtin" is KimBim's default; a template opens as an untitled project.
     bool newFromTemplate(const QString& path);
     bool saveAsTemplate(const QString& name, bool replace = false); // false if it exists and wasn't replaced
-    bool addLevel(const QString& name, double elevation);
+    bool addLevel(const QString& name, double elevation, bool fitBetween = false); // D92: push above or fit between
     LevelsBar* levelsBar() const { return m_levels; }
     // D85: underlays (Underlays.cpp). File > Place underlay... picks a DXF, PDF or image and places it on
     // the active level; placeUnderlay does the same without dialogs (options as app_bridge.add_underlay).
@@ -219,6 +219,7 @@ public:
     bool setSheetPurpose(const QString& number, const QString& purpose); // "" = the current purpose
     QStringList hiddenLayers() const { return QStringList(m_hiddenLayers.begin(), m_hiddenLayers.end()); }
     QString formatLength(double metres) const;            // in the project's unit and decimals
+    QString formatArea(double squareMetres) const;        // D92: in the project's area unit and decimals
     // D72: recovery copies of unsaved work (written every N minutes; offered after a crash).
     bool writeRecovery();
     QJsonArray recoveries();
@@ -366,6 +367,8 @@ public:
     // returns how many elements matched (-1 if refused). Only what can be selected is taken: not on
     // hidden or locked layers, not hidden in the view. Criteria and selection sets are project settings.
     bool selectSimilar(const QString& mode);
+    void selectAll(); // D92: with a creation tool active, its elements; otherwise everything
+    static QString toolElementClass(Tool tool); // the IFC class a creation tool makes ("" if none)
     int findAndSelect(const QJsonObject& query, const QString& how = QStringLiteral("replace"));
     bool saveSelectionCriteria(const QString& name, const QJsonObject& criteria);
     bool deleteSelectionCriteria(const QString& name);
@@ -390,6 +393,7 @@ public:
     ChecksPanel* checksPanel(); // created and docked on first use (Model > Check model...)
     bool runChecks(const QStringList& checks, const QJsonObject& options = {});
     bool addIdsFile(const QString& path);
+    bool linkIdsFile(const QString& path); // D92: keep the IDS as a path into a folder, not embedded
     bool removeIdsFile(const QString& name);
     bool exportIdsReport(const QString& path);
     bool saveClashSet(const QString& name, const QJsonObject& set, const QString& replaces = QString());
@@ -420,6 +424,9 @@ private:
     // A corrupt saved layout/geometry can ask for a multi-gigabyte window; reset it after show.
     void clampWindowSize();
     void applyDrawingPrefs(); // the drawing timeout and hidden-line mode, from the preferences
+    void applyViewPreferences(); // D92: the perspective field of view and the home view, from the preferences
+    void refreshNorthArrow(); // D92: the plan north indicator, from true north and the preference
+    void applyTitleBarPreferences(); // D92: which controls the title bar holds
     void showAbout();
     void openDialog();
     void stopLoading();
@@ -595,6 +602,9 @@ private:
     QComboBox* m_draftPattern = nullptr;
     QSpinBox* m_draftBackground = nullptr; // 0: no background
     QToolButton* m_draftShowArea = nullptr;
+    QSpinBox* m_draftOutline = nullptr; // D92: -1 the fill's pen, 0 none
+    QComboBox* m_draftPatternScale = nullptr; // D92: paper or model
+    bool m_gripRect = false; // D92: the gripped shape is a rectangle (stays rectangular when asked)
     QComboBox* m_tagStyle = nullptr;   // D87: Automatic (by kind) or a tag style
     QComboBox* m_tagShape = nullptr;   // the style's, or none / circle / box / hexagon
     QToolButton* m_tagLeader = nullptr;
@@ -678,7 +688,8 @@ private:
     QMenu* m_recentMenu = nullptr;
     int m_savesSinceVersion = 0; // D72: automatic versions every N saves...
     QElapsedTimer m_sinceVersion; // ...or N minutes
-    QJsonObject m_document;       // the last document_state
+    QJsonObject m_document;
+    bool m_panelsShrunk = false; // D92: the panels are at their smaller width
     QJsonObject m_settings;       // the project settings (D72)
     QTimer m_recoveryTimer;       // D72: the recovery copy
     QLineEdit* m_lengthInput = nullptr;
@@ -688,6 +699,9 @@ private:
     QAction* m_planCut = nullptr;
     QAction* m_sectionBox = nullptr;
     QDoubleSpinBox* m_cutHeight = nullptr;
+    QWidget* m_planCutButton = nullptr; // D92: the title bar controls the preferences can hide
+    QWidget* m_cutSeparator = nullptr;
+    QMenu* m_fileMenu = nullptr;
     Bnd_Box m_boxBounds; // captured when the section box is switched on
     // D85: underlays (Underlays.cpp): linework by file, page images by file/page/dpi/colour.
     QHash<QString, std::shared_ptr<const UnderlayLines>> m_underlayLines;

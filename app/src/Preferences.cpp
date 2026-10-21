@@ -53,6 +53,28 @@ QJsonObject Preferences::defaults()
         {"drawing_timeout", 300},
         {"drawing_hlr", "exact"},
         {"scroll_navigation", "auto"},
+        {"tracker", "always"},
+        {"angle_mode", "absolute"},
+        {"typed_length_unit", "metres"},
+        {"tab_annotations", true},
+        {"pinned_panels", QJsonArray()},
+        {"panels_shrink_first", false},
+        {"field_of_view", 45.0},
+        {"north_arrow", true},
+        {"mesh_vertex_snaps", false},
+        {"keep_rectangles_rectangular", false},
+        {"underlay_opacity", 0.5},
+        {"underlay_greyscale", false},
+        {"underlay_tint", ""},
+        {"underlay_layer_per_file", false},
+        {"title_bar_levels", true},
+        {"title_bar_cut", true},
+        {"title_bar_versions", true},
+        {"select_similar_scope", "class_predefined"},
+        {"box_selection", "direction"},
+        {"split_join", true},
+        {"merge_props", "keep"},
+        {"object_edit_scope", "selection"},
         {"recent", QJsonArray()},
     };
 }
@@ -143,7 +165,89 @@ QString Preferences::drawingHlr() const
 QString Preferences::scrollNavigation() const
 {
     const QString v = value("scroll_navigation").toString();
-    return v == QLatin1String("zoom") || v == QLatin1String("pan") ? v : QStringLiteral("auto");
+    return v == QLatin1String("zoom") || v == QLatin1String("pan") || v == QLatin1String("precision")
+        ? v : QStringLiteral("auto");
+}
+
+QString Preferences::trackerMode() const
+{
+    const QString v = value("tracker").toString();
+    return v == QLatin1String("typing") || v == QLatin1String("off") ? v : QStringLiteral("always");
+}
+
+QString Preferences::angleMode() const
+{
+    const QString v = value("angle_mode").toString();
+    return v == QLatin1String("relative") || v == QLatin1String("bearing") ? v : QStringLiteral("absolute");
+}
+
+QString Preferences::typedLengthUnit() const
+{
+    return value("typed_length_unit").toString() == QLatin1String("project") ? QStringLiteral("project")
+                                                                             : QStringLiteral("metres");
+}
+
+bool Preferences::tabAnnotations() const { return value("tab_annotations").toBool(true); }
+
+QStringList Preferences::pinnedPanels() const
+{
+    QStringList out;
+    for (const auto& v : value("pinned_panels").toArray())
+        if (v.isString())
+            out << v.toString();
+    return out;
+}
+
+bool Preferences::panelsShrinkFirst() const { return value("panels_shrink_first").toBool(false); }
+
+double Preferences::fieldOfView() const
+{
+    const QJsonValue v = value("field_of_view");
+    return v.isDouble() && v.toDouble() >= 5.0 && v.toDouble() <= 120.0 ? v.toDouble() : 45.0;
+}
+
+bool Preferences::northArrowPlans() const { return value("north_arrow").toBool(true); }
+bool Preferences::meshVertexSnaps() const { return value("mesh_vertex_snaps").toBool(false); }
+bool Preferences::keepRectanglesRectangular() const { return value("keep_rectangles_rectangular").toBool(false); }
+
+// D92: the defaults a new underlay gets.
+double Preferences::underlayOpacity() const
+{
+    const QJsonValue v = value("underlay_opacity");
+    return v.isDouble() && v.toDouble() >= 0.05 && v.toDouble() <= 1.0 ? v.toDouble() : 0.5;
+}
+
+bool Preferences::underlayGreyscale() const { return value("underlay_greyscale").toBool(false); }
+QString Preferences::underlayTint() const { return value("underlay_tint").toString().trimmed(); }
+bool Preferences::underlayLayerPerFile() const { return value("underlay_layer_per_file").toBool(false); }
+
+bool Preferences::titleBarLevels() const { return value("title_bar_levels").toBool(true); }
+bool Preferences::titleBarCut() const { return value("title_bar_cut").toBool(true); }
+bool Preferences::titleBarVersions() const { return value("title_bar_versions").toBool(true); }
+
+QString Preferences::selectSimilarScope() const
+{
+    const QString v = value("select_similar_scope").toString();
+    return v == QLatin1String("type") || v == QLatin1String("class") ? v : QStringLiteral("class_predefined");
+}
+
+QString Preferences::boxSelection() const
+{
+    const QString v = value("box_selection").toString();
+    return v == QLatin1String("partial") || v == QLatin1String("entire") ? v : QStringLiteral("direction");
+}
+
+bool Preferences::splitJoin() const { return value("split_join").toBool(true); }
+
+QString Preferences::objectEditScope() const
+{
+    return value("object_edit_scope").toString() == QLatin1String("ask") ? QStringLiteral("ask") : QStringLiteral("selection");
+}
+
+QString Preferences::mergeProps() const
+{
+    // D92: merging collinear walls keeps the first's properties (default) or refuses when they differ.
+    return value("merge_props").toString() == QLatin1String("refuse") ? QStringLiteral("refuse") : QStringLiteral("keep");
 }
 
 bool Preferences::trueLineWeights() const

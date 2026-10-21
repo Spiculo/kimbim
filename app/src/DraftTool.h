@@ -27,6 +27,7 @@ public:
     Mode mode() const { return m_mode; }
     void setTolerance(double metres) { m_tolerance = metres; }
     void setOrtho(bool ortho) { m_ortho = ortho; }
+    void setLengthFactor(double f) { m_lengthFactor = f > 0 ? f : 1.0; } // D92: typed lengths' unit
     bool isDrawing() const { return !m_points.isEmpty(); }
     const QVector<QPointF>& points() const { return m_points; }
     std::optional<QPointF> hover() const { return m_hover; }
@@ -65,6 +66,7 @@ private:
     Snapper m_snapper;
     Mode m_mode = Mode::Line;
     double m_tolerance = 0.1;
+    double m_lengthFactor = 1.0; // D92: typed lengths in the project unit
     bool m_ortho = false;
     QVector<QPointF> m_points;
     std::optional<QPointF> m_hover;

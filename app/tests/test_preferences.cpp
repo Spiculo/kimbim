@@ -4,6 +4,7 @@
 #include <QJsonObject>
 #include <QTemporaryDir>
 #include <QComboBox>
+#include <QCheckBox>
 #include <QLabel>
 #include <QLineEdit>
 #include <QSpinBox>
@@ -27,6 +28,10 @@ private slots:
         QCOMPARE(p.autoVersionEvery(), 10);
         QCOMPARE(p.recoveryMinutes(), 5);
         QCOMPARE(p.largeIfcMb(), 5.0);
+        QCOMPARE(p.trackerMode(), QString("always"));
+        QCOMPARE(p.angleMode(), QString("absolute"));
+        QCOMPARE(p.typedLengthUnit(), QString("metres"));
+        QVERIFY(p.tabAnnotations());
         QVERIFY(p.templatesFolder().endsWith(QStringLiteral("KimBim Templates")));
         QVERIFY(p.recent().isEmpty());
     }
@@ -89,9 +94,26 @@ private slots:
         QCOMPARE(p.recoveryMinutes(), 5);
         QCOMPARE(p.autoVersionEvery(), 10);
         QCOMPARE(p.largeIfcMb(), 5.0);
+        QCOMPARE(p.trackerMode(), QString("always"));
+        QCOMPARE(p.angleMode(), QString("absolute"));
+        QCOMPARE(p.typedLengthUnit(), QString("metres"));
+        QVERIFY(p.tabAnnotations());
         QCOMPARE(p.scrollNavigation(), QString("auto")); // D89
         p.setValue("scroll_navigation", "sideways");
         QCOMPARE(p.scrollNavigation(), QString("auto"));
+        QCOMPARE(p.fieldOfView(), 45.0); // D92
+        p.setValue("field_of_view", 500);
+        QCOMPARE(p.fieldOfView(), 45.0);
+        QVERIFY(p.titleBarLevels() && p.titleBarCut() && p.titleBarVersions()); // D92
+        p.setValue("title_bar_versions", false);
+        QVERIFY(!p.titleBarVersions());
+        QCOMPARE(p.selectSimilarScope(), QString("class_predefined")); // D92
+        QCOMPARE(p.boxSelection(), QString("direction"));
+        p.setValue("box_selection", "sideways");
+        QCOMPARE(p.boxSelection(), QString("direction"));
+        QVERIFY(p.splitJoin()); // D92
+        p.setValue("split_join", false);
+        QVERIFY(!p.splitJoin());
     }
 
     void theDialogWritesWhatTheUserPicked()
@@ -108,6 +130,19 @@ private slots:
         d.findChild<QSpinBox*>("recoveryMinutes")->setValue(0);
         d.findChild<QSpinBox*>("largeIfcMb")->setValue(20);
         d.findChild<QComboBox*>("scrollNavigation")->setCurrentIndex(2); // auto, zoom, pan (D89)
+        d.findChild<QSpinBox*>("fieldOfView")->setValue(60); // D92
+        d.findChild<QCheckBox*>("titleBarVersions")->setChecked(false); // D92
+        d.findChild<QCheckBox*>("titleBarLevels")->setChecked(false);
+        d.findChild<QComboBox*>("selectSimilarScope")->setCurrentIndex(1); // class_predefined, type, class
+        d.findChild<QComboBox*>("boxSelection")->setCurrentIndex(2); // direction, partial, entire
+        d.findChild<QCheckBox*>("splitJoin")->setChecked(false);
+        d.findChild<QComboBox*>("objectEditScope")->setCurrentIndex(1); // D92: selection, ask
+        d.findChild<QCheckBox*>("keepRectangles")->setChecked(true);
+        d.findChild<QComboBox*>("tracker")->setCurrentIndex(2); // always, typing, off
+        d.findChild<QComboBox*>("angleMode")->setCurrentIndex(2); // absolute, relative, bearing
+        d.findChild<QComboBox*>("typedLengthUnit")->setCurrentIndex(1); // metres, project
+        d.findChild<QCheckBox*>("tabAnnotations")->setChecked(false);
+        d.findChild<QCheckBox*>("panelsShrinkFirst")->setChecked(true);
         d.findChild<QLineEdit*>("authorName")->setText("Felipe");
         d.findChild<QLineEdit*>("templatesFolder")->setText("Z:/Plantillas");
         d.apply();
@@ -119,6 +154,19 @@ private slots:
         QCOMPARE(p.recoveryMinutes(), 0);
         QCOMPARE(p.largeIfcMb(), 20.0);
         QCOMPARE(p.scrollNavigation(), QString("pan"));
+        QCOMPARE(p.fieldOfView(), 60.0);
+        QVERIFY(!p.titleBarLevels() && !p.titleBarVersions());
+        QCOMPARE(p.selectSimilarScope(), QString("type"));
+        QCOMPARE(p.objectEditScope(), QString("ask"));
+        QVERIFY(p.keepRectanglesRectangular());
+        QCOMPARE(p.trackerMode(), QString("off"));
+        QCOMPARE(p.angleMode(), QString("bearing"));
+        QCOMPARE(p.typedLengthUnit(), QString("project"));
+        QVERIFY(!p.tabAnnotations());
+        QVERIFY(p.panelsShrinkFirst());
+        QVERIFY(p.pinnedPanels().isEmpty());
+        QCOMPARE(p.boxSelection(), QString("entire"));
+        QVERIFY(!p.splitJoin());
         QCOMPARE(p.authorName(), QString("Felipe"));
         QCOMPARE(p.templatesFolder(), QString("Z:/Plantillas"));
     }

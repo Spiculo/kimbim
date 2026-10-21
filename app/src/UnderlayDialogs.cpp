@@ -71,7 +71,8 @@ double PlaceUnderlayDialog::rasterScale(const QString& kind, int n, double dpi)
     return perUnit * std::max(1, n);
 }
 
-PlaceUnderlayDialog::PlaceUnderlayDialog(const QString& fileName, const QJsonObject& probe, const QStringList& layers, QWidget* parent)
+PlaceUnderlayDialog::PlaceUnderlayDialog(const QString& fileName, const QJsonObject& probe, const QStringList& layers,
+    const QString& defaultLayer, QWidget* parent)
     : QDialog(parent)
     , m_kind(probe.value("kind").toString())
 {
@@ -126,11 +127,18 @@ PlaceUnderlayDialog::PlaceUnderlayDialog(const QString& fileName, const QJsonObj
     m_layer->setObjectName(QStringLiteral("underlayLayer"));
     m_layer->setEditable(true);
     QStringList names = layers;
-    if (!names.contains(QStringLiteral("Underlays")))
-        names.prepend(QStringLiteral("Underlays"));
+    if (!names.contains(defaultLayer))
+        names.prepend(defaultLayer);
     m_layer->addItems(names);
-    m_layer->setCurrentText(QStringLiteral("Underlays"));
+    m_layer->setCurrentText(defaultLayer);
     form->addRow(tr("Layer:"), m_layer);
+    // D92: centred on the origin (default) or the drawing's own (survey) coordinates.
+    m_placement = new QComboBox;
+    m_placement->setObjectName(QStringLiteral("underlayPlacement"));
+    m_placement->addItem(tr("Centre it on the origin"), QStringLiteral("centred"));
+    m_placement->addItem(tr("Keep survey coordinates"), QStringLiteral("survey"));
+    m_placement->setToolTip(tr("Centre the drawing's middle on the level's origin, or keep its own coordinates (survey drawings)"));
+    form->addRow(tr("Placement:"), m_placement);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
     buttons->button(QDialogButtonBox::Ok)->setText(tr("Place"));
     connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
@@ -144,6 +152,8 @@ QJsonObject PlaceUnderlayDialog::options() const
 {
     QJsonObject o{{"x", m_x->value()}, {"y", m_y->value()}, {"rotation", m_rotation->value()},
         {"layer", m_layer->currentText().trimmed().isEmpty() ? QStringLiteral("Underlays") : m_layer->currentText().trimmed()}};
+    if (m_placement)
+        o.insert("placement", m_placement->currentData().toString());
     if (m_unit)
         o.insert("units", m_unit->currentData().toDouble());
     if (m_page)

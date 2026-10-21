@@ -398,9 +398,27 @@ def _entries() -> list[dict]:
 
 
 def _store(entries: list[dict]) -> dict:
+    """Save the underlay list. It goes through one undoable transaction (D92: underlay edits are undo
+    steps), unless a step is already open (a console edit block)."""
+    from . import app_bridge as B
     from . import settings as S
 
-    return json.loads(S.set_project_settings(json.dumps({"underlays": entries})))
+    result: dict = {}
+
+    def action():
+        result.update(json.loads(S.set_project_settings(json.dumps({"underlays": entries}))))
+        if not result.get("ok"):
+            raise RuntimeError(result.get("error", "could not save the underlays"))
+        return 1, [], []
+
+    try:
+        if B._model is not None and B._step is None:
+            B._run_settings(action)
+        else:
+            action()
+    except Exception as ex:
+        return {"ok": False, "error": str(ex)}
+    return result
 
 
 def validate(value) -> str | None:
@@ -554,6 +572,18 @@ def add_underlay(path: str, options_json: str = "{}") -> str:
             entry["base"] = [0.0, float(h)]
             entry["size"] = [float(w), float(h)]
             entry["dpi_image"] = dpi
+        # D92: placement, centred (the drawing's centre on the level's origin) or survey coordinates
+        # (the drawing's own origin kept, e.g. map/georeferenced drawings).
+        placement = str(options.get("placement", ""))
+        if placement == "centred":
+            if kind == "dxf":
+                ext = info["extents"]
+                entry["base"] = [(ext[0] + ext[2]) / 2, (ext[1] + ext[3]) / 2]
+            else:
+                w, h = entry["size"]
+                entry["base"] = [w / 2, h / 2]
+        elif placement == "survey":
+            entry["base"] = [0.0, 0.0]
     except Exception as ex:
         return _fail(f"could not read {p.name}: {ex}")
     for k in ("x", "y", "rotation", "scale", "base", "opacity", "layer", "greyscale", "tint", "show_3d", "name"):

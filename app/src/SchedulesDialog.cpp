@@ -6,6 +6,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
+#include <QDoubleSpinBox>
 #include <QElapsedTimer>
 #include <QEvent>
 #include <QFileDialog>
@@ -51,14 +52,14 @@ QString fieldKey(const QJsonObject& f)
     return QStringLiteral("%1:%2").arg(f.value("source").toString(), f.value("name").toString());
 }
 
-QString unitSuffix(const QString& kind)
+QString unitSuffix(const QString& kind, const QString& unit)
 {
     if (kind == QLatin1String("length"))
-        return QStringLiteral(" (m)");
+        return QStringLiteral(" (%1)").arg(unit);
     if (kind == QLatin1String("area"))
-        return QStringLiteral(" (m²)");
+        return QStringLiteral(" (%1²)").arg(unit);
     if (kind == QLatin1String("volume"))
-        return QStringLiteral(" (m³)");
+        return QStringLiteral(" (%1³)").arg(unit);
     return {};
 }
 
@@ -76,6 +77,8 @@ QString SchedulesDialog::translatedLabel(const QString& english)
         {QStringLiteral("Area"), tr("Area")}, {QStringLiteral("Gross area"), tr("Gross area")},
         {QStringLiteral("Net area"), tr("Net area")}, {QStringLiteral("Section area"), tr("Section area")},
         {QStringLiteral("Gross side area"), tr("Gross side area")}, {QStringLiteral("Net side area"), tr("Net side area")},
+        {QStringLiteral("Inside face length"), tr("Inside face length")},
+        {QStringLiteral("Outside face length"), tr("Outside face length")},
         {QStringLiteral("Opening area"), tr("Opening area")}, {QStringLiteral("Volume"), tr("Volume")},
         {QStringLiteral("Gross volume"), tr("Gross volume")}, {QStringLiteral("Count"), tr("Count")},
         {QStringLiteral("Number"), tr("Number")},
@@ -257,9 +260,10 @@ void SchedulesDialog::fill(const QJsonObject& data)
     const QJsonArray totals = data.value("totals").toArray();
     QStringList headers;
     QStringList kinds;
+    const QString unit = data.value("unit").toString(QStringLiteral("m"));
     for (const QJsonValue& v : std::as_const(m_columns)) {
         const QJsonObject c = v.toObject();
-        headers << translatedLabel(c.value("label").toString()) + unitSuffix(c.value("kind").toString());
+        headers << translatedLabel(c.value("label").toString()) + unitSuffix(c.value("kind").toString(), unit);
         kinds << c.value("kind").toString();
     }
     if (merged) {
@@ -488,6 +492,23 @@ ScheduleSchemeDialog::ScheduleSchemeDialog(const QJsonObject& scheme, QWidget* p
     lists->addLayout(right, 2);
     auto* form = new QFormLayout;
     form->addRow(tr("Name:"), m_name);
+    // D92: the schedule's own unit and the smallest opening it deducts.
+    m_unit = new QComboBox(this);
+    m_unit->setObjectName(QStringLiteral("scheduleUnit"));
+    m_unit->addItem(QStringLiteral("m"), QStringLiteral("m"));
+    m_unit->addItem(QStringLiteral("cm"), QStringLiteral("cm"));
+    m_unit->addItem(QStringLiteral("mm"), QStringLiteral("mm"));
+    const QString unit = scheme.value("unit").toString();
+    m_unit->setCurrentIndex(qMax(0, m_unit->findData(unit.isEmpty() ? QStringLiteral("m") : unit)));
+    m_minOpeningArea = new QDoubleSpinBox(this);
+    m_minOpeningArea->setObjectName(QStringLiteral("minOpeningArea"));
+    m_minOpeningArea->setRange(0.0, 100.0);
+    m_minOpeningArea->setDecimals(3);
+    m_minOpeningArea->setSuffix(tr(" m²"));
+    m_minOpeningArea->setValue(scheme.value("min_opening_area").toDouble(0.0));
+    m_minOpeningArea->setToolTip(tr("Openings smaller than this are not taken out of the host's areas (0: deduct all)"));
+    form->addRow(tr("Units:"), m_unit);
+    form->addRow(tr("Smallest opening to deduct:"), m_minOpeningArea);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     auto* layout = new QVBoxLayout(this);
     layout->addLayout(form);
@@ -578,6 +599,9 @@ QJsonObject ScheduleSchemeDialog::scheme() const
     }
     s["fields"] = fields;
     s["group_by"] = group;
+    s["unit"] = m_unit ? m_unit->currentData().toString() : QStringLiteral("m");
+    if (m_minOpeningArea && m_minOpeningArea->value() > 0.0)
+        s["min_opening_area"] = m_minOpeningArea->value();
     return s;
 }
 

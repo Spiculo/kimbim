@@ -122,6 +122,24 @@ def test_a_tag_goes_with_its_element_and_comes_back_with_undo(flat):
     assert t in listed(flat["l1"]) and tags.element_of(b._model.by_guid(t)).GlobalId == flat["door"]
 
 
+def test_orphan_tags_are_deleted_or_kept(flat):
+    # D92: by default a tag whose element is gone goes too; the option keeps it, showing "?".
+    t = call("add_tag", flat["door"], "")["guid"]
+    assert call("set_project_settings", json.dumps({"orphan_tags": "keep"}))["ok"]
+    assert call("delete_elements", g(flat["door"]))["ok"]
+    assert t in listed(flat["l1"])
+    assert listed(flat["l1"])[t]["text"] == "?"
+    call("undo")
+    assert tags.element_of(b._model.by_guid(t)).GlobalId == flat["door"]
+
+
+def test_radius_decimals_are_a_project_setting(flat):
+    # D92: radius and diameter dimensions follow the project's radius decimals.
+    assert call("set_project_settings", json.dumps({"radius_decimals": 1}))["ok"]
+    assert symbols.radial_text("radius", [(0, 0), (2.0, 0)]) == "R 2.0"
+    assert symbols.radial_text("diameter", [(0, 0), (2.0, 0)]) == "Ø 4.0"
+
+
 def test_a_copied_tag_annotates_the_same_element(flat):
     t = call("add_tag", flat["walls"][1], "")["guid"]
     r = call("copy_elements", g(t), 0, 2, 0)
@@ -165,6 +183,15 @@ def test_tag_all_tags_each_untagged_door_window_and_wall_once(flat):
     assert valid() == []
 
 
+def test_tag_all_can_ask_for_categories(flat):
+    """D92: Tag all tags only the categories it is asked for."""
+    doors = call("tag_all", flat["l1"], "", "", "door")
+    assert doors["ok"] and doors["tagged"] == 1  # the door; the walls are left
+    assert call("tag_all", flat["l1"], "", "", "wall")["tagged"] == 4
+    assert call("tag_all", flat["l1"], "", "", "nope")["ok"] is False
+    assert valid() == []
+
+
 def test_tag_styles_are_project_settings_and_restyle_their_tags(flat):
     t = call("add_tag", flat["door"], "")["guid"]
     styles = call("tag_styles")
@@ -192,8 +219,10 @@ def test_north_arrow_follows_true_north(flat):
     assert n["ok"], n
     tip = listed(flat["l1"])[n["guid"]]["curves"][1][0]
     assert tip == pytest.approx([15, 3 + 0.6])  # 6 mm at 1:100, up
+    assert call("get_true_north")["set"] is False  # D92: nothing stored yet
     assert call("set_true_north", 90)["ok"]  # north turned 90 degrees counter-clockwise: to the west
     assert call("get_true_north")["degrees"] == pytest.approx(90)
+    assert call("get_true_north")["set"] is True
     tip = listed(flat["l1"])[n["guid"]]["curves"][1][0]
     assert tip == pytest.approx([15 - 0.6, 3])
     ctx = next(c for c in b._model.by_type("IfcGeometricRepresentationContext") if c.ContextType == "Model")
@@ -249,7 +278,33 @@ def test_level_and_spot_elevations_measure_the_slab_below(flat):
     assert listed(l2)[up]["text"] == "+3.00"  # no slab: the level's elevation
 
 
+def test_level_dimensions_can_measure_from_the_level_or_sea_level(flat):
+    """D92: the level dimension reference is project zero (default), the level it is on, or sea level."""
+    l2 = call("add_storey", "Level 2", 3.0)["guid"]
+    up = call("add_symbol", l2, "level", json.dumps([[20, 20]]), "")["guid"]
+    assert listed(l2)[up]["text"] == "+3.00"
+    assert call("set_project_settings", json.dumps({"level_reference": "level"}))["ok"]
+    assert listed(l2)[up]["text"] == "±0.00"  # on its own level
+    assert call("set_project_settings", json.dumps({"level_reference": "sea", "sea_level": 100.0}))["ok"]
+    assert listed(l2)[up]["text"] == "+103.00"
+    assert call("set_project_settings", json.dumps({"level_reference": "project"}))["ok"]
+    assert listed(l2)[up]["text"] == "+3.00"
+
+
 # ---------------------------------------------------------------- drawings, sheets, DXF
+
+def test_north_arrow_and_scale_bar_symbols_are_selectable(flat):
+    """D92: the project picks the north arrow (circle/default, needle, plain arrow) and the scale
+    bar (alternating bar/default, line with ticks); the plan drawings follow."""
+    call("add_symbol", flat["l1"], "north", json.dumps([[15, 3]]), "")
+    call("add_symbol", flat["l1"], "scalebar", json.dumps([[15, 0]]), "")
+    circle = plan_svg()
+    assert call("set_project_settings", json.dumps({"north_arrow_style": "needle", "scale_bar_style": "line"}))["ok"]
+    other = plan_svg()
+    assert other != circle  # the needle and the line bar draw differently
+    assert call("set_project_settings", json.dumps({"north_arrow_style": "arrow"}))["ok"]
+    assert plan_svg() != other
+
 
 def test_plan_drawing_has_tags_stamps_and_symbols(flat, tmp_path):
     t = call("add_tag", flat["door"], json.dumps({"template": "$width$×$height$"}))["guid"]

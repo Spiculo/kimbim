@@ -4,6 +4,7 @@
 #include "GraphicsDialogs.h"
 #include "PropertiesPanel.h"
 
+#include <QCheckBox>
 #include <QComboBox>
 #include <QCompleter>
 #include <QCoreApplication>
@@ -134,6 +135,11 @@ FindSelectPanel::FindSelectPanel(QWidget* parent)
     auto* matchRow = new QHBoxLayout;
     matchRow->addWidget(new QLabel(tr("Match"), this));
     matchRow->addWidget(m_match, 1);
+    // D92: by default elements on hidden or locked layers can't be found or selected.
+    m_includeHidden = new QCheckBox(tr("Include hidden"), this);
+    m_includeHidden->setObjectName(QStringLiteral("includeHidden"));
+    m_includeHidden->setToolTip(tr("Find elements on hidden or locked layers too"));
+    matchRow->addWidget(m_includeHidden);
     auto* scopeRow = new QHBoxLayout;
     scopeRow->addWidget(new QLabel(tr("In"), this));
     scopeRow->addWidget(m_scope, 1);
@@ -433,6 +439,11 @@ QString FindSelectPanel::scope() const
 void FindSelectPanel::setScope(const QString& scope)
 {
     m_scope->setCurrentIndex(std::max(0, m_scope->findData(scope)));
+}
+
+bool FindSelectPanel::includeHidden() const
+{
+    return m_includeHidden->isChecked();
 }
 
 void FindSelectPanel::setResult(const QString& text)

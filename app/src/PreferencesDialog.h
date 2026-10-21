@@ -4,6 +4,7 @@
 #include <QDialog>
 
 class QComboBox;
+class QCheckBox;
 class QLabel;
 class QLineEdit;
 class QSpinBox;
@@ -37,6 +38,27 @@ private:
     QSpinBox* m_drawingTimeout;
     QComboBox* m_drawingHlr;
     QComboBox* m_scroll; // D89
+    QSpinBox* m_fieldOfView; // D92
+    QCheckBox* m_northArrow; // D92: north indicator on plans
+    QCheckBox* m_titleLevels; // D92: which controls the title bar holds
+    QCheckBox* m_titleCut;
+    QCheckBox* m_titleVersions;
+    QComboBox* m_selectSimilar; // D92
+    QComboBox* m_boxSelection;
+    QCheckBox* m_splitJoin; // D92
+    QComboBox* m_mergeProps; // D92
+    QCheckBox* m_meshVertexSnaps; // D92
+    QCheckBox* m_keepRectangles; // D92
+    QComboBox* m_objectEditScope; // D92
+    QComboBox* m_tracker; // D92: tracker and typed input
+    QComboBox* m_angleMode;
+    QComboBox* m_typedLength;
+    QCheckBox* m_tabAnnotations;
+    QCheckBox* m_panelsShrink;
+    QSpinBox* m_underlayOpacity; // D92: new underlay defaults
+    QCheckBox* m_underlayGrey;
+    QLineEdit* m_underlayTint;
+    QCheckBox* m_underlayLayerPerFile;
 };
 
 } // namespace kimbim

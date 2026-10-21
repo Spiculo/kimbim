@@ -25,12 +25,12 @@ HELP = """KimBim Python console
   kimbim, bridge    KimBim's modules; bridge = kimbim.app_bridge (the app's own commands, JSON in/out)
   selection()       the selected elements (entities)
   select(items)     select elements: GlobalIds, entities, or a list of them ([] clears)
-  with edit():      the changes in the block are ONE undo step (Ctrl+Z) and the views update
-  refresh()         redraw every element when the run ends (after changes made without edit())
+  with edit():      join the run's undo step explicitly (the run is one step already)
+  refresh()         redraw every element when the run ends
   help_kimbim()     this text
 Enter runs, Shift+Enter adds a line, Up/Down recall earlier input; the value of a last expression is
-printed. Stop (or Ctrl+C in the console) interrupts a script at its next line. Changes made outside
-edit() are not undoable."""
+printed. Stop (or Ctrl+C in the console) interrupts a script at its next line. Every run is one undo
+step (Ctrl+Z) and a run that changes nothing leaves none."""
 
 _ns: dict | None = None
 _lock = threading.Lock()
@@ -137,33 +137,45 @@ def _touched(f, operations) -> tuple[list[str], list[str]] | None:
     return list(dict.fromkeys(changed)), list(dict.fromkeys(removed))
 
 
+def _finish_step() -> bool:
+    """Close the open step as one undo step, or drop it when it changed nothing (D92). Returns whether a
+    step was kept."""
+    operations = B._model.transaction.operations if B._model.transaction else None
+    found = _touched(B._model, operations) if operations is not None else None
+    if found is None:
+        _run["refresh"] = True
+        found = ([], [])
+    changed, removed = found
+    changed = [*changed, *B._step[0]]
+    removed = [*removed, *B._step[1]]
+    B._step = None
+    if not changed and not removed and not operations:
+        B._end_step_without_change()  # nothing happened: no empty undo step
+        return False
+    result = B._follow_ups(len(changed), changed, removed)
+    B._commit(*result)
+    return True
+
+
 @contextlib.contextmanager
 def edit():
     """`with edit(): ...`: the changes made in the block are one undo step, and the views update when the
-    run ends. KimBim commands called inside (bridge.create_wall(...), ...) join the same step."""
+    run ends. KimBim commands called inside (bridge.create_wall(...), ...) join the same step. Every run
+    is already one undo step (D92), so edit() simply joins it; used stand-alone it opens its own."""
     if B._model is None:
         raise RuntimeError("no model open")
-    if B._step is not None:
-        raise RuntimeError("edit() blocks don't nest")
+    if B._step is not None:  # already inside the run's own step: join it
+        yield B._model
+        return
     B._begin()
     B._step = ([], [])
     try:
         yield B._model
-        operations = B._model.transaction.operations if B._model.transaction else None
-        found = _touched(B._model, operations) if operations is not None else None
-        if found is None:
-            _run["refresh"] = True
-            found = ([], [])
-        changed, removed = found
-        changed = [*changed, *B._step[0]]
-        removed = [*removed, *B._step[1]]
-        B._step = None
-        result = B._follow_ups(len(changed), changed, removed)
+        _finish_step()
     except BaseException as failure:
         B._step = None
         B._abort(failure)
         raise
-    B._commit(*result)
 
 
 def namespace() -> dict:
@@ -250,17 +262,29 @@ def _execute_all(source: str, filename: str, selection_json: str, echo: bool, ex
         ns.update(extra or {})
         out = io.StringIO()
         error = ""
+        implicit = B._step is None and B._model is not None  # the whole run is one undo step (D92)
+        if implicit:
+            B._begin()
+            B._step = ([], [])
         _stop, _worker = False, threading.get_ident()
+        failure: BaseException | None = None
         try:
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
                 _execute(source, filename, ns, echo)
         except BaseException as ex:  # noqa: BLE001  (a script's SystemExit or Stop ends the run, not the app)
+            failure = ex
             error = _show_error(ex)
         finally:
             _worker = None
             if _stop:
                 threading.settrace_all_threads(None)
             _stop = False
+        if implicit and B._step is not None:
+            if failure is not None:
+                B._step = None
+                B._abort(failure)  # a run that failed rolls back, so no half-made step survives
+            else:
+                _finish_step()
         geometry = _geometry(before)
         return B._dump({"ok": True, "output": out.getvalue(), "error": bool(error),
                         "traceback": error, "geometry": geometry,

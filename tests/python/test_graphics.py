@@ -178,7 +178,7 @@ def test_resolve_styles_elements_and_hidden():
     chair = _el(f, "IfcFurniture")
     r = g.resolve("Working", model=f)
     st = r["styles"][r["elements"][wall.GlobalId]]
-    assert st["cut"] == {"color": "#5a3a22", "weight": 0.5, "dash": []}
+    assert st["cut"] == {"color": "#5a3a22", "weight": 0.5, "dash": [], "pen": 10}
     assert st["projection"]["color"] == "#8a6a4a" and st["fill"] == "#b8a898" and st["surface"] is None
     assert r["hidden"] == [] and r["current_pen"] == 23 and r["annotation_pen"] == 23
     assert len(r["pens"]) == 255
@@ -216,7 +216,7 @@ def test_resolve_falls_back_on_missing_names():
     r = g.resolve("Nope", model=f)  # unknown purpose: the first one
     assert r["purpose"] == "P" and r["pen_set"] == "Only"
     st = r["styles"][r["elements"][wall.GlobalId]]
-    assert st["cut"] == {"color": "#000000", "weight": 0.18, "dash": []}  # pen 200 missing, line Gone
+    assert st["cut"] == {"color": "#000000", "weight": 0.18, "dash": [], "pen": 200}  # pen 200 missing, line Gone
     assert st["projection"]["color"] == "#123456"
     assert r["hidden"] == []
 

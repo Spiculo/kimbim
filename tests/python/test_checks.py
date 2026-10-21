@@ -13,6 +13,7 @@ import ifcopenshell.api.geometry
 import ifcopenshell.api.root
 import ifcopenshell.api.spatial
 import ifcopenshell.util.element
+import ifcopenshell.util.placement
 import numpy as np
 import pytest
 
@@ -172,6 +173,23 @@ def test_ids_files_are_read_stored_in_the_settings_and_run(opened, tmp_path):
     assert report["total_specifications"] == 3 and report["total_specifications_fail"] == 2
 
 
+def test_ids_linked_from_a_folder_run(opened, tmp_path):
+    """D92: an IDS file can be linked from a folder (its path) instead of embedded."""
+    opened(build_model(walls=3))
+    folder = tmp_path / "standards"
+    folder.mkdir()
+    (folder / "office.ids").write_text(IDS, encoding="utf-8")
+    assert call("set_project_settings", json.dumps({"ids_files": {"office.ids": {"path": str(folder / "office.ids")}}}))["ok"]
+    r = run("ids")
+    assert {g["name"] for g in r["groups"]} == {"office.ids · Walls have a fire rating",
+                                               "office.ids · Walls have a name", "office.ids · There are doors"}
+    # A link whose file is gone fails cleanly.
+    assert call("set_project_settings", json.dumps({"ids_files": {"miss.ids": {"path": str(folder / "gone.ids")}}}))["ok"]
+    r = run("ids")
+    assert any("could not be read" in i["message"] for i in r["issues"])
+    assert call("set_project_settings", json.dumps({"ids_files": {"bad.ids": {"nope": 1}}}))["ok"] is False
+
+
 def test_a_broken_ids_file_is_refused(tmp_path):
     path = tmp_path / "bad.ids"
     path.write_text("<ids><nope/></ids>", encoding="utf-8")
@@ -195,6 +213,23 @@ def test_hard_clashes_and_clearance_between_two_sets(opened):
     assert frozenset((near.GlobalId, w0.GlobalId)) in near_pairs
     tight = run("clash", {"clash_sets": {"gap": {"a": {"classes": ["IfcWall"]}, "mode": "clearance", "clearance": 0.1}}})
     assert frozenset((near.GlobalId, w0.GlobalId)) not in {frozenset(i["guids"]) for i in tight["issues"]}
+
+
+def test_clash_tolerance_and_joined_walls_are_settings(opened):
+    # D92: the tolerance and clearance defaults live in the project settings, and joined walls are ignored.
+    f = opened(build_model())
+    _wall(f, "Overlapping", x=2.0)  # crosses both walls
+    assert call("set_project_settings", json.dumps({"check_tolerance": 1.0}))["ok"]
+    r = run("clash", {"clash_sets": {"w": {"a": {"classes": ["IfcWall"]}, "mode": "hard"}}})
+    assert r["issues"] == []  # a 1 m tolerance swallows the 200 mm overlap
+    assert call("set_project_settings", json.dumps({"check_tolerance": 0.002}))["ok"]
+    assert run("clash", {"clash_sets": {"w": {"a": {"classes": ["IfcWall"]}, "mode": "hard"}}})["issues"]
+    w0, w1 = f.by_type("IfcWall")[:2]
+    ifcopenshell.api.geometry.connect_path(f, relating_element=w0, related_element=w1,
+                                           relating_connection="ATEND", related_connection="ATSTART")
+    assert frozenset((w0.id(), w1.id())) in checks._related_pairs(f)
+    assert call("set_project_settings", json.dumps({"check_ignore_joined": False}))["ok"]
+    assert frozenset((w0.id(), w1.id())) not in checks._related_pairs(f)
 
 
 def test_clash_sets_from_saved_find_and_select_criteria(opened):
@@ -243,6 +278,22 @@ def test_model_checks_find_each_planted_problem(opened):
     assert [i["guids"] for i in by_group(r, "Doors and windows without a host")] == [[door.GlobalId]]
     only = run("model", {"model_checks": ["rooms"]})
     assert [g["name"] for g in only["groups"]] == ["Rooms without a number or name"]
+
+
+def test_partial_overlap_duplicates_are_optional(opened):
+    """D92: elements that only partly overlap are flagged as duplicates only when the option is on."""
+    f = opened(build_model(walls=3))
+    w0 = f.by_type("IfcWall")[0]
+    twin = ifcopenshell.api.root.copy_class(f, product=w0)
+    twin.Representation = ifcopenshell.util.element.copy_deep(f, w0.Representation)
+    m = ifcopenshell.util.placement.get_local_placement(twin.ObjectPlacement)
+    m[0, 3] += 0.1  # nudge it 10 cm: same shape and class, but a different place
+    ifcopenshell.api.geometry.edit_object_placement(f, product=twin, matrix=m, is_si=True)
+    assert by_group(run("model"), "Duplicate elements") == []  # off by default
+    assert call("set_project_settings", json.dumps({"check_partial_duplicates": True}))["ok"]
+    dup = by_group(run("model"), "Duplicate elements")
+    assert len(dup) == 1 and set(dup[0]["guids"]) == {w0.GlobalId, twin.GlobalId}
+    assert "overlap" in dup[0]["message"]
 
 
 def test_bad_input_and_no_model(opened):

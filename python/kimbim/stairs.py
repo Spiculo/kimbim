@@ -59,6 +59,7 @@ RAMP_TYPES = {"straight": "STRAIGHT_RUN_RAMP", "L": "QUARTER_TURN_RAMP"}
 DEFAULTS = {"width": 1.0, "riser": 0.175, "tread": 0.28, "landing": 0.0, "turn": "left", "slope": 8.0}
 THICKNESS = 0.2       # metres: the flights' waist and the landings' thickness
 U_GAP = 0.1           # metres between the two flights of a U stair (the well)
+HEADROOM = 2.0        # metres: the clearance under the floor above that keeps a headroom-only opening
 RAMP_THICKNESS = 0.15  # metres
 # Building-code checks (warnings): a project setting, these are the defaults (Blondel's 2R+G 600-650 mm).
 RULES = {"max_riser": 0.18, "min_tread": 0.25, "step_min": 0.60, "step_max": 0.65, "max_ramp_slope": 8.33}
@@ -80,6 +81,13 @@ def riser_count(height: float, target: float) -> int:
     if height <= 0 or target <= 0:
         raise ValueError("the height and the riser must be more than 0")
     return max(2, math.ceil(height / target - 1e-9))
+
+
+def default_tread(riser: float, mode: str = "fixed", fixed: float = DEFAULTS["tread"]) -> float:
+    """A new stair's tread (D92): fixed (the default) or from 2 risers + tread = 625 mm (Blondel)."""
+    if mode != "blondel":
+        return fixed
+    return max(RULES["min_tread"], round(0.625 - 2 * riser, 4))
 
 
 def rules() -> dict:
@@ -167,7 +175,7 @@ def _split(total: int, weights: list[float], minimum: int) -> list[int]:
 
 
 def stair_layout(shape: str, height: float, width: float, riser: float, tread: float, landing: float = 0.0,
-                 turn: str = "left", points=None) -> dict:
+                 turn: str = "left", points=None, split: int | None = None, well: float | None = None) -> dict:
     """Flights and landings of a stair in its own frame (metres): the walking line starts at (0, 0) at
     the base, the first flight climbs along +X. Flights: start (walking line, first riser), dir, length,
     risers, tread, z0 (its base), z1/z0 walking heights at its ends; landings: polygon, z (top)."""
@@ -195,6 +203,10 @@ def stair_layout(shape: str, height: float, width: float, riser: float, tread: f
         if n < 4:
             raise ValueError("an L or U stair needs at least 4 risers")
         n1 = math.ceil(n / 2)
+        if split is not None:  # D92: an editable split of the risers between the flights
+            n1 = int(split)
+            if not 2 <= n1 <= n - 2:
+                raise ValueError("the flight split leaves fewer than 2 risers in a flight")
         f1 = add_flight((0.0, 0.0), x, n1, 0.0, tread)
         l1 = f1["length"]
         zl = n1 * r
@@ -205,9 +217,12 @@ def stair_layout(shape: str, height: float, width: float, riser: float, tread: f
                              "walk": [np.array([cx, 0.0])]})
             add_flight((cx, side * width / 2), (0.0, side), n - n1, zl, tread)
         else:
-            y2 = side * (width + U_GAP)
+            gap = U_GAP if well is None else float(well)  # D92: an editable well width
+            if gap < 0:
+                raise ValueError("the well width can't be negative")
+            y2 = side * (width + gap)
             outer = -side * width / 2
-            far = side * (width * 1.5 + U_GAP)
+            far = side * (width * 1.5 + gap)
             poly = [(l1, outer), (l1 + ld, outer), (l1 + ld, far), (l1, far)]
             landings.append({"polygon": [np.array(p) for p in poly], "z": zl,
                              "walk": [np.array([l1 + ld / 2, 0.0]), np.array([l1 + ld / 2, y2])]})
@@ -325,7 +340,7 @@ def ramp_layout(shape: str, height: float, width: float, slope: float, landing: 
             "walk": [tuple(float(v) for v in p) for p in walk]}
 
 
-def plan_lines(lay: dict, ramp: bool = False) -> dict:
+def plan_lines(lay: dict, ramp: bool = False, arrow: str = "top", riser_numbers: bool = False) -> dict:
     """The plan symbol's data (stair frame, metres): the walking line with heights, and the stair's
     lines (risers, sides, landing edges) each with the height that decides whether it is above the plan
     cut. Kept in the pset for drawgen, which runs without this module."""
@@ -361,7 +376,18 @@ def plan_lines(lay: dict, ramp: bool = False) -> dict:
         poly = landing["polygon"]
         for i in range(len(poly)):
             seg(poly[i], poly[(i + 1) % len(poly)], landing["z"])
-    return {"w": w, "walk": [[round(v, 4) for v in p] for p in lay["walk"]], "lines": lines, "ramp": ramp}
+    risers = []  # D92: each riser's number, at its nosing, for the plan's riser numbers
+    if not ramp:
+        number = 0
+        for f in lay["flights"]:
+            d = f["dir"]
+            for j in range(f["risers"]):
+                number += 1
+                p = f["start"] + d * f["tread"] * j
+                risers.append([round(float(p[0]), 4), round(float(p[1]), 4), round(float(f["z0"] + (j + 1) * f["riser"]), 4),
+                               number, round(float(d[0]), 4), round(float(d[1]), 4)])
+    return {"w": w, "walk": [[round(v, 4) for v in p] for p in lay["walk"]], "lines": lines, "risers": risers,
+            "arrow": arrow, "numbers": bool(riser_numbers), "ramp": ramp}
 
 
 def side_paths(lay: dict, inset: float = INSET) -> dict:
@@ -557,9 +583,12 @@ def _layout_of(e, data=None) -> dict:
         return ramp_layout(data.get("Shape") or "straight", float(data["Height"]), float(data["Width"]),
                            float(data["Slope"]), float(data.get("LandingDepth") or 0.0), data.get("Turn") or "left")
     points = json.loads(data.get("Points") or "[]")
+    split = data.get("FlightSplit")
     return stair_layout(data.get("Shape") or "straight", float(data["Height"]), float(data["Width"]),
                         float(data["Riser"]), float(data["Tread"]), float(data.get("LandingDepth") or 0.0),
-                        data.get("Turn") or "left", points)
+                        data.get("Turn") or "left", points,
+                        int(split) if split not in (None, "", 0) else None,
+                        data.get("WellWidth"))
 
 
 def _build(whole, lay) -> list:
@@ -660,8 +689,13 @@ def _whole_params(e, lay) -> None:
         _pset_edit(f, e, "Pset_StairCommon", {
             "NumberOfRiser": lay["risers"], "NumberOfTreads": lay["risers"] - len(lay["flights"]),
             "RiserHeight": lay["riser"] / s, "TreadLength": lay["tread"] / s, "WaistThickness": THICKNESS / s})
+    from . import settings
+
+    prefs = settings.current()  # D92: the drawing settings are kept with each stair's plan data
     _pset_edit(f, e, STAIR_PSET if e.is_a("IfcStair") else RAMP_PSET,
-               _text_props(f, {"Plan": json.dumps(plan_lines(lay, e.is_a("IfcRamp")), separators=(",", ":"))}))
+               _text_props(f, {"Plan": json.dumps(plan_lines(lay, e.is_a("IfcRamp"), prefs.get("stair_arrow") or "top",
+                                                             bool(prefs.get("stair_riser_numbers"))),
+                               separators=(",", ":"))}))
 
 
 def _make(kind: str, storey, x, y, angle, params: dict) -> dict:
@@ -670,7 +704,8 @@ def _make(kind: str, storey, x, y, angle, params: dict) -> dict:
     lay = ramp_layout(params["Shape"], params["Height"], params["Width"], params["Slope"], params["LandingDepth"],
                       params["Turn"]) if kind == "ramp" else \
         stair_layout(params["Shape"], params["Height"], params["Width"], params["Riser"], params["Tread"],
-                     params["LandingDepth"], params["Turn"], json.loads(params.get("Points") or "[]"))
+                     params["LandingDepth"], params["Turn"], json.loads(params.get("Points") or "[]"),
+                     params.get("FlightSplit") or None, params.get("WellWidth"))
     if kind == "ramp":
         whole = ifcopenshell.api.root.create_entity(f, ifc_class="IfcRamp", name="Ramp")
     else:
@@ -721,8 +756,20 @@ def create_stair(storey_guid: str, x, y, angle, width, height, options_json: str
         o = _options(options_json)
         shape = o.get("shape") or "straight"
         turn = "right" if o.get("turn") == "right" else "left"
-        riser, tread = _number(o, "riser", DEFAULTS["riser"]), _number(o, "tread", DEFAULTS["tread"])
+        from . import settings
+
+        st = settings.current()
+        riser = _number(o, "riser", float(st.get("stair_riser", DEFAULTS["riser"])))
+        mode = o.get("tread_mode") or st.get("stair_tread_mode") or "fixed"  # D92: fixed or from 2R+G
+        if mode not in ("fixed", "blondel"):
+            raise ValueError(f"unknown tread mode {mode}")
+        tread = _number(o, "tread", default_tread(riser, mode, float(st.get("stair_tread", DEFAULTS["tread"]))))
         landing = _number(o, "landing", 0.0)
+        split = int(o["split"]) if o.get("split") not in (None, "", 0) else None
+        well = _number(o, "well", U_GAP) if o.get("well") not in (None, "") else None
+        opening = o.get("opening") or "whole"
+        if opening not in ("whole", "headroom"):
+            raise ValueError(f"unknown opening {opening}")
         local = []
         if shape == "sketch":
             world = [(float(p[0]), float(p[1])) for p in o.get("points") or []]
@@ -734,11 +781,16 @@ def create_stair(storey_guid: str, x, y, angle, width, height, options_json: str
             local = [[round((px - x) * c - (py - y) * sn, 9), round((px - x) * sn + (py - y) * c, 9)] for px, py in world]
         if width <= 0 or height <= 0:
             raise ValueError("the stair needs a width and a height")
-        lay = stair_layout(shape, height, width, riser, tread, landing, turn, local)
+        lay = stair_layout(shape, height, width, riser, tread, landing, turn, local, split, well)
     except (TypeError, ValueError) as ex:
         return A._fail(str(ex))
     params = {"Shape": shape, "Turn": turn, "Width": width, "Height": height, "Riser": riser, "Tread": tread,
-              "LandingDepth": landing, "Points": json.dumps(local), "CutSlab": o.get("cut_slab", True) is not False}
+              "TreadMode": mode, "LandingDepth": landing, "Points": json.dumps(local),
+              "CutSlab": o.get("cut_slab", True) is not False, "Opening": opening}
+    if split is not None:
+        params["FlightSplit"] = split
+    if well is not None:
+        params["WellWidth"] = well
     made = {}
 
     def action():
@@ -831,7 +883,8 @@ def stair_preview(kind: str, x, y, angle, width, height, options_json: str = "")
 
 # ---------------------------------------------------------------- editing parameters
 
-STAIR_DIMENSIONS = (("Width", "Width"), ("Tread", "Tread"), ("Riser (target)", "Riser"), ("Landing depth", "LandingDepth"))
+STAIR_DIMENSIONS = (("Width", "Width"), ("Tread", "Tread"), ("Riser (target)", "Riser"), ("Landing depth", "LandingDepth"),
+                    ("Flight split", "FlightSplit"), ("Well width", "WellWidth"))
 RAMP_DIMENSIONS = (("Width", "Width"), ("Height", "Height"), ("Slope %", "Slope"), ("Landing depth", "LandingDepth"))
 
 
@@ -843,9 +896,15 @@ def dimensions(e) -> list[tuple[str, float, bool]]:
     if kind is None:
         return []
     data = _params(e)
-    out = [(label, float(data.get(key) or 0.0), True) for label, key in (RAMP_DIMENSIONS if kind == "ramp" else STAIR_DIMENSIONS)]
+    out = [(label, float(data.get(key) or 0.0), True) for label, key in (RAMP_DIMENSIONS if kind == "ramp" else STAIR_DIMENSIONS)
+           if key not in ("FlightSplit", "WellWidth")]
     if kind == "stair":
         out.insert(1, ("Height", float(data.get("Height") or 0.0), True))
+        if data.get("Shape") in ("L", "U"):  # D92: the risers shared between the flights, editable
+            fl = _layout_of(e)["flights"]
+            out.append(("Flight split", float(fl[0]["risers"] if fl else 0), True))
+        if data.get("Shape") == "U":  # D92: the well between the two flights
+            out.append(("Well width", float(data.get("WellWidth") or U_GAP), True))
     return out
 
 
@@ -866,6 +925,12 @@ def set_dimension(elements, name: str, value: float):
         key = table[name]
         if key == "LandingDepth" and value < 0:
             return "the landing depth can't be negative"
+        if key == "FlightSplit":
+            value = float(int(round(value)))
+            if value < 2:
+                return "the flight split needs at least 2 risers in each flight"
+        if key == "WellWidth" and value < 0:
+            return "the well width can't be negative"
         data = {**_params(e), key: value}
         try:
             _layout_of(e, data)
@@ -878,7 +943,10 @@ def set_dimension(elements, name: str, value: float):
     def apply():
         changed = []
         for e, pset, key in plan:
-            _pset_edit(B._model, e, pset, {key: value})
+            props = {key: value}
+            if key == "Riser" and _params(e).get("TreadMode") == "blondel":
+                props["Tread"] = default_tread(value, "blondel")  # D92: the tread follows the riser
+            _pset_edit(B._model, e, pset, props)
             changed += rebuild(e)
         return changed
 
@@ -895,8 +963,17 @@ def set_stair_params(guid: str, params_json: str) -> str:
     try:
         new = json.loads(params_json)
         allowed = ("Shape", "Turn", "Width", "Height", "Slope", "LandingDepth") if kind == "ramp" else \
-            ("Shape", "Turn", "Width", "Height", "Riser", "Tread", "LandingDepth")
-        new = {k: (v if k in ("Shape", "Turn") else float(v)) for k, v in new.items() if k in allowed}
+            ("Shape", "Turn", "Width", "Height", "Riser", "Tread", "TreadMode", "LandingDepth", "FlightSplit",
+             "WellWidth", "Opening")
+        new = {k: (v if k in ("Shape", "Turn", "TreadMode", "Opening") else
+                   int(v) if k == "FlightSplit" else float(v))
+               for k, v in new.items() if k in allowed}
+        if new.get("Opening") not in (None, "whole", "headroom"):
+            return A._fail(f"unknown opening {new['Opening']}")
+        if new.get("TreadMode") not in (None, "fixed", "blondel"):
+            return A._fail(f"unknown tread mode {new['TreadMode']}")
+        if new.get("TreadMode", _params(e).get("TreadMode") or "fixed") == "blondel" and "Tread" not in new:
+            new["Tread"] = default_tread(float(new.get("Riser", _params(e)["Riser"])), "blondel")
         data = {**_params(e), **new}
         lay = _layout_of(e, data)
     except (TypeError, ValueError) as ex:
@@ -1138,6 +1215,32 @@ def _footprint(e) -> list:
 
 # ---------------------------------------------------------------- the floor above: an opening
 
+def _headroom_footprint(e) -> list:
+    """The part of the stair that leaves too little headroom under the floor above (D92): only that
+    part of the footprint is cut, so the slab stays over the lower steps."""
+    lay = _layout_of(e)
+    m = _world_si(e)
+    top = float(_params(e).get("Height") or 0.0)
+    limit = top - HEADROOM
+
+    def w(p):
+        q = m @ np.array([p[0], p[1], 0.0, 1.0])
+        return (float(q[0]), float(q[1]))
+
+    out = []
+    for fl in lay["flights"]:
+        z0, z1 = fl["z0"], fl["z1"]
+        if z1 <= limit + 1e-9:
+            continue  # the whole flight has headroom: the slab stays over it
+        t = 0.0 if z0 >= limit else (limit - z0) / (z1 - z0)
+        start = fl["start"] + fl["dir"] * fl["length"] * t
+        out.append([w(p) for p in _rect(start, fl["dir"], fl["length"] * (1 - t), lay["width"])])
+    for landing in lay["landings"]:
+        if landing["z"] > limit + 1e-9:
+            out.append([w(p) for p in landing["polygon"]])
+    return out
+
+
 def _outline(polys):
     """One outline around the stair's pieces (the U stair's well closed), or the pieces when shapely
     is missing."""
@@ -1177,7 +1280,7 @@ def _sync_opening(e) -> list:
     if e.is_a("IfcRamp") or data.get("CutSlab") is False:
         wanted, slabs = [], []
     else:
-        outline = _outline(_footprint(e))
+        outline = _outline(_headroom_footprint(e) if data.get("Opening") == "headroom" else _footprint(e))
         slabs = []
         try:
             from shapely.geometry import Polygon
@@ -1321,6 +1424,25 @@ def mirror(e, point, direction) -> bool:
 
 # ---------------------------------------------------------------- plan symbols and selection
 
+def refresh_plan_settings() -> None:
+    """Update every stair's stored plan data after the stair drawing settings change (no undo step:
+    the settings change itself already marks the project)."""
+    if B._model is None:
+        return
+    from . import settings
+
+    prefs = settings.current()
+    for e in B._model.by_type("IfcStair"):
+        if kind_of(e) != "stair":
+            continue
+        try:
+            lay = _layout_of(e)
+            plan = plan_lines(lay, False, prefs.get("stair_arrow") or "top", bool(prefs.get("stair_riser_numbers")))
+        except (TypeError, ValueError):
+            continue
+        _pset_edit(B._model, e, STAIR_PSET, _text_props(B._model, {"Plan": json.dumps(plan, separators=(",", ":"))}))
+
+
 def stair_symbols(storey_guid: str, cut="") -> str:
     """The plan symbols of the stairs and ramps on a level (world metres), for plan views: solid and
     dashed polylines and labels, with the cut height above the level (default: the project's)."""
@@ -1349,7 +1471,8 @@ def stair_symbols(storey_guid: str, cut="") -> str:
                 continue
             m = ifcopenshell.util.placement.get_local_placement(e.ObjectPlacement)
             base = float(m[2][3]) * s - A._elevation(storey)
-            solid, dashed, labels = drawgen.stair_symbol(plan, cut - base)
+            solid, dashed, labels = drawgen.stair_symbol(plan, cut - base, False,
+                                                         plan.get("arrow") or "top", bool(plan.get("numbers")))
 
             def w(p):
                 q = m @ np.array([p[0] / s, p[1] / s, 0.0, 1.0])

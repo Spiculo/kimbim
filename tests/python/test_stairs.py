@@ -203,6 +203,61 @@ def test_the_floor_above_gets_an_opening_and_loses_it_with_the_stair(levels):
     assert len(b._model.by_type("IfcOpeningElement")) == 1
 
 
+def test_stair_defaults_from_the_project_and_blondel_tread(levels):
+    """D92: the project gives a new stair's riser target and whether the tread is fixed or from 2R+G."""
+    assert call("set_project_settings", json.dumps({"stair_riser": 0.2, "stair_tread_mode": "blondel"}))["ok"]
+    r = call("create_stair", levels["l1"], 0, 0, 0, 1.0, 3.2)
+    assert r["ok"], r
+    info = call("stair_info", r["guid"])
+    assert info["params"]["Riser"] == pytest.approx(0.2)
+    assert info["params"]["TreadMode"] == "blondel"
+    assert info["tread"] == pytest.approx(0.25)  # 0.625 - 2 x 0.2 is under the 0.25 minimum
+    # A fixed tread from the settings, and an explicit one still wins.
+    assert call("set_project_settings", json.dumps({"stair_riser": 0.175, "stair_tread": 0.3, "stair_tread_mode": "fixed"}))["ok"]
+    assert call("stair_info", call("create_stair", levels["l1"], 3, 0, 0, 1.0, 3.0)["guid"])["tread"] == pytest.approx(0.3)
+    assert call("stair_info", call("create_stair", levels["l1"], 6, 0, 0, 1.0, 3.0,
+                                   json.dumps({"tread": 0.27}))["guid"])["tread"] == pytest.approx(0.27)
+
+
+def test_flight_split_and_well_width_are_editable(levels):
+    """D92: the risers shared between the flights and the U stair's well width are per stair."""
+    r = call("create_stair", levels["l1"], 0, 0, 0, 1.0, 3.0, json.dumps({"shape": "U", "split": 4, "well": 0.3}))
+    assert r["ok"], r
+    info = call("stair_info", r["guid"])
+    assert info["params"]["FlightSplit"] == 4 and info["params"]["WellWidth"] == pytest.approx(0.3)
+    flights = sorted((p for p in parts(r["guid"]) if p.is_a("IfcStairFlight")), key=lambda p: p.Name or "")
+    assert [f.NumberOfRisers for f in flights] == [4, 14]
+    assert call("set_stair_params", r["guid"], json.dumps({"WellWidth": 0.5}))["ok"]
+    assert call("stair_info", r["guid"])["params"]["WellWidth"] == pytest.approx(0.5)
+    assert call("set_dimension", g(r["guid"]), "Flight split", 6)["ok"]
+    flights = sorted((p for p in parts(r["guid"]) if p.is_a("IfcStairFlight")), key=lambda p: p.Name or "")
+    assert [f.NumberOfRisers for f in flights] == [6, 12]
+    assert not call("set_dimension", g(r["guid"]), "Flight split", 1)["ok"]
+    dims = {d[0]: d[1] for d in stairs.dimensions(b._model.by_guid(r["guid"]))}
+    assert dims["Flight split"] == 6 and dims["Well width"] == pytest.approx(0.5)
+
+
+def test_the_opening_can_be_the_headroom_part_only(levels):
+    """D92: whole outline (default) or only where the stair leaves too little headroom."""
+    upper = call("create_slab", levels["l2"], levels["slab_type"], json.dumps([[0, 0], [8, 0], [8, 6], [0, 6]]), 0.0)["guid"]
+    r = call("create_stair", levels["l1"], 1.0, 1.0, 0.0, 1.0, 3.0, json.dumps({"opening": "headroom"}))
+    assert r["ok"], r
+    assert call("stair_info", r["guid"])["params"]["Opening"] == "headroom"
+    e = b._model.by_guid(r["guid"])
+    from shapely.geometry import Polygon
+
+    def area(polys):
+        return sum(Polygon(p).buffer(0).area for p in polys if len(p) >= 3)
+
+    head, full = stairs._headroom_footprint(e), stairs._footprint(e)
+    assert 0 < area(head) < area(full) * 0.85
+    assert len(b._model.by_type("IfcOpeningElement")) == 1
+    volume_with_hole = volume(upper)
+    assert call("set_stair_params", r["guid"], json.dumps({"Opening": "whole"}))["ok"]
+    assert volume(upper) < volume_with_hole  # the whole outline cuts more of the slab
+    assert not call("set_stair_params", r["guid"], json.dumps({"Opening": "stairs"}))["ok"]
+
+
 def test_u_stair_opening_is_one_outline_with_the_well_closed(levels):
     upper = call("create_slab", levels["l2"], levels["slab_type"], json.dumps([[0, 0], [8, 0], [8, 6], [0, 6]]), 0.0)["guid"]
     before = volume(upper)
@@ -331,6 +386,26 @@ def test_plan_symbol_breaks_at_the_cut_and_dashes_what_is_above():
     low = stairs.plan_lines(stairs.stair_layout("straight", 0.6, 1.0, 0.175, 0.28))
     s2, d2, _ = drawgen.stair_symbol(low, 1.1)
     assert d2 == [] and not [line for line in s2 if len(line) == 6]
+
+
+def test_plan_arrow_position_and_riser_numbers(levels):
+    """D92: the plan's arrow can sit at the top (default), the bottom or both, and the risers can be numbered."""
+    lay = stairs.stair_layout("straight", 3.0, 1.0, 0.175, 0.28)
+    plan = stairs.plan_lines(lay)
+    assert len(plan["risers"]) == 18
+    solid, _dashed, labels = drawgen.stair_symbol(plan, 1.1)
+    assert [t for *_, t, _ in labels] == ["UP"]
+    bottom, _d, _l = drawgen.stair_symbol(plan, 1.1, arrow="bottom")
+    assert any(len(line) == 3 and line[1] == (0.0, 0.0) for line in bottom)  # the head at the start
+    _s, _d, numbered = drawgen.stair_symbol(plan, 1.1, riser_numbers=True)
+    numbers = [t for *_, t, _ in numbered if t.isdigit()]
+    assert numbers and numbers[0] == "1" and "UP" in [t for *_, t, _ in numbered]
+    assert call("set_project_settings", json.dumps({"stair_arrow": "both", "stair_riser_numbers": True}))["ok"]
+    assert not call("set_project_settings", json.dumps({"stair_arrow": "sideways"}))["ok"]
+    r = call("create_stair", levels["l1"], 1.0, 1.0, 0.0, 1.0, 3.0, json.dumps({"shape": "L"}))
+    symbols = call("stair_symbols", levels["l1"], "1.2")["symbols"]
+    texts = [label["text"] for label in next(x for x in symbols if x["guid"] == r["guid"])["labels"]]
+    assert "1" in texts and "UP" in texts
 
 
 def test_plan_view_symbols_and_the_floor_plan_drawing(levels):

@@ -68,6 +68,26 @@ private slots:
         QCOMPARE(v.gestureFor(Aspect_VKeyMouse_MiddleButton, Aspect_VKeyFlags_SHIFT), AIS_MouseGesture_RotateOrbit);
     }
 
+    // D92: the north indicator shows only in plan views, and only when the option is on.
+    void northArrowShowsOnlyInPlanView()
+    {
+        kimbim::Viewport v;
+        v.resize(200, 200);
+        QVERIFY(!v.northArrowShown()); // 3D view: none
+        v.setNorthArrow(true, 90.0);
+        QVERIFY(!v.northArrowShown());
+        v.setPlanView(0.0);
+        QVERIFY(v.northArrowShown());
+        QCOMPARE(v.northArrowAngle(), 90.0);
+        v.setNorthArrow(false, 90.0);
+        QVERIFY(!v.northArrowShown());
+        v.setNorthArrow(true, 0.0);
+        QVERIFY(v.northArrowShown());
+        QCOMPARE(v.northArrowAngle(), 0.0);
+        v.set3DView();
+        QVERIFY(!v.northArrowShown()); // hidden again in 3D
+    }
+
     void pointOnPlaneNeedsAWindow()
     {
         kimbim::Viewport v;
@@ -156,6 +176,29 @@ private slots:
         v.zoomByFactor(2.0, QPointF(200, 150));
         v.homeView(false);
         QVERIFY(std::abs(v.zoomPercent() - 100.0) < 0.01);
+    }
+
+    // D92: the user can set the current view as home; the field of view is a preference.
+    void theUserCanSetTheHomeView()
+    {
+        kimbim::Viewport v;
+        v.setStandardView(V3d_Xpos, false);
+        const gp_Dir dir = v.currentViewDirection();
+        v.useCurrentViewAsHome();
+        v.setStandardView(V3d_Zpos, false);
+        v.homeView(false);
+        QVERIFY(sameDir(v.currentViewDirection(), dir));
+        kimbim::Viewport::setHomeView(kimbim::viewDirection(kimbim::HomeOrientation), kimbim::viewUp(kimbim::HomeOrientation));
+    }
+
+    void fieldOfViewIsAPreference()
+    {
+        QCOMPARE(kimbim::Viewport::fieldOfView(), 45.0);
+        kimbim::Viewport::setFieldOfView(60.0);
+        kimbim::Viewport v;
+        v.setPerspective(true);
+        QCOMPARE(v.view()->Camera()->FOVy(), 60.0);
+        kimbim::Viewport::setFieldOfView(45.0);
     }
 
     // Plans look straight down: presets and perspective wait for the 3D view.

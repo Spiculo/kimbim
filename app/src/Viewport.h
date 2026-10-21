@@ -7,6 +7,7 @@
 #include <AIS_InteractiveContext.hxx>
 #include <AIS_ViewCube.hxx>
 #include <AIS_ViewController.hxx>
+#include <gp_Dir.hxx>
 #include <gp_Pnt.hxx>
 #include <QColor>
 #include <QHash>
@@ -70,12 +71,33 @@ public:
     // Preset views (D76, D91): the camera turns (~250 ms) to look from that side or corner and fits
     // the whole model, like Revit's cube. Not in plan views.
     void setStandardView(V3d_TypeOfOrientation orientation, bool animate = true);
-    void homeView(bool animate = true); // the default south-east isometric, fitted
+    // Home view (D76, D92): south-east isometric by default; the user can set the current view as home
+    // (a preference, applied to every viewport).
+    void homeView(bool animate = true);
+    static void setHomeView(const gp_Dir& dir, const gp_Dir& up);
+    static gp_Dir homeDir();
+    static gp_Dir homeUp();
+    void useCurrentViewAsHome();           // capture this view's camera direction and up as home
+    gp_Dir currentViewDirection() const;
+    gp_Dir currentViewUp() const;
+    static void setFieldOfView(double degrees); // the perspective camera's vertical field of view (D92)
+    static double fieldOfView();
+    // D92: how a box selects: by drag direction (AutoCAD), or Archicad's partial (any touch) / entire
+    // (fully inside), whatever the direction.
+    enum class BoxMode { Direction, Partial, Entire };
+    static void setBoxMode(BoxMode mode);
+    static BoxMode boxMode();
+    static BoxMode boxModeFrom(const QString& preference); // "direction", "partial", "entire"
     // Perspective camera (D76), per view; plan views stay orthographic (the setting comes back in 3D).
     void setPerspective(bool on);
     bool isPerspective() const { return m_perspective; }
     bool isAnimating() const;
     void setAnimationDuration(double seconds) { m_animationSeconds = seconds; }
+    // D92: the plan view's north indicator (a view option, on once true north is set). Display only;
+    // shown only in plan views. `degrees` is counter-clockwise from the plan's +Y.
+    void setNorthArrow(bool show, double degrees);
+    bool northArrowShown() const { return m_planView && m_northWanted; }
+    double northArrowAngle() const { return m_northDegrees; }
     // The view cube and its home button (D76), top right of 3D views; hidden in plan views.
     bool viewCubeShown() const { return !m_planView; }
     QRect viewCubeRect() const;   // widget pixels; clicks inside never reach selection
@@ -117,6 +139,7 @@ public:
     // D89 Tab cycling (Revit): Tab with the mouse resting over overlapping elements highlights the
     // next one under the cursor (Shift+Tab the previous); a click there selects the highlighted one.
     QString cycleNext(const QPointF& widgetPos, bool backwards = false); // the highlighted guid ("" none)
+    QStringList annotationGuidsAt(const QPointF& widgetPos); // D92: annotations under the cursor (for Tab)
     QString cycleCandidate() const { return m_cycleGuid; }
     QStringList elementsAt(const QPointF& widgetPos); // front to back (needs a window, or a provider)
     void setPickProvider(std::function<QStringList(const QPointF&)> provider) { m_pickProvider = std::move(provider); }
@@ -126,7 +149,10 @@ public:
     enum class ScrollMode { Auto, Zoom, Pan };
     static void setScrollMode(ScrollMode mode);
     static ScrollMode scrollMode();
-    static ScrollMode scrollModeFrom(const QString& preference); // "auto", "zoom", "pan"
+    static ScrollMode scrollModeFrom(const QString& preference); // "auto", "zoom", "pan", "precision"
+    static void setNavigationPreset(const QString& preference); // D92: also the panning sensitivity
+    static void setTabAnnotations(bool on);                     // D92: Tab cycling reaches annotations
+    static bool tabAnnotations();
     enum class ScrollAction { None, Zoom, Pan, Orbit };
     ScrollAction lastScrollAction() const { return m_lastScroll; } // for tests
     void panByPixels(double dx, double dy);                  // the content follows (widget pixels)
@@ -166,6 +192,7 @@ public:
         QVector<QLineF> hatch;
         bool solid = false;
         int backgroundPen = 0;
+        int outlinePen = -1; // D92: a fill's outline pen (-1: the shape's own; 0: no outline)
         std::optional<QPointF> labelAt;
         bool isDrafting() const;
         // D87 symbols (tags, north arrows, scale bars, clouds, angle/radius/level dimensions), drawn in
@@ -261,7 +288,15 @@ public:
     // D78: dragged right to left (x1 < x0) it is a crossing box (takes what it touches), left to right
     // a window box (only what is fully inside), as in AutoCAD and Revit.
     int selectInRectangle(int x0, int y0, int x1, int y1, AIS_SelectionScheme scheme, bool through = false);
-    static bool isCrossingBox(int startX, int endX) { return endX < startX; }
+    static bool isCrossingBox(int startX, int endX)
+    {
+        if (s_boxMode == BoxMode::Partial)
+            return true;
+        if (s_boxMode == BoxMode::Entire)
+            return false;
+        return endX < startX;
+    }
+    static BoxMode s_boxMode;
     void setSelectThrough(bool on) { m_selectThrough = on; }
     bool selectThrough() const { return m_selectThrough; }
     // Guids with at least one visible pixel in the rectangle (nullopt: cannot tell, e.g. no window).
@@ -390,8 +425,16 @@ private:
     // D76: view cube, preset views, perspective.
     void ensureViewCube();
     void eraseViewCube();
+    // D92: the plan north compass.
+    void ensureNorthArrow();
+    void eraseNorthArrow();
+    Handle(AIS_InteractiveObject) m_northArrow;
+    double m_northDpr = 0.0;
+    double m_northAngleShown = -1.0;
+    bool m_northWanted = false;
+    double m_northDegrees = 0.0;
     void applyProjection();
-    void goTo(V3d_TypeOfOrientation orientation, bool animate, bool fit);
+    void goTo(const gp_Dir& dir, const gp_Dir& up, bool animate, bool fit);
     void animateTo(const Handle(Graphic3d_Camera)& end, bool animate);
     void orbitBy(double dx, double dy); // dragging the cube: turntable around the view's target
     enum class CubePress { None, Cube, Home };

@@ -33,6 +33,9 @@ public:
         std::function<bool()> active;                // the current tool places points
         std::function<bool(const Tracker&)> classic; // the tool takes the typed value its own way (true: used)
         std::function<double()> planZ;               // the work plane's height (guides overlay)
+        std::function<QString()> trackerMode;        // D92: "always", "typing" or "off"
+        std::function<QString()> angleMode;          // D92: "absolute", "relative" or "bearing"
+        std::function<double()> typedLengthFactor;   // D92: metres per typed length unit
     };
     explicit InputAidsController(Hooks hooks, QObject* parent = nullptr);
 
@@ -66,6 +69,7 @@ private:
     QTimer m_acquire;
     QPointer<Viewport> m_view;
     QPointF m_raw;
+    std::optional<QPointF> m_anchor, m_previousAnchor; // D92: for relative angles
     double m_tolerance = 0.1;
     Qt::KeyboardModifiers m_mods;
     int m_serial = -1;

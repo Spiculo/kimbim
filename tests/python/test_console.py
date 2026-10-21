@@ -50,6 +50,19 @@ def test_traceback_is_shown_and_the_app_survives(opened):
     assert run("raise SystemExit(3)")["error"]
 
 
+def test_every_run_is_one_undo_step_dropped_when_it_changed_nothing(opened):
+    # D92: a console run is one undo step even without edit(), and no step is left when nothing changed.
+    r = run("ifc.by_type('IfcWall')[0].Name = 'Scripted'")
+    assert r["ok"] and not r["error"], r["traceback"]
+    assert r["edited"]
+    assert r["geometry"]["changed"] == [opened[0]]
+    assert call("state")["can_undo"]
+    assert call("undo")["ok"]
+    assert not call("state")["can_undo"]
+    assert run("1 + 1")["output"] == "2\n"
+    assert not call("state")["can_undo"]
+
+
 def test_edit_is_one_undo_step_and_redraws_what_changed(opened):
     code = (
         "import ifcopenshell.api.attribute\n"

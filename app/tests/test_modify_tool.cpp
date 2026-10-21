@@ -47,6 +47,18 @@ private slots:
         QVERIFY(tool.splitPoint());
     }
 
+    void theJoinDefaultFollowsThePreference()
+    {
+        ModifyTool tool;
+        load(tool);
+        QSignalSpy split(&tool, &ModifyTool::splitRequested);
+        tool.setJoinDefault(false); // D92: pieces left apart unless Ctrl
+        tool.click({3.0, 0.12});
+        QVERIFY(!split.last().at(2).toBool());
+        tool.click({4.0, 0.12}, Qt::ControlModifier); // Ctrl inverts it
+        QVERIFY(split.last().at(2).toBool());
+    }
+
     void trimToABoundaryKeepsItPicked()
     {
         ModifyTool tool;

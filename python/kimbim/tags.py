@@ -444,10 +444,11 @@ def add_tag(element_guid: str, options_json: str = "") -> str:
     return B._dump({**r, "guid": made["guid"]})
 
 
-def tag_all(storey_guid: str, guids_json: str = "", style: str = "") -> str:
+def tag_all(storey_guid: str, guids_json: str = "", style: str = "", categories: str = "") -> str:
     """Tag every untagged element on a level (Archicad: Label all; Revit: Tag all not tagged) with its
     kind's style: doors, windows and walls (rooms have their stamps), or the elements of one `style`.
-    `guids_json`: only these elements (the ones the view shows). One undo step."""
+    `guids_json`: only these elements (the ones the view shows). `categories` (D92): a comma-separated
+    list of tag-style ids to tag (Tag all asks which categories). One undo step."""
     from . import authoring as A
     from . import schedules
 
@@ -464,7 +465,14 @@ def tag_all(storey_guid: str, guids_json: str = "", style: str = "") -> str:
     except ValueError as ex:
         return A._fail(f"bad input: {ex}")
     done = tagged_elements()
-    wanted = [style] if style else list(AUTO_STYLES)
+    if style:
+        wanted = [style]
+    elif categories:
+        wanted = [c for c in (c.strip() for c in categories.split(",")) if c in table]
+        if not wanted:
+            return A._fail("choose at least one category")
+    else:
+        wanted = list(AUTO_STYLES)
     todo = []
     for sid in wanted:
         classes = table[sid].get("classes") or []
@@ -651,6 +659,15 @@ def _sync_one(tag, force=False, text=None):
 
     e = element_of(tag)
     if e is None:
+        from . import settings as S
+
+        if S.current().get("orphan_tags", "delete") == "keep":  # D92: keep it, showing "?"
+            data = N._read(tag)
+            if data is not None and data[1] != "?":
+                N._set(tag, data[0], "?", [tuple(p) for p in data[2]], extra={**N.extra_of(tag), "Element": ""})
+                tag.Name = "?"
+                return True
+            return False
         ifcopenshell.api.root.remove_product(B._model, product=tag)
         return True
     data = N._read(tag)
@@ -702,7 +719,7 @@ def _sync(force_all=False) -> list:
         storey = ifcopenshell.util.element.get_container(a)
         if storey is None:
             continue
-        text = S.elevation_text(S.elevation_at(storey, N.world_points(a)[0]))
+        text = S.elevation_text(S.elevation_at(storey, N.world_points(a)[0]), storey)
         if text != data[1]:
             N._set(a, data[0], text, data[2])
             a.Name = text[:60]

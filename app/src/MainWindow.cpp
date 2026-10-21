@@ -139,6 +139,7 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     , m_loader(new ModelLoader(chunkSize))
 {
     m_prefs.load();
+    applyViewPreferences(); // D92: the field of view and the home view, before any view is used
     qRegisterMetaType<kimbim::MeshChunk>();
     // D71: the bottom bar (pen, layers, zoom, selection, messages) replaces the status bar.
     m_status = new StatusStrip(this);
@@ -201,6 +202,7 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     buildModelingToolbar();
     buildVersions();       // the Versions menu and the title bar's Versions button
     buildPalette();
+    applyTitleBarPreferences(); // D92: which title bar controls the preferences keep
     m_status->showMessage(tr("Ready"));
 
     m_loader->moveToThread(&m_thread);
@@ -312,6 +314,14 @@ void MainWindow::resizeEvent(QResizeEvent* event)
     const QRect avail = s ? s->availableGeometry() : QRect(0, 0, 1920, 1080);
     if (event->size().width() > avail.width() * 4 || event->size().height() > avail.height() * 4)
         clampWindowSize();
+    // D92: on a small screen the side panels shrink first (off by default: the views take it).
+    if (m_dock && m_prefs.panelsShrinkFirst()) {
+        const bool small = width() < 1100;
+        if (small != m_panelsShrunk) {
+            m_panelsShrunk = small;
+            m_dock->setSideWidths(small ? 168 : 216, small ? 220 : 280);
+        }
+    }
 }
 
 MainWindow::~MainWindow()
@@ -332,6 +342,8 @@ MainWindow::~MainWindow()
 void MainWindow::buildMenus()
 {
     QMenu* file = m_menuBar->addMenu(tr("&File"));
+    file->setObjectName(QStringLiteral("fileMenu"));
+    m_fileMenu = file;
     QAction* newProjectAction = file->addAction(tr("&New project..."));
     newProjectAction->setObjectName(QStringLiteral("actionNewProject"));
     newProjectAction->setShortcut(QKeySequence::New);
@@ -361,6 +373,11 @@ void MainWindow::buildMenus()
     QAction* saveTemplate = file->addAction(tr("Save as &template..."));
     saveTemplate->setObjectName(QStringLiteral("actionSaveAsTemplate"));
     connect(saveTemplate, &QAction::triggered, this, &MainWindow::saveAsTemplateDialog);
+    // D92: Save version also in the File menu (the shortcut stays on the Versions menu's action).
+    QAction* saveVersionFile = file->addAction(tr("Save &version..."));
+    saveVersionFile->setObjectName(QStringLiteral("actionSaveVersionFile"));
+    saveVersionFile->setToolTip(tr("Save the current state as a new version (same as the Versions menu)"));
+    connect(saveVersionFile, &QAction::triggered, this, &MainWindow::saveVersionDialog);
     QAction* exportIfcAction = file->addAction(tr("&Export IFC..."));
     exportIfcAction->setObjectName(QStringLiteral("actionExportIfc"));
     connect(exportIfcAction, &QAction::triggered, this, &MainWindow::exportIfcDialog);
@@ -432,10 +449,12 @@ void MainWindow::buildMenus()
     // D78: selection tools (Archicad's Find & Select; Revit's Select All Instances).
     editMenu->addSeparator();
     editAction(tr("Select &similar"), "actionSelectSimilar", QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_A),
-        [this] { selectSimilar(QStringLiteral("type")); })
-        ->setToolTip(tr("Select every element of the selected elements' types (untyped: same class and predefined type)"));
+        [this] { selectSimilar(m_prefs.selectSimilarScope()); })
+        ->setToolTip(tr("Select every element sharing the selected element's class and predefined type, its type object or its class (Edit ▸ Preferences)"));
     editAction(tr("Select all of this c&lass"), "actionSelectClass", QKeySequence(), [this] { selectSimilar(QStringLiteral("class")); })
         ->setToolTip(tr("Select every element of the selected elements' IFC classes"));
+    editAction(tr("Select &all"), "actionSelectAll", QKeySequence::SelectAll, [this] { selectAll(); })
+        ->setToolTip(tr("With a creation tool active, selects that tool's elements; otherwise everything"));
     editAction(tr("&Find && Select..."), "actionFindSelect", QKeySequence(Qt::CTRL | Qt::Key_F), [this] {
         findSelectPanel();
         m_dock->raisePanel(QStringLiteral("findselect"));
@@ -516,6 +535,20 @@ void MainWindow::buildMenus()
         connect(home, &QAction::triggered, this, [this] {
             if (m_viewport)
                 m_viewport->homeView();
+        });
+        // D92: the user can make the current view the home view (kept in the preferences).
+        QAction* setHome = views->addAction(tr("Set current view as &home"));
+        setHome->setObjectName(QStringLiteral("actionSetHomeView"));
+        setHome->setToolTip(tr("The Home view button and shortcut turn to this direction from now on"));
+        connect(setHome, &QAction::triggered, this, [this] {
+            if (!m_viewport || m_viewport->isPlanView())
+                return;
+            m_viewport->useCurrentViewAsHome();
+            const gp_Dir d = m_viewport->currentViewDirection(), u = m_viewport->currentViewUp();
+            m_prefs.setValue(QStringLiteral("home_view"),
+                QJsonArray{d.X(), d.Y(), d.Z(), u.X(), u.Y(), u.Z()});
+            m_prefs.save();
+            m_status->showMessage(tr("The current view is now the home view"));
         });
         QAction* perspective = view->addAction(tr("P&erspective"));
         perspective->setObjectName(QStringLiteral("actionPerspective"));
@@ -746,9 +779,10 @@ void MainWindow::buildCutsToolbar()
         b->setDefaultAction(action);
         b->setAutoRaise(true);
         m_titleBar->addControl(b);
+        return b;
     };
-    m_titleBar->addControlSeparator();
-    cutButton(m_planCut);
+    m_cutSeparator = m_titleBar->addControlSeparator();
+    m_planCutButton = cutButton(m_planCut);
     m_cutHeight = new QDoubleSpinBox(m_titleBar);
     m_cutHeight->setObjectName(QStringLiteral("planCutHeight"));
     m_cutHeight->setRange(-1000.0, 10000.0);
@@ -1009,9 +1043,28 @@ bool MainWindow::applyPropertyEdit(const QString& pset, const QString& prop, con
     }
     const bool dimension = pset == QLatin1String("Dimensions");
     const bool parameter = pset == QLatin1String("Parameters"); // D86: a library object's (its type follows)
+    QString scope; // D92: edit the selection (default) or ask when the type is shared
+    if (parameter && !m_quiet && m_prefs.objectEditScope() == QLatin1String("ask")) {
+        const QJsonObject usage = bridge("object_parameter_usage", {jsonList(m_selection), prop});
+        if (usage.value("shared").toBool()) {
+            QMessageBox box(QMessageBox::Question, tr("Change the object's type"),
+                tr("This object's type has %n placement(s) in the model.", nullptr, usage.value("elements").toInt()),
+                QMessageBox::NoButton, this);
+            box.setInformativeText(tr("Change every placement of the type, or only the %n selected one(s)?", nullptr,
+                                      usage.value("selected").toInt()));
+            QPushButton* whole = box.addButton(tr("Change every placement"), QMessageBox::AcceptRole);
+            QPushButton* only = box.addButton(tr("Only the selection"), QMessageBox::AcceptRole);
+            box.setDefaultButton(only);
+            box.exec();
+            scope = box.clickedButton() == whole ? QStringLiteral("type") : QStringLiteral("selection");
+        }
+    }
     const QJsonObject r = dimension || parameter
-        ? bridge(parameter ? "set_object_parameter" : "set_dimension", {jsonList(m_selection), prop,
-              value.isDouble() ? QString::number(value.toDouble(), 'g', 17) : value.toString()})
+        ? bridge(parameter ? "set_object_parameter" : "set_dimension",
+              parameter ? QStringList{jsonList(m_selection), prop,
+                  value.isDouble() ? QString::number(value.toDouble(), 'g', 17) : value.toString(), scope}
+                        : QStringList{jsonList(m_selection), prop,
+                              value.isDouble() ? QString::number(value.toDouble(), 'g', 17) : value.toString()})
         : bridge("set_property", {jsonList(m_selection), pset, prop, jsonValue(value)});
     if (!r.value("ok").toBool())
         showError(tr("Could not change %1").arg(prop), r.value("error").toString());
@@ -1143,9 +1196,12 @@ void MainWindow::refreshLevels()
         m_tree->refreshTree(bridge("spatial_tree")); // a level was added or undone
 }
 
-bool MainWindow::addLevel(const QString& name, double elevation)
+bool MainWindow::addLevel(const QString& name, double elevation, bool fitBetween)
 {
-    const QJsonObject r = bridge("add_storey", {name, QString::number(elevation, 'g', 17)});
+    // D92: insert level, push above (Archicad, default) or fit between the levels around it (Revit).
+    const QJsonObject r = fitBetween
+        ? bridge("insert_storey", {name, QString::number(elevation, 'g', 17), QStringLiteral("1")})
+        : bridge("add_storey", {name, QString::number(elevation, 'g', 17)});
     if (!r.value("ok").toBool()) {
         showError(tr("Could not add the level"), r.value("error").toString());
         return false;
@@ -1163,15 +1219,30 @@ void MainWindow::addLevelDialog()
         highest = any ? std::max(highest, s.toObject().value("elevation").toDouble()) : s.toObject().value("elevation").toDouble();
         any = true;
     }
-    bool ok = false;
-    const QString name = QInputDialog::getText(this, tr("Add level"), tr("Name:"), QLineEdit::Normal,
-        tr("Level %1").arg(m_levels->count() + 1), &ok);
-    if (!ok || name.trimmed().isEmpty())
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Add level"));
+    auto* form = new QFormLayout(&dialog);
+    auto* nameEdit = new QLineEdit(tr("Level %1").arg(m_levels->count() + 1), &dialog);
+    nameEdit->setObjectName(QStringLiteral("levelName"));
+    form->addRow(tr("Name:"), nameEdit);
+    auto* elev = new QDoubleSpinBox(&dialog);
+    elev->setObjectName(QStringLiteral("levelElevation"));
+    elev->setDecimals(m_settings.value("length_decimals").toInt(2));
+    elev->setRange(-1000.0, 10000.0);
+    elev->setValue(any ? highest + 3.0 : 0.0);
+    elev->setSuffix(QStringLiteral(" m"));
+    form->addRow(tr("Elevation (m):"), elev);
+    // D92: push above (default, Archicad) or fit in the middle of the gap (Revit).
+    auto* fit = new QCheckBox(tr("Fit between the levels around this elevation (Revit)"), &dialog);
+    fit->setObjectName(QStringLiteral("levelFitBetween"));
+    form->addRow(QString(), fit);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    form->addRow(buttons);
+    if (dialog.exec() != QDialog::Accepted || nameEdit->text().trimmed().isEmpty())
         return;
-    const double elevation = QInputDialog::getDouble(this, tr("Add level"), tr("Elevation (m):"),
-        any ? highest + 3.0 : 0.0, -1000.0, 10000.0, 2, &ok);
-    if (ok)
-        addLevel(name.trimmed(), elevation);
+    addLevel(nameEdit->text().trimmed(), elev->value(), fit->isChecked());
 }
 
 void MainWindow::levelsDialog()
@@ -1216,7 +1287,8 @@ void MainWindow::buildModelingToolbar()
     m_twoPointTool = new TwoPointTool(this);
     m_rotateTool = new RotateTool(this);
     m_gripTool = new GripTool(this);
-    m_measure = new MeasureController([this](double m) { return formatLength(m); }, this);
+    m_measure = new MeasureController([this](double m) { return formatLength(m); },
+        [this](double a) { return formatArea(a); }, this);
     connect(m_measure, &MeasureController::message, this, [this](const QString& text) {
         if (m_tool == Tool::Measure)
             m_status->showMessage(text);
@@ -1441,8 +1513,13 @@ void MainWindow::buildModelingToolbar()
             m_viewport->setFocus();
             return;
         }
+        const QString unit = m_settings.value("length_unit").toString(QStringLiteral("m"));
+        const double intoMetres = unit == QLatin1String("mm") ? 0.001 : unit == QLatin1String("cm") ? 0.01 : 1.0;
+        const double metres = m_prefs.typedLengthUnit() == QLatin1String("project")
+            ? value * intoMetres  // D92: the field takes the project's unit
+            : value;
         if (m_tool == Tool::Wall)
-            typed = m_wallTool->typeLength(value);
+            typed = m_wallTool->typeLength(metres);
         else if (ok && m_tool == Tool::Rotate)
             typed = m_rotateTool->typeAngle(value); // degrees
         else if (ok && m_tool == Tool::Object) {
@@ -1450,9 +1527,9 @@ void MainWindow::buildModelingToolbar()
             typed = true;
         }
         else if (ok && m_tool == Tool::Stretch)
-            typed = m_gripTool->typeLength(value);
+            typed = m_gripTool->typeLength(metres);
         else if (ok)
-            typed = m_twoPointTool->typeLength(value);
+            typed = m_twoPointTool->typeLength(metres);
         if (ok && typed)
             m_lengthInput->clear();
         m_viewport->setFocus();
@@ -1860,7 +1937,8 @@ void MainWindow::refreshTypes()
 
 void MainWindow::refreshSnapData()
 {
-    const QJsonObject data = bridge("snap_data", {m_levels->activeStorey()});
+    const QJsonObject data = bridge("snap_data",
+        {m_levels->activeStorey(), m_prefs.meshVertexSnaps() ? QStringLiteral("1") : QStringLiteral("0")}); // D92
     const QVector<SnapWall> walls = Snapper::parse(data);
     const QVector<SnapLine> lines = Snapper::parseGrid(data);
     const QVector<SnapPoint> points = Snapper::parsePoints(data); // D84: drafting shapes' points
@@ -2035,7 +2113,9 @@ void MainWindow::setTool(Tool tool)
     m_roofKind->parentWidget()->setVisible(tool == Tool::Roof);
     m_lengthInput->setVisible(tool == Tool::Wall || tool == Tool::Beam || tool == Tool::Grid || tool == Tool::Move
         || tool == Tool::Rotate || tool == Tool::Stretch || isDraftTool(tool) || tool == Tool::Object);
-    m_lengthInput->setPlaceholderText(tool == Tool::Rotate || tool == Tool::Object ? tr("Angle (degrees)") : tr("Length (m)"));
+    const QString unit = m_settings.value("length_unit").toString(QStringLiteral("m"));
+    m_lengthInput->setPlaceholderText(tool == Tool::Rotate || tool == Tool::Object ? tr("Angle (degrees)")
+        : m_prefs.typedLengthUnit() == QLatin1String("project") ? tr("Length (%1)").arg(unit) : tr("Length (m)"));
     if (m_objectTurn)
         m_objectTurn->setEnabled(tool == Tool::Object); // Tab moves the focus otherwise
     const bool typed = tool == Tool::Wall || tool == Tool::Slab || tool == Tool::Door || tool == Tool::Window
@@ -2506,6 +2586,8 @@ void MainWindow::buildPalette()
         tool(Tool::Rectangle)});
     m_palette->addFlyout(QStringLiteral("plane"), {tool(Tool::NorthArrow), tool(Tool::ScaleBar), tool(Tool::Cloud)});
     m_palette->addFlyout(QStringLiteral("view"), {tool(Tool::Section), tool(Tool::Elevation)});
+    m_palette->addFlyout(QStringLiteral("edit"), {tool(Tool::Split), tool(Tool::Trim), tool(Tool::Join)}); // D92
+    m_palette->addFlyout(QStringLiteral("3d"), {tool(Tool::Slab), tool(Tool::SlabOpening)});
     m_palette->setMode(ToolPalette::modeFromKey(m_prefs.value(QStringLiteral("palette_mode")).toString()));
     connect(m_palette, &ToolPalette::modeChanged, this, [this](ToolPalette::Mode mode) {
         m_prefs.setValue(QStringLiteral("palette_mode"), ToolPalette::modeKey(mode));
@@ -2520,13 +2602,36 @@ void MainWindow::buildPalette()
     QAction* hideTools = m_palette->contextMenu()->addAction(tr("&Auto-hide"));
     hideTools->setObjectName(QStringLiteral("actionAutoHideTools"));
     connect(hideTools, &QAction::triggered, toolsDock, [toolsDock] { toolsDock->setAutoHide(!toolsDock->isAutoHide()); });
-    // View > Panels: a panel closed with its x comes back from here (D71).
+    // View > Panels: a panel closed with its x comes back from here (D71); D92: pin any as a
+    // permanent tab (no close button, always shown), remembered in the preferences.
     m_viewMenu->addSeparator();
     QMenu* panels = m_viewMenu->addMenu(tr("&Panels"));
     panels->setObjectName(QStringLiteral("panelsMenu"));
     for (const char* key : {"tools", "tree", "properties", "layers", "history", "drawings", "sheets"})
-        if (ads::CDockWidget* d = m_dock->manager()->findDockWidget(QLatin1String(key)))
+        if (ads::CDockWidget* d = m_dock->manager()->findDockWidget(QLatin1String(key))) {
+            const QString k = QLatin1String(key);
+            const bool pinned = m_prefs.pinnedPanels().contains(k);
+            m_dock->setPanelPinned(k, pinned);
             panels->addAction(d->toggleViewAction());
+            if (k != QLatin1String("tools")) {
+                auto* pin = panels->addAction(tr("Pin %1").arg(d->windowTitle()));
+                pin->setObjectName(QStringLiteral("pinPanel_") + k);
+                pin->setCheckable(true);
+                pin->setChecked(pinned);
+                connect(pin, &QAction::toggled, this, [this, k, pin](bool on) {
+                    m_dock->setPanelPinned(k, on);
+                    QStringList pinnedPanels = m_prefs.pinnedPanels();
+                    if (on && !pinnedPanels.contains(k))
+                        pinnedPanels << k;
+                    else if (!on)
+                        pinnedPanels.removeAll(k);
+                    m_prefs.setValue(QStringLiteral("pinned_panels"), QJsonArray::fromStringList(pinnedPanels));
+                    if (!m_quiet)
+                        m_prefs.save();
+                    Q_UNUSED(pin);
+                });
+            }
+        }
     // D90: the panels used now and then cost no tab until opened (then closable): from here, the
     // Panels button of the panel area and their own commands.
     panels->addSeparator();
@@ -3552,6 +3657,47 @@ void MainWindow::setTrueLineWeights(bool on)
     refreshAnnotations();
 }
 
+void MainWindow::applyViewPreferences()
+{
+    Viewport::setFieldOfView(m_prefs.fieldOfView()); // D92
+    Viewport::setBoxMode(Viewport::boxModeFrom(m_prefs.boxSelection())); // D92
+    if (m_modifyTool)
+        m_modifyTool->setJoinDefault(m_prefs.splitJoin()); // D92: split/trim pieces joined
+    const QJsonArray home = m_prefs.value(QStringLiteral("home_view")).toArray();
+    if (home.size() == 6)
+        Viewport::setHomeView(gp_Dir(home.at(0).toDouble(), home.at(1).toDouble(), home.at(2).toDouble()),
+            gp_Dir(home.at(3).toDouble(), home.at(4).toDouble(), home.at(5).toDouble()));
+    else
+        Viewport::setHomeView(viewDirection(HomeOrientation), viewUp(HomeOrientation));
+    if (m_viewport && m_viewport->isPerspective())
+        m_viewport->setPerspective(true); // re-apply the field of view to the open camera
+    refreshNorthArrow();
+}
+
+// D92: the plan north arrow shows once true north is set (a preference turns it off).
+void MainWindow::refreshNorthArrow()
+{
+    if (!m_viewport)
+        return;
+    const QJsonObject north = bridge("get_true_north");
+    const bool on = m_prefs.northArrowPlans() && north.value("set").toBool();
+    m_viewport->setNorthArrow(on, north.value("degrees").toDouble());
+}
+
+void MainWindow::applyTitleBarPreferences()
+{
+    if (m_levels)
+        m_levels->setVisible(m_prefs.titleBarLevels());
+    if (m_planCutButton)
+        m_planCutButton->setVisible(m_prefs.titleBarCut());
+    if (m_cutHeight)
+        m_cutHeight->setVisible(m_prefs.titleBarCut());
+    if (m_cutSeparator)
+        m_cutSeparator->setVisible(m_prefs.titleBarCut());
+    if (m_versionsButton)
+        m_versionsButton->setVisible(m_prefs.titleBarVersions());
+}
+
 void MainWindow::refreshAnnotations()
 {
     QVector<Viewport::Annotation> list;
@@ -3789,6 +3935,7 @@ void MainWindow::activateView(const QString& key)
         m_viewport->setWorkPlaneZ(m_levels->activeElevation());
         applyCuts();
         refreshAnnotations(); // this view's level notes, grid and markers
+        refreshNorthArrow();  // D92: the plan north indicator
         refreshDrawings();
         refreshSnapData();
     }
@@ -5018,6 +5165,7 @@ void MainWindow::afterEdit(const QJsonObject& result)
     { StepTimer _(m_timings, "refreshSnapData"); refreshSnapData(); } // undo/redo can add or remove walls and grid lines
     { StepTimer _(m_timings, "refreshLayers"); refreshLayers(); }
     { StepTimer _(m_timings, "refreshAnnotations"); refreshAnnotations(); }
+    { StepTimer _(m_timings, "refreshNorthArrow"); refreshNorthArrow(); }
     { StepTimer _(m_timings, "refreshDrawings"); refreshDrawings(); }
     { StepTimer _(m_timings, "refreshSheets"); refreshSheets(); }
     StepTimer stateTimer(m_timings, "stateAndNames");
@@ -5243,6 +5391,8 @@ void MainWindow::preferencesDialog()
         return;
     m_prefs.save();
     Viewport::setScrollMode(Viewport::scrollModeFrom(m_prefs.scrollNavigation())); // D89
+    applyViewPreferences(); // D92: the field of view and the home view
+    applyTitleBarPreferences(); // D92: which controls the title bar holds
     bridge("set_author", {m_prefs.authorName(), m_prefs.authorEmail()});
     applyDrawingPrefs();
     restartRecoveryTimer();
@@ -5308,6 +5458,11 @@ void MainWindow::loadProjectSettings()
     const QSignalBlocker block(m_cutHeight);
     m_cutHeight->setValue(m_settings.value("plan_cut_height").toDouble(1.2));
     m_cutLabel->setText(formatLength(m_cutHeight->value()));
+    if (m_draftTool) { // D92: typed lengths (and a rectangle's width;height) in the project unit
+        const QString unit = m_settings.value("length_unit").toString(QStringLiteral("m"));
+        const double intoMetres = unit == QLatin1String("mm") ? 0.001 : unit == QLatin1String("cm") ? 0.01 : 1.0;
+        m_draftTool->setLengthFactor(m_prefs.typedLengthUnit() == QLatin1String("project") ? intoMetres : 1.0);
+    }
 }
 
 bool MainWindow::setProjectSettings(const QJsonObject& changes)
@@ -5329,6 +5484,15 @@ QString MainWindow::formatLength(double metres) const
     const QString unit = m_settings.value("length_unit").toString(QStringLiteral("m"));
     const double factor = unit == QLatin1String("mm") ? 1000.0 : unit == QLatin1String("cm") ? 100.0 : 1.0;
     return QLocale().toString(metres * factor, 'f', m_settings.value("length_decimals").toInt(2))
+        + QLatin1Char(' ') + unit;
+}
+
+QString MainWindow::formatArea(double squareMetres) const
+{
+    // D92: the project's area unit (m²/cm²/mm²).
+    const QString unit = m_settings.value("area_unit").toString(QStringLiteral("m²"));
+    const double factor = unit == QLatin1String("mm²") ? 1000000.0 : unit == QLatin1String("cm²") ? 10000.0 : 1.0;
+    return QLocale().toString(squareMetres * factor, 'f', m_settings.value("length_decimals").toInt(2))
         + QLatin1Char(' ') + unit;
 }
 

@@ -2,11 +2,18 @@
 // D87: the annotation pack in the main window: a tag placed by clicking a wall, Tag all, a north
 // arrow, an angle dimension and a revision cloud drawn through the tools.
 #include <QAction>
+#include <QCheckBox>
 #include <QComboBox>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QLineEdit>
+#include <QPushButton>
 #include <QStandardPaths>
+#include <QTimer>
 #include <QToolButton>
 #include <QtTest>
+
+#include <functional>
 
 #include "MainWindow.h"
 #include "Viewport.h"
@@ -18,6 +25,54 @@ class TestMarkupTools : public QObject {
     Q_OBJECT
 private slots:
     void initTestCase() { QStandardPaths::setTestModeEnabled(true); }
+
+    // D92: Tag all asks which categories to tag; with nothing chosen it cannot be accepted.
+    // (First: the engine is shared by every MainWindow in the process, and a non-quiet one asks
+    // before throwing away the previous test's unsaved model.)
+    void tagAllAsksForCategories()
+    {
+        MainWindow w(nullptr, /*quiet=*/false);
+        QVERIFY(w.newProject());
+        w.findChild<QAction*>(QStringLiteral("actionPlanView"))->trigger();
+        kimbim::Viewport* v = w.viewport();
+        w.setTool(MainWindow::Tool::Wall);
+        QVERIFY(w.createWall({QPointF(0, 0), QPointF(6, 0), {}, {}}));
+        QVERIFY(w.createWall({QPointF(0, 4), QPointF(6, 4), {}, {}}));
+        w.setTool(MainWindow::Tool::None);
+        const int before = v->annotationCount();
+        bool seen = false;
+        std::function<void()> poll = [&] {
+            QDialog* d = nullptr;
+            for (QWidget* top : QApplication::topLevelWidgets())
+                if (auto* candidate = qobject_cast<QDialog*>(top); candidate && candidate->objectName() == QStringLiteral("tagAllDialog"))
+                    d = candidate;
+            if (!d) { // the dialog is shown from exec(), one turn later
+                QTimer::singleShot(10, &w, poll);
+                return;
+            }
+            seen = true;
+            auto* wall = d->findChild<QCheckBox*>(QStringLiteral("tagCategory_wall"));
+            auto* door = d->findChild<QCheckBox*>(QStringLiteral("tagCategory_door"));
+            auto* window = d->findChild<QCheckBox*>(QStringLiteral("tagCategory_window"));
+            auto* box = d->findChild<QDialogButtonBox*>();
+            if (!wall || !door || !window || !box) {
+                d->reject();
+                return;
+            }
+            QVERIFY(door->isChecked() && window->isChecked() && wall->isChecked()); // the defaults
+            door->setChecked(false);
+            window->setChecked(false);
+            wall->setChecked(false);
+            QVERIFY(!box->button(QDialogButtonBox::Ok)->isEnabled());
+            wall->setChecked(true);
+            QVERIFY(box->button(QDialogButtonBox::Ok)->isEnabled());
+            d->accept();
+        };
+        QTimer::singleShot(0, &w, poll);
+        w.findChild<QAction*>(QStringLiteral("actionTagAll"))->trigger();
+        QVERIFY2(seen, "the Tag all dialog did not appear");
+        QCOMPARE(v->annotationCount() - before, 2); // both walls, and nothing else
+    }
 
     void tagsAndSymbolsThroughTheTools()
     {

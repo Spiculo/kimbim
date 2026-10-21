@@ -110,9 +110,11 @@ ChecksPanel::ChecksPanel(QWidget* parent)
     m_idsList->setObjectName(QStringLiteral("idsFiles"));
     m_idsList->setMaximumHeight(46);
     QToolButton* addIds = button(tr("Add..."), tr("Add an .ids file to the project"), "addIds");
+    QToolButton* linkIds = button(tr("Link..."), tr("Link an .ids file from a folder (kept as its path, not embedded)"), "linkIds"); // D92
     QToolButton* removeIds = button(tr("Remove"), tr("Remove the selected IDS file from the project"), "removeIds");
     QToolButton* report = button(tr("Report..."), tr("Save the last IDS results as IfcTester's HTML or JSON report"), "idsReport");
     connect(addIds, &QToolButton::clicked, this, &ChecksPanel::addIdsRequested);
+    connect(linkIds, &QToolButton::clicked, this, &ChecksPanel::linkIdsRequested);
     connect(removeIds, &QToolButton::clicked, this, [this] {
         if (QListWidgetItem* i = m_idsList->currentItem())
             emit removeIdsRequested(i->text());
@@ -123,6 +125,7 @@ ChecksPanel::ChecksPanel(QWidget* parent)
     idsLayout->addWidget(m_idsList);
     auto* idsButtons = new QHBoxLayout;
     idsButtons->addWidget(addIds);
+    idsButtons->addWidget(linkIds);
     idsButtons->addWidget(removeIds);
     idsButtons->addStretch(1);
     idsButtons->addWidget(report);

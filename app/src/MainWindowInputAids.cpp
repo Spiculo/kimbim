@@ -29,6 +29,13 @@ void MainWindow::setupInputAids()
     hooks.active = [this] { return trackerTool(); };
     hooks.classic = [this](const Tracker& t) { return trackerClassic(t); };
     hooks.planZ = [this] { return m_levels->activeElevation(); };
+    hooks.trackerMode = [this] { return m_prefs.trackerMode(); };   // D92
+    hooks.angleMode = [this] { return m_prefs.angleMode(); };
+    hooks.typedLengthFactor = [this] {
+        const QString unit = m_settings.value("length_unit").toString(QStringLiteral("m"));
+        return m_prefs.typedLengthUnit() == QLatin1String("project")
+            ? (unit == QLatin1String("mm") ? 0.001 : unit == QLatin1String("cm") ? 0.01 : 1.0) : 1.0;
+    };
     m_inputAids = new InputAidsController(std::move(hooks), this);
     for (Snapper* s : {&m_wallTool->snapper(), &m_polygonTool->snapper(), &m_twoPointTool->snapper(), &m_rotateTool->snapper(),
              &m_gripTool->snapper(), &m_measure->tool()->snapper(), &m_modifyTool->snapper(), &m_draftTool->snapper()})
@@ -47,7 +54,8 @@ void MainWindow::setupInputAids()
         clear->setObjectName(QStringLiteral("actionClearGuides"));
         connect(clear, &QAction::triggered, m_inputAids, &InputAidsController::clearGuides);
     }
-    Viewport::setScrollMode(Viewport::scrollModeFrom(m_prefs.scrollNavigation()));
+    Viewport::setNavigationPreset(m_prefs.scrollNavigation()); // D92: mouse, trackpad, precision
+    Viewport::setTabAnnotations(m_prefs.tabAnnotations());
 }
 
 bool MainWindow::trackerTool() const
@@ -102,7 +110,7 @@ bool MainWindow::trackerClassic(const Tracker& t)
     // a wall along the mouse, a circle's radius, a stretched wall's new length...).
     if (!t.lengthOnly() || m_lengthInput->isHidden() || m_toolOptions->isHidden())
         return false;
-    m_lengthInput->setText(QLocale().toString(*t.value(Tracker::Length), 'g', 12));
+    m_lengthInput->setText(QLocale().toString(*t.value(Tracker::Length), 'g', 12)); // already the typed unit
     emit m_lengthInput->returnPressed();
     if (m_lengthInput->text().isEmpty())
         return true;

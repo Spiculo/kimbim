@@ -46,8 +46,9 @@ from . import drawings as D
 SVG = "{http://www.w3.org/2000/svg}"
 IFC = "{http://www.ifcopenshell.org/ns}"
 DXF_VERSION = "R2013"
-LAYER_MODES = ("layer", "kind")
+LAYER_MODES = ("layer", "kind", "iso", "pen")
 DIMENSION_MODES = ("native", "exploded")
+COLOUR_MODES = ("exact", "aci", "lineweight")
 LINEWEIGHTS = (0, 5, 9, 13, 15, 18, 20, 25, 30, 35, 40, 50, 53, 60, 70, 80, 90, 100, 106, 120, 140, 158, 200, 211)
 # Element kind -> layer (US National CAD Standard, the names Revit's DWG export uses by default).
 KIND_LAYERS = {
@@ -59,6 +60,14 @@ KIND_LAYERS = {
 }
 OVERLAY_LAYERS = {"swing": "A-DOOR", "window": "A-GLAZ", "room": "A-AREA-IDEN", "marker": "A-ANNO-SYMB",
                   "stair": "A-FLOR-STRS"}
+# ISO 13567-style names (D92: a layer-scheme preset).
+ISO_LAYERS = {
+    "walls": "A-WALL-FULL", "columns": "S-COLS", "beams": "S-BEAM", "slabs": "S-SLAB", "roofs": "A-ROOF",
+    "stairs": "A-FLOR-STRS", "railings": "A-FLOR-HRAL", "doors": "A-DOOR", "windows": "A-GLAZ",
+    "coverings": "A-FLOR", "furniture": "I-FURN", "plumbing": "P-FIXT", "hvac": "M-HVAC",
+    "electrical": "E-POWR", "structure_other": "S-MISC", "rooms": "A-AREA", "annotations": "A-ANNO-NOTE",
+    "grids": "S-GRID", "other": "A-GENM",
+}
 DIMENSION_LAYER = "A-ANNO-DIMS"
 SHEET_LAYERS = {"frame": "A-ANNO-TTLB", "title": "A-ANNO-TITL", "legend": "A-ANNO-LGND"}
 _INSUNITS = {0.001: 4, 0.01: 5, 1.0: 6, 0.0254: 1, 0.3048: 2}  # metres per unit -> $INSUNITS
@@ -119,6 +128,16 @@ def _insunits(u: float) -> int:
     return next((code for m, code in _INSUNITS.items() if math.isclose(m, u, rel_tol=1e-6)), 4)
 
 
+_COLOUR_MODE = "exact"  # D92: set from the export options before writing
+_POCHE = True
+
+
+def _set_options(opts: dict) -> None:
+    global _COLOUR_MODE, _POCHE
+    _COLOUR_MODE = opts.get("colour", "exact")
+    _POCHE = bool(opts.get("poche", True))
+
+
 def _options(options_json) -> dict:
     try:
         o = json.loads(options_json) if isinstance(options_json, str) and options_json.strip() else dict(options_json or {})
@@ -128,6 +147,8 @@ def _options(options_json) -> dict:
         o = {}
     return {"layers": o.get("layers") if o.get("layers") in LAYER_MODES else "layer",
             "dimensions": o.get("dimensions") if o.get("dimensions") in DIMENSION_MODES else "native",
+            "colour": o.get("colour") if o.get("colour") in COLOUR_MODES else "exact",
+            "poche": o.get("poche") if isinstance(o.get("poche"), bool) else True,
             "purpose": o.get("purpose") or None}
 
 
@@ -184,7 +205,8 @@ class Doc:
 
 
 def _attribs(doc: Doc, ctx: dict, ltscale: float = 1.0) -> dict:
-    out = {"layer": doc.layer(ctx["layer"]), "color": aci(ctx["color"]), "lineweight": lineweight(ctx["weight"])}
+    color = _grey_for_weight(ctx["weight"]) if _COLOUR_MODE == "lineweight" else ctx["color"]
+    out = {"layer": doc.layer(ctx["layer"]), "color": aci(color), "lineweight": lineweight(ctx["weight"])}
     lt = doc.linetype(ctx.get("dash"))
     if lt != "CONTINUOUS":
         out["linetype"] = lt
@@ -194,8 +216,16 @@ def _attribs(doc: Doc, ctx: dict, ltscale: float = 1.0) -> dict:
 
 
 def _colour(entity, color: str):
+    if _COLOUR_MODE in ("aci", "lineweight"):
+        return  # the ACI set in _attribs is the colour (D92)
     if aci(color) != 7 or max(_rgb(color)) >= 24:
         entity.rgb = _rgb(color)
+
+
+def _grey_for_weight(weight: float) -> str:
+    """A grey ACI colour from a pen weight (heavier is darker), for the "lineweight" colour mode."""
+    v = 255 - int(min(1.0, max(0.0, float(weight))) * 200)
+    return f"#{v:02x}{v:02x}{v:02x}"
 
 
 # ---------------------------------------------------------------- SVG geometry
@@ -398,11 +428,13 @@ def drawing_mapping(svg: str, kind: str, u: float) -> Mapping:
 class Writer:
     """Walks an SVG and writes its lines, fills, text and circles into a DXF layout or block."""
 
-    def __init__(self, doc: Doc, target, mapping: Mapping, style=None, ltscale: float = 1.0, dims=None):
+    def __init__(self, doc: Doc, target, mapping: Mapping, style=None, ltscale: float = 1.0, dims=None,
+                 poche: bool = True):
         self.doc, self.target, self.map = doc, target, mapping
         self.style = style  # (element, ctx) -> new ctx, or None to skip the element's subtree
         self.ltscale = ltscale
         self.dims = dims  # guid -> True when the group was written as DIMENSION entities
+        self.poche = poche  # D92: fills go on the layer's "-PATT" sublayer
         self.count = 0
         self.lo = [math.inf, math.inf]
         self.hi = [-math.inf, -math.inf]
@@ -430,7 +462,8 @@ class Writer:
                 self.drafting_fill(element, ctx)
             loose = []  # the group's single segments (the serializer writes one path per edge)
             for child in element:
-                if fill and (child.get("class") == "hatch" or child.get("data-fill") or child.get("data-fill-pen")):
+                if fill and (child.get("class") == "hatch" or child.get("data-fill") or child.get("data-fill-pen")
+                             or child.get("data-outline") == "none"):
                     continue
                 if child.tag == SVG + "path" and set(child.attrib) <= {"d", "class"}:
                     subpaths = parse_path(child.get("d", ""))
@@ -503,7 +536,7 @@ class Writer:
         if ctx.get("fill"):
             loops = [m for m, closed in mapped if closed and len(m) >= 3]
             if loops:
-                hatch_attribs = {"layer": self.doc.layer(ctx["layer"] + "-PATT")}
+                hatch_attribs = {"layer": self.doc.layer(ctx["layer"] + "-PATT" if self.poche else ctx["layer"])}
                 hatch = self.target.add_hatch(color=aci(ctx["fill"]), dxfattribs=hatch_attribs)
                 hatch.set_solid_fill(color=aci(ctx["fill"]), rgb=_rgb(ctx["fill"]) if aci(ctx["fill"]) != 7 or
                                      max(_rgb(ctx["fill"])) >= 24 else None)
@@ -525,7 +558,7 @@ class Writer:
         from . import annotations as N
         from . import drafting
 
-        outline = next((c for c in group if c.tag == SVG + "path" and not c.get("class") and not c.get("data-fill")
+        outline = next((c for c in group.iter(SVG + "path") if not c.get("class") and not c.get("data-fill")
                         and not c.get("data-fill-pen")), None)
         subpaths = parse_path(outline.get("d", "")) if outline is not None else []
         if not subpaths:
@@ -536,7 +569,8 @@ class Writer:
         except (RuntimeError, AttributeError):
             e = None
         extra = N.extra_of(e) if e is not None else {}
-        layer = {"layer": self.doc.layer(ctx.get("layer", "0") + "-PATT")}
+        layer = {"layer": self.doc.layer(ctx.get("layer", "0") + ("-PATT" if self.poche else ""))}
+        factor = 0.001 if extra.get("PatternScale") == "model" else None  # D92: model-scaled spacings
         pen_of = getattr(self.style, "pen", None)
         bg = int(extra.get("BackgroundPen") or 0)
         name = extra.get("Pattern") or "Solid"
@@ -552,7 +586,7 @@ class Writer:
             hatch.paths.add_polyline_path(loop, is_closed=True)
             self.count += 1
         families = [] if pattern.get("solid") else pattern.get("lines", []) or []
-        k = self.map.size  # model units per paper mm
+        k = factor if factor is not None else self.map.size  # model units per pattern mm
         definition = []
         for fam in families:
             a = math.radians(float(fam.get("angle", 0)))
@@ -632,9 +666,14 @@ class Styler:
         except RuntimeError:
             return None
 
-    def layer_of(self, guid: str, kind_layer: str | None = None) -> str:
-        if guid in self._layer_of:
-            return self._layer_of[guid]
+    def pen_layer(self, n) -> str:
+        """D92 "per pen" layer scheme: one layer per pen number, e.g. PEN-23."""
+        return f"PEN-{int(n):02d}"
+
+    def layer_of(self, guid: str, kind_layer: str | None = None, pen=None) -> str:
+        key = (guid, int(pen)) if self.layers == "pen" and pen is not None else guid
+        if key in self._layer_of:
+            return self._layer_of[key]
         from . import graphics, layers
 
         e = self.element(guid)
@@ -642,9 +681,13 @@ class Styler:
         if e is not None and self.layers == "layer":
             layer = layers.element_layer(e)
             name = layer.Name if layer is not None and layer.Name else None
+        if name is None and self.layers == "pen" and pen is not None:
+            name = self.pen_layer(pen)
         if name is None:
-            name = kind_layer or KIND_LAYERS.get(graphics.kind_of(e) if e is not None else "other", "A-GENM")
-        self._layer_of[guid] = name
+            kind = graphics.kind_of(e) if e is not None else "other"
+            table = ISO_LAYERS if self.layers == "iso" else KIND_LAYERS
+            name = kind_layer or table.get(kind, "A-GENM")
+        self._layer_of[key] = name
         return name
 
     def pen(self, n) -> dict:
@@ -660,18 +703,18 @@ class Styler:
                 return None
             if kind == "annotation":
                 pm = element.get("data-pen")
-                p = self.pen(int(pm) if pm and pm.isdigit() else self.resolved.get("annotation_pen", 23))
+                n = int(pm) if pm and pm.isdigit() else int(self.resolved.get("annotation_pen", 23))
+                p = self.pen(n)
                 e = self.element(guid)
                 data = ifcopenshell.util.element.get_pset(e, G.ANNOTATION_PSET) or {} if e is not None else {}
                 is_dim = data.get("Kind") == "dimension"
                 if is_dim and self.native_dims:
-                    self.dimension_groups.append((guid, p))
+                    self.dimension_groups.append((guid, p, n))
                     return None
-                layer = self.layer_of(guid, DIMENSION_LAYER if is_dim else None)
+                layer = self.layer_of(guid, DIMENSION_LAYER if is_dim else None, pen=n)
                 dash = [float(v) for v in (element.get("data-dash") or "").split()]  # D84: a drafting line type
                 return {**ctx, "layer": layer, "color": p["color"], "weight": p["weight"], "dash": dash,
                         "fill": None, "text_color": p["color"], "lock_text": True}
-            layer = self.layer_of(guid)
             if guid in self.elements:
                 st = self.styles[self.elements[guid]]
                 cls = element.get("class") or ""
@@ -679,11 +722,13 @@ class Styler:
                     line, fill = st["projection"], None
                 else:
                     line, fill = st["cut"], st["fill"]
+                layer = self.layer_of(guid, pen=line.get("pen"))
                 return {**ctx, "layer": layer, "color": line["color"], "weight": line["weight"],
                         "dash": line["dash"], "fill": fill}
             from . import graphics
 
             fb = graphics.FALLBACK_PEN
+            layer = self.layer_of(guid)
             return {**ctx, "layer": layer, "color": fb["color"], "weight": fb["weight"], "dash": [], "fill": None}
         if kind in OVERLAY_LAYERS:
             return {**ctx, "layer": OVERLAY_LAYERS[kind]}
@@ -695,7 +740,7 @@ def write_dimensions(doc: Doc, target, styler: Styler, u: float, offset=None) ->
     the chain's dimension line, the segment's label as the text (empty: the measured value)."""
     count = 0
     style = doc.dimension_style() if styler.dimension_groups else None
-    for guid, p in styler.dimension_groups:
+    for guid, p, pen_no in styler.dimension_groups:
         a = styler.element(guid)
         if a is None or a.ObjectPlacement is None:
             continue
@@ -719,7 +764,7 @@ def write_dimensions(doc: Doc, target, styler: Styler, u: float, offset=None) ->
         angle = math.degrees(math.atan2(by - ay, bx - ax))
         labels = G.segment_labels(data.get("Text") or "", len(measured) - 1)
         size = float(data.get("Size") or G.TEXT_SIZE)
-        layer = doc.layer(styler.layer_of(guid, DIMENSION_LAYER))
+        layer = doc.layer(styler.layer_of(guid, DIMENSION_LAYER, pen=pen_no))
         color, lw = aci(p["color"]), lineweight(p["weight"])
         for (p1, p2), label in zip(zip(measured, measured[1:]), labels):
             dim = target.add_linear_dim(base=through, p1=p1, p2=p2, angle=angle, text=label or "<>", dimstyle=style,
@@ -757,7 +802,7 @@ def _write_drawing(doc: Doc, target, guid: str, resolved: dict, opts: dict, ltsc
     kind = G.settings_of(d)["kind"]
     mapping = drawing_mapping(svg, kind, doc.u)
     styler = Styler(resolved, opts["layers"], opts["dimensions"])
-    writer = Writer(doc, target, mapping, styler, ltscale)
+    writer = Writer(doc, target, mapping, styler, ltscale, poche=_POCHE)
     root = ET.fromstring(svg)
     base = {"layer": "0", "color": "#000000", "weight": 0.18, "dash": [], "fill": None}
     writer.walk(root, base)
@@ -773,6 +818,7 @@ def _zoom(layout, writer: Writer):
 
 def drawing_document(guid: str, opts: dict):
     """(ezdxf document, stats) of one drawing in model space, or (None, error)."""
+    _set_options(opts)
     resolved = _resolved(opts["purpose"])
     doc = _new_doc(resolved)
     msp = doc.doc.modelspace()
@@ -818,6 +864,7 @@ def sheet_document(number: str, opts: dict):
     sheet = S._sheet(number)
     if sheet is None:
         return None, "unknown sheet"
+    _set_options(opts)
     width, height = S.PAPERS.get(sheet.Scope or "A1", S.PAPERS["A1"])
     purpose = opts["purpose"] or St.current().get("sheet_purposes", {}).get(number) or None
     resolved = graphics.resolve(purpose)
@@ -829,7 +876,7 @@ def sheet_document(number: str, opts: dict):
     if "Layout1" in dxf.layouts:
         dxf.layouts.delete("Layout1")
     paper = Mapping([[1, 0, 0], [0, -1, height], [0, 0, 1]])  # sheet mm, y down -> paper space, y up
-    chrome = Writer(doc, layout, paper, ltscale=1.0 / doc.ltscale)
+    chrome = Writer(doc, layout, paper, ltscale=1.0 / doc.ltscale, poche=_POCHE)
     base = {"color": "#000000", "weight": 0.18, "dash": [], "fill": None}
     views, msp_x, msp_h, stats_entities = [], 0.0, 0.0, 0
     msp = dxf.modelspace()

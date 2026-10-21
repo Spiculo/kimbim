@@ -24,6 +24,14 @@ DEFAULTS = {
     "sheet_paper": "A1",
     "length_unit": "m",
     "length_decimals": 2,
+    "area_unit": "m²",  # D92: how areas are shown (project setting)
+    "level_reference": "project",  # D92: level dimensions from project zero, the level or sea level
+    "north_arrow_style": "circle",  # D92: the plan north arrow's symbol
+    "scale_bar_style": "bar",  # D92: the plan scale bar's symbol
+    "sea_level": 0.0,  # D92: the project zero's elevation above sea level (m)
+    "angle_decimals": 2,   # D92: decimals for angles in annotations
+    "radius_decimals": 2,  # D92: decimals for radii and diameters
+    "orphan_tags": "delete",  # D92: what a tag whose element is gone does: "delete" or "keep"
     "pen_sets": {},
     "line_types": {},
     "fill_patterns": {},  # D84: the project's fill patterns (empty: the built-ins)
@@ -50,8 +58,19 @@ DEFAULTS = {
     "underlays": [],  # DXF, PDF and image underlays on levels: file, placement, display (D85)
     "tag_styles": {},  # tag styles by id: the project's own and its edited built-ins (D87)
     "stair_rules": {},  # building-code limits for stair and ramp warnings (D88; empty: the defaults)
+    "check_tolerance": 0.002,   # D92: clash hard tolerance (m)
+    "check_clearance": 0.05,    # D92: clash clearance (m)
+    "check_ignore_joined": True,  # D92: walls joined to each other do not clash
+    "check_partial_duplicates": False,  # D92: also flag elements that only partly overlap
+    "imported_walls": "rebuild",  # D92: splitting an imported wall rebuilds it (default) or keeps its shape and cuts it
+    "stair_riser": 0.175,  # D92: a new stair's target riser (m)
+    "stair_tread": 0.28,  # D92: a new stair's tread when fixed (m)
+    "stair_tread_mode": "fixed",  # D92: a new stair's tread is fixed or from 2 risers + tread = 625 mm
+    "stair_arrow": "top",  # D92: the plan symbol's arrow: top (default), bottom or both
+    "stair_riser_numbers": False,  # D92: number the risers on the plan
 }
 UNITS = {"m": 1.0, "cm": 100.0, "mm": 1000.0}
+AREA_UNITS = {"m²": 1.0, "cm²": 10000.0, "mm²": 1000000.0}
 
 _current: dict = copy.deepcopy(DEFAULTS)
 _saved: dict = copy.deepcopy(DEFAULTS)
@@ -73,6 +92,13 @@ def load(data: dict | None, dirty: bool = False) -> None:
 def mark_saved() -> None:
     global _saved
     _saved = copy.deepcopy(_current)
+
+
+def restore(data: dict) -> None:
+    """Put back a snapshot of `current()` (D92: undo/redo of a settings-only step, e.g. an underlay
+    edit). `_saved` is left alone, so the dirty state follows."""
+    global _current
+    _current = copy.deepcopy(data)
 
 
 def is_dirty() -> bool:
@@ -146,6 +172,20 @@ def _error(key: str, value) -> str | None:
         return f"unknown paper size {value}"
     if key == "length_unit" and value not in UNITS:
         return f"unknown length unit {value}"
+    if key == "area_unit" and value not in AREA_UNITS:
+        return f"unknown area unit {value}"
+    if key == "level_reference" and value not in ("project", "level", "sea"):
+        return f"unknown level dimension reference {value}"
+    if key == "north_arrow_style" and value not in ("circle", "needle", "arrow"):
+        return f"unknown north arrow style {value}"
+    if key == "scale_bar_style" and value not in ("bar", "line"):
+        return f"unknown scale bar style {value}"
+    if key == "sea_level" and not (number and -10000 <= value <= 10000):
+        return "the sea level must be between -10000 and 10000 m"
+    if key in ("angle_decimals", "radius_decimals") and not (isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 4):
+        return f"{key} must be between 0 and 4"
+    if key == "orphan_tags" and value not in ("delete", "keep"):
+        return f"unknown orphan tag choice {value}"
     if key == "length_decimals" and not (isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 4):
         return "decimals must be between 0 and 4"
     if key in ("hidden_layers", "locked_layers") and not (isinstance(value, list) and all(isinstance(x, str) for x in value)):
@@ -180,6 +220,24 @@ def _error(key: str, value) -> str | None:
         from . import stairs
 
         return stairs.validate_rules(value)
+    if key in ("check_tolerance", "check_clearance") and not (number and 0 <= value <= 10):
+        return f"{key} must be between 0 and 10 m"
+    if key == "check_ignore_joined" and not isinstance(value, bool):
+        return "check_ignore_joined must be true or false"
+    if key == "check_partial_duplicates" and not isinstance(value, bool):
+        return "check_partial_duplicates must be true or false"
+    if key == "imported_walls" and value not in ("rebuild", "keep"):
+        return f"unknown imported wall choice {value}"
+    if key == "stair_riser" and not (number and 0.05 <= value <= 0.5):
+        return "the stair riser target must be between 0.05 and 0.5 m"
+    if key == "stair_tread" and not (number and 0.05 <= value <= 1.0):
+        return "the stair tread must be between 0.05 and 1.0 m"
+    if key == "stair_tread_mode" and value not in ("fixed", "blondel"):
+        return f"unknown stair tread mode {value}"
+    if key == "stair_arrow" and value not in ("top", "bottom", "both"):
+        return f"unknown stair arrow position {value}"
+    if key == "stair_riser_numbers" and not isinstance(value, bool):
+        return "stair_riser_numbers must be true or false"
     if key in ("ids_files", "clash_sets"):
         from . import checks
 
@@ -191,9 +249,17 @@ def _error(key: str, value) -> str | None:
     return None
 
 
-def format_length(metres: float, unit: bool = True) -> str:
+def format_length(metres: float, unit: bool = True, decimals: int | None = None) -> str:
     u = _current.get("length_unit", "m")
-    text = f"{metres * UNITS.get(u, 1.0):.{int(_current.get('length_decimals', 2))}f}"
+    d = int(_current.get("length_decimals", 2)) if decimals is None else int(decimals)
+    text = f"{metres * UNITS.get(u, 1.0):.{d}f}"
+    return f"{text} {u}" if unit else text
+
+
+def format_area(square_metres: float, unit: bool = True) -> str:
+    """An area in the project's area unit (D92), like format_length for lengths."""
+    u = _current.get("area_unit", "m²")
+    text = f"{square_metres * AREA_UNITS.get(u, 1.0):.{int(_current.get('length_decimals', 2))}f}"
     return f"{text} {u}" if unit else text
 
 
@@ -218,4 +284,8 @@ def set_project_settings(changes_json: str) -> str:
         if (err := _error(k, v)) is not None:
             return B._dump({"ok": False, "error": err})
     _current = {**_current, **copy.deepcopy(changes)}
+    if {"stair_arrow", "stair_riser_numbers"} & set(changes):  # D92: stairs keep their plan data current
+        from . import stairs
+
+        stairs.refresh_plan_settings()
     return B._dump({"ok": True, "settings": current(), "dirty": B._dirty()})

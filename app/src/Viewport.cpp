@@ -68,6 +68,17 @@ namespace kimbim {
 
 namespace {
 
+// D92: the home view and the perspective field of view, shared by every view (user preferences).
+gp_Dir g_homeDir = viewDirection(HomeOrientation);
+gp_Dir g_homeUp = viewUp(HomeOrientation);
+double g_fieldOfView = 45.0;
+
+} // namespace
+
+Viewport::BoxMode Viewport::s_boxMode = Viewport::BoxMode::Direction;
+
+namespace {
+
 Aspect_VKeyMouse toButtons(Qt::MouseButtons b)
 {
     Aspect_VKeyMouse m = Aspect_VKeyMouse_NONE;
@@ -146,6 +157,7 @@ void Viewport::setPlanView(double elevation)
     m_planElevation = elevation;
     AbortViewAnimation();
     eraseViewCube(); // D76: plans have no cube
+    ensureNorthArrow(); // D92: the plan north indicator
     m_view->Camera()->SetProjectionType(Graphic3d_Camera::Projection_Orthographic);
     m_view->SetProj(V3d_Zpos); // looking down, north (+Y) up
     applyNavigationPreset();
@@ -161,6 +173,7 @@ void Viewport::set3DView()
     const bool wasPlan = m_planView;
     m_planView = false;
     AbortViewAnimation();
+    eraseNorthArrow(); // D92: the north indicator belongs to plans
     m_view->SetProj(HomeOrientation);
     applyProjection(); // this view's perspective setting comes back
     applyNavigationPreset();
@@ -748,7 +761,7 @@ Viewport::~Viewport()
     // This view's own overlays leave the shared context; the elements stay for the other views.
     for (const Handle(AIS_InteractiveObject)& o :
          {Handle(AIS_InteractiveObject)(m_preview), Handle(AIS_InteractiveObject)(m_grid), Handle(AIS_InteractiveObject)(m_section),
-             Handle(AIS_InteractiveObject)(m_cube), m_home})
+             Handle(AIS_InteractiveObject)(m_cube), m_home, m_northArrow})
         if (!o.IsNull())
             m_context->Remove(o, false);
     for (const auto& a : std::as_const(m_annotations))
@@ -792,6 +805,7 @@ void Viewport::paintEvent(QPaintEvent*)
     // made every paint swap twice, waiting two vsyncs, so tool previews lagged behind the mouse;
     // not invalidating at all left the window blank after it was shown or uncovered.
     ensureViewCube();
+    ensureNorthArrow();
     m_view->Invalidate();
     FlushViewEvents(m_context, m_view, true);
     // Wheel zoom is applied while flushing the view events: report it after.
@@ -1037,11 +1051,12 @@ class AnnotationPrs : public AIS_InteractiveObject {
 public:
     // `ink`: the pen's colour and width (D73); nullopt keeps the kind's own colours (markers, rooms).
     AnnotationPrs(Viewport::Annotation a, double z, std::optional<std::pair<Quantity_Color, float>> ink = std::nullopt,
-        std::optional<Quantity_Color> background = std::nullopt)
+        std::optional<Quantity_Color> background = std::nullopt, std::optional<Quantity_Color> outline = std::nullopt)
         : m_a(std::move(a))
         , m_z(z)
         , m_ink(std::move(ink))
         , m_background(std::move(background))
+        , m_outline(std::move(outline))
     {
         SetZLayer(Graphic3d_ZLayerId_Topmost);
     }
@@ -1102,7 +1117,7 @@ public:
             g->AddPrimitiveArray(arr);
         }
         const std::vector<std::pair<gp_Pnt, gp_Pnt>> segs = segments();
-        if (!segs.empty()) {
+        if (!segs.empty() && !(m_a.isDrafting() && m_a.outlinePen == 0)) {
             Handle(Graphic3d_ArrayOfSegments) arr = new Graphic3d_ArrayOfSegments(int(segs.size()) * 2);
             for (const auto& s : segs) {
                 arr->AddVertex(s.first);
@@ -1110,7 +1125,8 @@ public:
             }
             Handle(Graphic3d_Group) lines = prs->NewGroup();
             const float width = m_ink ? std::max(m_ink->second, 1.0f) : (room ? 1.0f : 1.5f);
-            Handle(Graphic3d_AspectLine3d) aspect = new Graphic3d_AspectLine3d(ink, room ? Aspect_TOL_DOT : Aspect_TOL_SOLID, width);
+            Handle(Graphic3d_AspectLine3d) aspect = new Graphic3d_AspectLine3d(
+                m_outline ? *m_outline : ink, room ? Aspect_TOL_DOT : Aspect_TOL_SOLID, width);
             if (!m_a.dash.isEmpty()) // D84: the drafting shape's line type
                 aspect->SetLinePattern(Graphics::pattern(m_a.dash));
             lines->SetGroupPrimitivesAspect(aspect);
@@ -1318,6 +1334,7 @@ private:
     double m_z;
     std::optional<std::pair<Quantity_Color, float>> m_ink;
     std::optional<Quantity_Color> m_background;
+    std::optional<Quantity_Color> m_outline;
     Handle(SelectMgr_EntityOwner) m_owner;
 };
 
@@ -1383,13 +1400,36 @@ void Viewport::displayAnnotations()
             } else if (a.backgroundPen > 0) {
                 background = Quantity_Color(Quantity_NOC_WHITE);
             }
-            Handle(AnnotationPrs) prs = new AnnotationPrs(a, m_annotationZ + 0.02, ink, background);
+            std::optional<Quantity_Color> outline; // D92: a fill's own outline pen
+            if (a.outlinePen > 0 && !g.isEmpty()) {
+                const LineStyle op = g.pen(a.outlinePen);
+                outline = Quantity_Color(op.color.redF(), op.color.greenF(), op.color.blueF(), Quantity_TOC_sRGB);
+            }
+            Handle(AnnotationPrs) prs = new AnnotationPrs(a, m_annotationZ + 0.02, ink, background, outline);
             m_context->Display(prs, 0, m_scene->layerLocked.contains(a.guid) ? -1 : 0, false);
             keepHere(prs);
             m_annotations.insert(a.guid, prs);
         }
     }
     update();
+}
+
+QStringList Viewport::annotationGuidsAt(const QPointF& widgetPos)
+{
+    QStringList out;
+    if (!ensureWindow())
+        return out;
+    const NCollection_Vec2<int> px = toPixels(widgetPos);
+    m_context->MoveTo(px.x(), px.y(), m_view, false);
+    for (m_context->InitDetected(); m_context->MoreDetected(); m_context->NextDetected()) {
+        Handle(AnnotationOwner) note = Handle(AnnotationOwner)::DownCast(m_context->DetectedCurrentOwner());
+        if (note.IsNull())
+            continue;
+        const QString guid = note->guid();
+        if (!out.contains(guid) && !isLocked(guid))
+            out << guid;
+    }
+    return out;
 }
 
 void Viewport::setDrawingMarkers(const QVector<Annotation>& markers, double z)
@@ -2160,6 +2200,7 @@ void Viewport::keepOverlaysHere()
     keepHere(m_section);
     keepHere(m_cube);
     keepHere(m_home);
+    keepHere(m_northArrow);
     for (const auto& a : std::as_const(m_annotations))
         keepHere(a);
     for (const auto& u : std::as_const(m_underlays))
@@ -2334,6 +2375,42 @@ void Viewport::eraseViewCube()
             m_context->Erase(o, false);
 }
 
+// D92: the plan view's north indicator (a preference; on once true north is set).
+void Viewport::setNorthArrow(bool show, double degrees)
+{
+    m_northWanted = show;
+    m_northDegrees = degrees;
+    if (m_planView)
+        ensureNorthArrow();
+    else
+        eraseNorthArrow();
+    update();
+}
+
+void Viewport::ensureNorthArrow()
+{
+    if (!m_planView || !m_northWanted || m_view->Window().IsNull())
+        return;
+    const double dpr = devicePixelRatioF();
+    if (m_northArrow.IsNull() || std::abs(dpr - m_northDpr) > 1e-3 || std::abs(m_northDegrees - m_northAngleShown) > 1e-9) {
+        if (!m_northArrow.IsNull() && m_context->IsDisplayed(m_northArrow))
+            m_context->Remove(m_northArrow, false);
+        m_northArrow = makeNorthArrow(dpr, m_northDegrees);
+        m_northDpr = dpr;
+        m_northAngleShown = m_northDegrees;
+    }
+    if (!m_context->IsDisplayed(m_northArrow)) {
+        m_context->Display(m_northArrow, 0, 0, false);
+        keepHere(m_northArrow);
+    }
+}
+
+void Viewport::eraseNorthArrow()
+{
+    if (!m_northArrow.IsNull() && m_context->IsDisplayed(m_northArrow))
+        m_context->Erase(m_northArrow, false);
+}
+
 QRect Viewport::viewCubeRect() const
 {
     return viewCubeShown() ? kimbim::viewCubeRect(size()) : QRect();
@@ -2384,15 +2461,68 @@ void Viewport::applyProjection()
 {
     const Handle(Graphic3d_Camera)& camera = m_view->Camera();
     const auto type = m_perspective && !m_planView ? Graphic3d_Camera::Projection_Perspective : Graphic3d_Camera::Projection_Orthographic;
-    if (camera->ProjectionType() == type)
-        return;
-    // Keep what is seen at the target: an orthographic scale becomes a perspective distance and back.
-    const double scale = camera->Scale();
-    camera->SetProjectionType(type);
+    if (camera->ProjectionType() != type) {
+        // Keep what is seen at the target: an orthographic scale becomes a perspective distance and back.
+        const double scale = camera->Scale();
+        camera->SetProjectionType(type);
+        camera->SetScale(scale);
+    }
     if (type == Graphic3d_Camera::Projection_Perspective)
-        camera->SetFOVy(45.0); // a normal lens (about 70 degrees across a wide window)
-    camera->SetScale(scale);
+        camera->SetFOVy(g_fieldOfView); // D92: the preference (45° by default)
     m_view->Invalidate();
+}
+
+void Viewport::setFieldOfView(double degrees)
+{
+    g_fieldOfView = degrees;
+}
+
+double Viewport::fieldOfView()
+{
+    return g_fieldOfView;
+}
+
+void Viewport::setBoxMode(BoxMode mode)
+{
+    s_boxMode = mode;
+}
+
+Viewport::BoxMode Viewport::boxMode()
+{
+    return s_boxMode;
+}
+
+Viewport::BoxMode Viewport::boxModeFrom(const QString& preference)
+{
+    if (preference == QLatin1String("partial"))
+        return BoxMode::Partial;
+    if (preference == QLatin1String("entire"))
+        return BoxMode::Entire;
+    return BoxMode::Direction;
+}
+
+void Viewport::setHomeView(const gp_Dir& dir, const gp_Dir& up)
+{
+    g_homeDir = dir;
+    g_homeUp = up;
+}
+
+gp_Dir Viewport::homeDir() { return g_homeDir; }
+gp_Dir Viewport::homeUp() { return g_homeUp; }
+
+gp_Dir Viewport::currentViewDirection() const
+{
+    return m_view->Camera()->Direction().Reversed(); // target -> eye, as preset views
+}
+
+gp_Dir Viewport::currentViewUp() const
+{
+    return m_view->Camera()->Up();
+}
+
+void Viewport::useCurrentViewAsHome()
+{
+    setHomeView(currentViewDirection(), currentViewUp());
 }
 
 void Viewport::setPerspective(bool on)
@@ -2408,13 +2538,13 @@ void Viewport::setStandardView(V3d_TypeOfOrientation orientation, bool animate)
     // D91: preset views (cube faces and Alt+1…0) always zoom to fit, like Revit's cube (supersedes
     // D76's keep-zoom).
     if (!m_planView)
-        goTo(orientation, animate, true);
+        goTo(viewDirection(orientation), viewUp(orientation), animate, true);
 }
 
 void Viewport::homeView(bool animate)
 {
     if (!m_planView)
-        goTo(HomeOrientation, animate, true);
+        goTo(g_homeDir, g_homeUp, animate, true);
 }
 
 namespace {
@@ -2442,7 +2572,7 @@ bool boxInView(const Handle(Graphic3d_Camera)& camera, const Bnd_Box& box)
 
 } // namespace
 
-void Viewport::goTo(V3d_TypeOfOrientation orientation, bool animate, bool fit)
+void Viewport::goTo(const gp_Dir& dir, const gp_Dir& up, bool animate, bool fit)
 {
     AbortViewAnimation();
     const Handle(Graphic3d_Camera)& camera = m_view->Camera();
@@ -2450,8 +2580,8 @@ void Viewport::goTo(V3d_TypeOfOrientation orientation, bool animate, bool fit)
     Handle(Graphic3d_Camera) end = new Graphic3d_Camera();
     end->Copy(camera);
     const gp_Pnt center = end->Center();
-    end->SetEyeAndCenter(center.Translated(gp_Vec(viewDirection(orientation)) * end->Distance()), center);
-    end->SetUp(viewUp(orientation));
+    end->SetEyeAndCenter(center.Translated(gp_Vec(dir) * end->Distance()), center);
+    end->SetUp(up);
     end->OrthogonalizeUp();
     const Bnd_Box box = boundsOf({});
     // Fit all needs a window for the view's aspect ratio; headless tests have none (nothing to fit).

@@ -241,6 +241,34 @@ def test_far_survey_is_centred(tmp_path):
     assert 512000 < bx < 522000 and 4012000 < by < 4030000  # the drawing's middle lands on the origin
 
 
+def test_underlay_placement_centred_or_survey(tmp_path):
+    """D92: the placement option keeps the drawing's survey coordinates or centres it on the origin."""
+    assert call("new_project", "Under")["ok"]
+    far = str(survey_dxf(tmp_path / "far.dxf", insunits=6, offset=(512000, 4012000)))
+    survey = call("add_underlay", far, json.dumps({"placement": "survey"}))
+    assert survey["ok"] and survey["underlay"]["base"] == [0.0, 0.0]
+    centred = call("add_underlay", survey_dxf(tmp_path / "far2.dxf", insunits=6, offset=(512000, 4012000)),
+                   json.dumps({"placement": "centred"}))
+    assert centred["ok"]
+    bx, _by = centred["underlay"]["base"]
+    assert 512000 < bx < 522000
+
+
+def test_underlay_edits_are_undo_steps(tmp_path):
+    """D92: placing, moving or removing an underlay is one undo step."""
+    assert call("new_project", "Under")["ok"]
+    assert call("add_underlay", str(survey_dxf(tmp_path / "s.dxf")), "{}")["ok"]
+    u = call("underlays")["underlays"][0]["id"]
+    assert call("set_underlay", u, json.dumps({"x": 3.0, "rotation": 30}))["ok"]
+    assert call("underlays")["underlays"][0]["x"] == 3.0
+    assert call("undo")["ok"]
+    assert call("underlays")["underlays"][0]["x"] == 0.0
+    assert call("redo")["ok"]
+    assert call("underlays")["underlays"][0]["x"] == 3.0
+    assert call("undo")["ok"] and call("undo")["ok"]  # the move, then the placement
+    assert call("underlays")["underlays"] == []
+
+
 def test_images_take_their_dpi_at_1_to_100(tmp_path):
     assert call("new_project", "Under")["ok"]
     r = call("add_underlay", str(tiny_png(tmp_path / "scan.png", dpi=200)), "{}")

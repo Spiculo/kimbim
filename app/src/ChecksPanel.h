@@ -56,6 +56,7 @@ public:
 signals:
     void runRequested(const QStringList& checks, const QJsonObject& options);
     void addIdsRequested();
+    void linkIdsRequested(); // D92: link an IDS file from a folder instead of embedding it
     void removeIdsRequested(const QString& name);
     void exportReportRequested();
     void saveClashSetRequested(const QString& name, const QJsonObject& set, const QString& replaces);

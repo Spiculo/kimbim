@@ -7,6 +7,9 @@
 #include <Graphic3d_AspectLine3d.hxx>
 #include <Graphic3d_TransformPers.hxx>
 #include <Prs3d_Presentation.hxx>
+#include <Prs3d_Text.hxx>
+#include <Prs3d_TextAspect.hxx>
+#include <TCollection_ExtendedString.hxx>
 #include <V3d.hxx>
 
 #include <QCoreApplication>
@@ -24,6 +27,9 @@ constexpr int CubeHalfExtent = 56;    // half the square the turning cube (and i
 constexpr int HomeCenterX = 142;      // the home button's centre
 constexpr int HomeCenterY = 24;
 constexpr int HomeHalf = 13;
+constexpr int NorthCenterX = 34;      // the plan north compass's centre, from the bottom-left corner
+constexpr int NorthCenterY = 34;
+constexpr double NorthRadius = 15.0;  // the needle; the circle around it is a little larger
 
 const char* const Context = "ViewCube";
 
@@ -86,6 +92,72 @@ public:
 
 private:
     double m_dpr;
+};
+
+// D92: the plan view's north indicator: a compass at the view's bottom-left corner. The needle
+// points to true north (`m_angle` counter-clockwise from the plan's +Y); "N" sits beyond its tip.
+class NorthArrow : public AIS_InteractiveObject {
+public:
+    NorthArrow(double dpr, double degrees)
+        : m_dpr(dpr)
+        , m_angle(double(degrees) * M_PI / 180.0)
+    {
+        SetTransformPersistence(new Graphic3d_TransformPers(Graphic3d_TMF_2d, Aspect_TOTP_LEFT_LOWER,
+            NCollection_Vec2<int>(int(std::lround(NorthCenterX * dpr)), int(std::lround(NorthCenterY * dpr)))));
+        SetZLayer(Graphic3d_ZLayerId_TopOSD);
+        SetInfiniteState(true); // never part of Fit all
+    }
+    void Compute(const Handle(PrsMgr_PresentationManager)&, const Handle(Prs3d_Presentation)& prs, const int) override
+    {
+        const double s = m_dpr, r = NorthRadius;
+        auto p = [s](double x, double y) { return gp_Pnt(x * s, y * s, 0); };
+        const double nx = -std::sin(m_angle), ny = std::cos(m_angle); // north on screen (+y is up)
+        const double ex = ny, ey = -nx;                               // east: north turned clockwise
+        auto at = [&](double along, double across) { return p(along * nx + across * ex, along * ny + across * ey); };
+        const gp_Pnt tip = at(r, 0), notch = at(-0.25 * r, 0), left = at(-0.6 * r, -0.42 * r), right = at(-0.6 * r, 0.42 * r);
+        // The circle.
+        const int n = 48;
+        Handle(Graphic3d_ArrayOfSegments) lines = new Graphic3d_ArrayOfSegments(n + 4);
+        for (int i = 0; i < n; ++i) {
+            const double a = 2 * M_PI * i / n, b = 2 * M_PI * (i + 1) / n;
+            lines->AddVertex(p(r * std::cos(a), r * std::sin(a)));
+            lines->AddVertex(p(r * std::cos(b), r * std::sin(b)));
+        }
+        for (const gp_Pnt& v : {tip, right, notch, left}) // the needle's outline
+            lines->AddVertex(v);
+        lines->AddVertex(left);
+        lines->AddVertex(tip);
+        Handle(Graphic3d_Group) g = prs->NewGroup();
+        g->SetGroupPrimitivesAspect(new Graphic3d_AspectLine3d(Quantity_Color(0.25, 0.28, 0.33, Quantity_TOC_RGB), Aspect_TOL_SOLID, float(1.4 * s)));
+        g->AddPrimitiveArray(lines);
+        // The needle's filled (eastern) half.
+        Handle(Graphic3d_ArrayOfTriangles) fill = new Graphic3d_ArrayOfTriangles(3);
+        fill->AddVertex(tip);
+        fill->AddVertex(right);
+        fill->AddVertex(notch);
+        Handle(Graphic3d_AspectFillArea3d) area = new Graphic3d_AspectFillArea3d();
+        area->SetInteriorStyle(Aspect_IS_SOLID);
+        area->SetInteriorColor(Quantity_Color(0.25, 0.28, 0.33, Quantity_TOC_RGB));
+        area->SetShadingModel(Graphic3d_TypeOfShadingModel_Unlit);
+        area->SetFaceCulling(Graphic3d_TypeOfBackfacingModel_DoubleSided);
+        Handle(Graphic3d_Group) fg = prs->NewGroup();
+        fg->SetGroupPrimitivesAspect(area);
+        fg->AddPrimitiveArray(fill);
+        // "N", upright, beyond the tip.
+        Handle(Prs3d_TextAspect) text = new Prs3d_TextAspect();
+        text->SetColor(Quantity_Color(0.25, 0.28, 0.33, Quantity_TOC_RGB));
+        text->SetHeight(11 * s);
+        text->SetHorizontalJustification(Graphic3d_HTA_CENTER);
+        text->SetVerticalJustification(Graphic3d_VTA_CENTER);
+        const gp_Pnt label = at(r + 6.0, 0);
+        Handle(Graphic3d_Group) tg = prs->NewGroup();
+        Prs3d_Text::Draw(tg, text, TCollection_ExtendedString("N"), label);
+    }
+    void ComputeSelection(const Handle(SelectMgr_Selection)&, const int) override {}
+
+private:
+    double m_dpr;
+    double m_angle;
 };
 
 } // namespace
@@ -158,6 +230,11 @@ void ViewCube::HandleClick(const Handle(AIS_ViewCubeOwner)& owner)
 Handle(AIS_InteractiveObject) makeHomeButton(double devicePixelRatio)
 {
     return new HomeButton(devicePixelRatio);
+}
+
+Handle(AIS_InteractiveObject) makeNorthArrow(double devicePixelRatio, double degrees)
+{
+    return new NorthArrow(devicePixelRatio, degrees);
 }
 
 QRect viewCubeRect(const QSize& widget)

@@ -130,7 +130,8 @@ MeasureReadout MeasureTool::compute(const QVector<MeasurePoint>& path)
     return r;
 }
 
-QString MeasureTool::describe(const MeasureReadout& r, const std::function<QString(double)>& len)
+QString MeasureTool::describe(const MeasureReadout& r, const std::function<QString(double)>& len,
+    const std::function<QString(double)>& area)
 {
     if (r.points < 2)
         return r.points == 1 ? tr("Measure: click the next point (Enter: stop, Esc: clear)")
@@ -142,8 +143,10 @@ QString MeasureTool::describe(const MeasureReadout& r, const std::function<QStri
         parts << tr("Total %1").arg(len(r.total));
     if (r.angle)
         parts << tr("Angle %1°").arg(l.toString(*r.angle, 'f', 2));
-    if (r.area && r.perimeter)
-        parts << tr("Area %1 m²").arg(l.toString(*r.area, 'f', 2)) << tr("Perimeter %1").arg(len(*r.perimeter));
+    if (r.area && r.perimeter) { // D92: the project's area unit when the app supplies one
+        const QString a = area ? area(*r.area) : l.toString(*r.area, 'f', 2) + QStringLiteral(" m²");
+        parts << tr("Area %1").arg(a) << tr("Perimeter %1").arg(len(*r.perimeter));
+    }
     return parts.join(QStringLiteral("  ·  "));
 }
 

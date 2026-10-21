@@ -62,6 +62,17 @@ private slots:
         QCOMPARE(dialog.options().value("layers").toString(), QString("kind"));
         dialog.findChild<QCheckBox*>("dxfDimensions")->setChecked(false);
         QCOMPARE(dialog.options().value("dimensions").toString(), QString("exploded"));
+        // D92: the new export options are in the dialog.
+        dialog.setLayerMode("iso");
+        QCOMPARE(dialog.options().value("layers").toString(), QString("iso"));
+        dialog.setLayerMode("pen");
+        QCOMPARE(dialog.layerMode(), QString("pen"));
+        QCOMPARE(dialog.options().value("colour").toString(), QString("exact"));
+        dialog.findChild<QComboBox*>("dxfColour")->setCurrentIndex(1);
+        QCOMPARE(dialog.options().value("colour").toString(), QString("aci"));
+        QCOMPARE(dialog.options().value("poche").toBool(), true);
+        dialog.findChild<QCheckBox*>("dxfPoche")->setChecked(false);
+        QCOMPARE(dialog.options().value("poche").toBool(), false);
     }
 
     void exportsOnAWorkerThreadWithProgressAndErrors()

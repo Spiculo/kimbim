@@ -33,6 +33,7 @@ QString flag(bool on)
 void MainWindow::setupModifyTools(ToolOptionsBar* bar)
 {
     m_modifyTool = new ModifyTool(this);
+    m_modifyTool->setJoinDefault(m_prefs.splitJoin()); // D92
     m_modifyMode = new QComboBox(bar);
     m_modifyMode->setObjectName(QStringLiteral("modifyMode"));
     m_modifyMode->setToolTip(tr("What the tool does"));
@@ -137,7 +138,7 @@ bool MainWindow::cornerElements(const QString& first, QPointF p1, const QString&
 
 bool MainWindow::joinElements(const QString& first, const QString& second)
 {
-    return modifyResult(bridge("join_elements", {first, second}), tr("Could not join: %1"));
+    return modifyResult(bridge("join_elements", {first, second, m_prefs.mergeProps()}), tr("Could not join: %1"));
 }
 
 bool MainWindow::unjoinElements(const QString& first, const QString& second)

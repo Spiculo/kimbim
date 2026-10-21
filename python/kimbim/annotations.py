@@ -237,9 +237,13 @@ def annotations(storey_guid: str) -> str:
             for x, y in local:
                 w = m @ np.array([x / s, y / s, 0.0, 1.0])
                 points.append([round(float(w[0] * s), 6), round(float(w[1] * s), 6)])
+            if kind in ("level", "spot") and extra_of(a).get("Auto") and points:
+                # D92: an automatic elevation follows the project's reference without a model edit.
+                text = S.elevation_text(S.elevation_at(storey, points[0]), storey)
             item = {"guid": a.GlobalId, "kind": kind, "text": text, "points": points, "size": size, "pen": pen}
             if kind in D.KINDS:
                 item.update(D.shape_data(kind, points, extra_of(a), DRAWING_SCALE / 1000.0))
+                item["rect"] = bool(extra_of(a).get("Rect"))  # D92: a rectangle stays a rectangle
             elif kind in S.KINDS:  # D87: what to draw, from the same description as the drawings
                 item.update(S.round_geometry(S.geometry(kind, points, text or S.measured_text(kind, points), size,
                                                         extra_of(a, effective=True), DRAWING_SCALE / 1000.0, north)))
@@ -261,7 +265,8 @@ def set_annotation_text(guid: str, text: str) -> str:
     if kind in ("level", "spot"):  # D87: emptied, it measures (and keeps measuring) again
         extra = {"Auto": not text}
         if not text:
-            text = S.elevation_text(S.elevation_at(ifcopenshell.util.element.get_container(a), world_points(a)[0]))
+            text = S.elevation_text(S.elevation_at(ifcopenshell.util.element.get_container(a), world_points(a)[0]),
+                                    ifcopenshell.util.element.get_container(a))
     if not text and kind not in ("angle", "radius", "diameter", "cloud", "tag"):
         return A._fail("type the text")
     if kind == "tag":

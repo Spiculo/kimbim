@@ -3,6 +3,7 @@
 #include <QAction>
 #include <QApplication>
 #include <QClipboard>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -98,6 +99,45 @@ private slots:
         QVERIFY(std::abs(*r.area - 15.0) < 1e-9);
         const QString text = MeasureTool::describe(r, metres);
         QVERIFY2(text.contains(QStringLiteral("15")) && text.contains(QStringLiteral("16.00 m")), qPrintable(text));
+    }
+
+    // D92: the readout and the label use the project's area unit when the app supplies one.
+    void areaUsesTheProjectsUnit()
+    {
+        const auto r = MeasureTool::compute({{0, 0, 0}, {4, 0, 0}, {4, 3, 0}, {0, 3, 0}});
+        const QString text = MeasureTool::describe(r, metres, [](double a) { return QString::number(a, 'f', 2) + QStringLiteral(" cm²"); });
+        QVERIFY2(text.contains(QStringLiteral("12.00 cm²")), qPrintable(text));
+        QVERIFY(MeasureTool::describe(r, metres).contains(QStringLiteral("12.00 m²"))); // default unchanged
+    }
+
+    // D92: a level's elevation change can move the levels above it.
+    void levelsTableMoveAbove()
+    {
+        LevelsTable t(levels({{"L1", 0.0, 0}, {"L2", 3.0, 0}, {"L3", 6.0, 0}}));
+        QVERIFY(!t.moveAbove());
+        QVERIFY(!t.changes().value("move_above").toBool());
+        t.setMoveAbove(true);
+        QVERIFY(t.moveAbove());
+        QVERIFY(t.changes().value("move_above").toBool());
+    }
+
+    // D92 (Revit): when asked, an inserted level goes in the middle of the gap and the levels
+    // around it stay; otherwise the levels above make room (Archicad).
+    void insertingBetweenLevelsFitsInTheGap()
+    {
+        LevelsTable t(levels({{"L1", 0.0, 0}, {"L3", 6.0, 0}}));
+        QVERIFY(!t.fitBetween());
+        t.setFitBetween(true);
+        QCOMPARE(t.insertAbove(0, "L2"), 1);
+        QCOMPARE(t.rows()[1].elevation, 3.0);
+        QCOMPARE(t.rows()[2].elevation, 6.0); // L3 stayed
+        QCOMPARE(t.insertBelow(2, "L2b"), 2);
+        QCOMPARE(t.rows()[2].elevation, 4.5);
+        QCOMPARE(t.rows()[3].elevation, 6.0);
+
+        LevelsTable push(levels({{"L1", 0.0, 0}, {"L3", 6.0, 0}}));
+        QCOMPARE(push.insertAbove(0, "L2"), 1);
+        QCOMPARE(push.rows()[2].elevation, 12.0); // the default: L3 makes room by the gap
     }
 
     void clicksSnapAndEscClears()
@@ -217,6 +257,7 @@ private slots:
             if (!d)
                 return;
             seen = true;
+            QVERIFY(d->findChild<QCheckBox*>(QStringLiteral("fitBetween"))); // D92
             QCOMPARE(d->grid()->rowCount(), 2);
             QCOMPARE(d->grid()->item(0, 0)->text(), QString("Level 2")); // highest first
             d->grid()->item(0, 0)->setText(QStringLiteral("Roof"));     // edit in place

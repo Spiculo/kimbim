@@ -383,8 +383,39 @@ def _delete_cascade(elements) -> tuple:
     return action()
 
 
-def snap_data(storey_guid: str) -> str:
-    """Wall axes on a level, in world metres, for snapping while drawing."""
+def _mesh_vertex_points(storey) -> list:
+    """Unique plan vertices of the level's element meshes (D92: mesh-vertex snaps; off by default, so
+    computed only when the app asks). Rounded to the millimetre so shared corners are snapped once."""
+    import ifcopenshell.geom
+
+    products = [e for rel in (getattr(storey, "ContainsElements", ()) or ())
+                for e in rel.RelatedElements if e.is_a("IfcProduct") and getattr(e, "Representation", None)]
+    if not products:
+        return []
+    out, seen = [], set()
+    try:
+        it = ifcopenshell.geom.iterator(B._mesh_settings(), B._model, 1, include=products)
+        if not it.initialize():
+            return []
+        while True:
+            shape = it.get()
+            verts = shape.geometry.verts
+            for i in range(0, len(verts) - 2, 3):
+                key = (round(verts[i], 3), round(verts[i + 1], 3))
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append({"x": key[0], "y": key[1], "kind": "endpoint", "guid": shape.guid})
+            if not it.next():
+                break
+    except Exception:
+        return []
+    return out
+
+
+def snap_data(storey_guid: str, mesh_vertices: str = "") -> str:
+    """Wall axes on a level, in world metres, for snapping while drawing. With `mesh_vertices`
+    (D92, truthful), the level's element mesh vertices are added to the snapping points."""
     storey = _by_guid(storey_guid) if B._model is not None else None
     if storey is None:
         return B._dump({"walls": []})
@@ -410,7 +441,10 @@ def snap_data(storey_guid: str) -> str:
                                  "height": round(height, 6), "sill": round(sill, 6)})
     from . import drafting  # D84: the drafting shapes' ends, middles and centres
 
-    return B._dump({"walls": walls, "openings": openings, "grid": _grid_lines(storey), "points": drafting.snap_points(storey)})
+    points = drafting.snap_points(storey)
+    if str(mesh_vertices).lower() not in ("", "0", "false", "none"):
+        points = points + _mesh_vertex_points(storey)
+    return B._dump({"walls": walls, "openings": openings, "grid": _grid_lines(storey), "points": points})
 
 
 # ---------------------------------------------------------------- slabs (Slice 5)

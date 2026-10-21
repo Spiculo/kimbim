@@ -204,6 +204,11 @@ _future_deltas: list[list[str]] = []
 _base_drawing_id = 0
 _drawing_ids: list[int] = []
 _future_drawing_ids: list[int] = []
+# Settings snapshot of each step that changed them (D92: underlay edits are undoable), parallel to
+# _ids/_future_ids; None for a step that left the settings alone.
+_settings_before: list = []
+_future_settings_before: list = []
+_pending_settings = None  # set by _run_settings: the settings state before its transaction
 
 
 # Set when a failed edit could not be rolled back: the model may be half-changed, so edits and
@@ -215,10 +220,11 @@ INCONSISTENT = ("The edit failed and could not be undone, so the model may be in
 
 def _reset_history(path: str):
     global _path, _base_id, _ids, _future_ids, _saved_id, _next_id, _deltas, _future_deltas, _inconsistent
-    global _base_drawing_id, _drawing_ids, _future_drawing_ids
+    global _base_drawing_id, _drawing_ids, _future_drawing_ids, _settings_before, _future_settings_before
     _path, _base_id, _ids, _future_ids, _saved_id, _next_id = path, 0, [], [], 0, 1
     _deltas, _future_deltas = [], []
     _base_drawing_id, _drawing_ids, _future_drawing_ids = 0, [], []
+    _settings_before, _future_settings_before = [], []
     _inconsistent = False
     from . import versioning  # a different model leaves versioned mode (not the project's own working copy)
 
@@ -302,6 +308,19 @@ def _run(action, affects_drawings: bool = True) -> dict:
     return _commit(*changed, affects_drawings=affects_drawings)
 
 
+def _run_settings(action, affects_drawings: bool = False) -> dict:
+    """Run `action()` as one undoable transaction whose settings change is undone with it (D92: underlay
+    edits). `action()` returns the usual count (or tuple); the settings it changes are snapshotted."""
+    global _pending_settings
+    from . import settings
+
+    _pending_settings = settings.current()
+    try:
+        return _run(action, affects_drawings=affects_drawings)
+    finally:
+        _pending_settings = None
+
+
 def _begin() -> None:
     """Open the transaction of one undo step (`_run`, and the console's `edit()`)."""
     if _inconsistent:
@@ -316,9 +335,22 @@ def _follow_ups(count, geo_changed, geo_removed) -> tuple:
     return (count, geo_changed, geo_removed)
 
 
+def _end_step_without_change() -> None:
+    """Close a step whose transaction changed nothing and drop it from the history, so a run that made no
+    change leaves no empty undo step (D92)."""
+    _model.end_transaction()
+    _model.undo()
+    _model.future.pop()
+
+
 def _abort(failure: BaseException) -> None:
     """Roll back a half-applied step so the model and the history stay as they were. The caller re-raises."""
-    global _base_id, _base_drawing_id, _inconsistent
+    global _base_id, _base_drawing_id, _inconsistent, _pending_settings
+    if _pending_settings is not None:  # D92: a settings change rolled back with its step
+        from . import settings
+
+        settings.restore(_pending_settings)
+        _pending_settings = None
     _model.end_transaction()
     try:
         _model.undo()
@@ -332,6 +364,8 @@ def _abort(failure: BaseException) -> None:
         _future_deltas.clear()
         _drawing_ids.clear()
         _future_drawing_ids.clear()
+        _settings_before.clear()
+        _future_settings_before.clear()
         _model.history.clear()
         _model.future.clear()
         _base_id = -1  # differs from any saved state: the model counts as changed
@@ -341,19 +375,23 @@ def _abort(failure: BaseException) -> None:
 
 def _commit(count, geo_changed, geo_removed, affects_drawings: bool = True) -> dict:
     """Close the step's transaction and record it in the undo history."""
-    global _next_id, _base_id, _base_drawing_id
+    global _next_id, _base_id, _base_drawing_id, _pending_settings
     _model.end_transaction()
     _ids.append(_next_id)
     _deltas.append(list(dict.fromkeys([*geo_changed, *geo_removed])))
     _drawing_ids.append(_drawing_rev() + (1 if affects_drawings else 0))
+    _settings_before.append(_pending_settings)  # D92: a settings change undone with its step
+    _pending_settings = None
     _next_id += 1
     _future_ids.clear()
     _future_deltas.clear()
     _future_drawing_ids.clear()
+    _future_settings_before.clear()
     while len(_ids) > len(_model.history):  # ifcopenshell dropped its oldest transaction
         _base_id = _ids.pop(0)
         _deltas.pop(0)
         _base_drawing_id = _drawing_ids.pop(0)
+        _settings_before.pop(0)
     geometry = {"changed": list(dict.fromkeys(geo_changed)), "removed": list(dict.fromkeys(geo_removed))}
     return {"ok": True, "changed": count, "geometry": geometry}
 
@@ -655,20 +693,36 @@ def set_name(guids_json: str, name: str) -> str:
 def undo() -> str:
     if _model is None or not _ids:
         return _dump({"ok": False, "error": "nothing to undo", **(_flags() if _model else {})})
+    from . import settings
+
+    before = _settings_before[-1]
+    after = settings.current() if before is not None else None  # D92: for redo
     _model.undo()
     _future_ids.append(_ids.pop())
     _future_deltas.append(_deltas.pop())
     _future_drawing_ids.append(_drawing_ids.pop())
+    _future_settings_before.append(after)
+    _settings_before.pop()
+    if before is not None:
+        settings.restore(before)
     return _dump({"ok": True, **_flags(), "geometry": _geometry_now(_future_deltas[-1])})
 
 
 def redo() -> str:
     if _model is None or not _future_ids:
         return _dump({"ok": False, "error": "nothing to redo", **(_flags() if _model else {})})
+    from . import settings
+
+    after = _future_settings_before[-1]
+    before = settings.current() if after is not None else None
     _model.redo()
     _ids.append(_future_ids.pop())
     _deltas.append(_future_deltas.pop())
     _drawing_ids.append(_future_drawing_ids.pop())
+    _settings_before.append(before)
+    _future_settings_before.pop()
+    if after is not None:
+        settings.restore(after)
     return _dump({"ok": True, **_flags(), "geometry": _geometry_now(_deltas[-1])})
 
 
@@ -1174,6 +1228,7 @@ _EXPORTS = {
     ),
     "library": (
         "library_objects",
+        "object_parameter_usage",
         "object_symbol",
         "place_object",
         "set_library_paths",

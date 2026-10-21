@@ -362,7 +362,7 @@ void TitleBar::addControl(QWidget* control)
     m_controlsRow->addWidget(control, 0, Qt::AlignVCenter);
 }
 
-void TitleBar::addControlSeparator()
+QWidget* TitleBar::addControlSeparator()
 {
     auto* line = new QFrame(m_controls);
     line->setFrameShape(QFrame::VLine);
@@ -372,6 +372,7 @@ void TitleBar::addControlSeparator()
     p.setColor(QPalette::WindowText, palette().color(QPalette::Mid));
     line->setPalette(p);
     m_controlsRow->addWidget(line, 0, Qt::AlignVCenter);
+    return line;
 }
 
 void TitleBar::setTrailing(QWidget* widget)

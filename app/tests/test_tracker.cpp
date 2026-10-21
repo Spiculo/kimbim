@@ -105,6 +105,72 @@ private slots:
         QVERIFY(length && !length->isHidden());
     }
 
+    // D92: angles from east, from the previous segment or from north; typed lengths in metres or
+    // the project unit.
+    void angleModesAndTypedLengthUnits()
+    {
+        Tracker t;
+        t.setAnchor(QPointF(0, 0));
+        t.setCursor(QPointF(1, 1));
+        QCOMPARE(t.live(Tracker::Angle), 45.0);
+        t.setAngleMode(Tracker::Bearing);
+        t.setCursor(QPointF(0, 1));
+        QCOMPARE(t.live(Tracker::Angle), 0.0);
+        t.setCursor(QPointF(1, 0));
+        QCOMPARE(t.live(Tracker::Angle), 90.0);
+        t.setAngleMode(Tracker::RelativeAngle);
+        t.setReferenceAngle(3.14159265358979323846 / 2); // the previous segment went north
+        QCOMPARE(t.live(Tracker::Angle), 270.0);         // east is -90 from north
+        t.type(QStringLiteral("2<0")); // 0 relative to the north-going segment: north again
+        const auto target = t.target();
+        QVERIFY(target);
+        QCOMPARE(target->x(), 0.0);
+        QCOMPARE(target->y(), 2.0);
+
+        Tracker u;
+        u.setAnchor(QPointF(0, 0));
+        u.setCursor(QPointF(1, 0));
+        u.setLengthFactor(0.01); // centimetres
+        u.type(QStringLiteral("250"));
+        QCOMPARE(u.live(Tracker::Length), 100.0); // the mouse is 1 m away: 100 cm
+        const auto end = u.target();
+        QVERIFY(end);
+        QCOMPARE(end->x(), 2.5);
+        QCOMPARE(end->y(), 0.0);
+    }
+
+    void trackerModesAndTypedLengthUnitPreferences()
+    {
+        MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        w.findChild<QAction*>(QStringLiteral("actionPlanView"))->trigger();
+        kimbim::Viewport* v = w.viewport();
+        w.setTool(MainWindow::Tool::Wall);
+        QSignalSpy walls(w.wallTool(), &kimbim::WallTool::wallRequested);
+
+        w.preferences().setValue(QStringLiteral("tracker"), QStringLiteral("typing"));
+        emit v->workPointClicked(QPointF(0, 0), 0.01, Qt::NoModifier);
+        emit v->workPointMoved(QPointF(0, 3), 0.01, Qt::NoModifier);
+        QVERIFY(!w.inputAids()->trackerShown()); // nothing typed yet
+        QTest::keyClicks(v, QStringLiteral("250"));
+        QVERIFY(w.inputAids()->trackerShown());
+
+        w.preferences().setValue(QStringLiteral("typed_length_unit"), QStringLiteral("project"));
+        QVERIFY(w.setProjectSettings({{"length_unit", "cm"}}));
+        QTest::keyClick(v, Qt::Key_Return);
+        QCOMPARE(walls.count(), 1);
+        QVERIFY(samePoint(segment(walls, 0).p2, QPointF(0, 2.5))); // 250 cm along the mouse
+
+        // Off: no tracker, and digits go to the options bar's length field as before.
+        w.preferences().setValue(QStringLiteral("tracker"), QStringLiteral("off"));
+        emit v->workPointMoved(QPointF(2, 2.5), 0.01, Qt::NoModifier);
+        emit v->workPointMoved(QPointF(3, 2.5), 0.01, Qt::NoModifier);
+        QVERIFY(!w.inputAids()->trackerShown());
+        QTest::keyClicks(v, QStringLiteral("1"));
+        auto* length = w.findChild<QLineEdit*>(QStringLiteral("lengthInput"));
+        QVERIFY(length && length->text() == QStringLiteral("1"));
+    }
+
     void guideAcquiredThenExtensionLineGivesTheExactCoordinate()
     {
         MainWindow w(nullptr, /*quiet=*/true);

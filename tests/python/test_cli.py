@@ -109,3 +109,34 @@ def test_tags_and_blame(tmp_path, capsys):
     assert run(capsys, "-C", str(proj), "tag", "--delete", "Concept")[0] == 0
     code, out, _ = run(capsys, "-C", str(proj), "tag")
     assert "Concept" not in out
+
+
+def test_run_script_edits_a_model_in_place(tmp_path, capsys):
+    import ifcopenshell
+
+    model = build_model(walls=2)
+    ifc = tmp_path / "house.ifc"
+    model.write(str(ifc))
+    script = tmp_path / "rename.py"
+    script.write_text(
+        "for w in ifc.by_type('IfcWall'):\n    w.Name = 'From script'\nprint('renamed', len(ifc.by_type('IfcWall')))\n",
+        encoding="utf-8")
+    code, out, err = run(capsys, "run", str(script), str(ifc))
+    assert code == 0, err
+    assert "renamed 2" in out
+    result = ifcopenshell.open(str(ifc))
+    assert {w.Name for w in result.by_type("IfcWall")} == {"From script"}
+
+
+def test_run_script_error_reports_and_leaves_the_model(tmp_path, capsys):
+    import ifcopenshell
+
+    model = build_model(walls=1)
+    ifc = tmp_path / "house.ifc"
+    model.write(str(ifc))
+    script = tmp_path / "boom.py"
+    script.write_text("ifc.by_type('IfcWall')[0].Name = 'half'\nraise ValueError('nope')\n", encoding="utf-8")
+    code, out, err = run(capsys, "run", str(script), str(ifc))
+    assert code == 1 and "ValueError" in err
+    result = ifcopenshell.open(str(ifc))
+    assert {w.Name for w in result.by_type("IfcWall")} != {"half"}  # the failed run rolled back

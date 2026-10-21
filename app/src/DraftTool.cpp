@@ -189,7 +189,7 @@ bool DraftTool::typeInput(const QString& text)
         if (!w || !h || *w == 0 || *h == 0)
             return false;
         const double sx = m_hover && m_hover->x() < last.x() ? -1 : 1, sy = m_hover && m_hover->y() < last.y() ? -1 : 1;
-        add(last + QPointF(sx * std::abs(*w), sy * std::abs(*h)));
+        add(last + QPointF(sx * std::abs(*w * m_lengthFactor), sy * std::abs(*h * m_lengthFactor)));
         return true;
     }
     // "length<angle": polar, the angle in degrees from the x axis.
@@ -201,6 +201,8 @@ bool DraftTool::typeInput(const QString& text)
             return false;
         dir = QPointF(std::cos(*angle * kPi / 180), std::sin(*angle * kPi / 180));
     }
+    if (value)
+        *value *= m_lengthFactor; // D92: typed lengths in the project unit
     if (m_mode == Mode::ArcCentre && m_points.size() == 2 && lt < 0) { // the arc's angle, degrees counter-clockwise
         if (!value || std::abs(*value) < 1e-6)
             return false;

@@ -178,6 +178,21 @@ def test_layers_by_kimbim_layer_or_by_kind(house, tmp_path):
     assert "Bearing walls" not in {e.dxf.layer for e in by_kind.modelspace()}
 
 
+def test_dxf_layer_scheme_poche_and_colour_modes(house, tmp_path):
+    # D92: an ISO 13567 layer scheme, poché off, and an ACI-only colour mode.
+    plan = drawing("Level 1 Floor Plan")
+    iso = read(call("export_drawing_dxf", plan, str(tmp_path / "iso.dxf"), json.dumps({"layers": "iso"}))["path"])
+    assert "A-WALL-FULL" in {e.dxf.layer for e in iso.modelspace()}
+    no_poche = read(call("export_drawing_dxf", plan, str(tmp_path / "np.dxf"), json.dumps({"poche": False}))["path"])
+    assert not any(name.endswith("-PATT") for name in {e.dxf.layer for e in no_poche.modelspace()})
+    aci = read(call("export_drawing_dxf", plan, str(tmp_path / "aci.dxf"), json.dumps({"colour": "aci"}))["path"])
+    assert all(not e.dxf.hasattr("true_color") for e in aci.modelspace() if e.dxftype() in ("LINE", "LWPOLYLINE"))
+    # D92: "per pen": every drawn pen gets its own layer, named PEN-nn.
+    pen = read(call("export_drawing_dxf", plan, str(tmp_path / "pen.dxf"), json.dumps({"layers": "pen"}))["path"])
+    names = {e.dxf.layer for e in pen.modelspace()}
+    assert any(name.startswith("PEN-") for name in names) and "A-WALL" not in names, names
+
+
 def test_dimensions_can_be_exploded(house, tmp_path):
     plan = drawing("Level 1 Floor Plan")
     r = call("export_drawing_dxf", plan, str(tmp_path / "x.dxf"), json.dumps({"dimensions": "exploded"}))

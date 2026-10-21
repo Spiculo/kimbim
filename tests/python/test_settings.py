@@ -33,7 +33,9 @@ def test_bad_values_are_refused_and_change_nothing():
     for bad in ({"plan_cut_height": -1}, {"drawing_scale": 0}, {"sheet_paper": "B5"}, {"length_unit": "ft"},
                 {"length_decimals": 9}, {"hidden_layers": "A-WALL"}, {"ifc_status_default": "maybe"},
                 {"legend_mode": "sometimes"}, {"plan_cut_levels": {"lvl": -1}}, {"plan_symbols": "yes"},
-                {"view_depth": -1}, {"view_depth_levels": {"lvl": -1}}):
+                {"view_depth": -1}, {"view_depth_levels": {"lvl": -1}}, {"area_unit": "ft²"},
+                {"angle_decimals": 9}, {"orphan_tags": "x"}, {"level_reference": "datum"},
+                {"sea_level": "high"}, {"north_arrow_style": "star"}, {"scale_bar_style": "zigzag"}):
         r = call("set_project_settings", json.dumps(bad))
         assert not r["ok"], bad
     assert call("project_settings")["settings"] == S.DEFAULTS and call("state")["dirty"] is False
@@ -53,6 +55,13 @@ def test_the_builtin_scales_and_user_scales():
     assert call("set_project_settings", json.dumps({"scales": [200, 100, 50, 20, 10]}))["ok"]
     for bad in ([], [0], [-5], "100"):
         assert not call("set_project_settings", json.dumps({"scales": bad}))["ok"], bad
+
+
+def test_the_area_unit_formats_areas():
+    assert call("new_project", "x")["ok"]
+    assert call("set_project_settings", json.dumps({"area_unit": "cm²"}))["ok"]
+    assert S.format_area(1.5) == "15000.00 cm²"  # D92
+    assert S.format_area(1.5, unit=False) == "15000.00"
 
 
 def test_bytes_round_trip_is_canonical():
