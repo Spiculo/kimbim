@@ -127,7 +127,7 @@ release notes, so check before relying on a single cell.
 | Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Walls: straight, layered, L/T joins | all | ✅ | P0 | |
-| Walls: curved | all | ✅ | new | D97: Wall tool › Curved (3 points), layered, doors/windows, stretch, split, fillet, mitred joins with straight walls (not curved-to-curved yet) |
+| Walls: curved | all | ✅ | new | D97: Wall tool › Curved (3 points), layered, doors/windows, stretch, split, fillet, mitred joins with straight and curved walls |
 | Walls: slanted, trapezoid, custom profile | AC RV VW | 🟡 | new | D97: slant angle; no double-slanted or complex profiles yet |
 | Wall flip, reference line (core / face) | all | ✅ | P0 | D97: six reference lines (outside face default), Model › Flip walls |
 | Junction priorities (which layers run through) | AC RV | ✅ | new | D97: building-material priority → `IfcMaterialLayer.Priority`, used by the wall regenerator |

@@ -248,8 +248,19 @@ def create_curved_wall(storey_guid: str, type_guid: str, x1, y1, xm, ym, x2, y2,
         wall = new_curved_wall(storey, wall_type, p1, p2, pm, height, reference)
         layers.assign_active(wall)
         renovation.stamp_new(wall)
+        touched = [wall]
+        # D97: walls ending where this one starts or ends meet it in a mitre
+        for other in A._contained(storey):
+            if not other.is_a("IfcWall") or other == wall or A._axis_world(other) is None:
+                continue
+            for point in (p1, p2):
+                if min(np.linalg.norm(e - np.asarray(point)) for e in _ends(other)) < 0.02:
+                    if join_to_curved(other, wall, np.asarray(point, dtype=float)):
+                        touched.append(other)
+        for w in dict.fromkeys(touched):
+            A._regenerate(B._model, w, length=A._wall_length(w), height=A._wall_height(w) or height)
         made["wall"] = wall
-        return 1, [wall.GlobalId], []
+        return 1, [w.GlobalId for w in dict.fromkeys(touched)], []
 
     try:
         r = B._run(action)

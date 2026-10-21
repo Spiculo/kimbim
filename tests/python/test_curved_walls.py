@@ -294,3 +294,22 @@ def test_a_straight_wall_meets_a_curved_one_in_a_mitre(project):
     assert curved_walls.mitre(b._model.by_guid(s["guid"]), curved_walls.arc_joins(b._model.by_guid(s["guid"]))[0]) is None
     lo, hi, _ = radii(c)
     assert hi == pytest.approx(5.15, abs=0.01)
+
+
+def test_curved_walls_meet_in_mitres_too(project):
+    """D97: a curved wall drawn from another wall's end (straight or curved) is mitred with it."""
+    from kimbim import curved_walls
+
+    t = project["Exterior 300"]
+    a = call("create_curved_wall", project["level"], t, 0, 0, 2, 2, 4, 0, 3.0, "")["guid"]
+    c = call("create_curved_wall", project["level"], t, 4, 0, 6, -2, 8, 0, 3.0, "")["guid"]  # an S, tangent at (4, 0)
+    first, second = b._model.by_guid(a), b._model.by_guid(c)
+    assert curved_walls.arc_joins(first) and curved_walls.arc_joins(second)
+    # tangent at (4, 0) (both arcs vertical there): nothing to cut
+    assert curved_walls.mitre(first, curved_walls.arc_joins(first)[0]) is None
+    d = call("create_curved_wall", project["level"], t, 0, 0, -1, 3, -3, 4, 3.0, "")["guid"]  # at an angle
+    third = b._model.by_guid(d)
+    m = curved_walls.mitre(third, curved_walls.arc_joins(third)[0])
+    assert m is not None
+    s = call("create_wall", project["level"], t, 8, 0, 8, -4, 3.0, "", "")["guid"]
+    assert len(curved_walls.arc_joins(b._model.by_guid(s))) == 0  # drawn without a join: none recorded
