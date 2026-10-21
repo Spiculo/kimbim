@@ -1496,8 +1496,13 @@ void MainWindow::buildModelingToolbar()
             m_viewport->setFocus();
             return;
         }
+        const QString unit = m_settings.value("length_unit").toString(QStringLiteral("m"));
+        const double intoMetres = unit == QLatin1String("mm") ? 0.001 : unit == QLatin1String("cm") ? 0.01 : 1.0;
+        const double metres = m_prefs.typedLengthUnit() == QLatin1String("project")
+            ? value * intoMetres  // D92: the field takes the project's unit
+            : value;
         if (m_tool == Tool::Wall)
-            typed = m_wallTool->typeLength(value);
+            typed = m_wallTool->typeLength(metres);
         else if (ok && m_tool == Tool::Rotate)
             typed = m_rotateTool->typeAngle(value); // degrees
         else if (ok && m_tool == Tool::Object) {
@@ -1505,9 +1510,9 @@ void MainWindow::buildModelingToolbar()
             typed = true;
         }
         else if (ok && m_tool == Tool::Stretch)
-            typed = m_gripTool->typeLength(value);
+            typed = m_gripTool->typeLength(metres);
         else if (ok)
-            typed = m_twoPointTool->typeLength(value);
+            typed = m_twoPointTool->typeLength(metres);
         if (ok && typed)
             m_lengthInput->clear();
         m_viewport->setFocus();
@@ -2091,7 +2096,9 @@ void MainWindow::setTool(Tool tool)
     m_roofKind->parentWidget()->setVisible(tool == Tool::Roof);
     m_lengthInput->setVisible(tool == Tool::Wall || tool == Tool::Beam || tool == Tool::Grid || tool == Tool::Move
         || tool == Tool::Rotate || tool == Tool::Stretch || isDraftTool(tool) || tool == Tool::Object);
-    m_lengthInput->setPlaceholderText(tool == Tool::Rotate || tool == Tool::Object ? tr("Angle (degrees)") : tr("Length (m)"));
+    const QString unit = m_settings.value("length_unit").toString(QStringLiteral("m"));
+    m_lengthInput->setPlaceholderText(tool == Tool::Rotate || tool == Tool::Object ? tr("Angle (degrees)")
+        : m_prefs.typedLengthUnit() == QLatin1String("project") ? tr("Length (%1)").arg(unit) : tr("Length (m)"));
     if (m_objectTurn)
         m_objectTurn->setEnabled(tool == Tool::Object); // Tab moves the focus otherwise
     const bool typed = tool == Tool::Wall || tool == Tool::Slab || tool == Tool::Door || tool == Tool::Window
@@ -5296,6 +5303,11 @@ void MainWindow::loadProjectSettings()
     const QSignalBlocker block(m_cutHeight);
     m_cutHeight->setValue(m_settings.value("plan_cut_height").toDouble(1.2));
     m_cutLabel->setText(formatLength(m_cutHeight->value()));
+    if (m_draftTool) { // D92: typed lengths (and a rectangle's width;height) in the project unit
+        const QString unit = m_settings.value("length_unit").toString(QStringLiteral("m"));
+        const double intoMetres = unit == QLatin1String("mm") ? 0.001 : unit == QLatin1String("cm") ? 0.01 : 1.0;
+        m_draftTool->setLengthFactor(m_prefs.typedLengthUnit() == QLatin1String("project") ? intoMetres : 1.0);
+    }
 }
 
 bool MainWindow::setProjectSettings(const QJsonObject& changes)

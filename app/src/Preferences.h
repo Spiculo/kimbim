@@ -29,7 +29,11 @@ public:
     int autoVersionEvery() const;
     int recoveryMinutes() const;
     bool trueLineWeights() const;
-    QString scrollNavigation() const;   // D89: "auto", "zoom" (mouse wheel zooms) or "pan" (touchpad scroll pans)       // D73: View > True line weights
+    QString scrollNavigation() const;   // D89/D92: "auto", "zoom" (mouse), "pan" (Mac trackpad) or "precision" (fine pan)
+    QString trackerMode() const;        // D92: "always", "typing" or "off"
+    QString angleMode() const;          // D92: "absolute", "relative" or "bearing"
+    QString typedLengthUnit() const;    // D92: typed lengths in metres ("metres") or the project unit
+    bool tabAnnotations() const;        // D92: Tab cycling reaches annotations (on)
     double fieldOfView() const;         // D92: the perspective camera's vertical field of view, degrees (default 45)
     bool northArrowPlans() const;       // D92: show the plan north indicator (on once true north is set)
     bool meshVertexSnaps() const;       // D92: snap to element mesh vertices while drawing (off)

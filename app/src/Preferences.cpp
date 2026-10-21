@@ -53,6 +53,10 @@ QJsonObject Preferences::defaults()
         {"drawing_timeout", 300},
         {"drawing_hlr", "exact"},
         {"scroll_navigation", "auto"},
+        {"tracker", "always"},
+        {"angle_mode", "absolute"},
+        {"typed_length_unit", "metres"},
+        {"tab_annotations", true},
         {"field_of_view", 45.0},
         {"north_arrow", true},
         {"mesh_vertex_snaps", false},
@@ -159,8 +163,29 @@ QString Preferences::drawingHlr() const
 QString Preferences::scrollNavigation() const
 {
     const QString v = value("scroll_navigation").toString();
-    return v == QLatin1String("zoom") || v == QLatin1String("pan") ? v : QStringLiteral("auto");
+    return v == QLatin1String("zoom") || v == QLatin1String("pan") || v == QLatin1String("precision")
+        ? v : QStringLiteral("auto");
 }
+
+QString Preferences::trackerMode() const
+{
+    const QString v = value("tracker").toString();
+    return v == QLatin1String("typing") || v == QLatin1String("off") ? v : QStringLiteral("always");
+}
+
+QString Preferences::angleMode() const
+{
+    const QString v = value("angle_mode").toString();
+    return v == QLatin1String("relative") || v == QLatin1String("bearing") ? v : QStringLiteral("absolute");
+}
+
+QString Preferences::typedLengthUnit() const
+{
+    return value("typed_length_unit").toString() == QLatin1String("project") ? QStringLiteral("project")
+                                                                             : QStringLiteral("metres");
+}
+
+bool Preferences::tabAnnotations() const { return value("tab_annotations").toBool(true); }
 
 double Preferences::fieldOfView() const
 {

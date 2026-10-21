@@ -75,7 +75,28 @@ void InputAidsController::moved(Viewport* v, QPointF p, double tolerance, Qt::Ke
     // The tool snapped during this move: its anchor (the previous point) and the snapped point.
     const bool snapped = m_aids->serial() != m_serial;
     m_serial = m_aids->serial();
-    m_tracker.setAnchor(snapped ? m_aids->lastFrom() : std::nullopt);
+    const std::optional<QPointF> anchor = snapped ? m_aids->lastFrom() : std::optional<QPointF>();
+    if (anchor && (!m_anchor || *m_anchor != *anchor)) { // a new point: keep the segment before it
+        m_previousAnchor = m_anchor;
+        m_anchor = anchor;
+    } else if (!anchor) {
+        m_anchor.reset();
+        m_previousAnchor.reset();
+    }
+    m_tracker.setAnchor(anchor);
+    m_tracker.setLengthFactor(m_hooks.typedLengthFactor ? m_hooks.typedLengthFactor() : 1.0);
+    if (m_hooks.angleMode) {
+        const QString mode = m_hooks.angleMode();
+        m_tracker.setAngleMode(mode == QLatin1String("relative") ? Tracker::RelativeAngle
+            : mode == QLatin1String("bearing")                      ? Tracker::Bearing
+                                                                     : Tracker::AbsoluteAngle);
+    }
+    if (m_anchor && m_previousAnchor) {
+        const QPointF d = *m_anchor - *m_previousAnchor;
+        m_tracker.setReferenceAngle(std::atan2(d.y(), d.x()));
+    } else {
+        m_tracker.setReferenceAngle(std::nullopt);
+    }
     m_tracker.setCursor(snapped ? m_aids->lastPoint() : p);
     if (snapped && m_aids->hovered() && m_aids->guidesEnabled())
         m_acquire.start();
@@ -139,7 +160,13 @@ void InputAidsController::refresh()
     else
         v->setAidOverlay(Viewport::AidOverlay::Guides, new GuidesOverlay(points, lines, std::max(0.05, 0.6 * m_tolerance), z));
 
-    // The tracker beside the cursor.
+    // The tracker beside the cursor (D92: always, only while something is typed, or off).
+    const QString trackerMode = m_hooks.trackerMode ? m_hooks.trackerMode() : QStringLiteral("always");
+    if (trackerMode == QLatin1String("off") || (trackerMode == QLatin1String("typing") && !m_tracker.hasInput())) {
+        if (v->hasAidOverlay(Viewport::AidOverlay::Tracker))
+            v->setAidOverlay(Viewport::AidOverlay::Tracker, {});
+        m_trackerShown = false;
+    } else {
     QVector<TrackerOverlay::Box> boxes;
     for (const Tracker::Field f : m_tracker.fields()) {
         const bool typed = !m_tracker.typed(f).isEmpty();
@@ -179,6 +206,7 @@ void InputAidsController::refresh()
     }
     v->setAidOverlay(Viewport::AidOverlay::Tracker, new TrackerOverlay(boxes, at, ratio));
     m_trackerShown = true;
+    }
 }
 
 void InputAidsController::hide(Viewport* v)
@@ -225,6 +253,8 @@ bool InputAidsController::eventFilter(QObject* watched, QEvent* event)
     if (!v || !v->isDrawingMode() || !m_hooks.active || !m_hooks.active())
         return false;
     auto* e = static_cast<QKeyEvent*>(event);
+    if (m_hooks.trackerMode && m_hooks.trackerMode() == QLatin1String("off"))
+        return false; // the tracker is off: digits go to the length field
     if (!isTrackerKey(e))
         return false;
     if (event->type() == QEvent::ShortcutOverride) { // a digit is a value here, not the "3" shortcut

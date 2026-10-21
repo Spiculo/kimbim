@@ -139,6 +139,7 @@ public:
     // D89 Tab cycling (Revit): Tab with the mouse resting over overlapping elements highlights the
     // next one under the cursor (Shift+Tab the previous); a click there selects the highlighted one.
     QString cycleNext(const QPointF& widgetPos, bool backwards = false); // the highlighted guid ("" none)
+    QStringList annotationGuidsAt(const QPointF& widgetPos); // D92: annotations under the cursor (for Tab)
     QString cycleCandidate() const { return m_cycleGuid; }
     QStringList elementsAt(const QPointF& widgetPos); // front to back (needs a window, or a provider)
     void setPickProvider(std::function<QStringList(const QPointF&)> provider) { m_pickProvider = std::move(provider); }
@@ -148,7 +149,10 @@ public:
     enum class ScrollMode { Auto, Zoom, Pan };
     static void setScrollMode(ScrollMode mode);
     static ScrollMode scrollMode();
-    static ScrollMode scrollModeFrom(const QString& preference); // "auto", "zoom", "pan"
+    static ScrollMode scrollModeFrom(const QString& preference); // "auto", "zoom", "pan", "precision"
+    static void setNavigationPreset(const QString& preference); // D92: also the panning sensitivity
+    static void setTabAnnotations(bool on);                     // D92: Tab cycling reaches annotations
+    static bool tabAnnotations();
     enum class ScrollAction { None, Zoom, Pan, Orbit };
     ScrollAction lastScrollAction() const { return m_lastScroll; } // for tests
     void panByPixels(double dx, double dy);                  // the content follows (widget pixels)

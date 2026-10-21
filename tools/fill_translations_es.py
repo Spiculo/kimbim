@@ -1327,6 +1327,25 @@ ES = {
     'Stair plan arrow:': 'Flecha de escalera en planta:',
     'Number the risers on the plan': 'Numerar las contrahuellas en planta',
 
+    'Length (%1)': 'Longitud (%1)',
+    'Mouse: the wheel zooms': 'Ratón: la rueda hace zoom',
+    'Mac trackpad: two fingers pan': 'Trackpad de Mac: dos dedos desplazan',
+    'Precision touchpad: two fingers pan, finely': 'Touchpad de precisión: dos dedos desplazan, con precisión',
+    'Always while drawing': 'Siempre al dibujar',
+    'While typing': 'Al escribir',
+    'The tracker beside the cursor: always, only once something is typed, or not at all': 'El rastreador junto al cursor: siempre, solo cuando se escribe algo o nunca',
+    'Tracker:': 'Rastreador:',
+    'Absolute (from east)': 'Absoluto (desde el este)',
+    'Relative to the previous segment': 'Relativo al segmento anterior',
+    'Bearing (clockwise from north)': 'Rumbo (en sentido horario desde el norte)',
+    'How typed and live angles are measured': 'Cómo se miden los ángulos escritos y en vivo',
+    'Angle input:': 'Entrada de ángulo:',
+    'Metres': 'Metros',
+    'Project unit': 'Unidad del proyecto',
+    'The unit of lengths typed into the tracker and the length field': 'La unidad de las longitudes escritas en el rastreador y el campo de longitud',
+    'Typed lengths in:': 'Longitudes escritas en:',
+    'Tab also cycles through annotations and 2D drafting': 'Tab también recorre las anotaciones y el dibujo 2D',
+
 }
 
 

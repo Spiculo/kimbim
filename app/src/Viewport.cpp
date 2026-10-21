@@ -1414,6 +1414,24 @@ void Viewport::displayAnnotations()
     update();
 }
 
+QStringList Viewport::annotationGuidsAt(const QPointF& widgetPos)
+{
+    QStringList out;
+    if (!ensureWindow())
+        return out;
+    const NCollection_Vec2<int> px = toPixels(widgetPos);
+    m_context->MoveTo(px.x(), px.y(), m_view, false);
+    for (m_context->InitDetected(); m_context->MoreDetected(); m_context->NextDetected()) {
+        Handle(AnnotationOwner) note = Handle(AnnotationOwner)::DownCast(m_context->DetectedCurrentOwner());
+        if (note.IsNull())
+            continue;
+        const QString guid = note->guid();
+        if (!out.contains(guid) && !isLocked(guid))
+            out << guid;
+    }
+    return out;
+}
+
 void Viewport::setDrawingMarkers(const QVector<Annotation>& markers, double z)
 {
     m_markerData = markers;

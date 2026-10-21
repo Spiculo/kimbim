@@ -16,6 +16,8 @@ namespace kimbim {
 
 namespace {
 Viewport::ScrollMode g_scrollMode = Viewport::ScrollMode::Auto;
+double g_panScale = 1.0; // D92: a precision touchpad pans more finely
+bool g_tabAnnotations = true;
 QElapsedTimer g_touchpadSeen; // a touchpad scroll stream keeps panning even when one event looks like a wheel
 } // namespace
 
@@ -53,6 +55,10 @@ QStringList Viewport::elementsAt(const QPointF& widgetPos)
         if (!out.contains(guid) && !isLocked(guid))
             out << guid;
     }
+    if (g_tabAnnotations) // D92: Tab through the annotations and drafting shapes too
+        for (const QString& guid : annotationGuidsAt(widgetPos))
+            if (!out.contains(guid))
+                out << guid;
     return out;
 }
 
@@ -132,10 +138,19 @@ Viewport::ScrollMode Viewport::scrollModeFrom(const QString& preference)
 {
     if (preference == QLatin1String("zoom"))
         return ScrollMode::Zoom;
-    if (preference == QLatin1String("pan"))
+    if (preference == QLatin1String("pan") || preference == QLatin1String("precision"))
         return ScrollMode::Pan;
     return ScrollMode::Auto;
 }
+
+void Viewport::setNavigationPreset(const QString& preference)
+{
+    g_scrollMode = scrollModeFrom(preference);
+    g_panScale = preference == QLatin1String("precision") ? 0.55 : 1.0; // D92
+}
+
+void Viewport::setTabAnnotations(bool on) { g_tabAnnotations = on; }
+bool Viewport::tabAnnotations() { return g_tabAnnotations; }
 
 bool Viewport::touchpadScroll(QWheelEvent* e)
 {
@@ -160,7 +175,7 @@ bool Viewport::touchpadScroll(QWheelEvent* e)
         orbitBy(-d.x(), -d.y());
         m_lastScroll = ScrollAction::Orbit;
     } else {
-        panByPixels(d.x(), d.y());
+        panByPixels(d.x() * g_panScale, d.y() * g_panScale);
         m_lastScroll = ScrollAction::Pan;
     }
     e->accept();

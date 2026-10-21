@@ -134,10 +134,28 @@ PreferencesDialog::PreferencesDialog(Preferences& prefs, QWidget* parent)
     form->addRow(tr("Hidden-line mode:"), m_drawingHlr);
     // D89: touchpad or mouse wheel.
     m_scroll = choice(this, "scrollNavigation", {{tr("Automatic (touchpad scroll pans, mouse wheel zooms)"), "auto"},
-        {tr("Scrolling zooms (mouse wheel)"), "zoom"}, {tr("Scrolling pans, pinch or Ctrl+scroll zooms (touchpad)"), "pan"}},
+        {tr("Mouse: the wheel zooms"), "zoom"}, {tr("Mac trackpad: two fingers pan"), "pan"},
+        {tr("Precision touchpad: two fingers pan, finely"), "precision"}},
         prefs.scrollNavigation());
     m_scroll->setToolTip(tr("Two-finger scroll with Shift orbits the 3D view"));
     form->addRow(tr("Scroll and touchpad:"), m_scroll);
+    m_tracker = choice(this, "tracker", {{tr("Always while drawing"), "always"}, {tr("While typing"), "typing"},
+                                         {tr("Off") , "off"}}, prefs.trackerMode());
+    m_tracker->setToolTip(tr("The tracker beside the cursor: always, only once something is typed, or not at all"));
+    form->addRow(tr("Tracker:"), m_tracker);
+    m_angleMode = choice(this, "angleMode", {{tr("Absolute (from east)"), "absolute"},
+                                             {tr("Relative to the previous segment"), "relative"},
+                                             {tr("Bearing (clockwise from north)"), "bearing"}}, prefs.angleMode());
+    m_angleMode->setToolTip(tr("How typed and live angles are measured"));
+    form->addRow(tr("Angle input:"), m_angleMode);
+    m_typedLength = choice(this, "typedLengthUnit", {{tr("Metres"), "metres"}, {tr("Project unit"), "project"}},
+        prefs.typedLengthUnit());
+    m_typedLength->setToolTip(tr("The unit of lengths typed into the tracker and the length field"));
+    form->addRow(tr("Typed lengths in:"), m_typedLength);
+    m_tabAnnotations = new QCheckBox(tr("Tab also cycles through annotations and 2D drafting"), this);
+    m_tabAnnotations->setObjectName(QStringLiteral("tabAnnotations"));
+    m_tabAnnotations->setChecked(prefs.tabAnnotations());
+    form->addRow(QString(), m_tabAnnotations);
 
     // D92: the perspective camera's field of view.
     m_fieldOfView = new QSpinBox(this);
@@ -253,6 +271,10 @@ void PreferencesDialog::apply()
     m_prefs.setValue(QStringLiteral("drawing_timeout"), m_drawingTimeout->value());
     m_prefs.setValue(QStringLiteral("drawing_hlr"), m_drawingHlr->currentData().toString());
     m_prefs.setValue(QStringLiteral("scroll_navigation"), m_scroll->currentData().toString());
+    m_prefs.setValue(QStringLiteral("tracker"), m_tracker->currentData().toString());
+    m_prefs.setValue(QStringLiteral("angle_mode"), m_angleMode->currentData().toString());
+    m_prefs.setValue(QStringLiteral("typed_length_unit"), m_typedLength->currentData().toString());
+    m_prefs.setValue(QStringLiteral("tab_annotations"), m_tabAnnotations->isChecked());
     m_prefs.setValue(QStringLiteral("field_of_view"), double(m_fieldOfView->value()));
     m_prefs.setValue(QStringLiteral("north_arrow"), m_northArrow->isChecked());
     m_prefs.setValue(QStringLiteral("title_bar_levels"), m_titleLevels->isChecked());

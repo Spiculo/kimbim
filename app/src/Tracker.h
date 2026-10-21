@@ -25,6 +25,7 @@ namespace kimbim {
 class Tracker {
 public:
     enum Field { Length, Angle, X, Y };
+    enum AngleMode { AbsoluteAngle, RelativeAngle, Bearing }; // D92: from east, from the last segment, from north
 
     void setAnchor(const std::optional<QPointF>& anchor);
     std::optional<QPointF> anchor() const { return m_anchor; }
@@ -41,6 +42,12 @@ public:
     void setFocus(Field f);
     bool absolute() const { return m_absolute || !m_anchor; }
     void setAbsolute(bool on) { m_absolute = on; }
+    void setAngleMode(AngleMode mode) { m_angleMode = mode; }
+    AngleMode angleMode() const { return m_angleMode; }
+    // D92: the direction of the segment before the anchor, for RelativeAngle.
+    void setReferenceAngle(std::optional<double> radians) { m_reference = radians; }
+    // D92: metres per typed length unit (1 for metres, 0.01 for centimetres...).
+    void setLengthFactor(double factor) { m_lengthFactor = factor > 0 ? factor : 1.0; }
     bool hasInput() const;
     QString typed(Field f) const { return m_text[f]; }
     std::optional<double> value(Field f) const; // the typed number, if any and valid
@@ -57,6 +64,9 @@ private:
     std::array<QString, 4> m_text;
     Field m_focus = X;
     bool m_absolute = false;
+    AngleMode m_angleMode = AbsoluteAngle;
+    std::optional<double> m_reference;
+    double m_lengthFactor = 1.0;
 };
 
 } // namespace kimbim

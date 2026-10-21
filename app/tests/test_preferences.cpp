@@ -28,6 +28,10 @@ private slots:
         QCOMPARE(p.autoVersionEvery(), 10);
         QCOMPARE(p.recoveryMinutes(), 5);
         QCOMPARE(p.largeIfcMb(), 5.0);
+        QCOMPARE(p.trackerMode(), QString("always"));
+        QCOMPARE(p.angleMode(), QString("absolute"));
+        QCOMPARE(p.typedLengthUnit(), QString("metres"));
+        QVERIFY(p.tabAnnotations());
         QVERIFY(p.templatesFolder().endsWith(QStringLiteral("KimBim Templates")));
         QVERIFY(p.recent().isEmpty());
     }
@@ -90,6 +94,10 @@ private slots:
         QCOMPARE(p.recoveryMinutes(), 5);
         QCOMPARE(p.autoVersionEvery(), 10);
         QCOMPARE(p.largeIfcMb(), 5.0);
+        QCOMPARE(p.trackerMode(), QString("always"));
+        QCOMPARE(p.angleMode(), QString("absolute"));
+        QCOMPARE(p.typedLengthUnit(), QString("metres"));
+        QVERIFY(p.tabAnnotations());
         QCOMPARE(p.scrollNavigation(), QString("auto")); // D89
         p.setValue("scroll_navigation", "sideways");
         QCOMPARE(p.scrollNavigation(), QString("auto"));
@@ -130,6 +138,10 @@ private slots:
         d.findChild<QCheckBox*>("splitJoin")->setChecked(false);
         d.findChild<QComboBox*>("objectEditScope")->setCurrentIndex(1); // D92: selection, ask
         d.findChild<QCheckBox*>("keepRectangles")->setChecked(true);
+        d.findChild<QComboBox*>("tracker")->setCurrentIndex(2); // always, typing, off
+        d.findChild<QComboBox*>("angleMode")->setCurrentIndex(2); // absolute, relative, bearing
+        d.findChild<QComboBox*>("typedLengthUnit")->setCurrentIndex(1); // metres, project
+        d.findChild<QCheckBox*>("tabAnnotations")->setChecked(false);
         d.findChild<QLineEdit*>("authorName")->setText("Felipe");
         d.findChild<QLineEdit*>("templatesFolder")->setText("Z:/Plantillas");
         d.apply();
@@ -146,6 +158,10 @@ private slots:
         QCOMPARE(p.selectSimilarScope(), QString("type"));
         QCOMPARE(p.objectEditScope(), QString("ask"));
         QVERIFY(p.keepRectanglesRectangular());
+        QCOMPARE(p.trackerMode(), QString("off"));
+        QCOMPARE(p.angleMode(), QString("bearing"));
+        QCOMPARE(p.typedLengthUnit(), QString("project"));
+        QVERIFY(!p.tabAnnotations());
         QCOMPARE(p.boxSelection(), QString("entire"));
         QVERIFY(!p.splitJoin());
         QCOMPARE(p.authorName(), QString("Felipe"));
