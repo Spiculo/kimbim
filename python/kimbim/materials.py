@@ -282,7 +282,7 @@ class Palette:
         if look.get("texture"):
             from . import underlays
 
-            p = underlays.file_path(look["texture"])
+            p = underlays.local_path(look["texture"])  # the meshing thread never reads the history
             if p is not None:
                 w, h = (look.get("texture_size") or [1.0, 1.0])[:2]
                 row += [str(p), float(w), float(h)]

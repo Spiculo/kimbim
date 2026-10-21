@@ -38,7 +38,7 @@ KEY = "schedules"
 # Attributes a schedule can show; the editable ones are written back from the table.
 ATTRIBUTES = ["Name", "Tag", "LongName", "Description", "ObjectType", "PredefinedType", "GlobalId"]
 EDITABLE_ATTRIBUTES = {"Name", "Tag", "LongName", "Description", "ObjectType"}
-INFO = ["class", "type", "level"]
+INFO = ["class", "type", "level", "material"]  # material: D96, the element's building material
 # Quantity name -> (kind, summed when merging)
 QUANTITIES = {
     "length": ("length", True), "height": ("length", False), "width": ("length", False),
@@ -52,7 +52,7 @@ LABELS = {  # English labels; the app translates these (custom labels show as ty
     "attribute:Name": "Name", "attribute:Tag": "Mark", "attribute:LongName": "Long name",
     "attribute:Description": "Description", "attribute:ObjectType": "Object type",
     "attribute:PredefinedType": "Predefined type", "attribute:GlobalId": "GlobalId",
-    "info:class": "Class", "info:type": "Type", "info:level": "Level",
+    "info:class": "Class", "info:type": "Type", "info:level": "Level", "info:material": "Building material",
     "quantity:length": "Length", "quantity:height": "Height", "quantity:width": "Width",
     "quantity:thickness": "Thickness", "quantity:perimeter": "Perimeter", "quantity:area": "Area",
     "quantity:sill": "Sill height",
@@ -112,6 +112,11 @@ BUILTIN = [
      "fields": [A_("Tag"), A_("Name"), I_("type"), I_("level"), Q_("length"), Q_("area", label="Section area"),
                 Q_("volume")],
      "group_by": ["info:type"]},
+    # D96: Archicad's component list: one row per layer (or element) of each building material
+    {"id": "materials", "name": "Building materials", "takeoff": True,
+     "classes": ["IfcWall", "IfcSlab", "IfcRoof", "IfcColumn", "IfcBeam", "IfcCovering"],
+     "fields": [I_("material"), I_("type"), I_("level"), Q_("thickness"), Q_("area"), Q_("volume"), Q_("count")],
+     "group_by": ["info:material"]},
     {"id": "rooms", "name": "Rooms", "classes": ["IfcSpace"],
      "fields": [A_("Name", label="Number"), A_("LongName", label="Name"), I_("level"), Q_("area"),
                 Q_("perimeter"), Q_("height"), Q_("volume")],
@@ -588,7 +593,42 @@ def _collect(scheme, ctx: _Ctx) -> list[dict]:
                 if e.is_a("IfcSlab") and _stair_part(e):
                     continue  # a stair's or ramp's landing is the stair's, not a floor slab (D88)
                 elements.append(e)
+    if scheme.get("takeoff"):
+        return _takeoff(elements, scheme["fields"], ctx)
     return collect_elements(elements, scheme["fields"], ctx)
+
+
+def _takeoff(elements, fields, ctx) -> list[dict]:
+    """D96: one record per layer of a layered element (its material, the element's area, that area times
+    the layer's thickness), one per other element (its material and volume)."""
+    from . import materials
+
+    extra = [Q_("net_side_area"), Q_("area"), Q_("volume"), Q_("thickness")]
+    base = collect_elements(elements, fields + [f for f in extra if field_key(f) not in {field_key(x) for x in fields}], ctx)
+    keys = {field_key(f) for f in fields}
+    s = None
+    out = []
+    for e, rec in zip(elements, base):
+        v = rec["values"]
+        usage = ifcopenshell.util.element.get_material(e, should_skip_usage=True)
+        if usage is not None and usage.is_a("IfcMaterialLayerSet") and usage.MaterialLayers:
+            if s is None:
+                s = ifcopenshell.util.unit.calculate_unit_scale(B._model)
+            area = v.get("quantity:net_side_area") if e.is_a("IfcWall") else v.get("quantity:area")
+            for layer in usage.MaterialLayers:
+                t = float(layer.LayerThickness or 0.0) * s
+                values = {k: v.get(k) for k in keys}
+                values["info:material"] = layer.Material.Name if layer.Material is not None else ""
+                values["quantity:thickness"] = t
+                values["quantity:area"] = area
+                values["quantity:volume"] = area * t if isinstance(area, (int, float)) else None
+                values["quantity:count"] = 1
+                out.append({**rec, "values": {k: values.get(k) for k in keys}})
+        else:
+            values = {k: v.get(k) for k in keys}
+            values["quantity:count"] = 1
+            out.append({**rec, "values": {k: values.get(k) for k in keys}})
+    return out
 
 
 def _stair_part(e) -> bool:
@@ -615,6 +655,11 @@ def collect_elements(elements, fields, ctx: _Ctx | None = None) -> list[dict]:
             elif src == "info":
                 if name == "class":
                     values[k] = e.is_a()
+                elif name == "material":
+                    from . import materials
+
+                    m = materials.main_material(e)
+                    values[k] = (m.Name or "") if m is not None else ""
                 elif name == "type":
                     t = ctx.type_of(e)
                     # No type object: IFC's ObjectType names the type (how Revit 2011 exports walls).

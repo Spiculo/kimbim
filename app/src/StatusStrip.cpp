@@ -197,7 +197,7 @@ void StatusStrip::addToggle(QAction* action)
     auto* b = new QToolButton(this);
     b->setDefaultAction(action);
     b->setAutoRaise(true);
-    b->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    b->setToolButtonStyle(action->icon().isNull() ? Qt::ToolButtonTextOnly : Qt::ToolButtonIconOnly); // compact
     b->setObjectName(action->objectName() + QStringLiteral("Button"));
     m_toggles->addWidget(b);
 }

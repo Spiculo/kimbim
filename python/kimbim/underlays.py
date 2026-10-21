@@ -126,6 +126,19 @@ def file_path(name: str) -> pathlib.Path | None:
     return None
 
 
+def local_path(name: str) -> pathlib.Path | None:
+    """The file if it is already on this computer (the working folder or the per-computer store), else
+    None. Never reads the version history: safe from the meshing thread (D96 textures)."""
+    from . import documents
+
+    if not FILE_NAME.fullmatch(name or ""):
+        return None
+    for p in (store_dir() / name, documents.data_dir() / "underlays" / name):
+        if p.is_file():
+            return p
+    return None
+
+
 def referenced(settings: dict) -> list[str]:
     names = {u.get("file", "") for u in settings.get("underlays") or () if FILE_NAME.fullmatch(u.get("file", ""))}
     names |= {n for n in [*(settings.get("sheet_files") or ()), *(settings.get("texture_files") or ())]

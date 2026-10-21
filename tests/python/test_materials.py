@@ -452,3 +452,21 @@ def test_catalogue_surfaces_come_with_pictures(project):
     assert "texture" not in by_name(st["surfaces"], "Concrete")
     assert set(settings.current()["texture_files"]) == {s["texture"] for s in st["surfaces"] if s.get("texture")}
     assert call("state")["dirty"] is False  # part of the empty project
+
+
+def test_material_takeoff_schedule(project):
+    from kimbim import schedules
+
+    wall(project, x2=5.0)  # Exterior 300: brick 0.1, insulation 0.08, block 0.12; 5 x 3 m
+    r = schedules.compute("materials", merge=True)
+    assert r["ok"], r
+    keys = [c["key"] for c in r["columns"]]
+    rows = {row["values"][keys.index("info:material")]: row for row in r["rows"]}
+    volume = keys.index("quantity:volume")
+    assert rows["Brick"]["values"][volume] == pytest.approx(15.0 * 0.1, rel=0.05)
+    assert rows["Insulation"]["values"][volume] == pytest.approx(15.0 * 0.08, rel=0.05)
+    assert rows["Block"]["values"][volume] == pytest.approx(15.0 * 0.12, rel=0.05)
+    # any schedule can show an element's building material
+    walls = schedules.compute({"id": "x", "name": "x", "classes": ["IfcWall"],
+                               "fields": [{"source": "info", "name": "material"}]})
+    assert walls["rows"][0]["values"] == ["Block"]  # the core

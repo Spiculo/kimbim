@@ -238,8 +238,12 @@ def _reset_history(path: str):
     layers.forget()
     from . import documents, settings
 
+    kept = settings.current()
     settings.load(None)
-    documents.on_model_opened(path)
+    if documents.on_model_opened(path) == "working copy":
+        # the document's own working copy reopened (an option switch, discard, combine): its settings
+        # are the ones the switch put in place, not the defaults
+        settings.load(kept)
     from . import drawings  # the cached drawing snapshots belong to the old model
 
     drawings.forget_snapshots()

@@ -580,6 +580,7 @@ void MainWindow::buildMenus()
     m_gridSnap->setCheckable(true);
     m_gridSnap->setShortcut(QKeySequence(Qt::ALT | Qt::Key_G));
     m_gridSnap->setToolTip(tr("Free points jump to the construction grid's lines"));
+    m_gridSnap->setIcon(themedIcon(QStringLiteral("grid")));
     m_gridSnap->setChecked(m_prefs.value(QStringLiteral("grid_snap")).toBool(false));
     connect(m_gridSnap, &QAction::toggled, this, [this](bool on) {
         m_prefs.setValue(QStringLiteral("grid_snap"), on);
