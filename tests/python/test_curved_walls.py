@@ -109,3 +109,42 @@ def test_a_double_slanted_walls_height_changes(project):
     _, _, v, _ = mesh(w)
     assert v[:, 2].max() == pytest.approx(4.0, abs=1e-3)
     assert v[:, 0].max() - v[:, 0].min() == pytest.approx(5.0, abs=1e-3)  # still 5 m long
+
+
+def corner(project, reference="Outside face"):
+    t = project["Exterior 300"]
+    a = call("create_wall", project["level"], t, 0, 0, 6, 0, 3.0, "", "", reference)["guid"]
+    b2 = call("create_wall", project["level"], t, 6, 0, 6, 5, 3.0, a, "", reference)["guid"]
+    return a, b2
+
+
+def test_filleting_a_wall_corner(project):
+    """D97: Archicad's Fillet on two walls: both pulled back, a tangent curved wall between them."""
+    a, b2 = corner(project)
+    r = call("fillet_corners", json.dumps([a, b2]), 2.0, "fillet")
+    assert r["ok"], r
+    from kimbim import authoring
+
+    assert [list(map(lambda v: round(v, 6), p)) for p in authoring._axis_world(b._model.by_guid(a))] == [[0, 0], [4, 0]]
+    assert [round(v, 6) for v in authoring._axis_world(b._model.by_guid(b2))[0]] in ([6, 2], [6, 5])
+    arc = r["guid"]
+    dims = {k: e["value"] for k, e in call("properties_multi", json.dumps([arc]))["psets"]["Dimensions"].items()}
+    assert dims["Length"] == pytest.approx(math.pi, abs=1e-3)  # a quarter circle of radius 2
+    lo, hi, _ = radii(arc, (4.0, 2.0))
+    # drawn by the outside face (the corner's outside), the body is inside the arc: radii 1.7 to 2.0
+    assert lo == pytest.approx(1.7, abs=0.01) and hi == pytest.approx(2.0, abs=0.01)
+    call("undo")
+    assert [round(v, 6) for v in authoring._axis_world(b._model.by_guid(a))[1]] == [6, 0]
+    assert len([e for e in b._model.by_type("IfcWall")]) == 2
+
+
+def test_chamfering_a_wall_corner(project):
+    a, b2 = corner(project)
+    r = call("fillet_corners", json.dumps([a, b2]), 1.0, "chamfer")
+    assert r["ok"], r
+    from kimbim import authoring
+
+    new = authoring._axis_world(b._model.by_guid(r["guid"]))
+    assert sorted(tuple(round(v, 6) for v in p) for p in new) == [(5.0, 0.0), (6.0, 1.0)]
+    assert not call("fillet_corners", json.dumps([a, b2]), 50.0, "fillet")["ok"]  # too big
+    assert not call("fillet_corners", json.dumps([a]), 1.0, "fillet")["ok"]  # one wall

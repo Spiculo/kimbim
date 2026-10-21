@@ -174,6 +174,31 @@ def _axis_context():
     return ctx
 
 
+def new_curved_wall(storey, wall_type, p1, p2, pm, height: float, reference: str = "", usage_from=None):
+    """Inside an action: a curved wall from p1 through pm to p2 (world metres) on a level; its layers by
+    `reference` ("" = centred) or `usage_from` ((offset metres, direction sense, reference name))."""
+    from . import authoring as A
+    from . import configure
+
+    f = B._model
+    wall = ifcopenshell.api.root.create_entity(f, ifc_class="IfcWall", name=wall_type.Name)
+    ifcopenshell.api.type.assign_type(f, related_objects=[wall], relating_type=wall_type)
+    if usage_from is not None:
+        configure.set_usage(wall, *usage_from)
+    elif reference:
+        configure.apply_reference(wall, reference)
+    else:
+        A._centre_on_axis(wall, A._thickness(A._layer_set(wall_type)))
+    matrix = np.eye(4)
+    matrix[2, 3] = A._elevation(storey)
+    ifcopenshell.api.geometry.edit_object_placement(f, product=wall, matrix=matrix, is_si=True)
+    ifcopenshell.api.spatial.assign_container(f, products=[wall], relating_structure=storey)
+    configure._write_pset(wall, WALL_PSET, {"Arc": json.dumps([list(map(float, p1)), list(map(float, p2)),
+                                                               list(map(float, pm))]), "Height": float(height)})
+    rebuild(wall)
+    return wall
+
+
 def create_curved_wall(storey_guid: str, type_guid: str, x1, y1, xm, ym, x2, y2, height, reference: str = "") -> str:
     """A curved wall of a layered type from (x1, y1) through (xm, ym) to (x2, y2) on a level (one undo
     step). `reference` (configure.REFERENCES): where the drawn arc is in the wall; "" = its centre."""
@@ -201,20 +226,7 @@ def create_curved_wall(storey_guid: str, type_guid: str, x1, y1, xm, ym, x2, y2,
     made = {}
 
     def action():
-        f = B._model
-        wall = ifcopenshell.api.root.create_entity(f, ifc_class="IfcWall", name=wall_type.Name)
-        ifcopenshell.api.type.assign_type(f, related_objects=[wall], relating_type=wall_type)
-        if reference:
-            configure.apply_reference(wall, reference)
-        else:
-            A._centre_on_axis(wall, A._thickness(A._layer_set(wall_type)))
-        matrix = np.eye(4)
-        matrix[2, 3] = A._elevation(storey)
-        ifcopenshell.api.geometry.edit_object_placement(f, product=wall, matrix=matrix, is_si=True)
-        ifcopenshell.api.spatial.assign_container(f, products=[wall], relating_structure=storey)
-        configure._write_pset(wall, WALL_PSET, {"Arc": json.dumps([list(p1), list(p2), list(pm)]),
-                                                "Height": float(height)})
-        rebuild(wall)
+        wall = new_curved_wall(storey, wall_type, p1, p2, pm, height, reference)
         layers.assign_active(wall)
         renovation.stamp_new(wall)
         made["wall"] = wall

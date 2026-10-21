@@ -116,6 +116,36 @@ def apply_reference(wall, reference: str):
     _write_pset(wall, WALL_PSET, {"ReferenceLine": reference})
 
 
+def set_usage(wall, offset: float, sense: str, reference: str = ""):
+    """Give a wall layers placed like another's (D97, a wall continuing it): the direction sense, then
+    the named reference line (or the raw offset, metres, when it has none)."""
+    from . import authoring as A
+
+    usage = _usage(wall)
+    if usage is None:
+        return
+    usage.DirectionSense = "NEGATIVE" if sense == "NEGATIVE" else "POSITIVE"
+    if reference in REFERENCES:
+        apply_reference(wall, reference)
+    else:
+        usage.OffsetFromReferenceLine = float(offset) / A._scale()
+
+
+def usage_of(wall, reversed_: bool = False):
+    """(offset metres, direction sense, reference name) of a wall's layers, for set_usage; `reversed_`:
+    as seen walking its axis backwards (the same faces on the same sides)."""
+    from . import authoring as A
+
+    usage = _usage(wall)
+    if usage is None:
+        return None
+    offset = float(usage.OffsetFromReferenceLine or 0.0) * A._scale()
+    sense = usage.DirectionSense or "POSITIVE"
+    if reversed_:
+        offset, sense = -offset, ("POSITIVE" if sense == "NEGATIVE" else "NEGATIVE")
+    return offset, sense, reference_of(wall) if reference_of(wall) in REFERENCES else ""
+
+
 def reapply_reference(wall) -> bool:
     """After a composite change: keep the remembered location. False when none is remembered."""
     stored = _pset(wall, WALL_PSET).get("ReferenceLine")

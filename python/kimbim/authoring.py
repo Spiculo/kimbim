@@ -303,21 +303,7 @@ def create_wall(storey_guid: str, type_guid: str, x1, y1, x2, y2, height, join_s
 
     def action():
         f = B._model
-        thickness = _thickness(_layer_set(wall_type))
-        wall = ifcopenshell.api.root.create_entity(f, ifc_class="IfcWall", name=wall_type.Name)
-        ifcopenshell.api.type.assign_type(f, related_objects=[wall], relating_type=wall_type)
-        if reference:
-            from . import configure
-
-            configure.apply_reference(wall, reference)
-        else:
-            _centre_on_axis(wall, thickness)
-        representation = ifcopenshell.api.geometry.create_2pt_wall(
-            f, element=wall, context=_body_context(), p1=p1, p2=p2,
-            elevation=_elevation(storey), height=height, thickness=thickness, is_si=True)
-        ifcopenshell.api.geometry.assign_representation(f, product=wall, representation=representation)
-        ifcopenshell.api.spatial.assign_container(f, products=[wall], relating_structure=storey)
-        _regenerate(f, wall, length=length, height=height)
+        wall = _new_wall(storey, wall_type, p1, p2, height, reference)
         neighbours = []
         for guid, point in joins:
             other = B._model.by_guid(guid)
@@ -335,6 +321,31 @@ def create_wall(storey_guid: str, type_guid: str, x1, y1, x2, y2, height, join_s
     except Exception as ex:
         return _fail(f"{type(ex).__name__}: {ex}")
     return B._dump({**r, "guid": made["wall"].GlobalId})
+
+
+def _new_wall(storey, wall_type, p1, p2, height: float, reference: str = "", usage_from=None):
+    """Inside an action: a straight wall of a layered type from p1 to p2 (metres) on a level, built by
+    the regenerator; its layers sit by `reference` ("" = centred), or as `usage_from` gives them
+    ((offset metres, direction sense, reference name): a wall continuing another's faces)."""
+    f = B._model
+    thickness = _thickness(_layer_set(wall_type))
+    wall = ifcopenshell.api.root.create_entity(f, ifc_class="IfcWall", name=wall_type.Name)
+    ifcopenshell.api.type.assign_type(f, related_objects=[wall], relating_type=wall_type)
+    from . import configure
+
+    if usage_from is not None:
+        configure.set_usage(wall, *usage_from)
+    elif reference:
+        configure.apply_reference(wall, reference)
+    else:
+        _centre_on_axis(wall, thickness)
+    representation = ifcopenshell.api.geometry.create_2pt_wall(
+        f, element=wall, context=_body_context(), p1=tuple(p1), p2=tuple(p2),
+        elevation=_elevation(storey), height=height, thickness=thickness, is_si=True)
+    ifcopenshell.api.geometry.assign_representation(f, product=wall, representation=representation)
+    ifcopenshell.api.spatial.assign_container(f, products=[wall], relating_structure=storey)
+    _regenerate(f, wall, length=math.dist(p1, p2), height=height)
+    return wall
 
 
 def delete_elements(guids_json: str) -> str:

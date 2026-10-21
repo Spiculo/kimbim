@@ -1655,6 +1655,10 @@ ES = {
     "Curved": "Curvo",
     "Curved walls: click the start, the end, then a point on the arc": "Muros curvos: haga clic en el inicio, el fin y luego un punto del arco",
     "Straight walls": "Muros rectos",
+    "Round or cut the corners of the selected slabs, polylines and fills, or of two walls meeting at a corner":
+        "Redondear o cortar las esquinas de las losas, polilíneas y rellenos seleccionados, o de dos muros que forman una esquina",
+    "Select slabs, polylines or fills, or the two walls of a corner, first":
+        "Primero seleccione losas, polilíneas o rellenos, o los dos muros de una esquina",
 }
 
 

@@ -494,7 +494,7 @@ void MainWindow::buildMenus()
     editAction(tr("Multi&ply..."), "actionMultiply", QKeySequence(Qt::CTRL | Qt::Key_U), [this] { multiplyDialog(); });
     editAction(tr("&Offset..."), "actionOffset", QKeySequence(), [this] { offsetDialog(); });
     editAction(tr("&Fillet/Chamfer..."), "actionFillet", QKeySequence(), [this] { filletDialog(); }) // D98
-        ->setToolTip(tr("Round or cut the corners of the selected slabs, polylines and fills"));
+        ->setToolTip(tr("Round or cut the corners of the selected slabs, polylines and fills, or of two walls meeting at a corner"));
     // D78: selection tools (Archicad's Find & Select; Revit's Select All Instances).
     editMenu->addSeparator();
     editAction(tr("Select &similar"), "actionSelectSimilar", QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_A),
@@ -5678,7 +5678,7 @@ void MainWindow::filletDialog()
 {
     // D98: Archicad's Fillet/Chamfer for slab, polyline and fill corners.
     if (m_selection.isEmpty()) {
-        m_status->showMessage(tr("Select slabs, polylines or fills first"));
+        m_status->showMessage(tr("Select slabs, polylines or fills, or the two walls of a corner, first"));
         return;
     }
     QDialog dialog(this);

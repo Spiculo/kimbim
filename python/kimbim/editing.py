@@ -401,6 +401,85 @@ def round_corners(points, closed: bool, size: float, mode: str = "fillet"):
     return [(round(float(x), 6), round(float(y), 6)) for x, y in out]
 
 
+def _wall_corner(w1, w2):
+    """Where two straight walls' axes meet: (corner, u, v, end1, end2), u and v pointing from the corner
+    along each wall, endN "start" or "end" (the end at the corner); None when they are parallel."""
+    (a1, b1), (a2, b2) = (tuple(np.array(p, dtype=float) for p in A._axis_world(w)) for w in (w1, w2))
+    d1, d2 = b1 - a1, b2 - a2
+    den = d1[0] * d2[1] - d1[1] * d2[0]
+    if abs(den) < 1e-9:
+        return None
+    t = ((a2[0] - a1[0]) * d2[1] - (a2[1] - a1[1]) * d2[0]) / den
+    corner = a1 + d1 * t
+    out = [corner]
+    for a, b in ((a1, b1), (a2, b2)):
+        near_end = np.linalg.norm(b - corner) < np.linalg.norm(a - corner)
+        far = a if near_end else b
+        out.append((far - corner) / np.linalg.norm(far - corner))
+    ends = ["end" if np.linalg.norm(b - corner) < np.linalg.norm(a - corner) else "start" for a, b in ((a1, b1), (a2, b2))]
+    return out[0], out[1], out[2], ends[0], ends[1]
+
+
+def _fillet_walls(w1, w2, size: float, mode: str) -> str:
+    """Archicad's Fillet/Chamfer on two walls meeting at a corner: both pulled back from it and a
+    curved wall tangent to both (fillet, radius `size` on the axes) or a straight one (chamfer, `size`
+    back along each) between them, its layers continuing the first wall's (one undo step)."""
+    from . import configure, curved_walls, layers, renovation
+
+    corner = _wall_corner(w1, w2)
+    if corner is None:
+        return A._fail("the two walls are parallel: they have no corner")
+    p, u, v, end1, end2 = corner
+    turn = math.acos(max(-1.0, min(1.0, float(u @ v))))
+    if turn < 1e-3 or turn > math.pi - 1e-3:
+        return A._fail("the walls are in line: there is no corner to round")
+    (a1, b1), (a2, b2) = (tuple(np.array(q, dtype=float) for q in A._axis_world(w)) for w in (w1, w2))
+    room = min(np.linalg.norm((a1 if end1 == "end" else b1) - p), np.linalg.norm((a2 if end2 == "end" else b2) - p))
+    t = size if mode == "chamfer" else size / math.tan(turn / 2)
+    if t >= room - A.MIN_WALL_LENGTH:
+        return A._fail(f"too big for these walls: at most {room * (1 if mode == 'chamfer' else math.tan(turn / 2)):.3f} m")
+    q1, q2 = p + u * t, p + v * t
+    storey = ifcopenshell.util.element.get_container(w1)
+    wall_type = ifcopenshell.util.element.get_type(w1)
+    height = A._wall_height(w1) or 3.0
+    # walking w1 towards the corner, then on to w2: the new wall continues w1's faces
+    usage = configure.usage_of(w1, reversed_=(end1 == "start"))
+    made = {}
+
+    def action():
+        f = B._model
+        for rel in list(A._path_joins(w1)):  # the corner's join goes; the walls now end at the new wall
+            others = {rel.RelatingElement, rel.RelatedElement}
+            if w2 in others:
+                f.remove(rel)
+        for w, end, q in ((w1, end1, q1), (w2, end2, q2)):
+            a, b = (np.array(x, dtype=float) for x in A._axis_world(w))
+            A._reaxis(w, q if end == "start" else a, b if end == "start" else q)
+            A._regenerate(f, w, length=float(np.linalg.norm(b - a)), height=A._wall_height(w) or height)
+        if mode == "chamfer":
+            new = A._new_wall(storey, wall_type, q1, q2, height, usage_from=usage)
+            for other, point in ((w1, q1), (w2, q2)):
+                ifcopenshell.api.geometry.connect_wall(f, wall1=new, wall2=other, is_atpath=False)
+            for w in (new, w1, w2):
+                A._regenerate(f, w, length=float(np.linalg.norm(q2 - q1)), height=height)
+        else:
+            r = t * math.tan(turn / 2)
+            bis = (u + v) / np.linalg.norm(u + v)
+            centre = p + bis * (r / math.sin(turn / 2))
+            through = centre - bis * r
+            new = curved_walls.new_curved_wall(storey, wall_type, q1, q2, through, height, usage_from=usage)
+        layers.assign_active(new)
+        renovation.stamp_new(new)
+        made["wall"] = new
+        return 1, [w1.GlobalId, w2.GlobalId, new.GlobalId], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return A._fail(str(ex) if isinstance(ex, ValueError) else f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "guid": made["wall"].GlobalId})
+
+
 def fillet_corners(guids_json: str, size, mode: str = "fillet") -> str:
     """Fillet or chamfer the corners of the selected slabs and 2D polylines and fills (one undo step)."""
     from . import annotations as N
@@ -415,6 +494,17 @@ def fillet_corners(guids_json: str, size, mode: str = "fillet") -> str:
         return A._fail(str(ex))
     if size <= 0:
         return A._fail("the radius or distance must be more than zero")
+    walls = [e for e in B._elements(guids_json) if e.is_a("IfcWall")]
+    if walls:  # D97: two walls meeting at a corner: a curved (fillet) or straight (chamfer) wall between
+        from . import curved_walls
+
+        if len(walls) != 2:
+            return A._fail("select the two walls of the corner")
+        if (why := curved_walls.refusal(walls)) is not None:
+            return A._fail(why)
+        if any(A._axis_world(w) is None or A._layer_set(w) is None for w in walls):
+            return A._fail("select two layered walls drawn by KimBim")
+        return _fillet_walls(walls[0], walls[1], size, mode)
     slabs, shapes = [], []
     for e in B._elements(guids_json):
         if e.is_a("IfcSlab") and _slab_outline_world(e):

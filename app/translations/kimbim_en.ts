@@ -227,8 +227,8 @@
 <context>
     <name>QObject</name>
     <message>
-        <location filename="../tests/test_main_window.cpp" line="789"/>
-        <location filename="../tests/test_main_window.cpp" line="999"/>
+        <location filename="../tests/test_main_window.cpp" line="790"/>
+        <location filename="../tests/test_main_window.cpp" line="1000"/>
         <source>Untitled</source>
         <translation type="unfinished"></translation>
     </message>
@@ -3024,11 +3024,6 @@ License: GPL-3.0-or-later</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="497"/>
-        <source>Round or cut the corners of the selected slabs, polylines and fills</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../src/MainWindow.cpp" line="502"/>
         <source>Select every element sharing the selected element&apos;s class and predefined type, its type object or its class (Edit ▸ Preferences)</source>
         <translation type="unfinished"></translation>
@@ -4410,7 +4405,7 @@ License: GPL-3.0-or-later</source>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="3404"/>
-        <location filename="../tests/test_main_window.cpp" line="1367"/>
+        <location filename="../tests/test_main_window.cpp" line="1368"/>
         <source>Versions</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4638,11 +4633,6 @@ Editing the IFC directly opens it at once, without version history, options, com
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5681"/>
-        <source>Select slabs, polylines or fills first</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../src/MainWindow.cpp" line="5685"/>
         <source>Fillet/Chamfer</source>
         <translation type="unfinished"></translation>
@@ -4836,7 +4826,7 @@ Editing the IFC directly opens it at once, without version history, options, com
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="3021"/>
-        <location filename="../tests/test_main_window.cpp" line="724"/>
+        <location filename="../tests/test_main_window.cpp" line="725"/>
         <source>Wall: click the start point</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5368,6 +5358,11 @@ Editing the IFC directly opens it at once, without version history, options, com
     <message>
         <location filename="../src/MainWindow.cpp" line="3732"/>
         <source>Could not open the project</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="497"/>
+        <source>Round or cut the corners of the selected slabs, polylines and fills, or of two walls meeting at a corner</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -6045,6 +6040,11 @@ Open it read-only?</source>
     <message>
         <location filename="../src/MainWindow.cpp" line="5658"/>
         <source>Distance (m): walls get a parallel copy to the left of their axis (negative: right); slabs grow (negative: shrink)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="5681"/>
+        <source>Select slabs, polylines or fills, or the two walls of a corner, first</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

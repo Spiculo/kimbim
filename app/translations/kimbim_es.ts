@@ -226,8 +226,8 @@
   <context>
     <name>QObject</name>
     <message>
-      <location filename="../tests/test_main_window.cpp" line="789" />
-      <location filename="../tests/test_main_window.cpp" line="999" />
+      <location filename="../tests/test_main_window.cpp" line="790" />
+      <location filename="../tests/test_main_window.cpp" line="1000" />
       <source>Untitled</source>
       <translation>Sin título</translation>
     </message>
@@ -2706,6 +2706,11 @@ Licencia: GPL-3.0 o posterior</translation>
       <translation>Abriendo %1...</translation>
     </message>
     <message>
+      <location filename="../src/MainWindow.cpp" line="497" />
+      <source>Round or cut the corners of the selected slabs, polylines and fills, or of two walls meeting at a corner</source>
+      <translation>Redondear o cortar las esquinas de las losas, polilíneas y rellenos seleccionados, o de dos muros que forman una esquina</translation>
+    </message>
+    <message>
       <location filename="../src/MainWindow.cpp" line="1584" />
       <location filename="../src/MainWindow.cpp" line="1595" />
       <location filename="../src/MainWindow.cpp" line="1625" />
@@ -2820,7 +2825,7 @@ Licencia: GPL-3.0 o posterior</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="3404" />
-      <location filename="../tests/test_main_window.cpp" line="1367" />
+      <location filename="../tests/test_main_window.cpp" line="1368" />
       <source>Versions</source>
       <translation>Versiones</translation>
     </message>
@@ -3220,7 +3225,7 @@ Licencia: GPL-3.0 o posterior</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="3021" />
-      <location filename="../tests/test_main_window.cpp" line="724" />
+      <location filename="../tests/test_main_window.cpp" line="725" />
       <source>Wall: click the start point</source>
       <translation>Muro: haga clic en el punto inicial</translation>
     </message>
@@ -5769,9 +5774,8 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       <translation>&amp;Empalme/Chaflán...</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="497" />
       <source>Round or cut the corners of the selected slabs, polylines and fills</source>
-      <translation>Redondear o cortar las esquinas de las losas, polilíneas y rellenos seleccionados</translation>
+      <translation type="vanished">Redondear o cortar las esquinas de las losas, polilíneas y rellenos seleccionados</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="502" />
@@ -5888,6 +5892,11 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       <location filename="../src/MainWindow.cpp" line="5658" />
       <source>Distance (m): walls get a parallel copy to the left of their axis (negative: right); slabs grow (negative: shrink)</source>
       <translation>Distancia (m): los muros reciben una copia paralela a la izquierda de su eje (negativa: a la derecha); las losas crecen (negativa: se achican)</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="5681" />
+      <source>Select slabs, polylines or fills, or the two walls of a corner, first</source>
+      <translation>Primero seleccione losas, polilíneas o rellenos, o los dos muros de una esquina</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="5742" />
@@ -6187,9 +6196,8 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       <translation>No se pudo empalmar: %1</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="5681" />
       <source>Select slabs, polylines or fills first</source>
-      <translation>Primero seleccione losas, polilíneas o rellenos</translation>
+      <translation type="vanished">Primero seleccione losas, polilíneas o rellenos</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="5685" />
