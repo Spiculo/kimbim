@@ -3,199 +3,224 @@
   <context>
     <name>LibraryPanel</name>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="30" />
+      <location filename="../src/LibraryPanel.cpp" line="32" />
       <source>Furniture</source>
       <translation>Mobiliario</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="30" />
+      <location filename="../src/LibraryPanel.cpp" line="32" />
       <source>Sanitary</source>
       <translation>Sanitarios</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="31" />
+      <location filename="../src/LibraryPanel.cpp" line="33" />
       <source>Kitchen</source>
       <translation>Cocina</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="31" />
+      <location filename="../src/LibraryPanel.cpp" line="33" />
       <source>People, trees and cars</source>
       <translation>Personas, árboles y coches</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="32" />
+      <location filename="../src/LibraryPanel.cpp" line="34" />
       <source>Office library</source>
       <translation>Biblioteca de la oficina</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="32" />
+      <location filename="../src/LibraryPanel.cpp" line="34" />
       <source>Table</source>
       <translation>Mesa</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="33" />
+      <location filename="../src/LibraryPanel.cpp" line="35" />
       <source>Chair</source>
       <translation>Silla</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="33" />
+      <location filename="../src/LibraryPanel.cpp" line="35" />
       <source>Sofa</source>
       <translation>Sofá</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="34" />
+      <location filename="../src/LibraryPanel.cpp" line="36" />
       <source>Single bed</source>
       <translation>Cama individual</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="34" />
+      <location filename="../src/LibraryPanel.cpp" line="36" />
       <source>Double bed</source>
       <translation>Cama doble</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="35" />
+      <location filename="../src/LibraryPanel.cpp" line="37" />
       <source>Wardrobe</source>
       <translation>Armario</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="35" />
+      <location filename="../src/LibraryPanel.cpp" line="37" />
       <source>Desk</source>
       <translation>Escritorio</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="36" />
+      <location filename="../src/LibraryPanel.cpp" line="38" />
       <source>Shelf</source>
       <translation>Estantería</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="36" />
+      <location filename="../src/LibraryPanel.cpp" line="38" />
       <source>WC</source>
       <translation>Inodoro</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="37" />
+      <location filename="../src/LibraryPanel.cpp" line="39" />
       <source>Washbasin</source>
       <translation>Lavabo</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="37" />
+      <location filename="../src/LibraryPanel.cpp" line="39" />
       <source>Bathtub</source>
       <translation>Bañera</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="38" />
+      <location filename="../src/LibraryPanel.cpp" line="40" />
       <source>Shower tray</source>
       <translation>Plato de ducha</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="38" />
+      <location filename="../src/LibraryPanel.cpp" line="40" />
       <source>Bidet</source>
       <translation>Bidé</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="39" />
+      <location filename="../src/LibraryPanel.cpp" line="41" />
       <source>Base cabinets</source>
       <translation>Muebles bajos</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="39" />
+      <location filename="../src/LibraryPanel.cpp" line="41" />
       <source>Wall cabinets</source>
       <translation>Muebles altos</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="40" />
+      <location filename="../src/LibraryPanel.cpp" line="42" />
       <source>Sink unit</source>
       <translation>Mueble fregadero</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="40" />
+      <location filename="../src/LibraryPanel.cpp" line="42" />
       <source>Fridge</source>
       <translation>Frigorífico</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="41" />
+      <location filename="../src/LibraryPanel.cpp" line="43" />
       <source>Cooktop and oven</source>
       <translation>Placa y horno</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="41" />
+      <location filename="../src/LibraryPanel.cpp" line="43" />
       <source>Person</source>
       <translation>Persona</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="42" />
+      <location filename="../src/LibraryPanel.cpp" line="44" />
       <source>Tree</source>
       <translation>Árbol</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="42" />
+      <location filename="../src/LibraryPanel.cpp" line="44" />
       <source>Car</source>
       <translation>Coche</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="43" />
+      <location filename="../src/LibraryPanel.cpp" line="45" />
       <source>Width</source>
       <translation>Ancho</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="43" />
+      <location filename="../src/LibraryPanel.cpp" line="45" />
       <source>Depth</source>
       <translation>Fondo</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="44" />
+      <location filename="../src/LibraryPanel.cpp" line="46" />
       <source>Height</source>
       <translation>Altura</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="44" />
+      <location filename="../src/LibraryPanel.cpp" line="46" />
       <source>Seat height</source>
       <translation>Altura del asiento</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="45" />
+      <location filename="../src/LibraryPanel.cpp" line="47" />
       <source>Seats</source>
       <translation>Plazas</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="45" />
+      <location filename="../src/LibraryPanel.cpp" line="47" />
       <source>Doors</source>
       <translation>Puertas</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="46" />
+      <location filename="../src/LibraryPanel.cpp" line="48" />
       <source>Shelves</source>
       <translation>Baldas</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="46" />
+      <location filename="../src/LibraryPanel.cpp" line="48" />
       <source>Units</source>
       <translation>Módulos</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="47" />
+      <location filename="../src/LibraryPanel.cpp" line="49" />
       <source>Mounting height</source>
       <translation>Altura de montaje</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="47" />
+      <location filename="../src/LibraryPanel.cpp" line="49" />
       <source>Bowls</source>
       <translation>Senos</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="48" />
+      <location filename="../src/LibraryPanel.cpp" line="50" />
       <source>Burners</source>
       <translation>Fuegos</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="48" />
+      <location filename="../src/LibraryPanel.cpp" line="50" />
       <source>Crown diameter</source>
       <translation>Diámetro de copa</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="49" />
+      <location filename="../src/LibraryPanel.cpp" line="51" />
       <source>Trunk diameter</source>
       <translation>Diámetro del tronco</translation>
+    </message>
+    <message>
+      <location filename="../src/LibraryPanel.cpp" line="53" />
+      <source>Material</source>
+      <translation>Material</translation>
+    </message>
+    <message>
+      <location filename="../src/LibraryPanel.cpp" line="53" />
+      <source>Top material</source>
+      <translation>Material del tablero</translation>
+    </message>
+    <message>
+      <location filename="../src/LibraryPanel.cpp" line="54" />
+      <source>Legs material</source>
+      <translation>Material de las patas</translation>
+    </message>
+    <message>
+      <location filename="../src/LibraryPanel.cpp" line="54" />
+      <source>Frame material</source>
+      <translation>Material de la estructura</translation>
+    </message>
+    <message>
+      <location filename="../src/LibraryPanel.cpp" line="55" />
+      <source>Seat material</source>
+      <translation>Material del asiento</translation>
     </message>
   </context>
   <context>
@@ -2254,37 +2279,37 @@ Intro ejecuta, Mayús+Intro añade una línea, Arriba/Abajo recuperan entradas a
   <context>
     <name>kimbim::LibraryPanel</name>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="105" />
+      <location filename="../src/LibraryPanel.cpp" line="111" />
       <source>Search objects</source>
       <translation>Buscar objetos</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="122" />
+      <location filename="../src/LibraryPanel.cpp" line="128" />
       <source>Place</source>
       <translation>Colocar</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="124" />
+      <location filename="../src/LibraryPanel.cpp" line="130" />
       <source>Click in the view to place the object; Tab turns it 90 degrees, a typed number sets its angle</source>
       <translation>Haga clic en la vista para colocar el objeto; Tab lo gira 90 grados, un número escrito fija su ángulo</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="127" />
+      <location filename="../src/LibraryPanel.cpp" line="133" />
       <source>Office library...</source>
       <translation>Biblioteca de la oficina...</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="129" />
+      <location filename="../src/LibraryPanel.cpp" line="135" />
       <source>Choose the office library folder: Python objects (.py) and IFC type libraries (.ifc)</source>
       <translation>Elija la carpeta de la biblioteca de la oficina: objetos Python (.py) y bibliotecas de tipos IFC (.ifc)</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="130" />
+      <location filename="../src/LibraryPanel.cpp" line="136" />
       <source>Load IFC types...</source>
       <translation>Cargar tipos IFC...</translation>
     </message>
     <message>
-      <location filename="../src/LibraryPanel.cpp" line="132" />
+      <location filename="../src/LibraryPanel.cpp" line="138" />
       <source>Add the types of an IFC file (e.g. IfcFurnitureType definitions) to the office library</source>
       <translation>Añade los tipos de un archivo IFC (p. ej. definiciones IfcFurnitureType) a la biblioteca de la oficina</translation>
     </message>

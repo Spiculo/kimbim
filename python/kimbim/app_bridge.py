@@ -852,8 +852,10 @@ def properties_multi(guids_json: str) -> str:
             present = [next((v for n, v, _ in params if n == label), _MISSING) for params in per_params]
             varies = any(v is _MISSING or v != present[0] for v in present)
             group[label] = {"value": None if varies else present[0], "varies": varies,
-                            "ifc_type": "IfcLengthMeasure" if kind == "length" else "IfcInteger",
+                            "ifc_type": {"length": "IfcLengthMeasure", "material": "IfcLabel"}.get(kind, "IfcInteger"),
                             "editable": True, "source": "dimension", "type_value": None}
+            if kind == "material":  # D97: a part's building material, picked from a list
+                group[label]["choices"] = library._material_choices(present[0] if isinstance(present[0], str) else "")
         if group:
             psets = {**{k: v for k, v in psets.items() if k == authoring.DIMENSIONS}, library.PARAMETERS: group,
                      **{k: v for k, v in psets.items() if k != authoring.DIMENSIONS}}

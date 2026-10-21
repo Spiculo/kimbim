@@ -186,3 +186,26 @@ def test_objects_fall_onto_the_slab_below_with_gravity(project):
     assert z(on["guid"]) == pytest.approx(0.45, abs=1e-3)
     assert z(off["guid"]) == pytest.approx(0.0, abs=1e-3)
     assert z(outside["guid"]) == pytest.approx(0.0, abs=1e-3)  # nothing under it: the level
+
+
+def test_objects_have_materials_per_part(project):
+    from kimbim import library
+
+    table = call("place_object", project["level"], "table", "", 1.0, 1.0, 0.0, "")
+    assert table["ok"], table
+    palette, idx, v, t = mesh(table["guid"])
+    looks = {M._hex(palette[i][:3]) for i in set(idx.tolist())}
+    assert looks == {M.CATALOGUE["Timber - finish"]["colour"], M.CATALOGUE["Steel"]["colour"]}
+    group = props(table["guid"])[library.PARAMETERS]
+    assert group["Legs material"]["value"] == "Steel" and "Aluminium" in group["Legs material"]["choices"]
+    r = call("set_object_parameter", json.dumps([table["guid"]]), "Legs material", "Aluminium", "")
+    assert r["ok"], r
+    palette, idx, _, _ = mesh(table["guid"])
+    assert M.CATALOGUE["Aluminium"]["colour"] in {M._hex(palette[i][:3]) for i in set(idx.tolist())}
+    assert not call("set_object_parameter", json.dumps([table["guid"]]), "Legs material", "Unobtainium", "")["ok"]
+    wc = call("place_object", project["level"], "wc", "", 3.0, 1.0, 0.0, "")
+    palette, idx, _, _ = mesh(wc["guid"])
+    assert {M._hex(palette[i][:3]) for i in set(idx.tolist())} == {M.CATALOGUE["Porcelain"]["colour"]}
+    listing = next(o for o in call("library_objects")["objects"] if o["id"] == "chair")
+    kinds = {p["key"]: p["kind"] for p in listing["params"]}
+    assert kinds["mat_frame"] == "material" and kinds["mat_seat"] == "material"

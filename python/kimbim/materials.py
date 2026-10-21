@@ -61,6 +61,8 @@ CATALOGUE = {
     "Membrane": dict(colour="#3c3c3c", pen=12, pattern="Solid", priority=150, density=1100, conductivity=0.2, heat=1000, category="Membrane"),
     "Soil": dict(colour="#8a6a4a", pen=12, pattern="Diagonal", priority=50, density=1600, conductivity=1.5, heat=1200, category="Earth"),
     "Roof tiles": dict(colour="#a8553a", pen=15, pattern="Diagonal", priority=650, density=1900, conductivity=1.0, heat=800, category="Roofing"),
+    "Porcelain": dict(colour="#f6f6f3", shine=0.8, reflectance="PLASTIC", pen=12, pattern="Solid", priority=300, density=2400, conductivity=1.5, heat=1080, category="Ceramic"),
+    "Fabric": dict(colour="#7d8a99", shine=0.0, reflectance="MATT", pen=12, pattern="Empty", priority=100, density=300, conductivity=0.05, heat=1300, category="Textile"),
     "Paint - white": dict(colour="#fbfbf8", pen=12, pattern="Solid", priority=100, density=1200, conductivity=0.2, heat=1000, category="Finish"),
 }
 

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "LibraryPanel.h"
 
+#include <QComboBox>
+
 #include <QCoreApplication>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
@@ -47,6 +49,10 @@ enum { IdRole = Qt::UserRole + 1 };
     QT_TRANSLATE_NOOP("LibraryPanel", "Mounting height"), QT_TRANSLATE_NOOP("LibraryPanel", "Bowls"),
     QT_TRANSLATE_NOOP("LibraryPanel", "Burners"), QT_TRANSLATE_NOOP("LibraryPanel", "Crown diameter"),
     QT_TRANSLATE_NOOP("LibraryPanel", "Trunk diameter"),
+    // D97: the parts' building materials
+    QT_TRANSLATE_NOOP("LibraryPanel", "Material"), QT_TRANSLATE_NOOP("LibraryPanel", "Top material"),
+    QT_TRANSLATE_NOOP("LibraryPanel", "Legs material"), QT_TRANSLATE_NOOP("LibraryPanel", "Frame material"),
+    QT_TRANSLATE_NOOP("LibraryPanel", "Seat material"),
 };
 
 } // namespace
@@ -281,7 +287,17 @@ void LibraryPanel::showParams()
         const QString key = p.value("key").toString();
         const double value = m_params.value(key).toDouble(p.value("value").toDouble());
         QWidget* field = nullptr;
-        if (p.value("kind").toString() == QLatin1String("count")) {
+        if (p.value("kind").toString() == QLatin1String("material")) { // D97: a part's building material
+            auto* combo = new QComboBox(m_formHost);
+            for (const auto& c : p.value("choices").toArray())
+                combo->addItem(c.toString());
+            combo->setCurrentText(m_params.value(key).toString(p.value("value").toString()));
+            connect(combo, &QComboBox::currentTextChanged, this, [this, key](const QString& name) {
+                m_params.insert(key, name);
+                emit currentChanged();
+            });
+            field = combo;
+        } else if (p.value("kind").toString() == QLatin1String("count")) {
             auto* spin = new QSpinBox(m_formHost);
             spin->setRange(p.value("min").toInt(1), p.value("max").toInt(20));
             spin->setValue(int(std::lround(value)));

@@ -4,198 +4,223 @@
 <context>
     <name>LibraryPanel</name>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="30"/>
+        <location filename="../src/LibraryPanel.cpp" line="32"/>
         <source>Furniture</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="30"/>
+        <location filename="../src/LibraryPanel.cpp" line="32"/>
         <source>Sanitary</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="31"/>
+        <location filename="../src/LibraryPanel.cpp" line="33"/>
         <source>Kitchen</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="31"/>
+        <location filename="../src/LibraryPanel.cpp" line="33"/>
         <source>People, trees and cars</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="32"/>
+        <location filename="../src/LibraryPanel.cpp" line="34"/>
         <source>Office library</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="32"/>
+        <location filename="../src/LibraryPanel.cpp" line="34"/>
         <source>Table</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="33"/>
+        <location filename="../src/LibraryPanel.cpp" line="35"/>
         <source>Chair</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="33"/>
+        <location filename="../src/LibraryPanel.cpp" line="35"/>
         <source>Sofa</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="34"/>
+        <location filename="../src/LibraryPanel.cpp" line="36"/>
         <source>Single bed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="34"/>
+        <location filename="../src/LibraryPanel.cpp" line="36"/>
         <source>Double bed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="35"/>
+        <location filename="../src/LibraryPanel.cpp" line="37"/>
         <source>Wardrobe</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="35"/>
+        <location filename="../src/LibraryPanel.cpp" line="37"/>
         <source>Desk</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="36"/>
+        <location filename="../src/LibraryPanel.cpp" line="38"/>
         <source>Shelf</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="36"/>
+        <location filename="../src/LibraryPanel.cpp" line="38"/>
         <source>WC</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="37"/>
+        <location filename="../src/LibraryPanel.cpp" line="39"/>
         <source>Washbasin</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="37"/>
+        <location filename="../src/LibraryPanel.cpp" line="39"/>
         <source>Bathtub</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="38"/>
+        <location filename="../src/LibraryPanel.cpp" line="40"/>
         <source>Shower tray</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="38"/>
+        <location filename="../src/LibraryPanel.cpp" line="40"/>
         <source>Bidet</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="39"/>
+        <location filename="../src/LibraryPanel.cpp" line="41"/>
         <source>Base cabinets</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="39"/>
+        <location filename="../src/LibraryPanel.cpp" line="41"/>
         <source>Wall cabinets</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="40"/>
+        <location filename="../src/LibraryPanel.cpp" line="42"/>
         <source>Sink unit</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="40"/>
+        <location filename="../src/LibraryPanel.cpp" line="42"/>
         <source>Fridge</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="41"/>
+        <location filename="../src/LibraryPanel.cpp" line="43"/>
         <source>Cooktop and oven</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="41"/>
+        <location filename="../src/LibraryPanel.cpp" line="43"/>
         <source>Person</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="42"/>
+        <location filename="../src/LibraryPanel.cpp" line="44"/>
         <source>Tree</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="42"/>
+        <location filename="../src/LibraryPanel.cpp" line="44"/>
         <source>Car</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="43"/>
+        <location filename="../src/LibraryPanel.cpp" line="45"/>
         <source>Width</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="43"/>
+        <location filename="../src/LibraryPanel.cpp" line="45"/>
         <source>Depth</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="44"/>
+        <location filename="../src/LibraryPanel.cpp" line="46"/>
         <source>Height</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="44"/>
+        <location filename="../src/LibraryPanel.cpp" line="46"/>
         <source>Seat height</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="45"/>
+        <location filename="../src/LibraryPanel.cpp" line="47"/>
         <source>Seats</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="45"/>
+        <location filename="../src/LibraryPanel.cpp" line="47"/>
         <source>Doors</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="46"/>
+        <location filename="../src/LibraryPanel.cpp" line="48"/>
         <source>Shelves</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="46"/>
+        <location filename="../src/LibraryPanel.cpp" line="48"/>
         <source>Units</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="47"/>
+        <location filename="../src/LibraryPanel.cpp" line="49"/>
         <source>Mounting height</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="47"/>
+        <location filename="../src/LibraryPanel.cpp" line="49"/>
         <source>Bowls</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="48"/>
+        <location filename="../src/LibraryPanel.cpp" line="50"/>
         <source>Burners</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="48"/>
+        <location filename="../src/LibraryPanel.cpp" line="50"/>
         <source>Crown diameter</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="49"/>
+        <location filename="../src/LibraryPanel.cpp" line="51"/>
         <source>Trunk diameter</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/LibraryPanel.cpp" line="53"/>
+        <source>Material</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/LibraryPanel.cpp" line="53"/>
+        <source>Top material</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/LibraryPanel.cpp" line="54"/>
+        <source>Legs material</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/LibraryPanel.cpp" line="54"/>
+        <source>Frame material</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/LibraryPanel.cpp" line="55"/>
+        <source>Seat material</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -2250,37 +2275,37 @@ Enter runs, Shift+Enter adds a line, Up/Down recall earlier input</source>
 <context>
     <name>kimbim::LibraryPanel</name>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="105"/>
+        <location filename="../src/LibraryPanel.cpp" line="111"/>
         <source>Search objects</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="122"/>
+        <location filename="../src/LibraryPanel.cpp" line="128"/>
         <source>Place</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="124"/>
+        <location filename="../src/LibraryPanel.cpp" line="130"/>
         <source>Click in the view to place the object; Tab turns it 90 degrees, a typed number sets its angle</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="127"/>
+        <location filename="../src/LibraryPanel.cpp" line="133"/>
         <source>Office library...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="129"/>
+        <location filename="../src/LibraryPanel.cpp" line="135"/>
         <source>Choose the office library folder: Python objects (.py) and IFC type libraries (.ifc)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="130"/>
+        <location filename="../src/LibraryPanel.cpp" line="136"/>
         <source>Load IFC types...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="132"/>
+        <location filename="../src/LibraryPanel.cpp" line="138"/>
         <source>Add the types of an IFC file (e.g. IfcFurnitureType definitions) to the office library</source>
         <translation type="unfinished"></translation>
     </message>

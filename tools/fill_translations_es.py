@@ -1571,6 +1571,11 @@ ES = {
     "Texture": "Textura",
     "Picture": "Imagen",
     "Choose picture...": "Elegir imagen...",
+    "Material": "Material",
+    "Top material": "Material del tablero",
+    "Legs material": "Material de las patas",
+    "Frame material": "Material de la estructura",
+    "Seat material": "Material del asiento",
 }
 
 
