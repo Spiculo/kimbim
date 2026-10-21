@@ -3,6 +3,7 @@
 // window geometry, the questions on the way, answered by their default button or by --answer), and
 // logs the window's size and minimum at each step and whenever it changes. A window that asks for more
 // than the screen fails the test (the huge-window crash: a ~4 GB backing store).
+#include <QAction>
 #include <QAbstractButton>
 #include <QAbstractScrollArea>
 #include <QApplication>
@@ -232,6 +233,13 @@ int runRealOpen(const SelfTestOptions& options, const QString& path)
         {"largest_window", sizeText(largest)}, {"screen", sizeText(avail)},
         {"too_big_at", watch.firstTooBig()}, {"huge_widgets", QJsonArray::fromStringList(watch.culprits())},
         {"asked", QJsonArray::fromStringList(answerer.asked())}};
+    QJsonArray triggered;
+    for (const QString& name : options.trigger)
+        if (auto* action = window.findChild<QAction*>(name)) {
+            action->trigger();
+            triggered.append(name);
+        }
+    result.insert(QStringLiteral("triggered"), triggered);
     if (!options.screenshot.isEmpty()) {
         window.viewport()->fitAll();
         settle(500);

@@ -232,6 +232,28 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // D96: Archicad's 3D styles: white model and sun shadows, kept in saved views.
+    void whiteModelAndShadows()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        auto* white = w.findChild<QAction*>(QStringLiteral("actionWhiteModel"));
+        auto* shadows = w.findChild<QAction*>(QStringLiteral("actionShadows"));
+        QVERIFY(white && shadows);
+        white->setChecked(true);
+        shadows->setChecked(true);
+        QVERIFY(w.viewport()->whiteModel());
+        QVERIFY(w.viewport()->shadows());
+        auto* lines = w.findChild<QAction*>(QStringLiteral("actionLinesOnly"));
+        lines->setChecked(true); // lines only wins over the white model
+        QVERIFY(w.viewport()->linesOnly() && w.viewport()->whiteModel());
+        lines->setChecked(false);
+        white->setChecked(false);
+        shadows->setChecked(false);
+        QVERIFY(!w.viewport()->whiteModel() && !w.viewport()->shadows());
+        QVERIFY(w.close());
+    }
+
     // D98: Fillet/Chamfer on a slab's corners from the window.
     void filletSlabCorners()
     {

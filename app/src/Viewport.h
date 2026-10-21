@@ -107,6 +107,10 @@ public:
     // Lines only (hidden-line drawing, Slice 4b): every batch, including later ones.
     void setLinesOnly(bool on);
     bool linesOnly() const { return m_scene->linesOnly; }
+    void setWhiteModel(bool on); // D96: Archicad's white model 3D style
+    bool whiteModel() const { return m_scene->whiteModel; }
+    void setShadows(bool on) { m_scene->setShadows(on); } // D96: sun shadows
+    bool shadows() const { return m_scene->shadows(); }
     double planElevation() const { return m_planElevation; }
     // Screen point -> point on the horizontal plane z (metres). False without a window or when the
     // view ray is parallel to the plane.
@@ -404,6 +408,7 @@ private:
     Handle(V3d_View) m_view;
     bool m_planView = false;
     bool applyLayerState(const Handle(ElementBatch)& batch) const; // true if any element changed
+    void applyDisplayMode(); // D96: every batch in the scene's display mode
     void applyColors(const Handle(ElementBatch)& batch) const;
     bool applyGraphics(const Handle(ElementBatch)& batch) const; // true if any element changed
     bool m_selectThrough = false;

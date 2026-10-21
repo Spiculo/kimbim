@@ -67,6 +67,10 @@ int main(int argc, char* argv[])
     parser.addOption(underlayOption);
     QCommandLineOption linesOnly(QStringLiteral("lines-only"), QStringLiteral("Self-test: lines-only display."));
     parser.addOption(linesOnly);
+    QCommandLineOption triggerOption(QStringLiteral("trigger"),
+        QStringLiteral("Self-test (--real-open): trigger these actions (object names, comma separated) before the screenshot."),
+        QStringLiteral("actions"));
+    parser.addOption(triggerOption);
     QCommandLineOption perspective(QStringLiteral("perspective"), QStringLiteral("Self-test: perspective camera (D76)."));
     parser.addOption(perspective);
     QCommandLineOption presetView(QStringLiteral("view"),
@@ -172,6 +176,7 @@ int main(int argc, char* argv[])
         options.planView = parser.isSet(planView);
         options.underlay = parser.value(underlayOption);
         options.linesOnly = parser.isSet(linesOnly);
+        options.trigger = parser.value(triggerOption).split(QLatin1Char(','), Qt::SkipEmptyParts);
         options.perspective = parser.isSet(perspective);
         options.view = parser.value(presetView);
         options.cubeClick = parser.isSet(cubeClick);

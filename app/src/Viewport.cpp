@@ -319,7 +319,7 @@ std::optional<Viewport::IdImage> Viewport::renderIds(int w, int h)
     options.Height = h;
     options.BufferType = Graphic3d_BT_RGB;
     const bool ok = m_view->ToPixMap(*out.image, options);
-    const int mode = m_scene->linesOnly ? ElementBatch::LinesOnly : ElementBatch::Shaded;
+    const int mode = m_scene->displayMode();
     for (const auto& b : m_scene->batches)
         m_context->SetDisplayMode(b, mode, false);
     m_view->SetBackgroundColor(background);
@@ -2115,7 +2115,7 @@ void Viewport::addBatch(const Handle(ElementBatch)& batch)
     batch->setIdBase(m_scene->nextIdBase);
     m_scene->idBases.push_back(m_scene->nextIdBase);
     m_scene->nextIdBase += batch->elementCount();
-    const int mode = m_scene->linesOnly ? ElementBatch::LinesOnly : ElementBatch::Shaded;
+    const int mode = m_scene->displayMode();
     batch->SetDisplayMode(mode); // the object's own mode, so later redisplays keep it
     m_context->Display(batch, mode, 0, false);
     m_scene->elementsChanged(); // every view with a plan cut rebuilds its poché, and repaints
@@ -2124,9 +2124,22 @@ void Viewport::addBatch(const Handle(ElementBatch)& batch)
 void Viewport::setLinesOnly(bool on)
 {
     m_scene->linesOnly = on;
-    const int mode = on ? ElementBatch::LinesOnly : ElementBatch::Shaded;
-    for (const auto& b : m_scene->batches)
+    applyDisplayMode();
+}
+
+void Viewport::setWhiteModel(bool on)
+{
+    m_scene->whiteModel = on;
+    applyDisplayMode();
+}
+
+void Viewport::applyDisplayMode()
+{
+    const int mode = m_scene->displayMode();
+    for (const auto& b : m_scene->batches) {
+        b->SetDisplayMode(mode);
         m_context->SetDisplayMode(b, mode, false);
+    }
     m_scene->changed();
 }
 

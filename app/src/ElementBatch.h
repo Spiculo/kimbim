@@ -60,7 +60,7 @@ class ElementBatch : public AIS_InteractiveObject {
 public:
     // Display modes: shaded faces with border lines; element ids as flat colours (visibility
     // queries, never shown); lines only (hidden-line: faces in the background colour, black lines).
-    enum Mode { Shaded = 0, Ids = 1, LinesOnly = 2 };
+    enum Mode { Shaded = 0, Ids = 1, LinesOnly = 2, White = 3 }; // White: D96, Archicad's white model
 
     explicit ElementBatch(MeshChunk chunk);
 
@@ -170,7 +170,7 @@ public:
     // Flat-shaded triangles of one element (used for highlights).
     Handle(Graphic3d_ArrayOfTriangles) elementTriangles(int i) const;
 
-    bool AcceptDisplayMode(const int mode) const override { return mode >= Shaded && mode <= LinesOnly; }
+    bool AcceptDisplayMode(const int mode) const override { return mode >= Shaded && mode <= White; }
     void Compute(const Handle(PrsMgr_PresentationManager)& pm, const Handle(Prs3d_Presentation)& prs,
         const int mode) override;
     void ComputeSelection(const Handle(SelectMgr_Selection)& selection, const int mode) override;

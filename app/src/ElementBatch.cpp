@@ -691,7 +691,8 @@ void ElementBatch::addTriangles(const Handle(Prs3d_Presentation)& prs, int mode)
         for (uint32_t t = m_chunk.toff[size_t(i)]; t < m_chunk.toff[size_t(i) + 1]; ++t) {
             const std::pair<double, int> key = mode == Shaded
                 ? std::pair<double, int>(triangleTransparency(i, t), triangleTexture(i, t))
-                : std::pair<double, int>(0.0, -1);
+                : mode == White ? std::pair<double, int>(triangleTransparency(i, t), -1) // glass stays glass
+                                : std::pair<double, int>(0.0, -1);
             auto it = std::find(keys.begin(), keys.end(), key);
             if (it == keys.end()) {
                 keys.push_back(key);
@@ -711,8 +712,10 @@ void ElementBatch::addTriangles(const Handle(Prs3d_Presentation)& prs, int mode)
             addTexturedGroup(prs, alpha, textureIndex, tris);
             continue;
         }
-        const std::optional<double> only = mode == Shaded ? std::optional<double>(alpha) : std::nullopt;
-        const bool colours = mode == Shaded || mode == Ids;
+        const bool lit = mode == Shaded || mode == White;
+        const std::optional<double> only = lit ? std::optional<double>(alpha) : std::nullopt;
+        const bool colours = lit || mode == Ids;
+        static const Quantity_Color white(0.94, 0.94, 0.93, Quantity_TOC_RGB);
         Handle(Graphic3d_ArrayOfTriangles) arr = new Graphic3d_ArrayOfTriangles(
             tris * 3, 0, Graphic3d_ArrayFlags_VertexNormal | (colours ? Graphic3d_ArrayFlags_VertexColor : 0));
         for (int i = 0; i < elementCount(); ++i) {
@@ -724,16 +727,18 @@ void ElementBatch::addTriangles(const Handle(Prs3d_Presentation)& prs, int mode)
                 const Quantity_Color id(rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0, Quantity_TOC_RGB);
                 addElement(*arr, i, true, &id);
             } else {
-                addElement(*arr, i, colours, nullptr, only, mode == Shaded);
+                addElement(*arr, i, colours, mode == White ? &white : nullptr, only, mode == Shaded);
             }
         }
         Handle(Graphic3d_Group) group = prs->NewGroup();
         Handle(Graphic3d_AspectFillArea3d) aspect = new Graphic3d_AspectFillArea3d(*myDrawer->ShadingAspect()->Aspect());
-        if (mode == Shaded) {
+        if (lit) {
             // A colour-driven ("aspect") material, so per-vertex palette colours are used. The AIS
             // default (brass) is a physical material that ignores vertex colours.
             Graphic3d_MaterialAspect material(Graphic3d_NameOfMaterial_Plastified);
             material.SetSpecularColor(Quantity_Color(0.08, 0.08, 0.08, Quantity_TOC_RGB));
+            if (mode == White) // D96: a study model is bright, the light only modelling its shape
+                material.SetEmissiveColor(Quantity_Color(0.30, 0.30, 0.30, Quantity_TOC_RGB));
             if (alpha > 0.0) {
                 material.SetTransparency(float(alpha));
                 aspect->SetAlphaMode(Graphic3d_AlphaMode_Blend);
@@ -831,6 +836,10 @@ void ElementBatch::Compute(const Handle(PrsMgr_PresentationManager)&, const Hand
     switch (mode) {
     case Shaded:
         addTriangles(prs, Shaded);
+        addLines(prs, Quantity_Color(0.22, 0.22, 0.24, Quantity_TOC_RGB));
+        break;
+    case White: // D96: every surface white, the contours kept
+        addTriangles(prs, White);
         addLines(prs, Quantity_Color(0.22, 0.22, 0.24, Quantity_TOC_RGB));
         break;
     case LinesOnly:

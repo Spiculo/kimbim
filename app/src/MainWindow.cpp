@@ -552,6 +552,17 @@ void MainWindow::buildMenus()
     linesOnly->setCheckable(true);
     linesOnly->setToolTip(tr("Show the model as a line drawing (hidden lines removed), e.g. for plans"));
     connect(linesOnly, &QAction::toggled, m_viewport, &Viewport::setLinesOnly);
+    // D96: Archicad's 3D styles: a white model (surfaces white, contours and glass kept) and sun shadows.
+    QAction* white = view->addAction(tr("&White model"));
+    white->setObjectName(QStringLiteral("actionWhiteModel"));
+    white->setCheckable(true);
+    white->setToolTip(tr("Show every surface white, as a study model (the contours and glass stay)"));
+    connect(white, &QAction::toggled, m_viewport, &Viewport::setWhiteModel);
+    QAction* shadows = view->addAction(tr("Sun s&hadows"));
+    shadows->setObjectName(QStringLiteral("actionShadows"));
+    shadows->setCheckable(true);
+    shadows->setToolTip(tr("The sun casts shadows in the 3D views"));
+    connect(shadows, &QAction::toggled, m_viewport, &Viewport::setShadows);
     QAction* trueWeights = view->addAction(tr("&True line weights"));
     trueWeights->setObjectName(QStringLiteral("actionTrueLineWeights"));
     trueWeights->setCheckable(true);
@@ -5803,7 +5814,8 @@ bool MainWindow::saveView(const QString& name)
         {"level", m_levels->activeStorey()}, {"plan", m_viewport->isPlanView()},
         {"cut", m_planCut->isChecked() ? QJsonValue(m_cutHeight->value()) : QJsonValue()},
         {"planes", planes},
-        {"linesOnly", m_viewport->linesOnly()}, {"purpose", m_viewport->graphics().purpose()}};
+        {"linesOnly", m_viewport->linesOnly()}, {"whiteModel", m_viewport->whiteModel()},
+        {"shadows", m_viewport->shadows()}, {"purpose", m_viewport->graphics().purpose()}};
     const QJsonObject r = bridge("save_view", {name, QString::fromUtf8(QJsonDocument(data).toJson(QJsonDocument::Compact))});
     if (!r.value("ok").toBool()) {
         m_status->showMessage(tr("Could not save the view: %1").arg(r.value("error").toString()));
@@ -5834,6 +5846,10 @@ bool MainWindow::applyView(const QString& name)
             m_levels->setActive(data.value("level").toString());
         if (data.contains("linesOnly"))
             findChild<QAction*>(QStringLiteral("actionLinesOnly"))->setChecked(data.value("linesOnly").toBool());
+        if (data.contains("whiteModel"))
+            findChild<QAction*>(QStringLiteral("actionWhiteModel"))->setChecked(data.value("whiteModel").toBool());
+        if (data.contains("shadows"))
+            findChild<QAction*>(QStringLiteral("actionShadows"))->setChecked(data.value("shadows").toBool());
         if (data.value("cut").isDouble()) {
             m_cutHeight->setValue(data.value("cut").toDouble());
             m_planCut->setChecked(true);
