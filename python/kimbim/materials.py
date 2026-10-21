@@ -696,9 +696,10 @@ def _default_texture(f, style, name: str):
 
     painter, size = DEFAULT_TEXTURES[name]
     data = underlays.png_bytes(128, 64, painter(128, 64))
-    tmp = pathlib.Path(tempfile.mkdtemp()) / f"{name}.png"
-    tmp.write_bytes(data)
-    _write_texture(f, style, {"texture_path": str(tmp), "texture_size": list(size)})
+    with tempfile.TemporaryDirectory() as folder:  # copied into the store, then gone
+        tmp = pathlib.Path(folder) / f"{name}.png"
+        tmp.write_bytes(data)
+        _write_texture(f, style, {"texture_path": str(tmp), "texture_size": list(size)})
 
 
 def _apply_spec(f, material, name: str, spec: dict):
