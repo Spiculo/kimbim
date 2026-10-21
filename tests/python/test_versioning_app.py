@@ -149,3 +149,22 @@ def test_versions_open_as_valid_ifc(tmp_path):
     ifcopenshell.validate.validate(b._model, log, express_rules=True)
     assert log.statements == []
     assert call("version_changes")["modified"] == 0 and call("version_changes")["added"] == 0
+
+
+def test_switching_options_keeps_the_project_settings(tmp_path):
+    """Reopening the working copy (a switch) keeps the option's settings, not the defaults (D96 found it)."""
+    import json as _json
+
+    from kimbim import app_bridge as b
+    from kimbim import settings as S
+
+    call = lambda fn, *a: _json.loads(getattr(b, fn)(*a))  # noqa: E731
+    assert call("new_project", "x")["ok"]
+    assert call("set_project_settings", _json.dumps({"wall_reference_line": "Core centre"}))["ok"]
+    assert call("save_as_folder", str(tmp_path / "p"), "Initial")["ok"]
+    assert call("create_option", "B")["ok"]
+    r = call("switch_option", "main")
+    assert r["ok"], r
+    assert call("open_model", r["path"])["ok"]  # what the app's loader does
+    assert S.current()["wall_reference_line"] == "Core centre"
+    assert call("project_state")["unversioned"] is False

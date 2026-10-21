@@ -73,7 +73,7 @@ private slots:
         w.wallTool()->finish();
         w.setTool(kimbim::MainWindow::Tool::None);
         QVERIFY(w.viewport()->elementCount() >= 1);
-        QVERIFY(w.addVerticalCut({-1, 0}, {6, 0}, {0, 1}, 0)); // cuts the wall lengthwise
+        QVERIFY(w.addVerticalCut({-1, 0.05}, {6, 0.05}, {0, 1}, 0)); // cuts the wall lengthwise (inside it whatever its reference line)
         QVERIFY(w.viewport()->sectionElementCount() >= 1);
         // The plan cut adds its own section, clipped against the vertical cut.
         w.findChild<QAction*>(QStringLiteral("actionPlanCut"))->setChecked(true);

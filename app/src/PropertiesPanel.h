@@ -33,6 +33,7 @@ public:
     QTreeWidgetItem* itemFor(const QString& pset, const QString& prop) const;
     QTreeWidgetItem* nameItem() const { return m_name; }
     QComboBox* statusCombo() const { return m_status; } // D74: none when nothing selected has a status
+    QComboBox* materialCombo() const { return m_material; } // D96: none when the selection takes no material
     QString variesText() const { return tr("(varies)"); }
     QString fromTypeText() const { return tr("Inherited from the element's type"); }
     // The context-menu actions for an item (parented to `parent`, or to the panel).
@@ -43,6 +44,7 @@ signals:
     void propertyRemoved(const QString& pset, const QString& prop);
     void nameEdited(const QString& name);
     void statusEdited(const QString& status); // D74: "existing", "demolish" or "new"
+    void materialEdited(const QString& kind, const QString& name); // D96: "material" or "composite"
     void addPropertyRequested(const QString& pset); // empty pset: add a new property set
     void addPropertySetRequested();
     void typeEditRequested(const QString& pset, const QString& prop);   // change the value on the type (D50)
@@ -55,6 +57,7 @@ private:
     QTreeWidget* m_tree;
     QTreeWidgetItem* m_name = nullptr;
     QComboBox* m_status = nullptr;
+    QComboBox* m_material = nullptr;
     bool m_building = false;
 };
 

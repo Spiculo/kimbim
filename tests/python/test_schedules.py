@@ -44,7 +44,7 @@ def table(sid, merge=False):
 
 def test_builtin_schemes(house):
     ids = [s["id"] for s in call("schedule_schemes")["schemes"]]
-    assert ids == ["doors", "windows", "walls", "slabs", "columns", "beams", "rooms"]
+    assert ids == ["doors", "windows", "walls", "slabs", "columns", "beams", "materials", "rooms"]
 
 
 def test_wall_face_lengths(house):

@@ -93,6 +93,8 @@ QString SchedulesDialog::translatedSchemeName(const QString& english)
         {QStringLiteral("Walls"), tr("Walls")}, {QStringLiteral("Slabs"), tr("Slabs")},
         {QStringLiteral("Columns"), tr("Columns")}, {QStringLiteral("Beams"), tr("Beams")},
         {QStringLiteral("Rooms"), tr("Rooms")},
+        {QStringLiteral("Building materials"), tr("Building materials")}, // D96: the material take-off
+        {QStringLiteral("Building material"), tr("Building material")},
     };
     return names.value(english, english);
 }

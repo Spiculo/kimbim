@@ -37,7 +37,8 @@ CIRCLE_POINTS = 16  # ellipses and arcs in plan symbols and prism outlines
 # ---------------------------------------------------------------- definitions
 
 class Param:
-    """A parameter: `kind` is "length" (metres) or "count" (a whole number)."""
+    """A parameter: `kind` is "length" (metres), "count" (a whole number) or "material" (D97: a building
+    material's name, for one part of the object)."""
 
     def __init__(self, key, label, default, kind="length", lo=None, hi=None):
         self.key, self.label, self.default, self.kind = key, label, default, kind
@@ -45,6 +46,8 @@ class Param:
         self.hi = hi if hi is not None else (50.0 if kind == "length" else 20)
 
     def clean(self, value):
+        if self.kind == "material":
+            return str(value).strip() or str(self.default)
         v = float(value)
         if self.kind == "count":
             v = int(round(v))
@@ -53,8 +56,20 @@ class Param:
         return min(max(v, self.lo), self.hi)
 
     def listing(self) -> dict:
-        return {"key": self.key, "label": self.label, "value": self.default, "kind": self.kind,
-                "min": self.lo, "max": self.hi}
+        out = {"key": self.key, "label": self.label, "value": self.default, "kind": self.kind,
+               "min": self.lo, "max": self.hi}
+        if self.kind == "material":
+            out["choices"] = _material_choices(self.default)
+        return out
+
+
+def _material_choices(default: str) -> list:
+    """The model's building materials (the catalogue without a model), the default first if missing."""
+    from . import app_bridge as B
+    from . import materials
+
+    names = [m.Name for m in B._model.by_type("IfcMaterial") if m.Name] if B._model is not None else list(materials.CATALOGUE)
+    return names if default in names else [default, *names]
 
 
 class Shape:
@@ -62,30 +77,37 @@ class Shape:
 
     def __init__(self):
         self.solids, self.curves = [], []
+        # D97: each solid's part (its material is the object's "<part> material" parameter); a build
+        # function sets `part` before the solids of that part ("body" otherwise)
+        self.part, self.parts = "body", []
+
+    def _add(self, solid):
+        self.solids.append(solid)
+        self.parts.append(self.part)
 
     # 3D
     def box(self, x, y, z, dx, dy, dz):
         if dx > 1e-6 and dy > 1e-6 and dz > 1e-6:
-            self.solids.append(("box", x, y, z, dx, dy, dz))
+            self._add(("box", x, y, z, dx, dy, dz))
 
     def prism(self, points, z, dz):
         """A polygon (x, y) extruded up from z."""
         if dz > 1e-6 and len(points) >= 3:
-            self.solids.append(("prism", [tuple(p) for p in points], z, dz))
+            self._add(("prism", [tuple(p) for p in points], z, dz))
 
     def cylinder(self, cx, cy, z, r, dz):
         if r > 1e-6 and dz > 1e-6:
-            self.solids.append(("cylinder", cx, cy, z, r, dz))
+            self._add(("cylinder", cx, cy, z, r, dz))
 
     def side_prism(self, points, x, dx):
         """A polygon in the (y, z) plane extruded along x from x."""
         if dx > 1e-6 and len(points) >= 3:
-            self.solids.append(("side", [tuple(p) for p in points], x, dx))
+            self._add(("side", [tuple(p) for p in points], x, dx))
 
     def side_cylinder(self, cy, cz, x, r, dx):
         """A cylinder along x (wheels)."""
         if r > 1e-6 and dx > 1e-6:
-            self.solids.append(("side_cylinder", cy, cz, x, r, dx))
+            self._add(("side_cylinder", cy, cz, x, r, dx))
 
     # plan symbol
     def line(self, *points, closed=False):
@@ -131,10 +153,25 @@ class Obj:
     type or None, element type text or None). `origin` (D92): where the object's insertion point sits
     in its own coordinates (metres, from its left front corner, the library's default)."""
 
-    def __init__(self, key, name, category, ifc, params, build, library="bundled", origin=None):
+    def __init__(self, key, name, category, ifc, params, build, library="bundled", origin=None, materials=None):
         self.key, self.name, self.category, self.ifc = key, name, category, ifc
-        self.params, self.build, self.library = params, build, library
+        self.params, self.build, self.library = list(params), build, library
         self.origin = tuple(float(v) for v in (origin or (0.0, 0.0)))
+        # D97 (Archicad's object surfaces/materials): {part: (label, default building material)}
+        if materials is None and category in DEFAULT_MATERIALS:
+            materials = {"body": ("Material", DEFAULT_MATERIALS[category])}
+        self.materials = dict(materials or {})
+        for part, (label, default) in self.materials.items():
+            self.params.append(Param(f"mat_{part}", label, default, "material"))
+
+    def material_of(self, values: dict, part: str) -> str | None:
+        """The building material of one part: its parameter, else the object's main one, else None."""
+        if f"mat_{part}" in values:
+            return values[f"mat_{part}"]
+        if "mat_body" in values:
+            return values["mat_body"]
+        first = next(iter(self.materials), None)
+        return values.get(f"mat_{first}") if first else None
 
     def param(self, key_or_label: str):
         k = (key_or_label or "").strip().lower()
@@ -164,7 +201,7 @@ class Obj:
     def type_name(self, values) -> str:
         mm = lambda v: str(int(round(v * 1000)))  # noqa: E731
         name = f"{self.name} {'x'.join(mm(values[k]) for k in ('width', 'depth', 'height') if k in values)}"
-        extra = [f"{p.label} {values[p.key] if p.kind == 'count' else mm(values[p.key])}"
+        extra = [f"{p.label} {values[p.key] if p.kind in ('count', 'material') else mm(values[p.key])}"
                  for p in self.params if p.key not in ("width", "depth", "height") and values[p.key] != p.clean(p.default)]
         return name + (f" ({', '.join(extra)})" if extra else "")
 
@@ -175,12 +212,17 @@ class Obj:
 OBJECTS: dict = {}
 
 
-def define(key, name, category, ifc, params, build, library="bundled", origin=None):
+DEFAULT_MATERIALS = {"furniture": "Timber - finish", "sanitary": "Porcelain", "kitchen": "Timber - finish"}
+
+
+def define(key, name, category, ifc, params, build, library="bundled", origin=None, materials=None):
     """Add an object to the library (the office library's Python files call this too). `origin` (D92)
-    is where its insertion point sits, in object metres from the left front corner (the default)."""
+    is where its insertion point sits, in object metres from the left front corner (the default).
+    `materials` (D97): {part: (label, default building material)} for the parts the build function
+    names (Shape.part); furniture, sanitary and kitchen objects get one "Material" by default."""
     if isinstance(ifc, (tuple, list)):
         ifc = {"IFC4": tuple(ifc)}
-    OBJECTS[key] = Obj(key, name, category, dict(ifc), list(params), build, library, origin)
+    OBJECTS[key] = Obj(key, name, category, dict(ifc), list(params), build, library, origin, materials)
     return OBJECTS[key]
 
 
@@ -234,14 +276,18 @@ def _legs(s, w, d, h, leg, inset=0.03):
 
 def _table(s, p):
     w, d, h, top = p["width"], p["depth"], p["height"], 0.04
+    s.part = "legs"
     _legs(s, w, d, h - top, 0.06)
+    s.part = "top"
     s.box(0, 0, h - top, w, d, top)
     s.rect(0, 0, w, d)
 
 
 def _chair(s, p):
     w, d, h, seat = p["width"], p["depth"], p["height"], p["seat"]
+    s.part = "frame"
     _legs(s, w, d, seat - 0.04, 0.04, 0.0)
+    s.part = "seat"
     s.box(0, 0, seat - 0.04, w, d, 0.04)
     s.box(0, d - 0.04, seat, w, 0.04, max(h - seat, 0.01))
     s.rect(0, 0, w, d)
@@ -300,9 +346,11 @@ def _wardrobe(s, p):
 
 def _desk(s, p):
     w, d, h, top, side = p["width"], p["depth"], p["height"], 0.03, 0.025
+    s.part = "frame"
     s.box(0, 0.05, 0, side, d - 0.05, h - top)
     s.box(w - side, 0.05, 0, side, d - 0.05, h - top)
     s.box(side, d - 0.03, 0.3, w - 2 * side, 0.02, h - top - 0.3)
+    s.part = "top"
     s.box(0, 0, h - top, w, d, top)
     s.rect(0, 0, w, d)
 
@@ -319,16 +367,20 @@ def _shelf(s, p):
     s.line((0, 0), (w, d))
 
 
-define("table", "Table", "furniture", FURNITURE("TABLE"), [W(1.6), D(0.9), H(0.75)], _table)
+define("table", "Table", "furniture", FURNITURE("TABLE"), [W(1.6), D(0.9), H(0.75)], _table,
+       materials={"top": ("Top material", "Timber - finish"), "legs": ("Legs material", "Steel")})
 define("chair", "Chair", "furniture", FURNITURE("CHAIR"),
-       [W(0.45), D(0.5), H(0.85), Param("seat", "Seat height", 0.45)], _chair)
+       [W(0.45), D(0.5), H(0.85), Param("seat", "Seat height", 0.45)], _chair,
+       materials={"frame": ("Frame material", "Steel"), "seat": ("Seat material", "Timber - finish")})
 define("sofa", "Sofa", "furniture", FURNITURE("SOFA"),
-       [W(2.0), D(0.9), H(0.8), Param("seats", "Seats", 3, "count", 1, 6)], _sofa)
+       [W(2.0), D(0.9), H(0.8), Param("seats", "Seats", 3, "count", 1, 6)], _sofa,
+       materials={"body": ("Material", "Fabric")})
 define("bed_single", "Single bed", "furniture", FURNITURE("BED"), [W(0.9), D(2.0), H(0.5)], _bed(1))
 define("bed_double", "Double bed", "furniture", FURNITURE("BED"), [W(1.6), D(2.0), H(0.5)], _bed(2))
 define("wardrobe", "Wardrobe", "furniture", FURNITURE("USERDEFINED", "WARDROBE"),
        [W(1.2), D(0.6), H(2.2), Param("doors", "Doors", 2, "count", 1, 8)], _wardrobe)
-define("desk", "Desk", "furniture", FURNITURE("DESK"), [W(1.4), D(0.7), H(0.75)], _desk)
+define("desk", "Desk", "furniture", FURNITURE("DESK"), [W(1.4), D(0.7), H(0.75)], _desk,
+       materials={"top": ("Top material", "Timber - finish"), "frame": ("Frame material", "Timber - finish")})
 define("shelf", "Shelf", "furniture", FURNITURE("SHELF"),
        [W(0.9), D(0.35), H(2.0), Param("shelves", "Shelves", 5, "count", 2, 12)], _shelf)
 
@@ -735,12 +787,33 @@ def _representations(obj: Obj, values: dict):
     shape = obj.shape(values)
     writer = _Writer(f, ifcopenshell.util.unit.calculate_unit_scale(f))
     body_context, plan_context = _contexts()
-    body = f.createIfcShapeRepresentation(body_context, "Body", "SweptSolid", [writer.solid(s) for s in shape.solids])
+    items = [writer.solid(s) for s in shape.solids]
+    body = f.createIfcShapeRepresentation(body_context, "Body", "SweptSolid", items)
+    _style_parts(f, obj, values, items, shape.parts)
     plan = None
     if shape.curves:
         curve_set = f.createIfcGeometricCurveSet([writer.curve(c) for c in shape.curves])
         plan = f.createIfcShapeRepresentation(plan_context, "Annotation", "Annotation2D", [curve_set])
     return body, plan
+
+
+def _style_parts(f, obj: Obj, values: dict, items, parts):
+    """D97: every solid shows its part's building material (its surface as the item's style), so the 3D
+    view and other IFC viewers colour the parts."""
+    import ifcopenshell.api.style
+
+    from . import materials
+
+    styles = {}
+    for item, part in zip(items, parts):
+        name = obj.material_of(values, part)
+        if not name:
+            continue
+        if name not in styles:
+            m = materials.ensure(name, f)
+            styles[name] = materials.surface_of(m)
+        if styles[name] is not None:
+            ifcopenshell.api.style.assign_item_style(f, item=item, style=styles[name])
 
 
 def _params_of_type(t) -> tuple[str, dict] | None:
@@ -871,9 +944,10 @@ def _scale() -> float:
     return ifcopenshell.util.unit.calculate_unit_scale(B._model)
 
 
-def place_object(storey_guid: str, key: str, params_json: str, x, y, angle=0.0) -> str:
+def place_object(storey_guid: str, key: str, params_json: str, x, y, angle=0.0, gravity="") -> str:
     """Place a library object on a level: its origin (left front corner) at (x, y) metres, turned
-    `angle` radians. The type with these parameters is reused, or made. One undo step."""
+    `angle` radians. The type with these parameters is reused, or made. One undo step. `gravity`
+    (D97, Archicad's Gravity): "1" puts it on the top of the slab under (x, y), if any."""
     import ifcopenshell.api.geometry
     import ifcopenshell.api.root
     import ifcopenshell.api.spatial
@@ -898,6 +972,12 @@ def place_object(storey_guid: str, key: str, params_json: str, x, y, angle=0.0) 
     except (TypeError, ValueError) as ex:
         return A._fail(str(ex))
     values = obj.values(given) if isinstance(obj, Obj) else {}
+    z = A._elevation(storey)
+    if str(gravity) in ("1", "true", "True"):
+        from . import symbols
+
+        top = symbols._slab_top(storey, (x, y))
+        z = top if top is not None else z
     made = {}
 
     def action():
@@ -907,7 +987,7 @@ def place_object(storey_guid: str, key: str, params_json: str, x, y, angle=0.0) 
                                                       name=obj.name if isinstance(obj, Obj) else (t.Name or ""))
         ifcopenshell.api.type.assign_type(f, related_objects=[element], relating_type=t)
         c, s = math.cos(angle), math.sin(angle)
-        matrix = np.array([[c, -s, 0, x], [s, c, 0, y], [0, 0, 1, A._elevation(storey)], [0, 0, 0, 1]], dtype=float)
+        matrix = np.array([[c, -s, 0, x], [s, c, 0, y], [0, 0, 1, z], [0, 0, 0, 1]], dtype=float)
         ifcopenshell.api.geometry.edit_object_placement(f, product=element, matrix=matrix, is_si=True)
         ifcopenshell.api.spatial.assign_container(f, products=[element], relating_structure=storey)
         layers.assign_active(element)
@@ -1055,12 +1135,19 @@ def set_object_parameter(guids_json: str, name: str, value, scope: str = "") -> 
         p = obj.param(name)
         if p is None:
             continue
-        try:
-            v = float(str(value).strip().replace(",", "."))
-        except ValueError:
-            return A._fail(f"not a number: {value}")
-        if p.kind == "length" and v <= 0:
-            return A._fail(f"{p.label} must be more than 0")
+        if p.kind == "material":  # D97: a building material for one part
+            from . import materials
+
+            v = str(value).strip()
+            if not v or (materials._material_by_name(B._model, v) is None and v not in materials.CATALOGUE):
+                return A._fail(f"unknown building material {value}")
+        else:
+            try:
+                v = float(str(value).strip().replace(",", "."))
+            except ValueError:
+                return A._fail(f"not a number: {value}")
+            if p.kind == "length" and v <= 0:
+                return A._fail(f"{p.label} must be more than 0")
         new_values = dict(values)
         new_values[p.key] = p.clean(v)
         groups.setdefault(t.id(), (t, obj, new_values, []))[3].append(e)

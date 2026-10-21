@@ -114,12 +114,18 @@ void DrawingView::paintEvent(QPaintEvent*)
     p.fillRect(paper, Qt::white);
     p.setRenderHint(QPainter::Antialiasing);
     m_renderer->render(&p, paper);
-    if (m_dragging && m_panFrom) { // where the dragged drawing goes
-        const QRectF r = m_dragging->rect;
-        const QPointF delta = (*m_panFrom - m_dragStart) / m_scale;
+    if (m_dragging && m_panFrom) { // where the dragged drawing goes, or its new size
+        const QRectF r = m_resizing ? resizedRect(*m_panFrom) : m_dragging->rect;
+        const QPointF delta = m_resizing ? QPointF() : (*m_panFrom - m_dragStart) / m_scale;
         p.setPen(QPen(QColor(0x1a, 0x4d, 0xc0), 1.5, Qt::DashLine));
         p.drawRect(QRectF(m_offset + (r.topLeft() + delta) * m_scale, r.size() * m_scale));
     }
+    // D98: a picture's resize handle at its bottom-right corner
+    p.setPen(QPen(QColor(0x1a, 0x4d, 0xc0), 1.0));
+    p.setBrush(Qt::white);
+    for (const Placed& pl : std::as_const(m_placed))
+        if (pl.kind == QLatin1String("image"))
+            p.drawRect(QRectF(m_offset + pl.rect.bottomRight() * m_scale - QPointF(4, 4), QSizeF(8, 8)));
 }
 
 void DrawingView::wheelEvent(QWheelEvent* event)
@@ -138,9 +144,19 @@ void DrawingView::mousePressEvent(QMouseEvent* event)
 {
     if (event->button() == Qt::LeftButton) {
         const QPointF mm = toPaper(event->position());
+        for (int i = int(m_placed.size()) - 1; i >= 0; --i) { // D98: a picture's corner resizes it
+            const QPointF corner = m_offset + m_placed[i].rect.bottomRight() * m_scale;
+            if (m_placed[i].kind == QLatin1String("image") && QLineF(corner, event->position()).length() <= 8) {
+                m_dragging = m_placed[i];
+                m_resizing = true;
+                m_dragStart = event->position();
+                return;
+            }
+        }
         for (int i = int(m_placed.size()) - 1; i >= 0; --i)
             if (m_placed[i].rect.contains(mm)) { // drag a placed drawing (sheet mode)
                 m_dragging = m_placed[i];
+                m_resizing = false;
                 m_dragStart = event->position();
                 return;
             }
@@ -185,6 +201,19 @@ void DrawingView::mouseMoveEvent(QMouseEvent* event)
 
 void DrawingView::mouseReleaseEvent(QMouseEvent* event)
 {
+    if (m_dragging && m_resizing) {
+        const QRectF r = resizedRect(event->position());
+        const Placed p = *m_dragging;
+        m_dragging.reset();
+        m_resizing = false;
+        m_panFrom.reset();
+        if (std::abs(r.width() - p.rect.width()) > 0.5) {
+            m_placed.clear(); // stale until the sheet comes back
+            emit placedResized(p.guid, r.width());
+        }
+        update();
+        return;
+    }
     if (m_dragging) {
         const QPointF delta = (event->position() - m_dragStart) / m_scale;
         const Placed p = *m_dragging;
@@ -198,6 +227,16 @@ void DrawingView::mouseReleaseEvent(QMouseEvent* event)
         return;
     }
     m_panFrom.reset();
+}
+
+QRectF DrawingView::resizedRect(QPointF widget) const
+{
+    // The width follows the corner; the height keeps the picture's proportions.
+    const QRectF r = m_dragging ? m_dragging->rect : QRectF();
+    if (r.width() <= 0)
+        return r;
+    const double w = std::max(5.0, toPaper(widget).x() - r.left());
+    return QRectF(r.topLeft(), QSizeF(w, w * r.height() / r.width()));
 }
 
 void DrawingView::resizeEvent(QResizeEvent*)

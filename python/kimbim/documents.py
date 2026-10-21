@@ -123,7 +123,7 @@ def on_model_opened(path: str) -> None:
             B._saved_id = -1
         return
     if _doc["work"] and _same(path, pathlib.Path(_doc["work"]) / ".kimbim" / "working.ifc"):
-        return  # the document's own working copy reopened (an option switch, discard, combine)
+        return "working copy"  # the document's own working copy reopened (an option switch, discard, combine)
     _close()
     _doc = _plain(path)
     S.kept = False

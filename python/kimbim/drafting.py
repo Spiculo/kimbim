@@ -21,7 +21,8 @@ from __future__ import annotations
 import json
 import math
 
-KINDS = ("line", "polyline", "arc", "circle", "fill")
+KINDS = ("line", "polyline", "arc", "circle", "fill", "spline")  # spline: D98
+SPLINE_STEPS = 12  # points per span of a spline's drawn curve
 EXTRA = ("Closed", "LineType", "Pattern", "BackgroundPen", "ShowArea", "OutlinePen", "PatternScale",
          "Rect")  # pset keys beside Kind/Points/...
 CIRCLE_SEGMENTS = 72  # tessellation of a full circle on screen and in drawings
@@ -125,6 +126,40 @@ def is_simple(polygon) -> bool:
     return True
 
 
+def spline_points(points, closed=False, steps: int = SPLINE_STEPS):
+    """A smooth curve through the points (D98, Archicad's Spline): centripetal Catmull-Rom (no loops or
+    overshoot at sharp turns), `steps` points per span; closed: back to the first point."""
+    pts = [tuple(map(float, p)) for p in points]
+    n = len(pts)
+    if n < 3:
+        return [list(p) for p in pts]
+    ext = ([pts[-1]] + pts + pts[:2]) if closed else ([pts[0]] + pts + [pts[-1]])
+    spans = n if closed else n - 1
+    out = [list(pts[0])]
+    for i in range(spans):
+        p0, p1, p2, p3 = ext[i], ext[i + 1], ext[i + 2], ext[i + 3]
+
+        def knot(t, a, b):
+            return t + max(math.dist(a, b), 1e-9) ** 0.5
+
+        t0 = 0.0
+        t1 = knot(t0, p0, p1)
+        t2 = knot(t1, p1, p2)
+        t3 = knot(t2, p2, p3)
+        for k in range(1, steps + 1):
+            t = t1 + (t2 - t1) * k / steps
+
+            def lerp(a, b, ta, tb):
+                if tb - ta < 1e-12:
+                    return a
+                return tuple(((tb - t) * a[j] + (t - ta) * b[j]) / (tb - ta) for j in range(2))
+
+            a1, a2, a3 = lerp(p0, p1, t0, t1), lerp(p1, p2, t1, t2), lerp(p2, p3, t2, t3)
+            b1, b2 = lerp(a1, a2, t0, t2), lerp(a2, a3, t1, t3)
+            out.append(list(lerp(b1, b2, t1, t2)))
+    return out
+
+
 def outline(kind: str, points, closed=False):
     """The shape's drawn polylines (metres): a list of point lists."""
     pts = [list(p) for p in points]
@@ -138,6 +173,8 @@ def outline(kind: str, points, closed=False):
         return [circle_points(*pts)]
     if kind == "fill" and len(pts) >= 3:
         return [pts + [pts[0]]]
+    if kind == "spline" and len(pts) >= 2:
+        return [spline_points(pts, closed)]
     return []
 
 
@@ -147,6 +184,8 @@ def closed_polygon(kind: str, points, closed=False):
         return circle_points(*points)[:-1]
     if (kind == "polyline" and closed and len(points) >= 3) or (kind == "fill" and len(points) >= 3):
         return [list(p) for p in points]
+    if kind == "spline" and closed and len(points) >= 3:
+        return spline_points(points, True)[:-1]
     return None
 
 
@@ -380,6 +419,8 @@ def ifc_items(f, kind: str, local, data: dict, pt, scale: float, metres_per_mm: 
             items.append(f.createIfcTrimmedCurve(circle, [pt(local[0])], [pt(local[2])], sweep > 0, "CARTESIAN"))
     elif kind == "circle":
         items.append(f.createIfcCircle(f.createIfcAxis2Placement2D(pt(local[0]), None), math.dist(local[0], local[1]) / scale))
+    elif kind == "spline":  # D98: drawn as its curve, so every IFC viewer shows the same line
+        items.append(f.createIfcPolyline([pt(p) for p in spline_points(local, closed)]))
     elif kind == "fill":
         boundary = f.createIfcPolyline([pt(p) for p in local] + [pt(local[0])])
         fill_area = f.createIfcAnnotationFillArea(boundary, None)
@@ -429,7 +470,7 @@ def _extra(kind: str, o: dict) -> dict:
     extra = {}
     if "line_type" in o:
         extra["LineType"] = o["line_type"]
-    if kind == "polyline" and "closed" in o:
+    if kind in ("polyline", "spline") and "closed" in o:
         extra["Closed"] = bool(o["closed"])
     if kind == "fill":
         if "pattern" in o:
@@ -466,6 +507,13 @@ def _shape(kind: str, points, o: dict):
             cleaned.pop()
         if o.get("closed") and len(cleaned) < 3:
             return "a closed polyline needs at least three points"
+        points = cleaned
+    elif kind == "spline":  # D98: through its points (two give a straight line)
+        cleaned = [p for i, p in enumerate(points) if i == 0 or math.dist(p, points[i - 1]) > 1e-6]
+        if o.get("closed") and len(cleaned) > 2 and math.dist(cleaned[0], cleaned[-1]) < 1e-6:
+            cleaned.pop()
+        if len(cleaned) < 2 or (o.get("closed") and len(cleaned) < 3):
+            return "a spline needs at least two points (three when closed)"
         points = cleaned
     elif kind == "arc":
         if len(points) != 3 or circumcircle(*points) is None:
@@ -650,6 +698,9 @@ def snap_points(storey) -> list:
                 add(p, "endpoint", guid)
             for p, q in zip(pts, pts[1:] + (pts[:1] if closed else [])):
                 add(((p[0] + q[0]) / 2, (p[1] + q[1]) / 2), "midpoint", guid)
+        elif kind == "spline":  # D98: the points it passes through
+            for p in world:
+                add(p, "endpoint", guid)
         elif kind == "arc" and len(world) == 3:
             add(world[0], "endpoint", guid)
             add(world[2], "endpoint", guid)
@@ -743,6 +794,15 @@ def add_to_drawing(svg: str, drawing, settings: dict | None = None) -> str:
     if storey is None or to_paper is None:
         return svg
     parts = drawing_parts(storey, to_paper, settings)
+    from . import underlays
+    from .worksheets import is_worksheet
+
+    if is_worksheet(storey):  # D98: pictures on a worksheet are figures: they print, under the drafting
+        figures = underlays.figures_svg(storey.GlobalId, to_paper)
+        if figures:
+            parts = figures + parts
+            if "xmlns:xlink" not in svg[:500]:
+                svg = svg.replace("<svg ", '<svg xmlns:xlink="http://www.w3.org/1999/xlink" ', 1)
     if not parts:
         return svg
     group = ('<g class="kimbim-drafting" fill="none" stroke="#000000" stroke-width="0.18" font-family="sans-serif">\n'

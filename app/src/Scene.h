@@ -2,6 +2,7 @@
 #pragma once
 
 #include <AIS_InteractiveContext.hxx>
+#include <V3d_DirectionalLight.hxx>
 #include <V3d_View.hxx>
 #include <V3d_Viewer.hxx>
 
@@ -43,6 +44,14 @@ public:
     QHash<QString, QColor> colors;
     QSet<QString> layerHidden, layerLocked;
     bool linesOnly = false;
+    bool whiteModel = false; // D96: Archicad's white model 3D style (surfaces white, glass kept)
+    // D96: the display mode the 3D style gives every batch (lines only > white model > shaded).
+    int displayMode() const
+    {
+        return linesOnly ? ElementBatch::LinesOnly : whiteModel ? ElementBatch::White : ElementBatch::Shaded;
+    }
+    void setShadows(bool on); // D96: the sun casts shadows (shadow map) in shaded and white views
+    bool shadows() const { return m_shadows; }
     Graphics graphics;        // D73: the current purpose, resolved
     bool trueWeights = false; // D73: View > True line weights
     bool quietSelection = false;
@@ -57,6 +66,8 @@ signals:
 private:
     Handle(V3d_Viewer) m_viewer;
     Handle(AIS_InteractiveContext) m_context;
+    Handle(V3d_DirectionalLight) m_sun;
+    bool m_shadows = false;
 };
 
 } // namespace kimbim

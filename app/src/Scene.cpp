@@ -53,6 +53,7 @@ Scene::Scene(QObject* parent)
     Handle(V3d_AmbientLight) ambient = new V3d_AmbientLight(Quantity_Color(0.42, 0.42, 0.42, Quantity_TOC_RGB));
     Handle(V3d_DirectionalLight) sun = new V3d_DirectionalLight(gp_Dir(-0.3, 0.5, -0.8), Quantity_NOC_WHITE);
     sun->SetIntensity(0.75f);
+    m_sun = sun;
     Handle(V3d_DirectionalLight) fill = new V3d_DirectionalLight(gp_Dir(0.6, -0.25, -0.35), Quantity_NOC_WHITE);
     fill->SetIntensity(0.25f);
     for (const Handle(V3d_Light)& light : {Handle(V3d_Light)(ambient), Handle(V3d_Light)(sun), Handle(V3d_Light)(fill)})
@@ -78,6 +79,20 @@ void Scene::removeView(const Handle(V3d_View)& view)
     if (!view.IsNull() && !view->Window().IsNull())
         view->Remove();
     emit viewsChanged();
+}
+
+void Scene::setShadows(bool on)
+{
+    // D96: Archicad's sun shadows: OCCT's shadow map from the fixed sun, fitted to the shown model.
+    m_shadows = on;
+    m_sun->SetCastShadows(on);
+    for (const Handle(V3d_View)& view : m_viewer->DefinedViews()) {
+        Graphic3d_RenderingParams& params = view->ChangeRenderingParams();
+        params.ShadowMapResolution = 2048;
+        params.ShadowMapBias = 0.004f;
+    }
+    m_viewer->UpdateLights();
+    emit redrawRequested();
 }
 
 void Scene::changed()

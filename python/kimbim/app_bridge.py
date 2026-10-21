@@ -114,32 +114,62 @@ def start_meshing(threads: int = 0) -> str:
     return _dump({"ok": True, "total": len(_model.by_type("IfcProduct"))})
 
 
-def next_mesh_chunk(max_elements: int = 1000):
-    """Next batch of element meshes as (meta_json, verts f32 LE, tris u32 LE, chunk-local), or None when done."""
-    global _iterator_done
+def _collect_meshes(it, max_elements=None):
+    """Element meshes from a geometry iterator as (meta_json, verts f32 LE, tris u32 LE, face colours
+    u16 LE), chunk-local, or None without any. Stops after `max_elements` (returns done=True at the end).
+    D96: each triangle has a palette index (`meta.palette`: [r, g, b, transparency] rows); 0xFFFF is
+    no surface (the app's class colour)."""
     import numpy as np
 
-    if _iterator is None or _iterator_done:
-        return None
-    guids, types, verts, tris, voff, toff = [], [], [], [], [0], [0]
-    while len(guids) < int(max_elements):
-        shape = _iterator.get()
+    from . import materials
+
+    from . import settings
+
+    palette = materials.Palette()
+    slice_layers = bool(settings.current().get("layers_in_3d", True))
+    guids, types, verts, tris, colours, voff, toff = [], [], [], [], [], [0], [0]
+    done = False
+    while max_elements is None or len(guids) < int(max_elements):
+        shape = it.get()
         t = np.asarray(shape.geometry.faces, dtype=np.uint32)
         if len(t):
             v = np.asarray(shape.geometry.verts, dtype=np.float32)
+            try:
+                element = _model.by_id(shape.id)
+                sliced = materials.layered_mesh(element, v, t, palette) if slice_layers else None  # D96
+                if sliced is not None:
+                    v, t, c = sliced
+                else:
+                    c = materials.face_colours(element, shape.geometry, v, t, palette)
+            except Exception:  # a colour problem must never stop the model from showing
+                c = np.full(len(t) // 3, materials.NO_COLOUR, dtype=np.uint32)
             verts.append(v)
             tris.append(t + voff[-1])
+            colours.append(c)
             voff.append(voff[-1] + len(v) // 3)
             toff.append(toff[-1] + len(t) // 3)
             guids.append(shape.guid)
             types.append(shape.type)
-        if not _iterator.next():
-            _iterator_done = True
+        if not it.next():
+            done = True
             break
     if not guids:
+        return None, done
+    meta = _dump({"guids": guids, "types": types, "voff": voff, "toff": toff, "palette": palette.rows})
+    return (meta, np.concatenate(verts).astype("<f4").tobytes(), np.concatenate(tris).astype("<u4").tobytes(),
+            np.concatenate(colours).astype("<u2").tobytes()), done
+
+
+def next_mesh_chunk(max_elements: int = 1000):
+    """Next batch of element meshes (see _collect_meshes), or None when done."""
+    global _iterator_done
+
+    if _iterator is None or _iterator_done:
         return None
-    meta = _dump({"guids": guids, "types": types, "voff": voff, "toff": toff})
-    return meta, np.concatenate(verts).astype("<f4").tobytes(), np.concatenate(tris).astype("<u4").tobytes()
+    parts, done = _collect_meshes(_iterator, max_elements)
+    if done:
+        _iterator_done = True
+    return parts
 
 
 def _mesh_settings():
@@ -153,7 +183,6 @@ def _mesh_settings():
 def mesh_elements(guids_json: str):
     """Meshes of specific elements (after an edit), in the next_mesh_chunk format, or None."""
     import ifcopenshell.geom
-    import numpy as np
 
     if _model is None:
         return None
@@ -164,24 +193,7 @@ def mesh_elements(guids_json: str):
                                     geometry_library="hybrid-cgal-simple-opencascade")
     if not it.initialize():
         return None
-    guids, types, verts, tris, voff, toff = [], [], [], [], [0], [0]
-    while True:
-        shape = it.get()
-        t = np.asarray(shape.geometry.faces, dtype=np.uint32)
-        if len(t):
-            v = np.asarray(shape.geometry.verts, dtype=np.float32)
-            verts.append(v)
-            tris.append(t + voff[-1])
-            voff.append(voff[-1] + len(v) // 3)
-            toff.append(toff[-1] + len(t) // 3)
-            guids.append(shape.guid)
-            types.append(shape.type)
-        if not it.next():
-            break
-    if not guids:
-        return None
-    meta = _dump({"guids": guids, "types": types, "voff": voff, "toff": toff})
-    return meta, np.concatenate(verts).astype("<f4").tobytes(), np.concatenate(tris).astype("<u4").tobytes()
+    return _collect_meshes(it)[0]
 
 
 # ---------------------------------------------------------------- editing (M2, D49)
@@ -234,8 +246,12 @@ def _reset_history(path: str):
     layers.forget()
     from . import documents, settings
 
+    kept = settings.current()
     settings.load(None)
-    documents.on_model_opened(path)
+    if documents.on_model_opened(path) == "working copy":
+        # the document's own working copy reopened (an option switch, discard, combine): its settings
+        # are the ones the switch put in place, not the defaults
+        settings.load(kept)
     from . import drawings  # the cached drawing snapshots belong to the old model
 
     drawings.forget_snapshots()
@@ -848,8 +864,10 @@ def properties_multi(guids_json: str) -> str:
             present = [next((v for n, v, _ in params if n == label), _MISSING) for params in per_params]
             varies = any(v is _MISSING or v != present[0] for v in present)
             group[label] = {"value": None if varies else present[0], "varies": varies,
-                            "ifc_type": "IfcLengthMeasure" if kind == "length" else "IfcInteger",
+                            "ifc_type": {"length": "IfcLengthMeasure", "material": "IfcLabel"}.get(kind, "IfcInteger"),
                             "editable": True, "source": "dimension", "type_value": None}
+            if kind == "material":  # D97: a part's building material, picked from a list
+                group[label]["choices"] = library._material_choices(present[0] if isinstance(present[0], str) else "")
         if group:
             psets = {**{k: v for k, v in psets.items() if k == authoring.DIMENSIONS}, library.PARAMETERS: group,
                      **{k: v for k, v in psets.items() if k != authoring.DIMENSIONS}}
@@ -865,8 +883,17 @@ def properties_multi(guids_json: str) -> str:
         "types": sorted({e.is_a() for e in elements}),
         "name": {"value": names[0] if same_name else None, "varies": not same_name},
         "status": status,
-        "psets": psets,
+        "material": _materials.merged(elements),  # D96: the Material row (None: not shown)
+        "psets": _with_settings(psets, elements),
     })
+
+
+def _with_settings(psets: dict, elements) -> dict:
+    """D97: the Geometry and Surfaces groups go after Dimensions (and an object's Parameters)."""
+    from . import authoring, library
+
+    first = {k: v for k, v in psets.items() if k in (authoring.DIMENSIONS, library.PARAMETERS)}
+    return {**first, **_configure.groups(elements), **{k: v for k, v in psets.items() if k not in first}}
 
 
 def _write_occlusion_model(path: str) -> str:
@@ -952,10 +979,15 @@ from . import symbols as _symbols  # noqa: E402
 from . import tags as _tags  # noqa: E402
 from . import stairs as _stairs  # noqa: E402
 from . import showon as _showon  # noqa: E402
+from . import materials as _materials  # noqa: E402
+from . import configure as _configure  # noqa: E402
+from . import curved_walls as _curved_walls  # noqa: E402
+from . import worksheets as _worksheets  # noqa: E402
 
 _EXPORTS = {
     "authoring": (
         "add_grid_axis",
+        "add_grid_system",
         "add_slab_opening",
         "add_storey",
         "beam_types",
@@ -1066,6 +1098,7 @@ _EXPORTS = {
         "remove_legend",
         "move_title_block",
         "set_title_block",
+        "place_sheet_image",
         "place_sheet_symbol",
         "move_sheet_symbol",
         "set_sheet_symbol",
@@ -1075,6 +1108,7 @@ _EXPORTS = {
         "array_elements",
         "copy_elements",
         "duplicate_elements",
+        "fillet_corners",
         "mirror_elements",
         "offset_elements",
         "slab_outline",
@@ -1219,12 +1253,38 @@ _EXPORTS = {
     ),
     "underlays": (
         "add_underlay",
+        "place_figure",
         "remove_underlay",
         "set_underlay",
+        "trace_lines",
         "underlay_lines",
         "underlay_probe",
         "underlay_raster",
         "underlays",
+    ),
+    "worksheets": (
+        "create_worksheet",
+        "delete_worksheet",
+        "rename_worksheet",
+        "worksheets",
+    ),
+    "curved_walls": ("create_curved_wall",),
+    "configure": (
+        "flip_walls",
+        "inject",
+        "pick_up",
+        "save_wall_profile",
+        "set_junctions",
+        "set_element_setting",
+        "wall_options",
+    ),
+    "materials": (
+        "add_standard_materials",
+        "apply_materials",
+        "assign_material",
+        "element_material",
+        "materials_state",
+        "purge_materials",
     ),
     "library": (
         "library_objects",

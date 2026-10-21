@@ -2,6 +2,7 @@
 // D86: the object library in the main window (doc 14 §8): the Library panel and the Object tool.
 // The objects, their types and plan symbols are python/kimbim/library.py's; one undo step each.
 #include <QAction>
+#include <QCheckBox>
 #include <QFileDialog>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -17,6 +18,7 @@
 #include "StatusStrip.h"
 #include "TwoPointTool.h"
 #include "Viewport.h"
+#include "WallTool.h"
 
 namespace kimbim {
 
@@ -136,6 +138,42 @@ void MainWindow::setObjectAngle(double degrees)
     }
 }
 
+std::optional<MainWindow::ObjectFit> MainWindow::fitObjectToWall(QPointF p, double width, double depth) const
+{
+    // D97: the nearest wall face the cursor is in front of (within reach), the object's back against it,
+    // its middle where the cursor is along the wall (front at y = 0, origin the left front corner).
+    if (!m_objectFit || !m_objectFit->isChecked() || !m_wallTool)
+        return std::nullopt;
+    const double reach = std::max(0.6, depth);
+    std::optional<ObjectFit> best;
+    double bestDistance = reach;
+    for (const SnapWall& w : m_wallTool->snapper().walls()) {
+        const QPointF d = w.b - w.a;
+        const double len = std::hypot(d.x(), d.y());
+        if (len < 1e-9)
+            continue;
+        const QPointF along = d / len, left(-along.y(), along.x());
+        for (const double side : {1.0, -1.0}) { // the face on the axis' left, then on its right
+            const QPointF out = left * side; // away from the wall body
+            const QPointF face = w.a + left * (w.centre + side * w.thickness / 2);
+            const QPointF v = p - face;
+            const double t = v.x() * along.x() + v.y() * along.y();
+            const double dist = v.x() * out.x() + v.y() * out.y();
+            if (t < 0 || t > len || dist < -0.02 || dist > bestDistance)
+                continue;
+            bestDistance = dist;
+            const QPointF uy = -out; // the back faces the wall
+            const QPointF ux(uy.y(), -uy.x());
+            const QPointF onFace = face + along * t;
+            ObjectFit fit;
+            fit.origin = onFace - ux * (width / 2) - uy * depth;
+            fit.angle = std::atan2(ux.y(), ux.x()) * 180.0 / M_PI;
+            best = fit;
+        }
+    }
+    return best;
+}
+
 bool MainWindow::placeObjectAt(QPointF p, bool turned)
 {
     LibraryPanel* panel = libraryPanel();
@@ -144,9 +182,16 @@ bool MainWindow::placeObjectAt(QPointF p, bool turned)
         m_dock->raisePanel(QStringLiteral("library"));
         return false;
     }
-    const double angle = (m_objectAngle + (turned ? 90.0 : 0.0)) * M_PI / 180.0;
+    double angle = (m_objectAngle + (turned ? 90.0 : 0.0)) * M_PI / 180.0;
+    const QJsonObject info = panel->currentInfo();
+    const double width = info.value("width").toDouble(1.0);
+    if (const auto fit = fitObjectToWall(p, width, info.value("depth").toDouble(width))) {
+        p = fit->origin;
+        angle = fit->angle * M_PI / 180.0;
+    }
     const QJsonObject r = bridge("place_object", {m_levels->activeStorey(), panel->currentObject(),
-        compactJson(panel->currentParams()), num(p.x()), num(p.y()), num(angle)});
+        compactJson(panel->currentParams()), num(p.x()), num(p.y()), num(angle),
+        m_objectGravity && m_objectGravity->isChecked() ? QStringLiteral("1") : QString()});
     if (!r.value("ok").toBool()) {
         m_status->showMessage(tr("Could not place it: %1").arg(r.value("error").toString()));
         return false;
@@ -163,9 +208,14 @@ void MainWindow::updateObjectPreview()
         const QJsonObject info = m_library->currentInfo();
         const double w = info.value("width").toDouble(1.0), d = info.value("depth").toDouble(w);
         const double h = info.value("height").toDouble(1.0), z = m_levels->activeElevation();
-        const double a = m_objectAngle * M_PI / 180.0;
+        double a = m_objectAngle * M_PI / 180.0;
+        QPointF origin = *m_objectHover;
+        if (const auto fit = fitObjectToWall(origin, w, d)) { // D97: against the wall
+            origin = fit->origin;
+            a = fit->angle * M_PI / 180.0;
+        }
         const QPointF ux(std::cos(a), std::sin(a)), uy(-std::sin(a), std::cos(a));
-        const QPointF mid = *m_objectHover + uy * (d / 2); // the plan box: along x through its middle
+        const QPointF mid = origin + uy * (d / 2); // the plan box: along x through its middle
         boxes.push_back({mid, mid + ux * w, d, z, z + h});
     }
     m_viewport->setPreviewBoxes(boxes);

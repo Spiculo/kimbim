@@ -46,7 +46,8 @@ QVector<SnapWall> Snapper::parse(const QJsonObject& snapData)
     for (const auto& v : snapData.value("walls").toArray()) {
         const QJsonObject w = v.toObject();
         out.push_back({w.value("guid").toString(), QPointF(w.value("x1").toDouble(), w.value("y1").toDouble()),
-            QPointF(w.value("x2").toDouble(), w.value("y2").toDouble()), w.value("thickness").toDouble()});
+            QPointF(w.value("x2").toDouble(), w.value("y2").toDouble()), w.value("thickness").toDouble(),
+            w.value("centre").toDouble()});
     }
     return out;
 }
@@ -77,6 +78,13 @@ QVector<SnapPoint> Snapper::parsePoints(const QJsonObject& snapData)
 
 QPointF Snapper::onGrid(QPointF p) const
 {
+    if (m_snapStep > 0) { // D98: the snap grid's nodes, in its own frame
+        const double c = std::cos(m_gridAngle), s = std::sin(m_gridAngle);
+        const QPointF d = p - m_gridOrigin;
+        const double u = std::round((d.x() * c + d.y() * s) / m_snapStep) * m_snapStep;
+        const double v = std::round((-d.x() * s + d.y() * c) / m_snapStep) * m_snapStep;
+        return m_gridOrigin + QPointF(u * c - v * s, u * s + v * c);
+    }
     if (m_grid <= 0)
         return p;
     return QPointF(std::round(p.x() / m_grid) * m_grid, std::round(p.y() / m_grid) * m_grid);
@@ -139,6 +147,7 @@ Snap Snapper::snap(QPointF p, double tolerance, const QPointF* from, bool ortho)
             case Snap::UnderlayEnd:
             case Snap::UnderlayMid:
             case Snap::UnderlayCross:
+            case Snap::Division:
                 m_aids->hover(InputAids::Guide{s.point, wallDirection(s.wallGuid)});
                 break;
             default:
@@ -333,8 +342,10 @@ Snap Snapper::compute(QPointF p, double tolerance, const QPointF* from, bool ort
     auto faces = [](const SnapWall& w) {
         const QPointF d = w.b - w.a;
         const double len = std::hypot(d.x(), d.y());
-        const QPointF n = len > 1e-12 ? QPointF(-d.y() / len, d.x() / len) * (w.thickness / 2) : QPointF();
-        return std::array<std::pair<QPointF, QPointF>, 2>{std::pair{w.a + n, w.b + n}, std::pair{w.a - n, w.b - n}};
+        const QPointF u = len > 1e-12 ? QPointF(-d.y() / len, d.x() / len) : QPointF();
+        const QPointF n = u * (w.thickness / 2), c = u * w.centre;
+        return std::array<std::pair<QPointF, QPointF>, 2>{
+            std::pair{w.a + c + n, w.b + c + n}, std::pair{w.a + c - n, w.b + c - n}};
     };
     if (s.kind == Snap::None && m_faces)
         s = best(Snap::FaceEnd, [&](const SnapWall& w, QPointF* q) {
@@ -354,6 +365,30 @@ Snap Snapper::compute(QPointF p, double tolerance, const QPointF* from, bool ort
         });
     if (s.kind == Snap::None || s.kind == Snap::Midpoint)
         s = points(Snap::Midpoint, s);
+    if (s.kind == Snap::None && (m_divisions > 2 || m_distance > 0)) // D98: special snap points
+        s = best(Snap::Division, [&](const SnapWall& w, QPointF* q) {
+            const QPointF d = w.b - w.a;
+            const double len = std::hypot(d.x(), d.y());
+            if (len < 1e-9)
+                return false;
+            double bestD = std::numeric_limits<double>::max();
+            auto consider = [&](double t) {
+                if (t <= 0 || t >= 1)
+                    return;
+                const QPointF c = w.a + d * t;
+                if (dist(p, c) < bestD) {
+                    bestD = dist(p, c);
+                    *q = c;
+                }
+            };
+            for (int k = 1; m_divisions > 2 && k < m_divisions; ++k)
+                consider(double(k) / m_divisions);
+            if (m_distance > 0) {
+                consider(m_distance / len);
+                consider(1.0 - m_distance / len);
+            }
+            return bestD < std::numeric_limits<double>::max();
+        });
     if (s.kind == Snap::None)
         s = points(Snap::Centre, s);
     if (s.kind == Snap::None && m_underlays) { // D85: tracing a survey
@@ -417,7 +452,7 @@ Snap Snapper::compute(QPointF p, double tolerance, const QPointF* from, bool ort
     if (exact)
         return Snap{p, Snap::Typed, {}};
 
-    if (from) {
+    if (from && (m_snapStep <= 0 || ortho)) { // grid snap replaces the 15 degree steps (ortho stays)
         const QPointF v = p - *from;
         const double length = std::hypot(v.x(), v.y());
         if (length > 0) {

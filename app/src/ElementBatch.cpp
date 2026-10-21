@@ -8,6 +8,12 @@
 #include <Graphic3d_ArrayOfSegments.hxx>
 
 #include <Graphic3d_AspectFillArea3d.hxx>
+#include <Graphic3d_Texture2D.hxx>
+#include <Graphic3d_TextureParams.hxx>
+#include <Graphic3d_TextureSet.hxx>
+#include <Image_PixMap.hxx>
+#include <QHash>
+#include <QImage>
 #include <Graphic3d_Group.hxx>
 #include <Prs3d_Drawer.hxx>
 #include <Prs3d_ShadingAspect.hxx>
@@ -174,6 +180,76 @@ Quantity_Color ElementBatch::surfaceColor(int i) const
     return m_override[size_t(i)].value_or(m_surface[size_t(i)].value_or(colorFor(m_chunk.types.at(i))));
 }
 
+Quantity_Color ElementBatch::triangleColor(int i, uint32_t t) const
+{
+    if (m_override[size_t(i)])
+        return *m_override[size_t(i)];
+    if (m_surface[size_t(i)])
+        return *m_surface[size_t(i)];
+    // Taken as given, like the class palette: the shaded view's lighting darkens colours, so a surface
+    // then looks close to its swatch.
+    if (const MeshChunk::Surface* s = m_chunk.surfaceOf(t))
+        return Quantity_Color(s->r, s->g, s->b, Quantity_TOC_RGB);
+    return colorFor(m_chunk.types.at(i));
+}
+
+double ElementBatch::triangleTransparency(int i, uint32_t t) const
+{
+    if (m_override[size_t(i)] || m_surface[size_t(i)] || m_alpha[size_t(i)] > 0.0)
+        return m_alpha[size_t(i)]; // an override's transparency (0 when it sets none)
+    const MeshChunk::Surface* s = m_chunk.surfaceOf(t);
+    // Rounded so near-equal values share one draw group.
+    return s ? std::round(double(s->transparency) * 100.0) / 100.0 : 0.0;
+}
+
+int ElementBatch::triangleTexture(int i, uint32_t t) const
+{
+    if (m_override[size_t(i)] || m_surface[size_t(i)] || t >= m_chunk.faceColors.size())
+        return -1;
+    const uint16_t k = m_chunk.faceColors[t];
+    return k < m_chunk.palette.size() && !m_chunk.palette[k].texture.isEmpty() ? int(k) : -1;
+}
+
+std::pair<double, double> ElementBatch::boxTexel(const gp_Pnt& p, const gp_Dir& n, double w, double h)
+{
+    const double ax = std::abs(n.X()), ay = std::abs(n.Y()), az = std::abs(n.Z());
+    if (az >= ax && az >= ay)
+        return {p.X() / w, p.Y() / h}; // floors and roofs: plan x, y
+    if (ax >= ay)
+        return {p.Y() / w, p.Z() / h}; // faces looking along x
+    return {p.X() / w, p.Z() / h};     // faces looking along y
+}
+
+namespace {
+
+// One OCCT texture per picture file, loaded once (Qt reads PNG and JPEG).
+Handle(Graphic3d_Texture2D) textureFor(const QString& path)
+{
+    static QHash<QString, Handle(Graphic3d_Texture2D)> cache;
+    const auto it = cache.constFind(path);
+    if (it != cache.constEnd())
+        return *it;
+    Handle(Graphic3d_Texture2D) tex;
+    QImage img(path);
+    if (!img.isNull()) {
+        img = img.convertToFormat(QImage::Format_RGBA8888);
+        Handle(Image_PixMap) pm = new Image_PixMap();
+        if (pm->InitTrash(Image_Format_RGBA, size_t(img.width()), size_t(img.height()))) {
+            pm->SetTopDown(true);
+            for (int y = 0; y < img.height(); ++y)
+                std::memcpy(pm->ChangeRow(size_t(y)), img.constScanLine(y), size_t(img.width()) * 4);
+            tex = new Graphic3d_Texture2D(pm);
+            tex->EnableRepeat();
+            tex->EnableModulate();
+            tex->GetParams()->SetFilter(Graphic3d_TOTF_TRILINEAR);
+        }
+    }
+    cache.insert(path, tex);
+    return tex;
+}
+
+} // namespace
+
 std::vector<ElementBatch::LineBucket> ElementBatch::lineBuckets(const Quantity_Color& fallback) const
 {
     std::vector<LineBucket> out;
@@ -225,10 +301,15 @@ Handle(ElementOwner) ElementBatch::owner(int i)
     return o;
 }
 
-void ElementBatch::addElement(Graphic3d_ArrayOfTriangles& out, int i, bool withColors, const Quantity_Color* fixed) const
+void ElementBatch::addElement(Graphic3d_ArrayOfTriangles& out, int i, bool withColors, const Quantity_Color* fixed,
+    std::optional<double> onlyAlpha, bool skipTextured) const
 {
-    const Quantity_Color color = fixed ? *fixed : surfaceColor(i);
     for (uint32_t t = m_chunk.toff[size_t(i)]; t < m_chunk.toff[size_t(i) + 1]; ++t) {
+        if (onlyAlpha && triangleTransparency(i, t) != *onlyAlpha)
+            continue;
+        if (skipTextured && triangleTexture(i, t) >= 0)
+            continue; // drawn by addTexturedGroup
+        const Quantity_Color color = fixed ? *fixed : withColors ? triangleColor(i, t) : Quantity_Color();
         const gp_Pnt a = vertex(m_chunk, m_chunk.tris[3 * t]);
         const gp_Pnt b = vertex(m_chunk, m_chunk.tris[3 * t + 1]);
         const gp_Pnt c = vertex(m_chunk, m_chunk.tris[3 * t + 2]);
@@ -599,27 +680,46 @@ void ElementBatch::computeEdges()
 
 void ElementBatch::addTriangles(const Handle(Prs3d_Presentation)& prs, int mode)
 {
-    // D73: in shaded mode, elements an override makes transparent go in their own blended group per
-    // transparency (few: overrides set one or two).
-    std::vector<double> alphas{0.0};
-    if (mode == Shaded)
-        for (int i = 0; i < elementCount(); ++i)
-            if (!isHidden(i) && m_alpha[size_t(i)] > 0.0
-                && std::find(alphas.begin(), alphas.end(), m_alpha[size_t(i)]) == alphas.end())
-                alphas.push_back(m_alpha[size_t(i)]);
-    for (double alpha : alphas) {
-        auto inGroup = [&](int i) { return !isHidden(i) && (mode != Shaded || m_alpha[size_t(i)] == alpha); };
-        int tris = 0;
-        for (int i = 0; i < elementCount(); ++i)
-            if (inGroup(i))
-                tris += int(m_chunk.toff[size_t(i) + 1] - m_chunk.toff[size_t(i)]);
+    // D73, D96: in shaded mode, transparent triangles (an override's transparency, or a surface's such
+    // as glass) go in their own blended group per transparency (few: rounded to 1 %).
+    // D96: textured surfaces too, one group per picture (and transparency), mapped from the box.
+    std::vector<std::pair<double, int>> keys{{0.0, -1}};
+    std::vector<int> counts{0};
+    for (int i = 0; i < elementCount(); ++i) {
+        if (isHidden(i))
+            continue;
+        for (uint32_t t = m_chunk.toff[size_t(i)]; t < m_chunk.toff[size_t(i) + 1]; ++t) {
+            const std::pair<double, int> key = mode == Shaded
+                ? std::pair<double, int>(triangleTransparency(i, t), triangleTexture(i, t))
+                : mode == White ? std::pair<double, int>(triangleTransparency(i, t), -1) // glass stays glass
+                                : std::pair<double, int>(0.0, -1);
+            auto it = std::find(keys.begin(), keys.end(), key);
+            if (it == keys.end()) {
+                keys.push_back(key);
+                counts.push_back(0);
+                it = keys.end() - 1;
+            }
+            ++counts[size_t(it - keys.begin())];
+        }
+    }
+    for (size_t g = 0; g < keys.size(); ++g) {
+        const double alpha = keys[g].first;
+        const int textureIndex = keys[g].second;
+        const int tris = counts[g];
         if (tris == 0)
             continue;
-        const bool colours = mode == Shaded || mode == Ids;
+        if (textureIndex >= 0) {
+            addTexturedGroup(prs, alpha, textureIndex, tris);
+            continue;
+        }
+        const bool lit = mode == Shaded || mode == White;
+        const std::optional<double> only = lit ? std::optional<double>(alpha) : std::nullopt;
+        const bool colours = lit || mode == Ids;
+        static const Quantity_Color white(0.94, 0.94, 0.93, Quantity_TOC_RGB);
         Handle(Graphic3d_ArrayOfTriangles) arr = new Graphic3d_ArrayOfTriangles(
             tris * 3, 0, Graphic3d_ArrayFlags_VertexNormal | (colours ? Graphic3d_ArrayFlags_VertexColor : 0));
         for (int i = 0; i < elementCount(); ++i) {
-            if (!inGroup(i))
+            if (isHidden(i))
                 continue;
             if (mode == Ids) {
                 const auto rgb = idRgb(m_idBase + i + 1);
@@ -627,16 +727,18 @@ void ElementBatch::addTriangles(const Handle(Prs3d_Presentation)& prs, int mode)
                 const Quantity_Color id(rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0, Quantity_TOC_RGB);
                 addElement(*arr, i, true, &id);
             } else {
-                addElement(*arr, i, colours);
+                addElement(*arr, i, colours, mode == White ? &white : nullptr, only, mode == Shaded);
             }
         }
         Handle(Graphic3d_Group) group = prs->NewGroup();
         Handle(Graphic3d_AspectFillArea3d) aspect = new Graphic3d_AspectFillArea3d(*myDrawer->ShadingAspect()->Aspect());
-        if (mode == Shaded) {
+        if (lit) {
             // A colour-driven ("aspect") material, so per-vertex palette colours are used. The AIS
             // default (brass) is a physical material that ignores vertex colours.
             Graphic3d_MaterialAspect material(Graphic3d_NameOfMaterial_Plastified);
             material.SetSpecularColor(Quantity_Color(0.08, 0.08, 0.08, Quantity_TOC_RGB));
+            if (mode == White) // D96: a study model is bright, the light only modelling its shape
+                material.SetEmissiveColor(Quantity_Color(0.30, 0.30, 0.30, Quantity_TOC_RGB));
             if (alpha > 0.0) {
                 material.SetTransparency(float(alpha));
                 aspect->SetAlphaMode(Graphic3d_AlphaMode_Blend);
@@ -655,6 +757,51 @@ void ElementBatch::addTriangles(const Handle(Prs3d_Presentation)& prs, int mode)
         group->SetGroupPrimitivesAspect(aspect);
         group->AddPrimitiveArray(arr);
     }
+}
+
+void ElementBatch::addTexturedGroup(const Handle(Prs3d_Presentation)& prs, double alpha, int paletteIndex, int tris)
+{
+    const MeshChunk::Surface& s = m_chunk.palette[size_t(paletteIndex)];
+    Handle(Graphic3d_Texture2D) tex = textureFor(s.texture);
+    Handle(Graphic3d_ArrayOfTriangles) arr = new Graphic3d_ArrayOfTriangles(tris * 3, 0,
+        Graphic3d_ArrayFlags_VertexNormal | Graphic3d_ArrayFlags_VertexTexel);
+    const Quantity_Color tint = tex.IsNull() ? Quantity_Color(s.r, s.g, s.b, Quantity_TOC_RGB)
+                                             : Quantity_Color(Quantity_NOC_WHITE); // the picture shows its colours
+    for (int i = 0; i < elementCount(); ++i) {
+        if (isHidden(i))
+            continue;
+        for (uint32_t t = m_chunk.toff[size_t(i)]; t < m_chunk.toff[size_t(i) + 1]; ++t) {
+            if (triangleTexture(i, t) != paletteIndex || triangleTransparency(i, t) != alpha)
+                continue;
+            const gp_Pnt a = vertex(m_chunk, m_chunk.tris[3 * t]);
+            const gp_Pnt b = vertex(m_chunk, m_chunk.tris[3 * t + 1]);
+            const gp_Pnt c = vertex(m_chunk, m_chunk.tris[3 * t + 2]);
+            gp_Vec n = gp_Vec(a, b).Crossed(gp_Vec(a, c));
+            const gp_Dir dir = n.Magnitude() > 1e-12 ? gp_Dir(n) : gp_Dir(0, 0, 1);
+            for (const gp_Pnt& p : {a, b, c}) {
+                const auto [u, v] = boxTexel(p, dir, s.texW, s.texH);
+                arr->AddVertex(p, dir, gp_Pnt2d(u, v));
+            }
+        }
+    }
+    Handle(Graphic3d_Group) group = prs->NewGroup();
+    Handle(Graphic3d_AspectFillArea3d) aspect = new Graphic3d_AspectFillArea3d(*myDrawer->ShadingAspect()->Aspect());
+    Graphic3d_MaterialAspect material(Graphic3d_NameOfMaterial_Plastified);
+    material.SetSpecularColor(Quantity_Color(0.08, 0.08, 0.08, Quantity_TOC_RGB));
+    if (alpha > 0.0) {
+        material.SetTransparency(float(alpha));
+        aspect->SetAlphaMode(Graphic3d_AlphaMode_Blend);
+    }
+    aspect->SetFrontMaterial(material);
+    aspect->SetBackMaterial(material);
+    aspect->SetInteriorColor(tint);
+    if (!tex.IsNull()) {
+        aspect->SetTextureSet(new Graphic3d_TextureSet(tex));
+        aspect->SetTextureMapOn(true);
+    }
+    aspect->SetPolygonOffsets(Aspect_POM_Fill, 1.0f, 1.0f);
+    group->SetGroupPrimitivesAspect(aspect);
+    group->AddPrimitiveArray(arr);
 }
 
 void ElementBatch::addLines(const Handle(Prs3d_Presentation)& prs, const Quantity_Color& color)
@@ -689,6 +836,10 @@ void ElementBatch::Compute(const Handle(PrsMgr_PresentationManager)&, const Hand
     switch (mode) {
     case Shaded:
         addTriangles(prs, Shaded);
+        addLines(prs, Quantity_Color(0.22, 0.22, 0.24, Quantity_TOC_RGB));
+        break;
+    case White: // D96: every surface white, the contours kept
+        addTriangles(prs, White);
         addLines(prs, Quantity_Color(0.22, 0.22, 0.24, Quantity_TOC_RGB));
         break;
     case LinesOnly:

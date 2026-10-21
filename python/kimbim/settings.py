@@ -56,6 +56,8 @@ DEFAULTS = {
     "ids_files": {},  # IDS files by name: their XML, kept in the project so it is versioned (D81)
     "clash_sets": {},  # clash detection sets by name (D81)
     "underlays": [],  # DXF, PDF and image underlays on levels: file, placement, display (D85)
+    "sheet_files": [],  # D98: the picture files placed on sheets (so versions and .kim files keep them)
+    "texture_files": [],  # D96: the surfaces' texture pictures (likewise)
     "tag_styles": {},  # tag styles by id: the project's own and its edited built-ins (D87)
     "stair_rules": {},  # building-code limits for stair and ramp warnings (D88; empty: the defaults)
     "check_tolerance": 0.002,   # D92: clash hard tolerance (m)
@@ -68,6 +70,11 @@ DEFAULTS = {
     "stair_tread_mode": "fixed",  # D92: a new stair's tread is fixed or from 2 risers + tread = 625 mm
     "stair_arrow": "top",  # D92: the plan symbol's arrow: top (default), bottom or both
     "stair_riser_numbers": False,  # D92: number the risers on the plan
+    "construction_grid": {"spacing": 1.0, "subdivisions": 4, "angle": 0.0, "origin": [0.0, 0.0]},  # D98
+    "wall_reference_line": "Outside face",
+    "layers_in_3d": True,
+    "member_material_scope": "element",  # D97: a column's or beam's material: its own (Archicad) or its type's (Revit)
+    "wall_profiles": {},  # D97: complex wall sections by name: [[across, up], ...] metres from the base line  # D96: walls and slabs show each layer on their ends and tops in 3D  # D97: where a new wall's clicked line is (Archicad default)
 }
 UNITS = {"m": 1.0, "cm": 100.0, "mm": 1000.0}
 AREA_UNITS = {"m²": 1.0, "cm²": 10000.0, "mm²": 1000000.0}
@@ -216,6 +223,8 @@ def _error(key: str, value) -> str | None:
         from . import underlays
 
         return underlays.validate(value)
+    if key in ("sheet_files", "texture_files") and not (isinstance(value, list) and all(isinstance(v, str) for v in value)):
+        return f"{key} is a list of file names"
     if key == "stair_rules":
         from . import stairs
 
@@ -238,6 +247,35 @@ def _error(key: str, value) -> str | None:
         return f"unknown stair arrow position {value}"
     if key == "stair_riser_numbers" and not isinstance(value, bool):
         return "stair_riser_numbers must be true or false"
+    if key == "construction_grid":
+        g = value if isinstance(value, dict) else {}
+
+        def num(v):
+            return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+        if not (num(g.get("spacing")) and 0.001 <= g["spacing"] <= 10000):
+            return "the grid spacing must be between 0.001 and 10000 m"
+        if not (isinstance(g.get("subdivisions"), int) and not isinstance(g.get("subdivisions"), bool)
+                and 1 <= g["subdivisions"] <= 100):
+            return "the grid subdivisions must be 1-100"
+        if not num(g.get("angle")):
+            return "the grid angle is a number of degrees"
+        o = g.get("origin")
+        if not (isinstance(o, list) and len(o) == 2 and all(num(v) for v in o)):
+            return "the grid origin is [x, y]"
+    if key == "wall_profiles":
+        from . import configure
+
+        return configure.profiles_error(value)
+    if key == "member_material_scope" and value not in ("element", "type"):
+        return "member_material_scope must be element or type"
+    if key == "layers_in_3d" and not isinstance(value, bool):
+        return "layers_in_3d must be true or false"
+    if key == "wall_reference_line":
+        from . import configure
+
+        if value not in configure.REFERENCES:
+            return f"unknown wall reference line {value}"
     if key in ("ids_files", "clash_sets"):
         from . import checks
 

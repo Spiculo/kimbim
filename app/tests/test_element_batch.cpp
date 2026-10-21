@@ -215,13 +215,74 @@ private slots:
         QVERIFY(!b->surfaceColor(0).IsEqual(red));
     }
 
-    void acceptsShadedIdAndLinesModes()
+    // D96: each face takes its own surface (material) colour and transparency; an override colours
+    // the whole element, and a face without a surface keeps the class colour.
+    void faceSurfacesAndOverrides()
+    {
+        kimbim::MeshChunk c = threeElements();
+        c.palette = {{1, 0, 0, 0}, {0, 0, 1, 0.6f}};
+        c.faceColors = {0, 1, kimbim::MeshChunk::kNoColor};
+        Handle(kimbim::ElementBatch) b = new kimbim::ElementBatch(c);
+        const Quantity_Color red(1, 0, 0, Quantity_TOC_RGB), blue(0, 0, 1, Quantity_TOC_RGB);
+        QVERIFY(b->triangleColor(0, 0).IsEqual(red));
+        QCOMPARE(b->triangleTransparency(0, 0), 0.0);
+        QVERIFY(b->triangleColor(1, 1).IsEqual(blue));
+        QCOMPARE(b->triangleTransparency(1, 1), 0.6);
+        QVERIFY(b->triangleColor(2, 2).IsEqual(b->surfaceColor(2))); // the class colour
+        const Quantity_Color green(0, 1, 0, Quantity_TOC_RGB);
+        b->setSurface(1, green); // a rule's colour, opaque
+        QVERIFY(b->triangleColor(1, 1).IsEqual(green));
+        QCOMPARE(b->triangleTransparency(1, 1), 0.0);
+        b->setSurface(1, std::nullopt, 0.3); // a rule's transparency alone keeps the face colours
+        QVERIFY(b->triangleColor(1, 1).IsEqual(blue));
+        QCOMPARE(b->triangleTransparency(1, 1), 0.3);
+    }
+
+    void parsesFaceColoursFromTheBridge()
+    {
+        const QByteArray meta = R"({"guids":["A"],"types":["IfcWall"],"voff":[0,3],"toff":[0,1],"palette":[[0.5,0.25,1,0.2]]})";
+        QByteArray verts(9 * int(sizeof(float)), 0), tris(3 * int(sizeof(uint32_t)), 0);
+        const uint32_t idx[] = {0, 1, 2};
+        std::memcpy(tris.data(), idx, sizeof idx);
+        QString error;
+        const uint16_t ok = 0, bad = 3;
+        auto c = kimbim::MeshChunk::parse(meta, verts, tris, &error, QByteArray(reinterpret_cast<const char*>(&ok), 2));
+        QVERIFY2(c.has_value(), qPrintable(error));
+        QCOMPARE(c->palette.size(), size_t(1));
+        QCOMPARE(c->surfaceOf(0)->transparency, 0.2f);
+        QVERIFY(!kimbim::MeshChunk::parse(meta, verts, tris, &error, QByteArray(reinterpret_cast<const char*>(&bad), 2)));
+        QVERIFY(!kimbim::MeshChunk::parse(meta, verts, tris, &error, QByteArray(4, 0))); // two colours, one triangle
+        QVERIFY(kimbim::MeshChunk::parse(meta, verts, tris, &error)->faceColors.empty()); // colours are optional
+    }
+
+    // D96: textured surfaces: the palette row names the picture and its size; faces map from the box.
+    void texturedSurfaces()
+    {
+        kimbim::MeshChunk c = threeElements();
+        c.palette = {{1, 0, 0, 0}};
+        c.palette[0].texture = QStringLiteral("brick.png");
+        c.palette[0].texW = 0.5f;
+        c.faceColors = {0, kimbim::MeshChunk::kNoColor, 0};
+        Handle(kimbim::ElementBatch) b = new kimbim::ElementBatch(c);
+        QCOMPARE(b->triangleTexture(0, 0), 0);
+        QCOMPARE(b->triangleTexture(1, 1), -1);
+        b->setSurface(2, Quantity_Color(0, 1, 0, Quantity_TOC_RGB)); // an override colours it plainly
+        QCOMPARE(b->triangleTexture(2, 2), -1);
+        auto uv = kimbim::ElementBatch::boxTexel(gp_Pnt(1.0, 2.0, 3.0), gp_Dir(0, -1, 0), 0.5, 0.25); // a wall facing -y
+        QCOMPARE(uv.first, 2.0);  // x / 0.5
+        QCOMPARE(uv.second, 12.0); // z / 0.25
+        uv = kimbim::ElementBatch::boxTexel(gp_Pnt(1.0, 2.0, 3.0), gp_Dir(0, 0, 1), 1.0, 1.0); // a floor
+        QCOMPARE(uv.second, 2.0);
+    }
+
+    void acceptsShadedIdLinesAndWhiteModes()
     {
         Handle(kimbim::ElementBatch) b = new kimbim::ElementBatch(unitCube());
         QVERIFY(b->AcceptDisplayMode(kimbim::ElementBatch::Shaded));
         QVERIFY(b->AcceptDisplayMode(kimbim::ElementBatch::Ids));
         QVERIFY(b->AcceptDisplayMode(kimbim::ElementBatch::LinesOnly));
-        QVERIFY(!b->AcceptDisplayMode(3));
+        QVERIFY(b->AcceptDisplayMode(kimbim::ElementBatch::White)); // D96
+        QVERIFY(!b->AcceptDisplayMode(4));
     }
 
     void indexesElementsByGuid()

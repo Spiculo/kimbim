@@ -72,6 +72,20 @@ void MainWindow::addUnderlayActions(QMenu* file)
     place->setObjectName(QStringLiteral("actionPlaceUnderlay"));
     place->setToolTip(tr("A DXF survey, a PDF page or a scanned image on the active level, to trace over"));
     connect(place, &QAction::triggered, this, [this] { placeUnderlayDialog(); });
+    // D98: Archicad's Figure tool: a picture at a typed width, opaque (on a worksheet it prints).
+    QAction* figure = file->addAction(tr("Place &picture..."));
+    figure->setObjectName(QStringLiteral("actionPlaceFigure"));
+    figure->setToolTip(tr("A photo, render or logo on the active level or worksheet, at the width you type"));
+    connect(figure, &QAction::triggered, this, [this] {
+        const QString path = QFileDialog::getOpenFileName(this, tr("Place picture"), QString(),
+            tr("Pictures (*.png *.jpg *.jpeg *.pdf)"));
+        if (path.isEmpty())
+            return;
+        bool ok = false;
+        const double width = QInputDialog::getDouble(this, tr("Place picture"), tr("Width (m):"), 2.0, 0.01, 10000.0, 3, &ok);
+        if (ok)
+            placeFigure(path, width, QPointF(0, 0));
+    });
     QAction* manage = file->addAction(tr("U&nderlays..."));
     manage->setObjectName(QStringLiteral("actionUnderlays"));
     manage->setToolTip(tr("Show, hide, fade, calibrate, move or remove underlays"));
@@ -174,6 +188,22 @@ QJsonObject MainWindow::placeUnderlay(const QString& path, const QJsonObject& op
     return r;
 }
 
+bool MainWindow::placeFigure(const QString& path, double widthMetres, QPointF bottomLeft)
+{
+    const QJsonObject r = bridge("place_figure", {m_levels->activeStorey(), path, QString::number(widthMetres, 'g', 17),
+        QString::number(bottomLeft.x(), 'g', 17), QString::number(bottomLeft.y(), 'g', 17)});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(tr("Could not place it: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    loadProjectSettings();
+    setWindowModified(isDirty());
+    refreshLayers(); // also refreshes the underlays
+    m_status->showMessage(tr("Placed picture %1 (move or rotate it in File > Underlays)")
+                              .arg(r.value("underlay").toObject().value("name").toString()));
+    return true;
+}
+
 void MainWindow::underlaysDialog()
 {
     QHash<QString, QString> levels;
@@ -203,6 +233,66 @@ void MainWindow::underlaysDialog()
         placeUnderlayDialog();
     });
     dialog->show();
+}
+
+int MainWindow::traceSegments(const QString& storey)
+{
+    Underlay u;
+    std::shared_ptr<const UnderlayLines> lines;
+    return traceUnderlay(storey, &u, &lines) ? lines->count() : 0;
+}
+
+bool MainWindow::traceUnderlay(const QString& storey, Underlay* out, std::shared_ptr<const UnderlayLines>* lines)
+{
+    // D98: Archicad's Trace & Reference: the level below's (or above's) plan, faint and tinted.
+    if (m_traceMode.isEmpty() || storey.isEmpty())
+        return false;
+    const QString key = storey + QLatin1Char('|') + m_traceMode;
+    if (!m_traceCache.contains(key)) {
+        TraceEntry entry;
+        QList<QByteArray> parts;
+        bool none = false;
+        QString error;
+        if (PythonEngine::instance().callParts("trace_lines", {storey, m_traceMode}, &parts, &none, &error) && !none
+            && !parts.isEmpty()) {
+            const QJsonObject meta = QJsonDocument::fromJson(parts.first()).object();
+            if (meta.value("ok").toBool()) {
+                entry.lines = UnderlayLines::fromParts(parts, &error);
+                entry.units = meta.value("units").toDouble(1.0);
+                entry.reference = meta.value("reference").toString();
+            }
+        }
+        m_traceCache.insert(key, entry);
+    }
+    const TraceEntry& entry = m_traceCache[key];
+    if (!entry.lines)
+        return false;
+    Underlay u;
+    u.id = QStringLiteral("trace");
+    u.name = tr("Trace: %1").arg(entry.reference);
+    u.kind = QStringLiteral("dxf");
+    u.file = QStringLiteral("trace:") + key;
+    u.storey = storey;
+    u.placement.scale = entry.units;
+    u.opacity = 0.45;
+    u.tint = QStringLiteral("#2f6fd0"); // Archicad draws the reference in a colour of its own
+    *out = u;
+    *lines = entry.lines;
+    return true;
+}
+
+void MainWindow::setTraceMode(const QString& mode)
+{
+    m_traceMode = mode == QLatin1String("below") || mode == QLatin1String("above") ? mode : QString();
+    m_traceCache.clear();
+    for (const char* name : {"actionTraceOff", "actionTraceBelow", "actionTraceAbove"})
+        if (auto* a = findChild<QAction*>(QLatin1String(name)))
+            a->setChecked(a->data().toString() == m_traceMode);
+    refreshUnderlays();
+    if (m_status)
+        m_status->showMessage(m_traceMode.isEmpty() ? tr("Trace off")
+                : m_traceMode == QLatin1String("below") ? tr("Tracing the level below")
+                                                        : tr("Tracing the level above"));
 }
 
 void MainWindow::refreshUnderlays()
@@ -275,6 +365,10 @@ void MainWindow::refreshUnderlays()
             for (const Underlay& u : std::as_const(all))
                 if (u.storey == storey)
                     shown.push_back(view(u, vp->planElevation()));
+            Underlay trace;
+            std::shared_ptr<const UnderlayLines> traceLines;
+            if (traceUnderlay(storey, &trace, &traceLines)) // D98: Trace & Reference, under the level's own
+                shown.prepend(Viewport::UnderlayView{trace, traceLines, {}, vp->planElevation()});
         } else {
             for (const Underlay& u : std::as_const(all))
                 if (u.show3d && elevations.contains(u.storey))
@@ -288,6 +382,12 @@ void MainWindow::refreshUnderlays()
         if (!u.isRaster() && u.storey == m_levels->activeStorey() && lines.contains(u.file))
             key += u.id + compact(u.placementJson()) + QString::number(u.placement.base.x(), 'g', 17)
                 + QString::number(u.placement.base.y(), 'g', 17) + QLatin1Char(';');
+    Underlay trace; // D98: the traced level's lines snap too (Archicad's Trace & Reference)
+    std::shared_ptr<const UnderlayLines> traceLines;
+    const bool traced = traceUnderlay(m_levels->activeStorey(), &trace, &traceLines);
+    if (traced)
+        key += trace.file + QLatin1Char('#') + QString::number(traceLines->count())
+            + QString::number(quintptr(traceLines.get())) + QLatin1Char(';');
     if (key != m_underlaySnapKey) {
         std::shared_ptr<UnderlaySnapIndex> index;
         if (!key.isEmpty()) {
@@ -295,6 +395,8 @@ void MainWindow::refreshUnderlays()
             for (const Underlay& u : std::as_const(all))
                 if (!u.isRaster() && u.storey == m_levels->activeStorey() && lines.contains(u.file))
                     index->add(*lines.value(u.file), u.placement);
+            if (traced)
+                index->add(*traceLines, trace.placement);
             index->build();
         }
         m_underlaySnap = index;

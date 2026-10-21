@@ -126,8 +126,24 @@ def file_path(name: str) -> pathlib.Path | None:
     return None
 
 
+def local_path(name: str) -> pathlib.Path | None:
+    """The file if it is already on this computer (the working folder or the per-computer store), else
+    None. Never reads the version history: safe from the meshing thread (D96 textures)."""
+    from . import documents
+
+    if not FILE_NAME.fullmatch(name or ""):
+        return None
+    for p in (store_dir() / name, documents.data_dir() / "underlays" / name):
+        if p.is_file():
+            return p
+    return None
+
+
 def referenced(settings: dict) -> list[str]:
-    return sorted({u.get("file", "") for u in settings.get("underlays") or () if FILE_NAME.fullmatch(u.get("file", ""))})
+    names = {u.get("file", "") for u in settings.get("underlays") or () if FILE_NAME.fullmatch(u.get("file", ""))}
+    names |= {n for n in [*(settings.get("sheet_files") or ()), *(settings.get("texture_files") or ())]
+              if isinstance(n, str) and FILE_NAME.fullmatch(n)}  # D98 sheet pictures, D96 textures
+    return sorted(names)
 
 
 def write_files(work: pathlib.Path) -> None:
@@ -705,3 +721,170 @@ def merge_entries(base: list, ours: list, theirs: list) -> tuple[list, bool]:
         if value is not None:
             out.append(value)
     return out, clash
+
+
+# ---------------------------------------------------------------- figures (D98)
+# On a worksheet, a picture placed as an underlay is a *figure* (Archicad's Figure tool): it prints.
+# Its drawing embeds it as an SVG <image> mapped exactly as the view shows it (pixel -> level -> paper).
+
+def png_bytes(width: int, height: int, rows_rgb) -> bytes:
+    """A PNG (8-bit RGB) from `height` rows of 3*width bytes; zlib only, no image library."""
+    import struct
+    import zlib
+
+    raw = b"".join(b"\x00" + bytes(r) for r in rows_rgb)
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(raw, 6)) + chunk(b"IEND", b""))
+
+
+def _figure_image(u: dict):
+    """(mime, bytes, width px, height px, drawing units per pixel) of a figure, or None."""
+    if u.get("kind") == "image":
+        p = file_path(u.get("file", ""))
+        if p is None:
+            return None
+        data = p.read_bytes()
+        w, h, _dpi = _image_size(p)
+        return ("image/png" if data[:4] == b"\x89PNG" else "image/jpeg"), data, w, h, 1.0
+    if u.get("kind") == "pdf":
+        r = render_pdf(u["file"], int(u.get("page", 0)), int(u.get("dpi", PDF_DPI)))
+        w, h, stride = r["width"], r["height"], r["stride"]
+        buf = pathlib.Path(r["path"]).read_bytes()
+        rows = []
+        for y in range(h):
+            row = buf[y * stride:y * stride + 4 * w]
+            rgb = bytearray(3 * w)
+            rgb[0::3], rgb[1::3], rgb[2::3] = row[2::4], row[1::4], row[0::4]  # BGRX -> RGB
+            rows.append(rgb)
+        return "image/png", png_bytes(w, h, rows), w, h, 72.0 / r["dpi"]  # PDF points per pixel
+    return None
+
+
+def figures_svg(storey_guid: str, to_paper) -> list[str]:
+    """SVG <image> elements, in paper millimetres, for the pictures placed on a level (D98)."""
+    import base64
+    import math
+
+    out = []
+    for u in _entries():
+        if u.get("storey") != storey_guid or u.get("kind") not in ("image", "pdf"):
+            continue
+        u = _public(u)
+        if not u.get("visible", True) or u.get("missing"):
+            continue
+        try:
+            got = _figure_image(u)
+        except Exception:  # an unreadable file leaves a gap, not a broken drawing
+            got = None
+        if got is None:
+            continue
+        mime, data, w, h, units = got
+        bx, by = (float(v) for v in (u.get("base") or [0.0, 0.0]))
+        s, r = float(u["scale"]), math.radians(float(u["rotation"]))
+        c, sn = math.cos(r), math.sin(r)
+
+        def world(px, py):  # pixel -> drawing units (y down) -> level metres
+            lx, ly = (px * units - bx) * s, (by - py * units) * s
+            return float(u["x"]) + lx * c - ly * sn, float(u["y"]) + lx * sn + ly * c
+
+        p00, p10, p01 = (to_paper(*world(*q)) for q in ((0, 0), (1, 0), (0, 1)))
+        a, b = p10[0] - p00[0], p10[1] - p00[1]
+        cc, d = p01[0] - p00[0], p01[1] - p00[1]
+        href = f"data:{mime};base64," + base64.b64encode(data).decode("ascii")
+        out.append(f'<image data-figure="{u["id"]}" x="0" y="0" width="{w}" height="{h}" preserveAspectRatio="none" '
+                   f'transform="matrix({a:.6g} {b:.6g} {cc:.6g} {d:.6g} {p00[0]:.4f} {p00[1]:.4f})" '
+                   f'xlink:href="{href}" href="{href}"/>')
+    return out
+
+
+def place_figure(storey: str, path: str, width, x=0.0, y=0.0, page=0) -> str:
+    """Archicad's Figure tool (D98): a picture (PNG, JPEG or a PDF page) placed `width` metres wide with
+    its bottom left corner at (x, y), fully opaque (not a faded underlay). On a worksheet it prints."""
+    p = pathlib.Path(path)
+    kind = KINDS.get(p.suffix.lower())
+    if kind not in ("image", "pdf"):
+        return _fail("choose a PNG, JPEG or PDF file")
+    try:
+        width, x, y, page = float(width), float(x), float(y), int(page)
+        if width <= 0:
+            return _fail("the picture's width must be more than 0")
+        if kind == "image":
+            units = float(_image_size(p)[0])  # pixels across
+        else:
+            pages = _pdf_pages(p)
+            if not 0 <= page < len(pages):
+                return _fail(f"the PDF has {len(pages)} page(s)")
+            units = float(pages[page]["width"])  # points across
+    except (OSError, ValueError, TypeError) as ex:
+        return _fail(str(ex))
+    options = {"storey": storey, "x": x, "y": y, "scale": width / units, "opacity": 1.0, "page": page}
+    return add_underlay(str(p), json.dumps(options))
+
+
+# ---------------------------------------------------------------- trace (D98)
+# Archicad's Trace & Reference: another level's plan shown faintly under the one being drawn, to
+# draw over (the level below by default, or the one above). Built from that level's plan drawing,
+# exported as DXF (model space, real size), so it is the plan as printed.
+
+TRACE_SKIPPED_LAYERS = ("A-ANNO", "A-AREA")  # annotation and room-label layers (dxf layer names)
+
+
+def trace_reference(storey_guid: str, mode: str = "below"):
+    """The level a plan traces: the one below or above `storey_guid` (worksheets have none)."""
+    from . import app_bridge as B
+    from . import drawgen, worksheets
+
+    if B._model is None:
+        return None
+    try:
+        storey = B._model.by_guid(storey_guid)
+    except RuntimeError:
+        return None
+    if worksheets.is_worksheet(storey):
+        return None
+    order = sorted((s for s in B._model.by_type("IfcBuildingStorey") if not worksheets.is_worksheet(s)),
+                   key=drawgen.storey_elevation)
+    if storey not in order:
+        return None
+    i = order.index(storey) + (1 if mode == "above" else -1)
+    return order[i] if 0 <= i < len(order) else None
+
+
+def trace_lines(storey_guid: str, mode: str = "below"):
+    """(meta JSON, coords, colours) as underlay_lines gives them, for the plan of the level that
+    `storey_guid`'s plan traces; meta has "units" (metres per drawing unit) and "reference" (its name)."""
+    import tempfile
+
+    from . import app_bridge as B
+    from . import drawings, dxf
+
+    ref = trace_reference(storey_guid, mode)
+    if ref is None:
+        return (B._dump({"ok": False, "error": f"no level {'above' if mode == 'above' else 'below'} to trace"}), b"", b"")
+    plan = next((d for d in json.loads(drawings.drawings())["drawings"]
+                 if d["kind"] == "plan" and d.get("storey") == ref.GlobalId), None)
+    if plan is None:
+        return (B._dump({"ok": False, "error": f"{ref.Name} has no floor plan"}), b"", b"")
+    try:
+        doc, stats = dxf.drawing_document(plan["guid"], dxf._options(""))
+        if doc is None:
+            return (B._dump({"ok": False, "error": str(stats)}), b"", b"")
+        msp = doc.modelspace()  # the building only: no markers, notes, room labels or dimensions
+        for e in list(msp):
+            layer = e.dxf.get("layer", "")
+            if layer.startswith(TRACE_SKIPPED_LAYERS) or e.dxftype() in ("DIMENSION", "TEXT", "MTEXT", "HATCH"):
+                msp.delete_entity(e)
+        with tempfile.TemporaryDirectory() as folder:
+            path = pathlib.Path(folder) / "trace.dxf"
+            doc.saveas(str(path))
+            d = read_dxf(path)
+    except Exception as ex:
+        return (B._dump({"ok": False, "error": f"{type(ex).__name__}: {ex}"}), b"", b"")
+    meta = {"ok": True, "count": int(len(d["coords"])), "origin": list(d["origin"]), "extents": d["extents"],
+            "units": d["units"] or 1.0, "reference": ref.Name or "", "reference_guid": ref.GlobalId}
+    return (B._dump(meta), np.ascontiguousarray(d["coords"], dtype="<f4").tobytes(),
+            np.ascontiguousarray(d["colours"]).tobytes())

@@ -13,7 +13,7 @@ def call(fn, *args):
 def test_a_new_model_has_the_default_settings():
     assert call("new_project", "x")["ok"]
     s = call("project_settings")
-    assert s["ok"] and s["settings"] == S.DEFAULTS and s["settings"]["plan_cut_height"] == 1.2
+    assert s["ok"] and _defaults(s["settings"]) and s["settings"]["plan_cut_height"] == 1.2
     assert s["settings"]["view_depth"] == 0.5 and s["settings"]["view_depth_levels"] == {}
     assert call("state")["dirty"] is False
 
@@ -38,7 +38,7 @@ def test_bad_values_are_refused_and_change_nothing():
                 {"sea_level": "high"}, {"north_arrow_style": "star"}, {"scale_bar_style": "zigzag"}):
         r = call("set_project_settings", json.dumps(bad))
         assert not r["ok"], bad
-    assert call("project_settings")["settings"] == S.DEFAULTS and call("state")["dirty"] is False
+    assert _defaults(call("project_settings")["settings"]) and call("state")["dirty"] is False
     assert not call("set_project_settings", "not json")["ok"]
 
 
@@ -98,3 +98,8 @@ def test_new_dimensions_are_labelled_in_the_project_unit():
     assert r["ok"], r
     texts = [a["text"] for a in call("annotations", level)["annotations"] if a["kind"] == "dimension"]
     assert texts == ["3500"]
+
+
+def _defaults(settings: dict) -> bool:
+    """The defaults, but for the pictures a new project's catalogue surfaces carry (D96)."""
+    return {k: v for k, v in settings.items() if k != "texture_files"} ==         {k: v for k, v in S.DEFAULTS.items() if k != "texture_files"}

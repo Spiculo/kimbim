@@ -33,6 +33,7 @@ import numpy as np
 from . import app_bridge as B
 from . import drawgen
 from . import layers
+from . import materials
 from . import renovation
 
 # Default wall types created the first time a model without layered wall types needs one.
@@ -92,6 +93,8 @@ def new_project(name: str = "") -> str:
         for product in (site, building):
             ifcopenshell.api.geometry.edit_object_placement(f, product=product)
         B._model = f
+        for material_name in materials.CATALOGUE:  # D96: Archicad's template comes with its materials
+            materials.ensure(material_name, f)
         _make_storey("Level 1", 0.0)
         from . import drawings
 
@@ -100,6 +103,10 @@ def new_project(name: str = "") -> str:
     except Exception as ex:
         return _fail(f"{type(ex).__name__}: {ex}")
     B._reset_history("")
+    from . import settings
+
+    if materials.texture_files():  # D96: the catalogue's pictures are part of the new project
+        settings.load({**settings.current(), "texture_files": materials.texture_files()})
     return B._dump({"ok": True, "project": project.Name})
 
 
@@ -115,7 +122,10 @@ def storeys() -> str:
         return B._dump({"storeys": []})
     from .levels import _shown
 
+    from .worksheets import is_worksheet
+
     out = [{"guid": s.GlobalId, "name": s.Name or "", "elevation": round(_elevation(s), 6), "model": _is_model(s),
+            "worksheet": is_worksheet(s),  # D98
             "show": _shown(s)} for s in B._model.by_type("IfcBuildingStorey")]
     return B._dump({"storeys": sorted(out, key=lambda s: s["elevation"])})
 
@@ -185,10 +195,10 @@ def _create_layered_types(ifc_class: str, defaults):
         wall_type = ifcopenshell.api.root.create_entity(f, ifc_class=ifc_class, name=type_name)
         layer_set = ifcopenshell.api.material.add_material_set(f, name=type_name, set_type="IfcMaterialLayerSet")
         for material_name, thickness in layers:
-            material = next((m for m in f.by_type("IfcMaterial") if m.Name == material_name), None) \
-                or ifcopenshell.api.material.add_material(f, name=material_name)
-            layer = ifcopenshell.api.material.add_layer(f, layer_set=layer_set, material=material)
+            material = materials.ensure(material_name, f)  # D96: with its surface and cut fill
+            layer =ifcopenshell.api.material.add_layer(f, layer_set=layer_set, material=material)
             ifcopenshell.api.material.edit_layer(f, layer=layer, attributes={"LayerThickness": thickness / _scale()})
+        materials.sync_priorities(layer_set)  # D96: Archicad's junction rule
         ifcopenshell.api.material.assign_material(f, products=[wall_type], material=layer_set)
 
 
@@ -197,7 +207,10 @@ def wall_types() -> str:
         return B._dump({"types": []})
     if not _layered_wall_types():
         _create_default_wall_types()
-    return B._dump({"types": [{"guid": t.GlobalId, "name": t.Name or "", "thickness": round(_thickness(_layer_set(t)), 6)}
+    from . import configure
+
+    return B._dump({"types": [{"guid": t.GlobalId, "name": t.Name or "", "thickness": round(_thickness(_layer_set(t)), 6),
+                               "centres": configure.centres(_layer_set(t))}  # D97: the preview's offset
                               for t in _layered_wall_types()]})
 
 
@@ -253,8 +266,9 @@ def _centre_on_axis(wall, thickness_m: float):
 
 
 def create_wall(storey_guid: str, type_guid: str, x1, y1, x2, y2, height, join_start_guid: str = "",
-                join_end_guid: str = "") -> str:
-    """A wall of a layered type from (x1, y1) to (x2, y2) on a level, joined to the given walls."""
+                join_end_guid: str = "", reference: str = "") -> str:
+    """A wall of a layered type from (x1, y1) to (x2, y2) on a level, joined to the given walls.
+    `reference` (D97): where the clicked line is in the wall (configure.REFERENCES); "" = its centre."""
     if B._model is None:
         return _fail("no model open")
     try:
@@ -272,7 +286,15 @@ def create_wall(storey_guid: str, type_guid: str, x1, y1, x2, y2, height, join_s
         return _fail("the wall has no length")
     if height <= 0:
         return _fail("the wall height must be positive")
-    joins = [(guid, point) for guid, point in ((join_start_guid, p1), (join_end_guid, p2)) if guid]
+    from . import configure
+
+    if reference and reference not in configure.REFERENCES:
+        return _fail(f"unknown reference line {reference}")
+    from . import curved_walls
+
+    # D97: curved walls are not joined (the regenerator's joins are straight)
+    joins = [(guid, point) for guid, point in ((join_start_guid, p1), (join_end_guid, p2))
+             if guid and not ((w := _by_guid(guid)) is not None and w.is_a("IfcWall") and curved_walls.is_curved(w))]
     for guid, _ in joins:
         other = _by_guid(guid)
         if other is None or not other.is_a("IfcWall"):
@@ -281,16 +303,7 @@ def create_wall(storey_guid: str, type_guid: str, x1, y1, x2, y2, height, join_s
 
     def action():
         f = B._model
-        thickness = _thickness(_layer_set(wall_type))
-        wall = ifcopenshell.api.root.create_entity(f, ifc_class="IfcWall", name=wall_type.Name)
-        ifcopenshell.api.type.assign_type(f, related_objects=[wall], relating_type=wall_type)
-        _centre_on_axis(wall, thickness)
-        representation = ifcopenshell.api.geometry.create_2pt_wall(
-            f, element=wall, context=_body_context(), p1=p1, p2=p2,
-            elevation=_elevation(storey), height=height, thickness=thickness, is_si=True)
-        ifcopenshell.api.geometry.assign_representation(f, product=wall, representation=representation)
-        ifcopenshell.api.spatial.assign_container(f, products=[wall], relating_structure=storey)
-        _regenerate(f, wall, length=length, height=height)
+        wall = _new_wall(storey, wall_type, p1, p2, height, reference)
         neighbours = []
         for guid, point in joins:
             other = B._model.by_guid(guid)
@@ -308,6 +321,31 @@ def create_wall(storey_guid: str, type_guid: str, x1, y1, x2, y2, height, join_s
     except Exception as ex:
         return _fail(f"{type(ex).__name__}: {ex}")
     return B._dump({**r, "guid": made["wall"].GlobalId})
+
+
+def _new_wall(storey, wall_type, p1, p2, height: float, reference: str = "", usage_from=None):
+    """Inside an action: a straight wall of a layered type from p1 to p2 (metres) on a level, built by
+    the regenerator; its layers sit by `reference` ("" = centred), or as `usage_from` gives them
+    ((offset metres, direction sense, reference name): a wall continuing another's faces)."""
+    f = B._model
+    thickness = _thickness(_layer_set(wall_type))
+    wall = ifcopenshell.api.root.create_entity(f, ifc_class="IfcWall", name=wall_type.Name)
+    ifcopenshell.api.type.assign_type(f, related_objects=[wall], relating_type=wall_type)
+    from . import configure
+
+    if usage_from is not None:
+        configure.set_usage(wall, *usage_from)
+    elif reference:
+        configure.apply_reference(wall, reference)
+    else:
+        _centre_on_axis(wall, thickness)
+    representation = ifcopenshell.api.geometry.create_2pt_wall(
+        f, element=wall, context=_body_context(), p1=tuple(p1), p2=tuple(p2),
+        elevation=_elevation(storey), height=height, thickness=thickness, is_si=True)
+    ifcopenshell.api.geometry.assign_representation(f, product=wall, representation=representation)
+    ifcopenshell.api.spatial.assign_container(f, products=[wall], relating_structure=storey)
+    _regenerate(f, wall, length=math.dist(p1, p2), height=height)
+    return wall
 
 
 def delete_elements(guids_json: str) -> str:
@@ -413,6 +451,17 @@ def _mesh_vertex_points(storey) -> list:
     return out
 
 
+def _body_centre(wall) -> float:
+    """How far the wall body's middle lies from its axis, to the axis' left (metres; D97 reference lines)."""
+    usage = ifcopenshell.util.element.get_material(wall, should_skip_usage=False)
+    if usage is None or not usage.is_a("IfcMaterialLayerSetUsage"):
+        return 0.0
+    s = _scale()
+    total = sum(float(l.LayerThickness or 0.0) for l in usage.ForLayerSet.MaterialLayers) * s
+    off = float(usage.OffsetFromReferenceLine or 0.0) * s
+    return off + total / 2 if usage.DirectionSense != "NEGATIVE" else off - total / 2
+
+
 def snap_data(storey_guid: str, mesh_vertices: str = "") -> str:
     """Wall axes on a level, in world metres, for snapping while drawing. With `mesh_vertices`
     (D92, truthful), the level's element mesh vertices are added to the snapping points."""
@@ -429,7 +478,8 @@ def snap_data(storey_guid: str, mesh_vertices: str = "") -> str:
             if axis is None:
                 continue
             walls.append({"guid": e.GlobalId, "x1": axis[0][0], "y1": axis[0][1], "x2": axis[1][0], "y2": axis[1][1],
-                          "thickness": round(_thickness(layer_set), 6) if layer_set else 0.0})
+                          "thickness": round(_thickness(layer_set), 6) if layer_set else 0.0,
+                          "centre": round(_body_centre(e), 6)})  # D97: the body beside its reference line
             for void in getattr(e, "HasOpenings", ()) or ():
                 opening = void.RelatedOpeningElement
                 fill = next((r.RelatedBuildingElement for r in getattr(opening, "HasFillings", ()) or ()), None)
@@ -653,12 +703,39 @@ def _wall_frame(wall):
 def _filling_representation(kind, element_type, width, height):
     f, s = B._model, _scale()
     if kind == "door":
-        return ifcopenshell.api.geometry.add_door_representation(
+        representation = ifcopenshell.api.geometry.add_door_representation(
             f, context=_body_context(), overall_height=height / s, overall_width=width / s,
             operation_type=getattr(element_type, "OperationType", None) or "SINGLE_SWING_LEFT")
-    return ifcopenshell.api.geometry.add_window_representation(
-        f, context=_body_context(), overall_height=height / s, overall_width=width / s,
-        partition_type=getattr(element_type, "PartitioningType", None) or "SINGLE_PANEL")
+    else:
+        representation = ifcopenshell.api.geometry.add_window_representation(
+            f, context=_body_context(), overall_height=height / s, overall_width=width / s,
+            partition_type=getattr(element_type, "PartitioningType", None) or "SINGLE_PANEL")
+    materials.style_filling(kind, representation, element_type)  # D96: frame, glass, leaf in 3D
+    return representation
+
+
+def _patch_regenerator():
+    """ifcopenshell's wall regenerator writes a junction's priority overrides (IfcRelConnectsPathElements
+    Relating/RelatedPriorities) into namedtuples, which raises: D97 uses them, so fix that here."""
+    import importlib
+
+    R = importlib.import_module("ifcopenshell.api.geometry.regenerate_wall_representation")
+    if not hasattr(R, "Regenerator"):  # the package exports the function under the module's name
+        import sys
+
+        R = sys.modules["ifcopenshell.api.geometry.regenerate_wall_representation"]
+
+    if getattr(R.Regenerator, "_kimbim_patched", False):
+        return
+    original = R.Regenerator.combine_layers
+
+    def combine_layers(self, layers, override_priorities):
+        if override_priorities:
+            layers = [R.PrioritisedLayer(int(p), l.thickness) for p, l in zip(override_priorities, layers)]                 + list(layers[len(override_priorities):])
+        return original(self, layers, None)
+
+    R.Regenerator.combine_layers = combine_layers
+    R.Regenerator._kimbim_patched = True
 
 
 def _regenerate(f, wall, **kwargs):
@@ -670,7 +747,14 @@ def _regenerate(f, wall, **kwargs):
               if r.RepresentationIdentifier == "Body"]
     if ours is None and bodies:
         return None
+    from . import configure, curved_walls
+
+    if curved_walls.is_curved(wall):  # D97: its arc's body, rebuilt from its layers
+        return curved_walls.rebuild(wall)
+    if configure.is_double_slanted(wall):  # D97: its own swept section, rebuilt at the new length
+        return configure.rebuild_double_slant(wall, kwargs.get("length"))
     _body_context()  # the regenerator needs the Body/MODEL_VIEW context
+    _patch_regenerator()
     return ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=wall, **kwargs)
 
 
@@ -686,7 +770,11 @@ def _replace_body(product, representation):
 
 
 def _wall_height(wall) -> float:
-    """Extrusion depth of the wall body in metres (0 if unknown)."""
+    """Extrusion depth of the wall body in metres (0 if unknown); a swept section's own height (D97)."""
+    from . import configure
+
+    if configure.is_double_slanted(wall):
+        return float(configure._pset(wall, configure.WALL_PSET).get("Height") or 0.0)
     representation = ifcopenshell.util.representation.get_representation(wall, "Model", "Body", "MODEL_VIEW")
     depths = [float(e.Depth) for e in B._model.traverse(representation) if e.is_a("IfcExtrudedAreaSolid")] if representation else []
     return max(depths, default=0.0) * _scale()
@@ -703,6 +791,10 @@ def insert_opening(kind: str, wall_guid: str, type_guid: str, along, width, heig
     wall, opening_type = _by_guid(wall_guid), _by_guid(type_guid)
     if wall is None or not wall.is_a("IfcWall"):
         return _fail("not a wall")
+    from . import curved_walls
+
+    if (why := curved_walls.refusal([wall])) is not None:  # D97: openings follow straight axes
+        return _fail(why)
     if opening_type is None or not opening_type.is_a(type_class):
         return _fail(f"not a {kind} type")
     try:
@@ -801,8 +893,7 @@ def _profile_types(ifc_class: str, defaults) -> list:
                                           XDim=width / s, YDim=depth / s)
             profile_set = ifcopenshell.api.material.add_material_set(f, name=name, set_type="IfcMaterialProfileSet")
             material_name = "Concrete" if ifc_class == "IfcColumnType" else "Steel"
-            material = next((m for m in f.by_type("IfcMaterial") if m.Name == material_name), None) \
-                or ifcopenshell.api.material.add_material(f, name=material_name)
+            material = materials.ensure(material_name, f)
             ifcopenshell.api.material.add_profile(f, profile_set=profile_set, material=material, profile=profile)
             ifcopenshell.api.material.assign_material(f, products=[t], material=profile_set)
     out = []
@@ -941,6 +1032,83 @@ def _next_tag(existing: set, letters: bool) -> str:
             return tag
 
 
+def _create_axis(storey, p1, p2, tag: str, letters: bool):
+    """One grid axis from p1 to p2 (world metres) on the level's IfcGrid (made on first use); an
+    empty tag takes the next free letter or number. Inside an action. Returns (grid, tag)."""
+    f = B._model
+    grid = _level_grid(storey)
+    if grid is None:
+        grid = ifcopenshell.api.root.create_entity(f, ifc_class="IfcGrid", name="Grid")
+        matrix = np.eye(4)
+        matrix[2][3] = _elevation(storey)
+        ifcopenshell.api.geometry.edit_object_placement(f, product=grid, matrix=matrix, is_si=True)
+        ifcopenshell.api.spatial.assign_container(f, products=[grid], relating_structure=storey)
+    existing = {a.AxisTag for a in _grid_axes(grid)}
+    axis_tag = tag or _next_tag(existing, letters=letters)
+    vertical = abs(p2[1] - p1[1]) >= abs(p2[0] - p1[0])
+    axis = ifcopenshell.api.grid.create_grid_axis(f, grid=grid, axis_tag=axis_tag, uvw_axes="UAxes" if vertical else "VAxes")
+    origin = ifcopenshell.util.placement.get_local_placement(grid.ObjectPlacement)[:3, 3] * _scale()
+    ifcopenshell.api.grid.create_axis_curve(f, p1=np.array([p1[0] - origin[0], p1[1] - origin[1], 0.0]),
+                                            p2=np.array([p2[0] - origin[0], p2[1] - origin[1], 0.0]), grid_axis=axis, is_si=True)
+    return grid, axis_tag
+
+
+def add_grid_system(storey_guid: str, x, y, angle, across_json: str, along_json: str, extension=1.5,
+                    across_labels: str = "numbers", along_labels: str = "letters") -> str:
+    """Archicad's Grid System (D98): a rectangular set of grid axes in one undo step. From the corner
+    (x, y) metres, turned `angle` degrees: `across` = distances between successive lines that cross
+    the x direction (drawn along y; labelled 1, 2, 3... by default), `along` = the same for the lines
+    that run along x (A, B, C...). Lines reach `extension` metres past the outermost lines."""
+    if B._model is None:
+        return _fail("no model open")
+    storey = _by_guid(storey_guid)
+    if storey is None or not storey.is_a("IfcBuildingStorey"):
+        return _fail("unknown level")
+    try:
+        x, y, angle, extension = float(x), float(y), math.radians(float(angle or 0.0)), float(extension)
+        across = [float(v) for v in json.loads(across_json or "[]")]
+        along = [float(v) for v in json.loads(along_json or "[]")]
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    if any(v <= 0 for v in across + along):
+        return _fail("grid spacings must be more than 0")
+    if extension < 0:
+        return _fail("the extension can't be negative")
+    if across_labels not in ("numbers", "letters") or along_labels not in ("numbers", "letters"):
+        return _fail("labels are numbers or letters")
+    xs = [0.0] + list(np.cumsum(across)) if across else [0.0]
+    ys = [0.0] + list(np.cumsum(along)) if along else [0.0]
+    if len(xs) + len(ys) < 2:
+        return _fail("a grid system needs at least one spacing")
+    c, s = math.cos(angle), math.sin(angle)
+
+    def world(u, v):
+        return (x + u * c - v * s, y + u * s + v * c)
+
+    lo_u, hi_u = xs[0] - extension, xs[-1] + extension
+    lo_v, hi_v = ys[0] - extension, ys[-1] + extension
+    if min(hi_u - lo_u, hi_v - lo_v) < MIN_WALL_LENGTH:
+        return _fail("the grid lines have no length: give spacings both ways or an extension")
+    made = {"tags": []}
+
+    def action():
+        for u in xs:  # lines crossing x: numbered
+            grid, t = _create_axis(storey, world(u, lo_v), world(u, hi_v), "", letters=across_labels == "letters")
+            made["grid"] = grid
+            made["tags"].append(t)
+        for v in ys:  # lines along x: lettered
+            grid, t = _create_axis(storey, world(lo_u, v), world(hi_u, v), "", letters=along_labels == "letters")
+            made["grid"] = grid
+            made["tags"].append(t)
+        return len(made["tags"]), [], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "guid": made["grid"].GlobalId, "tags": made["tags"]})
+
+
 def add_grid_axis(storey_guid: str, x1, y1, x2, y2, tag: str = "") -> str:
     """A grid line on a level (its IfcGrid is created on first use). Without a tag, axes closer to
     vertical get letters (A, B, ...) and the others numbers (1, 2, ...)."""
@@ -959,21 +1127,7 @@ def add_grid_axis(storey_guid: str, x1, y1, x2, y2, tag: str = "") -> str:
     made = {}
 
     def action():
-        f = B._model
-        grid = _level_grid(storey)
-        if grid is None:
-            grid = ifcopenshell.api.root.create_entity(f, ifc_class="IfcGrid", name="Grid")
-            matrix = np.eye(4)
-            matrix[2][3] = _elevation(storey)
-            ifcopenshell.api.geometry.edit_object_placement(f, product=grid, matrix=matrix, is_si=True)
-            ifcopenshell.api.spatial.assign_container(f, products=[grid], relating_structure=storey)
-        existing = {a.AxisTag for a in _grid_axes(grid)}
-        axis_tag = tag or _next_tag(existing, letters=vertical)
-        axis = ifcopenshell.api.grid.create_grid_axis(f, grid=grid, axis_tag=axis_tag, uvw_axes="UAxes" if vertical else "VAxes")
-        origin = ifcopenshell.util.placement.get_local_placement(grid.ObjectPlacement)[:3, 3] * _scale()
-        ifcopenshell.api.grid.create_axis_curve(f, p1=np.array([x1 - origin[0], y1 - origin[1], 0.0]),
-                                                p2=np.array([x2 - origin[0], y2 - origin[1], 0.0]), grid_axis=axis, is_si=True)
-        made["grid"], made["tag"] = grid, axis_tag
+        made["grid"], made["tag"] = _create_axis(storey, (x1, y1), (x2, y2), tag, letters=vertical)
         return 1, [], []
 
     try:
@@ -1167,6 +1321,10 @@ def set_wall_axis(wall_guid: str, x1, y1, x2, y2) -> str:
     wall = _by_guid(wall_guid)
     if wall is None or not wall.is_a("IfcWall") or _axis_world(wall) is None:
         return _fail("not a wall with an axis")
+    from . import curved_walls
+
+    if (why := curved_walls.refusal([wall])) is not None:
+        return _fail(why)
     try:
         p1, p2 = np.array([float(x1), float(y1)]), np.array([float(x2), float(y2)])
     except (TypeError, ValueError) as ex:
@@ -1570,6 +1728,12 @@ def _extrusion_depth(element) -> float:
 
 def element_dimensions(e) -> list[tuple[str, float, bool]]:
     """(name, metres, editable) shown in the Properties panel's Dimensions group."""
+    from . import curved_walls
+
+    if e.is_a("IfcWall") and curved_walls.is_curved(e):  # D97: the arc's length, set by its points
+        layer_set = _layer_set(e)
+        return [("Length", curved_walls.length(e), False), ("Height", _wall_height(e), True),
+                ("Thickness", _thickness(layer_set) if layer_set else 0.0, False)]
     if e.is_a("IfcWall") and _axis_world(e) is not None:
         a, b = _axis_world(e)
         layer_set = _layer_set(e)
@@ -1634,6 +1798,10 @@ def set_dimension(guids_json: str, name: str, value) -> str:
         if name not in current:
             continue
         if not current[name][1]:
+            from . import curved_walls
+
+            if name == "Length" and (why := curved_walls.refusal([e])) is not None:
+                return _fail(why)
             return _fail(f"{name} can't be changed here (it comes from the type)")
         if e.is_a("IfcDoor") or e.is_a("IfcWindow"):
             opening, wall, along, width, height, sill = _opening_info(e)
@@ -1648,6 +1816,10 @@ def set_dimension(guids_json: str, name: str, value) -> str:
             p2 = a + (b - a) / np.linalg.norm(b - a) * metres
             plan.append(("wall-length", e, (a, p2, _stretch_plan(e, a, p2))))
         elif e.is_a("IfcWall"):
+            from . import configure
+
+            if configure.profile_of(e):
+                return _fail(f"{e.Name or 'the wall'} takes its height from its profile")
             plan.append(("wall-height", e, metres))
         elif e.is_a("IfcColumn") or e.is_a("IfcBeam"):
             element_type = ifcopenshell.util.element.get_type(e)
@@ -1680,6 +1852,14 @@ def set_dimension(guids_json: str, name: str, value) -> str:
                 changed += [e.GlobalId, *(n.GlobalId for n in neighbours),
                             *(x.GlobalId for x in _hosted(e) if not x.is_a("IfcOpeningElement"))]
             elif kind == "wall-height":
+                from . import configure
+
+                if configure.is_double_slanted(e) or configure._pset(e, configure.WALL_PSET).get("Arc"):
+                    # D97: swept and curved walls keep their height themselves (the depth is their length)
+                    configure._write_pset(e, configure.WALL_PSET, {"Height": float(data)})
+                    _regenerate(f, e, height=data)
+                    changed.append(e.GlobalId)
+                    continue
                 body = ifcopenshell.util.representation.get_representation(e, "Model", "Body", "MODEL_VIEW")
                 for solid in (f.traverse(body) if body is not None else ()):
                     if solid.is_a("IfcExtrudedAreaSolid"):
@@ -1748,7 +1928,9 @@ def create_model(name: str) -> str:
     levels = B._model.by_type("IfcBuildingStorey")
     if any((l.Name or "") == name for l in levels):
         return _fail(f"there is already a level or model called {name}")
-    elevation = min([_elevation(l) for l in levels] + [0.0]) - MODEL_DEPTH
+    from .worksheets import is_worksheet
+
+    elevation = min([_elevation(l) for l in levels if not is_worksheet(l)] + [0.0]) - MODEL_DEPTH
     made = {}
 
     def action():

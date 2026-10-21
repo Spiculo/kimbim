@@ -20,6 +20,7 @@ from pathlib import Path
 
 import ifcopenshell.api.root
 import ifcopenshell.util.element
+import numpy as np
 
 from . import app_bridge as B
 from . import authoring as A
@@ -181,7 +182,7 @@ def create_drawings() -> str:
         return A._fail("no model open")
     have_plans = _plans_by_storey()
     stories = [st for st in B._model.by_type("IfcBuildingStorey")
-               if st.GlobalId not in have_plans and not A._is_model(st)]
+               if st.GlobalId not in have_plans and not A._is_model(st)]  # worksheets make their own
     have = {G.settings_of(d).get("side") for d in _drawings()}
     missing = [side for side in SIDES if side not in have]
 
@@ -555,6 +556,66 @@ def generate_drawing(guid: str, include_json: str = "") -> str:
     return B._dump(r)
 
 
+def _clip_half(poly, a, b, c):
+    """The part of a 2D polygon where a*x + b*y + c >= 0 (Sutherland-Hodgman)."""
+    out = []
+    n = len(poly)
+    for i in range(n):
+        p, q = poly[i], poly[(i + 1) % n]
+        dp, dq = a * p[0] + b * p[1] + c, a * q[0] + b * q[1] + c
+        if dp >= 0:
+            out.append(p)
+        if (dp > 0 > dq) or (dp < 0 < dq):
+            t = dp / (dp - dq)
+            out.append((p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t))
+    return out
+
+
+def _layer_pieces(guid, loops, to_world):
+    """D96: an element's cut loops split into its layers, [(layer index, polygon)], or None when it is
+    not layered (or its layers do not cross this cut). `to_world(x, y)` -> world (x, y, z) in metres;
+    loops are in the drawing's 2D coordinates."""
+    from . import configure, materials
+
+    try:
+        if configure.profile_of(B._model.by_guid(guid)):  # D97: one fill for a complex profile
+            return None
+        bands = materials.layer_bands(B._model.by_guid(guid))
+    except Exception:
+        return None
+    if bands is None:
+        return None
+    o, axis = np.asarray(bands["origin"]), np.asarray(bands["axis"])
+    # the distance along the layer axis is linear in the drawing's x, y: a*x + b*y + c
+    p0, px, py = (np.asarray(to_world(*xy)) for xy in ((0.0, 0.0), (1.0, 0.0), (0.0, 1.0)))
+    c = float((p0 - o) @ axis)
+    a, b = float((px - p0) @ axis), float((py - p0) @ axis)
+    if math.hypot(a, b) < 0.5:  # the layers stack across the drawing's plane: one layer shows
+        return None
+    pieces = []
+    for k in range(len(bands["bounds"]) - 1):
+        lo, hi = sorted(bands["bounds"][k:k + 2])
+        if hi - lo < 1e-6:
+            continue
+        for loop in loops:
+            poly = _clip_half([tuple(map(float, pt)) for pt in loop], a, b, c - lo)
+            poly = _clip_half(poly, -a, -b, hi - c) if len(poly) >= 3 else []
+            if len(poly) >= 3:
+                pieces.append((k, poly))
+    return pieces
+
+
+def _cut_group(guid, loops, to_paper, to_world, path) -> str:
+    """A cut element's SVG group: one filled path per layer for a composite (D96), then its outline."""
+    pieces = _layer_pieces(guid, loops, to_world)
+    if not pieces:
+        body = "".join(path(loop) for loop in loops)
+        return f'<g ifc:guid="{guid}">{body}</g>' if body else ""
+    layers = "".join(path(poly).replace("<path ", f'<path data-layer="{k}" ', 1) for k, poly in pieces)
+    outline = "".join(path(loop).replace("<path ", '<path fill="none" ', 1) for loop in loops)
+    return f'<g ifc:guid="{guid}">{layers}{outline}</g>'
+
+
 def _plan_base_svg(g) -> str:
     """A plan drawing's base SVG from the app's meshes (no hidden-line pass). `g` is the geometry the
     viewport extracted: cut loops (poché) and projection loops, world x,y. Paper millimetres at the
@@ -577,11 +638,17 @@ def _plan_base_svg(g) -> str:
             out.append(f'<path d="{d}"/>')
         return "".join(out)
 
+    def one(loop) -> str:
+        pts = [to_paper(px, py) for px, py in loop]
+        if len(pts) < 3:
+            return ""
+        return '<path d="M' + " L".join(f"{px:.3f},{py:.3f}" for px, py in pts) + ' Z"/>'
+
     parts = []
-    for e in g["cut"]:  # walls and slabs cut by the plane: filled poché
-        body = paths(e["loops"])
-        if body:
-            parts.append(f'<g ifc:guid="{e["guid"]}">{body}</g>')
+    for e in g["cut"]:  # walls and slabs cut by the plane: filled poché (by layer, D96)
+        group = _cut_group(e["guid"], e["loops"], to_paper, lambda x, y: (x, y, 0.0), one)
+        if group:
+            parts.append(group)
     for e in g["proj"]:  # below the cut: their top outline, in projection
         body = paths(e["loops"])
         if body:
@@ -661,10 +728,13 @@ def _view_base_svg(g) -> str:
         body = "".join(path([(x1, y1), (x2, y2)], False) for x1, y1, x2, y2 in e["lines"])
         if body:
             parts.append(f'<g class="projection" ifc:guid="{e["guid"]}">{body}</g>')
+    view = np.asarray(plane, dtype=float)
     for e in g["cut"]:
-        body = "".join(path([(x, y) for x, y in loop], True) for loop in e["loops"])
-        if body:
-            parts.append(f'<g ifc:guid="{e["guid"]}">{body}</g>')
+        group = _cut_group(e["guid"], e["loops"], to_paper,
+                           lambda x, y: tuple((view @ np.array([x, y, 0.0, 1.0]))[:3]),
+                           lambda loop: path([(x, y) for x, y in loop], True))
+        if group:
+            parts.append(group)
     plane_json = json.dumps(plane, separators=(",", ":"))
     m3_json = json.dumps(m3, separators=(",", ":"))
     return ('<svg xmlns="http://www.w3.org/2000/svg" xmlns:ifc="http://www.ifcopenshell.org/ns" '

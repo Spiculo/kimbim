@@ -62,6 +62,8 @@ QJsonObject Preferences::defaults()
         {"field_of_view", 45.0},
         {"north_arrow", true},
         {"mesh_vertex_snaps", false},
+        {"grid_show", true},  // D98: the construction grid in plans
+        {"grid_snap", false}, // D98: free points snap to it
         {"keep_rectangles_rectangular", false},
         {"underlay_opacity", 0.5},
         {"underlay_greyscale", false},

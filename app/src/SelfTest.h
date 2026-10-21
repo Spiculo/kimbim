@@ -21,6 +21,7 @@ struct SelfTestOptions {
     bool planView = false;        // switch to the plan view of the lowest level before the screenshot
     QString underlay;             // D85: "file[;opacity[;x;y]]" placed on the active level after loading
     bool linesOnly = false;       // lines-only display before measuring/screenshot
+    QStringList trigger;          // --real-open: actions (object names) triggered before the screenshot
     bool benchTools = false;      // time tool previews and wall creation (ms), report them
     bool house = false;           // new project: walls, slab from walls, a door and a window
     QString drawWalls;            // "x,y;x,y;...": new project, draw this wall polyline with the wall tool

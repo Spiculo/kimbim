@@ -59,6 +59,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QLineEdit>
+#include <QRegularExpression>
 #include <QLineF>
 #include <QTreeWidgetItem>
 #include <QJsonObject>
@@ -97,6 +98,7 @@
 #include "LayersPanel.h"
 #include "LevelsBar.h"
 #include "LevelsDialog.h"
+#include "MaterialsDialog.h"
 #include "InputAidsController.h"
 #include "MeasureController.h"
 #include "HostTool.h"
@@ -169,6 +171,10 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
             setCurrentPen(pen);
     });
     connect(m_status, &StatusStrip::layerVisibilityToggled, this, &MainWindow::setLayerVisible);
+    if (m_gridSnap) { // D98: grid snap in reach, as in Archicad's status bar
+        m_gridSnap->setIconText(tr("Grid snap"));
+        m_status->addToggle(m_gridSnap);
+    }
     setWindowTitle(QStringLiteral("KimBim"));
     resize(1280, 800);
     // The plan-cut height slider at the right edge of the active model view (owner feedback).
@@ -230,6 +236,9 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     connect(m_properties, &PropertiesPanel::statusEdited, this, [this](const QString& s) {
         // after the drop-down's own signal: setRenovationStatus rebuilds the panel
         QMetaObject::invokeMethod(this, [this, s] { setRenovationStatus(s); }, Qt::QueuedConnection);
+    });
+    connect(m_properties, &PropertiesPanel::materialEdited, this, [this](const QString& kind, const QString& name) {
+        QMetaObject::invokeMethod(this, [this, kind, name] { setElementMaterial(kind, name); }, Qt::QueuedConnection);
     });
     connect(m_properties, &PropertiesPanel::nameEdited, this, &MainWindow::applyName);
     connect(m_properties, &PropertiesPanel::propertyRemoved, this, &MainWindow::removeProperty);
@@ -473,12 +482,19 @@ void MainWindow::buildMenus()
         return a;
     };
     editAction(tr("&Copy"), "actionCopy", QKeySequence::Copy, [this] { copyToClipboard(); });
+    // D97: Archicad's Pick Up / Inject Parameters (the eyedropper and the syringe).
+    editAction(tr("Pick &up settings"), "actionPickUp", QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_C),
+        [this] { pickUpSettings(); });
+    editAction(tr("&Inject settings"), "actionInject", QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_V),
+        [this] { injectSettings(); });
     editAction(tr("&Paste"), "actionPaste", QKeySequence::Paste, [this] { paste(); });
     editAction(tr("D&uplicate"), "actionDuplicate", QKeySequence(Qt::CTRL | Qt::Key_D), [this] { duplicateSelection(); });
     editAction(tr("&Mirror"), "actionMirror", QKeySequence(Qt::CTRL | Qt::Key_M), [this](bool on) { setTool(on ? Tool::Mirror : Tool::None); })
         ->setToolTip(tr("Mirror the selection: click two points of the mirror line (hold Ctrl on the second click to mirror a copy)"));
     editAction(tr("Multi&ply..."), "actionMultiply", QKeySequence(Qt::CTRL | Qt::Key_U), [this] { multiplyDialog(); });
     editAction(tr("&Offset..."), "actionOffset", QKeySequence(), [this] { offsetDialog(); });
+    editAction(tr("&Fillet/Chamfer..."), "actionFillet", QKeySequence(), [this] { filletDialog(); }) // D98
+        ->setToolTip(tr("Round or cut the corners of the selected slabs, polylines and fills, or of two walls meeting at a corner"));
     // D78: selection tools (Archicad's Find & Select; Revit's Select All Instances).
     editMenu->addSeparator();
     editAction(tr("Select &similar"), "actionSelectSimilar", QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_A),
@@ -536,6 +552,17 @@ void MainWindow::buildMenus()
     linesOnly->setCheckable(true);
     linesOnly->setToolTip(tr("Show the model as a line drawing (hidden lines removed), e.g. for plans"));
     connect(linesOnly, &QAction::toggled, m_viewport, &Viewport::setLinesOnly);
+    // D96: Archicad's 3D styles: a white model (surfaces white, contours and glass kept) and sun shadows.
+    QAction* white = view->addAction(tr("&White model"));
+    white->setObjectName(QStringLiteral("actionWhiteModel"));
+    white->setCheckable(true);
+    white->setToolTip(tr("Show every surface white, as a study model (the contours and glass stay)"));
+    connect(white, &QAction::toggled, m_viewport, &Viewport::setWhiteModel);
+    QAction* shadows = view->addAction(tr("Sun s&hadows"));
+    shadows->setObjectName(QStringLiteral("actionShadows"));
+    shadows->setCheckable(true);
+    shadows->setToolTip(tr("The sun casts shadows in the 3D views"));
+    connect(shadows, &QAction::toggled, m_viewport, &Viewport::setShadows);
     QAction* trueWeights = view->addAction(tr("&True line weights"));
     trueWeights->setObjectName(QStringLiteral("actionTrueLineWeights"));
     trueWeights->setCheckable(true);
@@ -546,6 +573,114 @@ void MainWindow::buildMenus()
     QAction* fit = view->addAction(tr("&Fit all"));
     fit->setShortcut(Qt::Key_F);
     connect(fit, &QAction::triggered, this, [this] { m_viewport->fitAll(); });
+    // D98: Archicad's Zoom to Selection.
+    QAction* fitSelection = view->addAction(tr("&Zoom to selection"));
+    fitSelection->setObjectName(QStringLiteral("actionZoomToSelection"));
+    fitSelection->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_F));
+    connect(fitSelection, &QAction::triggered, this, [this] {
+        if (!m_selection.isEmpty())
+            m_viewport->fitTo(m_selection);
+        else
+            m_viewport->fitAll();
+    });
+    // D98: Archicad's construction grid (Grids & Background): shown in plans, snapped to on request.
+    m_gridShow = view->addAction(tr("Construction &grid"));
+    m_gridShow->setObjectName(QStringLiteral("actionConstructionGrid"));
+    m_gridShow->setCheckable(true);
+    m_gridShow->setChecked(m_prefs.value(QStringLiteral("grid_show")).toBool(true));
+    connect(m_gridShow, &QAction::toggled, this, [this](bool on) {
+        m_prefs.setValue(QStringLiteral("grid_show"), on);
+        m_prefs.save();
+        refreshConstructionGrid();
+    });
+    m_gridSnap = view->addAction(tr("Grid &snap"));
+    m_gridSnap->setObjectName(QStringLiteral("actionGridSnap"));
+    m_gridSnap->setCheckable(true);
+    m_gridSnap->setShortcut(QKeySequence(Qt::ALT | Qt::Key_G));
+    m_gridSnap->setToolTip(tr("Free points jump to the construction grid's lines"));
+    m_gridSnap->setIcon(themedIcon(QStringLiteral("grid")));
+    m_gridSnap->setChecked(m_prefs.value(QStringLiteral("grid_snap")).toBool(false));
+    connect(m_gridSnap, &QAction::toggled, this, [this](bool on) {
+        m_prefs.setValue(QStringLiteral("grid_snap"), on);
+        m_prefs.save();
+        refreshConstructionGrid();
+        m_status->showMessage(on ? tr("Grid snap on") : tr("Grid snap off"));
+    });
+    if (m_status) { // D98: grid snap in reach, as in Archicad's status bar (or added with the strip)
+        m_gridSnap->setIconText(tr("Grid snap"));
+        m_status->addToggle(m_gridSnap);
+    }
+    QAction* gridOptions = view->addAction(tr("Grid &options..."));
+    gridOptions->setObjectName(QStringLiteral("actionGridOptions"));
+    connect(gridOptions, &QAction::triggered, this, &MainWindow::gridOptionsDialog);
+    // D98: Archicad's Go to story above/below.
+    QAction* up = view->addAction(tr("Level a&bove"));
+    up->setObjectName(QStringLiteral("actionLevelUp"));
+    up->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Up));
+    connect(up, &QAction::triggered, this, [this] {
+        if (!m_levels->step(1))
+            m_status->showMessage(tr("This is the top level"));
+    });
+    QAction* down = view->addAction(tr("Level be&low"));
+    down->setObjectName(QStringLiteral("actionLevelDown"));
+    down->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Down));
+    connect(down, &QAction::triggered, this, [this] {
+        if (!m_levels->step(-1))
+            m_status->showMessage(tr("This is the bottom level"));
+    });
+    { // D98: Archicad's Trace & Reference: another level's plan, faint, under the active one.
+        QMenu* trace = view->addMenu(tr("&Trace reference"));
+        trace->setObjectName(QStringLiteral("menuTrace"));
+        auto* group = new QActionGroup(trace);
+        const std::pair<const char*, QString> modes[] = {{"actionTraceOff", QString()},
+            {"actionTraceBelow", QStringLiteral("below")}, {"actionTraceAbove", QStringLiteral("above")}};
+        const QString labels[] = {tr("&Off"), tr("Level &below"), tr("Level &above")};
+        for (int i = 0; i < 3; ++i) {
+            QAction* a = trace->addAction(labels[i]);
+            a->setObjectName(QLatin1String(modes[i].first));
+            a->setData(modes[i].second);
+            a->setCheckable(true);
+            a->setChecked(i == 0);
+            group->addAction(a);
+            connect(a, &QAction::triggered, this, [this, mode = modes[i].second] { setTraceMode(mode); });
+        }
+        m_traceTimer = new QTimer(this);
+        m_traceTimer->setSingleShot(true);
+        m_traceTimer->setInterval(600);
+        connect(m_traceTimer, &QTimer::timeout, this, [this] {
+            m_traceCache.clear();
+            refreshUnderlays();
+        });
+    }
+    // D98: Archicad's special snap points: a wall's divisions and a distance from its ends.
+    QAction* special = view->addAction(tr("Special snap &points..."));
+    special->setObjectName(QStringLiteral("actionSpecialSnapPoints"));
+    special->setToolTip(tr("Snap to equal divisions of walls and to a distance from their ends"));
+    connect(special, &QAction::triggered, this, [this] {
+        QDialog dialog(this);
+        dialog.setWindowTitle(tr("Special snap points"));
+        auto* form = new QFormLayout(&dialog);
+        auto* divisions = new QSpinBox(&dialog);
+        divisions->setObjectName(QStringLiteral("snapDivisions"));
+        divisions->setRange(2, 50);
+        divisions->setSpecialValueText(tr("Off (middle only)"));
+        divisions->setValue(std::max(2, m_prefs.value(QStringLiteral("snap_divisions")).toInt(2)));
+        form->addRow(tr("Divide walls into:"), divisions);
+        auto* distance = new QDoubleSpinBox(&dialog);
+        distance->setObjectName(QStringLiteral("snapDistance"));
+        distance->setRange(0.0, 100.0);
+        distance->setDecimals(3);
+        distance->setSuffix(QStringLiteral(" m"));
+        distance->setSpecialValueText(tr("Off"));
+        distance->setValue(m_prefs.value(QStringLiteral("snap_distance")).toDouble(0.0));
+        form->addRow(tr("Distance from the ends:"), distance);
+        auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+        connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+        connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+        form->addRow(buttons);
+        if (dialog.exec() == QDialog::Accepted)
+            setSpecialSnapPoints(divisions->value(), distance->value());
+    });
     { // D76: preset views and perspective for the active view (the view cube lives in Viewport).
         QMenu* views = view->addMenu(tr("&Views"));
         views->setObjectName(QStringLiteral("menuViews"));
@@ -666,6 +801,22 @@ void MainWindow::buildMenus()
     editor("actionPenSets", tr("&Pen sets..."), [this](const QJsonObject& r) { return new PenSetsDialog(r, this); });
     editor("actionLineTypes", tr("&Line types..."), [this](const QJsonObject& r) { return new LineTypesDialog(r, this); });
     editor("actionElementStyles", tr("&Element styles..."), [this](const QJsonObject& r) { return new ElementStylesDialog(r, this); });
+    graphics->addSeparator();
+    // D96: Archicad's element attributes (Surfaces, Building Materials, Composites), one dialog.
+    auto materials = [this, graphics](const char* name, const QString& text, MaterialsEdits::Kind kind) {
+        QAction* a = graphics->addAction(text);
+        a->setObjectName(QLatin1String(name));
+        connect(a, &QAction::triggered, this, [this, kind] { materialsDialog(kind); });
+    };
+    materials("actionBuildingMaterials", tr("Building &materials..."), MaterialsEdits::Materials);
+    materials("actionSurfaces", tr("&Surfaces..."), MaterialsEdits::Surfaces);
+    materials("actionComposites", tr("&Composites..."), MaterialsEdits::Composites);
+    QAction* standard = graphics->addAction(tr("Add standard materials"));
+    standard->setObjectName(QStringLiteral("actionStandardMaterials"));
+    connect(standard, &QAction::triggered, this, [this] { materialsCommand("add_standard_materials", tr("Standard materials added")); });
+    QAction* purge = graphics->addAction(tr("Purge unused materials"));
+    purge->setObjectName(QStringLiteral("actionPurgeMaterials"));
+    connect(purge, &QAction::triggered, this, [this] { materialsCommand("purge_materials", tr("Unused materials removed")); });
     graphics->addSeparator();
     editor("actionVisibilitySets", tr("&Visibility sets..."), [this](const QJsonObject& r) { return new VisibilitySetsDialog(r, this); });
     editor("actionOverrides", tr("Graphic &overrides..."), [this](const QJsonObject& r) { return new OverridesDialog(r, this); });
@@ -816,6 +967,26 @@ void MainWindow::buildCutsToolbar()
         if (ok && !name.trimmed().isEmpty())
             createModel(name.trimmed());
     });
+    connect(m_levels, &LevelsBar::newWorksheetRequested, this, [this] {
+        bool ok = false;
+        const QString name = QInputDialog::getText(this, tr("New worksheet"),
+            tr("Worksheet name (e.g. Window details):"), QLineEdit::Normal, QString(), &ok);
+        if (ok && !name.trimmed().isEmpty())
+            createWorksheet(name.trimmed());
+    });
+    connect(m_levels, &LevelsBar::renameWorksheetRequested, this, [this](const QString& guid) {
+        bool ok = false;
+        const QString current = m_levels->activeName();
+        const QString name = QInputDialog::getText(this, tr("Rename worksheet"), tr("Name:"), QLineEdit::Normal, current, &ok);
+        if (ok && !name.trimmed().isEmpty() && name.trimmed() != current)
+            worksheetCommand("rename_worksheet", {guid, name.trimmed()});
+    });
+    connect(m_levels, &LevelsBar::deleteWorksheetRequested, this, [this](const QString& guid) {
+        if (QMessageBox::question(this, tr("Delete worksheet"),
+                tr("Delete the worksheet %1 with everything drawn on it? (Undo brings it back.)").arg(m_levels->activeName()))
+            == QMessageBox::Yes)
+            worksheetCommand("delete_worksheet", {guid});
+    });
     connect(m_levels, &LevelsBar::activeStoreyChanged, this, [this](const QString& storey, double elevation) {
         if (ViewHost* host = m_hosts.value(m_dock->current()); host && !host->storey().isEmpty() && host->storey() != storey) {
             openPlanTab(storey); // a plan tab shows one level: another level is another tab
@@ -835,6 +1006,7 @@ void MainWindow::buildCutsToolbar()
         applyCuts();
         refreshLayers(); // models show only while one is active
         refreshAnnotations(); // each level has its own
+        refreshDrawings(); // D98: worksheets show no section or elevation markers
     });
     auto cutButton = [this](QAction* action) {
         auto* b = new QToolButton(m_titleBar);
@@ -1415,6 +1587,15 @@ bool MainWindow::applyPropertyEdit(const QString& pset, const QString& prop, con
         }
         return all;
     }
+    // D97: wall geometry (reference line, slant) and surface overrides.
+    if (pset == QLatin1String("Geometry") || pset == QLatin1String("Surfaces")) {
+        const QJsonObject r = bridge("set_element_setting", {jsonList(m_selection), pset, prop,
+            value.isDouble() ? QString::number(value.toDouble(), 'g', 17) : value.toString()});
+        if (!r.value("ok").toBool())
+            showError(tr("Could not change %1").arg(prop), r.value("error").toString());
+        afterEdit(r);
+        return r.value("ok").toBool();
+    }
     const bool dimension = pset == QLatin1String("Dimensions");
     const bool parameter = pset == QLatin1String("Parameters"); // D86: a library object's (its type follows)
     QString scope; // D92: edit the selection (default) or ask when the type is shared
@@ -1638,6 +1819,218 @@ void MainWindow::levelsDialog()
     m_status->showMessage(tr("Levels changed"));
 }
 
+void MainWindow::materialsDialog(MaterialsEdits::Kind kind)
+{
+    // D96: edited in the dialog, applied on OK as one undo step (like the Levels dialog).
+    const QJsonObject state = bridge("materials_state");
+    if (!state.value("ok").toBool()) {
+        showError(tr("Materials"), state.value("error").toString());
+        return;
+    }
+    MaterialsDialog dialog(state, m_viewport->graphics().pens(), this);
+    dialog.showTab(kind);
+    if (dialog.exec() != QDialog::Accepted || !dialog.edits().modified())
+        return;
+    const QJsonObject r = bridge("apply_materials",
+        {QString::fromUtf8(QJsonDocument(dialog.edits().changes()).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not change the materials"), r.value("error").toString());
+        return;
+    }
+    afterEdit(r); // also restyles: cut fills come from the materials
+    m_status->showMessage(tr("Materials changed"));
+}
+
+bool MainWindow::setElementMaterial(const QString& kind, const QString& name)
+{
+    if (m_selection.isEmpty())
+        return false;
+    const QJsonObject r = bridge("assign_material", {jsonList(m_selection), kind, name});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(r.value("error").toString());
+        refreshProperties();
+        return false;
+    }
+    afterEdit(r); // also restyles: the cut fill follows the material
+    m_status->showMessage(tr("%n element(s) changed", nullptr, r.value("changed").toInt()));
+    return true;
+}
+
+void MainWindow::materialsCommand(const char* command, const QString& done)
+{
+    const QJsonObject r = bridge(command);
+    if (!r.value("ok").toBool()) {
+        showError(tr("Materials"), r.value("error").toString());
+        return;
+    }
+    afterEdit(r);
+    m_status->showMessage(done);
+}
+
+void MainWindow::refreshConstructionGrid()
+{
+    // D98: the project's grid (spacing, subdivisions, angle, origin) with the user's show/snap toggles.
+    if (!m_wallTool)
+        return; // the tools are not built yet
+    const QJsonObject g = m_settings.value("construction_grid").toObject();
+    const double spacing = g.value("spacing").toDouble(1.0);
+    const int subdivisions = std::max(1, g.value("subdivisions").toInt(4));
+    const double angle = g.value("angle").toDouble(0.0) * M_PI / 180.0;
+    const QJsonArray o = g.value("origin").toArray();
+    const QPointF origin(o.size() == 2 ? o[0].toDouble() : 0.0, o.size() == 2 ? o[1].toDouble() : 0.0);
+    const bool snap = m_gridSnap && m_gridSnap->isChecked();
+    for (Snapper* s : {&m_wallTool->snapper(), &m_polygonTool->snapper(), &m_twoPointTool->snapper(),
+             &m_rotateTool->snapper(), &m_gripTool->snapper(), &m_measure->tool()->snapper(), &m_modifyTool->snapper(),
+             &m_draftTool->snapper()})
+    {
+        s->setSnapGrid(origin, angle, snap ? spacing / subdivisions : 0.0);
+        s->setSpecialPoints(m_prefs.value(QStringLiteral("snap_divisions")).toInt(0),
+            m_prefs.value(QStringLiteral("snap_distance")).toDouble(0.0)); // D98
+    }
+    Viewport::ConstructionGrid grid;
+    grid.show = m_gridShow && m_gridShow->isChecked();
+    grid.spacing = spacing;
+    grid.subdivisions = subdivisions;
+    grid.angle = angle;
+    grid.origin = origin;
+    // just over the level's floor: behind furniture, stairs and walls, like Archicad's background grid
+    grid.z = (m_levels ? m_levels->activeElevation() : 0.0) + 0.003;
+    if (m_viewport)
+        m_viewport->setConstructionGrid(grid);
+}
+
+void MainWindow::setSpecialSnapPoints(int divisions, double distance)
+{
+    m_prefs.setValue(QStringLiteral("snap_divisions"), divisions > 2 ? divisions : 0);
+    m_prefs.setValue(QStringLiteral("snap_distance"), std::max(0.0, distance));
+    m_prefs.save();
+    refreshConstructionGrid();
+    m_status->showMessage(divisions > 2 || distance > 0
+            ? tr("Special snap points: %1 divisions, %2 m from the ends").arg(divisions > 2 ? divisions : 2).arg(distance)
+            : tr("Special snap points off"));
+}
+
+void MainWindow::gridOptionsDialog()
+{
+    const QJsonObject g = m_settings.value("construction_grid").toObject();
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Grid options"));
+    dialog.setObjectName(QStringLiteral("gridOptionsDialog"));
+    auto* form = new QFormLayout(&dialog);
+    auto number = [&](const char* name, double value, double lo, double hi, int decimals, const QString& suffix) {
+        auto* s = new QDoubleSpinBox(&dialog);
+        s->setObjectName(QLatin1String(name));
+        s->setRange(lo, hi);
+        s->setDecimals(decimals);
+        s->setSuffix(suffix);
+        s->setValue(value);
+        return s;
+    };
+    const QJsonArray o = g.value("origin").toArray();
+    auto* spacing = number("gridSpacing", g.value("spacing").toDouble(1.0), 0.01, 1000.0, 3, QStringLiteral(" m"));
+    auto* subdivisions = new QSpinBox(&dialog);
+    subdivisions->setObjectName(QStringLiteral("gridSubdivisions"));
+    subdivisions->setRange(1, 100);
+    subdivisions->setValue(g.value("subdivisions").toInt(4));
+    auto* angle = number("gridAngle", g.value("angle").toDouble(0.0), -360.0, 360.0, 2, QStringLiteral("\u00b0"));
+    auto* ox = number("gridOriginX", o.size() == 2 ? o[0].toDouble() : 0.0, -1e6, 1e6, 3, QStringLiteral(" m"));
+    auto* oy = number("gridOriginY", o.size() == 2 ? o[1].toDouble() : 0.0, -1e6, 1e6, 3, QStringLiteral(" m"));
+    form->addRow(tr("Main line spacing:"), spacing);
+    form->addRow(tr("Subdivisions:"), subdivisions);
+    form->addRow(tr("Angle:"), angle);
+    form->addRow(tr("Origin x:"), ox);
+    form->addRow(tr("Origin y:"), oy);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    form->addRow(buttons);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    setConstructionGrid(spacing->value(), subdivisions->value(), angle->value(), QPointF(ox->value(), oy->value()));
+}
+
+void MainWindow::gridSystemDialog()
+{
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Grid system"));
+    dialog.setObjectName(QStringLiteral("gridSystemDialog"));
+    auto* form = new QFormLayout(&dialog);
+    auto number = [&](const char* name, double value, double lo, double hi, const QString& suffix) {
+        auto* s = new QDoubleSpinBox(&dialog);
+        s->setObjectName(QLatin1String(name));
+        s->setRange(lo, hi);
+        s->setDecimals(3);
+        s->setSuffix(suffix);
+        s->setValue(value);
+        return s;
+    };
+    auto* across = new QLineEdit(QStringLiteral("6 6 6"), &dialog);
+    across->setObjectName(QStringLiteral("gridAcross"));
+    across->setToolTip(tr("Distances between the numbered lines, in metres (e.g. 6 6 4.5)"));
+    auto* along = new QLineEdit(QStringLiteral("5 5"), &dialog);
+    along->setObjectName(QStringLiteral("gridAlong"));
+    along->setToolTip(tr("Distances between the lettered lines, in metres"));
+    auto* x = number("gridSystemX", 0.0, -1e6, 1e6, QStringLiteral(" m"));
+    auto* y = number("gridSystemY", 0.0, -1e6, 1e6, QStringLiteral(" m"));
+    auto* angle = number("gridSystemAngle", 0.0, -360.0, 360.0, QString::fromUtf8("°"));
+    auto* extension = number("gridSystemExtension", 1.5, 0.0, 100.0, QStringLiteral(" m"));
+    form->addRow(tr("Numbered lines (1, 2, 3...) spacings:"), across);
+    form->addRow(tr("Lettered lines (A, B, C...) spacings:"), along);
+    form->addRow(tr("First crossing x:"), x);
+    form->addRow(tr("First crossing y:"), y);
+    form->addRow(tr("Angle:"), angle);
+    form->addRow(tr("Lines reach past the last crossing by:"), extension);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    form->addRow(buttons);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    auto spacings = [](const QString& text) {
+        QJsonArray out;
+        for (const QString& part : text.split(QRegularExpression(QStringLiteral("[\\s;]+")), Qt::SkipEmptyParts)) {
+            bool ok = false;
+            const double v = QLocale().toDouble(part, &ok);
+            out.append(ok ? v : QLocale::c().toDouble(part));
+        }
+        return out;
+    };
+    addGridSystem(QPointF(x->value(), y->value()), angle->value(), spacings(across->text()), spacings(along->text()),
+        extension->value());
+}
+
+bool MainWindow::addGridSystem(QPointF corner, double angleDegrees, const QJsonArray& across, const QJsonArray& along,
+    double extension)
+{
+    auto num = [](double v) { return QString::number(v, 'g', 17); };
+    auto compact = [](const QJsonArray& a) { return QString::fromUtf8(QJsonDocument(a).toJson(QJsonDocument::Compact)); };
+    const QJsonObject r = bridge("add_grid_system", {m_levels->activeStorey(), num(corner.x()), num(corner.y()),
+        num(angleDegrees), compact(across), compact(along), num(extension)});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not add the grid system"), r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
+    m_status->showMessage(tr("%n grid line(s) added", nullptr, r.value("changed").toInt()));
+    return true;
+}
+
+bool MainWindow::setConstructionGrid(double spacing, int subdivisions, double angleDegrees, QPointF origin)
+{
+    const QJsonObject grid{{"spacing", spacing}, {"subdivisions", subdivisions}, {"angle", angleDegrees},
+        {"origin", QJsonArray{origin.x(), origin.y()}}};
+    const QJsonObject r = bridge("set_project_settings", {QString::fromUtf8(QJsonDocument(QJsonObject{
+        {"construction_grid", grid}}).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Grid options"), r.value("error").toString());
+        return false;
+    }
+    m_settings = bridge("project_settings").value("settings").toObject();
+    setWindowModified(isDirty());
+    refreshConstructionGrid();
+    return true;
+}
+
 void MainWindow::setPlanView(bool plan)
 {
     // D71: a plan is its level's tab; 3 goes back to the 3D tab.
@@ -1786,6 +2179,41 @@ void MainWindow::buildModelingToolbar()
     explode->setObjectName(QStringLiteral("actionExplodeInstance"));
     explode->setToolTip(tr("Unlink the selected instance: its elements become ordinary elements you can edit one by one"));
     connect(explode, &QAction::triggered, this, &MainWindow::explodeSelectedInstance);
+    // D97: Archicad's Flip: the composite mirrors about the reference line (the outside skin changes side).
+    QAction* flipAction = model->addAction(tr("&Flip walls"));
+    flipAction->setObjectName(QStringLiteral("actionFlipWalls"));
+    flipAction->setToolTip(tr("Mirror the selected walls' layers about their reference lines"));
+    connect(flipAction, &QAction::triggered, this, [this] { flipWalls(m_selection); });
+    // D98: Archicad's Grid System: a rectangular set of grid axes at once.
+    QAction* gridSystem = model->addAction(tr("Grid s&ystem..."));
+    gridSystem->setObjectName(QStringLiteral("actionGridSystem"));
+    gridSystem->setToolTip(tr("Several grid lines at once: numbered across, lettered along"));
+    connect(gridSystem, &QAction::triggered, this, &MainWindow::gridSystemDialog);
+    // D97: Archicad's Profile Manager: a closed shape drawn in 2D becomes a wall section (Properties > Profile).
+    QAction* saveProfile = model->addAction(tr("Save shape as wall &profile..."));
+    saveProfile->setObjectName(QStringLiteral("actionSaveWallProfile"));
+    saveProfile->setToolTip(tr("Select a closed polyline, rectangle or fill drawn as a wall's section, then name it"));
+    connect(saveProfile, &QAction::triggered, this, [this] {
+        if (m_selection.size() != 1) {
+            m_status->showMessage(tr("Select one closed shape: the wall's section"));
+            return;
+        }
+        bool ok = false;
+        const QString name = QInputDialog::getText(this, tr("Wall profile"), tr("Profile name:"), QLineEdit::Normal,
+            QString(), &ok);
+        if (ok && !name.trimmed().isEmpty())
+            saveWallProfile(m_selection.first(), name.trimmed());
+    });
+    // D97: Archicad's junction override: the selected walls run through, stop, or their layers decide.
+    QMenu* junctions = model->addMenu(tr("Wall &junctions"));
+    junctions->setObjectName(QStringLiteral("menuJunctions"));
+    const std::pair<const char*, QString> modes[] = {{"through", tr("Run &through at their joins")},
+        {"butt", tr("&Stop at their joins")}, {"materials", tr("By building &materials")}};
+    for (const auto& [mode, text] : modes) {
+        QAction* a = junctions->addAction(text);
+        a->setObjectName(QStringLiteral("actionJunction_") + QLatin1String(mode));
+        connect(a, &QAction::triggered, this, [this, m = QString::fromLatin1(mode)] { setJunctions(m); });
+    }
     QAction* heightAction = model->addAction(tr("Wall &height..."));
     heightAction->setObjectName(QStringLiteral("actionWallHeight"));
     connect(heightAction, &QAction::triggered, this, &MainWindow::wallHeightDialog);
@@ -1836,6 +2264,46 @@ void MainWindow::buildModelingToolbar()
     m_wallHeight->setSuffix(QStringLiteral(" m"));
     m_wallHeight->setToolTip(tr("Wall height"));
     bar->addField(m_wallHeight);
+    // D97: where the clicked line is in the new wall (Archicad's reference line location).
+    m_wallReference = new QComboBox(bar);
+    m_wallReference->setObjectName(QStringLiteral("wallReference"));
+    m_wallReference->setToolTip(tr("Reference line: where the line you draw lies in the wall"));
+    const QStringList refLabels = {tr("Outside face"), tr("Centre"), tr("Inside face"), tr("Core outside"),
+        tr("Core centre"), tr("Core inside")};
+    const QStringList refKeys = {QStringLiteral("Outside face"), QStringLiteral("Centre"), QStringLiteral("Inside face"),
+        QStringLiteral("Core outside"), QStringLiteral("Core centre"), QStringLiteral("Core inside")};
+    for (int i = 0; i < refKeys.size(); ++i)
+        m_wallReference->addItem(refLabels[i], refKeys[i]);
+    connect(m_wallReference, &QComboBox::activated, this, [this] {
+        // remembered with the project, like Archicad's tool settings
+        bridge("set_project_settings", {QString::fromUtf8(QJsonDocument(QJsonObject{
+            {"wall_reference_line", m_wallReference->currentData().toString()}}).toJson(QJsonDocument::Compact))});
+        m_settings = bridge("project_settings").value("settings").toObject();
+    });
+    bar->addField(m_wallReference);
+    // D97: Archicad's geometry method: straight walls, or curved ones (start, end, a point on the arc).
+    m_wallGeometry = new QComboBox(bar);
+    m_wallGeometry->setObjectName(QStringLiteral("wallGeometry"));
+    m_wallGeometry->setToolTip(tr("Geometry method: straight walls, or curved ones (start, end, then a point on the arc)"));
+    m_wallGeometry->addItem(tr("Straight"), QStringLiteral("straight"));
+    m_wallGeometry->addItem(tr("Curved"), QStringLiteral("curved"));
+    connect(m_wallGeometry, &QComboBox::currentIndexChanged, this, [this] {
+        m_wallTool->setCurved(m_wallGeometry->currentData().toString() == QLatin1String("curved"));
+        m_status->showMessage(m_wallTool->curved() ? tr("Curved walls: click the start, the end, then a point on the arc")
+                                                   : tr("Straight walls"));
+    });
+    bar->addField(m_wallGeometry);
+    // D97: Archicad's Gravity: a placed object sits on the slab under it.
+    m_objectGravity = new QCheckBox(tr("Gravity"), bar);
+    m_objectGravity->setObjectName(QStringLiteral("objectGravity"));
+    m_objectGravity->setToolTip(tr("Place objects on the top of the slab under them"));
+    bar->addField(m_objectGravity);
+    // D97: an object dropped by a wall turns its back to the wall and stands against it.
+    m_objectFit = new QCheckBox(tr("Fit to walls"), bar);
+    m_objectFit->setObjectName(QStringLiteral("objectFitToWalls"));
+    m_objectFit->setToolTip(tr("Near a wall, the object turns its back to the wall and stands against it"));
+    m_objectFit->setChecked(true);
+    bar->addField(m_objectFit);
     m_roofKind = new QComboBox(bar);
     m_roofKind->setObjectName(QStringLiteral("roofKind"));
     m_roofKind->addItem(tr("Flat"), QStringLiteral("flat"));
@@ -2339,6 +2807,7 @@ void MainWindow::refreshSnapData()
         shown.push_back({l.a, l.b, l.tag});
     m_viewport->setGridLines(shown, m_levels->activeElevation());
     refreshUnderlays(); // D85: and their snap points
+    refreshConstructionGrid(); // D98: its height follows the level, its extent the model
 }
 
 void MainWindow::updateToolPreview()
@@ -2347,9 +2816,16 @@ void MainWindow::updateToolPreview()
     const QJsonObject type = currentType();
     QVector<Viewport::PreviewBox> boxes;
     switch (m_tool) {
-    case Tool::Wall:
-        m_viewport->setWallPreview(m_wallTool->preview(), type.value("thickness").toDouble(), m_wallHeight->value());
+    case Tool::Wall: {
+        m_viewport->setWallPreview(m_wallTool->preview(), type.value("thickness").toDouble(), m_wallHeight->value(),
+            type.value("centres").toObject().value(wallReference()).toDouble(0.0));
+        const QVector<QPointF> arc = m_wallTool->arcPreview(); // D97: a curved wall, as short pieces
+        const double t = std::max(type.value("thickness").toDouble(), 0.05);
+        for (int i = 0; i + 1 < arc.size(); ++i)
+            boxes.push_back({arc[i], arc[i + 1], t, z, z + m_wallHeight->value()});
+        m_viewport->setPreviewBoxes(boxes);
         return;
+    }
     case Tool::Stair:
     case Tool::Railing:
         updateStairPreview(); // D88 (StairTools.cpp)
@@ -2497,6 +2973,14 @@ void MainWindow::setTool(Tool tool)
         it.value()->setChecked(it.key() == int(tool));
     }
     m_wallHeight->setVisible(tool == Tool::Wall || tool == Tool::Column || tool == Tool::Beam || tool == Tool::Roof);
+    m_wallReference->setVisible(tool == Tool::Wall);
+    m_wallGeometry->setVisible(tool == Tool::Wall);
+    m_objectGravity->setVisible(tool == Tool::Object);
+    m_objectFit->setVisible(tool == Tool::Object);
+    if (tool == Tool::Wall) {
+        const int i = m_wallReference->findData(m_settings.value("wall_reference_line").toString(QStringLiteral("Outside face")));
+        m_wallReference->setCurrentIndex(std::max(0, i));
+    }
     m_wallHeight->setToolTip(tool == Tool::Roof ? tr("Eaves height above the level") : tr("Wall height"));
     m_roofKind->parentWidget()->setVisible(tool == Tool::Roof);
     m_lengthInput->setVisible(tool == Tool::Wall || tool == Tool::Beam || tool == Tool::Grid || tool == Tool::Move
@@ -4235,7 +4719,9 @@ void MainWindow::refreshDrawings()
         m.points << QPointF(look.at(0).toDouble(), look.at(1).toDouble());
         markers << m;
     }
-    m_viewport->setDrawingMarkers(markers, m_levels->activeElevation());
+    // D98: a worksheet is not the building: no section or elevation markers on it
+    m_viewport->setDrawingMarkers(m_levels->activeIsWorksheet() ? QVector<Viewport::Annotation>() : markers,
+        m_levels->activeElevation());
     for (const QString& key : m_dock->viewKeys()) {
         auto* view = qobject_cast<DrawingView*>(m_dock->view(key));
         if (!view || view->guid().startsWith(QLatin1String("sheet:")))
@@ -4668,6 +5154,16 @@ bool MainWindow::openSheet(const QString& number)
         afterEdit(r);
         if (titleBlock)
             refreshSheets(true);
+    });
+    connect(view, &DrawingView::placedResized, this, [this, number](const QString& drawing, double widthMm) {
+        if (!drawing.startsWith(QLatin1String("symbol:")))
+            return;
+        const QJsonObject r = bridge("set_sheet_symbol", {number, drawing.mid(7),
+            QString::fromUtf8(QJsonDocument(QJsonObject{{"w", widthMm}}).toJson(QJsonDocument::Compact))});
+        if (!r.value("ok").toBool())
+            m_status->showMessage(tr("Could not resize it: %1").arg(r.value("error").toString()));
+        afterEdit(r);
+        refreshSheets(true);
     });
     connect(view, &DrawingView::placedRemoveRequested, this, [this, number](const QString& drawing) {
         if (drawing == QLatin1String("titleblock"))
@@ -5165,6 +5661,80 @@ void MainWindow::offsetDialog()
         offsetSelection(distance);
 }
 
+bool MainWindow::filletSelection(double size, const QString& mode)
+{
+    if (m_selection.isEmpty())
+        return false;
+    const QJsonObject r = bridge("fillet_corners", {jsonList(m_selection), QString::number(size, 'g', 17), mode});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(tr("Could not fillet: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    return true;
+}
+
+void MainWindow::filletDialog()
+{
+    // D98: Archicad's Fillet/Chamfer for slab, polyline and fill corners.
+    if (m_selection.isEmpty()) {
+        m_status->showMessage(tr("Select slabs, polylines or fills, or the two walls of a corner, first"));
+        return;
+    }
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Fillet/Chamfer"));
+    auto* form = new QFormLayout(&dialog);
+    auto* mode = new QComboBox(&dialog);
+    mode->setObjectName(QStringLiteral("filletMode"));
+    mode->addItem(tr("Fillet (round)"), QStringLiteral("fillet"));
+    mode->addItem(tr("Chamfer (cut)"), QStringLiteral("chamfer"));
+    mode->setCurrentIndex(std::max(0, mode->findData(m_prefs.value(QStringLiteral("fillet_mode")).toString())));
+    form->addRow(tr("Corners:"), mode);
+    auto* size = new QDoubleSpinBox(&dialog);
+    size->setObjectName(QStringLiteral("filletSize"));
+    size->setRange(0.001, 1000.0);
+    size->setDecimals(3);
+    size->setSuffix(QStringLiteral(" m"));
+    size->setValue(m_prefs.value(QStringLiteral("fillet_size")).toDouble(0.5));
+    form->addRow(tr("Radius or distance:"), size);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    form->addRow(buttons);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    m_prefs.setValue(QStringLiteral("fillet_mode"), mode->currentData().toString());
+    m_prefs.setValue(QStringLiteral("fillet_size"), size->value());
+    m_prefs.save();
+    filletSelection(size->value(), mode->currentData().toString());
+}
+
+bool MainWindow::worksheetCommand(const char* command, const QStringList& args)
+{
+    const QJsonObject r = bridge(command, args);
+    if (!r.value("ok").toBool()) {
+        showError(tr("Worksheet"), r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
+    refreshSheets(true);
+    return true;
+}
+
+bool MainWindow::createWorksheet(const QString& name)
+{
+    // D98: Archicad's independent worksheet: a 2D space opened in its own tab, every 2D tool works there.
+    const QJsonObject r = bridge("create_worksheet", {name});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not create the worksheet"), r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
+    openPlanTab(r.value("guid").toString());
+    m_status->showMessage(tr("Draw on the worksheet; place pictures with File > Place underlay; put it on a sheet from Drawings"));
+    return true;
+}
+
 bool MainWindow::createModel(const QString& name)
 {
     const QJsonObject r = bridge("create_model", {name});
@@ -5309,7 +5879,8 @@ bool MainWindow::saveView(const QString& name)
         {"level", m_levels->activeStorey()}, {"plan", m_viewport->isPlanView()},
         {"cut", m_planCut->isChecked() ? QJsonValue(m_cutHeight->value()) : QJsonValue()},
         {"planes", planes},
-        {"linesOnly", m_viewport->linesOnly()}, {"purpose", m_viewport->graphics().purpose()}};
+        {"linesOnly", m_viewport->linesOnly()}, {"whiteModel", m_viewport->whiteModel()},
+        {"shadows", m_viewport->shadows()}, {"purpose", m_viewport->graphics().purpose()}};
     const QJsonObject r = bridge("save_view", {name, QString::fromUtf8(QJsonDocument(data).toJson(QJsonDocument::Compact))});
     if (!r.value("ok").toBool()) {
         m_status->showMessage(tr("Could not save the view: %1").arg(r.value("error").toString()));
@@ -5340,6 +5911,10 @@ bool MainWindow::applyView(const QString& name)
             m_levels->setActive(data.value("level").toString());
         if (data.contains("linesOnly"))
             findChild<QAction*>(QStringLiteral("actionLinesOnly"))->setChecked(data.value("linesOnly").toBool());
+        if (data.contains("whiteModel"))
+            findChild<QAction*>(QStringLiteral("actionWhiteModel"))->setChecked(data.value("whiteModel").toBool());
+        if (data.contains("shadows"))
+            findChild<QAction*>(QStringLiteral("actionShadows"))->setChecked(data.value("shadows").toBool());
         if (data.value("cut").isDouble()) {
             m_cutHeight->setValue(data.value("cut").toDouble());
             m_planCut->setChecked(true);
@@ -5497,8 +6072,13 @@ bool MainWindow::createWall(const WallSegment& s)
     }
     auto num = [](double v) { return QString::number(v, 'g', 17); };
     StepTimer createTimer(m_timings, "bridgeCreateWall");
-    const QJsonObject r = bridge("create_wall", {m_levels->activeStorey(), type.value("guid").toString(),
-        num(s.p1.x()), num(s.p1.y()), num(s.p2.x()), num(s.p2.y()), num(m_wallHeight->value()), s.joinStart, s.joinEnd});
+    const QJsonObject r = s.through // D97: a curved wall
+        ? bridge("create_curved_wall", {m_levels->activeStorey(), type.value("guid").toString(), num(s.p1.x()),
+              num(s.p1.y()), num(s.through->x()), num(s.through->y()), num(s.p2.x()), num(s.p2.y()),
+              num(m_wallHeight->value()), wallReference()})
+        : bridge("create_wall", {m_levels->activeStorey(), type.value("guid").toString(),
+              num(s.p1.x()), num(s.p1.y()), num(s.p2.x()), num(s.p2.y()), num(m_wallHeight->value()), s.joinStart,
+              s.joinEnd, wallReference()});
     if (!r.value("ok").toBool()) {
         m_status->showMessage(tr("Could not create the wall: %1").arg(r.value("error").toString()));
         return false;
@@ -5506,6 +6086,91 @@ bool MainWindow::createWall(const WallSegment& s)
     m_wallTool->setLastWall(r.value("guid").toString());
     afterEdit(r);
     refreshSnapData();
+    return true;
+}
+
+QString MainWindow::wallReference() const
+{
+    // The Wall tool's choice (D97); empty (the centre) when the tool strip was never built.
+    return m_wallReference ? m_wallReference->currentData().toString() : QString();
+}
+
+bool MainWindow::saveWallProfile(const QString& shapeGuid, const QString& name)
+{
+    const QJsonObject r = bridge("save_wall_profile", {shapeGuid, name});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(r.value("error").toString());
+        return false;
+    }
+    loadProjectSettings();
+    setWindowModified(isDirty());
+    refreshProperties();
+    m_status->showMessage(tr("Wall profile %1 saved: choose it in a wall's Properties > Geometry > Profile").arg(name));
+    return true;
+}
+
+bool MainWindow::pickUpSettings()
+{
+    if (m_selection.size() != 1) {
+        m_status->showMessage(tr("Select one element to pick up its settings"));
+        return false;
+    }
+    const QJsonObject r = bridge("pick_up", {m_selection.first()});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(r.value("error").toString());
+        return false;
+    }
+    m_pickedUp = r;
+    m_status->showMessage(tr("Picked up the settings of %1: select others and inject them (Ctrl+Alt+V)")
+                              .arg(r.value("name").toString()));
+    return true;
+}
+
+bool MainWindow::injectSettings()
+{
+    if (m_pickedUp.isEmpty()) {
+        m_status->showMessage(tr("Pick up an element's settings first (Ctrl+Alt+C)"));
+        return false;
+    }
+    if (m_selection.isEmpty())
+        return false;
+    const QJsonObject r = bridge("inject", {jsonList(m_selection),
+        QString::fromUtf8(QJsonDocument(m_pickedUp).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
+    m_status->showMessage(tr("%n element(s) took the settings", nullptr, r.value("changed").toInt()));
+    return true;
+}
+
+bool MainWindow::setJunctions(const QString& mode)
+{
+    if (m_selection.isEmpty())
+        return false;
+    const QJsonObject r = bridge("set_junctions", {jsonList(m_selection), mode});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
+    m_status->showMessage(tr("%n join(s) changed", nullptr, r.value("changed").toInt()));
+    return true;
+}
+
+bool MainWindow::flipWalls(const QStringList& guids)
+{
+    if (guids.isEmpty())
+        return false;
+    const QJsonObject r = bridge("flip_walls", {jsonList(guids)});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
+    refreshSnapData();
+    m_status->showMessage(tr("%n wall(s) flipped", nullptr, r.value("changed").toInt()));
     return true;
 }
 
@@ -5590,6 +6255,8 @@ void MainWindow::afterEdit(const QJsonObject& result)
     QMetaObject::invokeMethod(this, &MainWindow::refreshProperties, Qt::QueuedConnection);
     if (m_schedules)
         m_schedules->modelChanged();
+    if (!m_traceMode.isEmpty() && m_traceTimer) // D98: the traced plan follows the model, after a pause
+        m_traceTimer->start();
 }
 
 bool MainWindow::nativeEvent(const QByteArray& eventType, void* message, qintptr* result)

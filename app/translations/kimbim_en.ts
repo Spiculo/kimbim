@@ -4,206 +4,231 @@
 <context>
     <name>LibraryPanel</name>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="30"/>
+        <location filename="../src/LibraryPanel.cpp" line="32"/>
         <source>Furniture</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="30"/>
+        <location filename="../src/LibraryPanel.cpp" line="32"/>
         <source>Sanitary</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="31"/>
+        <location filename="../src/LibraryPanel.cpp" line="33"/>
         <source>Kitchen</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="31"/>
+        <location filename="../src/LibraryPanel.cpp" line="33"/>
         <source>People, trees and cars</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="32"/>
+        <location filename="../src/LibraryPanel.cpp" line="34"/>
         <source>Office library</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="32"/>
+        <location filename="../src/LibraryPanel.cpp" line="34"/>
         <source>Table</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="33"/>
+        <location filename="../src/LibraryPanel.cpp" line="35"/>
         <source>Chair</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="33"/>
+        <location filename="../src/LibraryPanel.cpp" line="35"/>
         <source>Sofa</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="34"/>
+        <location filename="../src/LibraryPanel.cpp" line="36"/>
         <source>Single bed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="34"/>
+        <location filename="../src/LibraryPanel.cpp" line="36"/>
         <source>Double bed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="35"/>
+        <location filename="../src/LibraryPanel.cpp" line="37"/>
         <source>Wardrobe</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="35"/>
+        <location filename="../src/LibraryPanel.cpp" line="37"/>
         <source>Desk</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="36"/>
+        <location filename="../src/LibraryPanel.cpp" line="38"/>
         <source>Shelf</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="36"/>
+        <location filename="../src/LibraryPanel.cpp" line="38"/>
         <source>WC</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="37"/>
+        <location filename="../src/LibraryPanel.cpp" line="39"/>
         <source>Washbasin</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="37"/>
+        <location filename="../src/LibraryPanel.cpp" line="39"/>
         <source>Bathtub</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="38"/>
+        <location filename="../src/LibraryPanel.cpp" line="40"/>
         <source>Shower tray</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="38"/>
+        <location filename="../src/LibraryPanel.cpp" line="40"/>
         <source>Bidet</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="39"/>
+        <location filename="../src/LibraryPanel.cpp" line="41"/>
         <source>Base cabinets</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="39"/>
+        <location filename="../src/LibraryPanel.cpp" line="41"/>
         <source>Wall cabinets</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="40"/>
+        <location filename="../src/LibraryPanel.cpp" line="42"/>
         <source>Sink unit</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="40"/>
+        <location filename="../src/LibraryPanel.cpp" line="42"/>
         <source>Fridge</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="41"/>
+        <location filename="../src/LibraryPanel.cpp" line="43"/>
         <source>Cooktop and oven</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="41"/>
+        <location filename="../src/LibraryPanel.cpp" line="43"/>
         <source>Person</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="42"/>
+        <location filename="../src/LibraryPanel.cpp" line="44"/>
         <source>Tree</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="42"/>
+        <location filename="../src/LibraryPanel.cpp" line="44"/>
         <source>Car</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="43"/>
+        <location filename="../src/LibraryPanel.cpp" line="45"/>
         <source>Width</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="43"/>
+        <location filename="../src/LibraryPanel.cpp" line="45"/>
         <source>Depth</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="44"/>
+        <location filename="../src/LibraryPanel.cpp" line="46"/>
         <source>Height</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="44"/>
+        <location filename="../src/LibraryPanel.cpp" line="46"/>
         <source>Seat height</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="45"/>
+        <location filename="../src/LibraryPanel.cpp" line="47"/>
         <source>Seats</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="45"/>
+        <location filename="../src/LibraryPanel.cpp" line="47"/>
         <source>Doors</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="46"/>
+        <location filename="../src/LibraryPanel.cpp" line="48"/>
         <source>Shelves</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="46"/>
+        <location filename="../src/LibraryPanel.cpp" line="48"/>
         <source>Units</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="47"/>
+        <location filename="../src/LibraryPanel.cpp" line="49"/>
         <source>Mounting height</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="47"/>
+        <location filename="../src/LibraryPanel.cpp" line="49"/>
         <source>Bowls</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="48"/>
+        <location filename="../src/LibraryPanel.cpp" line="50"/>
         <source>Burners</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="48"/>
+        <location filename="../src/LibraryPanel.cpp" line="50"/>
         <source>Crown diameter</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="49"/>
+        <location filename="../src/LibraryPanel.cpp" line="51"/>
         <source>Trunk diameter</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/LibraryPanel.cpp" line="53"/>
+        <source>Material</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/LibraryPanel.cpp" line="53"/>
+        <source>Top material</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/LibraryPanel.cpp" line="54"/>
+        <source>Legs material</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/LibraryPanel.cpp" line="54"/>
+        <source>Frame material</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/LibraryPanel.cpp" line="55"/>
+        <source>Seat material</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
     <name>QObject</name>
     <message>
-        <location filename="../tests/test_main_window.cpp" line="474"/>
-        <location filename="../tests/test_main_window.cpp" line="684"/>
+        <location filename="../tests/test_main_window.cpp" line="790"/>
+        <location filename="../tests/test_main_window.cpp" line="1000"/>
         <source>Untitled</source>
         <translation type="unfinished"></translation>
     </message>
@@ -230,6 +255,16 @@
     <message>
         <location filename="../src/GraphicsDialogs.cpp" line="45"/>
         <source>Name:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="90"/>
+        <source>A name is needed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="93"/>
+        <source>The name %1 is already used.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -1083,93 +1118,103 @@ Enter runs, Shift+Enter adds a line, Up/Down recall earlier input</source>
 <context>
     <name>kimbim::DraftTool</name>
     <message>
-        <location filename="../src/DraftTool.cpp" line="135"/>
+        <location filename="../src/DraftTool.cpp" line="136"/>
         <source>The three points are in a line</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTool.cpp" line="139"/>
+        <location filename="../src/DraftTool.cpp" line="140"/>
         <source>The outline crosses itself</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTool.cpp" line="320"/>
+        <location filename="../src/DraftTool.cpp" line="327"/>
         <source>Line: click the start point</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTool.cpp" line="320"/>
+        <location filename="../src/DraftTool.cpp" line="327"/>
         <source>Line: click the end point, or type a length (length&lt;angle)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTool.cpp" line="322"/>
+        <location filename="../src/DraftTool.cpp" line="329"/>
         <source>Polyline: click the first point</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTool.cpp" line="323"/>
+        <location filename="../src/DraftTool.cpp" line="330"/>
         <source>Polyline: click the next point or type a length; click the first point to close, Enter or double click to end</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTool.cpp" line="325"/>
+        <location filename="../src/DraftTool.cpp" line="332"/>
         <source>Rectangle: click a corner</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTool.cpp" line="325"/>
+        <location filename="../src/DraftTool.cpp" line="332"/>
         <source>Rectangle: click the opposite corner, or type width;height</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTool.cpp" line="327"/>
+        <location filename="../src/DraftTool.cpp" line="334"/>
         <source>Circle: click the centre</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTool.cpp" line="327"/>
+        <location filename="../src/DraftTool.cpp" line="334"/>
         <source>Circle: click a point on it, or type the radius</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTool.cpp" line="329"/>
+        <location filename="../src/DraftTool.cpp" line="336"/>
         <source>Arc: click where it starts</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTool.cpp" line="329"/>
+        <location filename="../src/DraftTool.cpp" line="336"/>
         <source>Arc: click a point it passes through</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTool.cpp" line="329"/>
+        <location filename="../src/DraftTool.cpp" line="336"/>
         <source>Arc: click where it ends</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTool.cpp" line="331"/>
+        <location filename="../src/DraftTool.cpp" line="338"/>
         <source>Arc: click the centre</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTool.cpp" line="332"/>
+        <location filename="../src/DraftTool.cpp" line="339"/>
         <source>Arc: click where it starts, or type the radius</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTool.cpp" line="333"/>
+        <location filename="../src/DraftTool.cpp" line="340"/>
         <source>Arc: click where it ends (counter-clockwise), or type the angle in degrees</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTool.cpp" line="335"/>
+        <location filename="../src/DraftTool.cpp" line="342"/>
         <source>Fill: click the outline&apos;s points (Alt+click inside a closed polyline or circle to fill it)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTool.cpp" line="336"/>
+        <location filename="../src/DraftTool.cpp" line="343"/>
         <source>Fill: click the next point; click the first point or press Enter to close</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/DraftTool.cpp" line="345"/>
+        <source>Spline: click the first point</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/DraftTool.cpp" line="346"/>
+        <source>Spline: click the points it passes through; click the first point to close, Enter or double click to end</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -1197,17 +1242,17 @@ Enter runs, Shift+Enter adds a line, Up/Down recall earlier input</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DrawingView.cpp" line="160"/>
+        <location filename="../src/DrawingView.cpp" line="176"/>
         <source>Edit text...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DrawingView.cpp" line="161"/>
+        <location filename="../src/DrawingView.cpp" line="177"/>
         <source>Edit title block...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DrawingView.cpp" line="162"/>
+        <location filename="../src/DrawingView.cpp" line="178"/>
         <source>Remove from sheet</source>
         <translation type="unfinished"></translation>
     </message>
@@ -2066,31 +2111,56 @@ Enter runs, Shift+Enter adds a line, Up/Down recall earlier input</source>
     </message>
     <message>
         <location filename="../src/LevelsBar.cpp" line="26"/>
+        <source>New worksheet...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/LevelsBar.cpp" line="27"/>
+        <source>Rename worksheet...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/LevelsBar.cpp" line="28"/>
+        <source>Delete worksheet</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/LevelsBar.cpp" line="29"/>
         <source>&amp;Levels...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LevelsBar.cpp" line="30"/>
+        <location filename="../src/LevelsBar.cpp" line="33"/>
         <source>Active level</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LevelsBar.cpp" line="34"/>
+        <location filename="../src/LevelsBar.cpp" line="37"/>
         <source>The levels table: names, elevations, heights; insert and delete levels</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LevelsBar.cpp" line="35"/>
+        <location filename="../src/LevelsBar.cpp" line="38"/>
         <source>A model is a unit (an apartment, a core...) drawn once and placed on many levels</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LevelsBar.cpp" line="41"/>
+        <location filename="../src/LevelsBar.cpp" line="40"/>
+        <source>A worksheet is a 2D drawing space for details, sketches and pictures</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/LevelsBar.cpp" line="55"/>
         <source>Levels and models</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LevelsBar.cpp" line="83"/>
+        <location filename="../src/LevelsBar.cpp" line="103"/>
+        <source>Worksheet: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/LevelsBar.cpp" line="104"/>
         <source>Model: %1</source>
         <translation type="unfinished"></translation>
     </message>
@@ -2205,37 +2275,37 @@ Enter runs, Shift+Enter adds a line, Up/Down recall earlier input</source>
 <context>
     <name>kimbim::LibraryPanel</name>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="105"/>
+        <location filename="../src/LibraryPanel.cpp" line="111"/>
         <source>Search objects</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="122"/>
+        <location filename="../src/LibraryPanel.cpp" line="128"/>
         <source>Place</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="124"/>
+        <location filename="../src/LibraryPanel.cpp" line="130"/>
         <source>Click in the view to place the object; Tab turns it 90 degrees, a typed number sets its angle</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="127"/>
+        <location filename="../src/LibraryPanel.cpp" line="133"/>
         <source>Office library...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="129"/>
+        <location filename="../src/LibraryPanel.cpp" line="135"/>
         <source>Choose the office library folder: Python objects (.py) and IFC type libraries (.ifc)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="130"/>
+        <location filename="../src/LibraryPanel.cpp" line="136"/>
         <source>Load IFC types...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="132"/>
+        <location filename="../src/LibraryPanel.cpp" line="138"/>
         <source>Add the types of an IFC file (e.g. IfcFurnitureType definitions) to the office library</source>
         <translation type="unfinished"></translation>
     </message>
@@ -2281,13 +2351,13 @@ Enter runs, Shift+Enter adds a line, Up/Down recall earlier input</source>
 <context>
     <name>kimbim::MainWindow</name>
     <message>
-        <location filename="../src/MainWindow.cpp" line="210"/>
+        <location filename="../src/MainWindow.cpp" line="216"/>
         <location filename="../tests/test_translations.cpp" line="14"/>
         <source>Ready</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="1389"/>
+        <location filename="../src/MainWindow.cpp" line="1561"/>
         <location filename="../src/SelectionTools.cpp" line="130"/>
         <source>%n element(s) selected</source>
         <translation type="unfinished">
@@ -2296,17 +2366,17 @@ Enter runs, Shift+Enter adds a line, Up/Down recall earlier input</source>
         </translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="290"/>
+        <location filename="../src/MainWindow.cpp" line="299"/>
         <source>KimBim cannot start</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="182"/>
+        <location filename="../src/MainWindow.cpp" line="188"/>
         <source>Plan cut height above the active level (drag to cut the model)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="377"/>
+        <location filename="../src/MainWindow.cpp" line="386"/>
         <location filename="../tests/test_translations.cpp" line="12"/>
         <source>&amp;File</source>
         <translation type="unfinished"></translation>
@@ -2317,73 +2387,73 @@ Enter runs, Shift+Enter adds a line, Up/Down recall earlier input</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="395"/>
+        <location filename="../src/MainWindow.cpp" line="404"/>
         <source>&amp;Save</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="399"/>
+        <location filename="../src/MainWindow.cpp" line="408"/>
         <source>Save &amp;As...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="410"/>
-        <location filename="../src/MainWindow.cpp" line="2861"/>
+        <location filename="../src/MainWindow.cpp" line="419"/>
+        <location filename="../src/MainWindow.cpp" line="3345"/>
         <source>Save &amp;version...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="445"/>
+        <location filename="../src/MainWindow.cpp" line="454"/>
         <source>&amp;Quit</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="449"/>
+        <location filename="../src/MainWindow.cpp" line="458"/>
         <source>&amp;Edit</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="450"/>
+        <location filename="../src/MainWindow.cpp" line="459"/>
         <source>&amp;Undo</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="455"/>
+        <location filename="../src/MainWindow.cpp" line="464"/>
         <source>&amp;Redo</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="461"/>
+        <location filename="../src/MainWindow.cpp" line="470"/>
         <source>&amp;Delete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="503"/>
+        <location filename="../src/MainWindow.cpp" line="519"/>
         <source>&amp;View</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="505"/>
+        <location filename="../src/MainWindow.cpp" line="521"/>
         <source>&amp;Plan view</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="509"/>
+        <location filename="../src/MainWindow.cpp" line="525"/>
         <source>&amp;3D view</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="513"/>
+        <location filename="../src/MainWindow.cpp" line="529"/>
         <source>Create floor plans and &amp;elevations</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="515"/>
+        <location filename="../src/MainWindow.cpp" line="531"/>
         <source>Add a floor plan for every level and the North, South, East and West elevations the model is missing</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="523"/>
+        <location filename="../src/MainWindow.cpp" line="539"/>
         <source>%n drawing(s) added</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -2391,284 +2461,285 @@ Enter runs, Shift+Enter adds a line, Up/Down recall earlier input</source>
         </translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="525"/>
+        <location filename="../src/MainWindow.cpp" line="541"/>
         <source>Select &amp;hidden elements too</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="528"/>
+        <location filename="../src/MainWindow.cpp" line="544"/>
         <source>Box selection also takes elements hidden behind others (same as holding Alt while dragging)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="533"/>
+        <location filename="../src/MainWindow.cpp" line="549"/>
         <source>&amp;Lines only</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="537"/>
+        <location filename="../src/MainWindow.cpp" line="553"/>
         <source>Show the model as a line drawing (hidden lines removed), e.g. for plans</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="546"/>
+        <location filename="../src/MainWindow.cpp" line="573"/>
         <source>&amp;Fit all</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="602"/>
+        <location filename="../src/MainWindow.cpp" line="737"/>
         <source>&amp;Hide selected</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="606"/>
+        <location filename="../src/MainWindow.cpp" line="741"/>
         <source>&amp;Isolate selected</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="614"/>
+        <location filename="../src/MainWindow.cpp" line="749"/>
         <source>&amp;Show all</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="619"/>
+        <location filename="../src/MainWindow.cpp" line="754"/>
         <source>&amp;Plan cut</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="624"/>
+        <location filename="../src/MainWindow.cpp" line="759"/>
         <source>Section &amp;box</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="682"/>
+        <location filename="../src/MainWindow.cpp" line="833"/>
         <source>&amp;Help</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="684"/>
+        <location filename="../src/MainWindow.cpp" line="835"/>
         <source>&amp;About KimBim</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="696"/>
+        <location filename="../src/MainWindow.cpp" line="847"/>
         <source>Model</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="519"/>
+        <location filename="../src/MainWindow.cpp" line="535"/>
         <source>Could not add them: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="697"/>
+        <location filename="../src/MainWindow.cpp" line="848"/>
         <source>Properties</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="700"/>
+        <location filename="../src/MainWindow.cpp" line="851"/>
         <source>History</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="698"/>
+        <location filename="../src/MainWindow.cpp" line="849"/>
         <source>Layers</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="713"/>
+        <location filename="../src/MainWindow.cpp" line="864"/>
         <source>Drawings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="749"/>
+        <location filename="../src/MainWindow.cpp" line="900"/>
         <source>Could not rename it: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="743"/>
-        <location filename="../src/MainWindow.cpp" line="755"/>
+        <location filename="../src/MainWindow.cpp" line="894"/>
+        <location filename="../src/MainWindow.cpp" line="906"/>
         <source>Could not delete it: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="422"/>
+        <location filename="../src/MainWindow.cpp" line="431"/>
         <source>Project &amp;info...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="425"/>
+        <location filename="../src/MainWindow.cpp" line="434"/>
         <source>Export sheet as &amp;PDF...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="428"/>
+        <location filename="../src/MainWindow.cpp" line="437"/>
         <source>Export sheet as S&amp;VG...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="436"/>
+        <location filename="../src/MainWindow.cpp" line="445"/>
         <source>&amp;Room schedule...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="475"/>
+        <location filename="../src/MainWindow.cpp" line="484"/>
         <source>&amp;Copy</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="476"/>
+        <location filename="../src/MainWindow.cpp" line="490"/>
         <source>&amp;Paste</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="477"/>
+        <location filename="../src/MainWindow.cpp" line="491"/>
         <source>D&amp;uplicate</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="478"/>
+        <location filename="../src/MainWindow.cpp" line="492"/>
         <source>&amp;Mirror</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="479"/>
+        <location filename="../src/MainWindow.cpp" line="493"/>
         <source>Mirror the selection: click two points of the mirror line (hold Ctrl on the second click to mirror a copy)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="480"/>
+        <location filename="../src/MainWindow.cpp" line="494"/>
         <source>Multi&amp;ply...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="481"/>
+        <location filename="../src/MainWindow.cpp" line="495"/>
         <source>&amp;Offset...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="714"/>
+        <location filename="../src/MainWindow.cpp" line="865"/>
         <source>Sheets</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3043"/>
+        <location filename="../src/MainWindow.cpp" line="3527"/>
         <source>New sheet</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3043"/>
+        <location filename="../src/MainWindow.cpp" line="3527"/>
         <source>Title:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="732"/>
+        <location filename="../src/MainWindow.cpp" line="883"/>
         <source>Select a drawing in the Drawings panel first</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="765"/>
+        <location filename="../src/MainWindow.cpp" line="916"/>
         <source>New layer</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="765"/>
+        <location filename="../src/MainWindow.cpp" line="916"/>
         <source>Layer name:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="792"/>
+        <location filename="../src/MainWindow.cpp" line="943"/>
         <source>Save view</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="792"/>
+        <location filename="../src/MainWindow.cpp" line="943"/>
         <source>View name:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="813"/>
+        <location filename="../src/MainWindow.cpp" line="964"/>
         <source>New model</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="814"/>
+        <location filename="../src/MainWindow.cpp" line="965"/>
         <source>Model name (e.g. Apartment A). Draw it, then place it on levels with Place model:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="860"/>
+        <location filename="../src/MainWindow.cpp" line="1032"/>
         <source>Plan cut height</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1236"/>
+        <location filename="../src/MainWindow.cpp" line="1408"/>
         <source>About KimBim</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1237"/>
+        <location filename="../src/MainWindow.cpp" line="1409"/>
         <source>KimBim %1
 Open-source native BIM for architects, with version control built in.
 License: GPL-3.0-or-later</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3168"/>
-        <location filename="../src/MainWindow.cpp" line="3209"/>
+        <location filename="../src/MainWindow.cpp" line="3652"/>
+        <location filename="../src/MainWindow.cpp" line="3693"/>
         <source>Open IFC</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5648"/>
+        <location filename="../src/MainWindow.cpp" line="6315"/>
         <source>Automatic version</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5677"/>
+        <location filename="../src/MainWindow.cpp" line="6344"/>
         <source>Save As</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5678"/>
+        <location filename="../src/MainWindow.cpp" line="6345"/>
         <source>KimBim project (*.kim);;IFC file (*.ifc)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5687"/>
+        <location filename="../src/MainWindow.cpp" line="6354"/>
         <source>Could not save the project folder</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5712"/>
+        <location filename="../src/MainWindow.cpp" line="6379"/>
         <source>Could not export</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5715"/>
+        <location filename="../src/MainWindow.cpp" line="6382"/>
         <source>Exported %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5728"/>
-        <location filename="../src/LibraryTools.cpp" line="104"/>
+        <location filename="../src/MainWindow.cpp" line="6395"/>
+        <location filename="../src/LibraryTools.cpp" line="106"/>
         <source>IFC files (*.ifc)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1269"/>
+        <location filename="../src/MainWindow.cpp" line="1441"/>
         <source>Opening %1...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1412"/>
-        <location filename="../src/MainWindow.cpp" line="1444"/>
-        <location filename="../src/MainWindow.cpp" line="1473"/>
+        <location filename="../src/MainWindow.cpp" line="1584"/>
+        <location filename="../src/MainWindow.cpp" line="1595"/>
+        <location filename="../src/MainWindow.cpp" line="1625"/>
+        <location filename="../src/MainWindow.cpp" line="1654"/>
         <source>Could not change %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="1475"/>
+        <location filename="../src/MainWindow.cpp" line="1656"/>
         <source>%1 changed on the type: %n element(s) updated</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -2676,18 +2747,18 @@ License: GPL-3.0-or-later</source>
         </translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1500"/>
-        <location filename="../src/MainWindow.cpp" line="1509"/>
+        <location filename="../src/MainWindow.cpp" line="1681"/>
+        <location filename="../src/MainWindow.cpp" line="1690"/>
         <source>Edit type value</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1501"/>
+        <location filename="../src/MainWindow.cpp" line="1682"/>
         <source>%1 on type %2:</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="1504"/>
+        <location filename="../src/MainWindow.cpp" line="1685"/>
         <source>This changes %1 for %n element(s) of this type, including elements that are not selected.</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -2695,7 +2766,7 @@ License: GPL-3.0-or-later</source>
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="1507"/>
+        <location filename="../src/MainWindow.cpp" line="1688"/>
         <source>%n selected element(s) have no type and will not change.</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -2703,396 +2774,608 @@ License: GPL-3.0-or-later</source>
         </translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3093"/>
+        <location filename="../src/MainWindow.cpp" line="3577"/>
         <source>Untitled</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1521"/>
+        <location filename="../src/MainWindow.cpp" line="1702"/>
         <source>Could not create the project</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="380"/>
+        <location filename="../src/MainWindow.cpp" line="389"/>
         <source>&amp;New project...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="384"/>
+        <location filename="../src/MainWindow.cpp" line="393"/>
         <source>&amp;Open...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="388"/>
+        <location filename="../src/MainWindow.cpp" line="397"/>
         <source>Open project &amp;folder...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="391"/>
+        <location filename="../src/MainWindow.cpp" line="400"/>
         <source>&amp;Recent files</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="403"/>
+        <location filename="../src/MainWindow.cpp" line="412"/>
         <source>Save as project f&amp;older...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="406"/>
+        <location filename="../src/MainWindow.cpp" line="415"/>
         <source>Save as &amp;template...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="414"/>
+        <location filename="../src/MainWindow.cpp" line="423"/>
         <source>&amp;Export IFC...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="418"/>
+        <location filename="../src/MainWindow.cpp" line="427"/>
         <source>Project se&amp;ttings...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="431"/>
+        <location filename="../src/MainWindow.cpp" line="440"/>
         <source>Export &amp;DXF...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="433"/>
+        <location filename="../src/MainWindow.cpp" line="442"/>
         <source>Drawings and sheets to DXF files, several at once</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="439"/>
+        <location filename="../src/MainWindow.cpp" line="448"/>
         <source>Sc&amp;hedules...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="441"/>
+        <location filename="../src/MainWindow.cpp" line="450"/>
         <source>Doors, windows, walls, slabs, columns, beams, rooms or your own schedules, with quantities</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="484"/>
+        <location filename="../src/MainWindow.cpp" line="500"/>
         <source>Select &amp;similar</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="487"/>
+        <location filename="../src/MainWindow.cpp" line="503"/>
         <source>Select all of this c&amp;lass</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="488"/>
+        <location filename="../src/MainWindow.cpp" line="504"/>
         <source>Select every element of the selected elements&apos; IFC classes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="491"/>
+        <location filename="../src/MainWindow.cpp" line="507"/>
         <source>&amp;Find &amp;&amp; Select...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="497"/>
+        <location filename="../src/MainWindow.cpp" line="513"/>
         <source>&amp;Preferences...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="539"/>
+        <location filename="../src/MainWindow.cpp" line="566"/>
         <source>&amp;True line weights</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="543"/>
+        <location filename="../src/MainWindow.cpp" line="570"/>
         <source>Draw lines as thick as their pens (otherwise every line is thin)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="550"/>
+        <location filename="../src/MainWindow.cpp" line="685"/>
         <source>&amp;Views</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="564"/>
+        <location filename="../src/MainWindow.cpp" line="699"/>
         <source>&amp;Home view</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="567"/>
+        <location filename="../src/MainWindow.cpp" line="702"/>
         <source>The default isometric view, fitted (the house beside the view cube)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="586"/>
+        <location filename="../src/MainWindow.cpp" line="721"/>
         <source>P&amp;erspective</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="590"/>
+        <location filename="../src/MainWindow.cpp" line="725"/>
         <source>Show this 3D view in perspective instead of parallel projection (plans stay parallel)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="653"/>
+        <location filename="../src/MainWindow.cpp" line="788"/>
         <source>&amp;Graphics</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="666"/>
+        <location filename="../src/MainWindow.cpp" line="801"/>
         <source>&amp;Pen sets...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="667"/>
+        <location filename="../src/MainWindow.cpp" line="802"/>
         <source>&amp;Line types...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="668"/>
+        <location filename="../src/MainWindow.cpp" line="803"/>
         <source>&amp;Element styles...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="670"/>
+        <location filename="../src/MainWindow.cpp" line="821"/>
         <source>&amp;Visibility sets...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="671"/>
+        <location filename="../src/MainWindow.cpp" line="822"/>
         <source>Graphic &amp;overrides...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="672"/>
+        <location filename="../src/MainWindow.cpp" line="823"/>
         <source>&amp;Renovation filters...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="673"/>
+        <location filename="../src/MainWindow.cpp" line="824"/>
         <source>Renovation &amp;styles...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="674"/>
+        <location filename="../src/MainWindow.cpp" line="825"/>
         <source>Layer &amp;combinations...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="680"/>
+        <location filename="../src/MainWindow.cpp" line="831"/>
         <source>P&amp;urposes...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1251"/>
+        <location filename="../src/MainWindow.cpp" line="1423"/>
         <source>Open</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1252"/>
+        <location filename="../src/MainWindow.cpp" line="1424"/>
         <source>KimBim and IFC files (*.kim *.ifc);;KimBim projects (*.kim);;IFC files (*.ifc)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1557"/>
-        <location filename="../src/MainWindow.cpp" line="5742"/>
+        <location filename="../src/MainWindow.cpp" line="1738"/>
+        <location filename="../src/MainWindow.cpp" line="6409"/>
         <source>New project</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1580"/>
+        <location filename="../src/MainWindow.cpp" line="1761"/>
         <source>Could not add the level</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1597"/>
+        <location filename="../src/MainWindow.cpp" line="1778"/>
         <source>Add level</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1601"/>
-        <location filename="../src/MainWindow.cpp" line="3420"/>
-        <location filename="../src/MainWindow.cpp" line="4930"/>
+        <location filename="../src/MainWindow.cpp" line="980"/>
+        <location filename="../src/MainWindow.cpp" line="1782"/>
+        <location filename="../src/MainWindow.cpp" line="3904"/>
+        <location filename="../src/MainWindow.cpp" line="5426"/>
         <source>Name:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1599"/>
+        <location filename="../src/MainWindow.cpp" line="1780"/>
         <source>Level %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="276"/>
+        <location filename="../src/MainWindow.cpp" line="285"/>
         <source>Click another face, or Esc to finish</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="412"/>
+        <location filename="../src/MainWindow.cpp" line="175"/>
+        <location filename="../src/MainWindow.cpp" line="610"/>
+        <source>Grid snap</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="421"/>
         <source>Save the current state as a new version (same as the Versions menu)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="486"/>
+        <source>Pick &amp;up settings</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="488"/>
+        <source>&amp;Inject settings</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="496"/>
+        <source>&amp;Fillet/Chamfer...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="502"/>
         <source>Select every element sharing the selected element&apos;s class and predefined type, its type object or its class (Edit ▸ Preferences)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="489"/>
+        <location filename="../src/MainWindow.cpp" line="505"/>
         <source>Select &amp;all</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="490"/>
+        <location filename="../src/MainWindow.cpp" line="506"/>
         <source>With a creation tool active, selects that tool&apos;s elements; otherwise everything</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="573"/>
-        <source>Set current view as &amp;home</source>
+        <location filename="../src/MainWindow.cpp" line="556"/>
+        <source>&amp;White model</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="575"/>
-        <source>The Home view button and shortcut turn to this direction from now on</source>
+        <location filename="../src/MainWindow.cpp" line="559"/>
+        <source>Show every surface white, as a study model (the contours and glass stay)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="584"/>
-        <source>The current view is now the home view</source>
+        <location filename="../src/MainWindow.cpp" line="561"/>
+        <source>Sun s&amp;hadows</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="564"/>
+        <source>The sun casts shadows in the 3D views</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="577"/>
+        <source>&amp;Zoom to selection</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="587"/>
+        <source>Construction &amp;grid</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="596"/>
+        <source>Grid &amp;snap</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="600"/>
+        <source>Free points jump to the construction grid&apos;s lines</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="607"/>
+        <source>Grid snap on</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="607"/>
+        <source>Grid snap off</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="613"/>
+        <source>Grid &amp;options...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="617"/>
+        <source>Level a&amp;bove</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="622"/>
+        <source>This is the top level</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="624"/>
+        <source>Level be&amp;low</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="629"/>
+        <source>This is the bottom level</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="632"/>
+        <source>&amp;Trace reference</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="637"/>
+        <source>&amp;Off</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="637"/>
+        <source>Level &amp;below</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="637"/>
+        <source>Level &amp;above</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="656"/>
+        <source>Special snap &amp;points...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="658"/>
+        <source>Snap to equal divisions of walls and to a distance from their ends</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="661"/>
+        <source>Special snap points</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="666"/>
+        <source>Off (middle only)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="668"/>
+        <source>Divide walls into:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="674"/>
+        <source>Off</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="676"/>
+        <source>Distance from the ends:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="708"/>
+        <source>Set current view as &amp;home</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="710"/>
+        <source>The Home view button and shortcut turn to this direction from now on</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="719"/>
+        <source>The current view is now the home view</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="772"/>
         <source>Cut &amp;planes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="645"/>
+        <location filename="../src/MainWindow.cpp" line="780"/>
         <source>&amp;Vertical cut</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="646"/>
+        <location filename="../src/MainWindow.cpp" line="781"/>
         <source>&amp;Horizontal cut...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="647"/>
+        <location filename="../src/MainWindow.cpp" line="782"/>
         <source>&amp;Oblique cut...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="648"/>
+        <location filename="../src/MainWindow.cpp" line="783"/>
         <source>From a &amp;face</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="650"/>
+        <location filename="../src/MainWindow.cpp" line="785"/>
         <source>Cut planes &amp;panel...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="699"/>
+        <location filename="../src/MainWindow.cpp" line="811"/>
+        <source>Building &amp;materials...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="812"/>
+        <source>&amp;Surfaces...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="813"/>
+        <source>&amp;Composites...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="814"/>
+        <source>Add standard materials</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="816"/>
+        <source>Standard materials added</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="817"/>
+        <source>Purge unused materials</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="819"/>
+        <source>Unused materials removed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="850"/>
         <source>Cut planes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="931"/>
-        <location filename="../src/MainWindow.cpp" line="1009"/>
+        <location filename="../src/MainWindow.cpp" line="972"/>
+        <source>New worksheet</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="973"/>
+        <source>Worksheet name (e.g. Window details):</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="980"/>
+        <source>Rename worksheet</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="985"/>
+        <source>Delete worksheet</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="986"/>
+        <source>Delete the worksheet %1 with everything drawn on it? (Undo brings it back.)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="1103"/>
+        <location filename="../src/MainWindow.cpp" line="1181"/>
         <source>This view&apos;s graphics driver has no clip plane left: turn off or delete another cut plane first</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="958"/>
+        <location filename="../src/MainWindow.cpp" line="1130"/>
         <source>Vertical cut %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="964"/>
+        <location filename="../src/MainWindow.cpp" line="1136"/>
         <source>Horizontal cut %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="972"/>
+        <location filename="../src/MainWindow.cpp" line="1144"/>
         <source>Oblique cut %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="978"/>
+        <location filename="../src/MainWindow.cpp" line="1150"/>
         <source>Face cut %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1077"/>
+        <location filename="../src/MainWindow.cpp" line="1249"/>
         <source>Cannot cut</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1087"/>
+        <location filename="../src/MainWindow.cpp" line="1259"/>
         <source>Cut from a face: click a model face; the kept side is away from the camera</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1092"/>
+        <location filename="../src/MainWindow.cpp" line="1264"/>
         <source>Vertical cut: click where the cut line starts</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1093"/>
+        <location filename="../src/MainWindow.cpp" line="1265"/>
         <source>Oblique cut: click where the cut line starts</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1112"/>
+        <location filename="../src/MainWindow.cpp" line="1284"/>
         <source>Click where the cut line ends</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1116"/>
+        <location filename="../src/MainWindow.cpp" line="1288"/>
         <source>Click the side the cut keeps</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1129"/>
+        <location filename="../src/MainWindow.cpp" line="1301"/>
         <source>Oblique cut</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1129"/>
+        <location filename="../src/MainWindow.cpp" line="1301"/>
         <source>Tilt about the line (degrees):</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1136"/>
+        <location filename="../src/MainWindow.cpp" line="1308"/>
         <source>Click where the next cut line starts</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1137"/>
+        <location filename="../src/MainWindow.cpp" line="1309"/>
         <source>The cut line is too short, or the view has no clip plane left</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1145"/>
+        <location filename="../src/MainWindow.cpp" line="1317"/>
         <source>Horizontal cut</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1145"/>
+        <location filename="../src/MainWindow.cpp" line="1317"/>
         <source>Height above the project zero (m):</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1151"/>
+        <location filename="../src/MainWindow.cpp" line="1323"/>
         <source>Horizontal cut at %1 m</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1424"/>
+        <location filename="../src/MainWindow.cpp" line="1605"/>
         <source>Change the object&apos;s type</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="1425"/>
+        <location filename="../src/MainWindow.cpp" line="1606"/>
         <source>This object&apos;s type has %n placement(s) in the model.</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -3100,7 +3383,7 @@ License: GPL-3.0-or-later</source>
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="1427"/>
+        <location filename="../src/MainWindow.cpp" line="1608"/>
         <source>Change every placement of the type, or only the %n selected one(s)?</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -3108,889 +3391,1148 @@ License: GPL-3.0-or-later</source>
         </translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1429"/>
+        <location filename="../src/MainWindow.cpp" line="1610"/>
         <source>Change every placement</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1430"/>
+        <location filename="../src/MainWindow.cpp" line="1611"/>
         <source>Only the selection</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1608"/>
+        <location filename="../src/MainWindow.cpp" line="1789"/>
         <source>Elevation (m):</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1610"/>
+        <location filename="../src/MainWindow.cpp" line="1791"/>
         <source>Fit between the levels around this elevation (Revit)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1634"/>
+        <location filename="../src/MainWindow.cpp" line="1815"/>
         <source>Could not change the levels</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1638"/>
+        <location filename="../src/MainWindow.cpp" line="1819"/>
         <source>Levels changed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1656"/>
-        <source>&amp;Model</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1679"/>
-        <source>&amp;Wall</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1680"/>
-        <source>Draw walls: click points, type a length + Enter, Esc to finish. Shift: right angles.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1681"/>
-        <source>&amp;Slab</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1682"/>
-        <source>Draw a slab outline: click points, click the first point or press Enter to close, Esc to cancel</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1683"/>
-        <source>&amp;Door</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1683"/>
-        <source>Place doors: click on a wall</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1684"/>
-        <source>Wi&amp;ndow</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1684"/>
-        <source>Place windows: click on a wall</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1685"/>
-        <source>&amp;Column</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1686"/>
-        <source>Place columns: click a point (snaps to grid crossings); Shift turns it 90 degrees</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1687"/>
-        <source>&amp;Beam</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1688"/>
-        <source>Draw a beam: click its two ends; its top is at the level plus the height field</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1689"/>
-        <source>&amp;Grid line</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1690"/>
-        <source>Draw a grid line: click its two ends (tags A, B... and 1, 2... are automatic)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1691"/>
-        <source>&amp;Move</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1692"/>
-        <source>Move the selection: click a base point, then where it goes; joined walls follow (Ctrl: detach)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1693"/>
-        <source>&amp;Rotate</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1694"/>
-        <source>Rotate the selection: click the centre, a reference, then the new direction (or type degrees)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1695"/>
-        <source>S&amp;tretch wall</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1696"/>
-        <source>Stretch a wall: click near one of its ends, then click its new position (or type the length)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1697"/>
-        <source>Spli&amp;t</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1698"/>
-        <source>Split a wall or beam in two where you click; doors and windows stay where they are (Ctrl: pieces unjoined)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1699"/>
-        <source>Trim/e&amp;xtend</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1700"/>
-        <source>Trim or extend walls and beams to a boundary, or two to their corner; click the side to keep</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1701"/>
-        <source>&amp;Join</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1702"/>
-        <source>Join two walls that meet (L or T), merge two in line of the same type, or unjoin them</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1703"/>
-        <source>S&amp;tair</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1707"/>
-        <source>Slab &amp;opening</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1708"/>
-        <source>Cut a hole in the selected slab: draw its outline like a slab</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1709"/>
-        <source>Place mo&amp;del</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1710"/>
-        <source>Place a model (an apartment drawn once) on this level: click where its origin goes; Shift turns it 90 degrees</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1711"/>
-        <source>Te&amp;xt label</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1711"/>
-        <source>Put a text label on the plan: click where it goes</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1712"/>
-        <source>Dimensi&amp;on</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1713"/>
-        <source>Dimension: click the two points to measure, then where the dimension line goes</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1714"/>
-        <source>Mar&amp;k</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1714"/>
-        <source>Mark something on the plan: a circle with a tag</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1715"/>
-        <source>&amp;Leader</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1716"/>
-        <source>Leader: click what it points at, then where its text goes</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1717"/>
-        <source>Roo&amp;f</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1718"/>
-        <source>Roof: draw its eaves outline like a slab; flat, shed, gable or hip with the pitch from the toolbar</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1719"/>
-        <source>R&amp;oom</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1720"/>
-        <source>Room: click inside walls; the room takes the shape they enclose and shows its name, number and area</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1721"/>
-        <source>Sect&amp;ion</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1722"/>
-        <source>Section: click the two ends of the section line, then the side it looks at</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1723"/>
-        <source>&amp;Elevation</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1724"/>
-        <source>Elevation: click the two ends of the elevation line, then the side it looks at</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1725"/>
-        <source>Mea&amp;sure</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1726"/>
-        <source>Measure distances, angles and areas: click points (they snap); Enter stops, Esc clears. Changes nothing</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1727"/>
-        <source>L&amp;ine</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1728"/>
-        <source>Draw a 2D line on the plan: click its two ends, or type a length (length&lt;angle)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1729"/>
-        <source>&amp;Polyline</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1730"/>
-        <source>Draw a 2D polyline: click points; click the first point to close it, Enter or double click to end it</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1731"/>
-        <source>&amp;Arc/circle</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1732"/>
-        <source>Draw a 2D circle (centre and radius) or arc (three points, or centre, start and end)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1733"/>
-        <source>Rec&amp;tangle</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1734"/>
-        <source>Draw a 2D rectangle: click two opposite corners, or type width;height</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1735"/>
-        <source>&amp;Fill</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1736"/>
-        <source>Draw a fill (hatch): click its outline; Alt+click inside a closed polyline, rectangle or circle to fill it</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1738"/>
-        <source>Ta&amp;g</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1739"/>
-        <source>Tag an element: click a door, window, wall or room; the tag shows its values and follows it</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1740"/>
-        <source>&amp;North arrow</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1741"/>
-        <source>Place a north arrow: it points to the project&apos;s true north</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1742"/>
-        <source>Scale &amp;bar</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1742"/>
-        <source>Place a scale bar of the drawing scale</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1743"/>
-        <source>Revision &amp;cloud</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1744"/>
-        <source>Draw a revision cloud: click its outline; the revision goes in its triangle</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1745"/>
-        <source>An&amp;gle dimension</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1746"/>
-        <source>Angle dimension: click the vertex, a point on each side, then where the arc goes</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1747"/>
-        <source>&amp;Radius/diameter</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1748"/>
-        <source>Radius or diameter: click the centre, a point on the circle, then where the text goes</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1749"/>
-        <source>&amp;Level/spot elevation</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1750"/>
-        <source>Level dimension or spot elevation: click the point (it measures the slab below, or the level)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1751"/>
-        <source>O&amp;bject</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1752"/>
-        <source>Place a library object (furniture, sanitary, kitchen, trees...): pick it in the Library panel, click where it goes; Tab turns it 90 degrees</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1767"/>
-        <source>Tag &amp;all untagged</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1769"/>
-        <source>Tag the doors, windows and walls of this level that the view shows and have no tag</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1778"/>
-        <source>Copy to &amp;level...</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1781"/>
-        <source>&amp;Update model instances</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1783"/>
-        <source>Apply the model&apos;s changes to every place it is used</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1785"/>
-        <source>E&amp;xplode model instance</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1787"/>
-        <source>Unlink the selected instance: its elements become ordinary elements you can edit one by one</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1789"/>
-        <source>Wall &amp;height...</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1792"/>
-        <source>Chec&amp;k model...</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1794"/>
-        <source>Schema validation, IDS, clash detection and model checks</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1796"/>
-        <source>Door/window si&amp;ze...</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1799"/>
-        <source>Slab from selected &amp;walls</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1802"/>
-        <source>&amp;Trim walls to roof</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1804"/>
-        <source>Select a roof and walls: the walls reach up to the roof and stop at its underside</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1806"/>
-        <source>&amp;Release walls from roof</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1811"/>
-        <source>Renovation &amp;status</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1816"/>
-        <source>Mark unmarked elements as</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/MainWindow.cpp" line="1822"/>
-        <source>Type</source>
+        <location filename="../src/MainWindow.cpp" line="1827"/>
+        <location filename="../src/MainWindow.cpp" line="1863"/>
+        <source>Materials</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="1837"/>
-        <location filename="../src/MainWindow.cpp" line="2500"/>
-        <location filename="../src/MainWindow.cpp" line="2730"/>
-        <source>Wall height</source>
+        <source>Could not change the materials</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="1841"/>
-        <source>Flat</source>
+        <source>Materials changed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/MainWindow.cpp" line="1855"/>
+        <source>%n element(s) changed</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="1909"/>
+        <source>Special snap points: %1 divisions, %2 m from the ends</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1842"/>
-        <source>Shed</source>
+        <location filename="../src/MainWindow.cpp" line="1910"/>
+        <source>Special snap points off</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1843"/>
-        <source>Gable</source>
+        <location filename="../src/MainWindow.cpp" line="1917"/>
+        <location filename="../src/MainWindow.cpp" line="2025"/>
+        <source>Grid options</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1844"/>
-        <source>Hip</source>
+        <location filename="../src/MainWindow.cpp" line="1938"/>
+        <source>Main line spacing:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1846"/>
-        <source>Roof kind</source>
+        <location filename="../src/MainWindow.cpp" line="1939"/>
+        <source>Subdivisions:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1853"/>
-        <source>Roof pitch</source>
+        <location filename="../src/MainWindow.cpp" line="1940"/>
+        <location filename="../src/MainWindow.cpp" line="1981"/>
+        <source>Angle:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1863"/>
-        <location filename="../src/MainWindow.cpp" line="2506"/>
-        <source>Length (m)</source>
+        <location filename="../src/MainWindow.cpp" line="1941"/>
+        <source>Origin x:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1868"/>
-        <source>Copy</source>
+        <location filename="../src/MainWindow.cpp" line="1942"/>
+        <source>Origin y:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1869"/>
-        <source>Copy the measurement to the clipboard</source>
+        <location filename="../src/MainWindow.cpp" line="1955"/>
+        <source>Grid system</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="1969"/>
+        <source>Distances between the numbered lines, in metres (e.g. 6 6 4.5)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="1972"/>
+        <source>Distances between the lettered lines, in metres</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="1977"/>
+        <source>Numbered lines (1, 2, 3...) spacings:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="1978"/>
+        <source>Lettered lines (A, B, C...) spacings:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="1979"/>
+        <source>First crossing x:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="1980"/>
+        <source>First crossing y:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="1982"/>
+        <source>Lines reach past the last crossing by:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2010"/>
+        <source>Could not add the grid system</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/MainWindow.cpp" line="2014"/>
+        <source>%n grid line(s) added</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2049"/>
+        <source>&amp;Model</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2072"/>
+        <source>&amp;Wall</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2073"/>
+        <source>Draw walls: click points, type a length + Enter, Esc to finish. Shift: right angles.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2074"/>
+        <source>&amp;Slab</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2075"/>
+        <source>Draw a slab outline: click points, click the first point or press Enter to close, Esc to cancel</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2076"/>
+        <source>&amp;Door</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2076"/>
+        <source>Place doors: click on a wall</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2077"/>
+        <source>Wi&amp;ndow</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2077"/>
+        <source>Place windows: click on a wall</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2078"/>
+        <source>&amp;Column</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2079"/>
+        <source>Place columns: click a point (snaps to grid crossings); Shift turns it 90 degrees</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2080"/>
+        <source>&amp;Beam</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2081"/>
+        <source>Draw a beam: click its two ends; its top is at the level plus the height field</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2082"/>
+        <source>&amp;Grid line</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2083"/>
+        <source>Draw a grid line: click its two ends (tags A, B... and 1, 2... are automatic)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2084"/>
+        <source>&amp;Move</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2085"/>
+        <source>Move the selection: click a base point, then where it goes; joined walls follow (Ctrl: detach)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2086"/>
+        <source>&amp;Rotate</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2087"/>
+        <source>Rotate the selection: click the centre, a reference, then the new direction (or type degrees)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2088"/>
+        <source>S&amp;tretch wall</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2089"/>
+        <source>Stretch a wall: click near one of its ends, then click its new position (or type the length)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2090"/>
+        <source>Spli&amp;t</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2091"/>
+        <source>Split a wall or beam in two where you click; doors and windows stay where they are (Ctrl: pieces unjoined)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2092"/>
+        <source>Trim/e&amp;xtend</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="2093"/>
+        <source>Trim or extend walls and beams to a boundary, or two to their corner; click the side to keep</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2094"/>
+        <source>&amp;Join</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2095"/>
+        <source>Join two walls that meet (L or T), merge two in line of the same type, or unjoin them</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2096"/>
+        <source>S&amp;tair</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2100"/>
+        <source>Slab &amp;opening</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2101"/>
+        <source>Cut a hole in the selected slab: draw its outline like a slab</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2102"/>
+        <source>Place mo&amp;del</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2103"/>
+        <source>Place a model (an apartment drawn once) on this level: click where its origin goes; Shift turns it 90 degrees</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2104"/>
+        <source>Te&amp;xt label</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2104"/>
+        <source>Put a text label on the plan: click where it goes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2105"/>
+        <source>Dimensi&amp;on</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2106"/>
+        <source>Dimension: click the two points to measure, then where the dimension line goes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2107"/>
+        <source>Mar&amp;k</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2107"/>
+        <source>Mark something on the plan: a circle with a tag</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2108"/>
+        <source>&amp;Leader</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2109"/>
+        <source>Leader: click what it points at, then where its text goes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2110"/>
+        <source>Roo&amp;f</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2111"/>
+        <source>Roof: draw its eaves outline like a slab; flat, shed, gable or hip with the pitch from the toolbar</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2112"/>
+        <source>R&amp;oom</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2113"/>
+        <source>Room: click inside walls; the room takes the shape they enclose and shows its name, number and area</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2114"/>
+        <source>Sect&amp;ion</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2115"/>
+        <source>Section: click the two ends of the section line, then the side it looks at</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2116"/>
+        <source>&amp;Elevation</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2117"/>
+        <source>Elevation: click the two ends of the elevation line, then the side it looks at</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2118"/>
+        <source>Mea&amp;sure</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2119"/>
+        <source>Measure distances, angles and areas: click points (they snap); Enter stops, Esc clears. Changes nothing</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2120"/>
+        <source>L&amp;ine</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2121"/>
+        <source>Draw a 2D line on the plan: click its two ends, or type a length (length&lt;angle)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2122"/>
+        <source>&amp;Polyline</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2123"/>
+        <source>Draw a 2D polyline: click points; click the first point to close it, Enter or double click to end it</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2124"/>
+        <source>&amp;Arc/circle</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2125"/>
+        <source>Draw a 2D circle (centre and radius) or arc (three points, or centre, start and end)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2126"/>
+        <source>Rec&amp;tangle</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2127"/>
+        <source>Draw a 2D rectangle: click two opposite corners, or type width;height</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2128"/>
+        <source>&amp;Fill</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2129"/>
+        <source>Draw a fill (hatch): click its outline; Alt+click inside a closed polyline, rectangle or circle to fill it</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2131"/>
+        <source>Ta&amp;g</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2132"/>
+        <source>Tag an element: click a door, window, wall or room; the tag shows its values and follows it</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2133"/>
+        <source>&amp;North arrow</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2134"/>
+        <source>Place a north arrow: it points to the project&apos;s true north</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2135"/>
+        <source>Scale &amp;bar</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2135"/>
+        <source>Place a scale bar of the drawing scale</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2136"/>
+        <source>Revision &amp;cloud</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2137"/>
+        <source>Draw a revision cloud: click its outline; the revision goes in its triangle</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2138"/>
+        <source>An&amp;gle dimension</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2139"/>
+        <source>Angle dimension: click the vertex, a point on each side, then where the arc goes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2140"/>
+        <source>&amp;Radius/diameter</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2141"/>
+        <source>Radius or diameter: click the centre, a point on the circle, then where the text goes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2142"/>
+        <source>&amp;Level/spot elevation</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2143"/>
+        <source>Level dimension or spot elevation: click the point (it measures the slab below, or the level)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2144"/>
+        <source>O&amp;bject</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2145"/>
+        <source>Place a library object (furniture, sanitary, kitchen, trees...): pick it in the Library panel, click where it goes; Tab turns it 90 degrees</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2160"/>
+        <source>Tag &amp;all untagged</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2162"/>
+        <source>Tag the doors, windows and walls of this level that the view shows and have no tag</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2171"/>
+        <source>Copy to &amp;level...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2174"/>
+        <source>&amp;Update model instances</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2176"/>
+        <source>Apply the model&apos;s changes to every place it is used</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2178"/>
+        <source>E&amp;xplode model instance</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2180"/>
+        <source>Unlink the selected instance: its elements become ordinary elements you can edit one by one</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2183"/>
+        <source>&amp;Flip walls</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2185"/>
+        <source>Mirror the selected walls&apos; layers about their reference lines</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2188"/>
+        <source>Grid s&amp;ystem...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2190"/>
+        <source>Several grid lines at once: numbered across, lettered along</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2193"/>
+        <source>Save shape as wall &amp;profile...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2195"/>
+        <source>Select a closed polyline, rectangle or fill drawn as a wall&apos;s section, then name it</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2198"/>
+        <source>Select one closed shape: the wall&apos;s section</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2202"/>
+        <source>Wall profile</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2202"/>
+        <source>Profile name:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2208"/>
+        <source>Wall &amp;junctions</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2210"/>
+        <source>Run &amp;through at their joins</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2211"/>
+        <source>&amp;Stop at their joins</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2211"/>
+        <source>By building &amp;materials</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2217"/>
+        <source>Wall &amp;height...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2220"/>
+        <source>Chec&amp;k model...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2222"/>
+        <source>Schema validation, IDS, clash detection and model checks</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2224"/>
+        <source>Door/window si&amp;ze...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2227"/>
+        <source>Slab from selected &amp;walls</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2230"/>
+        <source>&amp;Trim walls to roof</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2232"/>
+        <source>Select a roof and walls: the walls reach up to the roof and stop at its underside</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2234"/>
+        <source>&amp;Release walls from roof</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2239"/>
+        <source>Renovation &amp;status</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2244"/>
+        <source>Mark unmarked elements as</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2250"/>
+        <source>Type</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2265"/>
+        <location filename="../src/MainWindow.cpp" line="2984"/>
+        <location filename="../src/MainWindow.cpp" line="3214"/>
+        <source>Wall height</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2270"/>
+        <source>Reference line: where the line you draw lies in the wall</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2271"/>
+        <source>Outside face</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2271"/>
+        <source>Centre</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2271"/>
+        <source>Inside face</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2271"/>
+        <source>Core outside</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2272"/>
+        <source>Core centre</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2272"/>
+        <source>Core inside</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2287"/>
+        <source>Geometry method: straight walls, or curved ones (start, end, then a point on the arc)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2289"/>
+        <source>Curved</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2292"/>
+        <source>Curved walls: click the start, the end, then a point on the arc</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2293"/>
+        <source>Straight walls</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2297"/>
+        <source>Gravity</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2299"/>
+        <source>Place objects on the top of the slab under them</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2302"/>
+        <source>Fit to walls</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2304"/>
+        <source>Near a wall, the object turns its back to the wall and stands against it</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2309"/>
+        <source>Flat</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2310"/>
+        <source>Shed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2311"/>
+        <source>Gable</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2312"/>
+        <source>Hip</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2314"/>
+        <source>Roof kind</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2321"/>
+        <source>Roof pitch</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2331"/>
+        <location filename="../src/MainWindow.cpp" line="2990"/>
+        <source>Length (m)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2336"/>
+        <source>Copy</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2337"/>
+        <source>Copy the measurement to the clipboard</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2561"/>
         <source>Mirror: click the second point of the mirror line (Ctrl: mirror a copy)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2442"/>
-        <location filename="../src/DraftTools.cpp" line="190"/>
+        <location filename="../src/MainWindow.cpp" line="2918"/>
+        <location filename="../src/DraftTools.cpp" line="202"/>
         <source>endpoint</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2442"/>
-        <location filename="../src/DraftTools.cpp" line="190"/>
+        <location filename="../src/MainWindow.cpp" line="2918"/>
+        <location filename="../src/DraftTools.cpp" line="202"/>
         <source>midpoint</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2442"/>
-        <location filename="../src/DraftTools.cpp" line="190"/>
+        <location filename="../src/MainWindow.cpp" line="2918"/>
+        <location filename="../src/DraftTools.cpp" line="202"/>
         <source>perpendicular</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2443"/>
-        <location filename="../src/DraftTools.cpp" line="191"/>
+        <location filename="../src/MainWindow.cpp" line="2919"/>
+        <location filename="../src/DraftTools.cpp" line="203"/>
         <source>on wall</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2443"/>
-        <location filename="../src/DraftTools.cpp" line="191"/>
+        <location filename="../src/MainWindow.cpp" line="2919"/>
+        <location filename="../src/DraftTools.cpp" line="203"/>
         <source>angle</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2443"/>
-        <location filename="../src/DraftTools.cpp" line="191"/>
+        <location filename="../src/MainWindow.cpp" line="2919"/>
+        <location filename="../src/DraftTools.cpp" line="203"/>
         <source>grid</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2443"/>
-        <location filename="../src/DraftTools.cpp" line="191"/>
+        <location filename="../src/MainWindow.cpp" line="2919"/>
+        <location filename="../src/DraftTools.cpp" line="203"/>
         <source>grid crossing</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2443"/>
-        <location filename="../src/DraftTools.cpp" line="192"/>
+        <location filename="../src/MainWindow.cpp" line="2919"/>
+        <location filename="../src/DraftTools.cpp" line="204"/>
         <source>on grid line</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2444"/>
-        <location filename="../src/DraftTools.cpp" line="192"/>
+        <location filename="../src/MainWindow.cpp" line="2920"/>
+        <location filename="../src/DraftTools.cpp" line="204"/>
         <source>wall face end</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2444"/>
-        <location filename="../src/DraftTools.cpp" line="192"/>
+        <location filename="../src/MainWindow.cpp" line="2920"/>
+        <location filename="../src/DraftTools.cpp" line="204"/>
         <source>on wall face</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2444"/>
-        <location filename="../src/DraftTools.cpp" line="192"/>
+        <location filename="../src/MainWindow.cpp" line="2920"/>
+        <location filename="../src/DraftTools.cpp" line="204"/>
         <source>centre</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2444"/>
+        <location filename="../src/MainWindow.cpp" line="2920"/>
         <source>underlay endpoint</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2445"/>
+        <location filename="../src/MainWindow.cpp" line="2921"/>
         <source>underlay midpoint</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2445"/>
+        <location filename="../src/MainWindow.cpp" line="2921"/>
         <source>underlay crossing</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2445"/>
+        <location filename="../src/MainWindow.cpp" line="2921"/>
         <source>on underlay line</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2446"/>
+        <location filename="../src/MainWindow.cpp" line="2922"/>
         <source>intersection</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2446"/>
+        <location filename="../src/MainWindow.cpp" line="2922"/>
         <source>guide crossing</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2446"/>
+        <location filename="../src/MainWindow.cpp" line="2922"/>
         <source>on guide</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2446"/>
+        <location filename="../src/MainWindow.cpp" line="2922"/>
         <source>parallel</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2447"/>
+        <location filename="../src/MainWindow.cpp" line="2923"/>
         <source>tracker</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2447"/>
+        <location filename="../src/MainWindow.cpp" line="2923"/>
         <source>typed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2448"/>
+        <location filename="../src/MainWindow.cpp" line="2924"/>
         <source>Wall: click the next point, type a length, Esc to finish</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2506"/>
+        <location filename="../src/MainWindow.cpp" line="2990"/>
         <source>Length (%1)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2557"/>
+        <location filename="../src/MainWindow.cpp" line="3041"/>
         <source>Stretch: click near a wall end or a point of a line, arc or fill, then its new position</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2585"/>
+        <location filename="../src/MainWindow.cpp" line="3069"/>
         <source>Object: click where it goes (Tab: turn 90 degrees, type an angle + Enter; Shift: turned for this click)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2834"/>
+        <location filename="../src/MainWindow.cpp" line="3318"/>
         <source>&amp;Versions</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2838"/>
+        <location filename="../src/MainWindow.cpp" line="3322"/>
         <source>&amp;Enable versioning...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2840"/>
+        <location filename="../src/MainWindow.cpp" line="3324"/>
         <source>Save the project as a .kim file, which keeps its versions and design options</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2843"/>
+        <location filename="../src/MainWindow.cpp" line="3327"/>
         <source>Design options</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2845"/>
+        <location filename="../src/MainWindow.cpp" line="3329"/>
         <source>&amp;New option...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2850"/>
+        <location filename="../src/MainWindow.cpp" line="3334"/>
         <source>&amp;Delete option...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2854"/>
+        <location filename="../src/MainWindow.cpp" line="3338"/>
         <source>&amp;Combine options...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2865"/>
+        <location filename="../src/MainWindow.cpp" line="3349"/>
         <source>&amp;Milestone...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2870"/>
+        <location filename="../src/MainWindow.cpp" line="3354"/>
         <source>&amp;Object history...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2875"/>
+        <location filename="../src/MainWindow.cpp" line="3359"/>
         <source>&amp;History and compare</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2878"/>
+        <location filename="../src/MainWindow.cpp" line="3362"/>
         <source>The History panel: the versions, and comparing two of them</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2918"/>
+        <location filename="../src/MainWindow.cpp" line="3402"/>
         <source>Design option %1: switch options, save versions, history</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2920"/>
-        <location filename="../tests/test_main_window.cpp" line="1052"/>
+        <location filename="../src/MainWindow.cpp" line="3404"/>
+        <location filename="../tests/test_main_window.cpp" line="1368"/>
         <source>Versions</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2921"/>
+        <location filename="../src/MainWindow.cpp" line="3405"/>
         <source>This project keeps no versions yet: enable versioning to save versions and design options</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2929"/>
+        <location filename="../src/MainWindow.cpp" line="3413"/>
         <source>Enable versioning</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2930"/>
+        <location filename="../src/MainWindow.cpp" line="3414"/>
         <source>KimBim project (*.kim)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2987"/>
+        <location filename="../src/MainWindow.cpp" line="3471"/>
         <source>&amp;Float</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2990"/>
+        <location filename="../src/MainWindow.cpp" line="3474"/>
         <source>&amp;Auto-hide</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3005"/>
+        <location filename="../src/MainWindow.cpp" line="3489"/>
         <source>Pin %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3169"/>
+        <location filename="../src/MainWindow.cpp" line="3653"/>
         <source>%1 is a large model (%2 MB).</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3170"/>
+        <location filename="../src/MainWindow.cpp" line="3654"/>
         <source>Making a KimBim project from it can take several minutes.
 
 Editing the IFC directly opens it at once, without version history, options, compare or combine, and project settings (cut height, layer states, drawing scale, units) aren&apos;t kept. You can make a .kim later with File &gt; Save As.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3174"/>
+        <location filename="../src/MainWindow.cpp" line="3658"/>
         <source>Make a .kim project</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3175"/>
+        <location filename="../src/MainWindow.cpp" line="3659"/>
         <source>Edit the IFC directly</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3227"/>
+        <location filename="../src/MainWindow.cpp" line="3711"/>
         <source>Large models can take several minutes.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3307"/>
+        <location filename="../src/MainWindow.cpp" line="3791"/>
         <source>Enable versioning first (Versions menu)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3814"/>
+        <location filename="../src/MainWindow.cpp" line="4298"/>
         <source>%1 (modified)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3829"/>
+        <location filename="../src/MainWindow.cpp" line="4313"/>
         <source>Purpose: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3834"/>
+        <location filename="../src/MainWindow.cpp" line="4318"/>
         <source>(keep the layers as they are)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3845"/>
+        <location filename="../src/MainWindow.cpp" line="4329"/>
         <source>Pen set:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3846"/>
+        <location filename="../src/MainWindow.cpp" line="4330"/>
         <source>Visibility set:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3847"/>
+        <location filename="../src/MainWindow.cpp" line="4331"/>
         <source>Graphic overrides:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3848"/>
+        <location filename="../src/MainWindow.cpp" line="4332"/>
         <source>Layer combination:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3849"/>
+        <location filename="../src/MainWindow.cpp" line="4333"/>
         <source>Renovation filter:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3851"/>
+        <location filename="../src/MainWindow.cpp" line="4335"/>
         <source>Legend</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3858"/>
+        <location filename="../src/MainWindow.cpp" line="4342"/>
         <source>Everything is drawn with its element styles</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3900"/>
+        <location filename="../src/MainWindow.cpp" line="4384"/>
         <source>Select the elements first</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3929"/>
+        <location filename="../src/MainWindow.cpp" line="4413"/>
         <source>Every element already has a renovation status</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="3938"/>
+        <location filename="../src/MainWindow.cpp" line="4422"/>
         <source>%n element(s) marked</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -3998,12 +4540,12 @@ Editing the IFC directly opens it at once, without version history, options, com
         </translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3953"/>
+        <location filename="../src/MainWindow.cpp" line="4437"/>
         <source>Renovation status</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="3954"/>
+        <location filename="../src/MainWindow.cpp" line="4438"/>
         <source>%n element(s) have no renovation status. Mark them as:</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -4011,211 +4553,305 @@ Editing the IFC directly opens it at once, without version history, options, com
         </translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3957"/>
+        <location filename="../src/MainWindow.cpp" line="4441"/>
         <source>Leave them (they count as New)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3962"/>
+        <location filename="../src/MainWindow.cpp" line="4446"/>
         <source>Don&apos;t ask again</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4029"/>
+        <location filename="../src/MainWindow.cpp" line="4513"/>
         <source>Could not change the graphics</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4680"/>
+        <location filename="../src/MainWindow.cpp" line="5164"/>
+        <source>Could not resize it: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="5176"/>
         <source>Could not remove it: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4691"/>
+        <location filename="../src/MainWindow.cpp" line="5187"/>
         <source>Edit text</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4697"/>
+        <location filename="../src/MainWindow.cpp" line="5193"/>
         <source>Could not change it: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4816"/>
+        <location filename="../src/MainWindow.cpp" line="5312"/>
         <source>Could not change the title block</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4829"/>
+        <location filename="../src/MainWindow.cpp" line="5325"/>
         <source>Title block</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4833"/>
+        <location filename="../src/MainWindow.cpp" line="5329"/>
         <source>Project:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4837"/>
+        <location filename="../src/MainWindow.cpp" line="5333"/>
         <source>Sheet title:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4838"/>
+        <location filename="../src/MainWindow.cpp" line="5334"/>
         <source>Sheet number:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4839"/>
+        <location filename="../src/MainWindow.cpp" line="5335"/>
         <source>Scale:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4840"/>
+        <location filename="../src/MainWindow.cpp" line="5336"/>
         <source>Date:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4841"/>
+        <location filename="../src/MainWindow.cpp" line="5337"/>
         <source>Issued by:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5663"/>
+        <location filename="../src/MainWindow.cpp" line="5670"/>
+        <source>Could not fillet: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../src/MainWindow.cpp" line="5685"/>
+        <source>Fillet/Chamfer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="5689"/>
+        <source>Fillet (round)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="5690"/>
+        <source>Chamfer (cut)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="5692"/>
+        <source>Corners:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="5699"/>
+        <source>Radius or distance:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="5716"/>
+        <source>Worksheet</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="5729"/>
+        <source>Could not create the worksheet</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="5734"/>
+        <source>Draw on the worksheet; place pictures with File &gt; Place underlay; put it on a sheet from Drawings</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="6108"/>
+        <source>Wall profile %1 saved: choose it in a wall&apos;s Properties &gt; Geometry &gt; Profile</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="6115"/>
+        <source>Select one element to pick up its settings</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="6124"/>
+        <source>Picked up the settings of %1: select others and inject them (Ctrl+Alt+V)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="6132"/>
+        <source>Pick up an element&apos;s settings first (Ctrl+Alt+C)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/MainWindow.cpp" line="6144"/>
+        <source>%n element(s) took the settings</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/MainWindow.cpp" line="6158"/>
+        <source>%n join(s) changed</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/MainWindow.cpp" line="6173"/>
+        <source>%n wall(s) flipped</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="6330"/>
+        <location filename="../src/MainWindow.cpp" line="6352"/>
         <source>Saving %1...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5698"/>
+        <location filename="../src/MainWindow.cpp" line="6365"/>
         <source>Saving the first version...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5728"/>
+        <location filename="../src/MainWindow.cpp" line="6395"/>
         <source>Export IFC</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5744"/>
+        <location filename="../src/MainWindow.cpp" line="6411"/>
         <source>Start from a template:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5749"/>
+        <location filename="../src/MainWindow.cpp" line="6416"/>
         <source>KimBim default</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5768"/>
-        <location filename="../src/MainWindow.cpp" line="5783"/>
+        <location filename="../src/MainWindow.cpp" line="6435"/>
+        <location filename="../src/MainWindow.cpp" line="6450"/>
         <source>Save as template</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5768"/>
+        <location filename="../src/MainWindow.cpp" line="6435"/>
         <source>A template called %1 exists. Replace it?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5773"/>
+        <location filename="../src/MainWindow.cpp" line="6440"/>
         <source>Could not save the template</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5776"/>
+        <location filename="../src/MainWindow.cpp" line="6443"/>
         <source>Template %1 saved</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5784"/>
+        <location filename="../src/MainWindow.cpp" line="6451"/>
         <source>Template name (saved in %1):</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5796"/>
+        <location filename="../src/MainWindow.cpp" line="6463"/>
         <source>Project settings changed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5837"/>
+        <location filename="../src/MainWindow.cpp" line="6504"/>
         <source>Could not recover the work</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5850"/>
+        <location filename="../src/MainWindow.cpp" line="6517"/>
         <source>an untitled project</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5852"/>
+        <location filename="../src/MainWindow.cpp" line="6519"/>
         <source>Recover unsaved work</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5853"/>
+        <location filename="../src/MainWindow.cpp" line="6520"/>
         <source>KimBim closed unexpectedly. Recover your work on %1 from %2?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1077"/>
-        <location filename="../src/MainWindow.cpp" line="2475"/>
+        <location filename="../src/MainWindow.cpp" line="1249"/>
+        <location filename="../src/MainWindow.cpp" line="2951"/>
         <source>The model has no level. Add a level first.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2475"/>
+        <location filename="../src/MainWindow.cpp" line="2951"/>
         <source>Cannot model</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2500"/>
+        <location filename="../src/MainWindow.cpp" line="2984"/>
         <source>Eaves height above the level</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2505"/>
+        <location filename="../src/MainWindow.cpp" line="2989"/>
         <source>Angle (degrees)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2515"/>
+        <location filename="../src/MainWindow.cpp" line="2999"/>
         <source>Select one slab first, then draw the opening</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2516"/>
+        <location filename="../src/MainWindow.cpp" line="3000"/>
         <source>Select something first, then move or rotate it</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2537"/>
-        <location filename="../tests/test_main_window.cpp" line="409"/>
+        <location filename="../src/MainWindow.cpp" line="3021"/>
+        <location filename="../tests/test_main_window.cpp" line="725"/>
         <source>Wall: click the start point</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2540"/>
+        <location filename="../src/MainWindow.cpp" line="3024"/>
         <source>Slab: click the outline&apos;s points; click the first point or press Enter to close</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2543"/>
+        <location filename="../src/MainWindow.cpp" line="3027"/>
         <source>Column: click to place it</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2547"/>
+        <location filename="../src/MainWindow.cpp" line="3031"/>
         <source>Click the first point</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2550"/>
+        <location filename="../src/MainWindow.cpp" line="3034"/>
         <source>Move: click a base point, then where it goes (Ctrl: detach joined walls)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2553"/>
+        <location filename="../src/MainWindow.cpp" line="3037"/>
         <source>Rotate: click the centre, then a reference direction, then the new direction</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4225,138 +4861,138 @@ Editing the IFC directly opens it at once, without version history, options, com
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2592"/>
+        <location filename="../src/MainWindow.cpp" line="3076"/>
         <source>Slab opening: draw the hole&apos;s outline; click the first point or press Enter to close</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2595"/>
+        <location filename="../src/MainWindow.cpp" line="3079"/>
         <source>Text: click where the label goes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2598"/>
-        <location filename="../src/MainWindow.cpp" line="4167"/>
+        <location filename="../src/MainWindow.cpp" line="3082"/>
+        <location filename="../src/MainWindow.cpp" line="4651"/>
         <source>Dimension: click the first point to measure</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2601"/>
+        <location filename="../src/MainWindow.cpp" line="3085"/>
         <source>Mark: click what to mark</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2604"/>
-        <location filename="../src/MainWindow.cpp" line="4151"/>
+        <location filename="../src/MainWindow.cpp" line="3088"/>
+        <location filename="../src/MainWindow.cpp" line="4635"/>
         <source>Leader: click what it points at</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2607"/>
-        <location filename="../src/MainWindow.cpp" line="4940"/>
+        <location filename="../src/MainWindow.cpp" line="3091"/>
+        <location filename="../src/MainWindow.cpp" line="5436"/>
         <source>Room: click inside the walls that enclose it</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2610"/>
+        <location filename="../src/MainWindow.cpp" line="3094"/>
         <source>Roof: click the eaves outline&apos;s points; click the first point or press Enter to close</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2613"/>
+        <location filename="../src/MainWindow.cpp" line="3097"/>
         <source>Mirror: select what to mirror first</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2614"/>
+        <location filename="../src/MainWindow.cpp" line="3098"/>
         <source>Mirror: click the first point of the mirror line</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2617"/>
-        <location filename="../src/MainWindow.cpp" line="4194"/>
+        <location filename="../src/MainWindow.cpp" line="3101"/>
+        <location filename="../src/MainWindow.cpp" line="4678"/>
         <source>Section: click where the section line starts</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2620"/>
-        <location filename="../src/MainWindow.cpp" line="4195"/>
+        <location filename="../src/MainWindow.cpp" line="3104"/>
+        <location filename="../src/MainWindow.cpp" line="4679"/>
         <source>Elevation: click where the elevation line starts</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2623"/>
+        <location filename="../src/MainWindow.cpp" line="3107"/>
         <source>Place model: click where its origin goes (Shift: turned 90 degrees)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2624"/>
+        <location filename="../src/MainWindow.cpp" line="3108"/>
         <source>There are no models yet: use New model... next to the levels</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2627"/>
+        <location filename="../src/MainWindow.cpp" line="3111"/>
         <source>Click on a wall to place it</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2649"/>
+        <location filename="../src/MainWindow.cpp" line="3133"/>
         <source>Could not move: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2664"/>
+        <location filename="../src/MainWindow.cpp" line="3148"/>
         <source>Could not rotate: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2676"/>
+        <location filename="../src/MainWindow.cpp" line="3160"/>
         <source>Could not stretch: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2687"/>
+        <location filename="../src/MainWindow.cpp" line="3171"/>
         <source>Could not change the height: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2706"/>
-        <location filename="../src/MainWindow.cpp" line="2739"/>
+        <location filename="../src/MainWindow.cpp" line="3190"/>
+        <location filename="../src/MainWindow.cpp" line="3223"/>
         <source>Select one door or window on the active level</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2712"/>
+        <location filename="../src/MainWindow.cpp" line="3196"/>
         <source>Could not resize: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2726"/>
+        <location filename="../src/MainWindow.cpp" line="3210"/>
         <source>Select one or more walls first</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2730"/>
+        <location filename="../src/MainWindow.cpp" line="3214"/>
         <source>Height (m):</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2743"/>
+        <location filename="../src/MainWindow.cpp" line="3227"/>
         <source>Door/window size</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2757"/>
+        <location filename="../src/MainWindow.cpp" line="3241"/>
         <source>Width:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2758"/>
+        <location filename="../src/MainWindow.cpp" line="3242"/>
         <source>Height:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2759"/>
+        <location filename="../src/MainWindow.cpp" line="3243"/>
         <source>Sill height:</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4486,6 +5122,7 @@ Editing the IFC directly opens it at once, without version history, options, com
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../src/MainWindow.cpp" line="2288"/>
         <location filename="../src/StairTools.cpp" line="179"/>
         <source>Straight</source>
         <translation type="unfinished"></translation>
@@ -4591,18 +5228,18 @@ Editing the IFC directly opens it at once, without version history, options, com
         </translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2793"/>
+        <location filename="../src/MainWindow.cpp" line="3277"/>
         <source>Could not cut the opening: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2804"/>
+        <location filename="../src/MainWindow.cpp" line="3288"/>
         <source>Could not copy</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="2808"/>
-        <location filename="../src/MainWindow.cpp" line="5031"/>
+        <location filename="../src/MainWindow.cpp" line="3292"/>
+        <location filename="../src/MainWindow.cpp" line="5527"/>
         <source>%n element(s) copied</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -4610,33 +5247,33 @@ Editing the IFC directly opens it at once, without version history, options, com
         </translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2815"/>
+        <location filename="../src/MainWindow.cpp" line="3299"/>
         <source>Select what to copy first</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2825"/>
+        <location filename="../src/MainWindow.cpp" line="3309"/>
         <source>Copy to level</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2825"/>
+        <location filename="../src/MainWindow.cpp" line="3309"/>
         <source>Copy the selection to:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="150"/>
+        <location filename="../src/MainWindow.cpp" line="152"/>
         <source>Status</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="195"/>
-        <location filename="../src/MainWindow.cpp" line="2958"/>
+        <location filename="../src/MainWindow.cpp" line="201"/>
+        <location filename="../src/MainWindow.cpp" line="3442"/>
         <source>3D</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="1386"/>
+        <location filename="../src/MainWindow.cpp" line="1558"/>
         <source>%n element(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -4644,612 +5281,617 @@ Editing the IFC directly opens it at once, without version history, options, com
         </translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2857"/>
+        <location filename="../src/MainWindow.cpp" line="3341"/>
         <source>Bring another design option&apos;s work into this one, choosing where both changed the same thing</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2868"/>
+        <location filename="../src/MainWindow.cpp" line="3352"/>
         <source>Name the latest saved version (Concept, Schematic design, Tender...)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2873"/>
+        <location filename="../src/MainWindow.cpp" line="3357"/>
         <source>The versions that changed the selected element</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2941"/>
+        <location filename="../src/MainWindow.cpp" line="3425"/>
         <source>New &amp;plan tab</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2943"/>
+        <location filename="../src/MainWindow.cpp" line="3427"/>
         <source>Open the active level&apos;s floor plan in its own tab</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2945"/>
+        <location filename="../src/MainWindow.cpp" line="3429"/>
         <source>New &amp;sheet</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2961"/>
+        <location filename="../src/MainWindow.cpp" line="3445"/>
         <source>Plane</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2966"/>
+        <location filename="../src/MainWindow.cpp" line="3450"/>
         <source>View</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2968"/>
+        <location filename="../src/MainWindow.cpp" line="3452"/>
         <source>Edit</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2985"/>
+        <location filename="../src/MainWindow.cpp" line="3469"/>
         <source>Tools</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2996"/>
+        <location filename="../src/MainWindow.cpp" line="3480"/>
         <source>&amp;Panels</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5697"/>
+        <location filename="../src/MainWindow.cpp" line="6364"/>
         <source>Initial import</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5700"/>
+        <location filename="../src/MainWindow.cpp" line="6367"/>
         <source>Could not enable versioning</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5704"/>
+        <location filename="../src/MainWindow.cpp" line="6371"/>
         <source>Versioning enabled: first version saved</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5721"/>
+        <location filename="../src/MainWindow.cpp" line="6388"/>
         <source>Choose an empty folder for the project</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3248"/>
+        <location filename="../src/MainWindow.cpp" line="3732"/>
         <source>Could not open the project</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1704"/>
+        <location filename="../src/MainWindow.cpp" line="497"/>
+        <source>Round or cut the corners of the selected slabs, polylines and fills, or of two walls meeting at a corner</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="2097"/>
         <source>Draw a stair (straight, L, U or by sketch) or a ramp; a stair goes up to the next level</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1705"/>
+        <location filename="../src/MainWindow.cpp" line="2098"/>
         <source>Ra&amp;iling</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1706"/>
+        <location filename="../src/MainWindow.cpp" line="2099"/>
         <source>Railings on both sides of a clicked stair or ramp (they follow it), or along a clicked path</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2452"/>
-        <location filename="../src/DraftTools.cpp" line="195"/>
+        <location filename="../src/MainWindow.cpp" line="2928"/>
+        <location filename="../src/DraftTools.cpp" line="207"/>
         <source>Length %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2947"/>
+        <location filename="../src/MainWindow.cpp" line="3431"/>
         <source>Add a sheet and open it</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3097"/>
+        <location filename="../src/MainWindow.cpp" line="3581"/>
         <source>read-only</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3140"/>
+        <location filename="../src/MainWindow.cpp" line="3624"/>
         <source>File in use</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3141"/>
+        <location filename="../src/MainWindow.cpp" line="3625"/>
         <source>%1
 Open it read-only?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3154"/>
+        <location filename="../src/MainWindow.cpp" line="3638"/>
         <source>Could not open the file</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3210"/>
+        <location filename="../src/MainWindow.cpp" line="3694"/>
         <source>%1 already exists next to %2.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3212"/>
+        <location filename="../src/MainWindow.cpp" line="3696"/>
         <source>Make a new one</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3224"/>
+        <location filename="../src/MainWindow.cpp" line="3708"/>
         <source>Making %1...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3229"/>
+        <location filename="../src/MainWindow.cpp" line="3713"/>
         <source>Could not make the project file</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3269"/>
+        <location filename="../src/MainWindow.cpp" line="3753"/>
         <source>(none)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3274"/>
+        <location filename="../src/MainWindow.cpp" line="3758"/>
         <source>Open a KimBim project folder</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3291"/>
+        <location filename="../src/MainWindow.cpp" line="3775"/>
         <source>No version saved: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3299"/>
+        <location filename="../src/MainWindow.cpp" line="3783"/>
         <source>Version saved: %1 added, %2 modified, %3 removed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3312"/>
+        <location filename="../src/MainWindow.cpp" line="3796"/>
         <source>Save version</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3314"/>
+        <location filename="../src/MainWindow.cpp" line="3798"/>
         <source>%1 added, %2 modified, %3 removed since the last version</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3324"/>
+        <location filename="../src/MainWindow.cpp" line="3808"/>
         <source>What changed (the version&apos;s message):</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3344"/>
+        <location filename="../src/MainWindow.cpp" line="3828"/>
         <source>Could not compare: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3356"/>
+        <location filename="../src/MainWindow.cpp" line="3840"/>
         <source>Compare: %1 added, %2 modified, %3 removed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3379"/>
+        <location filename="../src/MainWindow.cpp" line="3863"/>
         <source>Could not create the option</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3383"/>
+        <location filename="../src/MainWindow.cpp" line="3867"/>
         <source>Now working on option %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3391"/>
+        <location filename="../src/MainWindow.cpp" line="3875"/>
         <source>Could not add the milestone</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3395"/>
+        <location filename="../src/MainWindow.cpp" line="3879"/>
         <source>Milestone %1 marks the latest version</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3402"/>
-        <location filename="../src/MainWindow.cpp" line="3412"/>
+        <location filename="../src/MainWindow.cpp" line="3886"/>
+        <location filename="../src/MainWindow.cpp" line="3896"/>
         <source>Milestone</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3403"/>
+        <location filename="../src/MainWindow.cpp" line="3887"/>
         <source>A milestone names a saved version. Save a version of your changes first?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3416"/>
+        <location filename="../src/MainWindow.cpp" line="3900"/>
         <source>Concept</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3416"/>
+        <location filename="../src/MainWindow.cpp" line="3900"/>
         <source>Schematic design</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3416"/>
+        <location filename="../src/MainWindow.cpp" line="3900"/>
         <source>Design development</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3416"/>
+        <location filename="../src/MainWindow.cpp" line="3900"/>
         <source>Permit</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3416"/>
+        <location filename="../src/MainWindow.cpp" line="3900"/>
         <source>Tender</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3417"/>
+        <location filename="../src/MainWindow.cpp" line="3901"/>
         <source>Construction</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3421"/>
+        <location filename="../src/MainWindow.cpp" line="3905"/>
         <source>Note:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3435"/>
+        <location filename="../src/MainWindow.cpp" line="3919"/>
         <source>Could not combine the options</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3440"/>
+        <location filename="../src/MainWindow.cpp" line="3924"/>
         <source>This option already contains everything in %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3460"/>
+        <location filename="../src/MainWindow.cpp" line="3944"/>
         <source>This option now has %1&apos;s latest version</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3461"/>
+        <location filename="../src/MainWindow.cpp" line="3945"/>
         <source>Combined with %1: review it (changes from %1 in green, your choices in orange), then Save version or Discard</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3469"/>
+        <location filename="../src/MainWindow.cpp" line="3953"/>
         <source>Combining needs a versioned project with design options</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3479"/>
+        <location filename="../src/MainWindow.cpp" line="3963"/>
         <source>There is no other option to combine with</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3495"/>
+        <location filename="../src/MainWindow.cpp" line="3979"/>
         <source>Could not delete the option</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3499"/>
+        <location filename="../src/MainWindow.cpp" line="3983"/>
         <source>Option %1 deleted</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3510"/>
+        <location filename="../src/MainWindow.cpp" line="3994"/>
         <source>No other option to delete (the current one and main can&apos;t be deleted)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3514"/>
-        <location filename="../src/MainWindow.cpp" line="3517"/>
+        <location filename="../src/MainWindow.cpp" line="3998"/>
+        <location filename="../src/MainWindow.cpp" line="4001"/>
         <source>Delete option</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3514"/>
+        <location filename="../src/MainWindow.cpp" line="3998"/>
         <source>Option to delete:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3518"/>
+        <location filename="../src/MainWindow.cpp" line="4002"/>
         <source>Delete the design option %1 and its versions? Milestones on it are kept.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3537"/>
+        <location filename="../src/MainWindow.cpp" line="4021"/>
         <source>Select one element to see its history</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3543"/>
-        <location filename="../src/MainWindow.cpp" line="3548"/>
+        <location filename="../src/MainWindow.cpp" line="4027"/>
+        <location filename="../src/MainWindow.cpp" line="4032"/>
         <source>Object history</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3551"/>
+        <location filename="../src/MainWindow.cpp" line="4035"/>
         <source>Version</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3551"/>
+        <location filename="../src/MainWindow.cpp" line="4035"/>
         <source>Change</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3551"/>
+        <location filename="../src/MainWindow.cpp" line="4035"/>
         <source>Author</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3551"/>
+        <location filename="../src/MainWindow.cpp" line="4035"/>
         <source>Date</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3559"/>
+        <location filename="../src/MainWindow.cpp" line="4043"/>
         <source>added</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3559"/>
+        <location filename="../src/MainWindow.cpp" line="4043"/>
         <source>modified</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3560"/>
+        <location filename="../src/MainWindow.cpp" line="4044"/>
         <source>removed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3560"/>
+        <location filename="../src/MainWindow.cpp" line="4044"/>
         <source>unsaved changes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3569"/>
+        <location filename="../src/MainWindow.cpp" line="4053"/>
         <source>(not saved yet)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3580"/>
+        <location filename="../src/MainWindow.cpp" line="4064"/>
         <source>Versions that changed this element (or its properties), newest first:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3583"/>
+        <location filename="../src/MainWindow.cpp" line="4067"/>
         <source>Before/after with current...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3603"/>
-        <location filename="../src/MainWindow.cpp" line="3608"/>
+        <location filename="../src/MainWindow.cpp" line="4087"/>
+        <location filename="../src/MainWindow.cpp" line="4092"/>
         <source>Before/after</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3610"/>
+        <location filename="../src/MainWindow.cpp" line="4094"/>
         <source>Only what changed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3614"/>
+        <location filename="../src/MainWindow.cpp" line="4098"/>
         <source>Current</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3617"/>
+        <location filename="../src/MainWindow.cpp" line="4101"/>
         <source>Field</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3617"/>
+        <location filename="../src/MainWindow.cpp" line="4101"/>
         <source>Before (%1)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3617"/>
+        <location filename="../src/MainWindow.cpp" line="4101"/>
         <source>After (%1)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3643"/>
+        <location filename="../src/MainWindow.cpp" line="4127"/>
         <source>The element did not exist in the earlier version.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3645"/>
+        <location filename="../src/MainWindow.cpp" line="4129"/>
         <source>The element was deleted in the later version.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3657"/>
+        <location filename="../src/MainWindow.cpp" line="4141"/>
         <source>New design option</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3657"/>
+        <location filename="../src/MainWindow.cpp" line="4141"/>
         <source>Name of the option:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3670"/>
+        <location filename="../src/MainWindow.cpp" line="4154"/>
         <source>Save a version of your changes before switching options?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3687"/>
+        <location filename="../src/MainWindow.cpp" line="4171"/>
         <source>Could not switch options</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3728"/>
+        <location filename="../src/MainWindow.cpp" line="4212"/>
         <source>Move %1 (Ctrl: copy, Alt: detach joined walls, Shift: straight)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4129"/>
-        <location filename="../src/MainWindow.cpp" line="4205"/>
-        <location filename="../src/MainWindow.cpp" line="4609"/>
-        <location filename="../src/MarkupTools.cpp" line="252"/>
+        <location filename="../src/MainWindow.cpp" line="4613"/>
+        <location filename="../src/MainWindow.cpp" line="4689"/>
+        <location filename="../src/MainWindow.cpp" line="5095"/>
+        <location filename="../src/MarkupTools.cpp" line="253"/>
         <source>Could not add it: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4141"/>
+        <location filename="../src/MainWindow.cpp" line="4625"/>
         <source>Leader: click where its text goes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4148"/>
-        <location filename="../src/MarkupTools.cpp" line="64"/>
+        <location filename="../src/MainWindow.cpp" line="4632"/>
+        <location filename="../src/MarkupTools.cpp" line="65"/>
         <source>Leader</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4160"/>
+        <location filename="../src/MainWindow.cpp" line="4644"/>
         <source>Dimension: click the second point</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4173"/>
+        <location filename="../src/MainWindow.cpp" line="4657"/>
         <source>Mark</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4173"/>
+        <location filename="../src/MainWindow.cpp" line="4657"/>
         <source>Text label</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4174"/>
+        <location filename="../src/MainWindow.cpp" line="4658"/>
         <source>Tag (e.g. A, 1, R2):</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4148"/>
-        <location filename="../src/MainWindow.cpp" line="4174"/>
-        <location filename="../src/MainWindow.cpp" line="4691"/>
-        <location filename="../src/MarkupTools.cpp" line="332"/>
+        <location filename="../src/MainWindow.cpp" line="4632"/>
+        <location filename="../src/MainWindow.cpp" line="4658"/>
+        <location filename="../src/MainWindow.cpp" line="5187"/>
+        <location filename="../src/MarkupTools.cpp" line="351"/>
         <source>Text:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4162"/>
+        <location filename="../src/MainWindow.cpp" line="4646"/>
         <source>Dimension: Shift+click to add a point, or click where the dimension line goes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4186"/>
+        <location filename="../src/MainWindow.cpp" line="4670"/>
         <source>Section: click where the section line ends</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4187"/>
+        <location filename="../src/MainWindow.cpp" line="4671"/>
         <source>Elevation: click where the elevation line ends</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4189"/>
+        <location filename="../src/MainWindow.cpp" line="4673"/>
         <source>Click the side the drawing looks at</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4386"/>
+        <location filename="../src/MainWindow.cpp" line="4872"/>
         <source>%1 plan</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4587"/>
+        <location filename="../src/MainWindow.cpp" line="5073"/>
         <source>Could not generate the drawing: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4618"/>
+        <location filename="../src/MainWindow.cpp" line="5104"/>
         <source>Placing the drawing...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4667"/>
+        <location filename="../src/MainWindow.cpp" line="5153"/>
         <source>Could not move it: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4703"/>
-        <location filename="../src/MainWindow.cpp" line="4750"/>
+        <location filename="../src/MainWindow.cpp" line="5199"/>
+        <location filename="../src/MainWindow.cpp" line="5246"/>
         <source>Sheet %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4764"/>
-        <location filename="../src/MainWindow.cpp" line="4772"/>
+        <location filename="../src/MainWindow.cpp" line="5260"/>
+        <location filename="../src/MainWindow.cpp" line="5268"/>
         <source>Could not export the sheet</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4775"/>
+        <location filename="../src/MainWindow.cpp" line="5271"/>
         <source>Sheet %1 exported to %2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4785"/>
+        <location filename="../src/MainWindow.cpp" line="5281"/>
         <source>No sheet</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4785"/>
+        <location filename="../src/MainWindow.cpp" line="5281"/>
         <source>Add a sheet in the Sheets panel first.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4788"/>
+        <location filename="../src/MainWindow.cpp" line="5284"/>
         <source>Export sheet as PDF</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4788"/>
+        <location filename="../src/MainWindow.cpp" line="5284"/>
         <source>Export sheet as SVG</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4789"/>
+        <location filename="../src/MainWindow.cpp" line="5285"/>
         <source>PDF (*.pdf)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4789"/>
+        <location filename="../src/MainWindow.cpp" line="5285"/>
         <source>SVG (*.svg)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4798"/>
+        <location filename="../src/MainWindow.cpp" line="5294"/>
         <source>Could not change the project info</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4879"/>
+        <location filename="../src/MainWindow.cpp" line="5375"/>
         <source>Could not create the roof: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4898"/>
+        <location filename="../src/MainWindow.cpp" line="5394"/>
         <source>Select a roof and the walls to trim to it</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4904"/>
+        <location filename="../src/MainWindow.cpp" line="5400"/>
         <source>Could not trim the walls: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="4908"/>
+        <location filename="../src/MainWindow.cpp" line="5404"/>
         <source>%n wall(s) trimmed to the roof</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -5257,186 +5899,191 @@ Open it read-only?</source>
         </translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4930"/>
-        <location filename="../src/MainWindow.cpp" line="4930"/>
+        <location filename="../src/MainWindow.cpp" line="5426"/>
+        <location filename="../src/MainWindow.cpp" line="5426"/>
         <source>Room</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4936"/>
+        <location filename="../src/MainWindow.cpp" line="5432"/>
         <source>No room here: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4978"/>
+        <location filename="../src/MainWindow.cpp" line="5474"/>
         <source>Project info</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4834"/>
-        <location filename="../src/MainWindow.cpp" line="4982"/>
+        <location filename="../src/MainWindow.cpp" line="5330"/>
+        <location filename="../src/MainWindow.cpp" line="5478"/>
         <source>Project number:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4982"/>
+        <location filename="../src/MainWindow.cpp" line="5478"/>
         <source>Project name:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4835"/>
-        <location filename="../src/MainWindow.cpp" line="4982"/>
+        <location filename="../src/MainWindow.cpp" line="5331"/>
+        <location filename="../src/MainWindow.cpp" line="5478"/>
         <source>Client:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4836"/>
-        <location filename="../src/MainWindow.cpp" line="4982"/>
+        <location filename="../src/MainWindow.cpp" line="5332"/>
+        <location filename="../src/MainWindow.cpp" line="5478"/>
         <source>Address:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5021"/>
+        <location filename="../src/MainWindow.cpp" line="5517"/>
         <source>Could not copy: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5041"/>
+        <location filename="../src/MainWindow.cpp" line="5537"/>
         <source>Could not paste: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5045"/>
+        <location filename="../src/MainWindow.cpp" line="5541"/>
         <source>Pasted; drag the copies where they go</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5055"/>
+        <location filename="../src/MainWindow.cpp" line="5551"/>
         <source>Could not duplicate: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5070"/>
+        <location filename="../src/MainWindow.cpp" line="5566"/>
         <source>Could not mirror: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5087"/>
+        <location filename="../src/MainWindow.cpp" line="5583"/>
         <source>Could not multiply: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5100"/>
+        <location filename="../src/MainWindow.cpp" line="5596"/>
         <source>Could not offset: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5113"/>
+        <location filename="../src/MainWindow.cpp" line="5609"/>
         <source>Select what to multiply first</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5117"/>
+        <location filename="../src/MainWindow.cpp" line="5613"/>
         <source>Multiply</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5120"/>
+        <location filename="../src/MainWindow.cpp" line="5616"/>
         <source>Linear (move each copy by a distance)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5121"/>
+        <location filename="../src/MainWindow.cpp" line="5617"/>
         <source>Polar (rotate each copy around a centre)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5134"/>
+        <location filename="../src/MainWindow.cpp" line="5630"/>
         <source>Kind:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5135"/>
+        <location filename="../src/MainWindow.cpp" line="5631"/>
         <source>Number of copies:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5136"/>
+        <location filename="../src/MainWindow.cpp" line="5632"/>
         <source>Distance X (m):</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5137"/>
+        <location filename="../src/MainWindow.cpp" line="5633"/>
         <source>Distance Y (m):</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5138"/>
+        <location filename="../src/MainWindow.cpp" line="5634"/>
         <source>Centre X (m):</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5139"/>
+        <location filename="../src/MainWindow.cpp" line="5635"/>
         <source>Centre Y (m):</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5140"/>
+        <location filename="../src/MainWindow.cpp" line="5636"/>
         <source>Angle per copy (degrees):</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5157"/>
+        <location filename="../src/MainWindow.cpp" line="5653"/>
         <source>Select walls or slabs to offset first</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5161"/>
+        <location filename="../src/MainWindow.cpp" line="5657"/>
         <source>Offset</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5162"/>
+        <location filename="../src/MainWindow.cpp" line="5658"/>
         <source>Distance (m): walls get a parallel copy to the left of their axis (negative: right); slabs grow (negative: shrink)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5172"/>
+        <location filename="../src/MainWindow.cpp" line="5681"/>
+        <source>Select slabs, polylines or fills, or the two walls of a corner, first</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="5742"/>
         <source>Could not create the model</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5177"/>
+        <location filename="../src/MainWindow.cpp" line="5747"/>
         <source>Draw the model here, then place it on levels with Place model (U)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5184"/>
+        <location filename="../src/MainWindow.cpp" line="5754"/>
         <source>Choose a building level to place the model on</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5214"/>
+        <location filename="../src/MainWindow.cpp" line="5784"/>
         <source>Update model instances</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5214"/>
+        <location filename="../src/MainWindow.cpp" line="5784"/>
         <source>Model:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5220"/>
+        <location filename="../src/MainWindow.cpp" line="5790"/>
         <source>There are no models yet</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5225"/>
+        <location filename="../src/MainWindow.cpp" line="5795"/>
         <source>Could not update: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="5229"/>
+        <location filename="../src/MainWindow.cpp" line="5799"/>
         <source>%n instance(s) updated</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -5444,22 +6091,22 @@ Open it read-only?</source>
         </translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5240"/>
+        <location filename="../src/MainWindow.cpp" line="5810"/>
         <source>Select a placed model first</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5254"/>
+        <location filename="../src/MainWindow.cpp" line="5824"/>
         <source>Could not create the layer: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5265"/>
+        <location filename="../src/MainWindow.cpp" line="5835"/>
         <source>Could not change the layer: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="5269"/>
+        <location filename="../src/MainWindow.cpp" line="5839"/>
         <source>%n element(s) moved to %1</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -5467,126 +6114,128 @@ Open it read-only?</source>
         </translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5298"/>
+        <location filename="../src/MainWindow.cpp" line="5868"/>
         <source>New elements go on layer %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5315"/>
+        <location filename="../src/MainWindow.cpp" line="5886"/>
         <source>Could not save the view: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5377"/>
+        <location filename="../src/MainWindow.cpp" line="5952"/>
         <source>View %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5425"/>
+        <location filename="../src/MainWindow.cpp" line="6000"/>
         <source>Could not create it: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5447"/>
+        <location filename="../src/MainWindow.cpp" line="6022"/>
         <source>Could not create the slab: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5458"/>
+        <location filename="../src/MainWindow.cpp" line="6033"/>
         <source>Cannot make a slab from these walls</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="4622"/>
-        <location filename="../src/MainWindow.cpp" line="4634"/>
-        <location filename="../src/MainWindow.cpp" line="5194"/>
-        <location filename="../src/MainWindow.cpp" line="5404"/>
-        <location filename="../src/MainWindow.cpp" line="5481"/>
-        <location filename="../src/MarkupTools.cpp" line="339"/>
-        <location filename="../src/LibraryTools.cpp" line="151"/>
+        <location filename="../src/MainWindow.cpp" line="5108"/>
+        <location filename="../src/MainWindow.cpp" line="5120"/>
+        <location filename="../src/MainWindow.cpp" line="5764"/>
+        <location filename="../src/MainWindow.cpp" line="5979"/>
+        <location filename="../src/MainWindow.cpp" line="6056"/>
+        <location filename="../src/MarkupTools.cpp" line="332"/>
+        <location filename="../src/MarkupTools.cpp" line="358"/>
+        <location filename="../src/Underlays.cpp" line="196"/>
+        <location filename="../src/LibraryTools.cpp" line="196"/>
         <source>Could not place it: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5503"/>
+        <location filename="../src/MainWindow.cpp" line="6083"/>
         <source>Could not create the wall: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5518"/>
+        <location filename="../src/MainWindow.cpp" line="6183"/>
         <source>Could not delete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5548"/>
+        <location filename="../src/MainWindow.cpp" line="6213"/>
         <source>Could not update the 3D view</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5574"/>
+        <location filename="../src/MainWindow.cpp" line="6239"/>
         <source>The model may be inconsistent</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5575"/>
+        <location filename="../src/MainWindow.cpp" line="6240"/>
         <source>An edit failed and could not be undone. Save a copy if you need it, then reopen the file.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5631"/>
-        <location filename="../src/MainWindow.cpp" line="5665"/>
+        <location filename="../src/MainWindow.cpp" line="6298"/>
+        <location filename="../src/MainWindow.cpp" line="6332"/>
         <source>Could not save</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5655"/>
+        <location filename="../src/MainWindow.cpp" line="6322"/>
         <source>Saved %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3669"/>
-        <location filename="../src/MainWindow.cpp" line="5926"/>
+        <location filename="../src/MainWindow.cpp" line="4153"/>
+        <location filename="../src/MainWindow.cpp" line="6593"/>
         <source>Unsaved changes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5927"/>
+        <location filename="../src/MainWindow.cpp" line="6594"/>
         <source>The model has unsaved changes. Save them?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5937"/>
-        <location filename="../src/MainWindow.cpp" line="5941"/>
+        <location filename="../src/MainWindow.cpp" line="6604"/>
+        <location filename="../src/MainWindow.cpp" line="6608"/>
         <source>Add property</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5937"/>
+        <location filename="../src/MainWindow.cpp" line="6604"/>
         <source>Property name in %1:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5941"/>
+        <location filename="../src/MainWindow.cpp" line="6608"/>
         <source>Value:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5956"/>
+        <location filename="../src/MainWindow.cpp" line="6623"/>
         <source>Add property set</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5956"/>
+        <location filename="../src/MainWindow.cpp" line="6623"/>
         <source>Property set (standard or custom):</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="5980"/>
+        <location filename="../src/MainWindow.cpp" line="6647"/>
         <source>Loading %1 (%2)...</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="5990"/>
+        <location filename="../src/MainWindow.cpp" line="6657"/>
         <source>Loading... %n element(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -5594,7 +6243,7 @@ Open it read-only?</source>
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="6002"/>
+        <location filename="../src/MainWindow.cpp" line="6669"/>
         <source>%n element(s) loaded in %1 s</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -5602,7 +6251,7 @@ Open it read-only?</source>
         </translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6013"/>
+        <location filename="../src/MainWindow.cpp" line="6680"/>
         <source>Could not open the model</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5954,86 +6603,101 @@ Open it read-only?</source>
     </message>
     <message>
         <location filename="../src/DraftTools.cpp" line="95"/>
+        <source>Straight segments, or a smooth curve through the points</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/DraftTools.cpp" line="96"/>
+        <source>Polyline</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/DraftTools.cpp" line="97"/>
+        <source>Spline</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/DraftTools.cpp" line="100"/>
         <source>Line type</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="98"/>
+        <location filename="../src/DraftTools.cpp" line="103"/>
         <source>Fill pattern (Graphics &gt; fill patterns are project settings)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="102"/>
+        <location filename="../src/DraftTools.cpp" line="107"/>
         <source>No background</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="103"/>
+        <location filename="../src/DraftTools.cpp" line="108"/>
         <source>Background pen </source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="104"/>
+        <location filename="../src/DraftTools.cpp" line="109"/>
         <source>The fill&apos;s background pen (0: none, the model shows through)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="107"/>
+        <location filename="../src/DraftTools.cpp" line="112"/>
         <source>Area</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="109"/>
+        <location filename="../src/DraftTools.cpp" line="114"/>
         <source>Show the fill&apos;s area in its middle</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="113"/>
+        <location filename="../src/DraftTools.cpp" line="118"/>
         <source>Same as the fill</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="115"/>
+        <location filename="../src/DraftTools.cpp" line="120"/>
         <source>Outline pen </source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="116"/>
+        <location filename="../src/DraftTools.cpp" line="121"/>
         <source>The fill&apos;s outline pen (-1: the fill&apos;s own pen; 0: no outline)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="119"/>
+        <location filename="../src/DraftTools.cpp" line="124"/>
         <source>Paper pattern</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="120"/>
+        <location filename="../src/DraftTools.cpp" line="125"/>
         <source>Model pattern</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="121"/>
+        <location filename="../src/DraftTools.cpp" line="126"/>
         <source>Paper: the pattern keeps its printed spacing at every drawing scale; model: its spacing grows with the model</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="237"/>
+        <location filename="../src/DraftTools.cpp" line="249"/>
         <source>Could not draw it: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="251"/>
+        <location filename="../src/DraftTools.cpp" line="263"/>
         <source>Could not fill: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="285"/>
+        <location filename="../src/DraftTools.cpp" line="297"/>
         <source>Could not move the point: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/DraftTools.cpp" line="315"/>
+        <location filename="../src/DraftTools.cpp" line="327"/>
         <source>Click the point&apos;s new position (Esc: leave it)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -6066,267 +6730,312 @@ Open it read-only?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="75"/>
+        <location filename="../src/Underlays.cpp" line="76"/>
+        <source>Place &amp;picture...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/Underlays.cpp" line="78"/>
+        <source>A photo, render or logo on the active level or worksheet, at the width you type</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/Underlays.cpp" line="81"/>
+        <source>Pictures (*.png *.jpg *.jpeg *.pdf)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/Underlays.cpp" line="85"/>
+        <source>Width (m):</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/Underlays.cpp" line="89"/>
         <source>U&amp;nderlays...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="77"/>
+        <location filename="../src/Underlays.cpp" line="91"/>
         <source>Show, hide, fade, calibrate, move or remove underlays</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="113"/>
+        <location filename="../src/Underlays.cpp" line="127"/>
         <source>Underlay: cancelled</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="121"/>
-        <location filename="../src/Underlays.cpp" line="125"/>
-        <location filename="../src/Underlays.cpp" line="132"/>
+        <location filename="../src/Underlays.cpp" line="135"/>
+        <location filename="../src/Underlays.cpp" line="139"/>
         <location filename="../src/Underlays.cpp" line="146"/>
+        <location filename="../src/Underlays.cpp" line="160"/>
         <source>Place underlay</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="121"/>
+        <location filename="../src/Underlays.cpp" line="135"/>
         <source>Open a model with a level first.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="126"/>
+        <location filename="../src/Underlays.cpp" line="140"/>
         <source>Underlays (*.dxf *.pdf *.png *.jpg *.jpeg);;DXF drawings (*.dxf);;PDF files (*.pdf);;Images (*.png *.jpg *.jpeg)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="130"/>
+        <location filename="../src/Underlays.cpp" line="144"/>
         <source>Reading %1...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="151"/>
+        <location filename="../src/Underlays.cpp" line="165"/>
         <source>Placed %1. To set its scale, use File &gt; Underlays... &gt; Calibrate.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="167"/>
+        <location filename="../src/Underlays.cpp" line="181"/>
         <source>Placing %1...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="172"/>
+        <location filename="../src/Underlays.cpp" line="186"/>
         <source>Placed underlay %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="236"/>
+        <location filename="../src/Underlays.cpp" line="202"/>
+        <source>Placed picture %1 (move or rotate it in File &gt; Underlays)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/Underlays.cpp" line="272"/>
+        <source>Trace: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/Underlays.cpp" line="293"/>
+        <source>Trace off</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/Underlays.cpp" line="294"/>
+        <source>Tracing the level below</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/Underlays.cpp" line="295"/>
+        <source>Tracing the level above</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/Underlays.cpp" line="326"/>
         <source>Could not read underlay %1: %2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="251"/>
+        <location filename="../src/Underlays.cpp" line="341"/>
         <source>Could not show underlay %1: %2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="355"/>
+        <location filename="../src/Underlays.cpp" line="457"/>
         <source>Calibrate: the two points are the same</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="362"/>
+        <location filename="../src/Underlays.cpp" line="464"/>
         <source>Calibrate underlay</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="363"/>
+        <location filename="../src/Underlays.cpp" line="465"/>
         <source>Real distance between the two points (%1):</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="384"/>
+        <location filename="../src/Underlays.cpp" line="486"/>
         <source>Underlay %1 calibrated</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/Underlays.cpp" line="384"/>
+        <location filename="../src/Underlays.cpp" line="486"/>
         <source>Underlay %1 moved</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="53"/>
+        <location filename="../src/MarkupTools.cpp" line="54"/>
         <source>Tag style (project settings): Automatic takes the element&apos;s kind&apos;s</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="56"/>
+        <location filename="../src/MarkupTools.cpp" line="57"/>
         <source>The tag&apos;s frame</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="57"/>
+        <location filename="../src/MarkupTools.cpp" line="58"/>
         <source>Style&apos;s frame</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="58"/>
+        <location filename="../src/MarkupTools.cpp" line="59"/>
         <source>No frame</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="59"/>
+        <location filename="../src/MarkupTools.cpp" line="60"/>
         <source>Circle</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="60"/>
+        <location filename="../src/MarkupTools.cpp" line="61"/>
         <source>Box</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="61"/>
+        <location filename="../src/MarkupTools.cpp" line="62"/>
         <source>Hexagon</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="66"/>
+        <location filename="../src/MarkupTools.cpp" line="67"/>
         <source>With a leader: click the element, then where the tag goes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="71"/>
+        <location filename="../src/MarkupTools.cpp" line="72"/>
         <source>Revision</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="73"/>
+        <location filename="../src/MarkupTools.cpp" line="74"/>
         <source>The revision the cloud marks (shown in a triangle)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="97"/>
+        <location filename="../src/MarkupTools.cpp" line="98"/>
         <source>Automatic</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="106"/>
+        <location filename="../src/MarkupTools.cpp" line="107"/>
         <source>Radius</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="107"/>
+        <location filename="../src/MarkupTools.cpp" line="108"/>
         <source>Diameter</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="109"/>
+        <location filename="../src/MarkupTools.cpp" line="110"/>
         <source>Level dimension</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="110"/>
+        <location filename="../src/MarkupTools.cpp" line="111"/>
         <source>Spot elevation</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="115"/>
-        <location filename="../src/MarkupTools.cpp" line="156"/>
+        <location filename="../src/MarkupTools.cpp" line="116"/>
+        <location filename="../src/MarkupTools.cpp" line="157"/>
         <source>Tag: click a door, window, wall, room or other element</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="118"/>
+        <location filename="../src/MarkupTools.cpp" line="119"/>
         <source>North arrow: click where it goes (it points to the project&apos;s true north)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="121"/>
+        <location filename="../src/MarkupTools.cpp" line="122"/>
         <source>Scale bar: click where its left end goes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="124"/>
-        <location filename="../src/MarkupTools.cpp" line="262"/>
+        <location filename="../src/MarkupTools.cpp" line="125"/>
+        <location filename="../src/MarkupTools.cpp" line="263"/>
         <source>Revision cloud: click its outline; click the first point or press Enter to close</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="127"/>
+        <location filename="../src/MarkupTools.cpp" line="128"/>
         <source>Angle: click the vertex</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="130"/>
+        <location filename="../src/MarkupTools.cpp" line="131"/>
         <source>Radius: click the centre (circle and arc centres snap)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="133"/>
+        <location filename="../src/MarkupTools.cpp" line="134"/>
         <source>Level: click the point to measure</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="161"/>
+        <location filename="../src/MarkupTools.cpp" line="162"/>
         <source>Nothing to tag there</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="166"/>
+        <location filename="../src/MarkupTools.cpp" line="167"/>
         <source>Tag: click where the tag goes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="184"/>
+        <location filename="../src/MarkupTools.cpp" line="185"/>
         <source>Angle: click a point on the first side</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="185"/>
+        <location filename="../src/MarkupTools.cpp" line="186"/>
         <source>Angle: click a point on the second side</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="185"/>
+        <location filename="../src/MarkupTools.cpp" line="186"/>
         <source>Angle: click where the arc goes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="190"/>
+        <location filename="../src/MarkupTools.cpp" line="191"/>
         <source>Click a point on the circle</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="190"/>
+        <location filename="../src/MarkupTools.cpp" line="191"/>
         <source>Click where the text goes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="192"/>
+        <location filename="../src/MarkupTools.cpp" line="193"/>
         <source>Spot elevation: click where the text goes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="233"/>
+        <location filename="../src/MarkupTools.cpp" line="234"/>
         <source>Could not tag it: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="280"/>
+        <location filename="../src/MarkupTools.cpp" line="281"/>
         <source>Tag all</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="282"/>
+        <location filename="../src/MarkupTools.cpp" line="283"/>
         <source>Tag every untagged element of these categories on the level:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="317"/>
+        <location filename="../src/MarkupTools.cpp" line="318"/>
         <source>Could not tag them: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/MarkupTools.cpp" line="323"/>
+        <location filename="../src/MarkupTools.cpp" line="324"/>
         <source>Tagged %n element(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -6334,62 +7043,74 @@ Open it read-only?</source>
         </translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="323"/>
+        <location filename="../src/MarkupTools.cpp" line="324"/>
         <source>Everything shown is tagged already</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MarkupTools.cpp" line="332"/>
+        <location filename="../src/MarkupTools.cpp" line="344"/>
+        <location filename="../src/Underlays.cpp" line="80"/>
+        <location filename="../src/Underlays.cpp" line="85"/>
+        <source>Place picture</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MarkupTools.cpp" line="345"/>
+        <source>Pictures (*.png *.jpg *.jpeg)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MarkupTools.cpp" line="351"/>
         <source>Place text</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryTools.cpp" line="39"/>
+        <location filename="../src/LibraryTools.cpp" line="41"/>
         <source>Object &amp;library</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryTools.cpp" line="41"/>
+        <location filename="../src/LibraryTools.cpp" line="43"/>
         <source>The library of furniture, sanitary, kitchen and site objects, and the office library</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryTools.cpp" line="48"/>
+        <location filename="../src/LibraryTools.cpp" line="50"/>
         <source>Turn object 90 degrees</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryTools.cpp" line="66"/>
+        <location filename="../src/LibraryTools.cpp" line="68"/>
         <source>Office library: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryTools.cpp" line="84"/>
+        <location filename="../src/LibraryTools.cpp" line="86"/>
         <source>Library</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryTools.cpp" line="95"/>
+        <location filename="../src/LibraryTools.cpp" line="97"/>
         <source>Office library</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryTools.cpp" line="104"/>
+        <location filename="../src/LibraryTools.cpp" line="106"/>
         <source>Load IFC types</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryTools.cpp" line="134"/>
+        <location filename="../src/LibraryTools.cpp" line="136"/>
         <source>Object angle: %1 degrees</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryTools.cpp" line="143"/>
+        <location filename="../src/LibraryTools.cpp" line="181"/>
         <source>Pick an object in the Library panel first</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryTools.cpp" line="155"/>
+        <location filename="../src/LibraryTools.cpp" line="200"/>
         <source>%1 placed</source>
         <translation type="unfinished"></translation>
     </message>
@@ -6407,6 +7128,344 @@ Open it read-only?</source>
         <location filename="../src/MainWindowInputAids.cpp" line="53"/>
         <source>&amp;Clear guides</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>kimbim::MaterialsDialog</name>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="245"/>
+        <location filename="../src/MaterialsDialog.cpp" line="468"/>
+        <location filename="../src/MaterialsDialog.cpp" line="603"/>
+        <location filename="../src/MaterialsDialog.cpp" line="774"/>
+        <location filename="../src/MaterialsDialog.cpp" line="827"/>
+        <source>Materials</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="252"/>
+        <source>Surfaces</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="252"/>
+        <source>Building materials</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="252"/>
+        <source>Composites</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="259"/>
+        <source>Search</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="275"/>
+        <source>Add</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="276"/>
+        <source>Duplicate</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="277"/>
+        <location filename="../src/MaterialsDialog.cpp" line="832"/>
+        <source>Delete</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="356"/>
+        <location filename="../src/MaterialsDialog.cpp" line="503"/>
+        <location filename="../src/MaterialsDialog.cpp" line="631"/>
+        <source>Name:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="359"/>
+        <source>Colour:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="363"/>
+        <source>Transparency (%):</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="367"/>
+        <source>Shine (%):</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="370"/>
+        <source>Matt</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="370"/>
+        <source>Plastic</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="370"/>
+        <source>Metal</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="370"/>
+        <source>Glass</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="370"/>
+        <source>Mirror</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="370"/>
+        <source>Not defined</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="373"/>
+        <source>Reflectance:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="377"/>
+        <source>A picture repeated over the surface in 3D (PNG or JPEG)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="378"/>
+        <source>Remove</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="382"/>
+        <source>Texture:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="395"/>
+        <source>Texture size (width x height):</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="397"/>
+        <source>Texture</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="397"/>
+        <source>Pictures (*.png *.jpg *.jpeg)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="406"/>
+        <source>Surface colour</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/MaterialsDialog.cpp" line="435"/>
+        <location filename="../src/MaterialsDialog.cpp" line="589"/>
+        <location filename="../src/MaterialsDialog.cpp" line="759"/>
+        <source>Used by %n element(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="442"/>
+        <source>Picture</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="442"/>
+        <location filename="../src/MaterialsDialog.cpp" line="453"/>
+        <source>Choose picture...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="487"/>
+        <source>None</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="504"/>
+        <source>ID:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="505"/>
+        <source>Category:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="506"/>
+        <source>Manufacturer:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="507"/>
+        <source>Description:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="510"/>
+        <source>Surface:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="513"/>
+        <source>(element style)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="516"/>
+        <source>Cut fill:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="522"/>
+        <source>Fill pen:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="524"/>
+        <source>Background:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="527"/>
+        <source>Cut fill pens:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="531"/>
+        <source>Intersection priority: where elements meet, the higher number runs through</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="532"/>
+        <source>Intersection priority:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="539"/>
+        <source>Not set</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="543"/>
+        <source>Density:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="544"/>
+        <source>Thermal conductivity:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="545"/>
+        <source>Heat capacity:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="574"/>
+        <source>(none)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="633"/>
+        <location filename="../src/MaterialsDialog.cpp" line="794"/>
+        <source>For:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="637"/>
+        <source>Building material</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="637"/>
+        <source>Thickness</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="637"/>
+        <source>Core</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="650"/>
+        <source>Add layer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="659"/>
+        <source>Remove layer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="680"/>
+        <source>Up</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="681"/>
+        <source>Down</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="746"/>
+        <source>Total thickness: %1 mm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="756"/>
+        <location filename="../src/MaterialsDialog.cpp" line="793"/>
+        <source>Walls</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="757"/>
+        <location filename="../src/MaterialsDialog.cpp" line="793"/>
+        <source>Slabs</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="788"/>
+        <source>New surface</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="790"/>
+        <source>New material</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="794"/>
+        <location filename="../src/MaterialsDialog.cpp" line="801"/>
+        <source>New composite</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MaterialsDialog.cpp" line="827"/>
+        <source>%1 is in use and there is nothing to replace it with.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/MaterialsDialog.cpp" line="833"/>
+        <source>%1 is used by %n element(s). Replace it with:</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
     </message>
 </context>
 <context>
@@ -7562,92 +8621,117 @@ Open it read-only?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="150"/>
-        <source>Rebuild with KimBim&apos;s shape</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="151"/>
-        <source>Keep the imported shape and cut it</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="153"/>
-        <source>Splitting a wall imported from another program: rebuild it (so it edits and joins like one drawn here) or keep the other program&apos;s body and cut it</source>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="148"/>
+        <source>Show each layer on the ends and tops of walls and slabs in 3D</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/ProjectSettingsDialog.cpp" line="154"/>
-        <source>Imported walls:</source>
+        <source>Each column or beam its own (Archicad)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/ProjectSettingsDialog.cpp" line="155"/>
-        <source>Flag partly overlapping elements as duplicates</source>
+        <source>Every column or beam of the type (Revit)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/ProjectSettingsDialog.cpp" line="158"/>
-        <source>Model checks: also report same-type elements that overlap by half or more without being exactly in the same place</source>
+        <source>What changing a column&apos;s or beam&apos;s building material changes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="164"/>
-        <source>Decimals:</source>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="159"/>
+        <source>Column and beam material:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="168"/>
-        <source>Existing</source>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="162"/>
+        <source>Rebuild with KimBim&apos;s shape</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="169"/>
-        <source>To be demolished</source>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="163"/>
+        <source>Keep the imported shape and cut it</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="165"/>
+        <source>Splitting a wall imported from another program: rebuild it (so it edits and joins like one drawn here) or keep the other program&apos;s body and cut it</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="166"/>
+        <source>Imported walls:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="167"/>
+        <source>Flag partly overlapping elements as duplicates</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/ProjectSettingsDialog.cpp" line="170"/>
-        <source>Leave them (they count as New)</source>
+        <source>Model checks: also report same-type elements that overlap by half or more without being exactly in the same place</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="172"/>
-        <source>Unmarked elements in an opened IFC:</source>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="176"/>
+        <source>Decimals:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="177"/>
-        <source>Renovation styles:</source>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="180"/>
+        <source>Existing</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/ProjectSettingsDialog.cpp" line="181"/>
-        <source>Every rule when it fits</source>
+        <source>To be demolished</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/ProjectSettingsDialog.cpp" line="182"/>
+        <source>Leave them (they count as New)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="184"/>
+        <source>Unmarked elements in an opened IFC:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="189"/>
+        <source>Renovation styles:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="193"/>
+        <source>Every rule when it fits</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="194"/>
         <source>Every rule</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="183"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="195"/>
         <source>Only the rules used</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="185"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="197"/>
         <source>Sheet legend:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="187"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="199"/>
         <source>Library objects show their plan symbol in plans</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="192"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="204"/>
         <source>These settings aren&apos;t kept with a plain IFC file. Save as .kim to keep them.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -7665,17 +8749,17 @@ Open it read-only?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/PropertiesPanel.cpp" line="111"/>
+        <location filename="../src/PropertiesPanel.cpp" line="112"/>
         <source>Error</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/PropertiesPanel.cpp" line="128"/>
+        <location filename="../src/PropertiesPanel.cpp" line="129"/>
         <source>Element</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/PropertiesPanel.cpp" line="128"/>
+        <location filename="../src/PropertiesPanel.cpp" line="129"/>
         <source>%n element(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -7683,57 +8767,77 @@ Open it read-only?</source>
         </translation>
     </message>
     <message>
-        <location filename="../src/PropertiesPanel.cpp" line="146"/>
+        <location filename="../src/PropertiesPanel.cpp" line="147"/>
         <source>Renovation status</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/PropertiesPanel.cpp" line="176"/>
+        <location filename="../src/PropertiesPanel.cpp" line="166"/>
+        <source>Composite</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/PropertiesPanel.cpp" line="166"/>
+        <source>Building material</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/PropertiesPanel.cpp" line="172"/>
+        <source>(none)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/PropertiesPanel.cpp" line="178"/>
+        <source>Set by the element&apos;s profile or layers: edit them in Graphics &gt; Composites</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/PropertiesPanel.cpp" line="201"/>
         <source>Metres, measured from the model; editing it changes the element</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/PropertiesPanel.cpp" line="206"/>
+        <location filename="../src/PropertiesPanel.cpp" line="250"/>
         <source>Overrides the type value: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/PropertiesPanel.cpp" line="208"/>
+        <location filename="../src/PropertiesPanel.cpp" line="252"/>
         <source>Some selected elements use their type&apos;s value</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/PropertiesPanel.cpp" line="283"/>
+        <location filename="../src/PropertiesPanel.cpp" line="327"/>
         <source>Edit type value...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/PropertiesPanel.cpp" line="285"/>
+        <location filename="../src/PropertiesPanel.cpp" line="329"/>
         <source>Reset to type value</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/PropertiesPanel.cpp" line="288"/>
+        <location filename="../src/PropertiesPanel.cpp" line="332"/>
         <source>Add property to %1...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/PropertiesPanel.cpp" line="290"/>
+        <location filename="../src/PropertiesPanel.cpp" line="334"/>
         <source>Remove property %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/PropertiesPanel.cpp" line="292"/>
+        <location filename="../src/PropertiesPanel.cpp" line="336"/>
         <source>Add property set...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/PropertiesPanel.h" line="36"/>
+        <location filename="../src/PropertiesPanel.h" line="37"/>
         <source>(varies)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/PropertiesPanel.h" line="37"/>
+        <location filename="../src/PropertiesPanel.h" line="38"/>
         <source>Inherited from the element&apos;s type</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8085,77 +9189,77 @@ Open it read-only?</source>
 <context>
     <name>kimbim::ScheduleSchemeDialog</name>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="430"/>
+        <location filename="../src/SchedulesDialog.cpp" line="432"/>
         <source>Schedule scheme</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="466"/>
+        <location filename="../src/SchedulesDialog.cpp" line="468"/>
         <source>Fields in column order. Ticked fields are what identical items share when merging; double-click a field to rename its column</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="468"/>
+        <location filename="../src/SchedulesDialog.cpp" line="470"/>
         <source>Double-click a field to add it</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="470"/>
+        <location filename="../src/SchedulesDialog.cpp" line="472"/>
         <source>Add →</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="471"/>
+        <location filename="../src/SchedulesDialog.cpp" line="473"/>
         <source>Remove</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="472"/>
+        <location filename="../src/SchedulesDialog.cpp" line="474"/>
         <source>Up</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="473"/>
+        <location filename="../src/SchedulesDialog.cpp" line="475"/>
         <source>Down</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="481"/>
+        <location filename="../src/SchedulesDialog.cpp" line="483"/>
         <source>Classes:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="484"/>
+        <location filename="../src/SchedulesDialog.cpp" line="486"/>
         <source>Available fields:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="487"/>
+        <location filename="../src/SchedulesDialog.cpp" line="489"/>
         <source>Schedule fields:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="494"/>
+        <location filename="../src/SchedulesDialog.cpp" line="496"/>
         <source>Name:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="507"/>
+        <location filename="../src/SchedulesDialog.cpp" line="509"/>
         <source> m²</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="509"/>
+        <location filename="../src/SchedulesDialog.cpp" line="511"/>
         <source>Openings smaller than this are not taken out of the host&apos;s areas (0: deduct all)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="510"/>
+        <location filename="../src/SchedulesDialog.cpp" line="512"/>
         <source>Units:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="511"/>
+        <location filename="../src/SchedulesDialog.cpp" line="513"/>
         <source>Smallest opening to deduct:</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8289,7 +9393,7 @@ Open it read-only?</source>
     </message>
     <message>
         <location filename="../src/SchedulesDialog.cpp" line="83"/>
-        <location filename="../src/SchedulesDialog.cpp" line="270"/>
+        <location filename="../src/SchedulesDialog.cpp" line="272"/>
         <source>Count</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8334,93 +9438,103 @@ Open it read-only?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="103"/>
+        <location filename="../src/SchedulesDialog.cpp" line="96"/>
+        <source>Building materials</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SchedulesDialog.cpp" line="97"/>
+        <source>Building material</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SchedulesDialog.cpp" line="105"/>
         <source>&amp;Merge identical items</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="106"/>
-        <location filename="../src/SchedulesDialog.cpp" line="220"/>
+        <location filename="../src/SchedulesDialog.cpp" line="108"/>
+        <location filename="../src/SchedulesDialog.cpp" line="222"/>
         <source>&amp;Delete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="109"/>
+        <location filename="../src/SchedulesDialog.cpp" line="111"/>
         <source>Schedules</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="114"/>
+        <location filename="../src/SchedulesDialog.cpp" line="116"/>
         <source>One row per group of elements that share the scheme&apos;s group fields, with their quantities summed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="121"/>
+        <location filename="../src/SchedulesDialog.cpp" line="123"/>
         <source>Click rows to select their elements; double-click a name, mark or property to edit it</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="124"/>
+        <location filename="../src/SchedulesDialog.cpp" line="126"/>
         <source>&amp;New...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="125"/>
+        <location filename="../src/SchedulesDialog.cpp" line="127"/>
         <source>&amp;Edit...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="126"/>
+        <location filename="../src/SchedulesDialog.cpp" line="128"/>
         <source>&amp;Refresh</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="127"/>
+        <location filename="../src/SchedulesDialog.cpp" line="129"/>
         <source>E&amp;xport...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="130"/>
+        <location filename="../src/SchedulesDialog.cpp" line="132"/>
         <source>Schedule:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="220"/>
+        <location filename="../src/SchedulesDialog.cpp" line="222"/>
         <source>Re&amp;set</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="233"/>
+        <location filename="../src/SchedulesDialog.cpp" line="235"/>
         <source>The model changed: Refresh to update the schedule</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="253"/>
+        <location filename="../src/SchedulesDialog.cpp" line="255"/>
         <source>Could not make the schedule: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="283"/>
+        <location filename="../src/SchedulesDialog.cpp" line="285"/>
         <source>Yes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="283"/>
+        <location filename="../src/SchedulesDialog.cpp" line="285"/>
         <source>No</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="303"/>
+        <location filename="../src/SchedulesDialog.cpp" line="305"/>
         <source>(varies)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="327"/>
+        <location filename="../src/SchedulesDialog.cpp" line="329"/>
         <source>Total</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/SchedulesDialog.cpp" line="336"/>
+        <location filename="../src/SchedulesDialog.cpp" line="338"/>
         <source>%n element(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -8428,7 +9542,7 @@ Open it read-only?</source>
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/SchedulesDialog.cpp" line="337"/>
+        <location filename="../src/SchedulesDialog.cpp" line="339"/>
         <source>%n row(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -8436,42 +9550,42 @@ Open it read-only?</source>
         </translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="352"/>
+        <location filename="../src/SchedulesDialog.cpp" line="354"/>
         <source>Could not change it</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="369"/>
+        <location filename="../src/SchedulesDialog.cpp" line="371"/>
         <source>New schedule</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="389"/>
+        <location filename="../src/SchedulesDialog.cpp" line="391"/>
         <source>Could not save the schedule</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="409"/>
+        <location filename="../src/SchedulesDialog.cpp" line="411"/>
         <source>Export schedule</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="410"/>
+        <location filename="../src/SchedulesDialog.cpp" line="412"/>
         <source>Excel workbooks (*.xlsx)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="410"/>
+        <location filename="../src/SchedulesDialog.cpp" line="412"/>
         <source>CSV files (*.csv)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="415"/>
+        <location filename="../src/SchedulesDialog.cpp" line="417"/>
         <source>Schedule saved to %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SchedulesDialog.cpp" line="416"/>
+        <location filename="../src/SchedulesDialog.cpp" line="418"/>
         <source>Could not export it: %1</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8544,12 +9658,17 @@ Open it read-only?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SheetsPanel.cpp" line="107"/>
-        <source>Purpose</source>
+        <location filename="../src/SheetsPanel.cpp" line="65"/>
+        <source>Place picture...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/SheetsPanel.cpp" line="109"/>
+        <source>Purpose</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SheetsPanel.cpp" line="111"/>
         <source>Current (as the views)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8587,12 +9706,12 @@ Open it read-only?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/StatusStrip.cpp" line="72"/>
+        <location filename="../src/StatusStrip.cpp" line="75"/>
         <source>Zoom (100% = the whole model)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/StatusStrip.cpp" line="123"/>
+        <location filename="../src/StatusStrip.cpp" line="126"/>
         <source>Layers %1</source>
         <translation type="unfinished"></translation>
     </message>

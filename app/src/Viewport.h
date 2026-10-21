@@ -107,6 +107,10 @@ public:
     // Lines only (hidden-line drawing, Slice 4b): every batch, including later ones.
     void setLinesOnly(bool on);
     bool linesOnly() const { return m_scene->linesOnly; }
+    void setWhiteModel(bool on); // D96: Archicad's white model 3D style
+    bool whiteModel() const { return m_scene->whiteModel; }
+    void setShadows(bool on) { m_scene->setShadows(on); } // D96: sun shadows
+    bool shadows() const { return m_scene->shadows(); }
     double planElevation() const { return m_planElevation; }
     // Screen point -> point on the horizontal plane z (metres). False without a window or when the
     // view ray is parallel to the plane.
@@ -118,7 +122,9 @@ public:
     void setWorkPlaneZ(double z) { m_workZ = z; }
     bool isDrawingMode() const { return m_drawingMode; }
     // Rubber-band wall preview: a box along p1-p2 (plan metres); nullopt hides it.
-    void setWallPreview(const std::optional<std::pair<QPointF, QPointF>>& axis, double thickness, double height);
+    // `offset`: the body's centre to the left of the drawn line (D97: the reference line location).
+    void setWallPreview(const std::optional<std::pair<QPointF, QPointF>>& axis, double thickness, double height,
+        double offset = 0.0);
     // General tool preview: boxes along a-b, `width` across, from z0 to z1 (absolute metres).
     struct PreviewBox {
         QPointF a, b;
@@ -163,6 +169,19 @@ public:
         QString tag;
     };
     void setGridLines(const QVector<GridLine>& lines, double z);
+    // D98: Archicad's construction grid, drawn in plan tabs: main lines `spacing` apart with
+    // `subdivisions` lighter ones between, turned `angle` radians about `origin`, at height `z`,
+    // over the model's extent plus a margin. Hidden in 3D views; show = false removes it.
+    struct ConstructionGrid {
+        bool show = false;
+        double spacing = 1.0;
+        int subdivisions = 4;
+        double angle = 0.0;
+        QPointF origin;
+        double z = 0.0;
+    };
+    void setConstructionGrid(const ConstructionGrid& grid);
+    int constructionLineCount() const { return m_constructionLines; }
     // D85: underlays drawn in this view under the model (just above level `z`): DXF linework as one
     // OCCT segment array per underlay (vertex colours, placement as the object's transformation, so a
     // move or rotation re-uses the GPU buffers); PDF pages and images as a textured quad. Not
@@ -389,6 +408,7 @@ private:
     Handle(V3d_View) m_view;
     bool m_planView = false;
     bool applyLayerState(const Handle(ElementBatch)& batch) const; // true if any element changed
+    void applyDisplayMode(); // D96: every batch in the scene's display mode
     void applyColors(const Handle(ElementBatch)& batch) const;
     bool applyGraphics(const Handle(ElementBatch)& batch) const; // true if any element changed
     bool m_selectThrough = false;
@@ -427,6 +447,11 @@ private:
     bool m_facePickMode = false;
     QPointF m_pointer;
     Handle(AIS_InteractiveObject) m_grid;
+    Handle(AIS_InteractiveObject) m_construction; // D98
+    ConstructionGrid m_constructionGrid;
+    int m_constructionLines = 0;
+    QRectF m_constructionExtent; // D98: the area the grid covers (world plan metres)
+    void displayConstructionGrid();
     QVector<Annotation> m_annotationData;
     QVector<Annotation> m_markerData;
     double m_annotationZ = 0.0;

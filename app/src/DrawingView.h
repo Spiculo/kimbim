@@ -49,6 +49,7 @@ signals:
     void placedMoved(const QString& drawing, QPointF topLeftMm);
     void placedRemoveRequested(const QString& drawing); // right-click > Remove from sheet
     void placedEditRequested(const QString& drawing);   // right-click > Edit text (a sheet text)
+    void placedResized(const QString& drawing, double widthMm); // D98: a picture's corner dragged
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -78,6 +79,8 @@ private:
     QVector<Placed> m_placed;
     // The placed drawing being dragged, a copy: the sheet can be refreshed (setPlaced) mid-drag.
     std::optional<Placed> m_dragging;
+    bool m_resizing = false; // D98: dragging a picture's bottom-right corner (its size, proportions kept)
+    QRectF resizedRect(QPointF widget) const;
     QPointF m_dragStart;     // widget position where the drag started
 };
 

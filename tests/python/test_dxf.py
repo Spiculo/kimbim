@@ -138,8 +138,9 @@ def test_house_plan_to_dxf_at_real_size_with_pens(house, tmp_path):
         (dxf.lineweight(pens["11"]["weight"]), dxf._rgb(pens["11"]["color"]))
     assert looks == {cut, projection}, looks
     assert cut[0] == 50 and projection[0] == 18
-    hatch = msp.query('HATCH[layer=="A-WALL-PATT"]').first
-    assert hatch.dxf.solid_fill == 1 and hatch.rgb == dxf._rgb(pens["12"]["color"])
+    hatches = msp.query('HATCH[layer=="A-WALL-PATT"]')
+    # D96: the walls' materials hatch them with their patterns, in the fill pen (12)
+    assert any(not h.dxf.solid_fill and h.dxf.color == dxf.aci(pens["12"]["color"]) for h in hatches)
     dim = msp.query("DIMENSION").first
     assert dim.dxf.layer == "A-ANNO-DIMS" and dim.dxf.dimstyle == "KimBim"
     assert dim.get_measurement() == pytest.approx(10000.0, abs=1.0)  # the house's 10 m chain

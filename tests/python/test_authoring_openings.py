@@ -22,7 +22,7 @@ def volume(guid):
 
 
 def bbox(guid):
-    _, verts, _ = b.mesh_elements(json.dumps([guid]))
+    _, verts, _, _ = b.mesh_elements(json.dumps([guid]))
     v = np.frombuffer(verts, dtype="<f4").reshape(-1, 3)
     return v.min(axis=0), v.max(axis=0)
 

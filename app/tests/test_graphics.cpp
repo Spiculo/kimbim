@@ -26,6 +26,50 @@ QJsonObject tablesFromBridge()
 class TestGraphics : public QObject {
     Q_OBJECT
 private slots:
+    // D96: cut fill hatches: parallel lines clipped by the outline (holes stay empty), dashes.
+    void hatchesFillTheOutline()
+    {
+        kimbim::FillPattern p;
+        kimbim::HatchFamily f;
+        f.angle = 0;
+        f.spacing = 1.0; // mm on paper -> 0.1 m at 1:100
+        p.lines << f;
+        const std::vector<QPointF> square{{0, 0}, {1, 0}, {1, 1}, {0, 1}};
+        auto segs = kimbim::Graphics::hatch({square}, p, 0.1);
+        QCOMPARE(int(segs.size()), 9); // y = 0.1 ... 0.9
+        for (const auto& s : segs)
+            QVERIFY(std::abs(s[0]) < 1e-9 && std::abs(s[2] - 1.0) < 1e-9);
+        const std::vector<QPointF> hole{{0.25, 0.25}, {0.75, 0.25}, {0.75, 0.75}, {0.25, 0.75}};
+        segs = kimbim::Graphics::hatch({square, hole}, p, 0.1);
+        QCOMPARE(int(segs.size()), 9 + 5); // lines through the hole are split in two
+        p.lines[0].dash = {2.0, 2.0}; // 0.2 m on, 0.2 m off
+        segs = kimbim::Graphics::hatch({square}, p, 0.1);
+        QVERIFY(segs.size() > 9);
+        kimbim::FillPattern solid;
+        solid.solid = true;
+        QVERIFY(kimbim::Graphics::hatch({square}, solid, 0.1).empty());
+    }
+
+    // D96: layered elements' bands come with the state; malformed ones are dropped.
+    void parsesLayerBands()
+    {
+        const QJsonObject w{{"origin", QJsonArray{1, 2, 0}}, {"axis", QJsonArray{0, 1, 0}},
+            {"bounds", QJsonArray{-0.15, -0.05, 0.15}}, {"fills", QJsonArray{"#ff0000", QJsonValue()}}};
+        const QJsonObject bad{{"origin", QJsonArray{0, 0, 0}}, {"axis", QJsonArray{0, 1, 0}},
+            {"bounds", QJsonArray{0, 1}}, {"fills", QJsonArray{"#ff0000", "#00ff00"}}};
+        const QJsonObject state{{"ok", true}, {"styles", QJsonArray()}, {"elements", QJsonObject()},
+            {"hidden", QJsonArray()}, {"layers", QJsonObject{{"W", w}, {"Bad", bad}}}};
+        const kimbim::Graphics g = kimbim::Graphics::fromJson(state);
+        const kimbim::LayerBands* lb = g.layersOf("W");
+        QVERIFY(lb);
+        QCOMPARE(lb->bounds.size(), 3);
+        QCOMPARE(lb->origin[1], 2.0);
+        QCOMPARE(lb->fills[0], QColor("#ff0000"));
+        QVERIFY(!lb->fills[1].isValid());
+        QVERIFY(!g.layersOf("Bad"));
+        QVERIFY(!g.layersOf("missing"));
+    }
+
     void parsesStylesHiddenAndPens()
     {
         const QByteArray json = R"({"ok": true, "purpose": "Working", "current_pen": 26, "annotation_pen": 23,

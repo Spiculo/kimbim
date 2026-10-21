@@ -37,7 +37,10 @@ _EPS = 1e-9
 
 def _levels() -> list:
     """The building's levels (models are not levels), lowest first."""
-    return sorted((s for s in B._model.by_type("IfcBuildingStorey") if not A._is_model(s)), key=A._elevation)
+    from .worksheets import is_worksheet
+
+    return sorted((s for s in B._model.by_type("IfcBuildingStorey") if not A._is_model(s) and not is_worksheet(s)),
+                  key=A._elevation)
 
 
 def _shown(storey) -> bool:

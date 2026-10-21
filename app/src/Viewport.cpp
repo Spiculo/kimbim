@@ -149,6 +149,19 @@ Viewport::Viewport(Scene* scene, QWidget* parent)
     connect(m_scene, &Scene::elementsAltered, this, [this] {
         if (!m_sectionPlanes.empty())
             rebuildSections();
+        // D98: the construction grid grows with the model (redrawn only when the model leaves it)
+        if (!m_construction.IsNull()) {
+            Bnd_Box box;
+            for (const auto& b : m_scene->batches)
+                box.Add(b->visibleBounds());
+            if (!box.IsVoid()) {
+                double x0, y0, z0, x1, y1, z1;
+                box.Get(x0, y0, z0, x1, y1, z1);
+                const QRectF& e = m_constructionExtent;
+                if (x0 < e.left() || y0 < e.top() || x1 > e.right() || y1 > e.bottom())
+                    displayConstructionGrid();
+            }
+        }
     });
 }
 
@@ -165,6 +178,8 @@ void Viewport::setPlanView(double elevation)
     applyNavigationPreset();
     if (!wasPlan && (!m_markerData.isEmpty() || !m_annotationData.isEmpty()))
         displayAnnotations(); // section/elevation markers and drafting (D84) belong to the plan
+    if (!wasPlan)
+        displayConstructionGrid(); // D98: plans only
     if (ensureWindow())
         fitAll();
     update();
@@ -176,6 +191,8 @@ void Viewport::set3DView()
     m_planView = false;
     AbortViewAnimation();
     eraseNorthArrow(); // D92: the north indicator belongs to plans
+    if (wasPlan)
+        displayConstructionGrid(); // D98: removed in 3D
     m_view->SetProj(HomeOrientation);
     applyProjection(); // this view's perspective setting comes back
     applyNavigationPreset();
@@ -315,7 +332,7 @@ std::optional<Viewport::IdImage> Viewport::renderIds(int w, int h)
     options.Height = h;
     options.BufferType = Graphic3d_BT_RGB;
     const bool ok = m_view->ToPixMap(*out.image, options);
-    const int mode = m_scene->linesOnly ? ElementBatch::LinesOnly : ElementBatch::Shaded;
+    const int mode = m_scene->displayMode();
     for (const auto& b : m_scene->batches)
         m_context->SetDisplayMode(b, mode, false);
     m_view->SetBackgroundColor(background);
@@ -853,11 +870,21 @@ void Viewport::setDrawingMode(bool on, double workPlaneZ)
     setCursor(on ? Qt::CrossCursor : Qt::ArrowCursor);
 }
 
-void Viewport::setWallPreview(const std::optional<std::pair<QPointF, QPointF>>& axis, double thickness, double height)
+void Viewport::setWallPreview(const std::optional<std::pair<QPointF, QPointF>>& axis, double thickness, double height,
+    double offset)
 {
     QVector<PreviewBox> boxes;
-    if (axis && thickness > 0 && height > 0)
-        boxes.push_back({axis->first, axis->second, thickness, m_workZ, m_workZ + height});
+    if (axis && thickness > 0 && height > 0) {
+        QPointF a = axis->first, b = axis->second;
+        const QPointF d = b - a;
+        const double len = std::hypot(d.x(), d.y());
+        if (len > 1e-9 && offset != 0.0) { // shift to the left of the drawing direction
+            const QPointF left(-d.y() / len * offset, d.x() / len * offset);
+            a += left;
+            b += left;
+        }
+        boxes.push_back({a, b, thickness, m_workZ, m_workZ + height});
+    }
     setPreviewBoxes(boxes);
 }
 
@@ -900,6 +927,107 @@ private:
 
 } // namespace
 
+// D98: the construction grid: thin light lines, the main ones a little darker (Archicad's look).
+class ConstructionGridPrs : public AIS_InteractiveObject {
+public:
+    ConstructionGridPrs(std::vector<std::pair<gp_Pnt, gp_Pnt>> minor, std::vector<std::pair<gp_Pnt, gp_Pnt>> major)
+        : m_minor(std::move(minor))
+        , m_major(std::move(major))
+    {
+    }
+    void Compute(const Handle(PrsMgr_PresentationManager)&, const Handle(Prs3d_Presentation)& prs, const int) override
+    {
+        auto add = [&](const std::vector<std::pair<gp_Pnt, gp_Pnt>>& segs, const Quantity_Color& colour) {
+            if (segs.empty())
+                return;
+            Handle(Graphic3d_ArrayOfSegments) arr = new Graphic3d_ArrayOfSegments(int(segs.size()) * 2);
+            for (const auto& [a, b] : segs) {
+                arr->AddVertex(a);
+                arr->AddVertex(b);
+            }
+            Handle(Graphic3d_Group) g = prs->NewGroup();
+            g->SetGroupPrimitivesAspect(new Graphic3d_AspectLine3d(colour, Aspect_TOL_SOLID, 1.0));
+            g->AddPrimitiveArray(arr);
+        };
+        add(m_minor, Quantity_Color(0.80, 0.83, 0.87, Quantity_TOC_RGB));
+        add(m_major, Quantity_Color(0.62, 0.68, 0.77, Quantity_TOC_RGB));
+    }
+    void ComputeSelection(const Handle(SelectMgr_Selection)&, const int) override {}
+
+private:
+    std::vector<std::pair<gp_Pnt, gp_Pnt>> m_minor, m_major;
+};
+
+void Viewport::setConstructionGrid(const ConstructionGrid& grid)
+{
+    m_constructionGrid = grid;
+    displayConstructionGrid();
+}
+
+void Viewport::displayConstructionGrid()
+{
+    if (!m_construction.IsNull()) {
+        m_context->Remove(m_construction, false);
+        m_construction.Nullify();
+    }
+    m_constructionLines = 0;
+    const ConstructionGrid& g = m_constructionGrid;
+    if (!g.show || !m_planView || g.spacing <= 0) {
+        update();
+        return;
+    }
+    // The model's extent (or 20 m around the origin), plus a margin, in the grid's own frame.
+    Bnd_Box box;
+    for (const auto& b : m_scene->batches)
+        box.Add(b->visibleBounds());
+    double x0 = -10, y0 = -10, x1 = 10, y1 = 10;
+    if (!box.IsVoid()) {
+        double z0, z1;
+        box.Get(x0, y0, z0, x1, y1, z1);
+    }
+    const double margin = std::max(10.0, 2 * g.spacing);
+    x0 -= margin, y0 -= margin, x1 += margin, y1 += margin;
+    m_constructionExtent = QRectF(QPointF(x0, y0), QPointF(x1, y1)); // the model may grow this far first
+    const double c = std::cos(g.angle), s = std::sin(g.angle);
+    double u0 = 1e30, u1 = -1e30, v0 = 1e30, v1 = -1e30;
+    for (double x : {x0, x1})
+        for (double y : {y0, y1}) {
+            const double dx = x - g.origin.x(), dy = y - g.origin.y();
+            const double u = dx * c + dy * s, v = -dx * s + dy * c;
+            u0 = std::min(u0, u), u1 = std::max(u1, u), v0 = std::min(v0, v), v1 = std::max(v1, v);
+        }
+    const int subdivisions = std::max(1, g.subdivisions);
+    double step = g.spacing / subdivisions;
+    const double span = std::max(u1 - u0, v1 - v0);
+    const bool minorShown = span / step <= 1500; // too dense to read: main lines only
+    if (!minorShown)
+        step = g.spacing;
+    if (span / step > 1500) { // even the main lines are too many
+        update();
+        return;
+    }
+    auto world = [&](double u, double v) {
+        return gp_Pnt(g.origin.x() + u * c - v * s, g.origin.y() + u * s + v * c, g.z);
+    };
+    std::vector<std::pair<gp_Pnt, gp_Pnt>> minor, major;
+    const long long ku0 = (long long)std::floor(u0 / step), ku1 = (long long)std::ceil(u1 / step);
+    const long long kv0 = (long long)std::floor(v0 / step), kv1 = (long long)std::ceil(v1 / step);
+    const long long every = minorShown ? subdivisions : 1;
+    for (long long k = ku0; k <= ku1; ++k) {
+        const double u = k * step;
+        (k % every == 0 ? major : minor).push_back({world(u, kv0 * step), world(u, kv1 * step)});
+    }
+    for (long long k = kv0; k <= kv1; ++k) {
+        const double v = k * step;
+        (k % every == 0 ? major : minor).push_back({world(ku0 * step, v), world(ku1 * step, v)});
+    }
+    m_constructionLines = int(minor.size() + major.size());
+    m_construction = new ConstructionGridPrs(std::move(minor), std::move(major));
+    m_context->Display(m_construction, 0, -1, false);
+    keepHere(m_construction);
+    update();
+}
+
 namespace {
 
 // Cut sections: filled outlines (unlit) plus bold borders, drawn just inside the kept half-space.
@@ -910,7 +1038,12 @@ struct SectionPart {
     Quantity_Color line;
     float width = 2.0f;
     uint16_t pattern = 0xFFFF;
+    // D96: the cut fill's hatch (drawn in `hatchColour` over `fill`, the background), per element group
+    std::optional<FillPattern> hatch;
+    Quantity_Color hatchColour;
+    std::vector<std::vector<int>> groups; // loops hatched together (an element's, holes included)
 };
+constexpr double kScreenMetresPerMm = 0.025; // D96: cut fills hatch at 1:25, fine enough for wall layers
 
 class SectionPrs : public AIS_InteractiveObject {
 public:
@@ -959,6 +1092,35 @@ public:
                 aspect->SetFaceCulling(Graphic3d_TypeOfBackfacingModel_DoubleSided);
                 g->SetGroupPrimitivesAspect(aspect);
                 g->AddPrimitiveArray(fill);
+            }
+            if (part.hatch) { // D96: the pattern, in the plane's own 2D frame (neighbours line up)
+                std::vector<std::array<double, 4>> segs;
+                for (const auto& group : part.groups) {
+                    std::vector<std::vector<QPointF>> loops2d;
+                    for (int l : group) {
+                        std::vector<QPointF> poly;
+                        for (const auto& p : part.loops[size_t(l)]) {
+                            const gp_Vec d(origin, p);
+                            poly.emplace_back(d.Dot(gp_Vec(u)), d.Dot(gp_Vec(v)));
+                        }
+                        loops2d.push_back(std::move(poly));
+                    }
+                    const auto h = Graphics::hatch(loops2d, *part.hatch, kScreenMetresPerMm);
+                    segs.insert(segs.end(), h.begin(), h.end());
+                }
+                if (!segs.empty()) {
+                    Handle(Graphic3d_ArrayOfSegments) arr = new Graphic3d_ArrayOfSegments(int(segs.size()) * 2);
+                    auto at = [&](double x, double y) {
+                        return gp_Pnt(origin.XYZ() + u.XYZ() * x + v.XYZ() * y + lift.XYZ() * 0.5); // in front of the fill
+                    };
+                    for (const auto& s : segs) {
+                        arr->AddVertex(at(s[0], s[1]));
+                        arr->AddVertex(at(s[2], s[3]));
+                    }
+                    Handle(Graphic3d_Group) g = prs->NewGroup();
+                    g->SetGroupPrimitivesAspect(new Graphic3d_AspectLine3d(part.hatchColour, Aspect_TOL_SOLID, 1.0f));
+                    g->AddPrimitiveArray(arr);
+                }
             }
             if (segments > 0) {
                 Handle(Graphic3d_ArrayOfSegments) lines = new Graphic3d_ArrayOfSegments(segments * 2);
@@ -1089,17 +1251,73 @@ void Viewport::rebuildSections()
                     part.width = std::max(Graphics::pixels(st->cut.weight, true), 1.0f); // cuts stay bold
                     part.pattern = Graphics::pattern(st->cut.dash);
                 }
-                const QString key = st ? QStringLiteral("%1|%2|%3|%4|%5").arg(st->fill.isValid() ? st->fill.name() : QString(),
-                    st->cut.color.name()).arg(part.width).arg(part.pattern).arg(0) : QStringLiteral("default");
+                // D96: a composite is cut layer by layer (Archicad): each layer's fill with thin separator
+                // lines, then the element's outline over them with the cut pen.
+                const LayerBands* bands = st && st->fill.isValid() ? g.layersOf(b->guid(i)) : nullptr;
+                if (bands) {
+                    const gp_Dir axis(bands->axis[0], bands->axis[1], bands->axis[2]);
+                    const gp_Pnt origin(bands->origin[0], bands->origin[1], bands->origin[2]);
+                    for (int k = 0; k + 1 < bands->bounds.size(); ++k) {
+                        const double lo = std::min(bands->bounds[k], bands->bounds[k + 1]);
+                        const double hi = std::max(bands->bounds[k], bands->bounds[k + 1]);
+                        if (hi - lo < 1e-6)
+                            continue;
+                        const gp_Pln from(origin.Translated(gp_Vec(axis) * lo), axis);
+                        const gp_Pln to(origin.Translated(gp_Vec(axis) * hi), axis.Reversed());
+                        SectionPart layer;
+                        layer.fill = bands->fills[k].isValid() ? std::optional<Quantity_Color>(occ(bands->fills[k])) : std::nullopt;
+                        layer.line = part.line;
+                        layer.width = 1.0f;
+                        const QString patternName = k < bands->patterns.size() ? bands->patterns[k] : QString();
+                        if (const FillPattern* fp = g.fillPattern(patternName); fp && layer.fill) {
+                            layer.hatch = *fp; // the fill pen draws the pattern over the background
+                            layer.hatchColour = *layer.fill;
+                            const QColor bg = k < bands->backgrounds.size() ? bands->backgrounds[k] : QColor();
+                            layer.fill = bg.isValid() ? occ(bg) : ElementBatch::background();
+                        }
+                        const QString lkey = QStringLiteral("layer|%1|%2|%3").arg(
+                            bands->fills[k].isValid() ? bands->fills[k].name() : QString(), st->cut.color.name(),
+                            patternName + QLatin1Char('|') + (k < bands->backgrounds.size() ? bands->backgrounds[k].name() : QString()));
+                        auto lit = partOf.constFind(lkey);
+                        if (lit == partOf.constEnd()) {
+                            lit = partOf.insert(lkey, parts.size());
+                            parts.push_back(layer);
+                        }
+                        std::vector<int> group;
+                        for (const auto& l : clipped) {
+                            std::vector<gp_Pnt> piece = clipLoop(clipLoop(l, from), to);
+                            if (piece.size() >= 3) {
+                                group.push_back(int(parts[*lit].loops.size()));
+                                parts[*lit].loops.push_back(std::move(piece));
+                                ++loopCount;
+                            }
+                        }
+                        if (!group.empty())
+                            parts[*lit].groups.push_back(std::move(group));
+                    }
+                    part.fill = std::nullopt; // the outline only: the layers are filled
+                }
+                if (const FillPattern* fp = st && part.fill ? g.fillPattern(st->pattern) : nullptr) { // D96
+                    part.hatch = *fp;
+                    part.hatchColour = *part.fill;
+                    part.fill = st->background.isValid() ? occ(st->background) : ElementBatch::background();
+                }
+                const QString key = st ? QStringLiteral("%1|%2|%3|%4|%5").arg(part.fill ? st->fill.name() : QString(),
+                    st->cut.color.name()).arg(part.width).arg(part.pattern).arg(0)
+                        + QLatin1Char('|') + (part.hatch ? st->pattern + st->background.name() : QString())
+                                       : QStringLiteral("default");
                 auto it = partOf.constFind(key);
                 if (it == partOf.constEnd()) {
                     it = partOf.insert(key, parts.size());
                     parts.push_back(part);
                 }
+                std::vector<int> group;
                 for (auto& l : clipped) {
+                    group.push_back(int(parts[*it].loops.size()));
                     parts[*it].loops.push_back(std::move(l));
                     ++loopCount;
                 }
+                parts[*it].groups.push_back(std::move(group));
             }
         if (loopCount > 0) {
             Handle(SectionPrs) prs = new SectionPrs(std::move(parts), section);
@@ -1426,7 +1644,7 @@ private:
 bool Viewport::Annotation::isDrafting() const
 {
     return kind == QLatin1String("line") || kind == QLatin1String("polyline") || kind == QLatin1String("arc")
-        || kind == QLatin1String("circle") || kind == QLatin1String("fill");
+        || kind == QLatin1String("circle") || kind == QLatin1String("fill") || kind == QLatin1String("spline");
 }
 
 QVector<QPointF> Viewport::annotationPoints(const QString& guid) const
@@ -1911,7 +2129,7 @@ void Viewport::addBatch(const Handle(ElementBatch)& batch)
     batch->setIdBase(m_scene->nextIdBase);
     m_scene->idBases.push_back(m_scene->nextIdBase);
     m_scene->nextIdBase += batch->elementCount();
-    const int mode = m_scene->linesOnly ? ElementBatch::LinesOnly : ElementBatch::Shaded;
+    const int mode = m_scene->displayMode();
     batch->SetDisplayMode(mode); // the object's own mode, so later redisplays keep it
     m_context->Display(batch, mode, 0, false);
     m_scene->elementsChanged(); // every view with a plan cut rebuilds its poché, and repaints
@@ -1920,9 +2138,22 @@ void Viewport::addBatch(const Handle(ElementBatch)& batch)
 void Viewport::setLinesOnly(bool on)
 {
     m_scene->linesOnly = on;
-    const int mode = on ? ElementBatch::LinesOnly : ElementBatch::Shaded;
-    for (const auto& b : m_scene->batches)
+    applyDisplayMode();
+}
+
+void Viewport::setWhiteModel(bool on)
+{
+    m_scene->whiteModel = on;
+    applyDisplayMode();
+}
+
+void Viewport::applyDisplayMode()
+{
+    const int mode = m_scene->displayMode();
+    for (const auto& b : m_scene->batches) {
+        b->SetDisplayMode(mode);
         m_context->SetDisplayMode(b, mode, false);
+    }
     m_scene->changed();
 }
 

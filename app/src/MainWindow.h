@@ -22,6 +22,7 @@
 
 #include "Cuts.h"
 #include "DockLayout.h"
+#include "MaterialsDialog.h"
 #include "Preferences.h"
 #include <QThread>
 
@@ -38,6 +39,7 @@ class QMenu;
 class QDoubleSpinBox;
 
 class QComboBox;
+class QCheckBox;
 class QSpinBox;
 class QToolBar;
 class QToolButton;
@@ -77,6 +79,7 @@ class MeasureController;
 class UnderlayPicker;
 class UnderlaySnapIndex;
 struct UnderlayLines;
+struct Underlay;
 class ModifyTool;
 class DraftTool;
 struct WallSegment;
@@ -216,6 +219,18 @@ public:
     bool hasUnversionedWork(); // work no version holds yet (Ctrl+S saves the file, not a version)
     // D72: project settings (kept with the .kim / folder, versioned).
     QJsonObject projectSettings() const { return m_settings; }
+    // D98: the construction grid's geometry (a project setting); the view and snapping follow.
+    bool setConstructionGrid(double spacing, int subdivisions, double angleDegrees, QPointF origin);
+    bool saveWallProfile(const QString& shapeGuid, const QString& name); // D97: a complex wall section
+    void setSpecialSnapPoints(int divisions, double distance); // D98: user preference, every tool's snapper
+    void setTraceMode(const QString& mode); // D98: "below", "above" or "" (off): Trace & Reference
+    QString traceMode() const { return m_traceMode; }
+    int traceSegments(const QString& storey); // D98: the shown trace's segment count (0: none)
+    bool pickUpSettings(); // D97: Archicad's eyedropper, from the one selected element
+    bool injectSettings(); // and syringe, into the selection
+    // D98: Archicad's Grid System on the active level (one undo step).
+    bool addGridSystem(QPointF corner, double angleDegrees, const QJsonArray& across, const QJsonArray& along,
+        double extension);
     bool setProjectSettings(const QJsonObject& changes); // false (and nothing changes) if refused
     // D73: the purpose (pen set, visibility, overrides, layer combination) and the graphics tables.
     bool setPurpose(const QString& name);
@@ -270,6 +285,8 @@ public:
     bool applyView(const QString& name);
     LayersPanel* layersPanel() const { return m_layersPanel; }
     // Models (Slice 12, owner feedback): a unit drawn once and placed on many levels.
+    bool createWorksheet(const QString& name); // D98
+    bool worksheetCommand(const char* command, const QStringList& args); // rename_worksheet, delete_worksheet
     bool createModel(const QString& name);
     bool placeModelAt(QPointF p, bool turned);
     bool updateModelInstances();
@@ -325,6 +342,7 @@ public:
     bool mirrorSelection(QPointF a, QPointF b, bool copy); // Ctrl+M tool: two clicks; Ctrl copies
     bool multiplySelection(const QString& kind, const QJsonObject& params); // Ctrl+U: linear / polar
     bool offsetSelection(double distance);
+    bool filletSelection(double size, const QString& mode); // D98: "fillet" or "chamfer"
     // D80: split, trim/extend (to a boundary or a corner), join/merge and unjoin walls and beams
     // (ModifyEdits.cpp). Ctrl (join = false) leaves the elements unjoined.
     ModifyTool* modifyTool() const { return m_modifyTool; }
@@ -350,6 +368,8 @@ public:
     bool addCloud(const QVector<QPointF>& points);
     int tagAll();
     bool placeSheetSymbol(const QString& number, const QString& kind);
+    bool placeSheetImage(const QString& number, const QString& path); // D98
+    bool placeFigure(const QString& path, double widthMetres, QPointF bottomLeft); // D98: File > Place picture
     bool splitElement(const QString& guid, QPointF at, bool join = true);
     bool trimElement(const QString& guid, QPointF keep, const QString& boundary, QPointF b1, QPointF b2, bool join = true);
     bool cornerElements(const QString& first, QPointF p1, const QString& second, QPointF p2, bool join = true);
@@ -401,6 +421,12 @@ public:
     LibraryPanel* libraryPanel();
     bool chooseObject(const QString& id, const QJsonObject& params = {}); // and start the Object tool
     bool placeObjectAt(QPointF p, bool turned = false);
+    struct ObjectFit {
+        QPointF origin; // the object's left front corner
+        double angle = 0.0; // degrees
+    };
+    // D97: where an object dropped at `p` stands against the nearest wall face (Fit to walls), if any.
+    std::optional<ObjectFit> fitObjectToWall(QPointF p, double width, double depth) const;
     double objectAngle() const { return m_objectAngle; } // degrees
     void setObjectAngle(double degrees);
     void applyLibraryPaths(); // the office library from the preferences (folder and IFC files)
@@ -462,6 +488,15 @@ private:
     void refreshLevels();
     void addLevelDialog();
     void levelsDialog(); // D79: Model > Levels..., the levels table
+    void materialsDialog(MaterialsEdits::Kind kind); // D96: Graphics > Building materials / Surfaces / Composites
+    void materialsCommand(const char* command, const QString& done);
+    bool setElementMaterial(const QString& kind, const QString& name); // D96: the Properties panel's Material row
+    QString wallReference() const;
+    void refreshConstructionGrid(); // D98
+    void gridOptionsDialog();
+    void gridSystemDialog(); // D98: Model > Grid system...
+    bool flipWalls(const QStringList& guids); // D97: Model > Flip walls
+    bool setJunctions(const QString& mode);    // D97: through, butt or materials, for the selection
     void setPlanView(bool plan);
     void buildModelingToolbar();
     void buildPalette();
@@ -482,6 +517,7 @@ private:
     void afterCopy(const QJsonObject& result);
     void multiplyDialog();
     void offsetDialog();
+    void filletDialog();
     void refreshDrawings();
     void refreshSheets(bool changed = true); // changed: the model changed, sheets need composing again
     void projectInfoDialog();
@@ -630,6 +666,7 @@ private:
     QVector<QPointF> m_gripPoints;
     QComboBox* m_draftLineType = nullptr;
     QComboBox* m_draftArcMode = nullptr;
+    QComboBox* m_draftPolyMode = nullptr; // D98: polyline or spline
     QComboBox* m_draftPattern = nullptr;
     QSpinBox* m_draftBackground = nullptr; // 0: no background
     QToolButton* m_draftShowArea = nullptr;
@@ -664,6 +701,23 @@ private:
     QHash<int, QAction*> m_toolActions;
     QComboBox* m_types = nullptr;
     QDoubleSpinBox* m_wallHeight = nullptr;
+    QComboBox* m_wallReference = nullptr; // D97: the Wall tool's reference line location
+    QAction* m_gridShow = nullptr; // D98: View > Construction grid
+    QJsonObject m_pickedUp;         // D97: the picked-up settings (pick_up's reply)
+    QAction* m_gridSnap = nullptr; // D98: View > Grid snap
+    QCheckBox* m_objectGravity = nullptr; // D97: objects land on the slab under them
+    QCheckBox* m_objectFit = nullptr;     // D97: objects stand against the wall they are dropped by
+    QComboBox* m_wallGeometry = nullptr;  // D97: straight or curved walls
+    // D98: Trace & Reference: the mode, and the traced plans by "storey|mode" (rebuilt after edits)
+    QString m_traceMode;
+    struct TraceEntry {
+        std::shared_ptr<const UnderlayLines> lines;
+        double units = 1.0;
+        QString reference;
+    };
+    QHash<QString, TraceEntry> m_traceCache;
+    QTimer* m_traceTimer = nullptr;
+    bool traceUnderlay(const QString& storey, Underlay* u, std::shared_ptr<const UnderlayLines>* lines);
     QComboBox* m_roofKind = nullptr;
     QDoubleSpinBox* m_roofPitch = nullptr;
     bool m_warnedInconsistent = false;

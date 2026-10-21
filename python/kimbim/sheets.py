@@ -554,7 +554,7 @@ def remove_legend(number: str, legend_id: str) -> str:
 # revision), "drawing" (the placed drawing a scale bar or north arrow belongs to; default the first)}.
 
 SYMBOL = "kimbim:symbol"
-SYMBOL_KINDS = ("north", "scalebar", "cloud", "text")
+SYMBOL_KINDS = ("north", "scalebar", "cloud", "text", "image")  # image: D98, a picture on the sheet
 
 
 def _symbols(sheet):
@@ -588,6 +588,8 @@ def _symbol_geometry(sheet, data):
         geom = Sy.scale_bar((2.0, 6.0), scale, 1.0)
         width = max(p[0] for c in geom["curves"] for p in c) + 6.0
         return geom, width, 13.0
+    if kind == "image":  # D98: drawn by symbols_svg as an <image>
+        return {"curves": [], "solids": [], "labels": []}, float(data.get("w", 80.0)), float(data.get("h", 60.0))
     if kind == "text":  # D91: free text on a sheet, moved and edited like any placed item
         text = str(data.get("text") or "")
         size = float(data.get("size", 3.5))
@@ -609,11 +611,103 @@ def symbols_svg(sheet) -> list:
             continue
         geom, _w, h = _symbol_geometry(sheet, data)
         x, y = float(data.get("x", MARGIN)), float(data.get("y", MARGIN))
+        if data["kind"] == "image":
+            out.append(_image_svg(data, x, y))
+            continue
         parts = Sy.svg_parts(geom, lambda p, x=x, y=y, h=h: (x + p[0], y + h - p[1]))
         body = "\n".join(parts).replace('data-fill="pen"', 'fill="#000000"').replace("<text ", '<text fill="#000000" stroke="none" ')
         out.append(f'<g class="kimbim-sheet-symbol" data-symbol="{data["kind"]}" fill="none" stroke="#000000" '
                    f'stroke-width="0.25" font-family="sans-serif">\n{body}\n</g>')
     return out
+
+
+def _image_svg(data: dict, x: float, y: float) -> str:
+    """A sheet picture as an SVG <image> (embedded, so exports carry it); a missing file is a crossed box."""
+    import base64
+
+    from . import underlays
+
+    w, h = float(data.get("w", 80.0)), float(data.get("h", 60.0))
+    p = underlays.file_path(str(data.get("file") or ""))
+    if p is None:
+        return (f'<g class="kimbim-sheet-symbol" data-symbol="image" fill="none" stroke="#c00000" stroke-width="0.25">'
+                f'<rect x="{x:.3f}" y="{y:.3f}" width="{w:.3f}" height="{h:.3f}"/>'
+                f'<path d="M{x:.3f},{y:.3f} L{x + w:.3f},{y + h:.3f} M{x + w:.3f},{y:.3f} L{x:.3f},{y + h:.3f}"/></g>')
+    raw = p.read_bytes()
+    mime = "image/png" if raw[:4] == b"\x89PNG" else "image/jpeg"
+    href = f"data:{mime};base64," + base64.b64encode(raw).decode("ascii")
+    return (f'<image class="kimbim-sheet-symbol" data-symbol="image" x="{x:.3f}" y="{y:.3f}" width="{w:.3f}" '
+            f'height="{h:.3f}" preserveAspectRatio="none" xlink:href="{href}" href="{href}"/>')
+
+
+def _sheet_files(skip=()) -> list:
+    """Every picture file the sheets use (D98), kept in the settings so versions and .kim files carry them.
+    `skip`: symbol ids being removed (inverse references can still list them inside the transaction)."""
+    names = set()
+    for sheet in _sheets():
+        for ref in _symbols(sheet):
+            if _link(ref) in skip:
+                continue
+            data = _symbol_data(ref)
+            if data.get("kind") == "image" and data.get("file"):
+                names.add(str(data["file"]))
+    return sorted(names)
+
+
+def _sync_sheet_files(skip=()):
+    from . import settings as S
+
+    names = _sheet_files(skip)
+    if S.current().get("sheet_files", []) != names:
+        st = S.current()
+        st["sheet_files"] = names
+        S.restore(st)
+
+
+def place_sheet_image(number: str, path: str, options_json: str = "") -> str:
+    """D98 (Archicad's Figure on a layout): a PNG or JPEG copied into the project and placed on a sheet,
+    `w` mm wide (80 by default; the height keeps its proportions) at options x, y or a free spot."""
+    import pathlib
+    import shutil
+
+    from . import underlays
+
+    sheet = _sheet(number) if B._model is not None else None
+    if sheet is None:
+        return A._fail("unknown sheet")
+    o = _symbol_options(options_json)
+    if o is None:
+        return A._fail("bad options")
+    src = pathlib.Path(path)
+    if not src.is_file():
+        return A._fail(f"no such file: {path}")
+    try:
+        pw, ph, _dpi = underlays._image_size(src)
+        w = float(o.get("w", 80.0))
+        if w <= 0 or pw <= 0 or ph <= 0:
+            return A._fail("bad size")
+        h = round(w * ph / pw, 3)
+        x, y = (float(o["x"]), float(o["y"])) if "x" in o and "y" in o else _free_spot(sheet, w, h)
+    except (TypeError, ValueError) as ex:
+        return A._fail(str(ex))
+    data = src.read_bytes()
+    name = underlays.blob_name(data, ".png" if data[:4] == b"\x89PNG" else ".jpg")
+    store = underlays.store_dir()
+    store.mkdir(parents=True, exist_ok=True)
+    if not (store / name).is_file():
+        shutil.copyfile(src, store / name)
+    info = {"kind": "image", "file": name, "x": round(x, 3), "y": round(y, 3), "w": round(w, 3), "h": h,
+            "ratio": ph / pw, "name": src.name}
+    symbol_id = ifcopenshell.guid.new()[:8]
+
+    def action():
+        ref = ifcopenshell.api.document.add_reference(B._model, information=sheet)
+        ifcopenshell.api.document.edit_reference(B._model, reference=ref, attributes={
+            _link_attr(): symbol_id, **_data_fields(json.dumps(info), SYMBOL)})
+        _sync_sheet_files()
+        return 1
+
+    return B._dump({**B._run_settings(action), "id": symbol_id})
 
 
 def _symbol_ref(number, symbol_id):
@@ -695,6 +789,8 @@ def set_sheet_symbol(number: str, symbol_id: str, changes_json: str) -> str:
         return A._fail("bad input")
     if data.get("w", 1) <= 0 or data.get("h", 1) <= 0:
         return A._fail("bad size")
+    if data.get("kind") == "image" and "w" in o and "h" not in o:  # a picture keeps its proportions
+        data["h"] = round(data["w"] * float(data.get("ratio") or 1.0), 3)
     for k in ("text", "drawing"):
         if k in o:
             data[k] = str(o[k] or "")
@@ -719,11 +815,15 @@ def remove_sheet_symbol(number: str, symbol_id: str) -> str:
     if ref is None:
         return A._fail("the symbol is not on that sheet")
 
+    image = _symbol_data(ref).get("kind") == "image"
+
     def action():
         ifcopenshell.api.document.remove_reference(B._model, reference=ref)
+        if image:
+            _sync_sheet_files(skip={symbol_id})  # D98: its file goes with it (undo brings both back)
         return 1
 
-    return B._dump(B._run(action, affects_drawings=False))
+    return B._dump(B._run_settings(action) if image else B._run(action, affects_drawings=False))
 
 
 def _symbol_listing(sheet) -> list:
@@ -919,7 +1019,8 @@ def sheet_svg(number: str) -> str:
     parts += symbols_svg(sheet)  # D87: north arrows, scale bars, revision clouds
     frame = [f'<rect x="{MARGIN}" y="{MARGIN}" width="{width - 2 * MARGIN}" height="{height - 2 * MARGIN}" '
              f'fill="none" stroke="#000" stroke-width="0.7"/>']
-    svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}mm" height="{height}mm" viewBox="0 0 {width} {height}">\n'
+    svg = (f'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '
+           f'width="{width}mm" height="{height}mm" viewBox="0 0 {width} {height}">\n'
            + "\n".join(styles) + '\n<rect x="0" y="0" width="100%" height="100%" fill="#ffffff"/>\n'
            + "\n".join(frame + parts) + '\n<g class="kimbim-title-block" font-family="sans-serif" fill="#000">\n'
            + "\n".join(_title_block(sheet, width, height, info)) + "\n</g>\n</svg>\n")

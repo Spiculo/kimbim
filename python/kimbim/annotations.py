@@ -36,6 +36,7 @@ KINDS = {"text": (1, 1), "dimension": (3, None), "mark": (1, 1), "leader": (2, N
          # 2D drafting (D84, module drafting): a line, a polyline, an arc (start, a point on it, end), a
          # circle (centre, a point on it), a fill (its outline)
          "line": (2, 2), "polyline": (2, None), "arc": (3, 3), "circle": (2, 2), "fill": (3, None),
+         "spline": (2, None),  # D98: a smooth curve through its points
          # the annotation pack (D87, module symbols): tags, north arrows, scale bars, revision clouds,
          # angle, radius, diameter, level and spot-elevation dimensions
          **S.POINTS}

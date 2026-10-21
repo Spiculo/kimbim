@@ -66,7 +66,7 @@ Snap DraftTool::snapAt(QPointF p) const
 {
     if (m_points.isEmpty())
         return m_snapper.snap(p, m_tolerance);
-    const bool open = m_mode == Mode::Polyline || m_mode == Mode::Fill;
+    const bool open = m_mode == Mode::Polyline || m_mode == Mode::Fill || m_mode == Mode::Spline;
     if (open && m_points.size() >= 3 && dist(p, m_points.first()) <= m_tolerance)
         return Snap{m_points.first(), Snap::Endpoint, {}}; // closing on the first point wins
     const QPointF from = m_points.last();
@@ -84,15 +84,16 @@ Snap DraftTool::move(QPointF p)
 void DraftTool::click(QPointF p)
 {
     const Snap s = snapAt(p);
-    const bool open = m_mode == Mode::Polyline || m_mode == Mode::Fill;
+    const bool open = m_mode == Mode::Polyline || m_mode == Mode::Fill || m_mode == Mode::Spline;
     if (open && m_points.size() >= 3 && s.point == m_points.first()) {
         const QVector<QPointF> pts = m_points;
         cancel();
-        emitShape(m_mode == Mode::Fill ? QStringLiteral("fill") : QStringLiteral("polyline"), pts, true);
+        emitShape(m_mode == Mode::Fill ? QStringLiteral("fill")
+                : m_mode == Mode::Spline ? QStringLiteral("spline") : QStringLiteral("polyline"), pts, true);
         return;
     }
     if (!m_points.isEmpty() && dist(s.point, m_points.last()) < kSame) {
-        if (m_mode == Mode::Polyline) // a double click ends the polyline (Archicad)
+        if (m_mode == Mode::Polyline || m_mode == Mode::Spline) // a double click ends it (Archicad)
             finish();
         return;
     }
@@ -144,10 +145,10 @@ void DraftTool::emitShape(const QString& kind, const QVector<QPointF>& points, b
 
 void DraftTool::finish()
 {
-    if (m_mode == Mode::Polyline && m_points.size() >= 2) {
+    if ((m_mode == Mode::Polyline || m_mode == Mode::Spline) && m_points.size() >= 2) {
         const QVector<QPointF> pts = m_points;
         cancel();
-        emitShape(QStringLiteral("polyline"), pts, false);
+        emitShape(m_mode == Mode::Spline ? QStringLiteral("spline") : QStringLiteral("polyline"), pts, false);
     } else if (m_mode == Mode::Fill && m_points.size() >= 3) {
         const QVector<QPointF> pts = m_points;
         cancel();
@@ -157,7 +158,7 @@ void DraftTool::finish()
 
 void DraftTool::escape()
 {
-    if (m_mode == Mode::Polyline && m_points.size() >= 2)
+    if ((m_mode == Mode::Polyline || m_mode == Mode::Spline) && m_points.size() >= 2)
         finish();
     else
         cancel();
@@ -288,6 +289,12 @@ QVector<QVector<QPointF>> DraftTool::preview() const
         out << pts;
         break;
     }
+    case Mode::Spline: {
+        QVector<QPointF> pts = m_points;
+        pts << h;
+        out << splinePoints(pts);
+        break;
+    }
     case Mode::Rectangle:
         out << QVector<QPointF>{p0, QPointF(h.x(), p0.y()), h, QPointF(p0.x(), h.y()), p0};
         break;
@@ -334,8 +341,40 @@ QString DraftTool::hint() const
     case Mode::Fill:
         return n == 0 ? tr("Fill: click the outline's points (Alt+click inside a closed polyline or circle to fill it)")
                       : tr("Fill: click the next point; click the first point or press Enter to close");
+    case Mode::Spline:
+        return n == 0 ? tr("Spline: click the first point")
+                      : tr("Spline: click the points it passes through; click the first point to close, Enter or double click to end");
     }
     return {};
+}
+
+QVector<QPointF> DraftTool::splinePoints(const QVector<QPointF>& points, bool closed, int steps)
+{
+    const int n = int(points.size());
+    if (n < 3)
+        return points;
+    QVector<QPointF> ext;
+    if (closed)
+        ext << points.last() << points << points[0] << points[1];
+    else
+        ext << points.first() << points << points.last();
+    const int spans = closed ? n : n - 1;
+    QVector<QPointF> out{points.first()};
+    auto knot = [](double t, QPointF a, QPointF b) { return t + std::sqrt(std::max(dist(a, b), 1e-9)); };
+    for (int i = 0; i < spans; ++i) {
+        const QPointF p0 = ext[i], p1 = ext[i + 1], p2 = ext[i + 2], p3 = ext[i + 3];
+        const double t0 = 0.0, t1 = knot(t0, p0, p1), t2 = knot(t1, p1, p2), t3 = knot(t2, p2, p3);
+        for (int k = 1; k <= steps; ++k) {
+            const double t = t1 + (t2 - t1) * k / steps;
+            auto lerp = [t](QPointF a, QPointF b, double ta, double tb) {
+                return tb - ta < 1e-12 ? a : (a * (tb - t) + b * (t - ta)) / (tb - ta);
+            };
+            const QPointF a1 = lerp(p0, p1, t0, t1), a2 = lerp(p1, p2, t1, t2), a3 = lerp(p2, p3, t2, t3);
+            const QPointF b1 = lerp(a1, a2, t0, t2), b2 = lerp(a2, a3, t1, t3);
+            out << lerp(b1, b2, t1, t2);
+        }
+    }
+    return out;
 }
 
 } // namespace kimbim

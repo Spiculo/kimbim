@@ -90,6 +90,11 @@ void MainWindow::setupDraftTools(ToolOptionsBar* bar)
     m_draftArcMode->addItem(tr("Circle: centre and radius"), int(DraftTool::Mode::Circle));
     m_draftArcMode->addItem(tr("Arc: three points"), int(DraftTool::Mode::Arc3));
     m_draftArcMode->addItem(tr("Arc: centre, start and end"), int(DraftTool::Mode::ArcCentre));
+    m_draftPolyMode = new QComboBox(bar); // D98: Archicad's Polyline and Spline
+    m_draftPolyMode->setObjectName(QStringLiteral("draftPolyMode"));
+    m_draftPolyMode->setToolTip(tr("Straight segments, or a smooth curve through the points"));
+    m_draftPolyMode->addItem(tr("Polyline"), int(DraftTool::Mode::Polyline));
+    m_draftPolyMode->addItem(tr("Spline"), int(DraftTool::Mode::Spline));
     m_draftLineType = new QComboBox(bar);
     m_draftLineType->setObjectName(QStringLiteral("draftLineType"));
     m_draftLineType->setToolTip(tr("Line type"));
@@ -120,7 +125,7 @@ void MainWindow::setupDraftTools(ToolOptionsBar* bar)
     m_draftPatternScale->addItem(tr("Model pattern"), QStringLiteral("model"));
     m_draftPatternScale->setToolTip(tr("Paper: the pattern keeps its printed spacing at every drawing scale; "
                                        "model: its spacing grows with the model"));
-    for (QWidget* w : std::initializer_list<QWidget*>{m_draftArcMode, m_draftLineType, m_draftPattern, m_draftBackground,
+    for (QWidget* w : std::initializer_list<QWidget*>{m_draftArcMode, m_draftPolyMode, m_draftLineType, m_draftPattern, m_draftBackground,
                                                       m_draftShowArea, m_draftOutline, m_draftPatternScale}) {
         w->setVisible(false);
         bar->addField(w);
@@ -128,6 +133,12 @@ void MainWindow::setupDraftTools(ToolOptionsBar* bar)
     connect(m_draftArcMode, &QComboBox::currentIndexChanged, this, [this] {
         if (m_tool == Tool::ArcCircle && m_draftArcMode->currentIndex() >= 0) {
             m_draftTool->setMode(DraftTool::Mode(m_draftArcMode->currentData().toInt()));
+            m_status->showMessage(m_draftTool->hint());
+        }
+    });
+    connect(m_draftPolyMode, &QComboBox::currentIndexChanged, this, [this] {
+        if (m_tool == Tool::Polyline) {
+            m_draftTool->setMode(DraftTool::Mode(m_draftPolyMode->currentData().toInt()));
             m_status->showMessage(m_draftTool->hint());
         }
     });
@@ -146,6 +157,7 @@ void MainWindow::startDraftTool(Tool tool)
 {
     const bool draft = isDraftTool(tool);
     m_draftArcMode->setVisible(tool == Tool::ArcCircle);
+    m_draftPolyMode->setVisible(tool == Tool::Polyline);
     m_draftLineType->setVisible(draft && tool != Tool::Fill && tool != Tool::Cloud);
     for (QWidget* w : std::initializer_list<QWidget*>{m_draftPattern, m_draftBackground, m_draftShowArea,
                                                       m_draftOutline, m_draftPatternScale})
@@ -170,7 +182,7 @@ void MainWindow::startDraftTool(Tool tool)
     fillCombo(m_draftPattern, patterns, QStringLiteral("Diagonal"));
     DraftTool::Mode mode = DraftTool::Mode::Line;
     if (tool == Tool::Polyline)
-        mode = DraftTool::Mode::Polyline;
+        mode = DraftTool::Mode(m_draftPolyMode->currentData().toInt());
     else if (tool == Tool::Rectangle)
         mode = DraftTool::Mode::Rectangle;
     else if (tool == Tool::Fill || tool == Tool::Cloud)
@@ -230,7 +242,7 @@ bool MainWindow::addDrafting(const QString& kind, const QVector<QPointF>& points
     for (const QPointF& p : points)
         pts.append(QJsonArray{p.x(), p.y()});
     QJsonObject o = draftOptions(kind);
-    if (kind == QLatin1String("polyline"))
+    if (kind == QLatin1String("polyline") || kind == QLatin1String("spline")) // D98: splines close too
         o.insert("closed", closed);
     const QJsonObject r = bridge("add_drafting", {m_levels->activeStorey(), kind, compact(pts), compact(o)});
     if (!r.value("ok").toBool()) {

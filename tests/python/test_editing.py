@@ -161,3 +161,38 @@ def test_moving_walls_of_an_imported_model_keeps_their_geometry(room):
     assert r["ok"], r
     assert axis(room["w1"])[0][1] == 1.0
     assert [r.Items for r in w1.Representation.Representations if r.RepresentationIdentifier == "Body"] == items
+
+
+def test_round_corners_geometry():
+    from kimbim import editing as E
+
+    square = [(0, 0), (4, 0), (4, 4), (0, 4)]
+    chamfered = E.round_corners(square, True, 1.0, "chamfer")
+    assert chamfered[:2] == [(0.0, 1.0), (1.0, 0.0)] and len(chamfered) == 8
+    filleted = E.round_corners(square, True, 1.0)
+    for x, y in filleted:  # every point on the square's edges or on a corner arc of radius 1
+        cx, cy = min(max(x, 1), 3), min(max(y, 1), 3)
+        assert math.hypot(x - cx, y - cy) == pytest.approx(1.0, abs=1e-6) or x in (0, 4) or y in (0, 4)
+    assert (1.0, 0.0) in filleted and (0.0, 1.0) in filleted
+    assert E.round_corners([(0, 0), (4, 0), (4, 4)], False, 1.0, "chamfer") == [(0, 0), (3.0, 0.0), (4.0, 1.0), (4, 4)]
+    clipped = E.round_corners([(0, 0), (1, 0), (1, 1), (0, 1)], True, 5.0, "chamfer")  # too big: half the edge
+    assert (0.5, 0.0) in clipped and (1.0, 0.5) in clipped
+
+
+def test_fillet_slabs_and_drafting(room):
+    r = call("fillet_corners", g(room["slab"]), 0.5, "chamfer")
+    assert r["ok"], r
+    outline = call("slab_outline", room["slab"])["points"]
+    assert len(outline) == 8 and [0.5, 0.0] in outline
+    poly = call("add_drafting", room["l1"], "polyline", json.dumps([[10, 0], [14, 0], [14, 3]]))["guid"]
+    assert call("fillet_corners", g(poly), 1.0)["ok"]
+    from kimbim import annotations as N
+
+    pts = N.world_points(b._model.by_guid(poly))
+    assert len(pts) > 4 and tuple(pts[0][:2]) == (10, 0) and tuple(pts[-1][:2]) == (14, 3)
+    assert not call("fillet_corners", g(room["w1"]), 1.0)["ok"]  # walls are not filleted
+    assert not call("fillet_corners", g(poly), 0)["ok"]
+    for _ in range(3):  # the polyline's fillet, the polyline, the slab's chamfer
+        call("undo")
+    assert len(call("slab_outline", room["slab"])["points"]) == 4
+    assert not valid()

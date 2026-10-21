@@ -1,0 +1,162 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Worksheets (D98): 2D drawing spaces with their own drawing, kept away from the building."""
+import json
+
+import pytest
+
+from kimbim import app_bridge as b
+from kimbim import drawgen as G
+
+
+def call(fn, *args):
+    return json.loads(getattr(b, fn)(*args))
+
+
+@pytest.fixture
+def project():
+    assert call("new_project", "Casa")["ok"]
+    level = call("storeys")["storeys"][0]["guid"]
+    t = call("wall_types")["types"][0]["guid"]
+    assert call("create_wall", level, t, 0, 0, 5, 0, 3.0)["ok"]
+    return level
+
+
+def test_a_worksheet_is_a_marked_storey_with_its_drawing(project):
+    r = call("create_worksheet", "Details")
+    assert r["ok"], r
+    ws = call("worksheets")["worksheets"]
+    assert [w["name"] for w in ws] == ["Details"] and ws[0]["drawing"] == r["drawing"]
+    storeys = {s["name"]: s for s in call("storeys")["storeys"]}
+    assert storeys["Details"]["worksheet"] and not storeys["Level 1"]["worksheet"]
+    assert storeys["Details"]["elevation"] <= -1000
+    assert "Details" in {d["name"] for d in call("drawings")["drawings"]}
+    assert not call("create_worksheet", "Details")["ok"]  # names are unique
+    assert not call("create_worksheet", "  ")["ok"]
+    call("undo")
+    assert call("worksheets")["worksheets"] == []
+
+
+def test_worksheets_stay_out_of_levels_and_bounds(project):
+    before = G.model_bounds(b._model)
+    r = call("create_worksheet", "Sketch")
+    assert call("add_drafting", r["guid"], "line", json.dumps([[0, 0], [100, 100]]))["ok"]
+    after = G.model_bounds(b._model)
+    assert [list(map(float, p)) for p in after] == [list(map(float, p)) for p in before]
+    names = [l["name"] for l in call("levels_table")["levels"]]
+    assert "Sketch" not in names
+    assert call("create_worksheet", "Second")["elevation"] < r["elevation"]  # each its own place
+
+
+def test_a_worksheet_drawing_shows_its_drafting_but_no_building_markers(project):
+    r = call("create_worksheet", "Details")
+    assert call("add_drafting", r["guid"], "line", json.dumps([[0, 0], [2, 1]]))["ok"]
+    geometry = {"cut": [], "proj": [], "bounds": [0, 0, 2, 1]}
+    svg = call("generate_plan_drawing", r["drawing"], json.dumps(geometry))["svg"]
+    assert "kimbim-drafting" in svg
+    assert "Elevation" not in svg and "North" not in svg
+
+
+def _png(tmp_path, name="pic.png", w=4, h=2):
+    from kimbim import underlays
+
+    p = tmp_path / name
+    p.write_bytes(underlays.png_bytes(w, h, [bytes([200, 30, 30] * w)] * h))
+    return p
+
+
+def test_pictures_on_a_worksheet_print_as_figures(project, tmp_path):
+    import re
+
+    ws = call("create_worksheet", "Pictures")
+    pic = _png(tmp_path)
+    r = call("add_underlay", str(pic), json.dumps({"storey": ws["guid"], "x": 1.0, "y": 2.0, "scale": 0.5}))
+    assert r["ok"], r
+    geometry = {"cut": [], "proj": [], "bounds": [0, 0, 3, 3]}
+    svg = call("generate_plan_drawing", ws["drawing"], json.dumps(geometry))["svg"]
+    m = re.search(r'<image data-figure="[^"]+" x="0" y="0" width="4" height="2"[^>]*transform="matrix\(([^)]*)\)"', svg)
+    assert m, svg[:400]
+    a, b2, c, d, e, f = (float(v) for v in m.group(1).split())
+    assert a == pytest.approx(5.0) and d == pytest.approx(5.0)  # 0.5 m per pixel at 1:100 = 5 mm on paper
+    assert b2 == pytest.approx(0) and c == pytest.approx(0)
+    assert 'xmlns:xlink="http://www.w3.org/1999/xlink"' in svg
+    # the same picture on a building level is a reference underlay: it does not print
+    level = call("storeys")["storeys"][0]["guid"]
+    plan = next(d for d in call("drawings")["drawings"] if d["name"] == "Level 1 Floor Plan")
+    assert call("add_underlay", str(_png(tmp_path, "scan.png")), json.dumps({"storey": level}))["ok"]
+    svg = call("generate_plan_drawing", plan["guid"], json.dumps(geometry))["svg"]
+    assert "<image" not in svg
+
+
+def test_png_writer_makes_a_valid_png(tmp_path):
+    from kimbim import underlays
+
+    p = _png(tmp_path, w=3, h=5)
+    assert underlays._image_size(p)[:2] == (3, 5)
+
+
+def test_pictures_on_sheets(project, tmp_path):
+    from kimbim import settings
+
+    sheet = call("add_sheet", "A3", "Presentation")
+    assert sheet["ok"], sheet
+    number = sheet["number"]
+    pic = _png(tmp_path, "logo.png", w=40, h=10)
+    r = call("place_sheet_image", number, str(pic), json.dumps({"x": 20, "y": 30, "w": 60}))
+    assert r["ok"], r
+    item = next(s for s in next(s for s in call("sheets")["sheets"] if s["number"] == number)["symbols"]
+                if s["kind"] == "image")
+    assert (item["x"], item["y"], item["w"], item["h"]) == pytest.approx((20, 30, 60, 15))  # proportions kept
+    svg = call("sheet_svg", number)["svg"]
+    assert 'xmlns:xlink="http://www.w3.org/1999/xlink"' in svg and 'data-symbol="image"' in svg
+    assert "data:image/png;base64," in svg
+    files = settings.current()["sheet_files"]
+    assert len(files) == 1 and files[0].endswith(".png")
+    assert call("set_sheet_symbol", number, r["id"], json.dumps({"w": 120}))["ok"]
+    item = next(s for s in next(s for s in call("sheets")["sheets"] if s["number"] == number)["symbols"]
+                if s["kind"] == "image")
+    assert item["h"] == pytest.approx(30)
+    assert call("remove_sheet_symbol", number, r["id"])["ok"]
+    assert settings.current()["sheet_files"] == []
+    call("undo")  # the picture and its file come back together
+    assert len(settings.current()["sheet_files"]) == 1
+    assert not call("place_sheet_image", number, str(tmp_path / "nope.png"), "")["ok"]
+
+
+def test_rename_and_delete_a_worksheet(project, tmp_path):
+    from kimbim import settings
+
+    ws = call("create_worksheet", "Sketch")
+    assert call("add_drafting", ws["guid"], "line", json.dumps([[0, 0], [1, 1]]))["ok"]
+    assert call("add_underlay", str(_png(tmp_path)), json.dumps({"storey": ws["guid"]}))["ok"]
+    sheet = call("add_sheet", "A3", "Details")["number"]
+    assert call("place_drawing", sheet, ws["drawing"], 50, 50, 100)["ok"]
+    assert call("rename_worksheet", ws["guid"], "Details 1")["ok"]
+    assert {w["name"] for w in call("worksheets")["worksheets"]} == {"Details 1"}
+    assert "Details 1" in {d["name"] for d in call("drawings")["drawings"]}
+    assert not call("rename_worksheet", ws["guid"], "Level 1")["ok"]
+    r = call("delete_worksheet", ws["guid"])
+    assert r["ok"], r
+    assert call("worksheets")["worksheets"] == []
+    assert not any(u.get("storey") == ws["guid"] for u in settings.current()["underlays"])
+    views = next(s for s in call("sheets")["sheets"] if s["number"] == sheet)["views"]
+    assert views == []
+    call("undo")
+    assert [w["name"] for w in call("worksheets")["worksheets"]] == ["Details 1"]
+    assert any(u.get("storey") == ws["guid"] for u in settings.current()["underlays"])
+    level = next(s["guid"] for s in call("storeys")["storeys"] if s["name"] == "Level 1")
+    assert not call("delete_worksheet", level)["ok"]  # a level is not a worksheet
+
+
+def test_figures_are_placed_at_a_typed_width(project, tmp_path):
+    import re
+
+    ws = call("create_worksheet", "Pictures")
+    r = call("place_figure", ws["guid"], str(_png(tmp_path, w=40, h=20)), 2.0, 1.0, 1.0)
+    assert r["ok"], r
+    u = r["underlay"]
+    assert u["opacity"] == 1.0 and u["scale"] == pytest.approx(0.05)  # 40 px across 2 m
+    geometry = {"cut": [], "proj": [], "bounds": [0, 0, 3, 3]}
+    svg = call("generate_plan_drawing", ws["drawing"], json.dumps(geometry))["svg"]
+    a = float(re.search(r'data-figure="[^"]+"[^>]*transform="matrix\(([-\d.e]+)', svg).group(1))
+    assert a * 40 == pytest.approx(20.0)  # 2 m at 1:100 = 20 mm on paper
+    assert not call("place_figure", ws["guid"], str(_png(tmp_path)), 0, 0, 0)["ok"]

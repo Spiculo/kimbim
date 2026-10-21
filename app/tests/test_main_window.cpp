@@ -11,6 +11,7 @@
 #include <QTemporaryDir>
 #include <QStandardPaths>
 #include <QToolButton>
+#include <QImage>
 #include <QtTest>
 
 #include <cmath>
@@ -52,6 +53,7 @@
 #include "HostTool.h"
 #include "Graphics.h"
 #include "MainWindow.h"
+#include "Snapper.h"
 #include "PropertiesPanel.h"
 #include "PolygonTool.h"
 #include "ProjectSettingsDialog.h"
@@ -198,6 +200,320 @@ private slots:
         QVERIFY(!w.dockLayout()->restoreLayout(QByteArray("garbage")));
         QVERIFY(w.dockLayout()->view("3d"));
         QVERIFY(w.dockLayout()->manager()->findDockWidget("tree"));
+    }
+
+    // D98: Archicad's construction grid: drawn in plan tabs only, snapped to when Grid snap is on.
+    void constructionGridInPlansAndGridSnap()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        auto* show = w.findChild<QAction*>(QStringLiteral("actionConstructionGrid"));
+        auto* snap = w.findChild<QAction*>(QStringLiteral("actionGridSnap"));
+        QVERIFY(show && snap);
+        show->setChecked(true);
+        snap->setChecked(false);
+        kimbim::Viewport* plan = w.openPlanTab(w.levelsBar()->activeStorey());
+        QVERIFY(plan->constructionLineCount() > 0);
+        QCOMPARE(w.modelView()->constructionLineCount(), 0); // 3D: no grid
+        QCOMPARE(w.wallTool()->snapper().snapGridStep(), 0.0);
+        auto* button = w.findChild<QToolButton*>(QStringLiteral("actionGridSnapButton"));
+        QVERIFY(button); // on the status strip
+        QCOMPARE(button->defaultAction(), snap);
+        QVERIFY(w.setConstructionGrid(2.0, 2, 0.0, QPointF(0.5, 0.5)));
+        QCOMPARE(w.projectSettings().value("construction_grid").toObject().value("spacing").toDouble(), 2.0);
+        snap->setChecked(true);
+        QCOMPARE(w.wallTool()->snapper().snapGridStep(), 1.0);
+        const kimbim::Snap s = w.wallTool()->snapper().snap(QPointF(1.4, 2.3), 0.01);
+        QVERIFY(std::abs(s.point.x() - 1.5) < 1e-9 && std::abs(s.point.y() - 2.5) < 1e-9);
+        const int before = plan->constructionLineCount();
+        snap->setChecked(false);
+        w.setTool(kimbim::MainWindow::Tool::Wall); // a wall far past the grid: the grid grows to cover it
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({120, 0});
+        w.wallTool()->finish();
+        w.setTool(kimbim::MainWindow::Tool::None);
+        QVERIFY(plan->constructionLineCount() > before);
+        show->setChecked(false);
+        QCOMPARE(plan->constructionLineCount(), 0);
+        snap->setChecked(false);
+        show->setChecked(true);
+        QVERIFY(w.close());
+    }
+
+    // D97: the Wall tool's Curved geometry method: start, end, a point on the arc.
+    void curvedWalls()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        w.setTool(kimbim::MainWindow::Tool::Wall);
+        auto* geometry = w.findChild<QComboBox*>(QStringLiteral("wallGeometry"));
+        QVERIFY(geometry);
+        geometry->setCurrentIndex(geometry->findData(QStringLiteral("curved")));
+        QVERIFY(w.wallTool()->curved());
+        w.wallTool()->click({4, 0});
+        w.wallTool()->click({-4, 0});
+        w.wallTool()->move({0, 4}); // the arc's preview through the pointer
+        QVERIFY(w.wallTool()->arcPreview().size() > 3);
+        w.wallTool()->click({0, 4});
+        w.wallTool()->finish();
+        w.setTool(kimbim::MainWindow::Tool::None);
+        const QStringList walls = w.viewport()->guids();
+        QCOMPARE(walls.size(), 1);
+        const QJsonObject dims = kimbim::PythonEngine::instance().callJson("properties_multi",
+            {QStringLiteral("[\"%1\"]").arg(walls.first())}, nullptr).object().value("psets").toObject()
+            .value("Dimensions").toObject();
+        const double length = dims.value("Length").toObject().value("value").toDouble();
+        QVERIFY2(length > 10.0 && length < M_PI * 4 + 0.5, qPrintable(QString::number(length))); // an arc, not the 8 m chord
+        const auto pts = kimbim::WallTool::arcPoints({1, 0}, {0, 1}, {-1, 0}, 4);
+        QCOMPARE(pts.size(), 5);
+        QVERIFY(std::hypot(pts[2].x(), pts[2].y() - 1.0) < 1e-9);
+        QVERIFY(w.close());
+    }
+
+    // D98: Trace & Reference: the level below's plan under the active level's.
+    void traceTheLevelBelow()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        auto& py = kimbim::PythonEngine::instance();
+        const QString l1 = w.levelsBar()->activeStorey();
+        w.setTool(kimbim::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({6, 0});
+        w.wallTool()->finish();
+        w.setTool(kimbim::MainWindow::Tool::None);
+        QVERIFY(w.addLevel(QStringLiteral("Upper"), 30.0));
+        QString l2;
+        for (const auto& v : py.callJson("storeys", {}, nullptr).object().value("storeys").toArray())
+            if (v.toObject().value("name").toString() == QLatin1String("Upper"))
+                l2 = v.toObject().value("guid").toString();
+        QVERIFY(!l2.isEmpty());
+        w.levelsBar()->setActive(l1);
+        QVERIFY(w.levelsBar()->step(1)); // the next level up (the top one may be another)
+        QVERIFY(w.levelsBar()->activeStorey() != l1);
+        w.levelsBar()->setActive(l1);
+        w.findChild<QAction*>(QStringLiteral("actionLevelUp"))->trigger(); // D98: Ctrl+Up
+        const QString above = w.levelsBar()->activeStorey();
+        QVERIFY(above != l1);
+        w.findChild<QAction*>(QStringLiteral("actionLevelDown"))->trigger();
+        QCOMPARE(w.levelsBar()->activeStorey(), l1);
+        QVERIFY(!w.levelsBar()->step(-1)); // the bottom
+        QCOMPARE(w.traceSegments(l2), 0); // off by default
+        w.setTraceMode(QStringLiteral("below"));
+        QVERIFY(w.findChild<QAction*>(QStringLiteral("actionTraceBelow"))->isChecked());
+        QVERIFY(w.traceSegments(l2) > 0);
+        w.levelsBar()->setActive(l2); // drawing on the upper level snaps to the traced wall's ends
+        QVERIFY(w.wallTool()->snapper().underlays());
+        QPointF end;
+        QVERIFY(w.wallTool()->snapper().underlays()->endpoint(QPointF(6.01, 0.01), 0.3, &end));
+        w.levelsBar()->setActive(l1);
+        QCOMPARE(w.traceSegments(l1), 0); // nothing below the lowest level
+        w.setTraceMode(QString());
+        QCOMPARE(w.traceSegments(l2), 0);
+        QVERIFY(w.close());
+    }
+
+    // D97: Fit to walls: an object dropped by a wall stands against its face, its back to the wall.
+    void objectsFitToWalls()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        w.setTool(kimbim::MainWindow::Tool::Wall); // drawn by its outside face: the body from y = 0 to 0.3
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({5, 0});
+        w.wallTool()->finish();
+        w.setTool(kimbim::MainWindow::Tool::Object);
+        auto same = [](QPointF a, QPointF b) { return std::hypot(a.x() - b.x(), a.y() - b.y()) < 1e-6; };
+        QCOMPARE(w.wallTool()->snapper().walls().size(), 1);
+        const kimbim::SnapWall sw = w.wallTool()->snapper().walls().first();
+        const double face = sw.centre + sw.thickness / 2; // the inside face (the outside one is at y = 0)
+        QVERIFY(std::abs(sw.centre - sw.thickness / 2) < 1e-9);
+        auto inside = w.fitObjectToWall(QPointF(2.5, face + 0.4), 1.0, 0.6);
+        QVERIFY(inside);
+        QVERIFY(same(inside->origin, QPointF(3.0, face + 0.6)));
+        QVERIFY(std::abs(std::abs(inside->angle) - 180.0) < 1e-6);
+        auto outside = w.fitObjectToWall(QPointF(2.5, -0.4), 1.0, 0.6); // by the face at y = 0
+        QVERIFY(outside);
+        QVERIFY(same(outside->origin, QPointF(2.0, -0.6)));
+        QVERIFY(std::abs(outside->angle) < 1e-6);
+        QVERIFY(!w.fitObjectToWall(QPointF(2.5, 3.0), 1.0, 0.6)); // too far from any wall
+        w.findChild<QCheckBox*>(QStringLiteral("objectFitToWalls"))->setChecked(false);
+        QVERIFY(!w.fitObjectToWall(QPointF(2.5, 0.8), 1.0, 0.6));
+        w.setTool(kimbim::MainWindow::Tool::None);
+        QVERIFY(w.close());
+    }
+
+    // D96: Archicad's 3D styles: white model and sun shadows, kept in saved views.
+    void whiteModelAndShadows()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        auto* white = w.findChild<QAction*>(QStringLiteral("actionWhiteModel"));
+        auto* shadows = w.findChild<QAction*>(QStringLiteral("actionShadows"));
+        QVERIFY(white && shadows);
+        white->setChecked(true);
+        shadows->setChecked(true);
+        QVERIFY(w.viewport()->whiteModel());
+        QVERIFY(w.viewport()->shadows());
+        auto* lines = w.findChild<QAction*>(QStringLiteral("actionLinesOnly"));
+        lines->setChecked(true); // lines only wins over the white model
+        QVERIFY(w.viewport()->linesOnly() && w.viewport()->whiteModel());
+        lines->setChecked(false);
+        white->setChecked(false);
+        shadows->setChecked(false);
+        QVERIFY(!w.viewport()->whiteModel() && !w.viewport()->shadows());
+        QVERIFY(w.close());
+    }
+
+    // D98: Fillet/Chamfer on a slab's corners from the window.
+    void filletSlabCorners()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        auto& py = kimbim::PythonEngine::instance();
+        const QString floor = py.callJson("slab_types", {}, nullptr).object().value("types").toArray().first()
+            .toObject().value("guid").toString();
+        const QJsonObject slab = py.callJson("create_slab", {w.levelsBar()->activeStorey(), floor,
+            QStringLiteral("[[0,0],[4,0],[4,4],[0,4]]"), QStringLiteral("0")}, nullptr).object();
+        QVERIFY(slab.value("ok").toBool());
+        w.setSelection({slab.value("guid").toString()});
+        QVERIFY(w.filletSelection(0.5, QStringLiteral("chamfer")));
+        QCOMPARE(py.callJson("slab_outline", {slab.value("guid").toString()}, nullptr).object()
+            .value("points").toArray().size(), 8);
+        QVERIFY(!w.filletSelection(0.5, QStringLiteral("nope")));
+        QVERIFY(w.close());
+    }
+
+    // D98: special snap points reach the drawing tools' snappers.
+    void specialSnapPointsReachTheTools()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        w.setSpecialSnapPoints(3, 0.5);
+        QCOMPARE(w.wallTool()->snapper().divisions(), 3);
+        QCOMPARE(w.wallTool()->snapper().specialDistance(), 0.5);
+        w.setSpecialSnapPoints(2, 0.0);
+        QCOMPARE(w.wallTool()->snapper().divisions(), 0);
+        QVERIFY(w.close());
+    }
+
+    // D97: pick up one wall's settings and inject them into another (Archicad's eyedropper and syringe).
+    void pickUpAndInject()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        w.setTool(kimbim::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({5, 0});
+        w.wallTool()->finish();
+        w.wallTool()->click({0, 3});
+        w.wallTool()->click({5, 3});
+        w.wallTool()->finish();
+        w.setTool(kimbim::MainWindow::Tool::None);
+        const QStringList walls = w.viewport()->guids();
+        QCOMPARE(walls.size(), 2);
+        QVERIFY(!w.injectSettings()); // nothing picked up yet
+        w.setSelection({walls[0]});
+        QVERIFY(w.pickUpSettings());
+        w.setSelection({walls[1]});
+        QVERIFY(w.injectSettings());
+        QVERIFY(w.close());
+    }
+
+    // D97: a closed shape saved as a wall profile (Archicad's Profile Manager) lands in the project settings.
+    void wallProfilesFromShapes()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        const QJsonObject d = kimbim::PythonEngine::instance().callJson("add_drafting",
+            {w.levelsBar()->activeStorey(), QStringLiteral("rectangle"), QStringLiteral("[[0,0],[0.3,2.5]]"), QString()}, nullptr).object();
+        QVERIFY(d.value("ok").toBool());
+        QVERIFY(w.saveWallProfile(d.value("guid").toString(), QStringLiteral("Parapet")));
+        QVERIFY(w.projectSettings().value("wall_profiles").toObject().contains(QStringLiteral("Parapet")));
+        QVERIFY(!w.saveWallProfile(d.value("guid").toString(), QString()));
+        QVERIFY(w.close());
+    }
+
+    // D98: Archicad's Grid System adds numbered and lettered axes at once, snappable, one undo step.
+    void gridSystemAddsAxesInOneStep()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        QVERIFY(w.addGridSystem(QPointF(0, 0), 0.0, QJsonArray{4, 4}, QJsonArray{3}, 1.0));
+        QCOMPARE(w.wallTool()->snapper().gridLines().size(), 5);
+        QVERIFY(!w.addGridSystem(QPointF(0, 0), 0.0, QJsonArray{-1}, QJsonArray{}, 1.0));
+        action(w, "actionUndo")->trigger();
+        QCOMPARE(w.wallTool()->snapper().gridLines().size(), 0);
+        QVERIFY(w.close());
+    }
+
+    // D98: worksheets: a 2D tab of their own, listed after the levels, with no building markers.
+    void worksheetsOpenAsTheirOwnTab()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        kimbim::Viewport* level = w.openPlanTab(w.levelsBar()->activeStorey());
+        QVERIFY(level->markerCount() > 0); // the template's elevation markers
+        QVERIFY(w.createWorksheet(QStringLiteral("Details")));
+        QVERIFY(w.levelsBar()->activeIsWorksheet());
+        kimbim::Viewport* sheet = w.viewport();
+        QVERIFY(sheet != level && sheet->isPlanView());
+        QCOMPARE(sheet->markerCount(), 0);
+        QVERIFY(!w.createWorksheet(QStringLiteral("Details"))); // unique names
+        QCOMPARE(w.levelsBar()->activeName(), QString("Details"));
+        const QString guid = w.levelsBar()->activeStorey();
+        QVERIFY(w.worksheetCommand("rename_worksheet", {guid, QStringLiteral("Window details")}));
+        QCOMPARE(w.levelsBar()->activeName(), QString("Window details"));
+        QVERIFY(w.worksheetCommand("delete_worksheet", {guid}));
+        QVERIFY(!w.levelsBar()->activeIsWorksheet());
+        QVERIFY(w.close());
+    }
+
+    // D98: a picture on a sheet (Archicad's Figure on a layout): placed, listed, removable.
+    void picturesOnSheets()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        const QString number = w.addSheet(QStringLiteral("A3"), QStringLiteral("Cover"));
+        QVERIFY(!number.isEmpty());
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("logo.png"));
+        QImage logo(40, 20, QImage::Format_RGB32);
+        logo.fill(QColor(30, 90, 160));
+        QVERIFY(logo.save(path));
+        QVERIFY(w.placeSheetImage(number, path));
+        QVERIFY(!w.placeSheetImage(number, dir.filePath(QStringLiteral("missing.png"))));
+        QVERIFY(w.createWorksheet(QStringLiteral("Renders"))); // D98: a figure on a worksheet
+        QVERIFY(w.placeFigure(path, 3.0, QPointF(1, 1)));
+        QVERIFY(!w.placeFigure(path, 0.0, QPointF(1, 1)));
+        const QJsonObject r = kimbim::PythonEngine::instance().callJson("sheets", {}, nullptr).object();
+        int images = 0;
+        for (const auto& sv : r.value("sheets").toArray())
+            for (const auto& sym : sv.toObject().value("symbols").toArray())
+                images += sym.toObject().value("kind").toString() == QLatin1String("image");
+        QCOMPARE(images, 1);
+        // D98: dragging the picture's corner resizes it (proportions kept)
+        kimbim::DrawingView* view = w.drawingView(QStringLiteral("sheet:") + number);
+        QVERIFY(view);
+        kimbim::DrawingView::Placed pic;
+        for (const auto& pl : view->placed())
+            if (pl.kind == QLatin1String("image"))
+                pic = pl;
+        QVERIFY(pic.rect.width() > 0);
+        const QPointF offset = -view->toPaper(QPointF(0, 0)) * view->zoom();
+        const QPointF corner = offset + pic.rect.bottomRight() * view->zoom();
+        const QPointF to = offset + QPointF(pic.rect.left() + pic.rect.width() * 2, pic.rect.bottom()) * view->zoom();
+        QTest::mousePress(view, Qt::LeftButton, {}, corner.toPoint());
+        QMouseEvent move(QEvent::MouseMove, to, view->mapToGlobal(to), Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(view, &move);
+        QTest::mouseRelease(view, Qt::LeftButton, {}, to.toPoint());
+        double width = 0;
+        for (const auto& sv : kimbim::PythonEngine::instance().callJson("sheets", {}, nullptr).object().value("sheets").toArray())
+            for (const auto& sym : sv.toObject().value("symbols").toArray())
+                if (sym.toObject().value("kind").toString() == QLatin1String("image"))
+                    width = sym.toObject().value("w").toDouble();
+        QVERIFY2(std::abs(width - pic.rect.width() * 2) < 1.0, qPrintable(QString::number(width)));
+        QVERIFY(w.close());
     }
 
     // D71: plan tabs per level, views of the one loaded model.
@@ -1348,11 +1664,13 @@ private slots:
         w.setTool(kimbim::MainWindow::Tool::None);
         const QString wall = w.viewport()->guids().first();
         w.setSelection({wall});
-        w.dragMoveTo(QPointF(2.5, 0.0), QPointF(2.52, -1.004), 0.05, Qt::NoModifier); // preview only
-        QVERIFY(w.dragFinished(QPointF(2.5, 0.0), QPointF(2.52, -1.004), 0.05, Qt::NoModifier));
         double x0, y0, z0, x1, y1, z1;
         w.viewport()->boundsOf({wall}).Get(x0, y0, z0, x1, y1, z1);
-        QVERIFY(std::abs((y0 + y1) / 2 - (-1.0)) < 0.01); // moved straight down 1 m (90 degree snap)
+        const double before = (y0 + y1) / 2; // D97: the body lies beside the drawn line (its reference line)
+        w.dragMoveTo(QPointF(2.5, 0.0), QPointF(2.52, -1.004), 0.05, Qt::NoModifier); // preview only
+        QVERIFY(w.dragFinished(QPointF(2.5, 0.0), QPointF(2.52, -1.004), 0.05, Qt::NoModifier));
+        w.viewport()->boundsOf({wall}).Get(x0, y0, z0, x1, y1, z1);
+        QVERIFY(std::abs((y0 + y1) / 2 - (before - 1.0)) < 0.01); // moved straight down 1 m (90 degree snap)
         QVERIFY(std::abs(x0 - (-0.15)) < 0.02 || std::abs(x0) < 0.02);
         QVERIFY(!w.dragFinished(QPointF(1, 1), QPointF(1, 1), 0.05, Qt::NoModifier)); // no movement
         QVERIFY(w.close());

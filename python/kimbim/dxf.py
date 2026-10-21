@@ -476,6 +476,17 @@ class Writer:
                 self.path(chain(loose), {**ctx, "fill": None})
             self.map = saved
         elif tag == "path":
+            k = element.get("data-layer")
+            if k is not None and ctx.get("guid") and self.style is not None:  # D96: a composite's layer
+                bands = (getattr(self.style, "resolved", {}) or {}).get("layers", {}).get(ctx["guid"]) or {}
+                i = int(k)
+
+                def at(key):
+                    v = bands.get(key) or []
+                    return v[i] if i < len(v) else None
+
+                ctx = {**ctx, "fill": at("fills") or ctx.get("fill"), "pattern": at("patterns"),
+                       "background": at("backgrounds")}
             self.path(parse_path(element.get("d", "")), ctx)
         elif tag == "rect":
             x, y = float(element.get("x", 0)), float(element.get("y", 0))
@@ -537,13 +548,31 @@ class Writer:
             loops = [m for m, closed in mapped if closed and len(m) >= 3]
             if loops:
                 hatch_attribs = {"layer": self.doc.layer(ctx["layer"] + "-PATT" if self.poche else ctx["layer"])}
-                hatch = self.target.add_hatch(color=aci(ctx["fill"]), dxfattribs=hatch_attribs)
-                hatch.set_solid_fill(color=aci(ctx["fill"]), rgb=_rgb(ctx["fill"]) if aci(ctx["fill"]) != 7 or
-                                     max(_rgb(ctx["fill"])) >= 24 else None)
-                hatch.dxf.hatch_style = 0  # odd parity: holes stay open
-                for loop in loops:
-                    hatch.paths.add_polyline_path(loop, is_closed=True)
-                self.count += 1
+                from . import drafting
+
+                pattern = drafting.patterns().get(ctx.get("pattern") or "") if ctx.get("pattern") else None
+                if pattern and not pattern.get("solid"):  # D96: the material's pattern over its background
+                    if ctx.get("background"):
+                        self._solid_hatch(loops, ctx["background"], hatch_attribs)
+                    definition = _pattern_definition(pattern, self.map.size * PRINT_PATTERN_FACTOR)
+                    if pattern.get("loops"):  # D93's insulation loops: no DXF pattern can say it, so lines
+                        lattribs = _attribs(self.doc, {**ctx, "color": ctx["fill"], "dash": []}, self.ltscale)
+                        for loop in loops:
+                            poly = [(x, y) for x, y, _ in loop]
+                            for x1, y1, x2, y2 in drafting.hatch(poly, pattern, self.map.size * PRINT_PATTERN_FACTOR):
+                                e = self.target.add_line((x1, y1), (x2, y2), dxfattribs={**lattribs, **hatch_attribs})
+                                _colour(e, ctx["fill"])
+                                self.count += 1
+                    if definition:
+                        hatch = self.target.add_hatch(color=aci(ctx["fill"]), dxfattribs=hatch_attribs)
+                        hatch.set_pattern_fill(layer_name(ctx["pattern"]).upper()[:31] or "KimBim", color=aci(ctx["fill"]),
+                                               definition=definition, scale=1.0)
+                        hatch.dxf.hatch_style = 0
+                        for loop in loops:
+                            hatch.paths.add_polyline_path(loop, is_closed=True)
+                        self.count += 1
+                else:
+                    self._solid_hatch(loops, ctx["fill"], hatch_attribs)
         for m, closed in mapped:
             if len(m) == 2 and not closed and m[0][2] == 0.0:
                 e = self.target.add_line(m[0][:2], m[1][:2], dxfattribs=attribs)
@@ -551,6 +580,14 @@ class Writer:
                 e = self.target.add_lwpolyline(m, format="xyb", close=closed, dxfattribs=attribs)
             _colour(e, ctx["color"])
             self.count += 1
+
+    def _solid_hatch(self, loops, colour, attribs):
+        hatch = self.target.add_hatch(color=aci(colour), dxfattribs=attribs)
+        hatch.set_solid_fill(color=aci(colour), rgb=_rgb(colour) if aci(colour) != 7 or max(_rgb(colour)) >= 24 else None)
+        hatch.dxf.hatch_style = 0  # odd parity: holes stay open
+        for loop in loops:
+            hatch.paths.add_polyline_path(loop, is_closed=True)
+        self.count += 1
 
     def drafting_fill(self, group, ctx):
         """A drafting fill (D84): a solid HATCH for its background pen or a solid pattern, and a
@@ -585,18 +622,8 @@ class Writer:
             hatch.set_solid_fill(color=aci(colour), rgb=_rgb(colour))
             hatch.paths.add_polyline_path(loop, is_closed=True)
             self.count += 1
-        families = [] if pattern.get("solid") else pattern.get("lines", []) or []
         k = factor if factor is not None else self.map.size  # model units per pattern mm
-        definition = []
-        for fam in families:
-            a = math.radians(float(fam.get("angle", 0)))
-            shift, spacing = float(fam.get("shift", 0)) * k, float(fam.get("spacing", 0)) * k
-            ox, oy = (float(v) * k for v in (fam.get("origin") or (0, 0)))
-            dash = []
-            for i, v in enumerate(fam.get("dash") or []):
-                dash.append(float(v) * k if i % 2 == 0 else -float(v) * k)  # DXF: gaps are negative
-            definition.append([math.degrees(a), (ox, oy),
-                               (shift * math.cos(a) - spacing * math.sin(a), shift * math.sin(a) + spacing * math.cos(a)), dash])
+        definition = [] if pattern.get("solid") else _pattern_definition(pattern, k)
         if definition:
             hatch = self.target.add_hatch(color=aci(ctx["color"]), dxfattribs=layer)
             hatch.set_pattern_fill(layer_name(name).upper()[:31] or "KimBim", color=aci(ctx["color"]),
@@ -645,6 +672,24 @@ class Writer:
 
 
 # ---------------------------------------------------------------- styling a drawing
+
+PRINT_PATTERN_FACTOR = 0.25  # D96: element cut patterns print at 1:25 of the pattern (graphics.style_svg's)
+
+
+def _pattern_definition(pattern: dict, k: float) -> list:
+    """An ezdxf pattern definition from a fill pattern's line families (mm on paper; `k` units per mm)."""
+    definition = []
+    for fam in pattern.get("lines", []) or []:
+        a = math.radians(float(fam.get("angle", 0)))
+        shift, spacing = float(fam.get("shift", 0)) * k, float(fam.get("spacing", 0)) * k
+        ox, oy = (float(v) * k for v in (fam.get("origin") or (0, 0)))
+        dash = []
+        for i, v in enumerate(fam.get("dash") or []):
+            dash.append(float(v) * k if i % 2 == 0 else -float(v) * k)  # DXF: gaps are negative
+        definition.append([math.degrees(a), (ox, oy),
+                           (shift * math.cos(a) - spacing * math.sin(a), shift * math.sin(a) + spacing * math.cos(a)), dash])
+    return definition
+
 
 class Styler:
     """Element groups of a drawing's SVG -> layer, pen, line type and fill (the purpose's, D73)."""
@@ -724,7 +769,8 @@ class Styler:
                     line, fill = st["cut"], st["fill"]
                 layer = self.layer_of(guid, pen=line.get("pen"))
                 return {**ctx, "layer": layer, "color": line["color"], "weight": line["weight"],
-                        "dash": line["dash"], "fill": fill}
+                        "dash": line["dash"], "fill": fill, "guid": guid,
+                        "pattern": st.get("pattern") if fill else None, "background": st.get("background")}
             from . import graphics
 
             fb = graphics.FALLBACK_PEN

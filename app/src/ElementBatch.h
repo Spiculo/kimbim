@@ -60,7 +60,7 @@ class ElementBatch : public AIS_InteractiveObject {
 public:
     // Display modes: shaded faces with border lines; element ids as flat colours (visibility
     // queries, never shown); lines only (hidden-line: faces in the background colour, black lines).
-    enum Mode { Shaded = 0, Ids = 1, LinesOnly = 2 };
+    enum Mode { Shaded = 0, Ids = 1, LinesOnly = 2, White = 3 }; // White: D96, Archicad's white model
 
     explicit ElementBatch(MeshChunk chunk);
 
@@ -79,6 +79,7 @@ public:
     // A triangulated face for one element, for OCCT's polygon hidden-line removal (section drawings).
     static TopoDS_Shape meshFace(const MeshChunk& chunk, int element);
     static void setBackground(const Quantity_Color& color) { s_background = color; }
+    static Quantity_Color background() { return s_background; }
     // Previews skip border lines (computing them on every mouse move made drawing lag).
     void setShowEdges(bool show) { m_showEdges = show; }
 
@@ -132,6 +133,16 @@ public:
     // The colour the element is shaded with: Compare's override, then the surface override, then the
     // calm palette by IFC class.
     Quantity_Color surfaceColor(int i) const;
+    // D96: one triangle's colour and transparency (t is the chunk-wide triangle index): an element
+    // override (Compare, a graphics rule) colours every face; otherwise the face's own surface (its
+    // material), else the class colour.
+    Quantity_Color triangleColor(int i, uint32_t t) const;
+    double triangleTransparency(int i, uint32_t t) const;
+    // D96: the palette index of triangle t's textured surface, or -1 (none, or an override colours it).
+    int triangleTexture(int i, uint32_t t) const;
+    // Box-mapped texture coordinates of a point on a face with this normal (Archicad's default mapping):
+    // the two world axes the face is most parallel to, in texture repeats.
+    static std::pair<double, double> boxTexel(const gp_Pnt& p, const gp_Dir& normal, double w, double h);
     // The visible elements' border lines grouped by style (one OCCT group each); `fallback` colours the
     // unstyled ones (1 px, solid).
     struct LineBucket {
@@ -159,13 +170,16 @@ public:
     // Flat-shaded triangles of one element (used for highlights).
     Handle(Graphic3d_ArrayOfTriangles) elementTriangles(int i) const;
 
-    bool AcceptDisplayMode(const int mode) const override { return mode >= Shaded && mode <= LinesOnly; }
+    bool AcceptDisplayMode(const int mode) const override { return mode >= Shaded && mode <= White; }
     void Compute(const Handle(PrsMgr_PresentationManager)& pm, const Handle(Prs3d_Presentation)& prs,
         const int mode) override;
     void ComputeSelection(const Handle(SelectMgr_Selection)& selection, const int mode) override;
 
 private:
-    void addElement(Graphic3d_ArrayOfTriangles& out, int i, bool withColors, const Quantity_Color* fixed = nullptr) const;
+    // Appends element i's triangles; with `onlyAlpha` only those whose transparency is that value.
+    void addElement(Graphic3d_ArrayOfTriangles& out, int i, bool withColors, const Quantity_Color* fixed = nullptr,
+        std::optional<double> onlyAlpha = std::nullopt, bool skipTextured = false) const;
+    void addTexturedGroup(const Handle(Prs3d_Presentation)& prs, double alpha, int paletteIndex, int tris); // D96
 
     MeshChunk m_chunk;
     QHash<QString, int> m_index;

@@ -5,6 +5,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 
+#include <algorithm>
 #include <cstring>
 
 #include "PythonEngine.h"
@@ -32,7 +33,7 @@ std::vector<uint32_t> toOffsets(const QJsonArray& a)
 } // namespace
 
 std::optional<MeshChunk> MeshChunk::parse(const QByteArray& metaJson, const QByteArray& verts,
-    const QByteArray& tris, QString* error)
+    const QByteArray& tris, QString* error, const QByteArray& colors)
 {
     QJsonParseError pe;
     const QJsonObject meta = QJsonDocument::fromJson(metaJson, &pe).object();
@@ -79,6 +80,35 @@ std::optional<MeshChunk> MeshChunk::parse(const QByteArray& metaJson, const QByt
             return std::nullopt;
         }
     }
+    for (const auto& row : meta.value("palette").toArray()) {
+        const QJsonArray a = row.toArray();
+        if (a.size() != 4 && a.size() != 7) {
+            fail(error, QStringLiteral("mesh chunk: a palette row is not [r, g, b, transparency(, texture, w, h)]"));
+            return std::nullopt;
+        }
+        Surface s{float(a[0].toDouble()), float(a[1].toDouble()), float(a[2].toDouble()),
+            float(std::clamp(a[3].toDouble(), 0.0, 1.0))};
+        if (a.size() == 7) { // D96: a textured surface
+            s.texture = a[4].toString();
+            s.texW = float(std::max(a[5].toDouble(1.0), 1e-3));
+            s.texH = float(std::max(a[6].toDouble(1.0), 1e-3));
+        }
+        c.palette.push_back(s);
+    }
+    if (!colors.isEmpty()) {
+        if (size_t(colors.size()) != size_t(nt) * sizeof(uint16_t)) {
+            fail(error, QStringLiteral("mesh chunk: %1 face colours for %2 triangles").arg(colors.size() / 2).arg(nt));
+            return std::nullopt;
+        }
+        c.faceColors.resize(nt);
+        std::memcpy(c.faceColors.data(), colors.constData(), size_t(colors.size()));
+        for (uint16_t k : c.faceColors) {
+            if (k != kNoColor && k >= c.palette.size()) {
+                fail(error, QStringLiteral("mesh chunk: face colour %1 out of range (%2 colours)").arg(k).arg(c.palette.size()));
+                return std::nullopt;
+            }
+        }
+    }
     return c;
 }
 
@@ -90,9 +120,9 @@ bool fetchElementMeshes(PythonEngine& py, const QStringList& guids, MeshChunk* o
         return false;
     if (*none)
         return true;
-    if (parts.size() != 3)
-        return fail(error, QStringLiteral("mesh_elements returned %1 parts, expected 3").arg(parts.size()));
-    auto chunk = MeshChunk::parse(parts[0], parts[1], parts[2], error);
+    if (parts.size() != 3 && parts.size() != 4)
+        return fail(error, QStringLiteral("mesh_elements returned %1 parts, expected 3 or 4").arg(parts.size()));
+    auto chunk = MeshChunk::parse(parts[0], parts[1], parts[2], error, parts.size() == 4 ? parts[3] : QByteArray());
     if (!chunk)
         return false;
     *out = std::move(*chunk);
@@ -110,9 +140,9 @@ bool fetchMeshChunk(PythonEngine& py, int maxElements, MeshChunk* out, bool* don
         *done = true;
         return true;
     }
-    if (parts.size() != 3)
-        return fail(error, QStringLiteral("next_mesh_chunk returned %1 parts, expected 3").arg(parts.size()));
-    auto chunk = MeshChunk::parse(parts[0], parts[1], parts[2], error);
+    if (parts.size() != 3 && parts.size() != 4)
+        return fail(error, QStringLiteral("next_mesh_chunk returned %1 parts, expected 3 or 4").arg(parts.size()));
+    auto chunk = MeshChunk::parse(parts[0], parts[1], parts[2], error, parts.size() == 4 ? parts[3] : QByteArray());
     if (!chunk)
         return false;
     *out = std::move(*chunk);

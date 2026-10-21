@@ -101,6 +101,7 @@ void PropertiesPanel::clear()
     m_tree->clear(); // deletes the status drop-down (an item widget) too
     m_name = nullptr;
     m_status = nullptr;
+    m_material = nullptr;
     m_building = false;
 }
 
@@ -158,6 +159,30 @@ void PropertiesPanel::showMulti(const QJsonObject& merged)
         });
         m_tree->setItemWidget(item, 1, m_status);
     }
+    // D96: the element's composite (walls, slabs) or building material, changed from a list.
+    const QJsonObject material = merged.value("material").toObject();
+    if (!material.isEmpty()) {
+        const QString kind = material.value("kind").toString();
+        auto* item = new QTreeWidgetItem(element, {kind == QLatin1String("composite") ? tr("Composite") : tr("Building material"), QString()});
+        m_material = new QComboBox(m_tree);
+        m_material->setObjectName(QStringLiteral("elementMaterial"));
+        if (material.value("varies").toBool())
+            m_material->addItem(variesText(), QString());
+        else if (material.value("value").toString().isEmpty())
+            m_material->addItem(tr("(none)"), QString());
+        for (const auto& c : material.value("choices").toArray())
+            m_material->addItem(c.toString(), c.toString());
+        m_material->setCurrentIndex(std::max(0, m_material->findData(material.value("value").toString())));
+        m_material->setEnabled(material.value("editable").toBool());
+        if (!m_material->isEnabled())
+            m_material->setToolTip(tr("Set by the element's profile or layers: edit them in Graphics > Composites"));
+        connect(m_material, &QComboBox::currentIndexChanged, this, [this, kind](int i) {
+            const QString name = m_material ? m_material->itemData(i).toString() : QString();
+            if (!m_building && !name.isEmpty())
+                emit materialEdited(kind, name);
+        });
+        m_tree->setItemWidget(item, 1, m_material);
+    }
     element->setExpanded(true);
 
     const QJsonObject psets = merged.value("psets").toObject();
@@ -176,6 +201,25 @@ void PropertiesPanel::showMulti(const QJsonObject& merged)
                     ? tr("Metres, measured from the model; editing it changes the element")
                     : prop.value("ifc_type").toString());
             const bool varies = prop.value("varies").toBool();
+            // D97: a value picked from a list (reference line, surfaces): a drop-down in the cell.
+            if (kind != ReadOnly && prop.value("choices").isArray()) {
+                auto* combo = new QComboBox(m_tree);
+                combo->setObjectName(QStringLiteral("choice:%1/%2").arg(p.key(), v.key()));
+                if (varies)
+                    combo->addItem(variesText(), QString());
+                for (const auto& c : prop.value("choices").toArray())
+                    combo->addItem(c.toString(), c.toString());
+                combo->setCurrentIndex(std::max(0, combo->findData(prop.value("value").toString())));
+                const QString pset = p.key(), name = v.key();
+                connect(combo, &QComboBox::currentIndexChanged, this, [this, combo, pset, name](int i) {
+                    const QString value = combo->itemData(i).toString();
+                    if (!m_building && !value.isEmpty())
+                        emit propertyEdited(pset, name, QJsonValue(value));
+                });
+                item->setFlags(item->flags() & ~Qt::ItemIsEditable);
+                m_tree->setItemWidget(item, 1, combo);
+                continue;
+            }
             if (kind == Bool) {
                 item->setFlags((item->flags() | Qt::ItemIsUserCheckable) & ~Qt::ItemIsEditable);
                 item->setCheckState(1, varies ? Qt::PartiallyChecked

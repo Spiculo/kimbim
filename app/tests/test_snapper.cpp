@@ -74,6 +74,60 @@ private slots:
         QVERIFY(snap.wallGuid.isEmpty());
     }
 
+    // D98: with grid snap on, free points land on the construction grid's nodes, also when it is turned.
+    void gridSnapUsesTheConstructionGrid()
+    {
+        Snapper s;
+        s.setSnapGrid(QPointF(0, 0), 0.0, 0.5);
+        QVERIFY(near(s.snap(QPointF(1.3, 0.8), 0.01).point, QPointF(1.5, 1.0)));
+        const QPointF from(0, 0); // no 15 degree steps: the node nearest the cursor
+        const Snap angled = s.snap(QPointF(2.2, 0.31), 0.01, &from);
+        QCOMPARE(angled.kind, Snap::Grid);
+        QVERIFY(near(angled.point, QPointF(2.0, 0.5)));
+        s.setSnapGrid(QPointF(1, 1), M_PI / 4, 1.0);
+        const QPointF node = QPointF(1, 1) + QPointF(std::cos(M_PI / 4), std::sin(M_PI / 4)) * 2.0;
+        QVERIFY(near(s.snap(node + QPointF(0.1, -0.05), 0.01).point, node, 1e-9));
+        s.setSnapGrid(QPointF(0, 0), 0.0, 0.0); // off: the 10 mm grid again
+        QVERIFY(near(s.snap(QPointF(1.234, 0.0), 0.001).point, QPointF(1.23, 0.0)));
+        // object snaps still win
+        Snapper w = withWalls();
+        w.setSnapGrid(QPointF(0, 0), 0.0, 1.0);
+        QCOMPARE(w.snap(QPointF(3.98, 0.02), 0.1).kind, Snap::Endpoint);
+    }
+
+    // D97: a wall drawn by a face: its faces are where the body is, not about the axis.
+    void facesOfAWallBesideItsAxis()
+    {
+        Snapper s;
+        s.setWalls(Snapper::parse(QJsonDocument::fromJson(
+            R"({"walls":[{"guid":"A","x1":0,"y1":0,"x2":4,"y2":0,"thickness":0.3,"centre":0.15}]})").object()));
+        s.setFaceSnapping(true);
+        const Snap corner = s.snap(QPointF(4.02, 0.31), 0.05);
+        QVERIFY(near(corner.point, QPointF(4.0, 0.3)) || near(corner.point, QPointF(4.0, 0.0)));
+        const Snap face = s.snap(QPointF(2.03, 0.32), 0.05);
+        QCOMPARE(face.kind, Snap::OnFace);
+        QVERIFY(near(face.point, QPointF(2.03, 0.3), 1e-9));
+    }
+
+    // D98: Archicad's special snap points: divisions of a wall and a distance from its ends.
+    void specialSnapPoints()
+    {
+        Snapper s = withWalls(); // A: (0,0)-(4,0)
+        QVERIFY(s.snap(QPointF(1.0, 0.05), 0.1).kind != Snap::Division); // off by default
+        s.setSpecialPoints(4, 0.0);
+        Snap d = s.snap(QPointF(1.03, 0.05), 0.1);
+        QCOMPARE(d.kind, Snap::Division);
+        QVERIFY(near(d.point, QPointF(1.0, 0.0)));
+        QCOMPARE(d.wallGuid, QStringLiteral("A"));
+        QCOMPARE(s.snap(QPointF(2.02, 0.0), 0.1).kind, Snap::Midpoint); // the middle stays a midpoint
+        s.setSpecialPoints(0, 0.6);
+        d = s.snap(QPointF(3.38, 0.02), 0.1);
+        QCOMPARE(d.kind, Snap::Division);
+        QVERIFY(near(d.point, QPointF(3.4, 0.0)));
+        QVERIFY(near(s.snap(QPointF(0.62, 0.0), 0.1).point, QPointF(0.6, 0.0)));
+        QCOMPARE(s.snap(QPointF(3.98, 0.02), 0.1).kind, Snap::Endpoint); // ends still win
+    }
+
     void anglesSnapTo15DegreesAndOrthoForcesRightAngles()
     {
         Snapper s;

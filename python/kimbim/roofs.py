@@ -32,6 +32,7 @@ import numpy as np
 from . import app_bridge as B
 from . import authoring as A
 from . import layers
+from . import materials
 from . import renovation
 
 PSET = "KIMBIM_Roof"
@@ -285,6 +286,7 @@ def create_roof(storey_guid: str, points_json: str, kind: str, pitch, thickness,
         ifcopenshell.api.pset.edit_pset(f, pset=pset, properties={
             "Kind": kind, "Points": json.dumps(local), "Slopes": json.dumps(slopes), "Thickness": thickness})
         _body(roof, local, slopes, thickness)
+        materials.give_roof_material(roof)  # D96
         layers.assign_active(roof)
         renovation.stamp_new(roof)
         made["guid"] = roof.GlobalId
