@@ -7,6 +7,7 @@
 #include "Scene.h"
 #include "Icons.h"
 #include "StatusStrip.h"
+#include "LibraryPanel.h"
 #include "ToolOptionsBar.h"
 #include "ToolPalette.h"
 #include "ViewCube.h"
@@ -119,6 +120,29 @@
 #include "DraftTool.h"
 
 namespace kimbim {
+
+namespace {
+
+// D97: the tools whose settings can be favourites, by a name kept in the project.
+QString favouriteTool(MainWindow::Tool tool)
+{
+    using T = MainWindow::Tool;
+    switch (tool) {
+    case T::Wall: return QStringLiteral("wall");
+    case T::Slab: return QStringLiteral("slab");
+    case T::Door: return QStringLiteral("door");
+    case T::Window: return QStringLiteral("window");
+    case T::Column: return QStringLiteral("column");
+    case T::Beam: return QStringLiteral("beam");
+    case T::Roof: return QStringLiteral("roof");
+    case T::Stair: return QStringLiteral("stair");
+    case T::Railing: return QStringLiteral("railing");
+    case T::Object: return QStringLiteral("object");
+    default: return QString();
+    }
+}
+
+} // namespace
 
 void readDrafting(const QJsonObject& o, Viewport::Annotation* a); // D84, DraftTools.cpp
 void readStairSymbols(const QJsonObject& data, QVector<Viewport::Annotation>* list); // D88, StairTools.cpp
@@ -2245,6 +2269,36 @@ void MainWindow::buildModelingToolbar()
     for (const QString& k : {QStringLiteral("existing"), QStringLiteral("demolish")})
         connect(unmarkedMenu->addAction(renovationLabel(k)), &QAction::triggered, this, [this, k] { markUnmarked(k); });
 
+    // D97: Archicad's Favourites: saved settings of the active tool, first in its strip.
+    m_favourites = new QToolButton(bar);
+    m_favourites->setObjectName(QStringLiteral("favouritesButton"));
+    m_favourites->setText(tr("Favourites"));
+    m_favourites->setToolTip(tr("Favourites: apply saved settings of this tool, or save the current ones"));
+    m_favourites->setPopupMode(QToolButton::InstantPopup);
+    auto* favMenu = new QMenu(m_favourites);
+    m_favourites->setMenu(favMenu);
+    connect(favMenu, &QMenu::aboutToShow, this, [this, favMenu] {
+        favMenu->clear();
+        const QStringList names = favouriteNames();
+        for (const QString& name : names)
+            connect(favMenu->addAction(name), &QAction::triggered, this, [this, name] { applyFavourite(name); });
+        if (names.isEmpty())
+            favMenu->addAction(tr("(none for this tool yet)"))->setEnabled(false);
+        favMenu->addSeparator();
+        connect(favMenu->addAction(tr("Save current settings as...")), &QAction::triggered, this, [this] {
+            bool ok = false;
+            const QString name = QInputDialog::getText(this, tr("Favourites"), tr("Name:"), QLineEdit::Normal,
+                QString(), &ok);
+            if (ok && !name.trimmed().isEmpty())
+                saveFavourite(name.trimmed());
+        });
+        if (!names.isEmpty()) {
+            QMenu* remove = favMenu->addMenu(tr("Delete"));
+            for (const QString& name : names)
+                connect(remove->addAction(name), &QAction::triggered, this, [this, name] { deleteFavourite(name); });
+        }
+    });
+    bar->addField(m_favourites);
     m_types = new QComboBox(bar);
     m_types->setObjectName(QStringLiteral("typeCombo"));
     m_types->setToolTip(tr("Type"));
@@ -2977,6 +3031,7 @@ void MainWindow::setTool(Tool tool)
     m_wallGeometry->setVisible(tool == Tool::Wall);
     m_objectGravity->setVisible(tool == Tool::Object);
     m_objectFit->setVisible(tool == Tool::Object);
+    m_favourites->setVisible(!favouriteTool(tool).isEmpty());
     if (tool == Tool::Wall) {
         const int i = m_wallReference->findData(m_settings.value("wall_reference_line").toString(QStringLiteral("Outside face")));
         m_wallReference->setCurrentIndex(std::max(0, i));
@@ -6106,6 +6161,126 @@ bool MainWindow::saveWallProfile(const QString& shapeGuid, const QString& name)
     setWindowModified(isDirty());
     refreshProperties();
     m_status->showMessage(tr("Wall profile %1 saved: choose it in a wall's Properties > Geometry > Profile").arg(name));
+    return true;
+}
+
+
+QJsonObject MainWindow::captureToolSettings() const
+{
+    QJsonObject fields;
+    for (QWidget* w : m_toolOptions->findChildren<QWidget*>()) {
+        const QString name = w->objectName();
+        if (name.isEmpty() || name == QLatin1String("favouritesButton") || !w->isVisibleTo(m_toolOptions))
+            continue;
+        if (auto* combo = qobject_cast<QComboBox*>(w)) {
+            // types by name (their ids are the project's); other choices by their key, else their text
+            const QVariant data = combo->currentData();
+            fields.insert(name, combo == m_types || !data.isValid() || data.typeId() == QMetaType::QJsonObject
+                    ? combo->currentText() : data.toString());
+        } else if (auto* spin = qobject_cast<QDoubleSpinBox*>(w)) {
+            fields.insert(name, spin->value());
+        } else if (auto* ispin = qobject_cast<QSpinBox*>(w)) {
+            fields.insert(name, ispin->value());
+        } else if (auto* check = qobject_cast<QCheckBox*>(w)) {
+            fields.insert(name, check->isChecked());
+        }
+    }
+    QJsonObject out{{"tool", favouriteTool(m_tool)}, {"fields", fields}};
+    if (m_tool == Tool::Object && m_library && !m_library->currentObject().isEmpty())
+        out.insert("object", QJsonObject{{"id", m_library->currentObject()}, {"params", m_library->currentParams()}});
+    return out;
+}
+
+bool MainWindow::applyToolSettings(const QJsonObject& favourite)
+{
+    const QString key = favourite.value("tool").toString();
+    Tool tool = Tool::None;
+    for (Tool t : {Tool::Wall, Tool::Slab, Tool::Door, Tool::Window, Tool::Column, Tool::Beam, Tool::Roof, Tool::Stair,
+             Tool::Railing, Tool::Object})
+        if (favouriteTool(t) == key)
+            tool = t;
+    if (tool == Tool::None)
+        return false;
+    if (tool == Tool::Object) { // the object first: choosing it starts the tool
+        const QJsonObject o = favourite.value("object").toObject();
+        if (!chooseObject(o.value("id").toString(), {}))
+            return false;
+        const QJsonObject params = o.value("params").toObject();
+        for (auto it = params.begin(); it != params.end(); ++it)
+            m_library->setParam(it.key(), it.value());
+    } else if (m_tool != tool) {
+        setTool(tool);
+    }
+    const QJsonObject fields = favourite.value("fields").toObject();
+    for (auto it = fields.begin(); it != fields.end(); ++it) {
+        QWidget* w = m_toolOptions->findChild<QWidget*>(it.key());
+        if (auto* combo = qobject_cast<QComboBox*>(w)) {
+            int i = combo->findData(it.value().toString());
+            if (i < 0)
+                i = combo->findText(it.value().toString());
+            if (i >= 0)
+                combo->setCurrentIndex(i);
+        } else if (auto* spin = qobject_cast<QDoubleSpinBox*>(w)) {
+            spin->setValue(it.value().toDouble());
+        } else if (auto* ispin = qobject_cast<QSpinBox*>(w)) {
+            ispin->setValue(it.value().toInt());
+        } else if (auto* check = qobject_cast<QCheckBox*>(w)) {
+            check->setChecked(it.value().toBool());
+        }
+    }
+    updateToolPreview();
+    return true;
+}
+
+QStringList MainWindow::favouriteNames(bool forThisTool) const
+{
+    QStringList out;
+    const QJsonObject all = m_settings.value("favourites").toObject();
+    for (auto it = all.begin(); it != all.end(); ++it)
+        if (!forThisTool || it.value().toObject().value("tool").toString() == favouriteTool(m_tool))
+            out << it.key();
+    return out;
+}
+
+bool MainWindow::saveFavourite(const QString& name)
+{
+    if (favouriteTool(m_tool).isEmpty() || name.trimmed().isEmpty())
+        return false;
+    QJsonObject all = m_settings.value("favourites").toObject();
+    all.insert(name.trimmed(), captureToolSettings());
+    const QJsonObject r = bridge("set_project_settings", {QString::fromUtf8(QJsonDocument(
+        QJsonObject{{"favourites", all}}).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(r.value("error").toString());
+        return false;
+    }
+    m_settings = r.value("settings").toObject();
+    setWindowModified(isDirty());
+    m_status->showMessage(tr("Favourite %1 saved").arg(name.trimmed()));
+    return true;
+}
+
+bool MainWindow::applyFavourite(const QString& name)
+{
+    const QJsonObject favourite = m_settings.value("favourites").toObject().value(name).toObject();
+    if (favourite.isEmpty() || !applyToolSettings(favourite))
+        return false;
+    m_status->showMessage(tr("Favourite %1").arg(name));
+    return true;
+}
+
+bool MainWindow::deleteFavourite(const QString& name)
+{
+    QJsonObject all = m_settings.value("favourites").toObject();
+    if (!all.contains(name))
+        return false;
+    all.remove(name);
+    const QJsonObject r = bridge("set_project_settings", {QString::fromUtf8(QJsonDocument(
+        QJsonObject{{"favourites", all}}).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool())
+        return false;
+    m_settings = r.value("settings").toObject();
+    setWindowModified(isDirty());
     return true;
 }
 

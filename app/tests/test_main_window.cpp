@@ -53,6 +53,7 @@
 #include "HostTool.h"
 #include "Graphics.h"
 #include "MainWindow.h"
+#include "LibraryPanel.h"
 #include "Snapper.h"
 #include "PropertiesPanel.h"
 #include "PolygonTool.h"
@@ -237,6 +238,45 @@ private slots:
         QCOMPARE(plan->constructionLineCount(), 0);
         snap->setChecked(false);
         show->setChecked(true);
+        QVERIFY(w.close());
+    }
+
+    // D97: Archicad's Favourites: the Wall tool's settings saved by name and applied again.
+    void favourites()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        w.setTool(kimbim::MainWindow::Tool::Wall);
+        auto* height = w.findChild<QDoubleSpinBox*>(QStringLiteral("wallHeight"));
+        auto* reference = w.findChild<QComboBox*>(QStringLiteral("wallReference"));
+        auto* geometry = w.findChild<QComboBox*>(QStringLiteral("wallGeometry"));
+        height->setValue(4.25);
+        reference->setCurrentIndex(reference->findData(QStringLiteral("Core centre")));
+        geometry->setCurrentIndex(geometry->findData(QStringLiteral("curved")));
+        QVERIFY(w.saveFavourite(QStringLiteral("Tall curved")));
+        QVERIFY(w.favouriteNames().contains(QStringLiteral("Tall curved")));
+        height->setValue(2.5);
+        reference->setCurrentIndex(0);
+        geometry->setCurrentIndex(0);
+        w.setTool(kimbim::MainWindow::Tool::Slab);
+        QVERIFY(w.favouriteNames().isEmpty()); // the slab tool has none
+        QVERIFY(w.favouriteNames(false).contains(QStringLiteral("Tall curved")));
+        QVERIFY(w.applyFavourite(QStringLiteral("Tall curved"))); // back to the wall tool, as saved
+        QCOMPARE(w.tool(), kimbim::MainWindow::Tool::Wall);
+        QCOMPARE(height->value(), 4.25);
+        QCOMPARE(reference->currentData().toString(), QStringLiteral("Core centre"));
+        QVERIFY(w.wallTool()->curved());
+        QVERIFY(w.projectSettings().value("favourites").toObject().contains(QStringLiteral("Tall curved")));
+        QVERIFY(w.deleteFavourite(QStringLiteral("Tall curved")));
+        QVERIFY(w.favouriteNames(false).isEmpty());
+        // an object and its parameters
+        QVERIFY(w.chooseObject(QStringLiteral("table"), {{"width", 2.2}}));
+        QVERIFY(w.saveFavourite(QStringLiteral("Long table")));
+        QVERIFY(w.chooseObject(QStringLiteral("chair"), {}));
+        QVERIFY(w.applyFavourite(QStringLiteral("Long table")));
+        QCOMPARE(w.libraryPanel()->currentObject(), QStringLiteral("table"));
+        QCOMPARE(w.libraryPanel()->currentParams().value("width").toDouble(), 2.2);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QVERIFY(w.close());
     }
 

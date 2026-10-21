@@ -1659,6 +1659,13 @@ ES = {
         "Redondear o cortar las esquinas de las losas, polilíneas y rellenos seleccionados, o de dos muros que forman una esquina",
     "Select slabs, polylines or fills, or the two walls of a corner, first":
         "Primero seleccione losas, polilíneas o rellenos, o los dos muros de una esquina",
+    "Favourites": "Favoritos",
+    "Favourites: apply saved settings of this tool, or save the current ones":
+        "Favoritos: aplicar parámetros guardados de esta herramienta o guardar los actuales",
+    "(none for this tool yet)": "(ninguno para esta herramienta aún)",
+    "Save current settings as...": "Guardar parámetros actuales como...",
+    "Favourite %1 saved": "Favorito %1 guardado",
+    "Favourite %1": "Favorito %1",
 }
 
 

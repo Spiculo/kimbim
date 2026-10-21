@@ -33,7 +33,7 @@ public:
     QString currentName() const;          // translated
     QJsonObject currentParams() const;    // {key: value} as edited
     QJsonObject currentInfo() const;      // the listing's entry, with the edited sizes
-    void setParam(const QString& key, double value);
+    void setParam(const QString& key, const QJsonValue& value); // a size, or a part's material (D97)
     int visibleObjectCount() const;
     QTreeWidget* tree() const { return m_tree; }
     // A plan symbol drawn as an icon (cached by the caller); `size` pixels square.

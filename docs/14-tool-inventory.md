@@ -120,7 +120,7 @@ release notes, so check before relying on a single cell.
 | Guide lines, temporary references, inference lines | AC VW SU | 🟡 | new | D89: temporary guides (rest 0.5 s on a snap point), extensions and parallels; no dragged or permanent guide lines |
 | Snap to perpendicular, tangent, intersection, wall faces | all | 🟡 | P0 | D89: intersections and parallels added; no tangent |
 | Work planes (custom drawing planes) | AC RV VW SU | 🟡 | P0 | The active level only; D98 construction grid (spacing, angle, origin, grid snap) |
-| Tool presets / favourites (saved tool settings) | AC VW | ⬜ | new | Archicad Favourites |
+| Tool presets / favourites (saved tool settings) | AC VW | ✅ | new | D97: the Favourites button in the tool strip, kept in the project |
 
 ## 6. Building elements
 
