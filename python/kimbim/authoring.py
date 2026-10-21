@@ -47,9 +47,16 @@ DEFAULT_SLAB_TYPES = [
 ]
 # Doors and windows: (name, width, height, sill) in metres. IFC types have no size attributes, so
 # the defaults live in a custom pset on the type (D53); occurrences carry OverallWidth/Height.
+# (name, width, height, sill, operation (doors) or partitioning (windows)); D97: Archicad's door and
+# window variety (double, sliding, several panels)
 DEFAULT_OPENING_TYPES = {
-    "door": [("Door 900x2100", 0.9, 2.1, 0.0), ("Door 800x2100", 0.8, 2.1, 0.0)],
-    "window": [("Window 1200x1200", 1.2, 1.2, 0.9), ("Window 600x600", 0.6, 0.6, 1.5)],
+    "door": [("Door 900x2100", 0.9, 2.1, 0.0, "SINGLE_SWING_LEFT"), ("Door 800x2100", 0.8, 2.1, 0.0, "SINGLE_SWING_LEFT"),
+             ("Double door 1600x2100", 1.6, 2.1, 0.0, "DOUBLE_DOOR_SINGLE_SWING"),
+             ("Sliding door 1800x2100", 1.8, 2.1, 0.0, "SLIDING_TO_LEFT"),
+             ("Double sliding door 2400x2100", 2.4, 2.1, 0.0, "DOUBLE_DOOR_SLIDING")],
+    "window": [("Window 1200x1200", 1.2, 1.2, 0.9, "SINGLE_PANEL"), ("Window 600x600", 0.6, 0.6, 1.5, "SINGLE_PANEL"),
+               ("Window 2400x1200, two panels", 2.4, 1.2, 0.9, "DOUBLE_PANEL_VERTICAL"),
+               ("Window 3000x1500, three panels", 3.0, 1.5, 0.9, "TRIPLE_PANEL_VERTICAL")],
 }
 OPENING_PSET = "KIMBIM_OpeningDefaults"
 OPENING_CLASSES = {"door": ("IfcDoor", "IfcDoorType"), "window": ("IfcWindow", "IfcWindowType")}
@@ -682,13 +689,13 @@ def opening_types(kind: str) -> str:
     f = B._model
     if not f.by_type(type_class):
         import ifcopenshell.api.pset
-        for name, width, height, sill in DEFAULT_OPENING_TYPES[kind]:
+        for name, width, height, sill, operation in DEFAULT_OPENING_TYPES[kind]:
             t = ifcopenshell.api.root.create_entity(f, ifc_class=type_class, name=name,
                                                     predefined_type="DOOR" if kind == "door" else "WINDOW")
             if kind == "door":
-                t.OperationType = "SINGLE_SWING_LEFT"
+                t.OperationType = operation
             else:
-                t.PartitioningType = "SINGLE_PANEL"
+                t.PartitioningType = operation
             pset = ifcopenshell.api.pset.add_pset(f, product=t, name=OPENING_PSET)
             ifcopenshell.api.pset.edit_pset(f, pset=pset, properties={
                 "Width": f.createIfcPositiveLengthMeasure(width / _scale()),
@@ -749,9 +756,14 @@ def _filling_representation(kind, element_type, width, height):
             f, context=_body_context(), overall_height=height / s, overall_width=width / s,
             operation_type=getattr(element_type, "OperationType", None) or "SINGLE_SWING_LEFT")
     else:
+        partition = getattr(element_type, "PartitioningType", None) or "SINGLE_PANEL"
+        panels = 3 if partition.startswith("TRIPLE") else 2 if partition.startswith("DOUBLE") else 1
         representation = ifcopenshell.api.geometry.add_window_representation(
             f, context=_body_context(), overall_height=height / s, overall_width=width / s,
-            partition_type=getattr(element_type, "PartitioningType", None) or "SINGLE_PANEL")
+            partition_type=partition, panel_properties=[{} for _ in range(panels)],  # one per panel
+            lining_properties={"FirstMullionOffset": width / panels / s,  # equal panels
+                               "SecondMullionOffset": 2 * width / 3 / s,
+                               "FirstTransomOffset": height / panels / s, "SecondTransomOffset": 2 * height / 3 / s})
     materials.style_filling(kind, representation, element_type)  # D96: frame, glass, leaf in 3D
     return representation
 

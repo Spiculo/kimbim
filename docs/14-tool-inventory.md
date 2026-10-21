@@ -136,7 +136,7 @@ release notes, so check before relying on a single cell.
 | Slab openings | all | ✅ | P0 | |
 | Sloped slabs, slab edges | AC RV VW | ⬜ | new | |
 | Doors and windows in walls (parametric) | all | ✅ | P0 | Basic types |
-| Door/window variety: sliding, double, corner window, skylight, storefront | all | ⬜ | new | |
+| Door/window variety: sliding, double, corner window, skylight, storefront | all | 🟡 | new | D97: double, sliding, double sliding doors; two- and three-panel windows; no corner windows, skylights or storefronts |
 | Door swing and window symbols in plan | all | ✅ | new | Door leaves and swing arcs in plan drawings (drawgen.door_swings) |
 | Generic opening (wall or slab hole without a filling) | AC RV VW | 🟡 | new | Slab openings only |
 | Columns, beams from profiles | all | ✅ | P0 | |
