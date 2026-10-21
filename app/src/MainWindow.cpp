@@ -171,6 +171,10 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
             setCurrentPen(pen);
     });
     connect(m_status, &StatusStrip::layerVisibilityToggled, this, &MainWindow::setLayerVisible);
+    if (m_gridSnap) { // D98: grid snap in reach, as in Archicad's status bar
+        m_gridSnap->setIconText(tr("Grid snap"));
+        m_status->addToggle(m_gridSnap);
+    }
     setWindowTitle(QStringLiteral("KimBim"));
     resize(1280, 800);
     // The plan-cut height slider at the right edge of the active model view (owner feedback).
@@ -583,6 +587,10 @@ void MainWindow::buildMenus()
         refreshConstructionGrid();
         m_status->showMessage(on ? tr("Grid snap on") : tr("Grid snap off"));
     });
+    if (m_status) { // D98: grid snap in reach, as in Archicad's status bar (or added with the strip)
+        m_gridSnap->setIconText(tr("Grid snap"));
+        m_status->addToggle(m_gridSnap);
+    }
     QAction* gridOptions = view->addAction(tr("Grid &options..."));
     gridOptions->setObjectName(QStringLiteral("actionGridOptions"));
     connect(gridOptions, &QAction::triggered, this, &MainWindow::gridOptionsDialog);

@@ -9,6 +9,8 @@ class QComboBox;
 class QLabel;
 class QTimer;
 class QToolButton;
+class QHBoxLayout;
+class QAction;
 
 namespace kimbim {
 
@@ -33,6 +35,8 @@ public:
     void setPurposes(const QStringList& names, const QString& current);
     // D74: the renovation status new elements get ("existing", "demolish" or "new").
     void setStatusForNew(const QString& status);
+    // D98: buttons for window actions (grid snap): toggles beside the zoom.
+    void addToggle(QAction* action);
 
 signals:
     void activeLayerRequested(const QString& layer);
@@ -48,6 +52,7 @@ private:
     QToolButton* m_pen;
     QComboBox* m_layer;
     QToolButton* m_layers;
+    QHBoxLayout* m_toggles;
     QLabel* m_zoom;
     QLabel* m_selection;
     QLabel* m_message;

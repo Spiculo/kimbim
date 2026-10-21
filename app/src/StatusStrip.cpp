@@ -67,6 +67,9 @@ StatusStrip::StatusStrip(QWidget* parent)
     m_layers->setToolTip(tr("Visible layers"));
     m_layers->setMenu(new QMenu(m_layers));
     row->addWidget(m_layers);
+    m_toggles = new QHBoxLayout;
+    m_toggles->setSpacing(2);
+    row->addLayout(m_toggles);
     m_zoom = new QLabel(this);
     m_zoom->setObjectName(QStringLiteral("zoomLabel"));
     m_zoom->setToolTip(tr("Zoom (100% = the whole model)"));
@@ -185,6 +188,18 @@ void StatusStrip::setPurposes(const QStringList& names, const QString& current)
         m_purpose->addItems(names);
     }
     m_purpose->setCurrentText(current);
+}
+
+void StatusStrip::addToggle(QAction* action)
+{
+    if (findChild<QToolButton*>(action->objectName() + QStringLiteral("Button")))
+        return; // already here
+    auto* b = new QToolButton(this);
+    b->setDefaultAction(action);
+    b->setAutoRaise(true);
+    b->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    b->setObjectName(action->objectName() + QStringLiteral("Button"));
+    m_toggles->addWidget(b);
 }
 
 } // namespace kimbim

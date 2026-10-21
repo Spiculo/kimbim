@@ -1577,6 +1577,7 @@ ES = {
     "Frame material": "Material de la estructura",
     "Seat material": "Material del asiento",
     "Could not resize it: %1": "No se pudo cambiar su tamaño: %1",
+    "Grid snap": "Imán de cuadrícula",
 }
 
 

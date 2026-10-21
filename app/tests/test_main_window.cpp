@@ -216,6 +216,9 @@ private slots:
         QVERIFY(plan->constructionLineCount() > 0);
         QCOMPARE(w.modelView()->constructionLineCount(), 0); // 3D: no grid
         QCOMPARE(w.wallTool()->snapper().snapGridStep(), 0.0);
+        auto* button = w.findChild<QToolButton*>(QStringLiteral("actionGridSnapButton"));
+        QVERIFY(button); // on the status strip
+        QCOMPARE(button->defaultAction(), snap);
         QVERIFY(w.setConstructionGrid(2.0, 2, 0.0, QPointF(0.5, 0.5)));
         QCOMPARE(w.projectSettings().value("construction_grid").toObject().value("spacing").toDouble(), 2.0);
         snap->setChecked(true);
