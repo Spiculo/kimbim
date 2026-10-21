@@ -66,6 +66,16 @@ public:
     void setWalls(QVector<SnapWall> walls) { m_walls = std::move(walls); }
     const QVector<SnapWall>& walls() const { return m_walls; }
     void setGrid(double step) { m_grid = step; }
+    // D98: grid snap (Archicad's construction grid): a point no object snap takes rounds to the grid's
+    // nodes, `step` apart along axes turned `angle` radians about `origin`, instead of 15 degree steps
+    // and the 10 mm grid. A step of 0 turns it off. Lengths along guides and angles keep 10 mm.
+    void setSnapGrid(QPointF origin, double angle, double step)
+    {
+        m_gridOrigin = origin;
+        m_gridAngle = angle;
+        m_snapStep = step;
+    }
+    double snapGridStep() const { return m_snapStep; }
     // D85: the active level's DXF underlay linework (shared by every tool's snapper); null: none.
     void setUnderlays(std::shared_ptr<const UnderlaySnapIndex> index) { m_underlays = std::move(index); }
     const std::shared_ptr<const UnderlaySnapIndex>& underlays() const { return m_underlays; }
@@ -92,6 +102,9 @@ private:
     QVector<SnapLine> m_lines;
     QVector<SnapPoint> m_points;
     double m_grid = 0.01; // 10 mm
+    QPointF m_gridOrigin{0, 0};
+    double m_gridAngle = 0.0;
+    double m_snapStep = 0.0; // D98: grid snap off
     bool m_faces = false;
     std::shared_ptr<const UnderlaySnapIndex> m_underlays;
     std::shared_ptr<InputAids> m_aids;

@@ -77,6 +77,13 @@ QVector<SnapPoint> Snapper::parsePoints(const QJsonObject& snapData)
 
 QPointF Snapper::onGrid(QPointF p) const
 {
+    if (m_snapStep > 0) { // D98: the snap grid's nodes, in its own frame
+        const double c = std::cos(m_gridAngle), s = std::sin(m_gridAngle);
+        const QPointF d = p - m_gridOrigin;
+        const double u = std::round((d.x() * c + d.y() * s) / m_snapStep) * m_snapStep;
+        const double v = std::round((-d.x() * s + d.y() * c) / m_snapStep) * m_snapStep;
+        return m_gridOrigin + QPointF(u * c - v * s, u * s + v * c);
+    }
     if (m_grid <= 0)
         return p;
     return QPointF(std::round(p.x() / m_grid) * m_grid, std::round(p.y() / m_grid) * m_grid);
@@ -417,7 +424,7 @@ Snap Snapper::compute(QPointF p, double tolerance, const QPointF* from, bool ort
     if (exact)
         return Snap{p, Snap::Typed, {}};
 
-    if (from) {
+    if (from && (m_snapStep <= 0 || ortho)) { // grid snap replaces the 15 degree steps (ortho stays)
         const QPointF v = p - *from;
         const double length = std::hypot(v.x(), v.y());
         if (length > 0) {

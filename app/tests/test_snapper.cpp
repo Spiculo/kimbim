@@ -74,6 +74,27 @@ private slots:
         QVERIFY(snap.wallGuid.isEmpty());
     }
 
+    // D98: with grid snap on, free points land on the construction grid's nodes, also when it is turned.
+    void gridSnapUsesTheConstructionGrid()
+    {
+        Snapper s;
+        s.setSnapGrid(QPointF(0, 0), 0.0, 0.5);
+        QVERIFY(near(s.snap(QPointF(1.3, 0.8), 0.01).point, QPointF(1.5, 1.0)));
+        const QPointF from(0, 0); // no 15 degree steps: the node nearest the cursor
+        const Snap angled = s.snap(QPointF(2.2, 0.31), 0.01, &from);
+        QCOMPARE(angled.kind, Snap::Grid);
+        QVERIFY(near(angled.point, QPointF(2.0, 0.5)));
+        s.setSnapGrid(QPointF(1, 1), M_PI / 4, 1.0);
+        const QPointF node = QPointF(1, 1) + QPointF(std::cos(M_PI / 4), std::sin(M_PI / 4)) * 2.0;
+        QVERIFY(near(s.snap(node + QPointF(0.1, -0.05), 0.01).point, node, 1e-9));
+        s.setSnapGrid(QPointF(0, 0), 0.0, 0.0); // off: the 10 mm grid again
+        QVERIFY(near(s.snap(QPointF(1.234, 0.0), 0.001).point, QPointF(1.23, 0.0)));
+        // object snaps still win
+        Snapper w = withWalls();
+        w.setSnapGrid(QPointF(0, 0), 0.0, 1.0);
+        QCOMPARE(w.snap(QPointF(3.98, 0.02), 0.1).kind, Snap::Endpoint);
+    }
+
     void anglesSnapTo15DegreesAndOrthoForcesRightAngles()
     {
         Snapper s;

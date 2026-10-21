@@ -165,6 +165,19 @@ public:
         QString tag;
     };
     void setGridLines(const QVector<GridLine>& lines, double z);
+    // D98: Archicad's construction grid, drawn in plan tabs: main lines `spacing` apart with
+    // `subdivisions` lighter ones between, turned `angle` radians about `origin`, at height `z`,
+    // over the model's extent plus a margin. Hidden in 3D views; show = false removes it.
+    struct ConstructionGrid {
+        bool show = false;
+        double spacing = 1.0;
+        int subdivisions = 4;
+        double angle = 0.0;
+        QPointF origin;
+        double z = 0.0;
+    };
+    void setConstructionGrid(const ConstructionGrid& grid);
+    int constructionLineCount() const { return m_constructionLines; }
     // D85: underlays drawn in this view under the model (just above level `z`): DXF linework as one
     // OCCT segment array per underlay (vertex colours, placement as the object's transformation, so a
     // move or rotation re-uses the GPU buffers); PDF pages and images as a textured quad. Not
@@ -429,6 +442,10 @@ private:
     bool m_facePickMode = false;
     QPointF m_pointer;
     Handle(AIS_InteractiveObject) m_grid;
+    Handle(AIS_InteractiveObject) m_construction; // D98
+    ConstructionGrid m_constructionGrid;
+    int m_constructionLines = 0;
+    void displayConstructionGrid();
     QVector<Annotation> m_annotationData;
     QVector<Annotation> m_markerData;
     double m_annotationZ = 0.0;

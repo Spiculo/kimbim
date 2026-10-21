@@ -550,6 +550,41 @@ void MainWindow::buildMenus()
     QAction* fit = view->addAction(tr("&Fit all"));
     fit->setShortcut(Qt::Key_F);
     connect(fit, &QAction::triggered, this, [this] { m_viewport->fitAll(); });
+    // D98: Archicad's Zoom to Selection.
+    QAction* fitSelection = view->addAction(tr("&Zoom to selection"));
+    fitSelection->setObjectName(QStringLiteral("actionZoomToSelection"));
+    fitSelection->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_F));
+    connect(fitSelection, &QAction::triggered, this, [this] {
+        if (!m_selection.isEmpty())
+            m_viewport->fitTo(m_selection);
+        else
+            m_viewport->fitAll();
+    });
+    // D98: Archicad's construction grid (Grids & Background): shown in plans, snapped to on request.
+    m_gridShow = view->addAction(tr("Construction &grid"));
+    m_gridShow->setObjectName(QStringLiteral("actionConstructionGrid"));
+    m_gridShow->setCheckable(true);
+    m_gridShow->setChecked(m_prefs.value(QStringLiteral("grid_show")).toBool(true));
+    connect(m_gridShow, &QAction::toggled, this, [this](bool on) {
+        m_prefs.setValue(QStringLiteral("grid_show"), on);
+        m_prefs.save();
+        refreshConstructionGrid();
+    });
+    m_gridSnap = view->addAction(tr("Grid &snap"));
+    m_gridSnap->setObjectName(QStringLiteral("actionGridSnap"));
+    m_gridSnap->setCheckable(true);
+    m_gridSnap->setShortcut(QKeySequence(Qt::ALT | Qt::Key_G));
+    m_gridSnap->setToolTip(tr("Free points jump to the construction grid's lines"));
+    m_gridSnap->setChecked(m_prefs.value(QStringLiteral("grid_snap")).toBool(false));
+    connect(m_gridSnap, &QAction::toggled, this, [this](bool on) {
+        m_prefs.setValue(QStringLiteral("grid_snap"), on);
+        m_prefs.save();
+        refreshConstructionGrid();
+        m_status->showMessage(on ? tr("Grid snap on") : tr("Grid snap off"));
+    });
+    QAction* gridOptions = view->addAction(tr("Grid &options..."));
+    gridOptions->setObjectName(QStringLiteral("actionGridOptions"));
+    connect(gridOptions, &QAction::triggered, this, &MainWindow::gridOptionsDialog);
     { // D76: preset views and perspective for the active view (the view cube lives in Viewport).
         QMenu* views = view->addMenu(tr("&Views"));
         views->setObjectName(QStringLiteral("menuViews"));
@@ -1715,6 +1750,89 @@ void MainWindow::materialsCommand(const char* command, const QString& done)
     m_status->showMessage(done);
 }
 
+void MainWindow::refreshConstructionGrid()
+{
+    // D98: the project's grid (spacing, subdivisions, angle, origin) with the user's show/snap toggles.
+    if (!m_wallTool)
+        return; // the tools are not built yet
+    const QJsonObject g = m_settings.value("construction_grid").toObject();
+    const double spacing = g.value("spacing").toDouble(1.0);
+    const int subdivisions = std::max(1, g.value("subdivisions").toInt(4));
+    const double angle = g.value("angle").toDouble(0.0) * M_PI / 180.0;
+    const QJsonArray o = g.value("origin").toArray();
+    const QPointF origin(o.size() == 2 ? o[0].toDouble() : 0.0, o.size() == 2 ? o[1].toDouble() : 0.0);
+    const bool snap = m_gridSnap && m_gridSnap->isChecked();
+    for (Snapper* s : {&m_wallTool->snapper(), &m_polygonTool->snapper(), &m_twoPointTool->snapper(),
+             &m_rotateTool->snapper(), &m_gripTool->snapper(), &m_measure->tool()->snapper(), &m_modifyTool->snapper(),
+             &m_draftTool->snapper()})
+        s->setSnapGrid(origin, angle, snap ? spacing / subdivisions : 0.0);
+    Viewport::ConstructionGrid grid;
+    grid.show = m_gridShow && m_gridShow->isChecked();
+    grid.spacing = spacing;
+    grid.subdivisions = subdivisions;
+    grid.angle = angle;
+    grid.origin = origin;
+    // just over the level's floor: behind furniture, stairs and walls, like Archicad's background grid
+    grid.z = (m_levels ? m_levels->activeElevation() : 0.0) + 0.003;
+    if (m_viewport)
+        m_viewport->setConstructionGrid(grid);
+}
+
+void MainWindow::gridOptionsDialog()
+{
+    const QJsonObject g = m_settings.value("construction_grid").toObject();
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Grid options"));
+    dialog.setObjectName(QStringLiteral("gridOptionsDialog"));
+    auto* form = new QFormLayout(&dialog);
+    auto number = [&](const char* name, double value, double lo, double hi, int decimals, const QString& suffix) {
+        auto* s = new QDoubleSpinBox(&dialog);
+        s->setObjectName(QLatin1String(name));
+        s->setRange(lo, hi);
+        s->setDecimals(decimals);
+        s->setSuffix(suffix);
+        s->setValue(value);
+        return s;
+    };
+    const QJsonArray o = g.value("origin").toArray();
+    auto* spacing = number("gridSpacing", g.value("spacing").toDouble(1.0), 0.01, 1000.0, 3, QStringLiteral(" m"));
+    auto* subdivisions = new QSpinBox(&dialog);
+    subdivisions->setObjectName(QStringLiteral("gridSubdivisions"));
+    subdivisions->setRange(1, 100);
+    subdivisions->setValue(g.value("subdivisions").toInt(4));
+    auto* angle = number("gridAngle", g.value("angle").toDouble(0.0), -360.0, 360.0, 2, QStringLiteral("\u00b0"));
+    auto* ox = number("gridOriginX", o.size() == 2 ? o[0].toDouble() : 0.0, -1e6, 1e6, 3, QStringLiteral(" m"));
+    auto* oy = number("gridOriginY", o.size() == 2 ? o[1].toDouble() : 0.0, -1e6, 1e6, 3, QStringLiteral(" m"));
+    form->addRow(tr("Main line spacing:"), spacing);
+    form->addRow(tr("Subdivisions:"), subdivisions);
+    form->addRow(tr("Angle:"), angle);
+    form->addRow(tr("Origin x:"), ox);
+    form->addRow(tr("Origin y:"), oy);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    form->addRow(buttons);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    setConstructionGrid(spacing->value(), subdivisions->value(), angle->value(), QPointF(ox->value(), oy->value()));
+}
+
+bool MainWindow::setConstructionGrid(double spacing, int subdivisions, double angleDegrees, QPointF origin)
+{
+    const QJsonObject grid{{"spacing", spacing}, {"subdivisions", subdivisions}, {"angle", angleDegrees},
+        {"origin", QJsonArray{origin.x(), origin.y()}}};
+    const QJsonObject r = bridge("set_project_settings", {QString::fromUtf8(QJsonDocument(QJsonObject{
+        {"construction_grid", grid}}).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Grid options"), r.value("error").toString());
+        return false;
+    }
+    m_settings = bridge("project_settings").value("settings").toObject();
+    setWindowModified(isDirty());
+    refreshConstructionGrid();
+    return true;
+}
+
 void MainWindow::setPlanView(bool plan)
 {
     // D71: a plan is its level's tab; 3 goes back to the 3D tab.
@@ -2443,6 +2561,7 @@ void MainWindow::refreshSnapData()
         shown.push_back({l.a, l.b, l.tag});
     m_viewport->setGridLines(shown, m_levels->activeElevation());
     refreshUnderlays(); // D85: and their snap points
+    refreshConstructionGrid(); // D98: its height follows the level, its extent the model
 }
 
 void MainWindow::updateToolPreview()

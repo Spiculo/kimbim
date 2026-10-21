@@ -218,6 +218,8 @@ public:
     bool hasUnversionedWork(); // work no version holds yet (Ctrl+S saves the file, not a version)
     // D72: project settings (kept with the .kim / folder, versioned).
     QJsonObject projectSettings() const { return m_settings; }
+    // D98: the construction grid's geometry (a project setting); the view and snapping follow.
+    bool setConstructionGrid(double spacing, int subdivisions, double angleDegrees, QPointF origin);
     bool setProjectSettings(const QJsonObject& changes); // false (and nothing changes) if refused
     // D73: the purpose (pen set, visibility, overrides, layer combination) and the graphics tables.
     bool setPurpose(const QString& name);
@@ -468,6 +470,8 @@ private:
     void materialsCommand(const char* command, const QString& done);
     bool setElementMaterial(const QString& kind, const QString& name); // D96: the Properties panel's Material row
     QString wallReference() const;
+    void refreshConstructionGrid(); // D98
+    void gridOptionsDialog();
     bool flipWalls(const QStringList& guids); // D97: Model > Flip walls
     void setPlanView(bool plan);
     void buildModelingToolbar();
@@ -672,6 +676,8 @@ private:
     QComboBox* m_types = nullptr;
     QDoubleSpinBox* m_wallHeight = nullptr;
     QComboBox* m_wallReference = nullptr; // D97: the Wall tool's reference line location
+    QAction* m_gridShow = nullptr; // D98: View > Construction grid
+    QAction* m_gridSnap = nullptr; // D98: View > Grid snap
     QCheckBox* m_objectGravity = nullptr; // D97: objects land on the slab under them
     QComboBox* m_roofKind = nullptr;
     QDoubleSpinBox* m_roofPitch = nullptr;

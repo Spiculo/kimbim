@@ -165,6 +165,8 @@ void Viewport::setPlanView(double elevation)
     applyNavigationPreset();
     if (!wasPlan && (!m_markerData.isEmpty() || !m_annotationData.isEmpty()))
         displayAnnotations(); // section/elevation markers and drafting (D84) belong to the plan
+    if (!wasPlan)
+        displayConstructionGrid(); // D98: plans only
     if (ensureWindow())
         fitAll();
     update();
@@ -176,6 +178,8 @@ void Viewport::set3DView()
     m_planView = false;
     AbortViewAnimation();
     eraseNorthArrow(); // D92: the north indicator belongs to plans
+    if (wasPlan)
+        displayConstructionGrid(); // D98: removed in 3D
     m_view->SetProj(HomeOrientation);
     applyProjection(); // this view's perspective setting comes back
     applyNavigationPreset();
@@ -909,6 +913,106 @@ private:
 };
 
 } // namespace
+
+// D98: the construction grid: thin light lines, the main ones a little darker (Archicad's look).
+class ConstructionGridPrs : public AIS_InteractiveObject {
+public:
+    ConstructionGridPrs(std::vector<std::pair<gp_Pnt, gp_Pnt>> minor, std::vector<std::pair<gp_Pnt, gp_Pnt>> major)
+        : m_minor(std::move(minor))
+        , m_major(std::move(major))
+    {
+    }
+    void Compute(const Handle(PrsMgr_PresentationManager)&, const Handle(Prs3d_Presentation)& prs, const int) override
+    {
+        auto add = [&](const std::vector<std::pair<gp_Pnt, gp_Pnt>>& segs, const Quantity_Color& colour) {
+            if (segs.empty())
+                return;
+            Handle(Graphic3d_ArrayOfSegments) arr = new Graphic3d_ArrayOfSegments(int(segs.size()) * 2);
+            for (const auto& [a, b] : segs) {
+                arr->AddVertex(a);
+                arr->AddVertex(b);
+            }
+            Handle(Graphic3d_Group) g = prs->NewGroup();
+            g->SetGroupPrimitivesAspect(new Graphic3d_AspectLine3d(colour, Aspect_TOL_SOLID, 1.0));
+            g->AddPrimitiveArray(arr);
+        };
+        add(m_minor, Quantity_Color(0.80, 0.83, 0.87, Quantity_TOC_RGB));
+        add(m_major, Quantity_Color(0.62, 0.68, 0.77, Quantity_TOC_RGB));
+    }
+    void ComputeSelection(const Handle(SelectMgr_Selection)&, const int) override {}
+
+private:
+    std::vector<std::pair<gp_Pnt, gp_Pnt>> m_minor, m_major;
+};
+
+void Viewport::setConstructionGrid(const ConstructionGrid& grid)
+{
+    m_constructionGrid = grid;
+    displayConstructionGrid();
+}
+
+void Viewport::displayConstructionGrid()
+{
+    if (!m_construction.IsNull()) {
+        m_context->Remove(m_construction, false);
+        m_construction.Nullify();
+    }
+    m_constructionLines = 0;
+    const ConstructionGrid& g = m_constructionGrid;
+    if (!g.show || !m_planView || g.spacing <= 0) {
+        update();
+        return;
+    }
+    // The model's extent (or 20 m around the origin), plus a margin, in the grid's own frame.
+    Bnd_Box box;
+    for (const auto& b : m_scene->batches)
+        box.Add(b->visibleBounds());
+    double x0 = -10, y0 = -10, x1 = 10, y1 = 10;
+    if (!box.IsVoid()) {
+        double z0, z1;
+        box.Get(x0, y0, z0, x1, y1, z1);
+    }
+    const double margin = std::max(10.0, 2 * g.spacing);
+    x0 -= margin, y0 -= margin, x1 += margin, y1 += margin;
+    const double c = std::cos(g.angle), s = std::sin(g.angle);
+    double u0 = 1e30, u1 = -1e30, v0 = 1e30, v1 = -1e30;
+    for (double x : {x0, x1})
+        for (double y : {y0, y1}) {
+            const double dx = x - g.origin.x(), dy = y - g.origin.y();
+            const double u = dx * c + dy * s, v = -dx * s + dy * c;
+            u0 = std::min(u0, u), u1 = std::max(u1, u), v0 = std::min(v0, v), v1 = std::max(v1, v);
+        }
+    const int subdivisions = std::max(1, g.subdivisions);
+    double step = g.spacing / subdivisions;
+    const double span = std::max(u1 - u0, v1 - v0);
+    const bool minorShown = span / step <= 1500; // too dense to read: main lines only
+    if (!minorShown)
+        step = g.spacing;
+    if (span / step > 1500) { // even the main lines are too many
+        update();
+        return;
+    }
+    auto world = [&](double u, double v) {
+        return gp_Pnt(g.origin.x() + u * c - v * s, g.origin.y() + u * s + v * c, g.z);
+    };
+    std::vector<std::pair<gp_Pnt, gp_Pnt>> minor, major;
+    const long long ku0 = (long long)std::floor(u0 / step), ku1 = (long long)std::ceil(u1 / step);
+    const long long kv0 = (long long)std::floor(v0 / step), kv1 = (long long)std::ceil(v1 / step);
+    const long long every = minorShown ? subdivisions : 1;
+    for (long long k = ku0; k <= ku1; ++k) {
+        const double u = k * step;
+        (k % every == 0 ? major : minor).push_back({world(u, kv0 * step), world(u, kv1 * step)});
+    }
+    for (long long k = kv0; k <= kv1; ++k) {
+        const double v = k * step;
+        (k % every == 0 ? major : minor).push_back({world(ku0 * step, v), world(ku1 * step, v)});
+    }
+    m_constructionLines = int(minor.size() + major.size());
+    m_construction = new ConstructionGridPrs(std::move(minor), std::move(major));
+    m_context->Display(m_construction, 0, -1, false);
+    keepHere(m_construction);
+    update();
+}
 
 namespace {
 

@@ -52,6 +52,7 @@
 #include "HostTool.h"
 #include "Graphics.h"
 #include "MainWindow.h"
+#include "Snapper.h"
 #include "PropertiesPanel.h"
 #include "PolygonTool.h"
 #include "ProjectSettingsDialog.h"
@@ -198,6 +199,33 @@ private slots:
         QVERIFY(!w.dockLayout()->restoreLayout(QByteArray("garbage")));
         QVERIFY(w.dockLayout()->view("3d"));
         QVERIFY(w.dockLayout()->manager()->findDockWidget("tree"));
+    }
+
+    // D98: Archicad's construction grid: drawn in plan tabs only, snapped to when Grid snap is on.
+    void constructionGridInPlansAndGridSnap()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        auto* show = w.findChild<QAction*>(QStringLiteral("actionConstructionGrid"));
+        auto* snap = w.findChild<QAction*>(QStringLiteral("actionGridSnap"));
+        QVERIFY(show && snap);
+        show->setChecked(true);
+        snap->setChecked(false);
+        kimbim::Viewport* plan = w.openPlanTab(w.levelsBar()->activeStorey());
+        QVERIFY(plan->constructionLineCount() > 0);
+        QCOMPARE(w.modelView()->constructionLineCount(), 0); // 3D: no grid
+        QCOMPARE(w.wallTool()->snapper().snapGridStep(), 0.0);
+        QVERIFY(w.setConstructionGrid(2.0, 2, 0.0, QPointF(0.5, 0.5)));
+        QCOMPARE(w.projectSettings().value("construction_grid").toObject().value("spacing").toDouble(), 2.0);
+        snap->setChecked(true);
+        QCOMPARE(w.wallTool()->snapper().snapGridStep(), 1.0);
+        const kimbim::Snap s = w.wallTool()->snapper().snap(QPointF(1.4, 2.3), 0.01);
+        QVERIFY(std::abs(s.point.x() - 1.5) < 1e-9 && std::abs(s.point.y() - 2.5) < 1e-9);
+        show->setChecked(false);
+        QCOMPARE(plan->constructionLineCount(), 0);
+        snap->setChecked(false);
+        show->setChecked(true);
+        QVERIFY(w.close());
     }
 
     // D71: plan tabs per level, views of the one loaded model.
