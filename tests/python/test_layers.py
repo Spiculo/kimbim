@@ -86,3 +86,16 @@ def test_views_are_saved_in_the_model(model):
     assert call("views")["views"][0]["data"]["hidden"] == ["A-WALL"]
     assert call("delete_view", "Structure only")["ok"]
     assert call("views")["views"] == []
+
+
+def test_saved_views_keep_cut_planes(model):
+    """D95: cut planes are view state; they travel in a saved view's data unchanged."""
+    plane = {"name": "Vertical cut 1", "enabled": True, "kind": "vertical",
+             "point": [0.0, 1.0, 2.5], "normal": [1.0, 0.0, 0.0],
+             "direction": [0.0, 1.0, 0.0], "angle": 0.0}
+    view = {"plan": False, "planes": [plane]}
+    assert call("save_view", "Cutaway", json.dumps(view))["ok"]
+    path = model["tmp"] / "cut-planes.ifc"
+    call("save", str(path))
+    call("open_model", str(path))
+    assert call("views")["views"][0]["data"]["planes"] == [plane]

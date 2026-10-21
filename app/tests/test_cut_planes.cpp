@@ -13,6 +13,7 @@
 #include "CutPlanesPanel.h"
 #include "DockLayout.h"
 #include "MainWindow.h"
+#include "WallTool.h"
 #include "Viewport.h"
 
 class TestCutPlanes : public QObject {
@@ -42,6 +43,54 @@ private slots:
         // Each user plane gets a poché pass; the empty model has no section loops.
         QCOMPARE(w.viewport()->sectionPlaneCount(), 0);
         QVERIFY(w.close());
+    }
+
+    void fourUserPlanesFitWithThePlanCutAndTheBox()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        w.setTool(kimbim::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({5, 0});
+        w.wallTool()->finish();
+        w.setTool(kimbim::MainWindow::Tool::None);
+        w.findChild<QAction*>(QStringLiteral("actionPlanCut"))->setChecked(true);
+        w.findChild<QAction*>(QStringLiteral("actionSectionBox"))->setChecked(true);
+        for (int i = 0; i < 4; ++i)
+            QVERIFY2(w.addVerticalCut({-1, -2.0 + i}, {6, -2.0 + i}, {0, 1}, 0), "the fourth user plane must fit");
+        QCOMPARE(w.cutPlanes().size(), 4);
+        QCOMPARE(w.viewport()->clipPlaneCount(), 1 + 6 + 4);
+    }
+
+    void aCutThroughAWallDrawsPoche()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        w.setTool(kimbim::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({5, 0});
+        w.wallTool()->finish();
+        w.setTool(kimbim::MainWindow::Tool::None);
+        QVERIFY(w.viewport()->elementCount() >= 1);
+        QVERIFY(w.addVerticalCut({-1, 0}, {6, 0}, {0, 1}, 0)); // cuts the wall lengthwise
+        QVERIFY(w.viewport()->sectionElementCount() >= 1);
+        // The plan cut adds its own section, clipped against the vertical cut.
+        w.findChild<QAction*>(QStringLiteral("actionPlanCut"))->setChecked(true);
+        QVERIFY(w.viewport()->sectionElementCount() >= 1);
+        QVERIFY(w.findChild<QAction*>(QStringLiteral("actionPlanCut"))->isChecked());
+    }
+
+    void cutsFromAFaceKeepTheGivenSide()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        QVERIFY(w.addFaceCut(gp_Pnt(1, 2, 3), gp_Dir(0, 0, 1)));
+        QCOMPARE(w.cutPlanes().size(), 1);
+        QVERIFY(w.cutPlanes().front().normal.Z() > 0.99);
+        QVERIFY(w.cutPlanes().front().contains(gp_Pnt(1, 2, 4)));
+        QVERIFY(!w.cutPlanes().front().contains(gp_Pnt(1, 2, 2)));
+        QVERIFY(w.addFaceCut(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0)));
+        QCOMPARE(w.viewport()->clipPlaneCount(), 2);
     }
 
     void editsFlipMoveTiltAndDelete()

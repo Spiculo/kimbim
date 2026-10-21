@@ -755,6 +755,8 @@ Viewport::~Viewport()
             m_context->Remove(o, false);
     for (const auto& a : std::as_const(m_annotations))
         m_context->Remove(a, false);
+    for (const auto& prs : std::as_const(m_sections))
+        m_context->Remove(prs, false);
     removeUnderlays();
     if (m_scene)
         m_scene->removeView(m_view);
@@ -1598,6 +1600,10 @@ bool Viewport::surfacePointAt(const QPointF& widgetPos, gp_Pnt* out)
 
 void Viewport::keyPressEvent(QKeyEvent* e)
 {
+    if (m_facePickMode && e->key() == Qt::Key_Escape) {
+        emit drawingEnded();
+        return;
+    }
     if (m_drawingMode) {
         if (e->key() == Qt::Key_Escape) {
             emit drawingEnded();
@@ -1674,6 +1680,10 @@ void Viewport::mousePressEvent(QMouseEvent* e)
     }
     if (cycleClick(e))
         return; // D89: the element Tab highlighted
+    if (m_facePickMode && e->button() == Qt::RightButton) {
+        emit drawingEnded();
+        return;
+    }
     if (m_facePickMode && e->button() == Qt::LeftButton) { // D95: the plane of the clicked face
         gp_Pnt point;
         gp_Dir normal;
@@ -2282,7 +2292,17 @@ void Viewport::setCutPlaneOverlay(const std::optional<gp_Pln>& plane, double hal
     }
     m_cutOverlayPlane = *plane;
     m_cutOverlayHalfSize = halfSize > 1e-6 ? halfSize : 1.0;
-    m_cutOverlay = new CutPlaneOverlay(*plane, m_cutOverlayHalfSize);
+    // Centre the rectangle on the model, wherever it lies in the plane (the plane is unchanged).
+    const Bnd_Box bounds = boundsOf({});
+    if (!bounds.IsVoid()) {
+        double x0, y0, z0, x1, y1, z1;
+        bounds.Get(x0, y0, z0, x1, y1, z1);
+        const gp_Pnt centre((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+        const gp_Dir n = plane->Axis().Direction();
+        const double dist = gp_Vec(plane->Location(), centre).Dot(gp_Vec(n));
+        m_cutOverlayPlane = gp_Pln(centre.Translated(gp_Vec(n) * -dist), n);
+    }
+    m_cutOverlay = new CutPlaneOverlay(m_cutOverlayPlane, m_cutOverlayHalfSize);
     m_context->Display(m_cutOverlay, 0, -1, false); // shown, never selectable
     keepHere(m_cutOverlay);
     update();
@@ -2364,11 +2384,16 @@ bool Viewport::facePlaneAt(const QPointF& widgetPos, gp_Pnt* point, gp_Dir* norm
             const double dist = std::abs(gp_Vec(a, picked).Dot(n));
             if (dist > 1e-3 || dist >= best)
                 continue;
-            // Barycentric coordinates of the picked point in the triangle (projected by its normal).
-            const double area = ab.Crossed(ac).Dot(gp_Vec(n));
-            const double w0 = gp_Vec(b, picked).Crossed(gp_Vec(b, d)).Dot(gp_Vec(n)) / area;
-            const double w1 = gp_Vec(d, picked).Crossed(gp_Vec(d, a)).Dot(gp_Vec(n)) / area;
-            const double w2 = 1.0 - w0 - w1;
+            // Barycentric coordinates of the picked point in the triangle.
+            const gp_Vec v2(a, picked);
+            const double d00 = ab.Dot(ab), d01 = ab.Dot(ac), d11 = ac.Dot(ac);
+            const double d20 = v2.Dot(ab), d21 = v2.Dot(ac);
+            const double den = d00 * d11 - d01 * d01;
+            if (std::abs(den) < 1e-18)
+                continue;
+            const double w1 = (d11 * d20 - d01 * d21) / den;
+            const double w2 = (d00 * d21 - d01 * d20) / den;
+            const double w0 = 1.0 - w1 - w2;
             if (w0 < -1e-3 || w1 < -1e-3 || w2 < -1e-3)
                 continue;
             best = dist;

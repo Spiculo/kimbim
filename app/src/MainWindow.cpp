@@ -674,8 +674,7 @@ void MainWindow::buildDocks()
     connect(m_cutPlanesPanel, &CutPlanesPanel::flipRequested, this, &MainWindow::flipCutPlane);
     connect(m_cutPlanesPanel, &CutPlanesPanel::deleteRequested, this, &MainWindow::removeCutPlane);
     connect(m_cutPlanesPanel, &CutPlanesPanel::planeSelected, this, [this](int row) {
-        if (row >= 0)
-            selectCutPlane(row);
+        selectCutPlane(row); // -1 clears the translucent rectangle
     });
     m_dock->addPanel(QStringLiteral("drawings"), tr("Drawings"), m_drawingsPanel);
     m_dock->addPanel(QStringLiteral("sheets"), tr("Sheets"), m_sheetsPanel);
@@ -873,7 +872,7 @@ int MainWindow::availableCutPlaneSlots() const
     const CutSettings& s = m_cuts[modelView()];
     int limit = modelView()->clipPlaneLimit();
     if (limit <= 0)
-        limit = 8;
+        limit = 32; // headless: the driver cannot be asked
     const int room = maxUserPlanes(limit, s.planCut, s.box && !s.bounds.IsVoid());
     int used = 0;
     for (const CutPlane& p : s.planes)
@@ -897,6 +896,10 @@ int MainWindow::addCutPlaneTo3D(const CutPlane& plane)
         qWarning("cut plane failed: %s", ex.GetMessageString());
         s.planes.pop_back();
         s.selectedPlane = -1;
+        try {
+            applyCutsTo(modelView(), s);
+        } catch (const Standard_Failure&) {
+        }
         return -1;
     }
     if (m_viewport != modelView())
@@ -953,7 +956,7 @@ bool MainWindow::setCutPlaneEnabled(int index, bool on)
     if (on && !s.planes[index].enabled) { // would the switch fit beside the others?
         int limit = modelView()->clipPlaneLimit();
         if (limit <= 0)
-            limit = 8;
+            limit = 32; // headless: the driver cannot be asked
         const int room = maxUserPlanes(limit, s.planCut, s.box && !s.bounds.IsVoid());
         int used = 0;
         for (int i = 0; i < s.planes.size(); ++i)
@@ -1134,7 +1137,8 @@ void MainWindow::applyCutsTo(Viewport* view, CutSettings& settings)
     state.planes.assign(settings.planes.begin(), settings.planes.end());
     int limit = view->clipPlaneLimit();
     if (limit <= 0)
-        limit = 8; // the GL/shaders' floor; the driver tells us its own when it can
+        limit = 32; // headless views cannot ask: assume room for the documented minimum
+
     view->clearClipPlanes();
     view->addClipPlanes(makePlanes(state, limit));
 
@@ -5084,7 +5088,13 @@ bool MainWindow::applyView(const QString& name)
                 if (ok)
                     three.planes.append(p);
             }
-            three.selectedPlane = three.planes.isEmpty() ? -1 : 0;
+            three.selectedPlane = -1;
+            if (data.value("cut").isDouble()) {
+                three.planCut = true;
+                three.height = data.value("cut").toDouble();
+            } else if (data.contains("cut")) {
+                three.planCut = false;
+            }
             if (m_viewport != modelView())
                 applyCutsTo(modelView(), three);
         }
