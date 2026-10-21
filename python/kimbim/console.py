@@ -262,7 +262,7 @@ def _execute_all(source: str, filename: str, selection_json: str, echo: bool, ex
         ns.update(extra or {})
         out = io.StringIO()
         error = ""
-        implicit = B._step is None  # the whole run is one undo step (D92)
+        implicit = B._step is None and B._model is not None  # the whole run is one undo step (D92)
         if implicit:
             B._begin()
             B._step = ([], [])
