@@ -19,7 +19,7 @@ namespace kimbim {
 class DraftTool : public QObject {
     Q_OBJECT
 public:
-    enum class Mode { Line, Polyline, Rectangle, Circle, Arc3, ArcCentre, Fill };
+    enum class Mode { Line, Polyline, Rectangle, Circle, Arc3, ArcCentre, Fill, Spline }; // Spline: D98
     explicit DraftTool(QObject* parent = nullptr);
 
     Snapper& snapper() { return m_snapper; }
@@ -50,6 +50,8 @@ public:
     static QVector<QPointF> circlePoints(QPointF centre, double radius, int segments = 48);
     static std::optional<std::pair<QPointF, double>> circumcircle(QPointF a, QPointF b, QPointF c);
     static QVector<QPointF> arcPoints(QPointF a, QPointF b, QPointF c, int segments = 32);
+    // D98: a smooth curve through the points (centripetal Catmull-Rom, as drafting.spline_points).
+    static QVector<QPointF> splinePoints(const QVector<QPointF>& points, bool closed = false, int steps = 12);
 
 signals:
     // kind: line, polyline, rectangle, circle, arc, fill (add_drafting's); closed: a polyline closed on its start.

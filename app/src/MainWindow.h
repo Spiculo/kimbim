@@ -647,6 +647,7 @@ private:
     QVector<QPointF> m_gripPoints;
     QComboBox* m_draftLineType = nullptr;
     QComboBox* m_draftArcMode = nullptr;
+    QComboBox* m_draftPolyMode = nullptr; // D98: polyline or spline
     QComboBox* m_draftPattern = nullptr;
     QSpinBox* m_draftBackground = nullptr; // 0: no background
     QToolButton* m_draftShowArea = nullptr;

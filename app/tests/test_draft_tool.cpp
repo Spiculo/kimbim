@@ -21,6 +21,35 @@ using kimbim::MainWindow;
 class TestDraftTool : public QObject {
     Q_OBJECT
 private slots:
+    // D98: the spline mode: clicked points, a smooth preview through them, Enter ends it open,
+    // clicking the first point closes it.
+    void splinesPassThroughTheirPoints()
+    {
+        DraftTool t;
+        t.setMode(DraftTool::Mode::Spline);
+        t.setTolerance(0.05);
+        QSignalSpy done(&t, &DraftTool::shapeFinished);
+        t.click({0, 0});
+        t.click({2, 1});
+        t.move({4, 0});
+        const auto preview = t.preview();
+        QCOMPARE(preview.size(), 1);
+        QCOMPARE(preview[0].size(), 1 + 2 * 12);
+        t.click({4, 0});
+        t.finish();
+        QCOMPARE(done.count(), 1);
+        QCOMPARE(done.last().at(0).toString(), QString("spline"));
+        QCOMPARE(done.last().at(2).toBool(), false);
+        t.click({0, 0});
+        t.click({2, 1});
+        t.click({4, 0});
+        t.click({0.01, 0.01}); // the first point: closes
+        QCOMPARE(done.count(), 2);
+        QCOMPARE(done.last().at(2).toBool(), true);
+        const QVector<QPointF> curve = DraftTool::splinePoints({{0, 0}, {2, 1}, {4, 0}});
+        QVERIFY(std::abs(curve[12].x() - 2) < 1e-9 && std::abs(curve[12].y() - 1) < 1e-9); // through the middle point
+    }
+
     void initTestCase()
     {
         QStandardPaths::setTestModeEnabled(true);

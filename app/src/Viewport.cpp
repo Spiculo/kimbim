@@ -1574,7 +1574,7 @@ private:
 bool Viewport::Annotation::isDrafting() const
 {
     return kind == QLatin1String("line") || kind == QLatin1String("polyline") || kind == QLatin1String("arc")
-        || kind == QLatin1String("circle") || kind == QLatin1String("fill");
+        || kind == QLatin1String("circle") || kind == QLatin1String("fill") || kind == QLatin1String("spline");
 }
 
 QVector<QPointF> Viewport::annotationPoints(const QString& guid) const

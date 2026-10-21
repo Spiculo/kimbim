@@ -281,3 +281,34 @@ def test_dxf_export_has_the_lines_arcs_and_pattern_hatches(plan, tmp_path):
     assert "DASHED" in doc.linetypes
     assert any(e.dxf.get("linetype") == "DASHED" for e in msp.query("LINE LWPOLYLINE"))
     assert len(msp.query("LINE")) < 200  # the hatch lines are not also written one by one
+
+
+# ---------------------------------------------------------------- splines (D98)
+
+def test_spline_passes_through_its_points_smoothly():
+    p = [(0, 0), (2, 1), (4, 0), (6, 1)]
+    curve = drafting.spline_points(p)
+    for q in p:  # it passes through every point
+        assert min(math.dist(q, c) for c in curve) < 1e-9
+    assert len(curve) == 1 + 3 * drafting.SPLINE_STEPS
+    assert max(c[1] for c in curve) < 1.2  # centripetal: no wild overshoot
+    closed = drafting.spline_points(p, closed=True)
+    assert closed[-1] == pytest.approx(list(p[0]))  # back to the start
+    assert drafting.spline_points([(0, 0), (1, 0)]) == [[0, 0], [1, 0]]  # two points: a straight line
+
+
+def test_spline_drafting_shape(plan):
+    level = plan["l1"]
+    r = call("add_drafting", level, "spline", pts((0, 0), (2, 1), (4, 0)), json.dumps({"closed": False}))
+    assert r["ok"], r
+    shape = next(a for a in listed(level).values() if a["kind"] == "spline")
+    assert len(shape["curves"][0]) == 1 + 2 * drafting.SPLINE_STEPS
+    snaps = {(round(p["x"], 6), round(p["y"], 6)) for p in call("snap_data", level)["points"]}
+    assert {(0, 0), (2, 1), (4, 0)} <= snaps
+    r = call("add_drafting", level, "spline", pts((0, 0), (2, 1), (4, 0)), json.dumps({"closed": True}))
+    assert r["ok"], r
+    assert not call("add_drafting", level, "spline", pts((0, 0)), "")["ok"]
+    assert not call("add_drafting", level, "spline", pts((0, 0), (1, 1)), json.dumps({"closed": True}))["ok"]
+    logger = ifcopenshell.validate.json_logger()
+    ifcopenshell.validate.validate(b._model, logger)
+    assert [x for x in logger.statements if x.get("level") == "error"] == []
