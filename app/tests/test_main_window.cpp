@@ -240,6 +240,36 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // D97: the Wall tool's Curved geometry method: start, end, a point on the arc.
+    void curvedWalls()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        w.setTool(kimbim::MainWindow::Tool::Wall);
+        auto* geometry = w.findChild<QComboBox*>(QStringLiteral("wallGeometry"));
+        QVERIFY(geometry);
+        geometry->setCurrentIndex(geometry->findData(QStringLiteral("curved")));
+        QVERIFY(w.wallTool()->curved());
+        w.wallTool()->click({4, 0});
+        w.wallTool()->click({-4, 0});
+        w.wallTool()->move({0, 4}); // the arc's preview through the pointer
+        QVERIFY(w.wallTool()->arcPreview().size() > 3);
+        w.wallTool()->click({0, 4});
+        w.wallTool()->finish();
+        w.setTool(kimbim::MainWindow::Tool::None);
+        const QStringList walls = w.viewport()->guids();
+        QCOMPARE(walls.size(), 1);
+        const QJsonObject dims = kimbim::PythonEngine::instance().callJson("properties_multi",
+            {QStringLiteral("[\"%1\"]").arg(walls.first())}, nullptr).object().value("psets").toObject()
+            .value("Dimensions").toObject();
+        const double length = dims.value("Length").toObject().value("value").toDouble();
+        QVERIFY2(length > 10.0 && length < M_PI * 4 + 0.5, qPrintable(QString::number(length))); // an arc, not the 8 m chord
+        const auto pts = kimbim::WallTool::arcPoints({1, 0}, {0, 1}, {-1, 0}, 4);
+        QCOMPARE(pts.size(), 5);
+        QVERIFY(std::hypot(pts[2].x(), pts[2].y() - 1.0) < 1e-9);
+        QVERIFY(w.close());
+    }
+
     // D98: Trace & Reference: the level below's plan under the active level's.
     void traceTheLevelBelow()
     {

@@ -2281,6 +2281,18 @@ void MainWindow::buildModelingToolbar()
         m_settings = bridge("project_settings").value("settings").toObject();
     });
     bar->addField(m_wallReference);
+    // D97: Archicad's geometry method: straight walls, or curved ones (start, end, a point on the arc).
+    m_wallGeometry = new QComboBox(bar);
+    m_wallGeometry->setObjectName(QStringLiteral("wallGeometry"));
+    m_wallGeometry->setToolTip(tr("Geometry method: straight walls, or curved ones (start, end, then a point on the arc)"));
+    m_wallGeometry->addItem(tr("Straight"), QStringLiteral("straight"));
+    m_wallGeometry->addItem(tr("Curved"), QStringLiteral("curved"));
+    connect(m_wallGeometry, &QComboBox::currentIndexChanged, this, [this] {
+        m_wallTool->setCurved(m_wallGeometry->currentData().toString() == QLatin1String("curved"));
+        m_status->showMessage(m_wallTool->curved() ? tr("Curved walls: click the start, the end, then a point on the arc")
+                                                   : tr("Straight walls"));
+    });
+    bar->addField(m_wallGeometry);
     // D97: Archicad's Gravity: a placed object sits on the slab under it.
     m_objectGravity = new QCheckBox(tr("Gravity"), bar);
     m_objectGravity->setObjectName(QStringLiteral("objectGravity"));
@@ -2804,10 +2816,16 @@ void MainWindow::updateToolPreview()
     const QJsonObject type = currentType();
     QVector<Viewport::PreviewBox> boxes;
     switch (m_tool) {
-    case Tool::Wall:
+    case Tool::Wall: {
         m_viewport->setWallPreview(m_wallTool->preview(), type.value("thickness").toDouble(), m_wallHeight->value(),
             type.value("centres").toObject().value(wallReference()).toDouble(0.0));
+        const QVector<QPointF> arc = m_wallTool->arcPreview(); // D97: a curved wall, as short pieces
+        const double t = std::max(type.value("thickness").toDouble(), 0.05);
+        for (int i = 0; i + 1 < arc.size(); ++i)
+            boxes.push_back({arc[i], arc[i + 1], t, z, z + m_wallHeight->value()});
+        m_viewport->setPreviewBoxes(boxes);
         return;
+    }
     case Tool::Stair:
     case Tool::Railing:
         updateStairPreview(); // D88 (StairTools.cpp)
@@ -2956,6 +2974,7 @@ void MainWindow::setTool(Tool tool)
     }
     m_wallHeight->setVisible(tool == Tool::Wall || tool == Tool::Column || tool == Tool::Beam || tool == Tool::Roof);
     m_wallReference->setVisible(tool == Tool::Wall);
+    m_wallGeometry->setVisible(tool == Tool::Wall);
     m_objectGravity->setVisible(tool == Tool::Object);
     m_objectFit->setVisible(tool == Tool::Object);
     if (tool == Tool::Wall) {
@@ -6053,9 +6072,13 @@ bool MainWindow::createWall(const WallSegment& s)
     }
     auto num = [](double v) { return QString::number(v, 'g', 17); };
     StepTimer createTimer(m_timings, "bridgeCreateWall");
-    const QJsonObject r = bridge("create_wall", {m_levels->activeStorey(), type.value("guid").toString(),
-        num(s.p1.x()), num(s.p1.y()), num(s.p2.x()), num(s.p2.y()), num(m_wallHeight->value()), s.joinStart, s.joinEnd,
-        wallReference()});
+    const QJsonObject r = s.through // D97: a curved wall
+        ? bridge("create_curved_wall", {m_levels->activeStorey(), type.value("guid").toString(), num(s.p1.x()),
+              num(s.p1.y()), num(s.through->x()), num(s.through->y()), num(s.p2.x()), num(s.p2.y()),
+              num(m_wallHeight->value()), wallReference()})
+        : bridge("create_wall", {m_levels->activeStorey(), type.value("guid").toString(),
+              num(s.p1.x()), num(s.p1.y()), num(s.p2.x()), num(s.p2.y()), num(m_wallHeight->value()), s.joinStart,
+              s.joinEnd, wallReference()});
     if (!r.value("ok").toBool()) {
         m_status->showMessage(tr("Could not create the wall: %1").arg(r.value("error").toString()));
         return false;

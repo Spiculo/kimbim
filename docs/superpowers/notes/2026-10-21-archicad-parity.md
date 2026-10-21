@@ -46,4 +46,5 @@ Branch `parity-materials`. Spec: [2026-10-21-archicad-parity-materials-design](.
 - Columns and beams: a building material per element (Archicad: the occurrence gets its own profile set, the type's profiles with the new material) or per type (Revit), project setting `member_material_scope` (Project settings › Column and beam material).
 - The construction grid covers the model plus a margin and is redrawn when the model grows past it.
 - Figures: File › Place picture (typed width, opaque) or Place underlay (calibrated). 
+- Curved walls (Wall tool › Geometry: Curved; start, end, a point on the arc; `curved_walls.py`): layered, any reference line, each face its layer's surface in 3D, cut as one fill; not joined, no openings, no stretch yet (refused with a message).
 - Pick Up / Inject (Edit menu, Ctrl+Alt+C / Ctrl+Alt+V): walls carry composite, reference line, slant, profile and surface overrides; slabs and others their composite or material and surfaces; library objects their parameters (one undo step per parameter).

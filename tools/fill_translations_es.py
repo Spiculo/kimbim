@@ -1649,6 +1649,12 @@ ES = {
     "Level be&low": "Nivel i&nferior",
     "This is the top level": "Este es el nivel más alto",
     "This is the bottom level": "Este es el nivel más bajo",
+    "Geometry method: straight walls, or curved ones (start, end, then a point on the arc)":
+        "Método geométrico: muros rectos o curvos (inicio, fin y luego un punto del arco)",
+    "Straight": "Recto",
+    "Curved": "Curvo",
+    "Curved walls: click the start, the end, then a point on the arc": "Muros curvos: haga clic en el inicio, el fin y luego un punto del arco",
+    "Straight walls": "Muros rectos",
 }
 
 

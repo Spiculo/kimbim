@@ -707,6 +707,7 @@ private:
     QAction* m_gridSnap = nullptr; // D98: View > Grid snap
     QCheckBox* m_objectGravity = nullptr; // D97: objects land on the slab under them
     QCheckBox* m_objectFit = nullptr;     // D97: objects stand against the wall they are dropped by
+    QComboBox* m_wallGeometry = nullptr;  // D97: straight or curved walls
     // D98: Trace & Reference: the mode, and the traced plans by "storey|mode" (rebuilt after edits)
     QString m_traceMode;
     struct TraceEntry {

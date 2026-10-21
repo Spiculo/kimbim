@@ -17,6 +17,7 @@ namespace kimbim {
 struct WallSegment {
     QPointF p1, p2;
     QString joinStart, joinEnd;
+    std::optional<QPointF> through; // D97: a curved wall's point on its arc
 };
 
 // Draws walls as a click-click polyline (pure logic: the viewport feeds it points on the level's
@@ -41,6 +42,14 @@ public:
     // The app reports the wall it created for the last request, so the next one joins it.
     void setLastWall(const QString& guid) { m_lastWall = guid; }
     std::optional<std::pair<QPointF, QPointF>> preview() const;
+    // D97: Archicad's Curved geometry method: start, end, then a point on the arc (the end starts the
+    // next wall of the chain).
+    void setCurved(bool on);
+    bool curved() const { return m_curved; }
+    // The curved wall being drawn, as points along its arc (empty unless both ends are placed).
+    QVector<QPointF> arcPreview() const;
+    // Points along the arc from `a` through `through` to `b` (`n` segments); just a and b if in a line.
+    static QVector<QPointF> arcPoints(QPointF a, QPointF through, QPointF b, int n = 24);
 
 signals:
     void wallRequested(const kimbim::WallSegment& segment);
@@ -59,6 +68,8 @@ private:
     QString m_startJoin; // wall under the first click of the chain
     QString m_lastWall;  // wall created by the previous segment
     std::optional<QPointF> m_hover;
+    bool m_curved = false;
+    std::optional<QPointF> m_end; // D97: a curved wall's end, waiting for its point on the arc
 };
 
 } // namespace kimbim
