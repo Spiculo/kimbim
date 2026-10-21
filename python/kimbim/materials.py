@@ -439,10 +439,22 @@ def _clip_scalar(poly, svals, lo, hi):
     return poly, svals
 
 
+def _area(poly) -> float:
+    """Area of a planar 3D polygon."""
+    total = np.zeros(3)
+    for i in range(1, len(poly) - 1):
+        total += np.cross(poly[i] - poly[0], poly[i + 1] - poly[0])
+    return float(np.linalg.norm(total)) / 2
+
+
 def layered_mesh(element, verts: np.ndarray, faces: np.ndarray, palette: "Palette"):
     """D96: a layered element's mesh with its ends, top, bottom and reveals cut at the layer boundaries,
     each piece in its layer's surface (Archicad shows the layers there), the sides as face_colours does.
     (verts, faces, colours), or None when the element has fewer than two layers."""
+    from . import configure
+
+    if configure.profile_of(element):  # a complex profile's section is not its composite's layers
+        return None
     bands = layer_bands(element)
     if bands is None:
         return None
@@ -463,8 +475,23 @@ def layered_mesh(element, verts: np.ndarray, faces: np.ndarray, palette: "Palett
     out_v, out_t, out_c = [v[side_tris.reshape(-1)]], [], [side_cols]
     count = len(side_tris) * 3
     extra_v, extra_t, extra_c = [], [], []
+    core = core_layer(usage.ForLayerSet) if (usage := ifcopenshell.util.element.get_material(
+        element, should_skip_usage=False)) is not None else None
+    core_colour = palette.of_material(core.Material if core is not None else None)
+    lo_all, hi_all = min(bounds), max(bounds)
     for a, b, c in tri[~sides]:  # ends, top, bottom, reveals: a few per wall
         pts, sv = [v[a], v[b], v[c]], [s_all[a], s_all[b], s_all[c]]
+        outside = ()
+        if min(sv) < lo_all - 1e-6 or max(sv) > hi_all + 1e-6:  # beyond the layers (odd bodies): the core
+            outside = ((-1e9, lo_all), (hi_all, 1e9))
+        for lo, hi in outside:
+            piece, _ = _clip_scalar(pts, sv, lo, hi)
+            if len(piece) >= 3 and _area(piece) > 1e-9:
+                base = count + len(extra_v)
+                extra_v += piece
+                for j in range(1, len(piece) - 1):
+                    extra_t.append((base, base + j, base + j + 1))
+                    extra_c.append(core_colour)
         for k in range(len(layers)):
             lo, hi = sorted(bounds[k:k + 2])
             piece, _ = _clip_scalar(pts, sv, lo, hi)
