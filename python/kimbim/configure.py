@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import math
+import sys
 
 import ifcopenshell
 import ifcopenshell.api.material
@@ -210,18 +211,9 @@ def set_profile(wall, name: str, height: float | None = None):
     pts = profiles().get(name)
     if pts is None:
         raise ValueError(f"unknown wall profile {name}")
-    f = B._model
-    axis = A._axis_world(wall)
-    if axis is None:
+    if A._axis_world(wall) is None:
         raise ValueError(f"{wall.Name or 'the wall'} has no axis line")
-    length = math.dist(*axis)
-    k = 1.0 / A._scale()
-    profile = f.createIfcArbitraryClosedProfileDef("AREA", None, f.createIfcPolyline(
-        [f.createIfcCartesianPoint((float(y) * k, float(z) * k)) for y, z in list(pts) + [pts[0]]]))
-    position = f.createIfcAxis2Placement3D(f.createIfcCartesianPoint((0.0, 0.0, 0.0)),
-                                           f.createIfcDirection((1.0, 0.0, 0.0)), f.createIfcDirection((0.0, 1.0, 0.0)))
-    solid = f.createIfcExtrudedAreaSolid(profile, position, f.createIfcDirection((0.0, 0.0, 1.0)), length * k)
-    A._replace_body(wall, f.createIfcShapeRepresentation(A._body_context(), "Body", "SweptSolid", [solid]))
+    _sweep(wall, [(float(y), float(z)) for y, z in pts], float(max(z for _, z in pts)))
     _write_pset(wall, WALL_PSET, {"Profile": name, "Height": float(max(z for _, z in pts))})
 
 
@@ -270,14 +262,84 @@ def opposite_slant_of(wall) -> float:
     return float(p["SlantOpposite"]) if p.get("DoubleSlant") else slant_of(wall)
 
 
+def _plain_body(wall, height: float):
+    """A plain vertical box body (the composite's thickness, the axis' length, `height` metres), what the
+    regenerator expects to rebuild from."""
+    from . import authoring as A
+
+    f = B._model
+    usage = _usage(wall)
+    s = A._scale()
+    length = math.dist(*A._axis_world(wall))
+    total = sum(float(l.LayerThickness or 0.0) for l in usage.ForLayerSet.MaterialLayers) * s
+    off = float(usage.OffsetFromReferenceLine or 0.0) * s
+    y0 = off if usage.DirectionSense != "NEGATIVE" else off - total
+    k = 1.0 / s
+    profile = f.createIfcRectangleProfileDef("AREA", None, f.createIfcAxis2Placement2D(
+        f.createIfcCartesianPoint((length / 2 * k, (y0 + total / 2) * k)), None), length * k, total * k)
+    solid = f.createIfcExtrudedAreaSolid(profile, f.createIfcAxis2Placement3D(f.createIfcCartesianPoint((0.0, 0.0, 0.0)), None, None),
+                                         f.createIfcDirection((0.0, 0.0, 1.0)), height * k)
+    A._replace_body(wall, f.createIfcShapeRepresentation(A._body_context(), "Body", "SweptSolid", [solid]))
+
+
+def _join_ends(wall, height: float):
+    """The wall's start and end lines after its joins, in its own plan coordinates (metres): ifcopenshell's
+    regenerator builds a plain wall first (mitres, butts, the axis trimmed and the origin moved to its start)."""
+    import importlib
+
+    from . import authoring as A
+
+    _plain_body(wall, height)
+    A._body_context()
+    A._patch_regenerator()
+    importlib.import_module("ifcopenshell.api.geometry.regenerate_wall_representation")
+    R = sys.modules["ifcopenshell.api.geometry.regenerate_wall_representation"]
+    r = R.Regenerator(B._model)
+    r.regenerate(wall, length=math.dist(*A._axis_world(wall)), height=height)
+    s = A._scale()
+    p1 = np.asarray(r.reference_p1, dtype=float)
+    start = [(np.asarray(p, dtype=float) - p1) * s for p in r.start_points]
+    end = [(np.asarray(p, dtype=float) - p1) * s for p in r.end_points]
+    return start, end
+
+
+def _sweep(wall, section, height: float):
+    """Sweep a section ([(across, up)], metres) along the wall (D97), cut at its ends as the joins cut a
+    plain wall: the solid runs past both ends and is clipped by vertical planes through the end lines."""
+    from . import authoring as A
+
+    f = B._model
+    start, end = _join_ends(wall, height)
+    k = 1.0 / A._scale()
+    margin = max(abs(y) for y, _ in section) + 1.0
+    x0 = min(p[0] for p in start + end) - margin
+    x1 = max(p[0] for p in start + end) + margin
+    profile = f.createIfcArbitraryClosedProfileDef("AREA", None, f.createIfcPolyline(
+        [f.createIfcCartesianPoint((float(y) * k, float(z) * k)) for y, z in list(section) + [section[0]]]))
+    position = f.createIfcAxis2Placement3D(f.createIfcCartesianPoint((x0 * k, 0.0, 0.0)),
+                                           f.createIfcDirection((1.0, 0.0, 0.0)), f.createIfcDirection((0.0, 1.0, 0.0)))
+    item = f.createIfcExtrudedAreaSolid(profile, position, f.createIfcDirection((0.0, 0.0, 1.0)), (x1 - x0) * k)
+    for line, outwards in ((start, -1.0), (end, 1.0)):
+        a, b = line[0], line[-1]
+        d = b - a
+        if np.linalg.norm(d) < 1e-9:
+            continue
+        n = np.array([d[1], -d[0]]) / np.linalg.norm(d)
+        if n[0] * outwards < 0:
+            n = -n
+        plane = f.createIfcPlane(f.createIfcAxis2Placement3D(
+            f.createIfcCartesianPoint((float(a[0]) * k, float(a[1]) * k, 0.0)),
+            f.createIfcDirection((float(n[0]), float(n[1]), 0.0)), f.createIfcDirection((0.0, 0.0, 1.0))))
+        # AgreementFlag false: the half space lies on the normal's side, beyond the end, and is cut away
+        item = f.createIfcBooleanClippingResult("DIFFERENCE", item, f.createIfcHalfSpaceSolid(plane, False))
+    A._replace_body(wall, f.createIfcShapeRepresentation(A._body_context(), "Body", "Clipping", [item]))
+
+
 def set_double_slant(wall, reference: float, opposite: float):
     """Archicad's double-slanted wall (D97): the reference side leans at `reference` degrees from the floor,
     the opposite side at `opposite`; the body is the trapezoid section swept along the wall (joins keep it)."""
     from . import authoring as A
 
-    import ifcopenshell.api.geometry
-
-    f = B._model
     usage = _usage(wall)
     axis = A._axis_world(wall)
     if usage is None or axis is None:
@@ -289,7 +351,6 @@ def set_double_slant(wall, reference: float, opposite: float):
         solids = _body_solids(wall)
         z = np.asarray(solids[0].ExtrudedDirection.DirectionRatios, dtype=float) if solids else np.array([0, 0, 1.0])
         height = A._wall_height(wall) * float(z[2] / np.linalg.norm(z))
-    length = math.dist(*axis)
     s = A._scale()
     total = sum(float(l.LayerThickness or 0.0) for l in usage.ForLayerSet.MaterialLayers) * s
     off = float(usage.OffsetFromReferenceLine or 0.0) * s
@@ -298,15 +359,7 @@ def set_double_slant(wall, reference: float, opposite: float):
     top1 = y1 - height / math.tan(math.radians(opposite))
     if top1 - top0 < 0.005:
         raise ValueError("the two faces would cross below the top: choose angles nearer 90 degrees")
-    k = 1.0 / s
-    pts = [(y0, 0.0), (y1, 0.0), (top1, height), (top0, height)]
-    profile = f.createIfcArbitraryClosedProfileDef("AREA", None, f.createIfcPolyline(
-        [f.createIfcCartesianPoint((y * k, z * k)) for y, z in pts + pts[:1]]))
-    position = f.createIfcAxis2Placement3D(f.createIfcCartesianPoint((0.0, 0.0, 0.0)),
-                                           f.createIfcDirection((1.0, 0.0, 0.0)), f.createIfcDirection((0.0, 1.0, 0.0)))
-    solid = f.createIfcExtrudedAreaSolid(profile, position, f.createIfcDirection((0.0, 0.0, 1.0)), length * k)
-    rep = f.createIfcShapeRepresentation(A._body_context(), "Body", "SweptSolid", [solid])
-    A._replace_body(wall, rep)
+    _sweep(wall, [(y0, 0.0), (y1, 0.0), (top1, height), (top0, height)], height)
     _write_pset(wall, WALL_PSET, {"DoubleSlant": True, "SlantReference": float(reference),
                                   "SlantOpposite": float(opposite), "Height": float(height)})
 
@@ -338,22 +391,10 @@ def clear_double_slant(wall):
     p = _pset(wall, WALL_PSET)
     if not p.get("DoubleSlant"):
         return
-    f = B._model
     height = float(p.get("Height") or 3.0)
-    usage = _usage(wall)
-    s = A._scale()
-    length = math.dist(*A._axis_world(wall))
-    total = sum(float(l.LayerThickness or 0.0) for l in usage.ForLayerSet.MaterialLayers) * s
-    off = float(usage.OffsetFromReferenceLine or 0.0) * s
-    y0 = off if usage.DirectionSense != "NEGATIVE" else off - total
-    k = 1.0 / s
-    profile = f.createIfcRectangleProfileDef("AREA", None, f.createIfcAxis2Placement2D(
-        f.createIfcCartesianPoint((length / 2 * k, (y0 + total / 2) * k)), None), length * k, total * k)
-    solid = f.createIfcExtrudedAreaSolid(profile, f.createIfcAxis2Placement3D(f.createIfcCartesianPoint((0.0, 0.0, 0.0)), None, None),
-                                         f.createIfcDirection((0.0, 0.0, 1.0)), height * k)
-    A._replace_body(wall, f.createIfcShapeRepresentation(A._body_context(), "Body", "SweptSolid", [solid]))
+    _plain_body(wall, height)
     _write_pset(wall, WALL_PSET, {"DoubleSlant": None, "SlantReference": None, "SlantOpposite": None, "Height": None})
-    A._regenerate(f, wall, length=length, height=height)
+    A._regenerate(B._model, wall, length=math.dist(*A._axis_world(wall)), height=height)
 
 
 def slant_of(wall) -> float:

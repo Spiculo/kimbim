@@ -41,7 +41,7 @@ Branch `parity-materials`. Spec: [2026-10-21-archicad-parity-materials-design](.
 - Cut fill patterns are hatched on screen, in printed drawings/PDF and in DXF (pattern HATCHes; the
   insulation loops as short lines on the -PATT layer).
 - Junctions: the layers' priorities decide (regenerator); Model › Wall junctions overrides per wall (run through / stop / by materials) via IfcRelConnectsPathElements priorities (KimBim patches the regenerator's override handling).
-- Double-slanted walls (Opposite slant angle) and complex-profile walls (Model › Save shape as wall profile, then Properties › Profile) sweep their own section along the line: stretches rebuild it, but joins don't trim it (Archicad trims complex profiles at junctions). (Wall and slab ends and tops now show each layer: the mesh is sliced at the layer boundaries, project setting `layers_in_3d`, about 1 ms per wall.)
+- Double-slanted walls (Opposite slant angle) and complex-profile walls (Model › Save shape as wall profile, then Properties › Profile) sweep their own section along the line, cut at their ends as the joins cut a plain wall (the regenerator's end lines as clipping planes); stretches rebuild it. (Wall and slab ends and tops now show each layer: the mesh is sliced at the layer boundaries, project setting `layers_in_3d`, about 1 ms per wall.)
 - Columns and beams: a building material per element (Archicad: the occurrence gets its own profile set, the type's profiles with the new material) or per type (Revit), project setting `member_material_scope` (Project settings › Column and beam material).
 - The construction grid's extent is computed when shown (it follows the model on the next refresh).
 - Figures: File › Place picture (typed width, opaque) or Place underlay (calibrated). 

@@ -741,7 +741,11 @@ def _replace_body(product, representation):
 
 
 def _wall_height(wall) -> float:
-    """Extrusion depth of the wall body in metres (0 if unknown)."""
+    """Extrusion depth of the wall body in metres (0 if unknown); a swept section's own height (D97)."""
+    from . import configure
+
+    if configure.is_double_slanted(wall):
+        return float(configure._pset(wall, configure.WALL_PSET).get("Height") or 0.0)
     representation = ifcopenshell.util.representation.get_representation(wall, "Model", "Body", "MODEL_VIEW")
     depths = [float(e.Depth) for e in B._model.traverse(representation) if e.is_a("IfcExtrudedAreaSolid")] if representation else []
     return max(depths, default=0.0) * _scale()

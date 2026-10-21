@@ -324,3 +324,21 @@ def test_pick_up_and_inject(project):
 
     group = props(t2["guid"])[library.PARAMETERS]
     assert group["Width"]["value"] == pytest.approx(2.0) and group["Legs material"]["value"] == "Aluminium"
+
+
+def test_swept_walls_are_cut_at_their_joins(project):
+    """D97: profile and double-slanted walls meet their neighbours as a plain wall does (mitred ends)."""
+    t = project["Exterior 300"]
+    a = call("create_wall", project["level"], t, 0, 0, 5, 0, 3.0, "", "", "Centre")["guid"]
+    call("create_wall", project["level"], t, 5, 0, 5, 4, 3.0, a, "", "Centre")
+    _, _, plain, _ = mesh(a)
+    assert call("set_element_setting", json.dumps([a]), C.GEOMETRY, "Opposite slant angle", "88")["ok"]
+    _, _, v, _ = mesh(a)
+    base = v[v[:, 2] < 1e-3]
+    assert base[:, 0].min() == pytest.approx(plain[:, 0].min(), abs=1e-3)
+    assert base[:, 0].max() == pytest.approx(plain[:, 0].max(), abs=1e-3)  # reaches the corner, mitred
+    for x, y in base[:, :2]:  # nothing beyond the mitre from (4.85, 0.15) to (5.15, -0.15)
+        assert x - 5.0 <= -y + 1e-3
+    from kimbim import authoring
+
+    assert any(abs(e["value"] - 3.0) < 1e-3 for k, e in props(a)[authoring.DIMENSIONS].items() if "eight" in k)
