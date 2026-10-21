@@ -997,6 +997,30 @@ def _stroke(line: dict, k: float) -> str:
     return out
 
 
+PRINT_MM_PER_PATTERN_MM = 0.25  # D96: element cut hatches print at 1:25 of the pattern (as on screen)
+
+
+def _hatched_path(rest: str, fill, pattern_name, background, table: dict, stroke_width, k: float) -> str:
+    """A cut path filled with `fill`, or, with a pattern, filled with its background and hatched in `fill`."""
+    from . import drafting
+
+    width = f' stroke-width="{stroke_width}"' if stroke_width else ""
+    pattern = table.get(pattern_name) if pattern_name and pattern_name != "Solid" else None
+    if not fill or pattern is None or pattern.get("solid"):
+        return f'<path fill="{fill or "none"}"{width}{rest}/>'
+    d = re.search(r'd="([^"]*)"', rest)
+    pts = [(float(x), float(y)) for x, y in _NUMBER_PAIR.findall(d.group(1))] if d else []
+    segs = drafting.hatch(pts, pattern, PRINT_MM_PER_PATTERN_MM) if len(pts) >= 3 else []
+    out = f'<path fill="{background or "#ffffff"}"{width}{rest}/>'
+    if segs:
+        dd = " ".join(f"M{a:.3f},{b:.3f} L{c:.3f},{e:.3f}" for a, b, c, e in segs)
+        out += f'<path d="{dd}" fill="none" stroke="{fill}" stroke-width="{_fmt(0.1 / k)}"/>'
+    return out
+
+
+_NUMBER_PAIR = re.compile(r"(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)")
+
+
 def style_svg(svg: str, resolved: dict, k: float = 1.0) -> str:
     svg = re.sub(r"<style[^>]*>.*?</style>", "", svg, flags=re.S)
     hidden = set(resolved.get("hidden", []))
@@ -1032,23 +1056,40 @@ def style_svg(svg: str, resolved: dict, k: float = 1.0) -> str:
         pos = m.end()
     out.append(svg[pos:])
     svg = "".join(out)
-    # D96: a composite's layers take their own fills, with thin separator lines.
+    # D96: a composite's layers take their own fills, with thin separator lines; a material's pattern
+    # is hatched in its fill pen over its background (white when it has none), as on screen.
     layers = resolved.get("layers", {})
+    table = resolved.get("fill_patterns") or {}
+    thin = _fmt(0.1 / k)
     if layers and "data-layer=" in svg:
-        thin = _fmt(0.1 / k)
-
         def layer_fills(m):
             guid = m.group(1)
-            fills = (layers.get(guid) or {}).get("fills") or []
+            bands = layers.get(guid) or {}
+            fills = bands.get("fills") or []
+            patterns_ = bands.get("patterns") or []
+            backgrounds = bands.get("backgrounds") or []
             fallback = styles[elements[guid]]["fill"] if guid in elements else None
 
             def one(p):
                 i = int(p.group(1))
                 fill = fills[i] if i < len(fills) else fallback
-                return f'<path fill="{fill or "none"}" stroke-width="{thin}"'
-            return re.sub(r'<path data-layer="(\d+)"', one, m.group(0))
+                name = patterns_[i] if i < len(patterns_) else None
+                bg = backgrounds[i] if i < len(backgrounds) else None
+                return _hatched_path(p.group(2), fill, name, bg, table, thin, k)
+            return re.sub(r'<path data-layer="(\d+)"([^>]*)/>', one, m.group(0))
 
         svg = re.sub(r'<g ifc:guid="([^"]+)"[^>]*>.*?</g>', layer_fills, svg, flags=re.S)
+    patterned = {g for g, i in elements.items() if styles[i].get("pattern") and g not in layers}
+    if patterned:
+        def whole(m):
+            guid = m.group(1)
+            if guid not in patterned or 'class="projection' in m.group(0)[:300]:
+                return m.group(0)
+            st = styles[elements[guid]]
+            return re.sub(r'<path( d="[^"]*")/>',
+                          lambda p: _hatched_path(p.group(1), st.get("fill"), st.get("pattern"), st.get("background"),
+                                                  table, None, k), m.group(0))
+        svg = re.sub(r'<g ifc:guid="([^"]+)"[^>]*>.*?</g>', whole, svg, flags=re.S)
     # Annotation text is filled in its pen's colour (the overlay writes black text).
     svg = re.sub(r'(<g data-kind="annotation"[^>]* color="(#[0-9a-fA-F]{6})"[^>]*>)(.*?)(</g>)',
                  lambda m: m.group(1) + m.group(3).replace('fill="#000000"', f'fill="{m.group(2)}"')

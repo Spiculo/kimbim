@@ -346,8 +346,10 @@ def test_plan_drawings_cut_composites_layer_by_layer(project):
     assert r["ok"], r
     group = re.search(rf'<g ifc:guid="{re.escape(g)}"[^>]*>(.*?)</g>', r["svg"], re.S).group(1)
     fills = re.findall(r'<path fill="([^"]+)" stroke-width="[^"]+" d=', group)
-    assert len(fills) == 3  # brick, insulation, block
-    assert group.count('fill="none"') == 1  # the outline over them
+    assert len(fills) == 3  # brick, insulation, block: their backgrounds (white: the patterns have none)
+    hatches = re.findall(r'<path d="[^"]*" fill="none" stroke="([^"]+)"', group)
+    assert len(hatches) == 3  # each layer's pattern in its fill pen
+    assert group.count('<path fill="none" d=') == 1  # the outline over them
 
 
 def test_windows_show_aluminium_frames_and_glass(project):
