@@ -967,6 +967,7 @@ from . import stairs as _stairs  # noqa: E402
 from . import showon as _showon  # noqa: E402
 from . import materials as _materials  # noqa: E402
 from . import configure as _configure  # noqa: E402
+from . import worksheets as _worksheets  # noqa: E402
 
 _EXPORTS = {
     "authoring": (
@@ -1241,6 +1242,10 @@ _EXPORTS = {
         "underlay_probe",
         "underlay_raster",
         "underlays",
+    ),
+    "worksheets": (
+        "create_worksheet",
+        "worksheets",
     ),
     "configure": (
         "flip_walls",

@@ -743,6 +743,15 @@ def add_to_drawing(svg: str, drawing, settings: dict | None = None) -> str:
     if storey is None or to_paper is None:
         return svg
     parts = drawing_parts(storey, to_paper, settings)
+    from . import underlays
+    from .worksheets import is_worksheet
+
+    if is_worksheet(storey):  # D98: pictures on a worksheet are figures: they print, under the drafting
+        figures = underlays.figures_svg(storey.GlobalId, to_paper)
+        if figures:
+            parts = figures + parts
+            if "xmlns:xlink" not in svg[:500]:
+                svg = svg.replace("<svg ", '<svg xmlns:xlink="http://www.w3.org/1999/xlink" ', 1)
     if not parts:
         return svg
     group = ('<g class="kimbim-drafting" fill="none" stroke="#000000" stroke-width="0.18" font-family="sans-serif">\n'

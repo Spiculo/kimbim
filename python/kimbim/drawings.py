@@ -182,7 +182,7 @@ def create_drawings() -> str:
         return A._fail("no model open")
     have_plans = _plans_by_storey()
     stories = [st for st in B._model.by_type("IfcBuildingStorey")
-               if st.GlobalId not in have_plans and not A._is_model(st)]
+               if st.GlobalId not in have_plans and not A._is_model(st)]  # worksheets make their own
     have = {G.settings_of(d).get("side") for d in _drawings()}
     missing = [side for side in SIDES if side not in have]
 

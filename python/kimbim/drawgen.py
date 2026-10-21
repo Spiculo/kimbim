@@ -104,8 +104,10 @@ def building_products(f):
     """The drawn products inside the building (its storeys and the building itself), not the whole
     site. An imported model is georeferenced across the whole plot (terrain, roads, utilities), so the
     site's extent would make every drawing frame the plot instead of the building."""
+    from .worksheets import is_worksheet
+
     products = drawn_products(f)
-    containers = {s.id() for s in f.by_type("IfcBuildingStorey")}
+    containers = {s.id() for s in f.by_type("IfcBuildingStorey") if not is_worksheet(s)}  # D98
     containers |= {b.id() for b in f.by_type("IfcBuilding")}
     if not containers:
         return products
@@ -959,7 +961,10 @@ def overlay(f, drawing, s, svg: str, include=None, plan_symbols: bool = True) ->
             # is the room stamp tag style's, a project setting this process does not see.
             parts += _tagged("stair", stair_symbols_svg(storey, to_paper, s.get("cut", PLAN_CUT)))  # D88
             parts += plan_annotations(storey, to_paper)  # tags each annotation (guid, pen) itself
-            parts += _tagged("marker", markers(f, to_paper, storey_elevation(storey)))
+            from .worksheets import is_worksheet
+
+            if not is_worksheet(storey):  # D98: a worksheet shows no building markers
+                parts += _tagged("marker", markers(f, to_paper, storey_elevation(storey)))
     if not parts:
         return svg
     group = ('<g class="kimbim-overlay" fill="none" stroke="#000000" stroke-width="0.18" '

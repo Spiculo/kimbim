@@ -14,7 +14,7 @@
 namespace kimbim {
 
 namespace {
-enum Role { GuidRole = Qt::UserRole, ElevationRole, ModelRole };
+enum Role { GuidRole = Qt::UserRole, ElevationRole, ModelRole, WorksheetRole };
 } // namespace
 
 LevelsBar::LevelsBar(QWidget* parent)
@@ -23,6 +23,7 @@ LevelsBar::LevelsBar(QWidget* parent)
     , m_menu(new QToolButton(this))
     , m_add(new QAction(tr("Add level..."), this))
     , m_newModel(new QAction(tr("New model..."), this))
+    , m_newWorksheet(new QAction(tr("New worksheet..."), this))
     , m_levels(new QAction(tr("&Levels..."), this))
 {
     m_combo->setObjectName(QStringLiteral("levelCombo"));
@@ -33,10 +34,13 @@ LevelsBar::LevelsBar(QWidget* parent)
     m_levels->setObjectName(QStringLiteral("actionLevels"));
     m_levels->setToolTip(tr("The levels table: names, elevations, heights; insert and delete levels"));
     m_newModel->setToolTip(tr("A model is a unit (an apartment, a core...) drawn once and placed on many levels"));
+    m_newWorksheet->setObjectName(QStringLiteral("actionNewWorksheet"));
+    m_newWorksheet->setToolTip(tr("A worksheet is a 2D drawing space for details, sketches and pictures (D98)"));
     auto* menu = new QMenu(m_menu);
     menu->addAction(m_add);
     menu->addAction(m_levels);
     menu->addAction(m_newModel);
+    menu->addAction(m_newWorksheet);
     m_menu->setObjectName(QStringLiteral("levelMenu"));
     m_menu->setToolTip(tr("Levels and models"));
     m_menu->setAutoRaise(true);
@@ -50,6 +54,7 @@ LevelsBar::LevelsBar(QWidget* parent)
     layout->addWidget(m_combo);
     layout->addWidget(m_menu);
     connect(m_newModel, &QAction::triggered, this, &LevelsBar::newModelRequested);
+    connect(m_newWorksheet, &QAction::triggered, this, &LevelsBar::newWorksheetRequested);
     connect(m_combo, &QComboBox::currentIndexChanged, this, &LevelsBar::onIndexChanged);
     connect(m_add, &QAction::triggered, this, &LevelsBar::addLevelRequested);
     connect(m_levels, &QAction::triggered, this, &LevelsBar::levelsDialogRequested);
@@ -60,28 +65,33 @@ void LevelsBar::setStoreys(const QJsonArray& storeys)
     QList<QJsonObject> sorted;
     for (const auto& s : storeys)
         sorted << s.toObject();
-    std::stable_sort(sorted.begin(), sorted.end(), [](const QJsonObject& a, const QJsonObject& b) {
-        const bool ma = a.value("model").toBool(), mb = b.value("model").toBool();
-        if (ma != mb)
-            return mb; // levels first, then models
-        return ma ? a.value("name").toString().localeAwareCompare(b.value("name").toString()) < 0
+    // levels first (by elevation), then models, then worksheets (D98), each by name
+    auto group = [](const QJsonObject& s) { return s.value("worksheet").toBool() ? 2 : s.value("model").toBool() ? 1 : 0; };
+    std::stable_sort(sorted.begin(), sorted.end(), [&group](const QJsonObject& a, const QJsonObject& b) {
+        const int ga = group(a), gb = group(b);
+        if (ga != gb)
+            return ga < gb;
+        return ga ? a.value("name").toString().localeAwareCompare(b.value("name").toString()) < 0
                   : a.value("elevation").toDouble() < b.value("elevation").toDouble();
     });
     m_filling = true;
     m_combo->clear();
     int keep = -1;
-    bool separated = false;
+    int section = 0;
     for (const auto& s : sorted) {
         if (!s.value("show").toBool(true) && s.value("guid").toString() != m_active)
             continue; // D79: not shown in the level list
         const double elevation = s.value("elevation").toDouble();
         const bool model = s.value("model").toBool();
-        if (model && !separated) {
+        const bool worksheet = s.value("worksheet").toBool();
+        if (group(s) > section) {
             m_combo->insertSeparator(m_combo->count());
-            separated = true;
+            section = group(s);
         }
-        m_combo->addItem(model ? tr("Model: %1").arg(s.value("name").toString())
-                               : QStringLiteral("%1 (%2 m)").arg(s.value("name").toString(), QLocale().toString(elevation, 'f', 2)));
+        m_combo->addItem(worksheet ? tr("Worksheet: %1").arg(s.value("name").toString())
+                : model ? tr("Model: %1").arg(s.value("name").toString())
+                        : QStringLiteral("%1 (%2 m)").arg(s.value("name").toString(), QLocale().toString(elevation, 'f', 2)));
+        m_combo->setItemData(m_combo->count() - 1, worksheet, WorksheetRole);
         m_combo->setItemData(m_combo->count() - 1, s.value("guid").toString(), GuidRole);
         m_combo->setItemData(m_combo->count() - 1, elevation, ElevationRole);
         m_combo->setItemData(m_combo->count() - 1, model, ModelRole);
@@ -122,6 +132,11 @@ int LevelsBar::count() const
 bool LevelsBar::activeIsModel() const
 {
     return m_combo->currentData(ModelRole).toBool();
+}
+
+bool LevelsBar::activeIsWorksheet() const
+{
+    return m_combo->currentData(WorksheetRole).toBool();
 }
 
 void LevelsBar::onIndexChanged(int index)

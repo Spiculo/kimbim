@@ -705,3 +705,81 @@ def merge_entries(base: list, ours: list, theirs: list) -> tuple[list, bool]:
         if value is not None:
             out.append(value)
     return out, clash
+
+
+# ---------------------------------------------------------------- figures (D98)
+# On a worksheet, a picture placed as an underlay is a *figure* (Archicad's Figure tool): it prints.
+# Its drawing embeds it as an SVG <image> mapped exactly as the view shows it (pixel -> level -> paper).
+
+def png_bytes(width: int, height: int, rows_rgb) -> bytes:
+    """A PNG (8-bit RGB) from `height` rows of 3*width bytes; zlib only, no image library."""
+    import struct
+    import zlib
+
+    raw = b"".join(b"\x00" + bytes(r) for r in rows_rgb)
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(raw, 6)) + chunk(b"IEND", b""))
+
+
+def _figure_image(u: dict):
+    """(mime, bytes, width px, height px, drawing units per pixel) of a figure, or None."""
+    if u.get("kind") == "image":
+        p = file_path(u.get("file", ""))
+        if p is None:
+            return None
+        data = p.read_bytes()
+        w, h, _dpi = _image_size(p)
+        return ("image/png" if data[:4] == b"\x89PNG" else "image/jpeg"), data, w, h, 1.0
+    if u.get("kind") == "pdf":
+        r = render_pdf(u["file"], int(u.get("page", 0)), int(u.get("dpi", PDF_DPI)))
+        w, h, stride = r["width"], r["height"], r["stride"]
+        buf = pathlib.Path(r["path"]).read_bytes()
+        rows = []
+        for y in range(h):
+            row = buf[y * stride:y * stride + 4 * w]
+            rgb = bytearray(3 * w)
+            rgb[0::3], rgb[1::3], rgb[2::3] = row[2::4], row[1::4], row[0::4]  # BGRX -> RGB
+            rows.append(rgb)
+        return "image/png", png_bytes(w, h, rows), w, h, 72.0 / r["dpi"]  # PDF points per pixel
+    return None
+
+
+def figures_svg(storey_guid: str, to_paper) -> list[str]:
+    """SVG <image> elements, in paper millimetres, for the pictures placed on a level (D98)."""
+    import base64
+    import math
+
+    out = []
+    for u in _entries():
+        if u.get("storey") != storey_guid or u.get("kind") not in ("image", "pdf"):
+            continue
+        u = _public(u)
+        if not u.get("visible", True) or u.get("missing"):
+            continue
+        try:
+            got = _figure_image(u)
+        except Exception:  # an unreadable file leaves a gap, not a broken drawing
+            got = None
+        if got is None:
+            continue
+        mime, data, w, h, units = got
+        bx, by = (float(v) for v in (u.get("base") or [0.0, 0.0]))
+        s, r = float(u["scale"]), math.radians(float(u["rotation"]))
+        c, sn = math.cos(r), math.sin(r)
+
+        def world(px, py):  # pixel -> drawing units (y down) -> level metres
+            lx, ly = (px * units - bx) * s, (by - py * units) * s
+            return float(u["x"]) + lx * c - ly * sn, float(u["y"]) + lx * sn + ly * c
+
+        p00, p10, p01 = (to_paper(*world(*q)) for q in ((0, 0), (1, 0), (0, 1)))
+        a, b = p10[0] - p00[0], p10[1] - p00[1]
+        cc, d = p01[0] - p00[0], p01[1] - p00[1]
+        href = f"data:{mime};base64," + base64.b64encode(data).decode("ascii")
+        out.append(f'<image data-figure="{u["id"]}" x="0" y="0" width="{w}" height="{h}" preserveAspectRatio="none" '
+                   f'transform="matrix({a:.6g} {b:.6g} {cc:.6g} {d:.6g} {p00[0]:.4f} {p00[1]:.4f})" '
+                   f'xlink:href="{href}" href="{href}"/>')
+    return out

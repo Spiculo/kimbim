@@ -118,7 +118,10 @@ def storeys() -> str:
         return B._dump({"storeys": []})
     from .levels import _shown
 
+    from .worksheets import is_worksheet
+
     out = [{"guid": s.GlobalId, "name": s.Name or "", "elevation": round(_elevation(s), 6), "model": _is_model(s),
+            "worksheet": is_worksheet(s),  # D98
             "show": _shown(s)} for s in B._model.by_type("IfcBuildingStorey")]
     return B._dump({"storeys": sorted(out, key=lambda s: s["elevation"])})
 
@@ -1829,7 +1832,9 @@ def create_model(name: str) -> str:
     levels = B._model.by_type("IfcBuildingStorey")
     if any((l.Name or "") == name for l in levels):
         return _fail(f"there is already a level or model called {name}")
-    elevation = min([_elevation(l) for l in levels] + [0.0]) - MODEL_DEPTH
+    from .worksheets import is_worksheet
+
+    elevation = min([_elevation(l) for l in levels if not is_worksheet(l)] + [0.0]) - MODEL_DEPTH
     made = {}
 
     def action():

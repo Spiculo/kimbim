@@ -241,6 +241,22 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // D98: worksheets: a 2D tab of their own, listed after the levels, with no building markers.
+    void worksheetsOpenAsTheirOwnTab()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        kimbim::Viewport* level = w.openPlanTab(w.levelsBar()->activeStorey());
+        QVERIFY(level->markerCount() > 0); // the template's elevation markers
+        QVERIFY(w.createWorksheet(QStringLiteral("Details")));
+        QVERIFY(w.levelsBar()->activeIsWorksheet());
+        kimbim::Viewport* sheet = w.viewport();
+        QVERIFY(sheet != level && sheet->isPlanView());
+        QCOMPARE(sheet->markerCount(), 0);
+        QVERIFY(!w.createWorksheet(QStringLiteral("Details"))); // unique names
+        QVERIFY(w.close());
+    }
+
     // D71: plan tabs per level, views of the one loaded model.
     void planTabsShareTheModel()
     {

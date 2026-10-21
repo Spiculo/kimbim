@@ -872,6 +872,13 @@ void MainWindow::buildCutsToolbar()
         if (ok && !name.trimmed().isEmpty())
             createModel(name.trimmed());
     });
+    connect(m_levels, &LevelsBar::newWorksheetRequested, this, [this] {
+        bool ok = false;
+        const QString name = QInputDialog::getText(this, tr("New worksheet"),
+            tr("Worksheet name (e.g. Window details):"), QLineEdit::Normal, QString(), &ok);
+        if (ok && !name.trimmed().isEmpty())
+            createWorksheet(name.trimmed());
+    });
     connect(m_levels, &LevelsBar::activeStoreyChanged, this, [this](const QString& storey, double elevation) {
         if (ViewHost* host = m_hosts.value(m_dock->current()); host && !host->storey().isEmpty() && host->storey() != storey) {
             openPlanTab(storey); // a plan tab shows one level: another level is another tab
@@ -891,6 +898,7 @@ void MainWindow::buildCutsToolbar()
         applyCuts();
         refreshLayers(); // models show only while one is active
         refreshAnnotations(); // each level has its own
+        refreshDrawings(); // D98: worksheets show no section or elevation markers
     });
     auto cutButton = [this](QAction* action) {
         auto* b = new QToolButton(m_titleBar);
@@ -4537,7 +4545,9 @@ void MainWindow::refreshDrawings()
         m.points << QPointF(look.at(0).toDouble(), look.at(1).toDouble());
         markers << m;
     }
-    m_viewport->setDrawingMarkers(markers, m_levels->activeElevation());
+    // D98: a worksheet is not the building: no section or elevation markers on it
+    m_viewport->setDrawingMarkers(m_levels->activeIsWorksheet() ? QVector<Viewport::Annotation>() : markers,
+        m_levels->activeElevation());
     for (const QString& key : m_dock->viewKeys()) {
         auto* view = qobject_cast<DrawingView*>(m_dock->view(key));
         if (!view || view->guid().startsWith(QLatin1String("sheet:")))
@@ -5465,6 +5475,20 @@ void MainWindow::offsetDialog()
         0.5, -1000, 1000, 3, &ok);
     if (ok)
         offsetSelection(distance);
+}
+
+bool MainWindow::createWorksheet(const QString& name)
+{
+    // D98: Archicad's independent worksheet: a 2D space opened in its own tab, every 2D tool works there.
+    const QJsonObject r = bridge("create_worksheet", {name});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not create the worksheet"), r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
+    openPlanTab(r.value("guid").toString());
+    m_status->showMessage(tr("Draw on the worksheet; place pictures with File > Place underlay; put it on a sheet from Drawings"));
+    return true;
 }
 
 bool MainWindow::createModel(const QString& name)

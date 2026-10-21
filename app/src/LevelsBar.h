@@ -24,6 +24,7 @@ public:
     // then the models (owner feedback: a dedicated "model" section on the levels).
     void setStoreys(const QJsonArray& storeys);
     bool activeIsModel() const;
+    bool activeIsWorksheet() const; // D98
     void setActive(const QString& guid);
     QString activeStorey() const;
     double activeElevation() const;
@@ -32,6 +33,7 @@ public:
     QComboBox* combo() const { return m_combo; }
     QAction* addLevelAction() const { return m_add; }
     QAction* newModelAction() const { return m_newModel; }
+    QAction* newWorksheetAction() const { return m_newWorksheet; }
     QAction* levelsAction() const { return m_levels; }
     QToolButton* menuButton() const { return m_menu; }
 
@@ -39,6 +41,7 @@ signals:
     void activeStoreyChanged(const QString& guid, double elevation);
     void addLevelRequested();
     void newModelRequested();
+    void newWorksheetRequested(); // D98
     void levelsDialogRequested();
 
 private:
@@ -48,6 +51,7 @@ private:
     QToolButton* m_menu;
     QAction* m_add;
     QAction* m_newModel;
+    QAction* m_newWorksheet;
     QAction* m_levels;
     QString m_active;
     bool m_filling = false;

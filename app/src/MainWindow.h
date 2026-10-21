@@ -277,6 +277,7 @@ public:
     bool applyView(const QString& name);
     LayersPanel* layersPanel() const { return m_layersPanel; }
     // Models (Slice 12, owner feedback): a unit drawn once and placed on many levels.
+    bool createWorksheet(const QString& name); // D98
     bool createModel(const QString& name);
     bool placeModelAt(QPointF p, bool turned);
     bool updateModelInstances();

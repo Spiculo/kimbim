@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // D85: underlays: placement maths, the snap index, and in the app placing a DXF survey and an image on
 // a level, snapping to the survey, calibrating and moving it by clicks, hiding it with its layer.
+#include <QBuffer>
 #include <QDateTime>
+#include <QPainter>
+#include <QSvgRenderer>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
@@ -67,6 +70,33 @@ void writeSurvey(const QString& path, int extra = 0)
 class TestUnderlays : public QObject {
     Q_OBJECT
 private slots:
+    // D98: a worksheet's figure is an SVG <image> (base64 PNG, xlink:href, an affine transform); the
+    // drawing view's renderer must draw it where the transform says.
+    void figuresRenderInDrawings()
+    {
+        QImage red(4, 2, QImage::Format_RGB32);
+        red.fill(QColor(220, 20, 20));
+        QByteArray png;
+        QBuffer buffer(&png);
+        buffer.open(QIODevice::WriteOnly);
+        red.save(&buffer, "PNG");
+        const QString svg = QStringLiteral(
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" "
+            "width=\"100mm\" height=\"100mm\" viewBox=\"0 0 100 100\">"
+            "<image x=\"0\" y=\"0\" width=\"4\" height=\"2\" preserveAspectRatio=\"none\" "
+            "transform=\"matrix(10 0 0 10 20 30)\" xlink:href=\"data:image/png;base64,%1\"/></svg>")
+                                .arg(QString::fromLatin1(png.toBase64()));
+        QSvgRenderer renderer(svg.toUtf8());
+        QVERIFY(renderer.isValid());
+        QImage out(100, 100, QImage::Format_RGB32);
+        out.fill(Qt::white);
+        QPainter painter(&out);
+        renderer.render(&painter);
+        painter.end();
+        QCOMPARE(out.pixelColor(40, 40).red(), 220); // inside: x 20-60, y 30-50
+        QCOMPARE(out.pixelColor(10, 10), QColor(Qt::white)); // outside
+    }
+
     void initTestCase()
     {
         QStandardPaths::setTestModeEnabled(true);

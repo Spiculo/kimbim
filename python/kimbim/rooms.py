@@ -33,6 +33,12 @@ _EPS = 1e-7
 
 # ---------------------------------------------------------------- the boundary from wall faces
 
+
+def _ws(storey) -> bool:
+    from .worksheets import is_worksheet
+
+    return is_worksheet(storey)
+
 def _faces(storey):
     """Wall faces on a level as segments (world metres): both sides of each wall axis, extended at
     the ends so faces of joined walls cross, plus the wall ends."""
@@ -201,7 +207,7 @@ def _rooms(storey=None):
 
 def _height(storey) -> float:
     above = sorted((A._elevation(s) for s in B._model.by_type("IfcBuildingStorey")
-                    if not A._is_model(s) and A._elevation(s) > A._elevation(storey) + 1e-6))
+                    if not A._is_model(s) and not _ws(s) and A._elevation(s) > A._elevation(storey) + 1e-6))
     return above[0] - A._elevation(storey) if above else DEFAULT_HEIGHT
 
 
@@ -226,7 +232,8 @@ def _shape(space, storey, outline):
 
 
 def _next_number(storey) -> str:
-    levels = sorted((s for s in B._model.by_type("IfcBuildingStorey") if not A._is_model(s)), key=A._elevation)
+    levels = sorted((s for s in B._model.by_type("IfcBuildingStorey") if not A._is_model(s) and not _ws(s)),
+                    key=A._elevation)
     base = (levels.index(storey) + 1) * 100 if storey in levels else 100
     taken = {s.Name for s in _rooms()}
     n = base + 1
