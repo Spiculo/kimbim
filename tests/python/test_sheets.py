@@ -233,6 +233,8 @@ def test_a_legend_is_placed_moved_drawn_and_removed(house):
 
 
 def test_the_legend_only_lists_what_the_sheet_shows(house):
+    # D91: "used" lists only the rules the sheet's drawings use; the default "auto" lists them all.
+    assert call("set_project_settings", json.dumps({"legend_mode": "used"}))["ok"]
     number = call("add_sheet", "A3", "Demolition")["number"]  # nothing demolished
     assert call("place_drawing", number, drawing("Level 1 Floor Plan"), 10, 10, 100)["ok"]
     assert call("set_sheet_purpose", number, "Demolition")["ok"]
@@ -241,8 +243,70 @@ def test_the_legend_only_lists_what_the_sheet_shows(house):
     assert "To be demolished" not in svg and "Everything is drawn with its element styles" in svg
 
 
+def test_the_legend_lists_every_rule_when_it_fits(house):
+    number = call("add_sheet", "A3", "Demolition")["number"]  # nothing demolished
+    assert call("place_drawing", number, drawing("Level 1 Floor Plan"), 10, 10, 100)["ok"]
+    assert call("set_sheet_purpose", number, "Demolition")["ok"]
+    assert call("place_legend", number)["ok"]
+    svg = call("sheet_svg", number)["svg"]  # the default "auto": the full legend fits on an A3
+    assert "To be demolished" in svg and "Temporary" in svg and "Auxiliary" in svg
+
+
+def test_a_sheet_text_can_be_placed_moved_edited_and_removed(house):
+    number = call("add_sheet", "A3", "Working")["number"]
+    r = call("place_sheet_symbol", number, "text", json.dumps({"text": "Hello", "x": 20, "y": 30}))
+    assert r["ok"], r
+    (sym,) = _sheet_of(number)["symbols"]
+    assert sym["kind"] == "text" and sym["text"] == "Hello" and (sym["x"], sym["y"]) == (20, 30)
+    assert "Hello" in call("sheet_svg", number)["svg"]
+    assert call("set_sheet_symbol", number, sym["id"], json.dumps({"text": "Bye", "x": 40}))["ok"]
+    svg = call("sheet_svg", number)["svg"]
+    assert "Bye" in svg and "Hello" not in svg  # D91: sheet texts are editable
+    assert call("move_sheet_symbol", number, sym["id"], 10, 10)["ok"]
+    assert _sheet_of(number)["symbols"][0]["x"] == 10
+    assert call("remove_sheet_symbol", number, sym["id"])["ok"]
+    assert _sheet_of(number)["symbols"] == []
+    assert not call("place_sheet_symbol", number, "text", json.dumps({"text": "  "}))["ok"]
+
+
 def test_legends_are_not_drawings(house):
     number = call("add_sheet", "A3", "L")["number"]
     assert call("place_legend", number)["ok"]
     sheet = _sheet_of(number)
     assert sheet["views"] == [] and len(sheet["legends"]) == 1
+
+
+def test_the_title_block_is_moved_and_its_fields_edited(house):
+    number = call("add_sheet", "A3", "Plans")["number"]
+    tb = _sheet_of(number)["title_block"]
+    assert (tb["w"], tb["h"]) == (180, 50)
+    assert (tb["x"], tb["y"]) == (420 - 10 - 180, 297 - 10 - 50)
+    assert tb["fields"]["title"] == "Plans" and tb["fields"]["sheet_number"] == number
+    assert call("move_title_block", number, 30, 40)["ok"]
+    assert (_sheet_of(number)["title_block"]["x"], _sheet_of(number)["title_block"]["y"]) == (30, 40)
+    fields = {"project": "Casa Lecot", "project_number": "2026-014", "client": "Familia Lecot",
+              "title": "Planta baja", "date": "2026-10-20", "issued": "Estudio"}
+    assert call("set_title_block", number, json.dumps({"fields": fields}))["ok"]
+    svg = call("sheet_svg", number)["svg"]
+    for value in fields.values():
+        assert f">{value}<" in svg, value
+    assert 'class="kimbim-title-block"' in svg
+    # Saved with the sheet, not with the project info.
+    assert "Casa Lecot" not in json.dumps(call("project_info"))
+    assert call("undo")["ok"]
+    assert "Planta baja" not in call("sheet_svg", number)["svg"]
+    # A field equal to the derived default is not an override, so project info changes still show.
+    assert call("set_title_block", number, json.dumps({"fields": {"title": "Plans"}}))["ok"]
+    assert call("set_title_block", number, json.dumps({"fields": {"title": ""}}))["ok"]
+    assert ">Plans<" not in call("sheet_svg", number)["svg"]
+
+
+def test_a_title_block_never_overlaps_a_drawing_placed_on_a_free_spot(house):
+    number = call("add_sheet", "A3", "Full")["number"]
+    assert call("move_title_block", number, 0, 0)["ok"]
+    spot = call("place_drawing", number, drawing("Level 1 Floor Plan"), -1, -1, 100)
+    assert spot["ok"], spot
+    (view,) = _sheet_of(number)["views"]
+    tb = _sheet_of(number)["title_block"]
+    assert not (view["x"] < tb["x"] + tb["w"] and tb["x"] < view["x"] + view["w"]
+                and view["y"] < tb["y"] + tb["h"] and tb["y"] < view["y"] + view["h"])

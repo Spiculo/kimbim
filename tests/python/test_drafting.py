@@ -180,6 +180,15 @@ def test_hatch_geometry():
     assert drafting.hatch(square, {"solid": True, "lines": []}, 0.1) == []
 
 
+def test_insulation_defaults_to_loops_and_zigzag_is_available():
+    square = [[0, 0], [2, 0], [2, 2], [0, 2]]
+    loops = drafting.hatch(square, drafting.patterns()["Insulation"], 0.1)
+    assert loops and all(abs(seg[0] - seg[2]) < 0.3 for seg in loops)  # short arc segments (D93)
+    zigzag = drafting.hatch(square, drafting.patterns()["Zigzag"], 0.1)
+    assert zigzag and zigzag != loops  # the zigzag is still there
+    assert not call("set_graphics", json.dumps({"fill_patterns": {"Bad": {"loops": True, "radius": 0}}}))["ok"]
+
+
 def test_saved_versions_round_trip_and_compare(plan, tmp_path):
     folder = tmp_path / "proj"
     assert call("enable_versioning", str(folder), "Start")["ok"]

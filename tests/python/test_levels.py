@@ -62,6 +62,28 @@ def test_the_table_lists_levels_with_heights_to_the_next(house):
     assert all(r["show"] for r in rows)
 
 
+def test_show_on_levels(house):
+    from kimbim import drawgen
+
+    s1, s2, s3 = (b._model.by_guid(house[k]) for k in ("l1", "l2", "l3"))
+    order = sorted(b._model.by_type("IfcBuildingStorey"), key=drawgen.storey_elevation)
+    wall = b._model.by_guid(house["w1"])
+    assert drawgen.shows_on(wall, s1, order) and not drawgen.shows_on(wall, s2, order)  # home only (D91)
+    # One up: the Level 1 wall also shows on the Level 2 plan.
+    assert call("set_show_on", json.dumps([house["w1"]]), "up")["ok"]
+    assert drawgen.shows_on(wall, s2, order)
+    plan2 = next(d for d in call("drawings")["drawings"] if d["name"].startswith("Level 2"))
+    assert f'ifc:guid="{house["w1"]}"' in call("generate_drawing", plan2["guid"], "")["svg"]
+    # Back home: the wall leaves the Level 2 plan.
+    assert call("set_show_on", json.dumps([house["w1"]]), "home")["ok"]
+    assert f'ifc:guid="{house["w1"]}"' not in call("generate_drawing", plan2["guid"], "")["svg"]
+    # A range and an expression both resolve; the expression keeps it off Level 3.
+    assert call("set_show_on", json.dumps([house["w1"]]), "range:0..2")["ok"]
+    assert drawgen.shows_on(wall, s2, order)
+    assert call("set_show_on", json.dumps([house["w1"]]), "d >= -1 and d <= 1")["ok"]
+    assert drawgen.shows_on(wall, s2, order) and not drawgen.shows_on(wall, s3, order)
+
+
 def test_rename_keeps_the_floor_plan_named_after_the_level(house):
     r = call("rename_storey", house["l2"], "First floor")
     assert r["ok"] and r["changed"] == 1
@@ -222,3 +244,19 @@ def test_clinic_level_edits_timing(tmp_path):
     print("clinic levels:", busiest["elements"], "elements on", busiest["name"],
           {k: round(v, 3) for k, v in timings.items()})
     assert timings["elevation"] < 30
+
+
+def test_an_element_depth_override_shows_it_below(house):
+    from kimbim import drawgen
+
+    s1, s2 = (b._model.by_guid(house[k]) for k in ("l1", "l2"))
+    order = sorted(b._model.by_type("IfcBuildingStorey"), key=drawgen.storey_elevation)
+    wall = b._model.by_guid(house["w1"])
+    assert not drawgen.shows_on(wall, s2, order)  # home only
+    assert call("set_element_view_depth", json.dumps([house["w1"]]), 4.0)["ok"]
+    assert drawgen.shows_in_view(wall, s2, order)
+    assert house["w1"] in call("visible_on", house["l2"])["guids"]
+    assert call("visible_on", house["l2"])["max_depth"] == 4.0
+    assert call("set_element_view_depth", json.dumps([house["w1"]]), 2.0)["ok"]  # 3 m below: out of reach
+    assert not drawgen.shows_in_view(wall, s2, order)
+    assert house["w1"] not in call("visible_on", house["l2"])["guids"]

@@ -245,6 +245,28 @@ private slots:
                                   .object();
         QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
     }
+    // D93: the renovation styles editor writes valid palettes.
+    void renovationStylesEditorWritesValidTables()
+    {
+        kimbim::RenovationStylesDialog d(tablesFromBridge(), nullptr);
+        d.selectSet(QStringLiteral("Uruguay"));
+        d.setPen(QStringLiteral("demolish"), 27);
+        d.setLine(QStringLiteral("demolish"), QStringLiteral("Dotted"));
+        d.setFill(QStringLiteral("demolish"), 15);
+        d.setSurface(QStringLiteral("demolish"), QColor("#102030"));
+        const QJsonObject st = d.changes().value("renovation_styles").toObject().value("Uruguay").toObject();
+        const QJsonObject demo = st.value("demolish").toObject();
+        QCOMPARE(demo.value("pen").toInt(), 27);
+        QCOMPARE(demo.value("line").toString(), QString("Dotted"));
+        QCOMPARE(demo.value("fill").toInt(), 15);
+        QCOMPARE(demo.value("surface").toString(), QString("#102030"));
+        QString error;
+        const QJsonObject r = kimbim::PythonEngine::instance()
+                                  .callJson("set_graphics", {QString::fromUtf8(QJsonDocument(d.changes()).toJson())}, &error)
+                                  .object();
+        QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
+    }
+
     void purposesHaveARenovationFilter()
     {
         kimbim::PurposesDialog d(tablesFromBridge(), nullptr);

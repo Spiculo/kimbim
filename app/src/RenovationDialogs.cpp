@@ -30,7 +30,7 @@ RenovationFiltersDialog::RenovationFiltersDialog(const QJsonObject& reply, QWidg
 {
     setWindowTitle(tr("Renovation filters"));
     buildPicker();
-    m_rows = new QTableWidget(3, 6, this);
+    m_rows = new QTableWidget(renovationKeys().size(), 6, this);
     m_rows->setObjectName(QStringLiteral("renovationRows"));
     m_rows->setHorizontalHeaderLabels({tr("Status"), tr("Show"), tr("Line pen"), tr("Line type"), tr("Fill pen"), tr("3D colour")});
     m_rows->verticalHeader()->hide();
@@ -143,6 +143,100 @@ void RenovationFiltersDialog::showSet(const QString&)
                 later([this, status, c] { setOverrideSurface(status, c); });
         });
         m_rows->setCellWidget(r, 5, colour);
+    }
+}
+
+RenovationStylesDialog::RenovationStylesDialog(const QJsonObject& reply, QWidget* parent)
+    : NamedSetsDialog(reply, QStringLiteral("renovation_styles"), QString(), parent)
+{
+    setWindowTitle(tr("Renovation styles"));
+    buildPicker();
+    m_rows = new QTableWidget(renovationKeys().size(), 5, this);
+    m_rows->setObjectName(QStringLiteral("renovationStyleRows"));
+    m_rows->setHorizontalHeaderLabels({tr("Status"), tr("Line pen"), tr("Line type"), tr("Fill pen"), tr("3D colour")});
+    m_rows->verticalHeader()->hide();
+    m_rows->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+    m_layout->addWidget(m_rows);
+    m_layout->addWidget(new QLabel(tr("A filter that overrides a status uses the active preset's look; the default preset is Uruguay."), this));
+    finishLayout();
+    resize(680, 300);
+    selectSet(reply.value("tables").toObject().value("renovation_styles").toObject().keys().value(0));
+}
+
+QJsonObject RenovationStylesDialog::style(const QString& status) const
+{
+    return currentValue().value(status).toObject();
+}
+
+void RenovationStylesDialog::setField(const QString& status, const QString& field, const QJsonValue& value)
+{
+    QJsonObject st = currentValue();
+    QJsonObject row = st.value(status).toObject();
+    if (value.isNull() || (value.isString() && value.toString().isEmpty()))
+        row.remove(field);
+    else
+        row.insert(field, value);
+    st.insert(status, row);
+    setCurrentValue(st);
+    showSet(currentSet());
+}
+
+void RenovationStylesDialog::setPen(const QString& status, int pen) { setField(status, QStringLiteral("pen"), pen); }
+void RenovationStylesDialog::setFill(const QString& status, int pen) { setField(status, QStringLiteral("fill"), pen); }
+void RenovationStylesDialog::setLine(const QString& status, const QString& line) { setField(status, QStringLiteral("line"), line); }
+void RenovationStylesDialog::setSurface(const QString& status, const QColor& color)
+{
+    setField(status, QStringLiteral("surface"), color.isValid() ? QJsonValue(color.name()) : QJsonValue());
+}
+
+void RenovationStylesDialog::showSet(const QString&)
+{
+    if (!m_rows)
+        return;
+    const QStringList lines = table("line_types").keys();
+    const QHash<int, LineStyle> pens = currentPens();
+    const QStringList keys = renovationKeys();
+    for (int r = 0; r < keys.size(); ++r) {
+        const QString status = keys[r];
+        const QJsonObject st = style(status);
+        auto* label = new QTableWidgetItem(renovationLabel(status));
+        label->setFlags(label->flags() & ~Qt::ItemIsEditable);
+        m_rows->setItem(r, 0, label);
+        // Every change rebuilds the row's widgets: apply it after the click or selection that made it.
+        auto later = [this](auto f) { QMetaObject::invokeMethod(this, f, Qt::QueuedConnection); };
+        auto penButton = [&](int col, const char* field) {
+            const int pen = st.value(QLatin1String(field)).toInt(0);
+            auto* b = new QPushButton(pen > 0 ? QString::number(pen) : tr("(style)"), m_rows);
+            if (pen > 0)
+                b->setIcon(colorIcon(pens.value(pen, LineStyle{}).color));
+            connect(b, &QPushButton::clicked, this, [this, b, status, pen, pens, field, later] {
+                const int picked = PenGrid::pick(b, pens, {}, pen > 0 ? pen : 1);
+                if (picked > 0)
+                    later([this, status, picked, field] { setField(status, QLatin1String(field), picked); });
+            });
+            m_rows->setCellWidget(r, col, b);
+        };
+        penButton(1, "pen");
+        auto* line = new QComboBox(m_rows);
+        line->addItem(tr("(style)"), QString());
+        for (const QString& l : lines)
+            line->addItem(l, l);
+        line->setCurrentIndex(std::max(0, line->findData(st.value("line").toString())));
+        connect(line, &QComboBox::activated, this, [this, line, status, later](int i) {
+            const QString v = line->itemData(i).toString();
+            later([this, status, v] { setLine(status, v); });
+        });
+        m_rows->setCellWidget(r, 2, line);
+        penButton(3, "fill");
+        const QColor surface(st.value("surface").toString());
+        auto* colour = new QPushButton(surface.isValid() ? surface.name() : tr("(none)"), m_rows);
+        colour->setIcon(colorIcon(surface));
+        connect(colour, &QPushButton::clicked, this, [this, status, surface, later] {
+            const QColor c = QColorDialog::getColor(surface.isValid() ? surface : Qt::yellow, this, tr("3D colour"));
+            if (c.isValid())
+                later([this, status, c] { setSurface(status, c); });
+        });
+        m_rows->setCellWidget(r, 4, colour);
     }
 }
 

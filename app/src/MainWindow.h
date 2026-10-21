@@ -107,6 +107,8 @@ public:
     PropertiesPanel* propertiesPanel() const { return m_properties; }
     void setPlanCutHeight(double metres);
     double planCutHeight() const;
+    // D91: the plan slice for a level: its own override, else the project setting (1.20 m).
+    double planCutForLevel(const QString& storey) const;
 
     // Selection and editing (M2). Edits apply to every selected element as one undoable step.
     void setSelection(const QStringList& guids);
@@ -269,6 +271,7 @@ public:
     // guid or "sheet:<number>").
     DockLayout* dockLayout() const { return m_dock; }
     QString currentViewKey() const;
+    bool currentViewShowsCutSlider() const; // D91: false in plan tabs (no cut slider there)
     // A level's plan tab (D71): opened once, raised after; a view of the same model as the 3D tab.
     Viewport* openPlanTab(const QString& storey); // nullptr if it isn't a level of this model
     Viewport* modelView() const;                  // the 3D tab's view
@@ -287,6 +290,10 @@ public:
     DrawingView* sheetView(const QString& number) const { return m_drawingViews.value(QStringLiteral("sheet:") + number); }
     bool exportSheet(const QString& number, const QString& path); // .pdf or .svg
     bool setProjectInfo(const QJsonObject& info);
+    // D91: the sheet's title block, moved and its fields edited (saved with the sheet).
+    QJsonObject titleBlock(const QString& number);
+    bool setTitleBlock(const QString& number, const QJsonObject& changes);
+    void editTitleBlock(const QString& number);
     // How many elements the last generation sent to the serializer (-1: all, no visible pass).
     int lastDrawingVisibleCount() const { return m_lastDrawingVisible; }
     // Milliseconds the last drawing's visible-element pass spent on the GUI thread (before the worker).

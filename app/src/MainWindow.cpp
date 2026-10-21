@@ -589,6 +589,7 @@ void MainWindow::buildMenus()
     editor("actionVisibilitySets", tr("&Visibility sets..."), [this](const QJsonObject& r) { return new VisibilitySetsDialog(r, this); });
     editor("actionOverrides", tr("Graphic &overrides..."), [this](const QJsonObject& r) { return new OverridesDialog(r, this); });
     editor("actionRenovationFilters", tr("&Renovation filters..."), [this](const QJsonObject& r) { return new RenovationFiltersDialog(r, this); });
+    editor("actionRenovationStyles", tr("Renovation &styles..."), [this](const QJsonObject& r) { return new RenovationStylesDialog(r, this); });
     editor("actionLayerCombinations", tr("Layer &combinations..."), [this](const QJsonObject& r) {
         const QStringList layers = bridge("layer_members").value("layers").toObject().keys();
         return new LayerCombinationsDialog(r, layers, QStringList(m_hiddenLayers.begin(), m_hiddenLayers.end()),
@@ -786,6 +787,14 @@ void MainWindow::setPlanCutHeight(double metres)
 double MainWindow::planCutHeight() const
 {
     return m_cutHeight->value();
+}
+
+double MainWindow::planCutForLevel(const QString& storey) const
+{
+    const QJsonObject levels = m_settings.value("plan_cut_levels").toObject();
+    if (levels.contains(storey))
+        return levels.value(storey).toDouble();
+    return m_settings.value("plan_cut_height").toDouble(1.2);
 }
 
 void MainWindow::updateCutSliderRange()
@@ -3444,6 +3453,8 @@ void MainWindow::askImportStatus()
     const int count = bridge("unmarked").value("count").toInt();
     if (count == 0)
         return;
+    // D91: the project's default for unmarked elements (Existing) is the offered answer.
+    const QString fallback = m_settings.value("ifc_status_default").toString(QStringLiteral("existing"));
     QString answer = m_importStatusAnswer;
     if (!m_quiet) {
         QMessageBox box(QMessageBox::Question, tr("Renovation status"),
@@ -3451,7 +3462,9 @@ void MainWindow::askImportStatus()
         QPushButton* existing = box.addButton(renovationLabel(QStringLiteral("existing")), QMessageBox::AcceptRole);
         QPushButton* demolish = box.addButton(renovationLabel(QStringLiteral("demolish")), QMessageBox::AcceptRole);
         QPushButton* leave = box.addButton(tr("Leave them (they count as New)"), QMessageBox::RejectRole);
-        box.setDefaultButton(leave);
+        box.setDefaultButton(fallback == QLatin1String("demolish") ? demolish
+                             : fallback == QLatin1String("existing") ? existing
+                                                                      : leave);
         box.setEscapeButton(leave);
         auto* again = new QCheckBox(tr("Don't ask again"), &box);
         box.setCheckBox(again);
@@ -3736,6 +3749,12 @@ QString MainWindow::currentViewKey() const
     return m_dock->current();
 }
 
+bool MainWindow::currentViewShowsCutSlider() const
+{
+    ViewHost* host = m_hosts.value(m_dock->current());
+    return host && host->showsCutColumn();
+}
+
 void MainWindow::activateView(const QString& key)
 {
     if (auto* view = qobject_cast<DrawingView*>(m_dock->view(key))) {
@@ -3759,7 +3778,8 @@ void MainWindow::activateView(const QString& key)
         m_cutHeight->setValue(cut.height);
         m_boxBounds = cut.bounds;
     }
-    host->adoptChrome(m_toolOptions, m_cutColumn);
+    // D91: a plan tab has no cut slider; the 3D tab keeps it.
+    host->adoptChrome(m_toolOptions, host->storey().isEmpty() ? m_cutColumn : nullptr);
     m_status->setZoom(m_viewport->zoomPercent());
     if (!host->storey().isEmpty() && host->storey() != m_levels->activeStorey())
         m_levels->setActive(host->storey()); // a plan tab's level is the active level
@@ -3826,7 +3846,7 @@ Viewport* MainWindow::openPlanTab(const QString& storey)
     view->setPlanView(elevation);
     CutSettings cut;
     cut.planCut = true; // a plan is a horizontal cut
-    cut.height = m_cutHeight->value();
+    cut.height = planCutForLevel(storey); // D91: the level's own slice, else the project setting
     m_cuts.insert(view, cut);
     m_dock->addView(key, tr("%1 plan").arg(name), host, true, newViewPlacement());
     m_dock->raise(key); // activateView(): the level, the cut, the chrome, the annotations
@@ -3914,14 +3934,22 @@ void MainWindow::regenerateDrawing(const QString& guid)
             // slow on a detailed storey (measured ~0.5-1.5 s per element).
             const double elevation = d.value("elevation").toDouble();
             const double cut = d.value("cut").toDouble(1.10);
-            const auto seen = m_viewport->visibleFromPlan(bounds, elevation, cut, 0.5);
+            // D91: Revit's view range, plus any object whose own depth below reaches further.
+            const QJsonObject visible = bridge("visible_on", {d.value("storey").toString()});
+            double below = std::max(d.value("view_depth").toDouble(0.5), visible.value("max_depth").toDouble(0.0));
+            const auto seen = m_viewport->visibleFromPlan(bounds, elevation, cut, below);
             if (seen) {
-                planGuids = QStringList(seen->begin(), seen->end());
+                QSet<QString> allowed;
+                for (const auto& g : visible.value("guids").toArray())
+                    allowed.insert(g.toString());
+                for (const QString& g : *seen)
+                    if (allowed.isEmpty() || allowed.contains(g))
+                        planGuids << g;
                 planGuids.sort();
                 include = QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(planGuids)).toJson(QJsonDocument::Compact));
             }
             planCutZ = elevation + cut;
-            planFloorZ = elevation - 0.5;
+            planFloorZ = elevation - below;
             break;
         }
         double x0, y0, z0, x1, y1, z1;
@@ -4092,16 +4120,23 @@ bool MainWindow::openSheet(const QString& number)
     auto* view = new DrawingView(key);
     connect(view, &DrawingView::regenerateRequested, this, &MainWindow::regenerateDrawing);
     connect(view, &DrawingView::placedMoved, this, [this, number](const QString& drawing, QPointF topLeft) {
+        const bool titleBlock = drawing == QLatin1String("titleblock");
         const bool legend = drawing.startsWith(QLatin1String("legend:"));
         const bool symbol = drawing.startsWith(QLatin1String("symbol:")); // D87
-        const QJsonObject r = bridge(symbol ? "move_sheet_symbol" : legend ? "move_legend" : "move_placed",
-            {number, legend || symbol ? drawing.mid(7) : drawing,
-            QString::number(topLeft.x(), 'f', 1), QString::number(topLeft.y(), 'f', 1)});
+        const QJsonObject r = titleBlock
+            ? bridge("move_title_block", {number, QString::number(topLeft.x(), 'f', 1), QString::number(topLeft.y(), 'f', 1)})
+            : bridge(symbol ? "move_sheet_symbol" : legend ? "move_legend" : "move_placed",
+                {number, legend || symbol ? drawing.mid(7) : drawing,
+                QString::number(topLeft.x(), 'f', 1), QString::number(topLeft.y(), 'f', 1)});
         if (!r.value("ok").toBool())
             m_status->showMessage(tr("Could not move it: %1").arg(r.value("error").toString()));
         afterEdit(r);
+        if (titleBlock)
+            refreshSheets(true);
     });
     connect(view, &DrawingView::placedRemoveRequested, this, [this, number](const QString& drawing) {
+        if (drawing == QLatin1String("titleblock"))
+            return; // the title block belongs to the sheet: it can be moved, not removed
         const bool legend = drawing.startsWith(QLatin1String("legend:"));
         const bool symbol = drawing.startsWith(QLatin1String("symbol:")); // D87
         const QJsonObject r = bridge(symbol ? "remove_sheet_symbol" : legend ? "remove_legend" : "remove_placed",
@@ -4110,10 +4145,29 @@ bool MainWindow::openSheet(const QString& number)
             m_status->showMessage(tr("Could not remove it: %1").arg(r.value("error").toString()));
         afterEdit(r);
     });
+    connect(view, &DrawingView::placedEditRequested, this, [this, number](const QString& drawing) {
+        if (drawing == QLatin1String("titleblock")) {
+            editTitleBlock(number);
+            return;
+        }
+        if (!drawing.startsWith(QLatin1String("symbol:")))
+            return;
+        bool ok = false;
+        const QString text = QInputDialog::getMultiLineText(this, tr("Edit text"), tr("Text:"), QString(), &ok);
+        if (!ok)
+            return;
+        const QJsonObject r = bridge("set_sheet_symbol",
+            {number, drawing.mid(7), QString::fromUtf8(QJsonDocument(QJsonObject{{"text", text}}).toJson(QJsonDocument::Compact))});
+        if (!r.value("ok").toBool())
+            m_status->showMessage(tr("Could not change it: %1").arg(r.value("error").toString()));
+        afterEdit(r);
+        refreshSheets(true);
+    });
     m_drawingViews.insert(key, view);
     view->setStale(true);
     m_dock->addView(key, tr("Sheet %1").arg(number), view, true, newViewPlacement());
     m_dock->raise(key);
+    refreshSheets(false); // the title block and whatever is already placed can be dragged at once
     if (!m_generating.contains(key) && !view->hasDrawing())
         regenerateDrawing(key);
     return true;
@@ -4146,11 +4200,17 @@ void MainWindow::refreshSheets(bool changed)
             placed.push_back({QStringLiteral("legend:") + l.value("id").toString(),
                 QRectF(l.value("x").toDouble(), l.value("y").toDouble(), l.value("w").toDouble(), l.value("h").toDouble())});
         }
-        for (const auto& sv : it->value("symbols").toArray()) { // D87: north arrows, scale bars, clouds
+        for (const auto& sv : it->value("symbols").toArray()) { // D87: north arrows, scale bars, clouds, texts
             const QJsonObject l = sv.toObject();
             placed.push_back({QStringLiteral("symbol:") + l.value("id").toString(),
-                QRectF(l.value("x").toDouble(), l.value("y").toDouble(), l.value("w").toDouble(), l.value("h").toDouble())});
+                QRectF(l.value("x").toDouble(), l.value("y").toDouble(), l.value("w").toDouble(), l.value("h").toDouble()),
+                l.value("kind").toString()});
         }
+        const QJsonObject tb = it->value("title_block").toObject(); // D91: dragged and its fields edited
+        if (!tb.isEmpty())
+            placed.push_back({QStringLiteral("titleblock"),
+                QRectF(tb.value("x").toDouble(), tb.value("y").toDouble(), tb.value("w").toDouble(), tb.value("h").toDouble()),
+                QStringLiteral("titleblock")});
         view->setPlaced(placed);
         m_dock->setTitle(key, tr("Sheet %1").arg(it->value("number").toString()));
         if (changed && !m_generating.contains(view->guid()) && view->hasDrawing()) {
@@ -4203,6 +4263,66 @@ bool MainWindow::setProjectInfo(const QJsonObject& info)
         showError(tr("Could not change the project info"), r.value("error").toString());
     afterEdit(r);
     return r.value("ok").toBool();
+}
+
+QJsonObject MainWindow::titleBlock(const QString& number)
+{
+    for (const auto& s : bridge("sheets").value("sheets").toArray())
+        if (s.toObject().value("number").toString() == number)
+            return s.toObject().value("title_block").toObject();
+    return {};
+}
+
+bool MainWindow::setTitleBlock(const QString& number, const QJsonObject& changes)
+{
+    const QJsonObject r = bridge("set_title_block",
+        {number, QString::fromUtf8(QJsonDocument(changes).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool())
+        showError(tr("Could not change the title block"), r.value("error").toString());
+    afterEdit(r);
+    refreshSheets(true);
+    return r.value("ok").toBool();
+}
+
+void MainWindow::editTitleBlock(const QString& number)
+{
+    const QJsonObject tb = titleBlock(number);
+    if (tb.isEmpty())
+        return;
+    const QJsonObject values = tb.value("fields").toObject();
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Title block"));
+    auto* form = new QFormLayout;
+    QVector<QPair<QString, QLineEdit*>> fields;
+    const QVector<QPair<QString, QString>> labels = {
+        {QStringLiteral("project"), tr("Project:")},
+        {QStringLiteral("project_number"), tr("Project number:")},
+        {QStringLiteral("client"), tr("Client:")},
+        {QStringLiteral("address"), tr("Address:")},
+        {QStringLiteral("title"), tr("Sheet title:")},
+        {QStringLiteral("sheet_number"), tr("Sheet number:")},
+        {QStringLiteral("scale"), tr("Scale:")},
+        {QStringLiteral("date"), tr("Date:")},
+        {QStringLiteral("issued"), tr("Issued by:")},
+    };
+    for (const auto& [key, label] : labels) {
+        auto* edit = new QLineEdit(values.value(key).toString(), &dialog);
+        edit->setObjectName(QStringLiteral("titleBlockField.") + key);
+        form->addRow(label, edit);
+        fields.push_back({key, edit});
+    }
+    auto* layout = new QVBoxLayout(&dialog);
+    layout->addLayout(form);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    layout->addWidget(buttons);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    QJsonObject edited;
+    for (const auto& [key, edit] : fields)
+        edited.insert(key, edit->text());
+    setTitleBlock(number, QJsonObject{{QStringLiteral("fields"), edited}});
 }
 
 void MainWindow::setRoofKind(const QString& kind, double pitch)
@@ -5110,6 +5230,8 @@ void MainWindow::saveAsTemplateDialog()
 void MainWindow::projectSettingsDialog()
 {
     ProjectSettingsDialog dialog(m_settings, bridge("project_settings").value("kept").toBool(), this);
+    const QJsonObject tables = bridge("graphics_tables").value("tables").toObject();
+    dialog.setRenovationPresets(tables.value("renovation_styles").toObject().keys());
     if (dialog.exec() == QDialog::Accepted && !dialog.changes().isEmpty() && setProjectSettings(dialog.changes()))
         m_status->showMessage(tr("Project settings changed"));
 }

@@ -230,6 +230,25 @@ private slots:
         QCOMPARE(w.viewport(), plan);
     }
 
+    // D91: a plan tab's hidden slice is the project setting, overridable per level; it has no cut slider.
+    void planTabSliceAndNoCutSlider()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        action(w, "action3DView")->trigger();
+        QCOMPARE(w.planCutHeight(), 1.2); // the project default
+        QVERIFY2(w.currentViewShowsCutSlider(), qPrintable(w.currentViewKey())); // the 3D tab keeps the cut slider
+        const QString l1 = w.levelsBar()->activeStorey();
+        QVERIFY(w.setProjectSettings({{"plan_cut_levels", QJsonObject{{l1, 2.0}}}}));
+        kimbim::Viewport* plan = w.openPlanTab(l1);
+        QVERIFY(plan);
+        QCOMPARE(w.planCutHeight(), 2.0); // the level's own slice
+        QVERIFY(!w.currentViewShowsCutSlider()); // D91: a plan tab has no cut slider
+        action(w, "action3DView")->trigger();
+        QVERIFY(w.currentViewShowsCutSlider());
+        QVERIFY(w.close());
+    }
+
     void deletingTheActivePlanLevel()
     {
         kimbim::MainWindow w(nullptr, true);
@@ -1191,6 +1210,32 @@ private slots:
             [](const kimbim::DrawingView::Placed& p) { return p.guid.startsWith(QLatin1String("legend:")); }));
     }
 
+    // D91: the title block is dragged like a drawing and its fields edited; both stay with the sheet.
+    void sheetTitleBlockDraggedAndFieldsEdited()
+    {
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        const QString number = w.addSheet(QStringLiteral("A3"), QStringLiteral("Title block"));
+        QVERIFY(!number.isEmpty());
+        QVERIFY(w.openSheet(number));
+        kimbim::DrawingView* view = w.sheetView(number);
+        QVERIFY(view);
+        QVERIFY(std::any_of(view->placed().begin(), view->placed().end(),
+            [](const kimbim::DrawingView::Placed& p) { return p.guid == QLatin1String("titleblock"); }));
+        emit view->placedMoved(QStringLiteral("titleblock"), QPointF(15, 20));
+        QCOMPARE(w.titleBlock(number).value("x").toDouble(), 15.0);
+        QCOMPARE(w.titleBlock(number).value("y").toDouble(), 20.0);
+        QVERIFY(w.setTitleBlock(number, QJsonObject{{"fields", QJsonObject{{"project", "Casa"},
+            {"client", "Ana"}, {"title", "Planta baja"}}}}));
+        const QJsonObject fields = w.titleBlock(number).value("fields").toObject();
+        QCOMPARE(fields.value("project").toString(), QStringLiteral("Casa"));
+        QCOMPARE(fields.value("client").toString(), QStringLiteral("Ana"));
+        QCOMPARE(fields.value("title").toString(), QStringLiteral("Planta baja"));
+        QVERIFY(w.exportSheet(number, QDir::temp().filePath(QStringLiteral("kimbim-title-block.svg"))));
+        emit view->placedRemoveRequested(QStringLiteral("titleblock")); // it cannot be removed
+        QCOMPARE(w.titleBlock(number).value("x").toDouble(), 15.0);
+    }
+
     void combineDialogPreviewsOncePerChoice()
     {
         // A choice queued a refresh and choose() refreshed again: the three-way merge ran twice.
@@ -1932,7 +1977,7 @@ private slots:
         QCOMPARE(w.propertiesPanel()->statusCombo()->currentData().toString(), QStringLiteral("new"));
         auto* menu = w.findChild<QMenu*>(QStringLiteral("renovationMenu"));
         QVERIFY(menu);
-        QCOMPARE(menu->actions().size(), 5); // 3 statuses, a separator, "Mark unmarked elements as"
+        QCOMPARE(menu->actions().size(), 7); // 5 statuses, a separator, "Mark unmarked elements as"
         menu->actions().at(1)->trigger();     // To be demolished
         QCOMPARE(w.propertiesPanel()->statusCombo()->currentData().toString(), QStringLiteral("demolish"));
         QVERIFY(w.setPurpose(QStringLiteral("New construction")));
@@ -2206,11 +2251,18 @@ private slots:
     void projectSettingsDialogReportsOnlyChanges()
     {
         kimbim::ProjectSettingsDialog d({{"plan_cut_height", 1.2}, {"drawing_scale", 100}, {"sheet_paper", "A1"},
-                                         {"length_unit", "m"}, {"length_decimals", 2}}, /*kept=*/false, nullptr);
+                                         {"length_unit", "m"}, {"length_decimals", 2},
+                                         {"scales", QJsonArray{500, 100, 50, 20}},
+                                         {"ifc_status_default", "existing"}}, /*kept=*/false, nullptr);
         QVERIFY(d.findChild<QLabel*>("notKeptNote")->isVisibleTo(&d));
         d.findChild<QComboBox*>("sheetPaper")->setCurrentText("A3");
-        d.findChild<QSpinBox*>("drawingScale")->setValue(50);
-        QCOMPARE(d.changes(), QJsonObject({{"sheet_paper", "A3"}, {"drawing_scale", 50}}));
+        d.findChild<QComboBox*>("drawingScale")->setCurrentText("50"); // D93: a scale from the list
+        d.findChild<QDoubleSpinBox*>("viewDepth")->setValue(0.8); // D91: Revit's view range
+        auto* ifcStatus = d.findChild<QComboBox*>("ifcStatusDefault");
+        QCOMPARE(ifcStatus->currentData().toString(), QStringLiteral("existing")); // D91 default
+        ifcStatus->setCurrentIndex(1); // To be demolished
+        QCOMPARE(d.changes(), QJsonObject({{"sheet_paper", "A3"}, {"drawing_scale", 50},
+            {"ifc_status_default", "demolish"}, {"view_depth", 0.8}}));
     }
 
     // D72: an IFC edited directly keeps no settings, so showing or hiding a layer isn't unsaved work.

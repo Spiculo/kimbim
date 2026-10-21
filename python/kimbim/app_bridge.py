@@ -897,6 +897,7 @@ from . import underlays as _underlays  # noqa: E402
 from . import symbols as _symbols  # noqa: E402
 from . import tags as _tags  # noqa: E402
 from . import stairs as _stairs  # noqa: E402
+from . import showon as _showon  # noqa: E402
 
 _EXPORTS = {
     "authoring": (
@@ -990,6 +991,7 @@ _EXPORTS = {
         "set_drawing_depth",
         "set_drawing_hlr",
         "set_drawing_timeout",
+        "set_view_depth",
     ),
     "sheets": (
         "add_sheet",
@@ -1008,6 +1010,8 @@ _EXPORTS = {
         "place_legend",
         "move_legend",
         "remove_legend",
+        "move_title_block",
+        "set_title_block",
         "place_sheet_symbol",
         "move_sheet_symbol",
         "set_sheet_symbol",
@@ -1060,6 +1064,11 @@ _EXPORTS = {
         "rename_storey",
         "set_storey_elevation",
         "set_storey_shown",
+    ),
+    "showon": (
+        "set_element_view_depth",
+        "set_show_on",
+        "visible_on",
     ),
     "checks": (
         "_write_sample_house",
@@ -1169,6 +1178,7 @@ _EXPORTS = {
         "place_object",
         "set_library_paths",
         "set_object_parameter",
+        "set_plan_display",
     ),
 }
 _EXPORTED = {name: module for module, names in _EXPORTS.items() for name in names}

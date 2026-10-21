@@ -42,7 +42,7 @@ INFO = ["class", "type", "level"]
 # Quantity name -> (kind, summed when merging)
 QUANTITIES = {
     "length": ("length", True), "height": ("length", False), "width": ("length", False),
-    "thickness": ("length", False), "perimeter": ("length", True),
+    "thickness": ("length", False), "perimeter": ("length", True), "sill": ("length", False),
     "area": ("area", True), "gross_area": ("area", True),
     "gross_side_area": ("area", True), "net_side_area": ("area", True), "opening_area": ("area", True),
     "volume": ("volume", True), "gross_volume": ("volume", True), "count": ("count", True),
@@ -54,6 +54,7 @@ LABELS = {  # English labels; the app translates these (custom labels show as ty
     "info:class": "Class", "info:type": "Type", "info:level": "Level",
     "quantity:length": "Length", "quantity:height": "Height", "quantity:width": "Width",
     "quantity:thickness": "Thickness", "quantity:perimeter": "Perimeter", "quantity:area": "Area",
+    "quantity:sill": "Sill height",
     "quantity:gross_area": "Gross area", "quantity:gross_side_area": "Gross side area",
     "quantity:net_side_area": "Net side area", "quantity:opening_area": "Opening area",
     "quantity:volume": "Volume", "quantity:gross_volume": "Gross volume", "quantity:count": "Count",
@@ -461,6 +462,9 @@ def _parametric(e, family: str, ctx: _Ctx) -> dict:
             if w and h:
                 w, h = float(w) * s, float(h) * s
                 q.update(width=w, height=h, area=w * h, perimeter=2 * (w + h))
+            info = A._opening_info(e)  # D93: the sill height above the host wall's base
+            if info is not None:
+                q["sill"] = info[5]
         elif family in ("IfcSlab", "IfcSpace", "IfcCovering"):
             solids = _body_solids(e)
             if solids:

@@ -30,6 +30,8 @@ PURPOSE = "SHEET"
 PAPERS = {"A1": (841, 594), "A3": (420, 297)}  # landscape, millimetres
 MARGIN = 10.0
 TITLE_W, TITLE_H = 180.0, 50.0
+TITLE_BLOCK = "title_block"
+TITLE_FIELDS = ("project", "project_number", "client", "address", "title", "sheet_number", "scale", "date", "issued")
 
 
 def _x3() -> bool:
@@ -63,6 +65,22 @@ def _number(sheet) -> str:
 
 def _link(ref) -> str:
     return getattr(ref, _link_attr())
+
+
+def _sheet_data(sheet) -> dict:
+    """The sheet's own JSON (Description): today only where its title block sits and its field
+    overrides (D91: the sheet is freely editable)."""
+    try:
+        data = json.loads(sheet.Description or "{}")
+    except ValueError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _write_sheet_data(sheet, data: dict) -> None:
+    sheet.Description = json.dumps(data, sort_keys=True) if data else None
+
+
 GAP = 15.0  # between placed drawings
 TITLE_BAND = 12.0  # the drawing title under each drawing
 
@@ -207,7 +225,7 @@ def sheets() -> str:
                 legends.append({"id": _link(ref), "x": p["x"], "y": p["y"], "w": round(lw, 3), "h": round(lh, 3)})
         out.append({"number": _number(sheet), "title": sheet.Name or "", "paper": sheet.Scope or "A1",
                     "width": w, "height": h, "views": views, "legends": legends,
-                    "symbols": _symbol_listing(sheet)})
+                    "symbols": _symbol_listing(sheet), "title_block": _title_block_listing(sheet)})
     return B._dump({"sheets": out})
 
 
@@ -322,7 +340,8 @@ def _free_spot(sheet, w, h):
         taken.append((p["x"], p["y"], lw, lh))
     for item in _symbol_listing(sheet):  # D87
         taken.append((item["x"], item["y"], item["w"], item["h"]))
-    taken.append((width - MARGIN - TITLE_W, height - MARGIN - TITLE_H, TITLE_W, TITLE_H))
+    tx, ty = _title_block_geometry(sheet)
+    taken.append((tx, ty, TITLE_W, TITLE_H))
     y = MARGIN + 5
     while y + h <= height - MARGIN:
         x = MARGIN + 5
@@ -445,12 +464,18 @@ def _sheet_resolved(number: str):
     return graphics.resolve(S.current().get("sheet_purposes", {}).get(number) or None)
 
 
+def _legend_max_height(sheet):
+    """How tall a legend may be on this sheet (D91: it lists every rule when it fits)."""
+    _, h = PAPERS.get(sheet.Scope or "A1", PAPERS["A1"])
+    return h - 2 * MARGIN
+
+
 def _legend_size(sheet):
     """The legend's size for listing and placing: from the whole model, so listing sheets never
     generates drawings (the composed legend, limited to the sheet's drawings, may have fewer rows)."""
     from . import graphics
 
-    _, w, h = graphics.legend_svg(_sheet_resolved(_number(sheet)))
+    _, w, h = graphics.legend_svg(_sheet_resolved(_number(sheet)), max_height=_legend_max_height(sheet))
     return w, h
 
 
@@ -464,7 +489,7 @@ def _legend_content(sheet, resolved):
         size, svg = _drawing_size(_link(ref), resolved["hidden"])
         if size is not None:
             guids.update(re.findall(r'ifc:guid="([^"]+)"', svg))
-    return graphics.legend_svg(resolved, guids if views else None)
+    return graphics.legend_svg(resolved, guids if views else None, max_height=_legend_max_height(sheet))
 
 
 def place_legend(number: str) -> str:
@@ -529,7 +554,7 @@ def remove_legend(number: str, legend_id: str) -> str:
 # revision), "drawing" (the placed drawing a scale bar or north arrow belongs to; default the first)}.
 
 SYMBOL = "kimbim:symbol"
-SYMBOL_KINDS = ("north", "scalebar", "cloud")
+SYMBOL_KINDS = ("north", "scalebar", "cloud", "text")
 
 
 def _symbols(sheet):
@@ -563,6 +588,12 @@ def _symbol_geometry(sheet, data):
         geom = Sy.scale_bar((2.0, 6.0), scale, 1.0)
         width = max(p[0] for c in geom["curves"] for p in c) + 6.0
         return geom, width, 13.0
+    if kind == "text":  # D91: free text on a sheet, moved and edited like any placed item
+        text = str(data.get("text") or "")
+        size = float(data.get("size", 3.5))
+        geom = {"curves": [], "solids": [],
+                "labels": [{"text": text, "at": (0.0, size * 0.6), "size": size, "anchor": "start", "angle": 0.0}]}
+        return geom, max(1.8 * size * len(text), size), size * 1.4
     w, h = float(data.get("w", 60.0)), float(data.get("h", 40.0))
     return Sy.revision_cloud([(0, 0), (w, 0), (w, h), (0, h)], str(data.get("text") or ""), 2.5, 1.0), w, h
 
@@ -615,6 +646,13 @@ def place_sheet_symbol(number: str, kind: str, options_json: str = "") -> str:
             data.update(w=float(o.get("w", 60.0)), h=float(o.get("h", 40.0)), text=str(o.get("text") or ""))
             if data["w"] <= 0 or data["h"] <= 0:
                 return A._fail("bad size")
+        if kind == "text":
+            data["text"] = str(o.get("text") or "")
+            if not data["text"].strip():
+                return A._fail("the sheet text is empty")
+            data["size"] = float(o.get("size", 3.5))
+            if data["size"] <= 0:
+                return A._fail("bad size")
         if o.get("drawing"):
             data["drawing"] = str(o["drawing"])
         _geom, w, h = _symbol_geometry(sheet, data)
@@ -649,6 +687,10 @@ def set_sheet_symbol(number: str, symbol_id: str, changes_json: str) -> str:
         for k in ("x", "y", "w", "h"):
             if k in o:
                 data[k] = round(float(o[k]), 3)
+        if "size" in o:  # D91: a sheet text's size
+            data["size"] = round(float(o["size"]), 3)
+            if data["size"] <= 0:
+                return A._fail("bad size")
     except (TypeError, ValueError):
         return A._fail("bad input")
     if data.get("w", 1) <= 0 or data.get("h", 1) <= 0:
@@ -692,7 +734,8 @@ def _symbol_listing(sheet) -> list:
             continue
         _geom, w, h = _symbol_geometry(sheet, data)
         out.append({"id": _link(ref), "kind": data["kind"], "x": float(data.get("x", MARGIN)),
-                    "y": float(data.get("y", MARGIN)), "w": round(w, 3), "h": round(h, 3), "text": data.get("text", "")})
+                    "y": float(data.get("y", MARGIN)), "w": round(w, 3), "h": round(h, 3), "text": data.get("text", ""),
+                    "size": float(data.get("size", 0.0))})
     return out
 
 
@@ -714,31 +757,127 @@ def _inner(svg: str):
     return styles, defs, body
 
 
-def _title_block(sheet, width, height, info) -> list:
-    """Archicad-like title block, bottom right: project, client, address, sheet title and number,
-    scale, date, issued with KimBim."""
-    x0, y0 = width - MARGIN - TITLE_W, height - MARGIN - TITLE_H
+def _title_defaults(sheet, info=None) -> dict:
+    """What the title block shows when the sheet has no override for a field."""
+    if info is None:
+        info = json.loads(project_info())
     scales = sorted({_placement(r)["scale"] for r in _views(sheet)})
     scale = f"1:{scales[0]}" if len(scales) == 1 else "As indicated" if scales else ""
+    return {
+        "project": info.get("name") or info.get("number") or "",
+        "project_number": info.get("number") or "",
+        "client": info.get("client") or "",
+        "address": info.get("address") or "",
+        "title": sheet.Name or "",
+        "sheet_number": _number(sheet) or "",
+        "scale": scale,
+        "date": datetime.date.today().isoformat(),
+        "issued": "KimBim",
+    }
+
+
+def _title_block_geometry(sheet):
+    """The title block's top-left corner on the sheet (mm), bottom right until it is moved."""
+    width, height = PAPERS.get(sheet.Scope or "A1", PAPERS["A1"])
+    data = _sheet_data(sheet).get(TITLE_BLOCK, {})
+    try:
+        return float(data.get("x", width - MARGIN - TITLE_W)), float(data.get("y", height - MARGIN - TITLE_H))
+    except (TypeError, ValueError):
+        return width - MARGIN - TITLE_W, height - MARGIN - TITLE_H
+
+
+def _title_block_fields(sheet, info=None) -> dict:
+    """The title block's fields with the sheet's overrides applied."""
+    fields = _title_defaults(sheet, info)
+    overrides = _sheet_data(sheet).get(TITLE_BLOCK, {}).get("fields", {})
+    if isinstance(overrides, dict):
+        fields.update({k: str(v) for k, v in overrides.items() if k in TITLE_FIELDS})
+    return fields
+
+
+def _title_block_listing(sheet) -> dict:
+    x, y = _title_block_geometry(sheet)
+    return {"x": x, "y": y, "w": TITLE_W, "h": TITLE_H, "fields": _title_block_fields(sheet)}
+
+
+def _title_block(sheet, width, height, info) -> list:
+    """Archicad-like title block: project, client, address, sheet title and number, scale, date,
+    issued by KimBim. It can be moved and each field edited (D91)."""
+    x0, y0 = _title_block_geometry(sheet)
+    fields = _title_block_fields(sheet, info)
     rows = [
-        (x0 + 3, y0 + 8, 5.0, info.get("name") or info.get("number") or B._model.by_type("IfcProject")[0].Name or ""),
-        (x0 + 3, y0 + 14, 3.0, f"Project no. {info.get('number', '')}" if info.get("number") else ""),
-        (x0 + 3, y0 + 19, 3.0, f"Client: {info.get('client')}" if info.get("client") else ""),
-        (x0 + 3, y0 + 24, 3.0, info.get("address", "")),
-        (x0 + 3, y0 + 36, 4.5, sheet.Name or ""),
-        (x0 + 3, y0 + 45, 2.5, datetime.date.today().isoformat()),
-        (x0 + 60, y0 + 45, 2.5, "KimBim"),
+        (3, 8, 5.0, fields["project"]),
+        (3, 14, 3.0, fields["project_number"]),
+        (3, 19, 3.0, fields["client"]),
+        (3, 24, 3.0, fields["address"]),
+        (3, 36, 4.5, fields["title"]),
+        (3, 45, 2.5, fields["date"]),
+        (60, 45, 2.5, fields["issued"]),
     ]
     out = [f'<rect x="{x0}" y="{y0}" width="{TITLE_W}" height="{TITLE_H}" fill="none" stroke="#000" stroke-width="0.5"/>',
            f'<path d="M{x0},{y0 + 28} L{x0 + TITLE_W},{y0 + 28}" stroke="#000" stroke-width="0.25"/>',
            f'<path d="M{x0 + 130},{y0 + 28} L{x0 + 130},{y0 + TITLE_H}" stroke="#000" stroke-width="0.25"/>',
            f'<text x="{x0 + 133}" y="{y0 + 34}" font-size="2.5">Sheet</text>',
-           f'<text x="{x0 + 133}" y="{y0 + 44}" font-size="7">{_esc(_number(sheet))}</text>',
-           f'<text x="{x0 + 100}" y="{y0 + 45}" font-size="3">{_esc(scale)}</text>']
+           f'<text x="{x0 + 133}" y="{y0 + 44}" font-size="7">{_esc(fields["sheet_number"])}</text>',
+           f'<text x="{x0 + 100}" y="{y0 + 45}" font-size="3">{_esc(fields["scale"])}</text>']
     for x, y, size, value in rows:
         if value:
-            out.append(f'<text x="{x}" y="{y}" font-size="{size}">{_esc(value)}</text>')
+            out.append(f'<text x="{x0 + x}" y="{y0 + y}" font-size="{size}">{_esc(value)}</text>')
     return out
+
+
+def set_title_block(number: str, changes_json: str) -> str:
+    """Move the title block ({x, y}, top-left mm) or edit its fields ({fields: {name: value}}).
+    A field equal to what the sheet derives by default is not kept as an override."""
+    sheet = _sheet(number) if B._model is not None else None
+    if sheet is None:
+        return A._fail("unknown sheet")
+    try:
+        changes = json.loads(changes_json or "{}")
+    except ValueError as ex:
+        return A._fail(f"bad input: {ex}")
+    if not isinstance(changes, dict):
+        return A._fail("bad input: expected an object")
+    data = _sheet_data(sheet)
+    block = dict(data.get(TITLE_BLOCK, {}))
+    try:
+        if "x" in changes:
+            block["x"] = round(float(changes["x"]), 3)
+        if "y" in changes:
+            block["y"] = round(float(changes["y"]), 3)
+    except (TypeError, ValueError):
+        return A._fail("bad position")
+    if "fields" in changes:
+        if not isinstance(changes["fields"], dict):
+            return A._fail("bad fields")
+        defaults = _title_defaults(sheet)
+        overrides = dict(block.get("fields", {})) if isinstance(block.get("fields"), dict) else {}
+        for key, value in changes["fields"].items():
+            if key not in TITLE_FIELDS:
+                return A._fail(f"unknown title block field {key}")
+            text = "" if value is None else str(value)
+            if text == defaults[key]:
+                overrides.pop(key, None)
+            else:
+                overrides[key] = text
+        if overrides:
+            block["fields"] = overrides
+        else:
+            block.pop("fields", None)
+
+    def action():
+        data[TITLE_BLOCK] = block
+        _write_sheet_data(sheet, data)
+        return 1
+
+    return B._dump(B._run(action, affects_drawings=False))
+
+
+def move_title_block(number: str, x, y) -> str:
+    try:
+        return set_title_block(number, json.dumps({"x": float(x), "y": float(y)}))
+    except (TypeError, ValueError):
+        return A._fail("bad position")
 
 
 def sheet_svg(number: str) -> str:

@@ -63,17 +63,18 @@ def plan_svg(storey_name="Level 1"):
 
 def test_template_text_from_attributes_quantities_and_properties(flat):
     door = b._model.by_guid(flat["door"])
-    assert tags.text_of(door, "{Width}×{Height}") == "0.90×2.10"
-    assert tags.text_of(door, "{Mark}\n{Width}") == "0.90"  # a line whose fields are all empty goes
-    assert tags.text_of(door, "{Mark|Class}") == "IfcDoor"  # the first with a value
-    assert tags.text_of(door, "{Level}") == "Level 1"
-    assert tags.text_of(door, "{Mark}") == "?"  # nothing at all: the tag still shows
+    assert tags.text_of(door, "$width$×$height$") == "0.90×2.10"
+    assert tags.text_of(door, "$mark$\n$width$") == "0.90"  # a line whose fields are all empty goes
+    assert tags.text_of(door, "$mark|class$") == "IfcDoor"  # the first with a value
+    assert tags.text_of(door, "$level$") == "Level 1"
+    assert tags.text_of(door, "$sill$") == "0.00"  # D93: the sill height above the wall base
+    assert tags.text_of(door, "$mark$") == "?"  # nothing at all: the tag still shows
     assert call("set_property", g(flat["door"]), "Pset_DoorCommon", "FireRating", json.dumps("EI2 30"))["ok"]
-    assert tags.text_of(door, "Fire {Pset_DoorCommon.FireRating}") == "Fire EI2 30"
+    assert tags.text_of(door, "Fire $Pset_DoorCommon.FireRating$") == "Fire EI2 30"
     room = b._model.by_guid(flat["room"])
     stamp = tags.text_of(room, tags.BUILTIN["room"]["template"]).split("\n")
     assert stamp[0] == "Living room" and stamp[-1].endswith(" m²")
-    assert tags.template_fields("{Gross area} {Mark|Name}") == [
+    assert tags.template_fields("$gross area$ $mark|name$") == [
         {"source": "quantity", "name": "gross_area"}, {"source": "attribute", "name": "Tag"},
         {"source": "attribute", "name": "Name"}]
 
@@ -82,7 +83,7 @@ def test_template_text_from_attributes_quantities_and_properties(flat):
 
 def test_a_tag_follows_its_element_and_shows_its_values(flat):
     assert call("tag_target", flat["l1"], 4.1, 0.05)["guid"] == flat["door"]  # a click on the door
-    t = call("add_tag", flat["door"], "")
+    t = call("add_tag", flat["door"], json.dumps({"template": "$mark$\n$width$×$height$"}))
     assert t["ok"], t
     tag = b._model.by_guid(t["guid"])
     assert tag.ObjectType == "TAG" and tags.element_of(tag).GlobalId == flat["door"]
@@ -132,7 +133,7 @@ def test_a_copied_tag_annotates_the_same_element(flat):
 
 
 def test_tag_options_shapes_and_leader(flat):
-    t = call("add_tag", flat["door"], json.dumps({"template": "{Class}", "shape": "hexagon", "leader": True,
+    t = call("add_tag", flat["door"], json.dumps({"template": "$class$", "shape": "hexagon", "leader": True,
                                                    "at": [5.5, -2.0]}))
     assert t["ok"], t
     a = listed(flat["l1"])[t["guid"]]
@@ -169,19 +170,19 @@ def test_tag_styles_are_project_settings_and_restyle_their_tags(flat):
     styles = call("tag_styles")
     assert set(tags.AUTO_STYLES) <= set(styles["styles"]) and "room" in styles["styles"]
     r = call("save_tag_style", json.dumps({"id": "door", "name": "Door marker", "classes": ["IfcDoor"],
-                                           "template": "P-{Width}", "shape": "circle"}))
+                                           "template": "P-$width$", "shape": "circle"}))
     assert r["ok"] and r["updated"] == 1, r
     assert listed(flat["l1"])[t]["text"] == "P-0.90"
-    assert s.current()["tag_styles"]["door"]["template"] == "P-{Width}"
+    assert s.current()["tag_styles"]["door"]["template"] == "P-$width$"
     assert not call("save_tag_style", json.dumps({"name": "Bad", "shape": "star"}))["ok"]
     assert not call("set_project_settings", json.dumps({"tag_styles": {"x": {"name": "X", "size": 0}}}))["ok"]
     # The room stamp style is every room's stamp.
-    call("save_tag_style", json.dumps({"id": "room", "name": "Room stamp", "template": "{Name} {LongName}"}))
+    call("save_tag_style", json.dumps({"id": "room", "name": "Room stamp", "template": "$name$ $longname$"}))
     room = call("rooms", flat["l1"])["rooms"][0]
     assert room["stamp"] == f"{room['number']} Living room"
     assert f">{room['number']} Living room</text>" in plan_svg()
     assert call("delete_tag_style", "door")["ok"]
-    assert listed(flat["l1"])[t]["text"] == "0.90×2.10"
+    assert listed(flat["l1"])[t]["text"] == "?"  # the default door marker is the code alone; no Mark here
 
 
 # ---------------------------------------------------------------- symbols
@@ -251,7 +252,7 @@ def test_level_and_spot_elevations_measure_the_slab_below(flat):
 # ---------------------------------------------------------------- drawings, sheets, DXF
 
 def test_plan_drawing_has_tags_stamps_and_symbols(flat, tmp_path):
-    t = call("add_tag", flat["door"], "")["guid"]
+    t = call("add_tag", flat["door"], json.dumps({"template": "$width$×$height$"}))["guid"]
     call("add_symbol", flat["l1"], "north", json.dumps([[15, 3]]), "")
     call("add_symbol", flat["l1"], "cloud", json.dumps([[1, 1], [3, 1], [3, 2]]), json.dumps({"text": "A"}))
     call("add_symbol", flat["l1"], "angle", json.dumps([[0, 0], [2, 0], [0, 2], [1, 1]]), "")

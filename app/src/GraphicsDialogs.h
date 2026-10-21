@@ -260,6 +260,26 @@ private:
     QTableWidget* m_rows = nullptr;
 };
 
+// Graphics > Renovation styles (D93): the palette of looks (line pen, line type, fill pen, 3D colour)
+// per renovation status, by preset; the default preset is Uruguay.
+class RenovationStylesDialog : public NamedSetsDialog {
+    Q_OBJECT
+public:
+    RenovationStylesDialog(const QJsonObject& reply, QWidget* parent);
+    void setPen(const QString& status, int pen);
+    void setFill(const QString& status, int pen);
+    void setLine(const QString& status, const QString& line);
+    void setSurface(const QString& status, const QColor& color);
+
+protected:
+    void showSet(const QString& name) override;
+
+private:
+    QJsonObject style(const QString& status) const;
+    void setField(const QString& status, const QString& field, const QJsonValue& value);
+    QTableWidget* m_rows = nullptr;
+};
+
 // Graphics > Purposes: each purpose's pen set, visibility set, override set and layer combination.
 class PurposesDialog : public NamedSetsDialog {
     Q_OBJECT

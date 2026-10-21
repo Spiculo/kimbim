@@ -14,9 +14,13 @@ from . import app_bridge as B
 
 DEFAULTS = {
     "plan_cut_height": 1.2,
+    "plan_cut_levels": {},  # D91: per-level overrides of the plan slice (level guid -> metres)
+    "view_depth": 0.5,  # D91: how far below a plan's level it still sees (Revit's view range)
+    "view_depth_levels": {},  # D91: per-level overrides of the view depth (level guid -> metres)
     "hidden_layers": [],
     "locked_layers": [],
     "drawing_scale": 100,
+    "scales": [500, 100, 50, 20],  # D93: the scales a drawing can be placed at; users add more
     "sheet_paper": "A1",
     "length_unit": "m",
     "length_decimals": 2,
@@ -29,10 +33,15 @@ DEFAULTS = {
     "layer_combinations": {},
     "purposes": {},
     "renovation_filters": {},
+    "renovation_styles": {},  # D93: renovation look presets (pen, line, fill, colour) by status
+    "renovation_preset": "Uruguay",  # D93: the active renovation-styles preset
+    "legend_mode": "auto",  # D91: sheet legends: "auto" (all rules when they fit), "all" or "used"
+    "plan_symbols": True,  # D91: plans show library objects' 2D plan symbol (else the 3D body)
     "purpose": "",
     "current_pen": 23,
     "sheet_purposes": {},
     "status_for_new": "new",
+    "ifc_status_default": "existing",  # D91: the status offered for unmarked elements of an opened IFC
     "schedules": {},  # schedule schemes by id: the project's own and its edited built-ins (D77)
     "selection_criteria": {},
     "selection_sets": {},
@@ -118,8 +127,21 @@ def _error(key: str, value) -> str | None:
     number = isinstance(value, (int, float)) and not isinstance(value, bool)
     if key == "plan_cut_height" and not (number and 0 < value <= 20):
         return "the plan cut height must be between 0 and 20 m"
+    if key == "view_depth" and not (number and 0 <= value <= 20):
+        return "the view depth below must be between 0 and 20 m"
+    if key == "view_depth_levels" and not (isinstance(value, dict) and all(
+            isinstance(k, str) and isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 20
+            for k, v in value.items())):
+        return "the per-level view depths must be numbers between 0 and 20 m"
+    if key == "plan_cut_levels" and not (isinstance(value, dict) and all(
+            isinstance(k, str) and isinstance(v, (int, float)) and not isinstance(v, bool) and 0 < v <= 20
+            for k, v in value.items())):
+        return "the per-level plan cut heights must be numbers between 0 and 20 m"
     if key == "drawing_scale" and not (isinstance(value, int) and not isinstance(value, bool) and value > 0):
         return "the drawing scale must be a whole number above 0"
+    if key == "scales" and not (isinstance(value, list) and value and all(
+            isinstance(v, int) and not isinstance(v, bool) and v > 0 for v in value)):
+        return "the scales must be a non-empty list of whole numbers above 0"
     if key == "sheet_paper" and value not in PAPERS:
         return f"unknown paper size {value}"
     if key == "length_unit" and value not in UNITS:
@@ -128,8 +150,16 @@ def _error(key: str, value) -> str | None:
         return "decimals must be between 0 and 4"
     if key in ("hidden_layers", "locked_layers") and not (isinstance(value, list) and all(isinstance(x, str) for x in value)):
         return f"{key} must be a list of layer names"
-    if key == "status_for_new" and value not in ("existing", "demolish", "new"):
+    if key == "status_for_new" and value not in ("existing", "demolish", "new", "temporary", "auxiliary"):
         return f"unknown renovation status {value}"
+    if key == "ifc_status_default" and value not in ("existing", "demolish", "leave"):
+        return f"unknown default for unmarked elements {value}"
+    if key == "renovation_preset" and not isinstance(value, str):
+        return "the renovation style preset is a name"
+    if key == "legend_mode" and value not in ("auto", "all", "used"):
+        return f"unknown legend mode {value}"
+    if key == "plan_symbols" and not isinstance(value, bool):
+        return "plan symbols is true or false"
     if key == "schedules":  # schedule schemes by id (D77)
         from .schedules import table_error
 

@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Renovation status (Archicad's model, D74): Existing, To be demolished, New. Stored where IFC keeps it,
-Pset_<Class>Common.Status (an enumerated value: EXISTING, DEMOLISH, NEW), or KIMBIM_Renovation.Status
-where the schema's template for the class has no Status (IFC2X3, spaces, furniture occurrences). Read
-from any pset's Status or Archicad's "Renovation Status"; no status, or an unknown one, is New.
+"""Renovation status (Archicad's model, D74, D91): Existing, To be demolished, New, Temporary,
+Auxiliary. Stored where IFC keeps it, Pset_<Class>Common.Status (an enumerated value: EXISTING,
+DEMOLISH, NEW, TEMPORARY), or KIMBIM_Renovation.Status where the schema's template for the class has
+no Status (IFC2X3, spaces, furniture occurrences) or where IFC has no value (Auxiliary). Read from any
+pset's Status or Archicad's "Renovation Status"; no status, or an unknown one, is New.
 Same protocol as app_bridge for the bridge functions (strings in, JSON out, never raise).
 """
 from __future__ import annotations
@@ -14,8 +15,9 @@ import ifcopenshell.api.pset
 import ifcopenshell.util.element
 import ifcopenshell.util.pset
 
-STATUSES = ("existing", "demolish", "new")
-IFC_VALUE = {"existing": "EXISTING", "demolish": "DEMOLISH", "new": "NEW"}
+STATUSES = ("existing", "demolish", "new", "temporary", "auxiliary")
+# IFC's PEnum_ElementStatus has no "Auxiliary": that one only lives in KimBim's own pset.
+IFC_VALUE = {"existing": "EXISTING", "demolish": "DEMOLISH", "new": "NEW", "temporary": "TEMPORARY"}
 PSET = "KIMBIM_Renovation"
 NAMES = ("Status", "Renovation Status")
 
@@ -28,6 +30,10 @@ def normalize(value) -> str:
         return "existing"
     if text in ("demolish", "demolished", "to be demolished"):
         return "demolish"
+    if text == "temporary":
+        return "temporary"
+    if text == "auxiliary":
+        return "auxiliary"
     return "new"
 
 
@@ -55,22 +61,42 @@ def _stored(element):
         sources.append(element_type)
     for source in sources:
         psets = ifcopenshell.util.element.get_psets(source, psets_only=True, should_inherit=False)
-        for name in NAMES:
-            for props in psets.values():
+        # KimBim's own pset first: it holds statuses IFC has no value for (Auxiliary) and never
+        # contradicts the common one (write_status clears the other place).
+        for pset_name in (PSET, *[n for n in psets if n != PSET]):
+            props = psets.get(pset_name) or {}
+            for name in NAMES:
                 if props.get(name) is not None:
                     return props[name]
     return None
 
 
+def _host(element):
+    """The wall (or other element) a door or window fills, through its opening; None otherwise."""
+    for rel in getattr(element, "FillsVoids", ()) or ():
+        opening = rel.RelatingOpeningElement
+        for voids in getattr(opening, "VoidsElements", ()) or ():
+            host = voids.RelatingBuildingElement
+            if host is not None:
+                return host
+    return None
+
+
 def status_of(element, facts=None) -> str:
-    """`facts`: a graphics._Facts sharing the file-wide index (many elements); without it, only this
+    """The element's status. A door or window without its own status takes its host wall's (D91),
+    so it follows the wall when the wall's status changes; setting one on the door pins it.
+    `facts`: a graphics._Facts sharing the file-wide index (many elements); without it, only this
     element is read (one element: Properties, copies)."""
-    if facts is None:
-        return normalize(_stored(element))
-    for name in NAMES:
-        v = facts.prop(name)
-        if v is not None:
-            return normalize(v)
+    seen = set()
+    while element is not None and element.id() not in seen:
+        seen.add(element.id())
+        if facts is None:
+            own = _stored(element)
+        else:
+            own = next((facts.prop(n, element) for n in NAMES if facts.prop(n, element) is not None), None)
+        if own is not None:
+            return normalize(own)
+        element = _host(element)
     return "new"
 
 
@@ -83,15 +109,21 @@ def write_status(element, status: str) -> None:
     """Inside an action: the element's own status, in one place (the other place's Status is removed)."""
     f = element.file
     target = common_pset(element)
-    if target:
+    if target is None or status not in IFC_VALUE:
+        # Classes without a Status template keep it in KimBim's pset; so does Auxiliary, which IFC's
+        # PEnum_ElementStatus has no value for.
+        ps = _own_pset(element, PSET) or ifcopenshell.api.pset.add_pset(f, product=element, name=PSET)
+        ifcopenshell.api.pset.edit_pset(f, pset=ps, properties={"Status": IFC_VALUE.get(status, status.upper())})
+        if target is not None:
+            stale = _own_pset(element, target)
+            if stale is not None and any(p.Name == "Status" for p in stale.HasProperties):
+                ifcopenshell.api.pset.edit_pset(f, pset=stale, properties={"Status": None})
+    else:
         ps = _own_pset(element, target) or ifcopenshell.api.pset.add_pset(f, product=element, name=target)
         ifcopenshell.api.pset.edit_pset(f, pset=ps, properties={"Status": [IFC_VALUE[status]]})
         stale = _own_pset(element, PSET)
         if stale is not None and any(p.Name == "Status" for p in stale.HasProperties):
             ifcopenshell.api.pset.edit_pset(f, pset=stale, properties={"Status": None})
-    else:
-        ps = _own_pset(element, PSET) or ifcopenshell.api.pset.add_pset(f, product=element, name=PSET)
-        ifcopenshell.api.pset.edit_pset(f, pset=ps, properties={"Status": IFC_VALUE[status]})
 
 
 # ---------------------------------------------------------------- new elements, copies, the bridge
@@ -112,9 +144,13 @@ def stamp_new(*elements) -> None:
 
 
 def copy_status(source, target) -> None:
-    """Copies keep their source's status, as they keep its layer."""
-    if not source.is_a("IfcAnnotation"):
-        write_status(target, status_of(source))
+    """Copies keep their source's own status, as they keep its layer; a door or window with none
+    stays without one and inherits its new host's (D91)."""
+    if source.is_a("IfcAnnotation"):
+        return
+    own = _stored(source)
+    if own is not None:
+        write_status(target, normalize(own))
 
 
 def _edit(elements, status) -> str:
@@ -155,14 +191,17 @@ def set_status_for_new(status: str) -> str:
 
 
 def _unmarked_elements() -> list:
-    """Building elements with no status at all, own or from the type (an explicit NEW is marked)."""
+    """Building elements with no status at all, own or from the type (an explicit NEW is marked).
+    Doors and windows are left out: they take their host wall's status (D91), so marking the wall
+    marks them too."""
     from . import app_bridge as B
     from . import graphics
 
     shared: dict = {}
     out = []
     for e in graphics._products(B._model):
-        if e.is_a("IfcAnnotation") or e.is_a("IfcGrid"):
+        if e.is_a("IfcAnnotation") or e.is_a("IfcGrid") or e.is_a("IfcOpeningElement") \
+                or getattr(e, "FillsVoids", None):
             continue
         facts = graphics._Facts(e, shared)
         if all(facts.prop(n) is None for n in NAMES):

@@ -2405,8 +2405,10 @@ void Viewport::setPerspective(bool on)
 
 void Viewport::setStandardView(V3d_TypeOfOrientation orientation, bool animate)
 {
+    // D91: preset views (cube faces and Alt+1…0) always zoom to fit, like Revit's cube (supersedes
+    // D76's keep-zoom).
     if (!m_planView)
-        goTo(orientation, animate, false);
+        goTo(orientation, animate, true);
 }
 
 void Viewport::homeView(bool animate)
@@ -2452,7 +2454,8 @@ void Viewport::goTo(V3d_TypeOfOrientation orientation, bool animate, bool fit)
     end->SetUp(viewUp(orientation));
     end->OrthogonalizeUp();
     const Bnd_Box box = boundsOf({});
-    if (!box.IsVoid() && (fit || !boxInView(end, box))) {
+    // Fit all needs a window for the view's aspect ratio; headless tests have none (nothing to fit).
+    if (!box.IsVoid() && ensureWindow() && (fit || !boxInView(end, box))) {
         // Fit all on the end camera, with Fit all's margin.
         Handle(Graphic3d_Camera) saved = new Graphic3d_Camera();
         saved->Copy(camera);

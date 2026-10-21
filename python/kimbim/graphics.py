@@ -17,11 +17,12 @@ KINDS = ("walls", "columns", "beams", "slabs", "roofs", "stairs", "railings", "d
          "coverings", "furniture", "plumbing", "hvac", "electrical", "structure_other", "rooms",
          "annotations", "grids", "other")
 TABLES = ("pen_sets", "line_types", "element_styles", "visibility_sets", "override_sets",
-          "layer_combinations", "purposes", "renovation_filters", "fill_patterns")
-STATUS_KEYS = ("existing", "demolish", "new")  # renovation status (D74)
+          "layer_combinations", "purposes", "renovation_filters", "renovation_styles", "fill_patterns")
+STATUS_KEYS = ("existing", "demolish", "new", "temporary", "auxiliary")  # renovation status (D74, D91)
 FILTER_SHOW = ("as_is", "hide", "override")
 FILTER_FIELDS = ("pen", "cut_pen", "projection_pen", "line", "fill", "surface", "transparency")
-_STATUS_LABELS = {"existing": "Existing", "demolish": "To be demolished", "new": "New"}
+_STATUS_LABELS = {"existing": "Existing", "demolish": "To be demolished", "new": "New",
+                  "temporary": "Temporary", "auxiliary": "Auxiliary"}
 OPS = ("equals", "not_equals", "contains", "exists", "missing", "true", "false", "less", "more")
 WHEN = ("kind", "ifc_class", "property", "op", "value", "layer", "material")
 THEN = ("pen", "cut_pen", "projection_pen", "line", "fill", "surface", "transparency", "hide")
@@ -33,10 +34,19 @@ _ROLES = {10: "Walls cut", 11: "Walls projection", 12: "Walls fill", 13: "Struct
           14: "Structure projection", 15: "Structure fill", 16: "Doors and windows",
           17: "Stairs and railings", 18: "Furniture", 19: "Plumbing", 20: "HVAC", 21: "Electrical",
           22: "Rooms", 23: "Annotations", 24: "Grids", 25: "Other", 26: "Highlight",
-          27: "Highlight 2", 28: "Highlight 3", 31: "Existing", 32: "Demolition", 33: "Demolition fill"}
-# D74: the renovation pens; black and white in the Permit set (permit drawings print in black).
-_RENOVATION_PENS = {"default": {31: ("#808080", .18), 32: ("#c09000", .25), 33: ("#f8e8a0", .18)},
-                    "Permit": {31: ("#808080", .18), 32: ("#000000", .25), 33: ("#ffffff", .18)}}
+          27: "Highlight 2", 28: "Highlight 3", 31: "Existing", 32: "Demolition", 33: "Demolition fill",
+          34: "Temporary", 35: "Temporary fill", 36: "Auxiliary", 37: "Auxiliary fill",
+          38: "New", 39: "New fill"}
+# D74, D91: the renovation pens; black and white in the Permit set (permit drawings print in black).
+# Temporary is dashed cyan like the demolition but cyan, Auxiliary dashed magenta (D93).
+_RENOVATION_PENS = {"default": {31: ("#808080", .18), 32: ("#c09000", .25), 33: ("#f8e8a0", .18),
+                                34: ("#00a0c0", .25), 35: ("#c8f0f8", .18),
+                                36: ("#c020a0", .25), 37: ("#f8c8f0", .18),
+                                38: ("#000000", .5), 39: ("#606060", .18)},
+                    "Permit": {31: ("#808080", .18), 32: ("#000000", .25), 33: ("#ffffff", .18),
+                               34: ("#000000", .25), 35: ("#ffffff", .18),
+                               36: ("#000000", .25), 37: ("#ffffff", .18),
+                               38: ("#000000", .5), 39: ("#404040", .18)}}
 _GENERIC = {1: 0.13, 2: 0.18, 3: 0.25, 4: 0.35, 5: 0.50, 6: 0.70, 7: 1.00}
 _HIGHLIGHT = {26: ("#e02020", 0.5), 27: ("#2050e0", 0.5), 28: ("#f08010", 0.5)}
 _SETS = {  # pen: (colour, weight) for pens 10-25 (fills use the weight only nominally)
@@ -115,8 +125,10 @@ _BUILTINS = {
         "Crosshatch": {"lines": [{"angle": 45, "spacing": 2.0}, {"angle": 135, "spacing": 2.0}]},
         "Horizontal": {"lines": [{"angle": 0, "spacing": 2.0}]},
         "Brick": {"lines": [{"angle": 0, "spacing": 2.0}, {"angle": 90, "spacing": 2.0, "shift": 2.0, "dash": [2.0, 2.0]}]},
+        # D93: insulation defaults to loops; the zigzag is still available.
+        "Insulation": {"loops": True, "radius": 1.0, "spacing": 3.0},
         # zigzag rows 2 mm high, 2 mm period: two families of dashes that meet at the peaks
-        "Insulation": {"lines": [
+        "Zigzag": {"lines": [
             {"angle": 63.434949, "spacing": 0.894427, "shift": 1.788854, "dash": [2.236068, 2.236068]},
             {"angle": 116.565051, "spacing": 0.894427, "shift": -1.788854, "dash": [2.236068, 2.236068]}]},
         "Concrete": {"lines": [{"angle": 0, "spacing": 1.2, "shift": 0.6, "dash": [0.1, 1.1]},
@@ -165,16 +177,33 @@ _BUILTINS = {
                              "renovation": "New plan"},
     },
     # D74, Archicad's built-in renovation filters: each status shown as is, hidden or overridden.
+    # D91/D93: Temporary and Auxiliary always show their own look, so they stay recognisable. An
+    # override takes its look from the active renovation-styles preset (below); the filter can still
+    # pin a pen, line type, fill or colour of its own.
     "renovation_filters": {
-        "Everything": {"existing": {"show": "as_is"}, "demolish": {"show": "as_is"}, "new": {"show": "as_is"}},
-        "Existing plan": {"existing": {"show": "as_is"}, "demolish": {"show": "as_is"}, "new": {"show": "hide"}},
-        "Demolition plan": {"existing": {"show": "as_is"},
-                            "demolish": {"show": "override", "pen": 32, "line": "Dashed", "fill": 33,
-                                         "surface": "#f0c020"},
-                            "new": {"show": "hide"}},
-        "New plan": {"existing": {"show": "override", "pen": 31, "fill": 31}, "demolish": {"show": "hide"},
-                     "new": {"show": "as_is"}},
-        "Planned": {"existing": {"show": "as_is"}, "demolish": {"show": "hide"}, "new": {"show": "as_is"}},
+        "Everything": {"existing": {"show": "as_is"}, "demolish": {"show": "as_is"}, "new": {"show": "as_is"},
+                       "temporary": {"show": "override"}, "auxiliary": {"show": "override"}},
+        "Existing plan": {"existing": {"show": "as_is"}, "demolish": {"show": "as_is"}, "new": {"show": "hide"},
+                          "temporary": {"show": "override"}, "auxiliary": {"show": "override"}},
+        "Demolition plan": {"existing": {"show": "as_is"}, "demolish": {"show": "override"},
+                            "new": {"show": "hide"},
+                            "temporary": {"show": "override"}, "auxiliary": {"show": "override"}},
+        "New plan": {"existing": {"show": "override"}, "demolish": {"show": "hide"}, "new": {"show": "as_is"},
+                     "temporary": {"show": "override"}, "auxiliary": {"show": "override"}},
+        "Planned": {"existing": {"show": "as_is"}, "demolish": {"show": "hide"}, "new": {"show": "as_is"},
+                    "temporary": {"show": "override"}, "auxiliary": {"show": "override"}},
+    },
+    # D93: renovation looks are a palette of named styles per status (a region preset). "Uruguay" is
+    # the default: Existing grey solid, To be demolished yellow dashed, New black with solid poche,
+    # Temporary dashed cyan, Auxiliary dashed magenta. Pens are numbers into the purpose's pen set.
+    "renovation_styles": {
+        "Uruguay": {
+            "existing": {"pen": 31, "line": "Solid", "fill": 31, "surface": "#808080"},
+            "demolish": {"pen": 32, "line": "Dashed", "fill": 33, "surface": "#f0c020"},
+            "new": {"pen": 38, "line": "Solid", "fill": 39},
+            "temporary": {"pen": 34, "line": "Dashed", "fill": 35, "surface": "#00c0e0"},
+            "auxiliary": {"pen": 36, "line": "Dashed", "fill": 37, "surface": "#e000c0"},
+        },
     },
 }
 
@@ -306,10 +335,16 @@ def validate(key: str, value) -> str | None:
                 return f"line type {name}: at most 6 dash and gap pairs"
     elif key == "fill_patterns":
         for name, p in value.items():
-            if not isinstance(p, dict) or not isinstance(p.get("lines", []), list):
-                return f"fill pattern {name}: a list of hatch lines"
+            if not isinstance(p, dict):
+                return f"fill pattern {name}: expected an object"
             if "solid" in p and not isinstance(p["solid"], bool):
                 return f"fill pattern {name}: solid is true or false"
+            if p.get("loops"):  # D93: an insulation-style loop pattern
+                if not (_number(p.get("radius")) and p["radius"] > 0) or not (_number(p.get("spacing")) and p["spacing"] > 0):
+                    return f"fill pattern {name}: loops need a radius and a spacing above 0"
+                continue
+            if not isinstance(p.get("lines", []), list):
+                return f"fill pattern {name}: a list of hatch lines"
             if len(p.get("lines", [])) > 8:
                 return f"fill pattern {name}: at most 8 hatch line families"
             for line in p.get("lines", []):
@@ -384,6 +419,24 @@ def validate(key: str, value) -> str | None:
                         return f"filter {name}: transparency must be 0-1"
                     if k == "line" and not isinstance(v, str):
                         return f"filter {name}: the line type is a name"
+    elif key == "renovation_styles":
+        for preset, styles in value.items():
+            if not isinstance(styles, dict):
+                return f"renovation style preset {preset}: expected an object"
+            for status, st in styles.items():
+                if status not in STATUS_KEYS:
+                    return f"renovation style {preset}: unknown status {status}"
+                if not isinstance(st, dict):
+                    return f"renovation style {preset}/{status}: expected an object"
+                for k, v in st.items():
+                    if k not in ("pen", "line", "fill", "surface"):
+                        return f"renovation style {preset}/{status}: unknown field {k}"
+                    if k in ("pen", "fill") and v is not None and not _pen_no(v):
+                        return f"renovation style {preset}/{status}: pens are 1-255"
+                    if k == "surface" and v is not None and not (isinstance(v, str) and _COLOR.match(v)):
+                        return f"renovation style {preset}/{status}: colour must be #rrggbb"
+                    if k == "line" and v is not None and not isinstance(v, str):
+                        return f"renovation style {preset}/{status}: the line type is a name"
     return None
 
 
@@ -462,14 +515,14 @@ class _Facts:
             self._kind = kind_of(self.element)
         return self._kind
 
-    def prop(self, name: str):
+    def prop(self, name: str, element=None):
         key = ("property", name)
         if key not in self._shared:
             try:
                 self._shared[key] = _property_index(self.element.file, name)
             except Exception:  # an IFC this reader doesn't follow: no properties
                 self._shared[key] = {}
-        return self._shared[key].get(self.element.id())
+        return self._shared[key].get((element or self.element).id())
 
     @property
     def layer(self):
@@ -628,6 +681,13 @@ def resolve(purpose: str | None = None, model=None, settings: dict | None = None
     flt_name = p.get("renovation") if p.get("renovation") in filters else ("Everything" if "Everything" in filters else "")
     flt = filters.get(flt_name) or {}
     flt_active = any(t.get("show") != "as_is" for t in flt.values())
+    # D93: the active renovation-styles preset gives every overridden status its look (pen, line,
+    # fill, colour); a filter may still pin its own fields on top.
+    style_presets = effective("renovation_styles", st)
+    preset_name = st.get("renovation_preset")
+    if preset_name not in style_presets:
+        preset_name = "Uruguay" if "Uruguay" in style_presets else next(iter(style_presets), "")
+    palette = style_presets.get(preset_name) or {}
     from . import renovation
 
     styles, index, elements, hidden = [], {}, {}, []
@@ -650,7 +710,7 @@ def resolve(purpose: str | None = None, model=None, settings: dict | None = None
             fill_pen = None
         surface = transparency = None
         if treatment.get("show") == "override":
-            then = treatment
+            then = {**palette.get(status, {}), **treatment}  # the palette's style, the filter's fields win
             cut_pen = then.get("cut_pen", then.get("pen", cut_pen))
             proj_pen = then.get("projection_pen", then.get("pen", proj_pen))
             if "line" in then:
@@ -686,21 +746,52 @@ def resolve(purpose: str | None = None, model=None, settings: dict | None = None
     reno = sorted((k, v) for k, v in legend_hits.items() if k[0] == "renovation")
     reno.sort(key=lambda kv: STATUS_KEYS.index(kv[0][1]))
     if any(flt.get(k[1], {}).get("show") == "override" for k, _ in reno):  # as-is rows only explain an override
-        for (src, key), (style_no, guids) in reno:
-            legend.append({"label": _STATUS_LABELS[key], "source": src, "key": key, "style": style_no,
-                           "override": flt.get(key, {}).get("show") == "override"})
+        for (src, skey), (style_no, guids) in reno:
+            legend.append({"label": _STATUS_LABELS[skey], "source": src, "key": skey, "style": style_no,
+                           "override": flt.get(skey, {}).get("show") == "override"})
             members.append(guids)
-    for (src, key), (style_no, guids) in legend_hits.items():
+    for (src, skey), (style_no, guids) in legend_hits.items():
         if src == "override":
-            legend.append({"label": key, "source": src, "key": key, "style": style_no, "override": True})
+            legend.append({"label": skey, "source": src, "key": skey, "style": style_no, "override": True})
             members.append(guids)
+    # D91: the full legend — every rule of the purpose (its overridden statuses and its override
+    # rules) — used when it fits on the sheet.
+    def _legend_add(label, source, key, then):
+        base = builtin_styles["other"]
+        cut_pen = then.get("cut_pen", then.get("pen", base["cut"]["pen"]))
+        proj_pen = then.get("projection_pen", then.get("pen", base["projection"]["pen"]))
+        line = then.get("line", base["cut"]["line"])
+        fill_pen = then.get("fill", base["fill"])
+        style = {"cut": _line(pens, line_types, cut_pen, line),
+                 "projection": _line(pens, line_types, proj_pen, line),
+                 "fill": pen(pens, fill_pen)["color"] if fill_pen is not None else None,
+                 "surface": then.get("surface"), "transparency": then.get("transparency")}
+        k = json.dumps(style, sort_keys=True)
+        if k not in index:
+            index[k] = len(styles)
+            styles.append(style)
+        legend_all.append({"label": label, "source": source, "key": key, "style": index[k], "override": True})
+        members_all.append([])
+
+    legend_all, members_all = [], []
+    for status in STATUS_KEYS:
+        t = flt.get(status)
+        if t and t.get("show") == "override":
+            _legend_add(_STATUS_LABELS[status], "renovation", status, {**palette.get(status, {}), **t})
+    for rule in rules:
+        then = rule.get("then", {})
+        if not then.get("hide"):
+            _legend_add(rule.get("name", ""), "override", rule.get("name", ""), then)
     ann = styles_by_kind.get("annotations") or builtin_styles["annotations"]
     out = {"purpose": name, "purposes": list(purposes), "pen_set": set_name, "visibility": vis_name or "", "overrides": ovr_name or "",
            "pens": {str(n): pen(pens, n) for n in range(1, 256)},
            "pen_names": {n: p["name"] for n, p in pens.items() if isinstance(p, dict) and p.get("name")},
            "current_pen": st.get("current_pen", 23), "annotation_pen": ann["projection"]["pen"],
            "styles": styles, "elements": elements, "hidden": hidden,
-           "renovation": flt_name, "legend": legend, "legend_members": members}
+           "renovation": flt_name, "renovation_preset": preset_name, "renovation_presets": list(style_presets),
+           "legend": legend, "legend_members": members,
+           "legend_all": legend_all, "legend_members_all": members_all,
+           "legend_mode": st.get("legend_mode", "auto")}
     if len(_cache) > 8:
         _cache.clear()
     _cache[key] = (weakref.ref(model) if model is not None else (lambda: None), out)
@@ -720,7 +811,7 @@ def graphics_state() -> str:
     from . import settings as S
 
     st = S.current()
-    res = {k: v for k, v in resolve(settings=st).items() if k != "legend_members"}  # members stay in Python
+    res = {k: v for k, v in resolve(settings=st).items() if k not in ("legend_members", "legend_members_all")}  # members stay in Python
     return B._dump({"ok": True, **res, "hidden_layers": st.get("hidden_layers", []),
                     "locked_layers": st.get("locked_layers", [])})
 
@@ -765,7 +856,7 @@ def set_graphics(changes_json: str) -> str:
     if not isinstance(changes, dict):
         return _fail("bad input: expected an object")
     for k, v in changes.items():
-        if k not in TABLES and k not in ("purpose", "current_pen", "sheet_purposes"):
+        if k not in TABLES and k not in ("purpose", "current_pen", "sheet_purposes", "renovation_preset"):
             return _fail(f"unknown graphics setting {k}")
         if (err := validate(k, v)) is not None:
             return _fail(err)
@@ -895,15 +986,29 @@ def _xml(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def legend_svg(resolved: dict, guids=None) -> tuple:
+def legend_svg(resolved: dict, guids=None, mode=None, max_height=None) -> tuple:
     """The legend as SVG in paper mm (top-left 0,0): a title, then a swatch and a label per entry;
     returns (body, width, height). `guids`: only entries that apply to one of these elements (a sheet's
-    drawings). Renovation rows shown as is only explain an overridden one: without one they are left out."""
+    drawings). Renovation rows shown as is only explain an overridden one: without one they are left out.
+    D91: `mode` is "used" (only the rules the drawing uses), "all" (every rule of the purpose) or
+    "auto" (all of them when they fit in `max_height`, else only the used ones)."""
     styles = resolved.get("styles", [])
-    rows = [e for e, members in zip(resolved.get("legend", []), resolved.get("legend_members", []))
-            if guids is None or guids.intersection(members)]
-    if not any(e.get("override") for e in rows if e["source"] == "renovation"):
-        rows = [e for e in rows if e["source"] != "renovation"]
+    mode = mode or resolved.get("legend_mode", "auto")
+
+    def used_rows():
+        rows = [e for e, members in zip(resolved.get("legend", []), resolved.get("legend_members", []))
+                if guids is None or guids.intersection(members)]
+        if not any(e.get("override") for e in rows if e["source"] == "renovation"):
+            rows = [e for e in rows if e["source"] != "renovation"]
+        return rows
+
+    all_rows = list(resolved.get("legend_all", []))
+    if mode == "all":
+        rows = all_rows
+    elif mode == "auto" and max_height is not None and all_rows and _TITLE + _ROW * len(all_rows) <= max_height:
+        rows = all_rows
+    else:
+        rows = used_rows()
     parts = ['<text x="0" y="5" font-size="4" font-family="sans-serif">Legend</text>']
     y = _TITLE
     if not rows:

@@ -403,6 +403,64 @@ def test_demolition_purpose_hides_new_and_restyles_demolished():
     assert out["renovation"] == "Demolition plan"
 
 
+def test_a_door_inherits_its_host_walls_status_in_the_resolve():
+    import ifcopenshell.api.feature
+
+    f = _model()
+    wall = _el(f, "IfcWall", Pset_WallCommon={"Status": ["EXISTING"]})
+    opening = ifcopenshell.api.root.create_entity(f, ifc_class="IfcOpeningElement")
+    door = ifcopenshell.api.root.create_entity(f, ifc_class="IfcDoor")
+    ifcopenshell.api.feature.add_feature(f, feature=opening, element=wall)
+    ifcopenshell.api.feature.add_filling(f, opening=opening, element=door)
+    out = g.resolve("Demolition", model=f)
+    assert door.GlobalId not in out["hidden"]  # D91: it inherits the wall's Existing, not New
+    assert wall.GlobalId not in out["hidden"]
+
+
+def test_temporary_and_auxiliary_get_their_default_looks():
+    from kimbim import renovation as r
+
+    f = _model()
+    temp = _el(f, "IfcWall")
+    r.write_status(temp, "temporary")
+    aux = _el(f, "IfcWall")
+    r.write_status(aux, "auxiliary")
+    out = g.resolve("Working", model=f)
+    t = out["styles"][out["elements"][temp.GlobalId]]
+    a = out["styles"][out["elements"][aux.GlobalId]]
+    assert t["cut"]["color"] == "#00a0c0" and t["cut"]["dash"] == [3.0, 1.5]  # dashed cyan (D93)
+    assert a["cut"]["color"] == "#c020a0" and a["cut"]["dash"] == [3.0, 1.5]  # dashed magenta (D93)
+    assert [(e["source"], e["key"]) for e in out["legend"]] == [("renovation", "temporary"), ("renovation", "auxiliary")]
+    assert out["legend"][0]["label"] == "Temporary" and out["legend"][1]["label"] == "Auxiliary"
+
+
+def test_renovation_style_palette_drives_the_override_looks():
+    f, w = _reno_model()
+    out = g.resolve("Demolition", model=f)
+    demo = out["styles"][out["elements"][w["demolish"].GlobalId]]
+    assert demo["cut"]["color"] == g.builtin("pen_sets")["Permit"]["pens"]["32"]["color"]  # Uruguay's pen
+    assert out["renovation_preset"] == "Uruguay"
+    # A project preset with a different look changes what the filter applies.
+    styles = g.builtin("renovation_styles")
+    styles["Office"] = {**styles["Uruguay"], "demolish": {"pen": 27, "line": "Dotted", "fill": 15}}
+    s.load({"renovation_styles": styles, "renovation_preset": "Office"})
+    out = g.resolve("Demolition", model=f)
+    demo = out["styles"][out["elements"][w["demolish"].GlobalId]]
+    assert demo["cut"]["color"] == g.builtin("pen_sets")["Permit"]["pens"]["27"]["color"]
+    assert demo["cut"]["dash"] == [0.3, 1.0]  # Dotted
+    assert out["renovation_preset"] == "Office"
+
+
+@pytest.mark.parametrize("value,message", [
+    ({"X": {"ruined": {"pen": 1}}}, "renovation style X: unknown status ruined"),
+    ({"X": {"new": {"pen": 300}}}, "renovation style X/new: pens are 1-255"),
+    ({"X": {"new": {"surface": "red"}}}, "renovation style X/new: colour must be #rrggbb"),
+    ({"X": {"new": {"glow": 1}}}, "renovation style X/new: unknown field glow"),
+])
+def test_renovation_style_validation(value, message):
+    assert g.validate("renovation_styles", value) == message
+
+
 def test_override_rules_apply_on_top_of_the_renovation_filter():
     f, w = _reno_model()
     s.load({"purposes": {**g.builtin("purposes"),
@@ -465,6 +523,21 @@ def test_legend_svg_rows_and_restriction():
     assert g.LEGEND_EMPTY in body and h == pytest.approx(8 + 7)
     body, _, _ = g.legend_svg(out, guids={w["existing"].GlobalId, w["demolish"].GlobalId})
     assert body.count('class="kimbim-legend-row"') == 2
+
+
+def test_legend_can_list_every_rule_of_the_purpose():
+    f, w = _reno_model()
+    out = g.resolve("Demolition", model=f)
+    used, _, _ = g.legend_svg(out, mode="used")
+    assert used.count("kimbim-legend-row") == 2  # existing (as is) and demolish (override)
+    everything, _, _ = g.legend_svg(out, mode="all")
+    assert everything.count("kimbim-legend-row") == 3  # the filter's overridden statuses
+    assert "Temporary" in everything and "Auxiliary" in everything
+    # "auto": the full list when it fits, else only the used ones.
+    assert g.legend_svg(out, mode="auto", max_height=6)[0].count("kimbim-legend-row") == 2
+    assert g.legend_svg(out, mode="auto", max_height=1000)[0].count("kimbim-legend-row") == 3
+    # The default (no mode) is the used list: no sheet height to fit into.
+    assert g.legend_svg(out)[0].count("kimbim-legend-row") == 2
 
 
 def test_a_lone_override_row_stays_in_the_legend():

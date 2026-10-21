@@ -29,7 +29,7 @@ namespace kimbim {
 namespace {
 
 const QStringList kTables{"pen_sets", "line_types", "element_styles", "visibility_sets", "override_sets",
-    "layer_combinations", "purposes", "renovation_filters"};
+    "layer_combinations", "purposes", "renovation_filters", "renovation_styles"};
 
 QIcon swatch(const QColor& color)
 {

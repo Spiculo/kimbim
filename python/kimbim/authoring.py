@@ -714,7 +714,7 @@ def insert_opening(kind: str, wall_guid: str, type_guid: str, along, width, heig
         if container is not None:
             ifcopenshell.api.spatial.assign_container(f, products=[element], relating_structure=container)
         layers.assign_active(element)
-        renovation.stamp_new(element)
+        # D91: the door or window takes its host wall's status; it is left without one and inherits.
         made["element"] = element
         return 1, [wall.GlobalId, element.GlobalId], []
 

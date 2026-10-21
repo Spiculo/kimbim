@@ -31,7 +31,9 @@ def _el(f, cls, **psets):
 @pytest.mark.parametrize("value,expected", [
     ("EXISTING", "existing"), ("existing", "existing"), (["EXISTING"], "existing"),
     ("DEMOLISH", "demolish"), ("Demolished", "demolish"), ("To Be Demolished", "demolish"),
-    ("NEW", "new"), ("TEMPORARY", "new"), ("OTHER", "new"), ("", "new"), (None, "new"), ("garbage", "new"),
+    ("NEW", "new"), ("OTHER", "new"), ("", "new"), (None, "new"), ("garbage", "new"),
+    ("TEMPORARY", "temporary"), ("Temporary", "temporary"),
+    ("AUXILIARY", "auxiliary"), ("Auxiliary", "auxiliary"),
 ])
 def test_normalize(value, expected):
     assert r.normalize(value) == expected
@@ -79,6 +81,27 @@ def test_writing_clears_the_other_place():
     r.write_status(w, "existing")  # goes to Pset_WallCommon; the KimBim one must not contradict it
     assert "Status" not in (ifcopenshell.util.element.get_pset(w, "KIMBIM_Renovation") or {})
     assert r.status_of(w) == "existing"
+
+
+def test_temporary_uses_ifc_value_where_the_class_has_one():
+    f = _model()
+    w = _el(f, "IfcWall")
+    r.write_status(w, "temporary")
+    prop = next(p for p in f.by_type("IfcPropertyEnumeratedValue") if p.Name == "Status")
+    assert [v.wrappedValue for v in prop.EnumerationValues] == ["TEMPORARY"]
+    assert r.status_of(w) == "temporary"
+
+
+def test_auxiliary_has_no_ifc_value_so_it_lives_in_kimbims_pset():
+    f = _model()
+    w = _el(f, "IfcWall")
+    r.write_status(w, "auxiliary")
+    assert ifcopenshell.util.element.get_pset(w, "KIMBIM_Renovation")["Status"] == "AUXILIARY"
+    assert not [p for p in f.by_type("IfcPropertyEnumeratedValue") if p.Name == "Status"]
+    assert r.status_of(w) == "auxiliary"
+    r.write_status(w, "new")  # switching back clears KimBim's pset
+    assert "Status" not in (ifcopenshell.util.element.get_pset(w, "KIMBIM_Renovation") or {})
+    assert r.status_of(w) == "new"
 
 
 def test_read_from_archicad_name_and_from_the_type():
@@ -157,13 +180,20 @@ def test_new_elements_get_the_status_for_new():
     assert not call("set_status_for_new", "ruined")["ok"]
 
 
-def test_doors_in_a_demolished_wall_take_the_status_for_new():
+def test_doors_take_their_host_walls_status_and_follow_it():
     _, _, w1, _ = _house()
-    call("set_status", json.dumps([w1]), "demolish")
+    call("set_status", json.dumps([w1]), "existing")
     door_type = json.loads(A.opening_types("door"))["types"][0]["guid"]
     door = json.loads(A.insert_opening("door", w1, door_type, 2.0, 0.9, 2.1, 0.0))["guid"]
-    assert r.status_of(b._model.by_guid(door)) == "new"
-    assert ifcopenshell.util.element.get_pset(b._model.by_guid(door), "Pset_DoorCommon")["Status"] == ["NEW"]
+    assert r.status_of(b._model.by_guid(door)) == "existing"  # D91: the host wall's status
+    # It has no status of its own: it inherits, so it follows the wall when the wall changes.
+    assert ifcopenshell.util.element.get_pset(b._model.by_guid(door), "Pset_DoorCommon") is None
+    call("set_status", json.dumps([w1]), "demolish")
+    assert r.status_of(b._model.by_guid(door)) == "demolish"
+    # Set explicitly on the door, it stops following the wall.
+    call("set_status", json.dumps([door]), "temporary")
+    call("set_status", json.dumps([w1]), "new")
+    assert r.status_of(b._model.by_guid(door)) == "temporary"
 
 
 def test_copies_keep_the_source_status():

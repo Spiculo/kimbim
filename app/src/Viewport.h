@@ -67,8 +67,8 @@ public:
     void setPlanView(double elevation);
     void set3DView();
     bool isPlanView() const { return m_planView; }
-    // Preset views (D76): the camera turns (~250 ms) to look from that side or corner, keeping its
-    // target and zoom; it fits all when the model would be off-screen. Not in plan views.
+    // Preset views (D76, D91): the camera turns (~250 ms) to look from that side or corner and fits
+    // the whole model, like Revit's cube. Not in plan views.
     void setStandardView(V3d_TypeOfOrientation orientation, bool animate = true);
     void homeView(bool animate = true); // the default south-east isometric, fitted
     // Perspective camera (D76), per view; plan views stay orthographic (the setting comes back in 3D).
