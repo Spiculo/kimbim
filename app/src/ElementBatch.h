@@ -79,6 +79,7 @@ public:
     // A triangulated face for one element, for OCCT's polygon hidden-line removal (section drawings).
     static TopoDS_Shape meshFace(const MeshChunk& chunk, int element);
     static void setBackground(const Quantity_Color& color) { s_background = color; }
+    static Quantity_Color background() { return s_background; }
     // Previews skip border lines (computing them on every mouse move made drawing lag).
     void setShowEdges(bool show) { m_showEdges = show; }
 

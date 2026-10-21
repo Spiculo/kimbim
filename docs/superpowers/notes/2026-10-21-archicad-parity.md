@@ -35,8 +35,8 @@ Branch `parity-materials`. Spec: [2026-10-21-archicad-parity-materials-design](.
 
 ## Follow-ups (not done)
 - **Textures** in 3D (`IfcSurfaceStyleWithTextures`, UVs in the mesh chunk) and a render-style view.
-- **Cut fill patterns on screen** (hatches in the plan poché; drawings already have fill patterns for
-  drafting fills, not yet for element cuts) — layers are told apart by colour only on screen.
+- Cut fill patterns are hatched **on screen** (the material's pattern in its fill pen over its background
+  pen, at 1:25 so wall layers show them); printed drawings and DXF still fill element cuts solid.
 - **Layer-by-layer junctions** are the regenerator's (priority 0–100); no per-junction override UI.
 - Double-slanted and complex-profile walls; per-layer surfaces on edges (the core's surface is used).
 - Composite editor for **profiles** (columns, beams) — they show their material read-only.

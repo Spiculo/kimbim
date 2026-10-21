@@ -652,20 +652,31 @@ def _line(pens, line_types, pen_no, line_name) -> dict:
     return {"color": p["color"], "weight": p["weight"], "dash": dash(line_types, line_name), "pen": pen_no}
 
 
+def _material_cut(material, cache: dict) -> dict:
+    """{pen, bg, pattern} of a building material's cut fill (D96), read once per material."""
+    from . import materials
+
+    if material.id() not in cache:
+        props = materials.properties(material)
+        pen_no, bg = props.get("pen"), props.get("bg")
+        cache[material.id()] = {"pen": pen_no if _pen_no(pen_no) else None, "bg": bg if _pen_no(bg) else None,
+                                "pattern": props.get("pattern") or None}
+    return cache[material.id()]
+
+
 def _material_fill(element, cache: dict, fallback):
-    """The cut fill pen of the element's building material (D96), else `fallback`."""
+    """(fill pen, background pen, pattern) of the element's building material (D96); the pen falls back
+    to `fallback`, the others to None (solid fill, no background)."""
     from . import materials
 
     try:
         m = materials.main_material(element)
     except Exception:  # an odd material assignment must not stop the drawing
-        return fallback
+        return fallback, None, None
     if m is None:
-        return fallback
-    if m.id() not in cache:
-        pen_no = materials.properties(m).get("pen")
-        cache[m.id()] = pen_no if _pen_no(pen_no) else None
-    return cache[m.id()] if cache[m.id()] is not None else fallback
+        return fallback, None, None
+    cut = _material_cut(m, cache)
+    return (cut["pen"] if cut["pen"] is not None else fallback), cut["bg"], cut["pattern"]
 
 
 def _layer_fills(element, cache: dict, fallback, pens) -> dict | None:
@@ -679,15 +690,16 @@ def _layer_fills(element, cache: dict, fallback, pens) -> dict | None:
         return None
     if bands is None:
         return None
-    fills = []
+    fills, backgrounds, patterns_ = [], [], []
     for m in bands.pop("materials"):
-        if m is not None and m.id() not in cache:
-            pen_no = materials.properties(m).get("pen")
-            cache[m.id()] = pen_no if _pen_no(pen_no) else None
-        pen_no = cache.get(m.id()) if m is not None else None
-        pen_no = pen_no if pen_no is not None else fallback
+        cut = _material_cut(m, cache) if m is not None else {"pen": None, "bg": None, "pattern": None}
+        pen_no = cut["pen"] if cut["pen"] is not None else fallback
         fills.append(pen(pens, pen_no)["color"] if pen_no is not None else None)
+        backgrounds.append(pen(pens, cut["bg"])["color"] if cut["bg"] is not None else None)
+        patterns_.append(cut["pattern"])
     bands["fills"] = fills
+    bands["backgrounds"] = backgrounds  # D96: a pattern's background (None: none)
+    bands["patterns"] = patterns_  # D96: each layer's cut fill pattern (None: solid)
     return bands
 
 
@@ -751,11 +763,12 @@ def resolve(purpose: str | None = None, model=None, settings: dict | None = None
         cut_pen, proj_pen = base["cut"]["pen"], base["projection"]["pen"]
         cut_line, proj_line, fill_pen = base["cut"]["line"], base["projection"]["line"], base["fill"]
         bands = None
+        fill_bg = fill_pattern = None
         if facts.kind in NO_FILL:
             fill_pen = None
         elif base.get("fill_source", "material") == "material":  # D96: Archicad's cut fill comes from the material
             style_fill = fill_pen
-            fill_pen = _material_fill(e, material_fills, fill_pen)
+            fill_pen, fill_bg, fill_pattern = _material_fill(e, material_fills, fill_pen)
             bands = _layer_fills(e, material_fills, style_fill, pens)
         fill_before = fill_pen
         surface = transparency = None
@@ -783,6 +796,9 @@ def resolve(purpose: str | None = None, model=None, settings: dict | None = None
                  "projection": _line(pens, line_types, proj_pen, proj_line),
                  "fill": pen(pens, fill_pen)["color"] if fill_pen is not None else None,
                  "surface": surface, "transparency": transparency}
+        if fill_pen == fill_before and fill_pen is not None and fill_pattern:  # D96: an override's fill is solid
+            style["pattern"] = fill_pattern
+            style["background"] = pen(pens, fill_bg)["color"] if fill_bg is not None else None
         if bands is not None and fill_pen == fill_before:  # an override's fill covers the layers
             layer_bands[e.GlobalId] = bands
         k = json.dumps(style, sort_keys=True)
@@ -840,6 +856,7 @@ def resolve(purpose: str | None = None, model=None, settings: dict | None = None
            "pen_names": {n: p["name"] for n, p in pens.items() if isinstance(p, dict) and p.get("name")},
            "current_pen": st.get("current_pen", 23), "annotation_pen": ann["projection"]["pen"],
            "styles": styles, "elements": elements, "hidden": hidden, "layers": layer_bands,
+           "fill_patterns": effective("fill_patterns", st),  # D96: the cut fills' hatches
            "renovation": flt_name, "renovation_preset": preset_name, "renovation_presets": list(style_presets),
            "legend": legend, "legend_members": members,
            "legend_all": legend_all, "legend_members_all": members_all,

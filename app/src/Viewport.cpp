@@ -1024,7 +1024,12 @@ struct SectionPart {
     Quantity_Color line;
     float width = 2.0f;
     uint16_t pattern = 0xFFFF;
+    // D96: the cut fill's hatch (drawn in `hatchColour` over `fill`, the background), per element group
+    std::optional<FillPattern> hatch;
+    Quantity_Color hatchColour;
+    std::vector<std::vector<int>> groups; // loops hatched together (an element's, holes included)
 };
+constexpr double kScreenMetresPerMm = 0.025; // D96: cut fills hatch at 1:25, fine enough for wall layers
 
 class SectionPrs : public AIS_InteractiveObject {
 public:
@@ -1073,6 +1078,35 @@ public:
                 aspect->SetFaceCulling(Graphic3d_TypeOfBackfacingModel_DoubleSided);
                 g->SetGroupPrimitivesAspect(aspect);
                 g->AddPrimitiveArray(fill);
+            }
+            if (part.hatch) { // D96: the pattern, in the plane's own 2D frame (neighbours line up)
+                std::vector<std::array<double, 4>> segs;
+                for (const auto& group : part.groups) {
+                    std::vector<std::vector<QPointF>> loops2d;
+                    for (int l : group) {
+                        std::vector<QPointF> poly;
+                        for (const auto& p : part.loops[size_t(l)]) {
+                            const gp_Vec d(origin, p);
+                            poly.emplace_back(d.Dot(gp_Vec(u)), d.Dot(gp_Vec(v)));
+                        }
+                        loops2d.push_back(std::move(poly));
+                    }
+                    const auto h = Graphics::hatch(loops2d, *part.hatch, kScreenMetresPerMm);
+                    segs.insert(segs.end(), h.begin(), h.end());
+                }
+                if (!segs.empty()) {
+                    Handle(Graphic3d_ArrayOfSegments) arr = new Graphic3d_ArrayOfSegments(int(segs.size()) * 2);
+                    auto at = [&](double x, double y) {
+                        return gp_Pnt(origin.XYZ() + u.XYZ() * x + v.XYZ() * y + lift.XYZ() * 0.5); // in front of the fill
+                    };
+                    for (const auto& s : segs) {
+                        arr->AddVertex(at(s[0], s[1]));
+                        arr->AddVertex(at(s[2], s[3]));
+                    }
+                    Handle(Graphic3d_Group) g = prs->NewGroup();
+                    g->SetGroupPrimitivesAspect(new Graphic3d_AspectLine3d(part.hatchColour, Aspect_TOL_SOLID, 1.0f));
+                    g->AddPrimitiveArray(arr);
+                }
             }
             if (segments > 0) {
                 Handle(Graphic3d_ArrayOfSegments) lines = new Graphic3d_ArrayOfSegments(segments * 2);
@@ -1220,34 +1254,56 @@ void Viewport::rebuildSections()
                         layer.fill = bands->fills[k].isValid() ? std::optional<Quantity_Color>(occ(bands->fills[k])) : std::nullopt;
                         layer.line = part.line;
                         layer.width = 1.0f;
-                        const QString lkey = QStringLiteral("layer|%1|%2").arg(
-                            bands->fills[k].isValid() ? bands->fills[k].name() : QString(), st->cut.color.name());
+                        const QString patternName = k < bands->patterns.size() ? bands->patterns[k] : QString();
+                        if (const FillPattern* fp = g.fillPattern(patternName); fp && layer.fill) {
+                            layer.hatch = *fp; // the fill pen draws the pattern over the background
+                            layer.hatchColour = *layer.fill;
+                            const QColor bg = k < bands->backgrounds.size() ? bands->backgrounds[k] : QColor();
+                            layer.fill = bg.isValid() ? occ(bg) : ElementBatch::background();
+                        }
+                        const QString lkey = QStringLiteral("layer|%1|%2|%3").arg(
+                            bands->fills[k].isValid() ? bands->fills[k].name() : QString(), st->cut.color.name(),
+                            patternName + QLatin1Char('|') + (k < bands->backgrounds.size() ? bands->backgrounds[k].name() : QString()));
                         auto lit = partOf.constFind(lkey);
                         if (lit == partOf.constEnd()) {
                             lit = partOf.insert(lkey, parts.size());
                             parts.push_back(layer);
                         }
+                        std::vector<int> group;
                         for (const auto& l : clipped) {
                             std::vector<gp_Pnt> piece = clipLoop(clipLoop(l, from), to);
                             if (piece.size() >= 3) {
+                                group.push_back(int(parts[*lit].loops.size()));
                                 parts[*lit].loops.push_back(std::move(piece));
                                 ++loopCount;
                             }
                         }
+                        if (!group.empty())
+                            parts[*lit].groups.push_back(std::move(group));
                     }
                     part.fill = std::nullopt; // the outline only: the layers are filled
                 }
+                if (const FillPattern* fp = st && part.fill ? g.fillPattern(st->pattern) : nullptr) { // D96
+                    part.hatch = *fp;
+                    part.hatchColour = *part.fill;
+                    part.fill = st->background.isValid() ? occ(st->background) : ElementBatch::background();
+                }
                 const QString key = st ? QStringLiteral("%1|%2|%3|%4|%5").arg(part.fill ? st->fill.name() : QString(),
-                    st->cut.color.name()).arg(part.width).arg(part.pattern).arg(0) : QStringLiteral("default");
+                    st->cut.color.name()).arg(part.width).arg(part.pattern).arg(0)
+                        + QLatin1Char('|') + (part.hatch ? st->pattern + st->background.name() : QString())
+                                       : QStringLiteral("default");
                 auto it = partOf.constFind(key);
                 if (it == partOf.constEnd()) {
                     it = partOf.insert(key, parts.size());
                     parts.push_back(part);
                 }
+                std::vector<int> group;
                 for (auto& l : clipped) {
+                    group.push_back(int(parts[*it].loops.size()));
                     parts[*it].loops.push_back(std::move(l));
                     ++loopCount;
                 }
+                parts[*it].groups.push_back(std::move(group));
             }
         if (loopCount > 0) {
             Handle(SectionPrs) prs = new SectionPrs(std::move(parts), section);

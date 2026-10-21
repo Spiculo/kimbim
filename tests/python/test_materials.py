@@ -374,3 +374,17 @@ def test_doors_are_timber_and_roofs_tiled(project):
     assert roof["ok"], roof
     palette, idx, _, _ = colours(roof["guid"])
     assert hexes(palette, idx) == {M.CATALOGUE["Roof tiles"]["colour"]}
+
+
+def test_cut_patterns_and_backgrounds_come_with_the_state(project):
+    from kimbim import graphics
+
+    g = wall(project)
+    r = graphics.resolve()
+    bands = r["layers"][g]
+    assert bands["patterns"] == ["Brick", "Insulation", "Crosshatch"]
+    assert bands["backgrounds"] == [None, None, None]
+    assert "Brick" in r["fill_patterns"]
+    col = call("create_column", project["level"], call("column_types")["types"][0]["guid"], 1, 1, 3.0)["guid"]
+    style = r and graphics.resolve()["styles"][graphics.resolve()["elements"][col]]
+    assert style.get("pattern") in ("Concrete", "Solid", None)

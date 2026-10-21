@@ -26,6 +26,30 @@ QJsonObject tablesFromBridge()
 class TestGraphics : public QObject {
     Q_OBJECT
 private slots:
+    // D96: cut fill hatches: parallel lines clipped by the outline (holes stay empty), dashes.
+    void hatchesFillTheOutline()
+    {
+        kimbim::FillPattern p;
+        kimbim::HatchFamily f;
+        f.angle = 0;
+        f.spacing = 1.0; // mm on paper -> 0.1 m at 1:100
+        p.lines << f;
+        const std::vector<QPointF> square{{0, 0}, {1, 0}, {1, 1}, {0, 1}};
+        auto segs = kimbim::Graphics::hatch({square}, p, 0.1);
+        QCOMPARE(int(segs.size()), 9); // y = 0.1 ... 0.9
+        for (const auto& s : segs)
+            QVERIFY(std::abs(s[0]) < 1e-9 && std::abs(s[2] - 1.0) < 1e-9);
+        const std::vector<QPointF> hole{{0.25, 0.25}, {0.75, 0.25}, {0.75, 0.75}, {0.25, 0.75}};
+        segs = kimbim::Graphics::hatch({square, hole}, p, 0.1);
+        QCOMPARE(int(segs.size()), 9 + 5); // lines through the hole are split in two
+        p.lines[0].dash = {2.0, 2.0}; // 0.2 m on, 0.2 m off
+        segs = kimbim::Graphics::hatch({square}, p, 0.1);
+        QVERIFY(segs.size() > 9);
+        kimbim::FillPattern solid;
+        solid.solid = true;
+        QVERIFY(kimbim::Graphics::hatch({square}, solid, 0.1).empty());
+    }
+
     // D96: layered elements' bands come with the state; malformed ones are dropped.
     void parsesLayerBands()
     {
