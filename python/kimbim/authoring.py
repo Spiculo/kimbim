@@ -103,6 +103,10 @@ def new_project(name: str = "") -> str:
     except Exception as ex:
         return _fail(f"{type(ex).__name__}: {ex}")
     B._reset_history("")
+    from . import settings
+
+    if materials.texture_files():  # D96: the catalogue's pictures are part of the new project
+        settings.load({**settings.current(), "texture_files": materials.texture_files()})
     return B._dump({"ok": True, "project": project.Name})
 
 

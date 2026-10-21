@@ -505,10 +505,107 @@ def ensure(name: str, f=None):
     return m
 
 
+# ---------------------------------------------------------------- default textures (D96)
+# Pictures for the catalogue's surfaces, drawn here (no third-party assets): {surface: (painter, size m)}.
+
+def _shade(rgb, k):
+    return bytes(max(0, min(255, int(c * k))) for c in rgb)
+
+
+def _brick_pixels(w, h):
+    rows = []
+    for y in range(h):
+        row = bytearray()
+        course = y // (h // 4)
+        for x in range(w):
+            mortar = y % (h // 4) < 2 or (x + (w // 4 if course % 2 else 0)) % (w // 2) < 2
+            if mortar:
+                row += bytes([222, 216, 205])
+            else:
+                brick = (x + (w // 4 if course % 2 else 0)) // (w // 2) + course * 7
+                row += _shade((181, 101, 74), 0.88 + 0.12 * ((brick * 37) % 10) / 10 + ((x * 13 + y * 7) % 5) / 100)
+        rows.append(row)
+    return rows
+
+
+def _timber_pixels(w, h):
+    import math as m
+
+    rows = []
+    for y in range(h):
+        row = bytearray()
+        for x in range(w):
+            grain = 0.5 + 0.5 * m.sin(y * 0.55 + 2.0 * m.sin(x * 0.045) + 0.8 * m.sin(x * 0.011 + y * 0.03))
+            row += _shade((216, 180, 138), 0.84 + 0.16 * grain)
+        rows.append(row)
+    return rows
+
+
+def _tile_pixels(w, h):
+    rows = []
+    for y in range(h):
+        row = bytearray()
+        for x in range(w):
+            joint = x % (w // 2) < 2 or y % (h // 2) < 2
+            row += bytes([170, 168, 160]) if joint else _shade((230, 226, 218), 0.97 + ((x // (w // 2) + y // (h // 2)) % 2) * 0.03)
+        rows.append(row)
+    return rows
+
+
+def _stone_pixels(w, h):
+    rows = []
+    for y in range(h):
+        row = bytearray()
+        course = y // (h // 2)
+        for x in range(w):
+            off = (w // 3) if course % 2 else 0
+            joint = y % (h // 2) < 2 or (x + off) % (w // 2 + 8 * (course % 3)) < 2
+            noise = ((x * 7919 + y * 104729) % 23) / 230
+            row += bytes([150, 144, 132]) if joint else _shade((201, 193, 176), 0.9 + noise)
+        rows.append(row)
+    return rows
+
+
+def _roof_tile_pixels(w, h):
+    rows = []
+    for y in range(h):
+        row = bytearray()
+        course = y // (h // 4)
+        for x in range(w):
+            xx = (x + (w // 8 if course % 2 else 0)) % (w // 4)
+            edge = y % (h // 4) > h // 4 - 3 or xx < 2
+            depth = 0.82 + 0.18 * (y % (h // 4)) / (h // 4)  # each tile darker at its lower edge
+            row += _shade((168, 85, 58), 0.6 if edge else depth)
+        rows.append(row)
+    return rows
+
+
+DEFAULT_TEXTURES = {"Roof tiles": (_roof_tile_pixels, (1.2, 0.4)), "Brick": (_brick_pixels, (0.5, 0.26)), "Timber - finish": (_timber_pixels, (1.0, 0.25)),
+                    "Ceramic tiles": (_tile_pixels, (0.6, 0.6)), "Stone": (_stone_pixels, (1.2, 0.6))}
+
+
+def _default_texture(f, style, name: str):
+    """Give a catalogue surface its drawn picture (D96), written into the project's file store."""
+    import tempfile
+    import pathlib
+
+    from . import underlays
+
+    painter, size = DEFAULT_TEXTURES[name]
+    data = underlays.png_bytes(128, 64, painter(128, 64))
+    tmp = pathlib.Path(tempfile.mkdtemp()) / f"{name}.png"
+    tmp.write_bytes(data)
+    _write_texture(f, style, {"texture_path": str(tmp), "texture_size": list(size)})
+
+
 def _apply_spec(f, material, name: str, spec: dict):
-    style = _surface_by_name(f, name) or make_surface(f, name, {
-        "colour": spec["colour"], "transparency": spec.get("transparency", 0.0), "shine": spec.get("shine", 0.1),
-        "reflectance": spec.get("reflectance", "MATT")})
+    style = _surface_by_name(f, name)
+    if style is None:
+        style = make_surface(f, name, {
+            "colour": spec["colour"], "transparency": spec.get("transparency", 0.0), "shine": spec.get("shine", 0.1),
+            "reflectance": spec.get("reflectance", "MATT")})
+        if name in DEFAULT_TEXTURES:
+            _default_texture(f, style, name)
     attach_surface(f, material, style)
     _write_properties(f, material, {k: spec.get(k) for k in ("pen", "pattern", "priority", "density", "conductivity", "heat")})
 

@@ -403,14 +403,14 @@ def test_surface_textures(project, tmp_path):
     assert r["ok"], r
     s = by_name(state()["surfaces"], "Brick")
     assert s["texture"].endswith(".png") and s["texture_size"] == [0.5, 0.25]
-    assert settings.current()["texture_files"] == [s["texture"]]
+    assert s["texture"] in settings.current()["texture_files"]
     palette, idx, _, _ = colours(g)
     textured = [row for row in palette if len(row) == 7]
     assert textured and textured[0][5:] == [0.5, 0.25] and textured[0][4].endswith(s["texture"])
     r = call("apply_materials", json.dumps({"surfaces": [{**s, "texture": ""}]}))
     assert r["ok"], r
     assert "texture" not in by_name(state()["surfaces"], "Brick")
-    assert settings.current()["texture_files"] == []
+    assert s["texture"] not in settings.current()["texture_files"]
     call("undo")
     assert by_name(state()["surfaces"], "Brick")["texture"] == s["texture"]
     logger = ifcopenshell.validate.json_logger()
@@ -434,3 +434,16 @@ def test_dxf_exports_composite_cuts_with_pattern_hatches(project, tmp_path):
     doc = ezdxf.readfile(str(out))
     names = {h.dxf.pattern_name for h in doc.modelspace().query("HATCH") if not h.dxf.solid_fill}
     assert {"BRICK", "CROSSHATCH"} <= names  # brick and block layers; insulation loops have no line families
+
+
+def test_catalogue_surfaces_come_with_pictures(project):
+    from kimbim import settings, underlays
+
+    st = state()
+    brick = by_name(st["surfaces"], "Brick")
+    assert brick["texture"].endswith(".png") and brick["texture_size"] == [0.5, 0.26]
+    assert underlays.file_path(brick["texture"]) is not None
+    assert by_name(st["surfaces"], "Timber - finish")["texture"]
+    assert "texture" not in by_name(st["surfaces"], "Concrete")
+    assert set(settings.current()["texture_files"]) == {s["texture"] for s in st["surfaces"] if s.get("texture")}
+    assert call("state")["dirty"] is False  # part of the empty project
