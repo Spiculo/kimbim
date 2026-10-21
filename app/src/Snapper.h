@@ -19,6 +19,7 @@ struct SnapWall {
     QString guid;
     QPointF a, b;
     double thickness = 0.0;
+    double centre = 0.0; // D97: the body's middle, to the axis' left (a wall drawn by a face)
 };
 
 // A grid axis (from app_bridge.snap_data "grid"), in metres.

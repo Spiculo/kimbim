@@ -2247,6 +2247,12 @@ void MainWindow::buildModelingToolbar()
     m_objectGravity->setObjectName(QStringLiteral("objectGravity"));
     m_objectGravity->setToolTip(tr("Place objects on the top of the slab under them"));
     bar->addField(m_objectGravity);
+    // D97: an object dropped by a wall turns its back to the wall and stands against it.
+    m_objectFit = new QCheckBox(tr("Fit to walls"), bar);
+    m_objectFit->setObjectName(QStringLiteral("objectFitToWalls"));
+    m_objectFit->setToolTip(tr("Near a wall, the object turns its back to the wall and stands against it"));
+    m_objectFit->setChecked(true);
+    bar->addField(m_objectFit);
     m_roofKind = new QComboBox(bar);
     m_roofKind->setObjectName(QStringLiteral("roofKind"));
     m_roofKind->addItem(tr("Flat"), QStringLiteral("flat"));
@@ -2912,6 +2918,7 @@ void MainWindow::setTool(Tool tool)
     m_wallHeight->setVisible(tool == Tool::Wall || tool == Tool::Column || tool == Tool::Beam || tool == Tool::Roof);
     m_wallReference->setVisible(tool == Tool::Wall);
     m_objectGravity->setVisible(tool == Tool::Object);
+    m_objectFit->setVisible(tool == Tool::Object);
     if (tool == Tool::Wall) {
         const int i = m_wallReference->findData(m_settings.value("wall_reference_line").toString(QStringLiteral("Outside face")));
         m_wallReference->setCurrentIndex(std::max(0, i));

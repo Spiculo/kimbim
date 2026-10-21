@@ -240,6 +240,36 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // D97: Fit to walls: an object dropped by a wall stands against its face, its back to the wall.
+    void objectsFitToWalls()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        w.setTool(kimbim::MainWindow::Tool::Wall); // drawn by its outside face: the body from y = 0 to 0.3
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({5, 0});
+        w.wallTool()->finish();
+        w.setTool(kimbim::MainWindow::Tool::Object);
+        auto same = [](QPointF a, QPointF b) { return std::hypot(a.x() - b.x(), a.y() - b.y()) < 1e-6; };
+        QCOMPARE(w.wallTool()->snapper().walls().size(), 1);
+        const kimbim::SnapWall sw = w.wallTool()->snapper().walls().first();
+        const double face = sw.centre + sw.thickness / 2; // the inside face (the outside one is at y = 0)
+        QVERIFY(std::abs(sw.centre - sw.thickness / 2) < 1e-9);
+        auto inside = w.fitObjectToWall(QPointF(2.5, face + 0.4), 1.0, 0.6);
+        QVERIFY(inside);
+        QVERIFY(same(inside->origin, QPointF(3.0, face + 0.6)));
+        QVERIFY(std::abs(std::abs(inside->angle) - 180.0) < 1e-6);
+        auto outside = w.fitObjectToWall(QPointF(2.5, -0.4), 1.0, 0.6); // by the face at y = 0
+        QVERIFY(outside);
+        QVERIFY(same(outside->origin, QPointF(2.0, -0.6)));
+        QVERIFY(std::abs(outside->angle) < 1e-6);
+        QVERIFY(!w.fitObjectToWall(QPointF(2.5, 3.0), 1.0, 0.6)); // too far from any wall
+        w.findChild<QCheckBox*>(QStringLiteral("objectFitToWalls"))->setChecked(false);
+        QVERIFY(!w.fitObjectToWall(QPointF(2.5, 0.8), 1.0, 0.6));
+        w.setTool(kimbim::MainWindow::Tool::None);
+        QVERIFY(w.close());
+    }
+
     // D96: Archicad's 3D styles: white model and sun shadows, kept in saved views.
     void whiteModelAndShadows()
     {

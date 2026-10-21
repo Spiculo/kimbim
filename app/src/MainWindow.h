@@ -417,6 +417,12 @@ public:
     LibraryPanel* libraryPanel();
     bool chooseObject(const QString& id, const QJsonObject& params = {}); // and start the Object tool
     bool placeObjectAt(QPointF p, bool turned = false);
+    struct ObjectFit {
+        QPointF origin; // the object's left front corner
+        double angle = 0.0; // degrees
+    };
+    // D97: where an object dropped at `p` stands against the nearest wall face (Fit to walls), if any.
+    std::optional<ObjectFit> fitObjectToWall(QPointF p, double width, double depth) const;
     double objectAngle() const { return m_objectAngle; } // degrees
     void setObjectAngle(double degrees);
     void applyLibraryPaths(); // the office library from the preferences (folder and IFC files)
@@ -696,6 +702,7 @@ private:
     QJsonObject m_pickedUp;         // D97: the picked-up settings (pick_up's reply)
     QAction* m_gridSnap = nullptr; // D98: View > Grid snap
     QCheckBox* m_objectGravity = nullptr; // D97: objects land on the slab under them
+    QCheckBox* m_objectFit = nullptr;     // D97: objects stand against the wall they are dropped by
     QComboBox* m_roofKind = nullptr;
     QDoubleSpinBox* m_roofPitch = nullptr;
     bool m_warnedInconsistent = false;

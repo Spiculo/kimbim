@@ -46,7 +46,8 @@ QVector<SnapWall> Snapper::parse(const QJsonObject& snapData)
     for (const auto& v : snapData.value("walls").toArray()) {
         const QJsonObject w = v.toObject();
         out.push_back({w.value("guid").toString(), QPointF(w.value("x1").toDouble(), w.value("y1").toDouble()),
-            QPointF(w.value("x2").toDouble(), w.value("y2").toDouble()), w.value("thickness").toDouble()});
+            QPointF(w.value("x2").toDouble(), w.value("y2").toDouble()), w.value("thickness").toDouble(),
+            w.value("centre").toDouble()});
     }
     return out;
 }
@@ -341,8 +342,10 @@ Snap Snapper::compute(QPointF p, double tolerance, const QPointF* from, bool ort
     auto faces = [](const SnapWall& w) {
         const QPointF d = w.b - w.a;
         const double len = std::hypot(d.x(), d.y());
-        const QPointF n = len > 1e-12 ? QPointF(-d.y() / len, d.x() / len) * (w.thickness / 2) : QPointF();
-        return std::array<std::pair<QPointF, QPointF>, 2>{std::pair{w.a + n, w.b + n}, std::pair{w.a - n, w.b - n}};
+        const QPointF u = len > 1e-12 ? QPointF(-d.y() / len, d.x() / len) : QPointF();
+        const QPointF n = u * (w.thickness / 2), c = u * w.centre;
+        return std::array<std::pair<QPointF, QPointF>, 2>{
+            std::pair{w.a + c + n, w.b + c + n}, std::pair{w.a + c - n, w.b + c - n}};
     };
     if (s.kind == Snap::None && m_faces)
         s = best(Snap::FaceEnd, [&](const SnapWall& w, QPointF* q) {

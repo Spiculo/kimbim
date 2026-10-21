@@ -24,7 +24,7 @@ Branch `parity-materials`. Spec: [2026-10-21-archicad-parity-materials-design](.
   entries with `choices`).
 - Layer priorities follow the materials' priorities (`materials.sync_priorities`).
 - Wall tool: reference line combo (project setting `wall_reference_line`, default outside face), preview
-  offset (`wall_types` → `centres`). Model › Flip walls. Object tool: Gravity.
+  offset (`wall_types` → `centres`). Model › Flip walls. Object tool: Gravity, Fit to walls (an object dropped by a wall face turns its back to it and stands against it; on by default). Snap data carries each wall body's centre offset, so face snaps follow walls drawn by a face.
 
 ### D98 tooling
 - Construction grid + grid snap (`Snapper::setSnapGrid`, `Viewport::setConstructionGrid`), Zoom to selection.

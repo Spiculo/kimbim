@@ -342,3 +342,11 @@ def test_swept_walls_are_cut_at_their_joins(project):
     from kimbim import authoring
 
     assert any(abs(e["value"] - 3.0) < 1e-3 for k, e in props(a)[authoring.DIMENSIONS].items() if "eight" in k)
+
+
+def test_snap_data_knows_where_the_body_is(project):
+    """D97: walls drawn by a face report their body's middle, so face snaps and Fit to walls land on it."""
+    g = wall(project, "Outside face")
+    data = call("snap_data", project["level"])
+    w = next(x for x in data["walls"] if x["guid"] == g)
+    assert w["centre"] == pytest.approx(0.15) and w["thickness"] == pytest.approx(0.3)

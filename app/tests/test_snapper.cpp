@@ -95,6 +95,20 @@ private slots:
         QCOMPARE(w.snap(QPointF(3.98, 0.02), 0.1).kind, Snap::Endpoint);
     }
 
+    // D97: a wall drawn by a face: its faces are where the body is, not about the axis.
+    void facesOfAWallBesideItsAxis()
+    {
+        Snapper s;
+        s.setWalls(Snapper::parse(QJsonDocument::fromJson(
+            R"({"walls":[{"guid":"A","x1":0,"y1":0,"x2":4,"y2":0,"thickness":0.3,"centre":0.15}]})").object()));
+        s.setFaceSnapping(true);
+        const Snap corner = s.snap(QPointF(4.02, 0.31), 0.05);
+        QVERIFY(near(corner.point, QPointF(4.0, 0.3)) || near(corner.point, QPointF(4.0, 0.0)));
+        const Snap face = s.snap(QPointF(2.03, 0.32), 0.05);
+        QCOMPARE(face.kind, Snap::OnFace);
+        QVERIFY(near(face.point, QPointF(2.03, 0.3), 1e-9));
+    }
+
     // D98: Archicad's special snap points: divisions of a wall and a distance from its ends.
     void specialSnapPoints()
     {

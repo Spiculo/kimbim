@@ -1634,6 +1634,9 @@ ES = {
         "Mostrar todas las superficies en blanco, como maqueta de estudio (se mantienen los contornos y el vidrio)",
     "Sun s&hadows": "So&mbras del sol",
     "The sun casts shadows in the 3D views": "El sol proyecta sombras en las vistas 3D",
+    "Fit to walls": "Ajustar a muros",
+    "Near a wall, the object turns its back to the wall and stands against it":
+        "Cerca de un muro, el objeto se gira de espaldas al muro y se apoya contra él",
 }
 
 

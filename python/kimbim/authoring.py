@@ -436,6 +436,17 @@ def _mesh_vertex_points(storey) -> list:
     return out
 
 
+def _body_centre(wall) -> float:
+    """How far the wall body's middle lies from its axis, to the axis' left (metres; D97 reference lines)."""
+    usage = ifcopenshell.util.element.get_material(wall, should_skip_usage=False)
+    if usage is None or not usage.is_a("IfcMaterialLayerSetUsage"):
+        return 0.0
+    s = _scale()
+    total = sum(float(l.LayerThickness or 0.0) for l in usage.ForLayerSet.MaterialLayers) * s
+    off = float(usage.OffsetFromReferenceLine or 0.0) * s
+    return off + total / 2 if usage.DirectionSense != "NEGATIVE" else off - total / 2
+
+
 def snap_data(storey_guid: str, mesh_vertices: str = "") -> str:
     """Wall axes on a level, in world metres, for snapping while drawing. With `mesh_vertices`
     (D92, truthful), the level's element mesh vertices are added to the snapping points."""
@@ -452,7 +463,8 @@ def snap_data(storey_guid: str, mesh_vertices: str = "") -> str:
             if axis is None:
                 continue
             walls.append({"guid": e.GlobalId, "x1": axis[0][0], "y1": axis[0][1], "x2": axis[1][0], "y2": axis[1][1],
-                          "thickness": round(_thickness(layer_set), 6) if layer_set else 0.0})
+                          "thickness": round(_thickness(layer_set), 6) if layer_set else 0.0,
+                          "centre": round(_body_centre(e), 6)})  # D97: the body beside its reference line
             for void in getattr(e, "HasOpenings", ()) or ():
                 opening = void.RelatedOpeningElement
                 fill = next((r.RelatedBuildingElement for r in getattr(opening, "HasFillings", ()) or ()), None)
