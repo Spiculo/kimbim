@@ -225,6 +225,14 @@ private slots:
         QCOMPARE(w.wallTool()->snapper().snapGridStep(), 1.0);
         const kimbim::Snap s = w.wallTool()->snapper().snap(QPointF(1.4, 2.3), 0.01);
         QVERIFY(std::abs(s.point.x() - 1.5) < 1e-9 && std::abs(s.point.y() - 2.5) < 1e-9);
+        const int before = plan->constructionLineCount();
+        snap->setChecked(false);
+        w.setTool(kimbim::MainWindow::Tool::Wall); // a wall far past the grid: the grid grows to cover it
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({120, 0});
+        w.wallTool()->finish();
+        w.setTool(kimbim::MainWindow::Tool::None);
+        QVERIFY(plan->constructionLineCount() > before);
         show->setChecked(false);
         QCOMPARE(plan->constructionLineCount(), 0);
         snap->setChecked(false);

@@ -149,6 +149,19 @@ Viewport::Viewport(Scene* scene, QWidget* parent)
     connect(m_scene, &Scene::elementsAltered, this, [this] {
         if (!m_sectionPlanes.empty())
             rebuildSections();
+        // D98: the construction grid grows with the model (redrawn only when the model leaves it)
+        if (!m_construction.IsNull()) {
+            Bnd_Box box;
+            for (const auto& b : m_scene->batches)
+                box.Add(b->visibleBounds());
+            if (!box.IsVoid()) {
+                double x0, y0, z0, x1, y1, z1;
+                box.Get(x0, y0, z0, x1, y1, z1);
+                const QRectF& e = m_constructionExtent;
+                if (x0 < e.left() || y0 < e.top() || x1 > e.right() || y1 > e.bottom())
+                    displayConstructionGrid();
+            }
+        }
     });
 }
 
@@ -974,6 +987,7 @@ void Viewport::displayConstructionGrid()
     }
     const double margin = std::max(10.0, 2 * g.spacing);
     x0 -= margin, y0 -= margin, x1 += margin, y1 += margin;
+    m_constructionExtent = QRectF(QPointF(x0, y0), QPointF(x1, y1)); // the model may grow this far first
     const double c = std::cos(g.angle), s = std::sin(g.angle);
     double u0 = 1e30, u1 = -1e30, v0 = 1e30, v1 = -1e30;
     for (double x : {x0, x1})

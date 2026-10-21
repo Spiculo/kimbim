@@ -450,6 +450,7 @@ private:
     Handle(AIS_InteractiveObject) m_construction; // D98
     ConstructionGrid m_constructionGrid;
     int m_constructionLines = 0;
+    QRectF m_constructionExtent; // D98: the area the grid covers (world plan metres)
     void displayConstructionGrid();
     QVector<Annotation> m_annotationData;
     QVector<Annotation> m_markerData;
