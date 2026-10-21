@@ -266,3 +266,32 @@ def test_double_slanted_walls_follow_a_stretch(project):
     assert props(g)[C.GEOMETRY]["Opposite slant angle"]["value"] == pytest.approx(85.0)
     top = v[v[:, 2] > 2.999]
     assert top[:, 1].max() == pytest.approx(0.3 - 3.0 * np.tan(np.radians(5)), abs=1e-3)
+
+
+def test_complex_profile_walls(project):
+    # a stepped section drawn as a closed polyline: 0.4 m wide at the base, 0.2 m above 1 m, 3 m high
+    pts = [[10, 10], [10.4, 10], [10.4, 11], [10.2, 11], [10.2, 13], [10, 13]]
+    d = call("add_drafting", project["level"], "polyline", json.dumps(pts), json.dumps({"closed": True}))
+    assert d["ok"], d
+    r = call("save_wall_profile", d["guid"], "Stepped")
+    assert r["ok"], r
+    assert r["points"][0] == [0, 0] and max(p[1] for p in r["points"]) == pytest.approx(3.0)
+    g = wall(project, "Outside face", x2=5.0)
+    assert "Stepped" in props(g)[C.GEOMETRY]["Profile"]["choices"]
+    r = call("set_element_setting", json.dumps([g]), C.GEOMETRY, "Profile", "Stepped")
+    assert r["ok"], r
+    _, _, v, _ = mesh(g)
+    assert v[:, 1].max() == pytest.approx(0.4, abs=1e-3) and v[:, 2].max() == pytest.approx(3.0, abs=1e-3)
+    top = v[v[:, 2] > 2.999]
+    assert top[:, 1].max() == pytest.approx(0.2, abs=1e-3)  # the upper part is the narrow one
+    assert call("set_dimension", json.dumps([g]), "Length", "6")["ok"]  # a stretch keeps the profile
+    _, _, v, _ = mesh(g)
+    assert v[:, 0].max() - v[:, 0].min() == pytest.approx(6.0, abs=1e-3)
+    assert props(g)[C.GEOMETRY]["Profile"]["value"] == "Stepped"
+    r = call("set_element_setting", json.dumps([g]), C.GEOMETRY, "Profile", C.NO_PROFILE)
+    assert r["ok"], r
+    _, _, v, _ = mesh(g)
+    assert v[:, 1].max() == pytest.approx(0.3, abs=1e-3)  # the composite's own thickness again
+    assert not call("save_wall_profile", d["guid"], "")["ok"]
+    line = call("add_drafting", project["level"], "line", json.dumps([[0, 0], [1, 0]]))
+    assert not call("save_wall_profile", line["guid"], "Open")["ok"]

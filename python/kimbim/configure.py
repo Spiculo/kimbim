@@ -167,7 +167,99 @@ def _body_solids(wall) -> list:
 
 
 def is_double_slanted(wall) -> bool:
-    return bool(_pset(wall, WALL_PSET).get("DoubleSlant"))
+    """A wall with its own swept section (double slanted or a complex profile), not the regenerator's."""
+    p = _pset(wall, WALL_PSET)
+    return bool(p.get("DoubleSlant") or p.get("Profile"))
+
+
+# ---------------------------------------------------------------- complex profiles (D97)
+# Archicad's Profile Manager: a section drawn once (a closed shape in 2D), named, and given to walls,
+# which sweep it along their reference line (x across from the line, y up from the base).
+
+NO_PROFILE = "(none)"
+
+
+def profiles_error(value) -> str | None:
+    if not isinstance(value, dict):
+        return "wall profiles are a table by name"
+    for name, pts in value.items():
+        if not isinstance(name, str) or not name.strip():
+            return "a wall profile needs a name"
+        if not (isinstance(pts, list) and len(pts) >= 3 and all(
+                isinstance(p, list) and len(p) == 2 and all(isinstance(c, (int, float)) for c in p) for p in pts)):
+            return f"the profile {name} needs at least three [across, up] points"
+    return None
+
+
+def profiles() -> dict:
+    from . import settings
+
+    return dict(settings.current().get("wall_profiles") or {})
+
+
+def profile_of(wall) -> str:
+    return str(_pset(wall, WALL_PSET).get("Profile") or "")
+
+
+def set_profile(wall, name: str, height: float | None = None):
+    """Sweep the named section along the wall (the line stays, joins and stretches keep the section)."""
+    from . import authoring as A
+
+    pts = profiles().get(name)
+    if pts is None:
+        raise ValueError(f"unknown wall profile {name}")
+    f = B._model
+    axis = A._axis_world(wall)
+    if axis is None:
+        raise ValueError(f"{wall.Name or 'the wall'} has no axis line")
+    length = math.dist(*axis)
+    k = 1.0 / A._scale()
+    profile = f.createIfcArbitraryClosedProfileDef("AREA", None, f.createIfcPolyline(
+        [f.createIfcCartesianPoint((float(y) * k, float(z) * k)) for y, z in list(pts) + [pts[0]]]))
+    position = f.createIfcAxis2Placement3D(f.createIfcCartesianPoint((0.0, 0.0, 0.0)),
+                                           f.createIfcDirection((1.0, 0.0, 0.0)), f.createIfcDirection((0.0, 1.0, 0.0)))
+    solid = f.createIfcExtrudedAreaSolid(profile, position, f.createIfcDirection((0.0, 0.0, 1.0)), length * k)
+    A._replace_body(wall, f.createIfcShapeRepresentation(A._body_context(), "Body", "SweptSolid", [solid]))
+    _write_pset(wall, WALL_PSET, {"Profile": name, "Height": float(max(z for _, z in pts))})
+
+
+def save_wall_profile(guid: str, name: str) -> str:
+    """A closed polyline, rectangle or fill (D84) as a named wall profile: its lowest left corner is the
+    wall's base on its reference line, x across the wall, y up (one undo step, a settings change)."""
+    from . import annotations as N
+    from . import settings
+
+    if B._model is None:
+        return _fail("no model open")
+    name = (name or "").strip()
+    if not name:
+        return _fail("a wall profile needs a name")
+    try:
+        a = B._model.by_guid(guid)
+    except RuntimeError:
+        return _fail("select a closed shape")
+    data = N._read(a) if a.is_a("IfcAnnotation") else None
+    kind = data[0] if data else ""
+    closed = kind == "fill" or (kind == "polyline" and N.extra_of(a).get("Closed"))
+    if not closed:
+        return _fail("draw the section as a closed polyline, a rectangle or a fill")
+    world = [(float(p[0]), float(p[1])) for p in N.world_points(a)]
+    x0, y0 = min(p[0] for p in world), min(p[1] for p in world)
+    pts = [[round(x - x0, 6), round(y - y0, 6)] for x, y in world]
+
+    def action():
+        table = profiles()
+        table[name] = pts
+        r = json.loads(settings.set_project_settings(json.dumps({"wall_profiles": table})))
+        if not r.get("ok"):
+            raise ValueError(r.get("error"))
+        return 1
+
+    try:
+        r = B._run_settings(action)
+    except Exception as ex:
+        return _fail(str(ex))
+    return B._dump({**r, "name": name, "points": pts})
 
 
 def opposite_slant_of(wall) -> float:
@@ -217,7 +309,7 @@ def set_double_slant(wall, reference: float, opposite: float):
                                   "SlantOpposite": float(opposite), "Height": float(height)})
 
 
-def rebuild_double_slant(wall, length=None):
+def rebuild_double_slant(wall, length=None):  # also a complex-profile wall
     """A double-slanted wall after a stretch or a move (D97): its axis line takes `length` (metres) when
     given and its section is swept again along it, the angles and height kept."""
     from . import authoring as A
@@ -230,7 +322,10 @@ def rebuild_double_slant(wall, length=None):
                 first = item.Points[0].Coordinates
                 item.Points[-1].Coordinates = (float(first[0]) + float(length) * k, float(first[1]))
     p = _pset(wall, WALL_PSET)
-    set_double_slant(wall, float(p["SlantReference"]), float(p["SlantOpposite"]))
+    if p.get("Profile"):
+        set_profile(wall, str(p["Profile"]))
+    else:
+        set_double_slant(wall, float(p["SlantReference"]), float(p["SlantOpposite"]))
     return True
 
 
@@ -355,6 +450,7 @@ def groups(elements) -> dict:
             "Reference line": _entry(refs, list(REFERENCES) + ([CUSTOM] if CUSTOM in refs else []), "IfcLabel"),
             "Slant angle": _entry(slants, None, "IfcPlaneAngleMeasure"),
             "Opposite slant angle": _entry(opposite, None, "IfcPlaneAngleMeasure"),  # D97: double slanted
+            "Profile": _entry({profile_of(w) or NO_PROFILE for w in walls}, [NO_PROFILE, *profiles()], "IfcLabel"),
         }
     things = [e for e in elements if e.is_a("IfcElement") and not e.is_a("IfcOpeningElement")]
     if things and len(things) == len(elements):
@@ -420,6 +516,25 @@ def set_element_setting(guids_json: str, group: str, name: str, value) -> str:
                             set_slant(w, ref)
                 else:
                     set_double_slant(w, ref, degrees)
+            touched = _regenerate_with_neighbours(walls)
+            return len(walls), [w.GlobalId for w in touched], []
+    elif group == GEOMETRY and name == "Profile":
+        if value != NO_PROFILE and value not in profiles():
+            return _fail(f"unknown wall profile {value}")
+        walls = [e for e in elements if e.is_a("IfcWall") and _usage(e) is not None]
+
+        def action():
+            for w in walls:
+                if value == NO_PROFILE:
+                    if profile_of(w):
+                        height = float(_pset(w, WALL_PSET).get("Height") or 3.0)
+                        _write_pset(w, WALL_PSET, {"Profile": None, "DoubleSlant": True, "Height": height,
+                                                   "SlantReference": 90.0, "SlantOpposite": 90.0})
+                        clear_double_slant(w)  # a plain wall again, the profile's height kept
+                else:
+                    if is_double_slanted(w) and not profile_of(w):
+                        _write_pset(w, WALL_PSET, {"DoubleSlant": None, "SlantReference": None, "SlantOpposite": None})
+                    set_profile(w, value)
             touched = _regenerate_with_neighbours(walls)
             return len(walls), [w.GlobalId for w in touched], []
     elif group == SURFACES:

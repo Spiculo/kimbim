@@ -1590,6 +1590,14 @@ ES = {
     "&Stop at their joins": "&Detenerse en sus uniones",
     "By building &materials": "Según los &materiales de construcción",
     "%n join(s) changed": ("%n unión cambiada", "%n uniones cambiadas"),
+    "Save shape as wall &profile...": "Guardar forma como &perfil de muro...",
+    "Select a closed polyline, rectangle or fill drawn as a wall's section, then name it":
+        "Seleccione una polilínea cerrada, rectángulo o relleno dibujado como sección del muro y póngale nombre",
+    "Select one closed shape: the wall's section": "Seleccione una forma cerrada: la sección del muro",
+    "Wall profile": "Perfil de muro",
+    "Profile name:": "Nombre del perfil:",
+    "Wall profile %1 saved: choose it in a wall's Properties > Geometry > Profile":
+        "Perfil de muro %1 guardado: elíjalo en Propiedades > Geometry > Profile de un muro",
 }
 
 

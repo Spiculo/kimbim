@@ -232,6 +232,20 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // D97: a closed shape saved as a wall profile (Archicad's Profile Manager) lands in the project settings.
+    void wallProfilesFromShapes()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        const QJsonObject d = kimbim::PythonEngine::instance().callJson("add_drafting",
+            {w.levelsBar()->activeStorey(), QStringLiteral("rectangle"), QStringLiteral("[[0,0],[0.3,2.5]]"), QString()}, nullptr).object();
+        QVERIFY(d.value("ok").toBool());
+        QVERIFY(w.saveWallProfile(d.value("guid").toString(), QStringLiteral("Parapet")));
+        QVERIFY(w.projectSettings().value("wall_profiles").toObject().contains(QStringLiteral("Parapet")));
+        QVERIFY(!w.saveWallProfile(d.value("guid").toString(), QString()));
+        QVERIFY(w.close());
+    }
+
     // D98: Archicad's Grid System adds numbered and lettered axes at once, snappable, one undo step.
     void gridSystemAddsAxesInOneStep()
     {

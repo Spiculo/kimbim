@@ -2088,6 +2088,21 @@ void MainWindow::buildModelingToolbar()
     gridSystem->setObjectName(QStringLiteral("actionGridSystem"));
     gridSystem->setToolTip(tr("Several grid lines at once: numbered across, lettered along"));
     connect(gridSystem, &QAction::triggered, this, &MainWindow::gridSystemDialog);
+    // D97: Archicad's Profile Manager: a closed shape drawn in 2D becomes a wall section (Properties > Profile).
+    QAction* saveProfile = model->addAction(tr("Save shape as wall &profile..."));
+    saveProfile->setObjectName(QStringLiteral("actionSaveWallProfile"));
+    saveProfile->setToolTip(tr("Select a closed polyline, rectangle or fill drawn as a wall's section, then name it"));
+    connect(saveProfile, &QAction::triggered, this, [this] {
+        if (m_selection.size() != 1) {
+            m_status->showMessage(tr("Select one closed shape: the wall's section"));
+            return;
+        }
+        bool ok = false;
+        const QString name = QInputDialog::getText(this, tr("Wall profile"), tr("Profile name:"), QLineEdit::Normal,
+            QString(), &ok);
+        if (ok && !name.trimmed().isEmpty())
+            saveWallProfile(m_selection.first(), name.trimmed());
+    });
     // D97: Archicad's junction override: the selected walls run through, stop, or their layers decide.
     QMenu* junctions = model->addMenu(tr("Wall &junctions"));
     junctions->setObjectName(QStringLiteral("menuJunctions"));
@@ -5894,6 +5909,20 @@ QString MainWindow::wallReference() const
 {
     // The Wall tool's choice (D97); empty (the centre) when the tool strip was never built.
     return m_wallReference ? m_wallReference->currentData().toString() : QString();
+}
+
+bool MainWindow::saveWallProfile(const QString& shapeGuid, const QString& name)
+{
+    const QJsonObject r = bridge("save_wall_profile", {shapeGuid, name});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(r.value("error").toString());
+        return false;
+    }
+    loadProjectSettings();
+    setWindowModified(isDirty());
+    refreshProperties();
+    m_status->showMessage(tr("Wall profile %1 saved: choose it in a wall's Properties > Geometry > Profile").arg(name));
+    return true;
 }
 
 bool MainWindow::setJunctions(const QString& mode)

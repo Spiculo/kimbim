@@ -72,7 +72,8 @@ DEFAULTS = {
     "stair_riser_numbers": False,  # D92: number the risers on the plan
     "construction_grid": {"spacing": 1.0, "subdivisions": 4, "angle": 0.0, "origin": [0.0, 0.0]},  # D98
     "wall_reference_line": "Outside face",
-    "layers_in_3d": True,  # D96: walls and slabs show each layer on their ends and tops in 3D  # D97: where a new wall's clicked line is (Archicad default)
+    "layers_in_3d": True,
+    "wall_profiles": {},  # D97: complex wall sections by name: [[across, up], ...] metres from the base line  # D96: walls and slabs show each layer on their ends and tops in 3D  # D97: where a new wall's clicked line is (Archicad default)
 }
 UNITS = {"m": 1.0, "cm": 100.0, "mm": 1000.0}
 AREA_UNITS = {"m²": 1.0, "cm²": 10000.0, "mm²": 1000000.0}
@@ -261,6 +262,10 @@ def _error(key: str, value) -> str | None:
         o = g.get("origin")
         if not (isinstance(o, list) and len(o) == 2 and all(num(v) for v in o)):
             return "the grid origin is [x, y]"
+    if key == "wall_profiles":
+        from . import configure
+
+        return configure.profiles_error(value)
     if key == "layers_in_3d" and not isinstance(value, bool):
         return "layers_in_3d must be true or false"
     if key == "wall_reference_line":
