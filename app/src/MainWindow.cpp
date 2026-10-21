@@ -4994,6 +4994,16 @@ bool MainWindow::openSheet(const QString& number)
         if (titleBlock)
             refreshSheets(true);
     });
+    connect(view, &DrawingView::placedResized, this, [this, number](const QString& drawing, double widthMm) {
+        if (!drawing.startsWith(QLatin1String("symbol:")))
+            return;
+        const QJsonObject r = bridge("set_sheet_symbol", {number, drawing.mid(7),
+            QString::fromUtf8(QJsonDocument(QJsonObject{{"w", widthMm}}).toJson(QJsonDocument::Compact))});
+        if (!r.value("ok").toBool())
+            m_status->showMessage(tr("Could not resize it: %1").arg(r.value("error").toString()));
+        afterEdit(r);
+        refreshSheets(true);
+    });
     connect(view, &DrawingView::placedRemoveRequested, this, [this, number](const QString& drawing) {
         if (drawing == QLatin1String("titleblock"))
             return; // the title block belongs to the sheet: it can be moved, not removed

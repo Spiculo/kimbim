@@ -284,6 +284,27 @@ private slots:
             for (const auto& sym : sv.toObject().value("symbols").toArray())
                 images += sym.toObject().value("kind").toString() == QLatin1String("image");
         QCOMPARE(images, 1);
+        // D98: dragging the picture's corner resizes it (proportions kept)
+        kimbim::DrawingView* view = w.drawingView(QStringLiteral("sheet:") + number);
+        QVERIFY(view);
+        kimbim::DrawingView::Placed pic;
+        for (const auto& pl : view->placed())
+            if (pl.kind == QLatin1String("image"))
+                pic = pl;
+        QVERIFY(pic.rect.width() > 0);
+        const QPointF offset = -view->toPaper(QPointF(0, 0)) * view->zoom();
+        const QPointF corner = offset + pic.rect.bottomRight() * view->zoom();
+        const QPointF to = offset + QPointF(pic.rect.left() + pic.rect.width() * 2, pic.rect.bottom()) * view->zoom();
+        QTest::mousePress(view, Qt::LeftButton, {}, corner.toPoint());
+        QMouseEvent move(QEvent::MouseMove, to, view->mapToGlobal(to), Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(view, &move);
+        QTest::mouseRelease(view, Qt::LeftButton, {}, to.toPoint());
+        double width = 0;
+        for (const auto& sv : kimbim::PythonEngine::instance().callJson("sheets", {}, nullptr).object().value("sheets").toArray())
+            for (const auto& sym : sv.toObject().value("symbols").toArray())
+                if (sym.toObject().value("kind").toString() == QLatin1String("image"))
+                    width = sym.toObject().value("w").toDouble();
+        QVERIFY2(std::abs(width - pic.rect.width() * 2) < 1.0, qPrintable(QString::number(width)));
         QVERIFY(w.close());
     }
 

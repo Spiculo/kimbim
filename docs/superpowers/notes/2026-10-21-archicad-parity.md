@@ -35,7 +35,7 @@ Branch `parity-materials`. Spec: [2026-10-21-archicad-parity-materials-design](.
 
 ## Follow-ups (not done)
 - Textures are done (surface picture + size, `IfcSurfaceStyleWithTextures`, box-mapped in 3D, files in
-  `texture_files`); the catalogue ships no default pictures yet, and there is no render-style view.
+  `texture_files`); the catalogue's brick, timber, tiles, stone and roof tiles come with drawn pictures; no render-style view.
 - Cut fill patterns are hatched on screen, in printed drawings/PDF and in DXF (pattern HATCHes); the
   insulation loops have no line families, so DXF leaves those layers unhatched.
 - **Layer-by-layer junctions** are the regenerator's (priority 0–100); no per-junction override UI.
@@ -45,4 +45,3 @@ Branch `parity-materials`. Spec: [2026-10-21-archicad-parity-materials-design](.
   (it follows the model on the next refresh).
 - Worksheets cannot be renamed or deleted from the UI yet (the levels table excludes them); figures on a
   worksheet are calibrated like underlays (two points) rather than by a typed size.
-- Sheet pictures: no corner-drag resize in the sheet view (width through `set_sheet_symbol`).
