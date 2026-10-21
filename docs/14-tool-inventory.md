@@ -41,7 +41,7 @@ release notes, so check before relying on a single cell.
 | Project info (address, client, number) used in title blocks | AC RV VW | ✅ | new | Slice 16: *File › Project info…*, in IFC fields (D63) |
 | Survey point, project base point, georeferencing | AC RV VW BB | ⬜ | P2 | `ifcopenshell.api.georeference` |
 | Story settings (levels table: edit heights, insert/delete) | AC RV | ✅ | P0 | D79: Model › Levels..., one undo step; elements follow |
-| Purge unused types/materials | RV VW BB | ⬜ | new | |
+| Purge unused types/materials | RV VW BB | 🟡 | new | D96: Graphics › Purge unused materials (surfaces, materials, composites); not types yet |
 
 ## 2. Viewing and navigation
 
@@ -57,7 +57,7 @@ release notes, so check before relying on a single cell.
 | Hide, isolate, show all (per element, per level) | all | ✅ | P0 | |
 | Hide / isolate by class or type | all | ⬜ | P0 | |
 | Plan cut height | AC RV VW BB | ✅ | P1 | Slider beside the view |
-| Poché on cut elements | AC RV VW | ✅ | P1 | Dark fill and bold outline; not by material yet |
+| Poché on cut elements | AC RV VW | ✅ | P1 | D96: fill from the building material; composites cut layer by layer |
 | Section box | AC RV VW BB | 🟡 | P0 | Around the selection; no drag handles |
 | Free clipping planes, several at once | AC RV BB | ⬜ | P0 | |
 | Saved views (layers, level, plan/3D, cut) | AC RV VW BB | ✅ | P1 | D57 |
@@ -119,7 +119,7 @@ release notes, so check before relying on a single cell.
 | Coordinate input (absolute and relative x, y; polar) | AC VW | ✅ | new | D89: tracker beside the cursor in every point tool; Tab between boxes, `a`/`#` absolute |
 | Guide lines, temporary references, inference lines | AC VW SU | 🟡 | new | D89: temporary guides (rest 0.5 s on a snap point), extensions and parallels; no dragged or permanent guide lines |
 | Snap to perpendicular, tangent, intersection, wall faces | all | 🟡 | P0 | D89: intersections and parallels added; no tangent |
-| Work planes (custom drawing planes) | AC RV VW SU | 🟡 | P0 | The active level only |
+| Work planes (custom drawing planes) | AC RV VW SU | 🟡 | P0 | The active level only; D98 construction grid (spacing, angle, origin, grid snap) |
 | Tool presets / favourites (saved tool settings) | AC VW | ⬜ | new | Archicad Favourites |
 
 ## 6. Building elements
@@ -128,9 +128,9 @@ release notes, so check before relying on a single cell.
 |------|-----|--------|-----|-------|
 | Walls: straight, layered, L/T joins | all | ✅ | P0 | |
 | Walls: curved | all | ⬜ | new | |
-| Walls: slanted, trapezoid, custom profile | AC RV VW | ⬜ | new | Archicad complex profiles |
-| Wall flip, reference line (core / face) | all | ⬜ | P0 | |
-| Junction priorities (which layers run through) | AC RV | ⬜ | new | Archicad building-material priority |
+| Walls: slanted, trapezoid, custom profile | AC RV VW | 🟡 | new | D97: slant angle; no double-slanted or complex profiles yet |
+| Wall flip, reference line (core / face) | all | ✅ | P0 | D97: six reference lines (outside face default), Model › Flip walls |
+| Junction priorities (which layers run through) | AC RV | ✅ | new | D97: building-material priority → `IfcMaterialLayer.Priority`, used by the wall regenerator |
 | Wall attached to a slab or roof above | AC RV | ⬜ | new | |
 | Slabs by outline or from walls | all | ✅ | P0 | |
 | Slab openings | all | ✅ | P0 | |
@@ -141,7 +141,7 @@ release notes, so check before relying on a single cell.
 | Generic opening (wall or slab hole without a filling) | AC RV VW | 🟡 | new | Slab openings only |
 | Columns, beams from profiles | all | ✅ | P0 | |
 | Slanted, tapered, segmented columns and beams | AC RV | ⬜ | new | |
-| Grids | all | ✅ | P0 | |
+| Grids | all | ✅ | P0 | D98: Grid system (numbered and lettered axes at once) |
 | Stairs: straight flight | all | ✅ | P1 | |
 | Stairs: landings, L/U shapes, spiral, by sketch | all | 🟡 | P1 | D88: L, U, by sketch with landings, risers from the height, code warnings, floor opening, plan symbol; no winders or spiral yet |
 | Railings | all | ✅ | P1 | D88: on a stair or ramp's sides (they follow it) or by path; posts, top rail, balusters |
@@ -200,11 +200,11 @@ release notes, so check before relying on a single cell.
 | Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Layered (composite) wall and slab types | all | ✅ | P0 | |
-| Material editor (cut fill, surface, physical data) | all | ⬜ | P0 | |
+| Material editor (cut fill, surface, physical data) | all | ✅ | P0 | D96: Graphics › Building materials / Surfaces / Composites; IFC materials, styles and psets |
 | Pen sets / line weights by scale | AC RV VW | 🟡 | new | D73: pen sets (255 pens), element styles, purposes; weights don't change with the scale yet |
 | Graphic overrides and model view options (visibility by kind, rules) | AC RV VW | ✅ | new | D73: visibility sets, override rules (property, layer, material), layer combinations in purposes |
 | Line types and fill patterns (hatches) | all | 🟡 | new | D73: line types (dash patterns in mm); cut fills are solid, no hatches yet |
-| Surfaces / textures for 3D and rendering | all | ⬜ | new | |
+| Surfaces / textures for 3D and rendering | all | 🟡 | new | D96: surfaces (colour, transparency, shine) per face in 3D, per-side overrides (D97); no textures yet |
 | Attribute manager (import/export standards between projects) | AC RV VW | ⬜ | new | |
 
 ## 11. Drawings (views made from the model)
@@ -214,8 +214,8 @@ release notes, so check before relying on a single cell.
 | Floor plan drawings (one per story, cut plane, symbols) | all | ✅ | P1 | Slice 15: cut at 1.10 m (Archicad), door swings, window glass, annotations and markers drawn on |
 | Section views (marker in plan, linked view) | all | 🟡 | P1 | Slice 14: Section tool (V), Archicad's three clicks; SVG from IfcOpenShell's serializer, in a tab (D60, D61). Not yet: scale setting, detail level, cropping by hand |
 | Elevations (building, interior) | all | 🟡 | P1 | Slice 14: template N/S/E/W elevations in new projects, *Create elevations*, Elevation tool (Shift+V). Interior elevations: an elevation with a limited depth |
-| Detail views (enlarged, cropped, with extra 2D) | all | ⬜ | P1 | Archicad details and worksheets, Revit callouts |
-| Drafting views (2D only) | all | ⬜ | new | |
+| Detail views (enlarged, cropped, with extra 2D) | all | 🟡 | P1 | D98: worksheets (independent 2D, figures, on sheets); no linked details/callouts yet |
+| Drafting views (2D only) | all | ✅ | new | D98: worksheets |
 | 3D documents / axonometric drawings | AC RV VW | ⬜ | new | |
 | Crop regions, view range, depth | AC RV VW | 🟡 | new | Depth: infinite / limited / zero (D61), in the bridge; no UI yet |
 | Model view options (detail level by scale) | AC RV VW | ⬜ | new | |
@@ -225,7 +225,7 @@ release notes, so check before relying on a single cell.
 
 | Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
-| Lines, polylines, arcs, circles, splines | all | 🟡 | new | D84: line, polyline, arc/circle (centre-radius, 3-point, centre-start-end), rectangle; snaps, typed lengths, grips; in plans, drawings, sheets, DXF. No splines yet |
+| Lines, polylines, arcs, circles, splines | all | ✅ | new | D84: line, polyline, arc/circle, rectangle; D98: splines; snaps, typed lengths, grips; in plans, drawings, sheets, DXF |
 | Fills / hatches (regions) | all | ✅ | new | D84: IfcAnnotationFillArea + IfcFillAreaStyleHatching; pattern table in project settings; pens fg/bg; area label; magic wand (Alt+click) |
 | 2D symbols / blocks | AC VW | ⬜ | new | |
 | Detail components (repeating patterns such as insulation, brick) | RV VW | ⬜ | new | |

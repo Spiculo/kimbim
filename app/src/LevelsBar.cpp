@@ -35,7 +35,7 @@ LevelsBar::LevelsBar(QWidget* parent)
     m_levels->setToolTip(tr("The levels table: names, elevations, heights; insert and delete levels"));
     m_newModel->setToolTip(tr("A model is a unit (an apartment, a core...) drawn once and placed on many levels"));
     m_newWorksheet->setObjectName(QStringLiteral("actionNewWorksheet"));
-    m_newWorksheet->setToolTip(tr("A worksheet is a 2D drawing space for details, sketches and pictures (D98)"));
+    m_newWorksheet->setToolTip(tr("A worksheet is a 2D drawing space for details, sketches and pictures"));
     auto* menu = new QMenu(m_menu);
     menu->addAction(m_add);
     menu->addAction(m_levels);
