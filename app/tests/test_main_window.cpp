@@ -228,6 +228,19 @@ private slots:
         QVERIFY(w.close());
     }
 
+    // D98: Archicad's Grid System adds numbered and lettered axes at once, snappable, one undo step.
+    void gridSystemAddsAxesInOneStep()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        QVERIFY(w.addGridSystem(QPointF(0, 0), 0.0, QJsonArray{4, 4}, QJsonArray{3}, 1.0));
+        QCOMPARE(w.wallTool()->snapper().gridLines().size(), 5);
+        QVERIFY(!w.addGridSystem(QPointF(0, 0), 0.0, QJsonArray{-1}, QJsonArray{}, 1.0));
+        action(w, "actionUndo")->trigger();
+        QCOMPARE(w.wallTool()->snapper().gridLines().size(), 0);
+        QVERIFY(w.close());
+    }
+
     // D71: plan tabs per level, views of the one loaded model.
     void planTabsShareTheModel()
     {

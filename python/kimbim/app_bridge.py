@@ -971,6 +971,7 @@ from . import configure as _configure  # noqa: E402
 _EXPORTS = {
     "authoring": (
         "add_grid_axis",
+        "add_grid_system",
         "add_slab_opening",
         "add_storey",
         "beam_types",

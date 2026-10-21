@@ -59,6 +59,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QLineEdit>
+#include <QRegularExpression>
 #include <QLineF>
 #include <QTreeWidgetItem>
 #include <QJsonObject>
@@ -1817,6 +1818,72 @@ void MainWindow::gridOptionsDialog()
     setConstructionGrid(spacing->value(), subdivisions->value(), angle->value(), QPointF(ox->value(), oy->value()));
 }
 
+void MainWindow::gridSystemDialog()
+{
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Grid system"));
+    dialog.setObjectName(QStringLiteral("gridSystemDialog"));
+    auto* form = new QFormLayout(&dialog);
+    auto number = [&](const char* name, double value, double lo, double hi, const QString& suffix) {
+        auto* s = new QDoubleSpinBox(&dialog);
+        s->setObjectName(QLatin1String(name));
+        s->setRange(lo, hi);
+        s->setDecimals(3);
+        s->setSuffix(suffix);
+        s->setValue(value);
+        return s;
+    };
+    auto* across = new QLineEdit(QStringLiteral("6 6 6"), &dialog);
+    across->setObjectName(QStringLiteral("gridAcross"));
+    across->setToolTip(tr("Distances between the numbered lines, in metres (e.g. 6 6 4.5)"));
+    auto* along = new QLineEdit(QStringLiteral("5 5"), &dialog);
+    along->setObjectName(QStringLiteral("gridAlong"));
+    along->setToolTip(tr("Distances between the lettered lines, in metres"));
+    auto* x = number("gridSystemX", 0.0, -1e6, 1e6, QStringLiteral(" m"));
+    auto* y = number("gridSystemY", 0.0, -1e6, 1e6, QStringLiteral(" m"));
+    auto* angle = number("gridSystemAngle", 0.0, -360.0, 360.0, QString::fromUtf8("°"));
+    auto* extension = number("gridSystemExtension", 1.5, 0.0, 100.0, QStringLiteral(" m"));
+    form->addRow(tr("Numbered lines (1, 2, 3...) spacings:"), across);
+    form->addRow(tr("Lettered lines (A, B, C...) spacings:"), along);
+    form->addRow(tr("First crossing x:"), x);
+    form->addRow(tr("First crossing y:"), y);
+    form->addRow(tr("Angle:"), angle);
+    form->addRow(tr("Lines reach past the last crossing by:"), extension);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    form->addRow(buttons);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    auto spacings = [](const QString& text) {
+        QJsonArray out;
+        for (const QString& part : text.split(QRegularExpression(QStringLiteral("[\\s;]+")), Qt::SkipEmptyParts)) {
+            bool ok = false;
+            const double v = QLocale().toDouble(part, &ok);
+            out.append(ok ? v : QLocale::c().toDouble(part));
+        }
+        return out;
+    };
+    addGridSystem(QPointF(x->value(), y->value()), angle->value(), spacings(across->text()), spacings(along->text()),
+        extension->value());
+}
+
+bool MainWindow::addGridSystem(QPointF corner, double angleDegrees, const QJsonArray& across, const QJsonArray& along,
+    double extension)
+{
+    auto num = [](double v) { return QString::number(v, 'g', 17); };
+    auto compact = [](const QJsonArray& a) { return QString::fromUtf8(QJsonDocument(a).toJson(QJsonDocument::Compact)); };
+    const QJsonObject r = bridge("add_grid_system", {m_levels->activeStorey(), num(corner.x()), num(corner.y()),
+        num(angleDegrees), compact(across), compact(along), num(extension)});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not add the grid system"), r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
+    m_status->showMessage(tr("%n grid line(s) added", nullptr, r.value("changed").toInt()));
+    return true;
+}
+
 bool MainWindow::setConstructionGrid(double spacing, int subdivisions, double angleDegrees, QPointF origin)
 {
     const QJsonObject grid{{"spacing", spacing}, {"subdivisions", subdivisions}, {"angle", angleDegrees},
@@ -1986,6 +2053,11 @@ void MainWindow::buildModelingToolbar()
     flipAction->setObjectName(QStringLiteral("actionFlipWalls"));
     flipAction->setToolTip(tr("Mirror the selected walls' layers about their reference lines"));
     connect(flipAction, &QAction::triggered, this, [this] { flipWalls(m_selection); });
+    // D98: Archicad's Grid System: a rectangular set of grid axes at once.
+    QAction* gridSystem = model->addAction(tr("Grid s&ystem..."));
+    gridSystem->setObjectName(QStringLiteral("actionGridSystem"));
+    gridSystem->setToolTip(tr("Several grid lines at once: numbered across, lettered along"));
+    connect(gridSystem, &QAction::triggered, this, &MainWindow::gridSystemDialog);
     QAction* heightAction = model->addAction(tr("Wall &height..."));
     heightAction->setObjectName(QStringLiteral("actionWallHeight"));
     connect(heightAction, &QAction::triggered, this, &MainWindow::wallHeightDialog);

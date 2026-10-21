@@ -959,6 +959,83 @@ def _next_tag(existing: set, letters: bool) -> str:
             return tag
 
 
+def _create_axis(storey, p1, p2, tag: str, letters: bool):
+    """One grid axis from p1 to p2 (world metres) on the level's IfcGrid (made on first use); an
+    empty tag takes the next free letter or number. Inside an action. Returns (grid, tag)."""
+    f = B._model
+    grid = _level_grid(storey)
+    if grid is None:
+        grid = ifcopenshell.api.root.create_entity(f, ifc_class="IfcGrid", name="Grid")
+        matrix = np.eye(4)
+        matrix[2][3] = _elevation(storey)
+        ifcopenshell.api.geometry.edit_object_placement(f, product=grid, matrix=matrix, is_si=True)
+        ifcopenshell.api.spatial.assign_container(f, products=[grid], relating_structure=storey)
+    existing = {a.AxisTag for a in _grid_axes(grid)}
+    axis_tag = tag or _next_tag(existing, letters=letters)
+    vertical = abs(p2[1] - p1[1]) >= abs(p2[0] - p1[0])
+    axis = ifcopenshell.api.grid.create_grid_axis(f, grid=grid, axis_tag=axis_tag, uvw_axes="UAxes" if vertical else "VAxes")
+    origin = ifcopenshell.util.placement.get_local_placement(grid.ObjectPlacement)[:3, 3] * _scale()
+    ifcopenshell.api.grid.create_axis_curve(f, p1=np.array([p1[0] - origin[0], p1[1] - origin[1], 0.0]),
+                                            p2=np.array([p2[0] - origin[0], p2[1] - origin[1], 0.0]), grid_axis=axis, is_si=True)
+    return grid, axis_tag
+
+
+def add_grid_system(storey_guid: str, x, y, angle, across_json: str, along_json: str, extension=1.5,
+                    across_labels: str = "numbers", along_labels: str = "letters") -> str:
+    """Archicad's Grid System (D98): a rectangular set of grid axes in one undo step. From the corner
+    (x, y) metres, turned `angle` degrees: `across` = distances between successive lines that cross
+    the x direction (drawn along y; labelled 1, 2, 3... by default), `along` = the same for the lines
+    that run along x (A, B, C...). Lines reach `extension` metres past the outermost lines."""
+    if B._model is None:
+        return _fail("no model open")
+    storey = _by_guid(storey_guid)
+    if storey is None or not storey.is_a("IfcBuildingStorey"):
+        return _fail("unknown level")
+    try:
+        x, y, angle, extension = float(x), float(y), math.radians(float(angle or 0.0)), float(extension)
+        across = [float(v) for v in json.loads(across_json or "[]")]
+        along = [float(v) for v in json.loads(along_json or "[]")]
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    if any(v <= 0 for v in across + along):
+        return _fail("grid spacings must be more than 0")
+    if extension < 0:
+        return _fail("the extension can't be negative")
+    if across_labels not in ("numbers", "letters") or along_labels not in ("numbers", "letters"):
+        return _fail("labels are numbers or letters")
+    xs = [0.0] + list(np.cumsum(across)) if across else [0.0]
+    ys = [0.0] + list(np.cumsum(along)) if along else [0.0]
+    if len(xs) + len(ys) < 2:
+        return _fail("a grid system needs at least one spacing")
+    c, s = math.cos(angle), math.sin(angle)
+
+    def world(u, v):
+        return (x + u * c - v * s, y + u * s + v * c)
+
+    lo_u, hi_u = xs[0] - extension, xs[-1] + extension
+    lo_v, hi_v = ys[0] - extension, ys[-1] + extension
+    if min(hi_u - lo_u, hi_v - lo_v) < MIN_WALL_LENGTH:
+        return _fail("the grid lines have no length: give spacings both ways or an extension")
+    made = {"tags": []}
+
+    def action():
+        for u in xs:  # lines crossing x: numbered
+            grid, t = _create_axis(storey, world(u, lo_v), world(u, hi_v), "", letters=across_labels == "letters")
+            made["grid"] = grid
+            made["tags"].append(t)
+        for v in ys:  # lines along x: lettered
+            grid, t = _create_axis(storey, world(lo_u, v), world(hi_u, v), "", letters=along_labels == "letters")
+            made["grid"] = grid
+            made["tags"].append(t)
+        return len(made["tags"]), [], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "guid": made["grid"].GlobalId, "tags": made["tags"]})
+
+
 def add_grid_axis(storey_guid: str, x1, y1, x2, y2, tag: str = "") -> str:
     """A grid line on a level (its IfcGrid is created on first use). Without a tag, axes closer to
     vertical get letters (A, B, ...) and the others numbers (1, 2, ...)."""
@@ -977,21 +1054,7 @@ def add_grid_axis(storey_guid: str, x1, y1, x2, y2, tag: str = "") -> str:
     made = {}
 
     def action():
-        f = B._model
-        grid = _level_grid(storey)
-        if grid is None:
-            grid = ifcopenshell.api.root.create_entity(f, ifc_class="IfcGrid", name="Grid")
-            matrix = np.eye(4)
-            matrix[2][3] = _elevation(storey)
-            ifcopenshell.api.geometry.edit_object_placement(f, product=grid, matrix=matrix, is_si=True)
-            ifcopenshell.api.spatial.assign_container(f, products=[grid], relating_structure=storey)
-        existing = {a.AxisTag for a in _grid_axes(grid)}
-        axis_tag = tag or _next_tag(existing, letters=vertical)
-        axis = ifcopenshell.api.grid.create_grid_axis(f, grid=grid, axis_tag=axis_tag, uvw_axes="UAxes" if vertical else "VAxes")
-        origin = ifcopenshell.util.placement.get_local_placement(grid.ObjectPlacement)[:3, 3] * _scale()
-        ifcopenshell.api.grid.create_axis_curve(f, p1=np.array([x1 - origin[0], y1 - origin[1], 0.0]),
-                                                p2=np.array([x2 - origin[0], y2 - origin[1], 0.0]), grid_axis=axis, is_si=True)
-        made["grid"], made["tag"] = grid, axis_tag
+        made["grid"], made["tag"] = _create_axis(storey, (x1, y1), (x2, y2), tag, letters=vertical)
         return 1, [], []
 
     try:

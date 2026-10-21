@@ -220,6 +220,9 @@ public:
     QJsonObject projectSettings() const { return m_settings; }
     // D98: the construction grid's geometry (a project setting); the view and snapping follow.
     bool setConstructionGrid(double spacing, int subdivisions, double angleDegrees, QPointF origin);
+    // D98: Archicad's Grid System on the active level (one undo step).
+    bool addGridSystem(QPointF corner, double angleDegrees, const QJsonArray& across, const QJsonArray& along,
+        double extension);
     bool setProjectSettings(const QJsonObject& changes); // false (and nothing changes) if refused
     // D73: the purpose (pen set, visibility, overrides, layer combination) and the graphics tables.
     bool setPurpose(const QString& name);
@@ -472,6 +475,7 @@ private:
     QString wallReference() const;
     void refreshConstructionGrid(); // D98
     void gridOptionsDialog();
+    void gridSystemDialog(); // D98: Model > Grid system...
     bool flipWalls(const QStringList& guids); // D97: Model > Flip walls
     void setPlanView(bool plan);
     void buildModelingToolbar();
