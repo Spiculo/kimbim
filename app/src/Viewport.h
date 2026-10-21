@@ -118,7 +118,9 @@ public:
     void setWorkPlaneZ(double z) { m_workZ = z; }
     bool isDrawingMode() const { return m_drawingMode; }
     // Rubber-band wall preview: a box along p1-p2 (plan metres); nullopt hides it.
-    void setWallPreview(const std::optional<std::pair<QPointF, QPointF>>& axis, double thickness, double height);
+    // `offset`: the body's centre to the left of the drawn line (D97: the reference line location).
+    void setWallPreview(const std::optional<std::pair<QPointF, QPointF>>& axis, double thickness, double height,
+        double offset = 0.0);
     // General tool preview: boxes along a-b, `width` across, from z0 to z1 (absolute metres).
     struct PreviewBox {
         QPointF a, b;

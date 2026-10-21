@@ -870,8 +870,16 @@ def properties_multi(guids_json: str) -> str:
         "name": {"value": names[0] if same_name else None, "varies": not same_name},
         "status": status,
         "material": _materials.merged(elements),  # D96: the Material row (None: not shown)
-        "psets": psets,
+        "psets": _with_settings(psets, elements),
     })
+
+
+def _with_settings(psets: dict, elements) -> dict:
+    """D97: the Geometry and Surfaces groups go after Dimensions (and an object's Parameters)."""
+    from . import authoring, library
+
+    first = {k: v for k, v in psets.items() if k in (authoring.DIMENSIONS, library.PARAMETERS)}
+    return {**first, **_configure.groups(elements), **{k: v for k, v in psets.items() if k not in first}}
 
 
 def _write_occlusion_model(path: str) -> str:
@@ -958,6 +966,7 @@ from . import tags as _tags  # noqa: E402
 from . import stairs as _stairs  # noqa: E402
 from . import showon as _showon  # noqa: E402
 from . import materials as _materials  # noqa: E402
+from . import configure as _configure  # noqa: E402
 
 _EXPORTS = {
     "authoring": (
@@ -1231,6 +1240,11 @@ _EXPORTS = {
         "underlay_probe",
         "underlay_raster",
         "underlays",
+    ),
+    "configure": (
+        "flip_walls",
+        "set_element_setting",
+        "wall_options",
     ),
     "materials": (
         "add_standard_materials",

@@ -25,11 +25,48 @@ QJsonObject sample()
         .object();
 }
 
+
+QJsonObject withChoices()
+{
+    const QJsonObject ref{{"value", "Centre"}, {"varies", false}, {"ifc_type", "IfcLabel"}, {"editable", true},
+        {"choices", QJsonArray{"Outside face", "Centre", "Inside face"}}};
+    const QJsonObject side{{"value", QJsonValue()}, {"varies", true}, {"ifc_type", "IfcLabel"}, {"editable", true},
+        {"choices", QJsonArray{"(material)", "Brick"}}};
+    const QJsonObject material{{"kind", "composite"}, {"value", "Exterior 300"}, {"varies", false},
+        {"choices", QJsonArray{"Exterior 300", "Generic 200"}}, {"editable", true}};
+    return QJsonObject{{"count", 1}, {"guids", QJsonArray{"a"}}, {"types", QJsonArray{"IfcWall"}},
+        {"name", QJsonObject{{"value", "W"}, {"varies", false}}}, {"material", material},
+        {"psets", QJsonObject{{"Geometry", QJsonObject{{"Reference line", ref}}},
+                              {"Surfaces", QJsonObject{{"Edges", side}}}}}};
+}
+
 } // namespace
 
 class TestPropertiesPanel : public QObject {
     Q_OBJECT
 private slots:
+    // D96/D97: list values (reference line, surfaces, the composite) are drop-downs.
+    void choicesAreDropDowns()
+    {
+        kimbim::PropertiesPanel panel;
+        panel.showMulti(withChoices());
+        auto* ref = panel.findChild<QComboBox*>("choice:Geometry/Reference line");
+        QVERIFY(ref);
+        QCOMPARE(ref->currentText(), QString("Centre"));
+        QSignalSpy spy(&panel, &kimbim::PropertiesPanel::propertyEdited);
+        ref->setCurrentIndex(ref->findData("Inside face"));
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(spy.last().at(1).toString(), QString("Reference line"));
+        QCOMPARE(spy.last().at(2).value<QJsonValue>(), QJsonValue("Inside face"));
+        auto* edges = panel.findChild<QComboBox*>("choice:Surfaces/Edges");
+        QCOMPARE(edges->currentText(), panel.variesText()); // varies: nothing is sent until a value is picked
+        QVERIFY(panel.materialCombo());
+        QSignalSpy mat(&panel, &kimbim::PropertiesPanel::materialEdited);
+        panel.materialCombo()->setCurrentIndex(panel.materialCombo()->findData("Generic 200"));
+        QCOMPARE(mat.count(), 1);
+        QCOMPARE(mat.last().at(0).toString(), QString("composite"));
+    }
+
     void editsEmitTypedValues()
     {
         kimbim::PropertiesPanel panel;

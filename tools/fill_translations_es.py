@@ -1500,6 +1500,20 @@ ES = {
     "Could not change the materials": "No se pudieron cambiar los materiales",
     "Materials changed": "Materiales cambiados",
     "%n element(s) changed": ("%n elemento cambiado", "%n elementos cambiados"),
+    # D97: wall and object configuration (Archicad's Spanish: línea de referencia, cara exterior, gravedad)
+    "&Flip walls": "&Invertir muros",
+    "Mirror the selected walls' layers about their reference lines":
+        "Refleja las capas de los muros seleccionados respecto a sus líneas de referencia",
+    "Reference line: where the line you draw lies in the wall": "Línea de referencia: dónde queda en el muro la línea que dibuja",
+    "Outside face": "Cara exterior",
+    "Centre": "Centro",
+    "Inside face": "Cara interior",
+    "Core outside": "Exterior del núcleo",
+    "Core centre": "Centro del núcleo",
+    "Core inside": "Interior del núcleo",
+    "Gravity": "Gravedad",
+    "Place objects on the top of the slab under them": "Coloca los objetos sobre la losa que tienen debajo",
+    "%n wall(s) flipped": ("%n muro invertido", "%n muros invertidos"),
 }
 
 

@@ -853,11 +853,21 @@ void Viewport::setDrawingMode(bool on, double workPlaneZ)
     setCursor(on ? Qt::CrossCursor : Qt::ArrowCursor);
 }
 
-void Viewport::setWallPreview(const std::optional<std::pair<QPointF, QPointF>>& axis, double thickness, double height)
+void Viewport::setWallPreview(const std::optional<std::pair<QPointF, QPointF>>& axis, double thickness, double height,
+    double offset)
 {
     QVector<PreviewBox> boxes;
-    if (axis && thickness > 0 && height > 0)
-        boxes.push_back({axis->first, axis->second, thickness, m_workZ, m_workZ + height});
+    if (axis && thickness > 0 && height > 0) {
+        QPointF a = axis->first, b = axis->second;
+        const QPointF d = b - a;
+        const double len = std::hypot(d.x(), d.y());
+        if (len > 1e-9 && offset != 0.0) { // shift to the left of the drawing direction
+            const QPointF left(-d.y() / len * offset, d.x() / len * offset);
+            a += left;
+            b += left;
+        }
+        boxes.push_back({a, b, thickness, m_workZ, m_workZ + height});
+    }
     setPreviewBoxes(boxes);
 }
 

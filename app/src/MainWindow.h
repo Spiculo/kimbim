@@ -39,6 +39,7 @@ class QMenu;
 class QDoubleSpinBox;
 
 class QComboBox;
+class QCheckBox;
 class QSpinBox;
 class QToolBar;
 class QToolButton;
@@ -466,6 +467,8 @@ private:
     void materialsDialog(MaterialsEdits::Kind kind); // D96: Graphics > Building materials / Surfaces / Composites
     void materialsCommand(const char* command, const QString& done);
     bool setElementMaterial(const QString& kind, const QString& name); // D96: the Properties panel's Material row
+    QString wallReference() const;
+    bool flipWalls(const QStringList& guids); // D97: Model > Flip walls
     void setPlanView(bool plan);
     void buildModelingToolbar();
     void buildPalette();
@@ -668,6 +671,8 @@ private:
     QHash<int, QAction*> m_toolActions;
     QComboBox* m_types = nullptr;
     QDoubleSpinBox* m_wallHeight = nullptr;
+    QComboBox* m_wallReference = nullptr; // D97: the Wall tool's reference line location
+    QCheckBox* m_objectGravity = nullptr; // D97: objects land on the slab under them
     QComboBox* m_roofKind = nullptr;
     QDoubleSpinBox* m_roofPitch = nullptr;
     bool m_warnedInconsistent = false;

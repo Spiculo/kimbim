@@ -285,8 +285,11 @@ def face_colours(element, geometry, verts: np.ndarray, faces: np.ndarray, palett
         missing = out == NO_COLOUR
         if missing.any():
             out[missing] = palette.of_material(main_material(element))
-    if overrides is not None:
-        overrides(element, verts, faces, out, palette)
+    if overrides is None:
+        from . import configure
+
+        overrides = configure.apply_surface_overrides  # D97: per-side surface overrides
+    overrides(element, verts, faces, out, palette)
     return out
 
 
@@ -417,6 +420,29 @@ def _apply_spec(f, material, name: str, spec: dict):
         "reflectance": spec.get("reflectance", "MATT")})
     attach_surface(f, material, style)
     _write_properties(f, material, {k: spec.get(k) for k in ("pen", "pattern", "priority", "density", "conductivity", "heat")})
+
+
+def layer_priority(material) -> int:
+    """IfcMaterialLayer.Priority (IFC4: 0-100) from the material's Archicad priority (0-999)."""
+    p = properties(material).get("priority", DEFAULT_PRIORITY) if material is not None else DEFAULT_PRIORITY
+    try:
+        return max(0, min(100, round(int(p) / 10)))
+    except (TypeError, ValueError):
+        return DEFAULT_PRIORITY // 10
+
+
+def sync_priorities(layer_set) -> bool:
+    """D96: the layers carry their materials' intersection priority, which ifcopenshell's wall
+    regenerator uses at junctions (the higher layer runs through, Archicad's rule). True if changed."""
+    if layer_set is None or B._model is None or not _ifc4(B._model):
+        return False
+    changed = False
+    for layer in layer_set.MaterialLayers or ():
+        p = layer_priority(layer.Material)
+        if layer.Priority != p:
+            layer.Priority = p
+            changed = True
+    return changed
 
 
 # ---------------------------------------------------------------- doors, windows and roofs
@@ -649,6 +675,9 @@ def _apply_material(f, item, touched: set):
     if style != surface_of(m):
         attach_surface(f, m, style)
     _write_properties(f, m, {k: item.get(k) for k in _MATERIAL_FIELDS if k in item})
+    for ls in f.by_type("IfcMaterialLayerSet"):
+        if any(l.Material == m for l in ls.MaterialLayers or ()) and sync_priorities(ls):
+            _rejoin(f, _users_of_set(f, ls), touched)
     touched.update(_users_of_material(f, m))
 
 
@@ -728,16 +757,38 @@ def _apply_composite(f, item, touched: set):
             ml.Category = CORE if layer.get("core") else None
     for ml in existing[len(layers):]:
         ifcopenshell.api.material.remove_layer(f, layer=ml)
+    priorities_changed = sync_priorities(ls)
     users = _users_of_set(f, ls)
     new_thickness = A._thickness(ls)
     if abs(new_thickness - old_thickness) > 1e-9:
         for e in users:
             usage = ifcopenshell.util.element.get_material(e, should_skip_usage=False)
             if e.is_a("IfcWall") and usage is not None and usage.is_a("IfcMaterialLayerSetUsage") and old_thickness > 0:
-                # the reference line keeps its relative place in the wall (centre stays centre)
-                usage.OffsetFromReferenceLine = float(usage.OffsetFromReferenceLine or 0.0) * new_thickness / old_thickness
+                from . import configure
+
+                # the reference line keeps its place in the wall: the remembered location (D97), else
+                # the same fraction of the thickness (centre stays centre)
+                if not configure.reapply_reference(e):
+                    usage.OffsetFromReferenceLine = float(usage.OffsetFromReferenceLine or 0.0) * new_thickness / old_thickness
             _reshape(f, e, touched)
+    elif priorities_changed:
+        _rejoin(f, users, touched)
     touched.update(users)
+
+
+def _rejoin(f, elements, touched: set):
+    """Regenerate walls (and the walls joined to them) after their junction priorities changed."""
+    from . import authoring as A
+
+    walls = [e for e in elements if e.is_a("IfcWall")]
+    for w in walls:
+        A._regenerate(f, w)
+        touched.add(w)
+    for w in walls:
+        for n in A._connected_walls(w):
+            if n not in touched:
+                A._regenerate(f, n)
+                touched.add(n)
 
 
 def _delete_material(f, key, replace, touched: set):

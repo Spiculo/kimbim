@@ -191,6 +191,7 @@ def _create_layered_types(ifc_class: str, defaults):
             material = materials.ensure(material_name, f)  # D96: with its surface and cut fill
             layer =ifcopenshell.api.material.add_layer(f, layer_set=layer_set, material=material)
             ifcopenshell.api.material.edit_layer(f, layer=layer, attributes={"LayerThickness": thickness / _scale()})
+        materials.sync_priorities(layer_set)  # D96: Archicad's junction rule
         ifcopenshell.api.material.assign_material(f, products=[wall_type], material=layer_set)
 
 
@@ -199,7 +200,10 @@ def wall_types() -> str:
         return B._dump({"types": []})
     if not _layered_wall_types():
         _create_default_wall_types()
-    return B._dump({"types": [{"guid": t.GlobalId, "name": t.Name or "", "thickness": round(_thickness(_layer_set(t)), 6)}
+    from . import configure
+
+    return B._dump({"types": [{"guid": t.GlobalId, "name": t.Name or "", "thickness": round(_thickness(_layer_set(t)), 6),
+                               "centres": configure.centres(_layer_set(t))}  # D97: the preview's offset
                               for t in _layered_wall_types()]})
 
 
@@ -255,8 +259,9 @@ def _centre_on_axis(wall, thickness_m: float):
 
 
 def create_wall(storey_guid: str, type_guid: str, x1, y1, x2, y2, height, join_start_guid: str = "",
-                join_end_guid: str = "") -> str:
-    """A wall of a layered type from (x1, y1) to (x2, y2) on a level, joined to the given walls."""
+                join_end_guid: str = "", reference: str = "") -> str:
+    """A wall of a layered type from (x1, y1) to (x2, y2) on a level, joined to the given walls.
+    `reference` (D97): where the clicked line is in the wall (configure.REFERENCES); "" = its centre."""
     if B._model is None:
         return _fail("no model open")
     try:
@@ -274,6 +279,10 @@ def create_wall(storey_guid: str, type_guid: str, x1, y1, x2, y2, height, join_s
         return _fail("the wall has no length")
     if height <= 0:
         return _fail("the wall height must be positive")
+    from . import configure
+
+    if reference and reference not in configure.REFERENCES:
+        return _fail(f"unknown reference line {reference}")
     joins = [(guid, point) for guid, point in ((join_start_guid, p1), (join_end_guid, p2)) if guid]
     for guid, _ in joins:
         other = _by_guid(guid)
@@ -286,7 +295,12 @@ def create_wall(storey_guid: str, type_guid: str, x1, y1, x2, y2, height, join_s
         thickness = _thickness(_layer_set(wall_type))
         wall = ifcopenshell.api.root.create_entity(f, ifc_class="IfcWall", name=wall_type.Name)
         ifcopenshell.api.type.assign_type(f, related_objects=[wall], relating_type=wall_type)
-        _centre_on_axis(wall, thickness)
+        if reference:
+            from . import configure
+
+            configure.apply_reference(wall, reference)
+        else:
+            _centre_on_axis(wall, thickness)
         representation = ifcopenshell.api.geometry.create_2pt_wall(
             f, element=wall, context=_body_context(), p1=p1, p2=p2,
             elevation=_elevation(storey), height=height, thickness=thickness, is_si=True)

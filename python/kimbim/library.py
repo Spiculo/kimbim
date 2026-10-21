@@ -871,9 +871,10 @@ def _scale() -> float:
     return ifcopenshell.util.unit.calculate_unit_scale(B._model)
 
 
-def place_object(storey_guid: str, key: str, params_json: str, x, y, angle=0.0) -> str:
+def place_object(storey_guid: str, key: str, params_json: str, x, y, angle=0.0, gravity="") -> str:
     """Place a library object on a level: its origin (left front corner) at (x, y) metres, turned
-    `angle` radians. The type with these parameters is reused, or made. One undo step."""
+    `angle` radians. The type with these parameters is reused, or made. One undo step. `gravity`
+    (D97, Archicad's Gravity): "1" puts it on the top of the slab under (x, y), if any."""
     import ifcopenshell.api.geometry
     import ifcopenshell.api.root
     import ifcopenshell.api.spatial
@@ -898,6 +899,12 @@ def place_object(storey_guid: str, key: str, params_json: str, x, y, angle=0.0) 
     except (TypeError, ValueError) as ex:
         return A._fail(str(ex))
     values = obj.values(given) if isinstance(obj, Obj) else {}
+    z = A._elevation(storey)
+    if str(gravity) in ("1", "true", "True"):
+        from . import symbols
+
+        top = symbols._slab_top(storey, (x, y))
+        z = top if top is not None else z
     made = {}
 
     def action():
@@ -907,7 +914,7 @@ def place_object(storey_guid: str, key: str, params_json: str, x, y, angle=0.0) 
                                                       name=obj.name if isinstance(obj, Obj) else (t.Name or ""))
         ifcopenshell.api.type.assign_type(f, related_objects=[element], relating_type=t)
         c, s = math.cos(angle), math.sin(angle)
-        matrix = np.array([[c, -s, 0, x], [s, c, 0, y], [0, 0, 1, A._elevation(storey)], [0, 0, 0, 1]], dtype=float)
+        matrix = np.array([[c, -s, 0, x], [s, c, 0, y], [0, 0, 1, z], [0, 0, 0, 1]], dtype=float)
         ifcopenshell.api.geometry.edit_object_placement(f, product=element, matrix=matrix, is_si=True)
         ifcopenshell.api.spatial.assign_container(f, products=[element], relating_structure=storey)
         layers.assign_active(element)

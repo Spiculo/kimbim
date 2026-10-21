@@ -2,6 +2,7 @@
 // D86: the object library in the main window (doc 14 §8): the Library panel and the Object tool.
 // The objects, their types and plan symbols are python/kimbim/library.py's; one undo step each.
 #include <QAction>
+#include <QCheckBox>
 #include <QFileDialog>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -146,7 +147,8 @@ bool MainWindow::placeObjectAt(QPointF p, bool turned)
     }
     const double angle = (m_objectAngle + (turned ? 90.0 : 0.0)) * M_PI / 180.0;
     const QJsonObject r = bridge("place_object", {m_levels->activeStorey(), panel->currentObject(),
-        compactJson(panel->currentParams()), num(p.x()), num(p.y()), num(angle)});
+        compactJson(panel->currentParams()), num(p.x()), num(p.y()), num(angle),
+        m_objectGravity && m_objectGravity->isChecked() ? QStringLiteral("1") : QString()});
     if (!r.value("ok").toBool()) {
         m_status->showMessage(tr("Could not place it: %1").arg(r.value("error").toString()));
         return false;

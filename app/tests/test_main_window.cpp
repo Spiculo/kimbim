@@ -1348,11 +1348,13 @@ private slots:
         w.setTool(kimbim::MainWindow::Tool::None);
         const QString wall = w.viewport()->guids().first();
         w.setSelection({wall});
-        w.dragMoveTo(QPointF(2.5, 0.0), QPointF(2.52, -1.004), 0.05, Qt::NoModifier); // preview only
-        QVERIFY(w.dragFinished(QPointF(2.5, 0.0), QPointF(2.52, -1.004), 0.05, Qt::NoModifier));
         double x0, y0, z0, x1, y1, z1;
         w.viewport()->boundsOf({wall}).Get(x0, y0, z0, x1, y1, z1);
-        QVERIFY(std::abs((y0 + y1) / 2 - (-1.0)) < 0.01); // moved straight down 1 m (90 degree snap)
+        const double before = (y0 + y1) / 2; // D97: the body lies beside the drawn line (its reference line)
+        w.dragMoveTo(QPointF(2.5, 0.0), QPointF(2.52, -1.004), 0.05, Qt::NoModifier); // preview only
+        QVERIFY(w.dragFinished(QPointF(2.5, 0.0), QPointF(2.52, -1.004), 0.05, Qt::NoModifier));
+        w.viewport()->boundsOf({wall}).Get(x0, y0, z0, x1, y1, z1);
+        QVERIFY(std::abs((y0 + y1) / 2 - (before - 1.0)) < 0.01); // moved straight down 1 m (90 degree snap)
         QVERIFY(std::abs(x0 - (-0.15)) < 0.02 || std::abs(x0) < 0.02);
         QVERIFY(!w.dragFinished(QPointF(1, 1), QPointF(1, 1), 0.05, Qt::NoModifier)); // no movement
         QVERIFY(w.close());

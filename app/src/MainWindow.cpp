@@ -1435,6 +1435,15 @@ bool MainWindow::applyPropertyEdit(const QString& pset, const QString& prop, con
         }
         return all;
     }
+    // D97: wall geometry (reference line, slant) and surface overrides.
+    if (pset == QLatin1String("Geometry") || pset == QLatin1String("Surfaces")) {
+        const QJsonObject r = bridge("set_element_setting", {jsonList(m_selection), pset, prop,
+            value.isDouble() ? QString::number(value.toDouble(), 'g', 17) : value.toString()});
+        if (!r.value("ok").toBool())
+            showError(tr("Could not change %1").arg(prop), r.value("error").toString());
+        afterEdit(r);
+        return r.value("ok").toBool();
+    }
     const bool dimension = pset == QLatin1String("Dimensions");
     const bool parameter = pset == QLatin1String("Parameters"); // D86: a library object's (its type follows)
     QString scope; // D92: edit the selection (default) or ask when the type is shared
@@ -1676,8 +1685,7 @@ void MainWindow::materialsDialog(MaterialsEdits::Kind kind)
         showError(tr("Could not change the materials"), r.value("error").toString());
         return;
     }
-    afterEdit(r);
-    refreshGraphics(); // cut fills come from the materials
+    afterEdit(r); // also restyles: cut fills come from the materials
     m_status->showMessage(tr("Materials changed"));
 }
 
@@ -1691,8 +1699,7 @@ bool MainWindow::setElementMaterial(const QString& kind, const QString& name)
         refreshProperties();
         return false;
     }
-    afterEdit(r);
-    refreshGraphics(); // the cut fill follows the material
+    afterEdit(r); // also restyles: the cut fill follows the material
     m_status->showMessage(tr("%n element(s) changed", nullptr, r.value("changed").toInt()));
     return true;
 }
@@ -1856,6 +1863,11 @@ void MainWindow::buildModelingToolbar()
     explode->setObjectName(QStringLiteral("actionExplodeInstance"));
     explode->setToolTip(tr("Unlink the selected instance: its elements become ordinary elements you can edit one by one"));
     connect(explode, &QAction::triggered, this, &MainWindow::explodeSelectedInstance);
+    // D97: Archicad's Flip: the composite mirrors about the reference line (the outside skin changes side).
+    QAction* flipAction = model->addAction(tr("&Flip walls"));
+    flipAction->setObjectName(QStringLiteral("actionFlipWalls"));
+    flipAction->setToolTip(tr("Mirror the selected walls' layers about their reference lines"));
+    connect(flipAction, &QAction::triggered, this, [this] { flipWalls(m_selection); });
     QAction* heightAction = model->addAction(tr("Wall &height..."));
     heightAction->setObjectName(QStringLiteral("actionWallHeight"));
     connect(heightAction, &QAction::triggered, this, &MainWindow::wallHeightDialog);
@@ -1906,6 +1918,28 @@ void MainWindow::buildModelingToolbar()
     m_wallHeight->setSuffix(QStringLiteral(" m"));
     m_wallHeight->setToolTip(tr("Wall height"));
     bar->addField(m_wallHeight);
+    // D97: where the clicked line is in the new wall (Archicad's reference line location).
+    m_wallReference = new QComboBox(bar);
+    m_wallReference->setObjectName(QStringLiteral("wallReference"));
+    m_wallReference->setToolTip(tr("Reference line: where the line you draw lies in the wall"));
+    const QStringList refLabels = {tr("Outside face"), tr("Centre"), tr("Inside face"), tr("Core outside"),
+        tr("Core centre"), tr("Core inside")};
+    const QStringList refKeys = {QStringLiteral("Outside face"), QStringLiteral("Centre"), QStringLiteral("Inside face"),
+        QStringLiteral("Core outside"), QStringLiteral("Core centre"), QStringLiteral("Core inside")};
+    for (int i = 0; i < refKeys.size(); ++i)
+        m_wallReference->addItem(refLabels[i], refKeys[i]);
+    connect(m_wallReference, &QComboBox::activated, this, [this] {
+        // remembered with the project, like Archicad's tool settings
+        bridge("set_project_settings", {QString::fromUtf8(QJsonDocument(QJsonObject{
+            {"wall_reference_line", m_wallReference->currentData().toString()}}).toJson(QJsonDocument::Compact))});
+        m_settings = bridge("project_settings").value("settings").toObject();
+    });
+    bar->addField(m_wallReference);
+    // D97: Archicad's Gravity: a placed object sits on the slab under it.
+    m_objectGravity = new QCheckBox(tr("Gravity"), bar);
+    m_objectGravity->setObjectName(QStringLiteral("objectGravity"));
+    m_objectGravity->setToolTip(tr("Place objects on the top of the slab under them"));
+    bar->addField(m_objectGravity);
     m_roofKind = new QComboBox(bar);
     m_roofKind->setObjectName(QStringLiteral("roofKind"));
     m_roofKind->addItem(tr("Flat"), QStringLiteral("flat"));
@@ -2418,7 +2452,8 @@ void MainWindow::updateToolPreview()
     QVector<Viewport::PreviewBox> boxes;
     switch (m_tool) {
     case Tool::Wall:
-        m_viewport->setWallPreview(m_wallTool->preview(), type.value("thickness").toDouble(), m_wallHeight->value());
+        m_viewport->setWallPreview(m_wallTool->preview(), type.value("thickness").toDouble(), m_wallHeight->value(),
+            type.value("centres").toObject().value(wallReference()).toDouble(0.0));
         return;
     case Tool::Stair:
     case Tool::Railing:
@@ -2567,6 +2602,12 @@ void MainWindow::setTool(Tool tool)
         it.value()->setChecked(it.key() == int(tool));
     }
     m_wallHeight->setVisible(tool == Tool::Wall || tool == Tool::Column || tool == Tool::Beam || tool == Tool::Roof);
+    m_wallReference->setVisible(tool == Tool::Wall);
+    m_objectGravity->setVisible(tool == Tool::Object);
+    if (tool == Tool::Wall) {
+        const int i = m_wallReference->findData(m_settings.value("wall_reference_line").toString(QStringLiteral("Outside face")));
+        m_wallReference->setCurrentIndex(std::max(0, i));
+    }
     m_wallHeight->setToolTip(tool == Tool::Roof ? tr("Eaves height above the level") : tr("Wall height"));
     m_roofKind->parentWidget()->setVisible(tool == Tool::Roof);
     m_lengthInput->setVisible(tool == Tool::Wall || tool == Tool::Beam || tool == Tool::Grid || tool == Tool::Move
@@ -5568,7 +5609,8 @@ bool MainWindow::createWall(const WallSegment& s)
     auto num = [](double v) { return QString::number(v, 'g', 17); };
     StepTimer createTimer(m_timings, "bridgeCreateWall");
     const QJsonObject r = bridge("create_wall", {m_levels->activeStorey(), type.value("guid").toString(),
-        num(s.p1.x()), num(s.p1.y()), num(s.p2.x()), num(s.p2.y()), num(m_wallHeight->value()), s.joinStart, s.joinEnd});
+        num(s.p1.x()), num(s.p1.y()), num(s.p2.x()), num(s.p2.y()), num(m_wallHeight->value()), s.joinStart, s.joinEnd,
+        wallReference()});
     if (!r.value("ok").toBool()) {
         m_status->showMessage(tr("Could not create the wall: %1").arg(r.value("error").toString()));
         return false;
@@ -5576,6 +5618,27 @@ bool MainWindow::createWall(const WallSegment& s)
     m_wallTool->setLastWall(r.value("guid").toString());
     afterEdit(r);
     refreshSnapData();
+    return true;
+}
+
+QString MainWindow::wallReference() const
+{
+    // The Wall tool's choice (D97); empty (the centre) when the tool strip was never built.
+    return m_wallReference ? m_wallReference->currentData().toString() : QString();
+}
+
+bool MainWindow::flipWalls(const QStringList& guids)
+{
+    if (guids.isEmpty())
+        return false;
+    const QJsonObject r = bridge("flip_walls", {jsonList(guids)});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
+    refreshSnapData();
+    m_status->showMessage(tr("%n wall(s) flipped", nullptr, r.value("changed").toInt()));
     return true;
 }
 

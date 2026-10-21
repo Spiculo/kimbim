@@ -201,6 +201,25 @@ void PropertiesPanel::showMulti(const QJsonObject& merged)
                     ? tr("Metres, measured from the model; editing it changes the element")
                     : prop.value("ifc_type").toString());
             const bool varies = prop.value("varies").toBool();
+            // D97: a value picked from a list (reference line, surfaces): a drop-down in the cell.
+            if (kind != ReadOnly && prop.value("choices").isArray()) {
+                auto* combo = new QComboBox(m_tree);
+                combo->setObjectName(QStringLiteral("choice:%1/%2").arg(p.key(), v.key()));
+                if (varies)
+                    combo->addItem(variesText(), QString());
+                for (const auto& c : prop.value("choices").toArray())
+                    combo->addItem(c.toString(), c.toString());
+                combo->setCurrentIndex(std::max(0, combo->findData(prop.value("value").toString())));
+                const QString pset = p.key(), name = v.key();
+                connect(combo, &QComboBox::currentIndexChanged, this, [this, combo, pset, name](int i) {
+                    const QString value = combo->itemData(i).toString();
+                    if (!m_building && !value.isEmpty())
+                        emit propertyEdited(pset, name, QJsonValue(value));
+                });
+                item->setFlags(item->flags() & ~Qt::ItemIsEditable);
+                m_tree->setItemWidget(item, 1, combo);
+                continue;
+            }
             if (kind == Bool) {
                 item->setFlags((item->flags() | Qt::ItemIsUserCheckable) & ~Qt::ItemIsEditable);
                 item->setCheckState(1, varies ? Qt::PartiallyChecked

@@ -68,6 +68,7 @@ DEFAULTS = {
     "stair_tread_mode": "fixed",  # D92: a new stair's tread is fixed or from 2 risers + tread = 625 mm
     "stair_arrow": "top",  # D92: the plan symbol's arrow: top (default), bottom or both
     "stair_riser_numbers": False,  # D92: number the risers on the plan
+    "wall_reference_line": "Outside face",  # D97: where a new wall's clicked line is (Archicad default)
 }
 UNITS = {"m": 1.0, "cm": 100.0, "mm": 1000.0}
 AREA_UNITS = {"m²": 1.0, "cm²": 10000.0, "mm²": 1000000.0}
@@ -238,6 +239,11 @@ def _error(key: str, value) -> str | None:
         return f"unknown stair arrow position {value}"
     if key == "stair_riser_numbers" and not isinstance(value, bool):
         return "stair_riser_numbers must be true or false"
+    if key == "wall_reference_line":
+        from . import configure
+
+        if value not in configure.REFERENCES:
+            return f"unknown wall reference line {value}"
     if key in ("ids_files", "clash_sets"):
         from . import checks
 
