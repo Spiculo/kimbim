@@ -38,7 +38,7 @@ Branch `parity-materials`. Spec: [2026-10-21-archicad-parity-materials-design](.
   `texture_files`); the catalogue's brick, timber, tiles, stone and roof tiles come with drawn pictures; no render-style view.
 - Cut fill patterns are hatched on screen, in printed drawings/PDF and in DXF (pattern HATCHes; the
   insulation loops as short lines on the -PATT layer).
-- **Layer-by-layer junctions** are the regenerator's (priority 0–100); no per-junction override UI.
+- Junctions: the layers' priorities decide (regenerator); Model › Wall junctions overrides per wall (run through / stop / by materials) via IfcRelConnectsPathElements priorities (KimBim patches the regenerator's override handling).
 - Double-slanted and complex-profile walls. (Wall and slab ends and tops now show each layer: the mesh is sliced at the layer boundaries, project setting `layers_in_3d`, about 1 ms per wall.)
 - Columns and beams change material through their type's profile set (every column of the type follows); no per-occurrence material yet.
 - The construction grid's extent is computed when shown (it follows the model on the next refresh).

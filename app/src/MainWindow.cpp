@@ -2088,6 +2088,16 @@ void MainWindow::buildModelingToolbar()
     gridSystem->setObjectName(QStringLiteral("actionGridSystem"));
     gridSystem->setToolTip(tr("Several grid lines at once: numbered across, lettered along"));
     connect(gridSystem, &QAction::triggered, this, &MainWindow::gridSystemDialog);
+    // D97: Archicad's junction override: the selected walls run through, stop, or their layers decide.
+    QMenu* junctions = model->addMenu(tr("Wall &junctions"));
+    junctions->setObjectName(QStringLiteral("menuJunctions"));
+    const std::pair<const char*, QString> modes[] = {{"through", tr("Run &through at their joins")},
+        {"butt", tr("&Stop at their joins")}, {"materials", tr("By building &materials")}};
+    for (const auto& [mode, text] : modes) {
+        QAction* a = junctions->addAction(text);
+        a->setObjectName(QStringLiteral("actionJunction_") + QLatin1String(mode));
+        connect(a, &QAction::triggered, this, [this, m = QString::fromLatin1(mode)] { setJunctions(m); });
+    }
     QAction* heightAction = model->addAction(tr("Wall &height..."));
     heightAction->setObjectName(QStringLiteral("actionWallHeight"));
     connect(heightAction, &QAction::triggered, this, &MainWindow::wallHeightDialog);
@@ -5884,6 +5894,20 @@ QString MainWindow::wallReference() const
 {
     // The Wall tool's choice (D97); empty (the centre) when the tool strip was never built.
     return m_wallReference ? m_wallReference->currentData().toString() : QString();
+}
+
+bool MainWindow::setJunctions(const QString& mode)
+{
+    if (m_selection.isEmpty())
+        return false;
+    const QJsonObject r = bridge("set_junctions", {jsonList(m_selection), mode});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
+    m_status->showMessage(tr("%n join(s) changed", nullptr, r.value("changed").toInt()));
+    return true;
 }
 
 bool MainWindow::flipWalls(const QStringList& guids)

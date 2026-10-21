@@ -334,6 +334,44 @@ def set_element_setting(guids_json: str, group: str, name: str, value) -> str:
     return B._dump(r)
 
 
+JUNCTIONS = ("through", "butt", "materials")  # D97: at its joins a wall runs through, stops, or its layers decide
+
+
+def set_junctions(guids_json: str, mode: str) -> str:
+    """Archicad's junction override, per wall (D97): at every join of the selected walls, "through" makes
+    all their layers win (priority 100), "butt" makes them give way (0), "materials" goes back to the
+    layers' own priorities (D96). Stored on IfcRelConnectsPathElements' Relating/RelatedPriorities."""
+    if B._model is None:
+        return _fail("no model open")
+    if mode not in JUNCTIONS:
+        return _fail(f"unknown junction {mode}")
+    walls = [e for e in B._elements(guids_json) if e.is_a("IfcWall") and _usage(e) is not None]
+    if not walls:
+        return _fail("select layered walls")
+
+    def action():
+        rels = set()
+        for w in walls:
+            n = len(_usage(w).ForLayerSet.MaterialLayers or ())
+            value = None if mode == "materials" else [100 if mode == "through" else 0] * n
+            for rel in list(w.ConnectedTo or ()) + list(w.ConnectedFrom or ()):
+                if not rel.is_a("IfcRelConnectsPathElements"):
+                    continue
+                if rel.RelatingElement == w:
+                    rel.RelatingPriorities = value or []
+                else:
+                    rel.RelatedPriorities = value or []
+                rels.add(rel)
+        touched = _regenerate_with_neighbours(walls)
+        return len(rels), [w.GlobalId for w in touched], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump(r)
+
+
 def flip_walls(guids_json: str) -> str:
     """Model > Flip: mirror the selected walls' composites about their reference lines (one undo step)."""
     if B._model is None:

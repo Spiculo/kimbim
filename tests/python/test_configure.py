@@ -209,3 +209,26 @@ def test_objects_have_materials_per_part(project):
     listing = next(o for o in call("library_objects")["objects"] if o["id"] == "chair")
     kinds = {p["key"]: p["kind"] for p in listing["params"]}
     assert kinds["mat_frame"] == "material" and kinds["mat_seat"] == "material"
+
+
+def test_junction_overrides(project):
+    a = wall(project, "Centre", x2=4.0)  # 0,0 -> 4,0
+    r = call("create_wall", project["level"], project["Exterior 300"], 4, 0, 4, 3, 3.0, a, "", "Centre")
+    assert r["ok"], r
+    b2 = r["guid"]
+
+    def reach():
+        _, _, v, _ = mesh(a)
+        return round(float(v[:, 0].max()), 3)
+
+    assert call("set_junctions", json.dumps([a]), "through")["ok"]
+    through = reach()
+    assert call("set_junctions", json.dumps([a]), "butt")["ok"]
+    butt = reach()
+    assert through > butt + 0.1  # running through reaches past the other wall's face
+    assert call("set_junctions", json.dumps([a]), "materials")["ok"]
+    rel = next(r for r in b._model.by_type("IfcRelConnectsPathElements"))
+    assert list(rel.RelatingPriorities or []) == [] and list(rel.RelatedPriorities or []) == []
+    assert not call("set_junctions", json.dumps([a]), "sideways")["ok"]
+    _, _, vb, _ = mesh(b2)
+    assert len(vb) > 0

@@ -481,6 +481,7 @@ private:
     void gridOptionsDialog();
     void gridSystemDialog(); // D98: Model > Grid system...
     bool flipWalls(const QStringList& guids); // D97: Model > Flip walls
+    bool setJunctions(const QString& mode);    // D97: through, butt or materials, for the selection
     void setPlanView(bool plan);
     void buildModelingToolbar();
     void buildPalette();

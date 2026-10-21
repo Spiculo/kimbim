@@ -687,6 +687,30 @@ def _filling_representation(kind, element_type, width, height):
     return representation
 
 
+def _patch_regenerator():
+    """ifcopenshell's wall regenerator writes a junction's priority overrides (IfcRelConnectsPathElements
+    Relating/RelatedPriorities) into namedtuples, which raises: D97 uses them, so fix that here."""
+    import importlib
+
+    R = importlib.import_module("ifcopenshell.api.geometry.regenerate_wall_representation")
+    if not hasattr(R, "Regenerator"):  # the package exports the function under the module's name
+        import sys
+
+        R = sys.modules["ifcopenshell.api.geometry.regenerate_wall_representation"]
+
+    if getattr(R.Regenerator, "_kimbim_patched", False):
+        return
+    original = R.Regenerator.combine_layers
+
+    def combine_layers(self, layers, override_priorities):
+        if override_priorities:
+            layers = [R.PrioritisedLayer(int(p), l.thickness) for p, l in zip(override_priorities, layers)]                 + list(layers[len(override_priorities):])
+        return original(self, layers, None)
+
+    R.Regenerator.combine_layers = combine_layers
+    R.Regenerator._kimbim_patched = True
+
+
 def _regenerate(f, wall, **kwargs):
     """Rebuild a layered wall's body and axis (ifcopenshell's wall regenerator). Imported walls whose
     body is not on the Model/Body/MODEL_VIEW context (e.g. Revit IFC2X3 puts it on the Model context)
@@ -697,6 +721,7 @@ def _regenerate(f, wall, **kwargs):
     if ours is None and bodies:
         return None
     _body_context()  # the regenerator needs the Body/MODEL_VIEW context
+    _patch_regenerator()
     return ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=wall, **kwargs)
 
 
