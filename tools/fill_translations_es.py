@@ -1584,6 +1584,7 @@ ES = {
     "Pictures (*.png *.jpg *.jpeg *.pdf)": "Imágenes (*.png *.jpg *.jpeg *.pdf)",
     "Width (m):": "Ancho (m):",
     "Placed picture %1 (move or rotate it in File > Underlays)": "Imagen %1 colocada (muévala o gírela en Archivo > Calcos)",
+    "Show each layer on the ends and tops of walls and slabs in 3D": "Mostrar cada capa en los extremos y la parte superior de muros y losas en 3D",
 }
 
 

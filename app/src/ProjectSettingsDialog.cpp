@@ -145,6 +145,10 @@ ProjectSettingsDialog::ProjectSettingsDialog(const QJsonObject& settings, bool k
     m_stairNumbers->setObjectName(QStringLiteral("stairRiserNumbers"));
     m_stairNumbers->setChecked(settings.value("stair_riser_numbers").toBool(false));
     form->addRow(QString(), m_stairNumbers);
+    m_layers3d = new QCheckBox(tr("Show each layer on the ends and tops of walls and slabs in 3D"), this); // D96
+    m_layers3d->setObjectName(QStringLiteral("layersIn3d"));
+    m_layers3d->setChecked(settings.value("layers_in_3d").toBool(true));
+    form->addRow(QString(), m_layers3d);
     m_importedWalls = new QComboBox(this); // D92
     m_importedWalls->setObjectName(QStringLiteral("importedWalls"));
     m_importedWalls->addItem(tr("Rebuild with KimBim's shape"), QStringLiteral("rebuild"));
@@ -239,6 +243,8 @@ QJsonObject ProjectSettingsDialog::changes() const
         out.insert("stair_arrow", m_stairArrow->currentData().toString());
     if (m_stairNumbers->isChecked() != m_settings.value("stair_riser_numbers").toBool(false))
         out.insert("stair_riser_numbers", m_stairNumbers->isChecked());
+    if (m_layers3d->isChecked() != m_settings.value("layers_in_3d").toBool(true))
+        out.insert("layers_in_3d", m_layers3d->isChecked());
     if (m_importedWalls->currentData().toString() != m_settings.value("imported_walls").toString(QStringLiteral("rebuild")))
         out.insert("imported_walls", m_importedWalls->currentData().toString());
     if (m_partialDups->isChecked() != m_settings.value("check_partial_duplicates").toBool(false))

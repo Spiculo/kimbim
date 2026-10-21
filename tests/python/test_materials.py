@@ -122,7 +122,7 @@ def test_layered_wall_sides_show_outer_layers_and_edges_the_core(project):
     core = M.CATALOGUE[M.core_layer(usage.ForLayerSet).Material.Name]["colour"]
     assert hexes(palette, idx[n < -0.7]) == {first}
     assert hexes(palette, idx[n > 0.7]) == {last}
-    assert hexes(palette, idx[np.abs(n) <= 0.7]) == {core}
+    assert core in hexes(palette, idx[np.abs(n) <= 0.7])  # the edges show every layer (sliced), the core among them
 
 
 def test_iterator_styles_win_for_non_layered_elements(model, tmp_path):
@@ -485,3 +485,27 @@ def test_ifc2x3_catalogue_textures():
         assert look["texture"].endswith(".png") and look["texture_size"] == [0.5, 0.26]
     finally:
         _reset_owner()
+
+
+def test_wall_ends_and_tops_show_each_layer(project):
+    g = wall(project)  # Exterior 300: brick, insulation, block
+    palette, idx, v, t = colours(g)
+    w = b._model.by_guid(g)
+    usage = ifcopenshell.util.element.get_material(w, should_skip_usage=False)
+    n = M._normals(v.reshape(-1), t.reshape(-1)) @ M._layer_axis(w, usage)
+    ends = idx[np.abs(n) <= 0.7]
+    assert hexes(palette, ends) == {M.CATALOGUE[k]["colour"] for k in ("Brick", "Insulation", "Block")}
+    top = [i for i in range(len(t)) if v[t[i]][:, 2].min() > 2.999]
+    y = {M._hex(palette[idx[i]][:3]): sorted({round(float(v[t[i]][:, 1].mean()), 2)}) for i in top}
+    assert y[M.CATALOGUE["Brick"]["colour"]][0] < y[M.CATALOGUE["Block"]["colour"]][0]  # brick on the -y side
+    # the mesh still closes: the area of the top is the wall's 5 x 0.3
+    area = sum(np.linalg.norm(np.cross(v[t[i]][1] - v[t[i]][0], v[t[i]][2] - v[t[i]][0])) / 2 for i in top)
+    assert area == pytest.approx(5 * 0.3, rel=1e-3)
+
+
+def test_layers_in_3d_can_be_turned_off(project):
+    g = wall(project)
+    sliced = len(colours(g)[1])
+    assert call("set_project_settings", json.dumps({"layers_in_3d": False}))["ok"]
+    assert len(colours(g)[1]) < sliced  # the ends and top are whole again
+    assert not call("set_project_settings", json.dumps({"layers_in_3d": "yes"}))["ok"]

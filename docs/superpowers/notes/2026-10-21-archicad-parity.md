@@ -39,7 +39,7 @@ Branch `parity-materials`. Spec: [2026-10-21-archicad-parity-materials-design](.
 - Cut fill patterns are hatched on screen, in printed drawings/PDF and in DXF (pattern HATCHes); the
   insulation loops have no line families, so DXF leaves those layers unhatched.
 - **Layer-by-layer junctions** are the regenerator's (priority 0–100); no per-junction override UI.
-- Double-slanted and complex-profile walls; per-layer surfaces on edges (the core's surface is used).
+- Double-slanted and complex-profile walls. (Wall and slab ends and tops now show each layer: the mesh is sliced at the layer boundaries, project setting `layers_in_3d`, about 1 ms per wall.)
 - Columns and beams change material through their type's profile set (every column of the type follows); no per-occurrence material yet.
 - The construction grid's extent is computed when shown (it follows the model on the next refresh).
 - Figures: File › Place picture (typed width, opaque) or Place underlay (calibrated). 

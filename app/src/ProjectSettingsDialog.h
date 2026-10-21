@@ -40,6 +40,7 @@ private:
     QComboBox* m_stairTreadMode;
     QComboBox* m_stairArrow;
     QCheckBox* m_stairNumbers;
+    QCheckBox* m_layers3d; // D96
     QComboBox* m_importedWalls; // D92
     QCheckBox* m_partialDups; // D92: model checks
     QSpinBox* m_decimals;

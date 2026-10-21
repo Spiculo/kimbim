@@ -413,7 +413,78 @@ def layer_bands(element) -> dict | None:
         bound += sense * float(layer.LayerThickness or 0.0) * s
         bounds.append(bound)
     return {"origin": [float(v) * s for v in m[:3, 3]], "axis": (axis / length).tolist(), "bounds": bounds,
-            "materials": [l.Material for l in layers]}
+            "materials": [l.Material for l in layers], "sense": usage.DirectionSense}
+
+
+def _clip_scalar(poly, svals, lo, hi):
+    """The part of a polygon (points with a scalar each) where lo <= s <= hi: (points, scalars)."""
+    for bound, keep_above in ((lo, True), (hi, False)):
+        out_p, out_s = [], []
+        n = len(poly)
+        for i in range(n):
+            a, b = poly[i], poly[(i + 1) % n]
+            sa, sb = svals[i], svals[(i + 1) % n]
+            ina = sa >= bound - 1e-9 if keep_above else sa <= bound + 1e-9
+            inb = sb >= bound - 1e-9 if keep_above else sb <= bound + 1e-9
+            if ina:
+                out_p.append(a)
+                out_s.append(sa)
+            if ina != inb:
+                t = (bound - sa) / (sb - sa)
+                out_p.append(a + (b - a) * t)
+                out_s.append(bound)
+        poly, svals = out_p, out_s
+        if len(poly) < 3:
+            return [], []
+    return poly, svals
+
+
+def layered_mesh(element, verts: np.ndarray, faces: np.ndarray, palette: "Palette"):
+    """D96: a layered element's mesh with its ends, top, bottom and reveals cut at the layer boundaries,
+    each piece in its layer's surface (Archicad shows the layers there), the sides as face_colours does.
+    (verts, faces, colours), or None when the element has fewer than two layers."""
+    bands = layer_bands(element)
+    if bands is None:
+        return None
+    sense = -1.0 if bands["sense"] == "NEGATIVE" else 1.0
+    signed = np.asarray(bands["axis"]) * sense  # face_colours' _layer_axis, without a second placement
+    layers = bands["materials"]
+    colours_of = [palette.of_material(m) for m in layers]
+    v = verts.reshape(-1, 3).astype(float)
+    tri = faces.reshape(-1, 3)
+    d = _normals(verts, faces) @ signed
+    sides = np.abs(d) > SIDE
+    # the sides: the first layer's surface on one, the last's on the other (face_colours' rule)
+    side_tris = tri[sides]
+    side_cols = np.where(d[sides] < 0, colours_of[0], colours_of[-1]).astype(np.uint32)
+    origin, axis = np.asarray(bands["origin"]), np.asarray(bands["axis"])
+    bounds = bands["bounds"]
+    s_all = (v - origin) @ axis
+    out_v, out_t, out_c = [v[side_tris.reshape(-1)]], [], [side_cols]
+    count = len(side_tris) * 3
+    extra_v, extra_t, extra_c = [], [], []
+    for a, b, c in tri[~sides]:  # ends, top, bottom, reveals: a few per wall
+        pts, sv = [v[a], v[b], v[c]], [s_all[a], s_all[b], s_all[c]]
+        for k in range(len(layers)):
+            lo, hi = sorted(bounds[k:k + 2])
+            piece, _ = _clip_scalar(pts, sv, lo, hi)
+            if len(piece) < 3:
+                continue
+            base = count + len(extra_v)
+            extra_v += piece
+            for j in range(1, len(piece) - 1):  # a convex piece: a fan
+                extra_t.append((base, base + j, base + j + 1))
+                extra_c.append(colours_of[k])
+    nv = np.concatenate([out_v[0], np.asarray(extra_v, dtype=float).reshape(-1, 3)]) if extra_v else out_v[0]
+    side_index = np.arange(count, dtype=np.uint32).reshape(-1, 3)
+    nt = np.concatenate([side_index, np.asarray(extra_t, dtype=np.uint32).reshape(-1, 3)]) if extra_t else side_index
+    nc = np.concatenate([side_cols, np.asarray(extra_c, dtype=np.uint32)]) if extra_c else side_cols
+    nv = nv.astype(np.float32).reshape(-1)
+    nt = nt.reshape(-1)
+    from . import configure
+
+    configure.apply_surface_overrides(element, nv, nt, nc, palette)  # D97: the sides' overrides win
+    return nv, nt, nc
 
 
 # ---------------------------------------------------------------- creating

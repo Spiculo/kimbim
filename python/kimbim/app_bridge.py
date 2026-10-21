@@ -123,7 +123,10 @@ def _collect_meshes(it, max_elements=None):
 
     from . import materials
 
+    from . import settings
+
     palette = materials.Palette()
+    slice_layers = bool(settings.current().get("layers_in_3d", True))
     guids, types, verts, tris, colours, voff, toff = [], [], [], [], [], [0], [0]
     done = False
     while max_elements is None or len(guids) < int(max_elements):
@@ -132,7 +135,12 @@ def _collect_meshes(it, max_elements=None):
         if len(t):
             v = np.asarray(shape.geometry.verts, dtype=np.float32)
             try:
-                c = materials.face_colours(_model.by_id(shape.id), shape.geometry, v, t, palette)
+                element = _model.by_id(shape.id)
+                sliced = materials.layered_mesh(element, v, t, palette) if slice_layers else None  # D96
+                if sliced is not None:
+                    v, t, c = sliced
+                else:
+                    c = materials.face_colours(element, shape.geometry, v, t, palette)
             except Exception:  # a colour problem must never stop the model from showing
                 c = np.full(len(t) // 3, materials.NO_COLOUR, dtype=np.uint32)
             verts.append(v)

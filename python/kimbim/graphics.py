@@ -691,6 +691,7 @@ def _layer_fills(element, cache: dict, fallback, pens) -> dict | None:
     if bands is None:
         return None
     fills, backgrounds, patterns_ = [], [], []
+    bands.pop("sense", None)
     for m in bands.pop("materials"):
         cut = _material_cut(m, cache) if m is not None else {"pen": None, "bg": None, "pattern": None}
         pen_no = cut["pen"] if cut["pen"] is not None else fallback

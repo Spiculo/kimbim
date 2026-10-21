@@ -8329,92 +8329,97 @@ Open it read-only?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="150"/>
-        <source>Rebuild with KimBim&apos;s shape</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="151"/>
-        <source>Keep the imported shape and cut it</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="153"/>
-        <source>Splitting a wall imported from another program: rebuild it (so it edits and joins like one drawn here) or keep the other program&apos;s body and cut it</source>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="148"/>
+        <source>Show each layer on the ends and tops of walls and slabs in 3D</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/ProjectSettingsDialog.cpp" line="154"/>
-        <source>Imported walls:</source>
+        <source>Rebuild with KimBim&apos;s shape</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/ProjectSettingsDialog.cpp" line="155"/>
-        <source>Flag partly overlapping elements as duplicates</source>
+        <source>Keep the imported shape and cut it</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="157"/>
+        <source>Splitting a wall imported from another program: rebuild it (so it edits and joins like one drawn here) or keep the other program&apos;s body and cut it</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/ProjectSettingsDialog.cpp" line="158"/>
+        <source>Imported walls:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="159"/>
+        <source>Flag partly overlapping elements as duplicates</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="162"/>
         <source>Model checks: also report same-type elements that overlap by half or more without being exactly in the same place</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="164"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="168"/>
         <source>Decimals:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="168"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="172"/>
         <source>Existing</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="169"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="173"/>
         <source>To be demolished</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="170"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="174"/>
         <source>Leave them (they count as New)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="172"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="176"/>
         <source>Unmarked elements in an opened IFC:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="177"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="181"/>
         <source>Renovation styles:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="181"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="185"/>
         <source>Every rule when it fits</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="182"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="186"/>
         <source>Every rule</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="183"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="187"/>
         <source>Only the rules used</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="185"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="189"/>
         <source>Sheet legend:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="187"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="191"/>
         <source>Library objects show their plan symbol in plans</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ProjectSettingsDialog.cpp" line="192"/>
+        <location filename="../src/ProjectSettingsDialog.cpp" line="196"/>
         <source>These settings aren&apos;t kept with a plain IFC file. Save as .kim to keep them.</source>
         <translation type="unfinished"></translation>
     </message>
