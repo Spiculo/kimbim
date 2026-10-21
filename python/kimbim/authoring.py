@@ -33,6 +33,7 @@ import numpy as np
 from . import app_bridge as B
 from . import drawgen
 from . import layers
+from . import materials
 from . import renovation
 
 # Default wall types created the first time a model without layered wall types needs one.
@@ -92,6 +93,8 @@ def new_project(name: str = "") -> str:
         for product in (site, building):
             ifcopenshell.api.geometry.edit_object_placement(f, product=product)
         B._model = f
+        for material_name in materials.CATALOGUE:  # D96: Archicad's template comes with its materials
+            materials.ensure(material_name, f)
         _make_storey("Level 1", 0.0)
         from . import drawings
 
@@ -185,9 +188,8 @@ def _create_layered_types(ifc_class: str, defaults):
         wall_type = ifcopenshell.api.root.create_entity(f, ifc_class=ifc_class, name=type_name)
         layer_set = ifcopenshell.api.material.add_material_set(f, name=type_name, set_type="IfcMaterialLayerSet")
         for material_name, thickness in layers:
-            material = next((m for m in f.by_type("IfcMaterial") if m.Name == material_name), None) \
-                or ifcopenshell.api.material.add_material(f, name=material_name)
-            layer = ifcopenshell.api.material.add_layer(f, layer_set=layer_set, material=material)
+            material = materials.ensure(material_name, f)  # D96: with its surface and cut fill
+            layer =ifcopenshell.api.material.add_layer(f, layer_set=layer_set, material=material)
             ifcopenshell.api.material.edit_layer(f, layer=layer, attributes={"LayerThickness": thickness / _scale()})
         ifcopenshell.api.material.assign_material(f, products=[wall_type], material=layer_set)
 
@@ -801,8 +803,7 @@ def _profile_types(ifc_class: str, defaults) -> list:
                                           XDim=width / s, YDim=depth / s)
             profile_set = ifcopenshell.api.material.add_material_set(f, name=name, set_type="IfcMaterialProfileSet")
             material_name = "Concrete" if ifc_class == "IfcColumnType" else "Steel"
-            material = next((m for m in f.by_type("IfcMaterial") if m.Name == material_name), None) \
-                or ifcopenshell.api.material.add_material(f, name=material_name)
+            material = materials.ensure(material_name, f)
             ifcopenshell.api.material.add_profile(f, profile_set=profile_set, material=material, profile=profile)
             ifcopenshell.api.material.assign_material(f, products=[t], material=profile_set)
     out = []

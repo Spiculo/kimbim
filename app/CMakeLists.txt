@@ -59,6 +59,7 @@ qt_add_library(kimbim_core STATIC
     src/Underlay.cpp src/Underlay.h src/ViewportUnderlays.cpp
     src/UnderlayDialogs.cpp src/UnderlayDialogs.h src/Underlays.cpp
     src/LibraryPanel.cpp src/LibraryPanel.h src/LibraryTools.cpp
+    src/MaterialsDialog.cpp src/MaterialsDialog.h
 )
 target_include_directories(kimbim_core PUBLIC src)
 # Element icons (owner feedback: objects need an icon and a hint on hover).
@@ -124,6 +125,7 @@ kimbim_test(test_preferences)
 kimbim_test(test_graphics)
 kimbim_test(test_dxf_export)
 kimbim_test(test_underlays)
+kimbim_test(test_materials_dialog)
 
 # GUI self-tests: need a real OpenGL window (GPU, or Mesa on the Linux CI runner). Label "gui".
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/broken.ifc "ISO-10303-21;

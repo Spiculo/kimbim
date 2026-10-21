@@ -174,6 +174,28 @@ Quantity_Color ElementBatch::surfaceColor(int i) const
     return m_override[size_t(i)].value_or(m_surface[size_t(i)].value_or(colorFor(m_chunk.types.at(i))));
 }
 
+Quantity_Color ElementBatch::triangleColor(int i, uint32_t t) const
+{
+    if (m_override[size_t(i)])
+        return *m_override[size_t(i)];
+    if (m_surface[size_t(i)])
+        return *m_surface[size_t(i)];
+    // Taken as given, like the class palette: the shaded view's lighting darkens colours, so a surface
+    // then looks close to its swatch.
+    if (const MeshChunk::Surface* s = m_chunk.surfaceOf(t))
+        return Quantity_Color(s->r, s->g, s->b, Quantity_TOC_RGB);
+    return colorFor(m_chunk.types.at(i));
+}
+
+double ElementBatch::triangleTransparency(int i, uint32_t t) const
+{
+    if (m_override[size_t(i)] || m_surface[size_t(i)] || m_alpha[size_t(i)] > 0.0)
+        return m_alpha[size_t(i)]; // an override's transparency (0 when it sets none)
+    const MeshChunk::Surface* s = m_chunk.surfaceOf(t);
+    // Rounded so near-equal values share one draw group.
+    return s ? std::round(double(s->transparency) * 100.0) / 100.0 : 0.0;
+}
+
 std::vector<ElementBatch::LineBucket> ElementBatch::lineBuckets(const Quantity_Color& fallback) const
 {
     std::vector<LineBucket> out;
@@ -225,10 +247,13 @@ Handle(ElementOwner) ElementBatch::owner(int i)
     return o;
 }
 
-void ElementBatch::addElement(Graphic3d_ArrayOfTriangles& out, int i, bool withColors, const Quantity_Color* fixed) const
+void ElementBatch::addElement(Graphic3d_ArrayOfTriangles& out, int i, bool withColors, const Quantity_Color* fixed,
+    std::optional<double> onlyAlpha) const
 {
-    const Quantity_Color color = fixed ? *fixed : surfaceColor(i);
     for (uint32_t t = m_chunk.toff[size_t(i)]; t < m_chunk.toff[size_t(i) + 1]; ++t) {
+        if (onlyAlpha && triangleTransparency(i, t) != *onlyAlpha)
+            continue;
+        const Quantity_Color color = fixed ? *fixed : withColors ? triangleColor(i, t) : Quantity_Color();
         const gp_Pnt a = vertex(m_chunk, m_chunk.tris[3 * t]);
         const gp_Pnt b = vertex(m_chunk, m_chunk.tris[3 * t + 1]);
         const gp_Pnt c = vertex(m_chunk, m_chunk.tris[3 * t + 2]);
@@ -599,27 +624,35 @@ void ElementBatch::computeEdges()
 
 void ElementBatch::addTriangles(const Handle(Prs3d_Presentation)& prs, int mode)
 {
-    // D73: in shaded mode, elements an override makes transparent go in their own blended group per
-    // transparency (few: overrides set one or two).
+    // D73, D96: in shaded mode, transparent triangles (an override's transparency, or a surface's such
+    // as glass) go in their own blended group per transparency (few: rounded to 1 %).
     std::vector<double> alphas{0.0};
-    if (mode == Shaded)
-        for (int i = 0; i < elementCount(); ++i)
-            if (!isHidden(i) && m_alpha[size_t(i)] > 0.0
-                && std::find(alphas.begin(), alphas.end(), m_alpha[size_t(i)]) == alphas.end())
-                alphas.push_back(m_alpha[size_t(i)]);
-    for (double alpha : alphas) {
-        auto inGroup = [&](int i) { return !isHidden(i) && (mode != Shaded || m_alpha[size_t(i)] == alpha); };
-        int tris = 0;
-        for (int i = 0; i < elementCount(); ++i)
-            if (inGroup(i))
-                tris += int(m_chunk.toff[size_t(i) + 1] - m_chunk.toff[size_t(i)]);
+    std::vector<int> counts{0};
+    for (int i = 0; i < elementCount(); ++i) {
+        if (isHidden(i))
+            continue;
+        for (uint32_t t = m_chunk.toff[size_t(i)]; t < m_chunk.toff[size_t(i) + 1]; ++t) {
+            const double a = mode == Shaded ? triangleTransparency(i, t) : 0.0;
+            auto it = std::find(alphas.begin(), alphas.end(), a);
+            if (it == alphas.end()) {
+                alphas.push_back(a);
+                counts.push_back(0);
+                it = alphas.end() - 1;
+            }
+            ++counts[size_t(it - alphas.begin())];
+        }
+    }
+    for (size_t g = 0; g < alphas.size(); ++g) {
+        const double alpha = alphas[g];
+        const int tris = counts[g];
         if (tris == 0)
             continue;
+        const std::optional<double> only = mode == Shaded ? std::optional<double>(alpha) : std::nullopt;
         const bool colours = mode == Shaded || mode == Ids;
         Handle(Graphic3d_ArrayOfTriangles) arr = new Graphic3d_ArrayOfTriangles(
             tris * 3, 0, Graphic3d_ArrayFlags_VertexNormal | (colours ? Graphic3d_ArrayFlags_VertexColor : 0));
         for (int i = 0; i < elementCount(); ++i) {
-            if (!inGroup(i))
+            if (isHidden(i))
                 continue;
             if (mode == Ids) {
                 const auto rgb = idRgb(m_idBase + i + 1);
@@ -627,7 +660,7 @@ void ElementBatch::addTriangles(const Handle(Prs3d_Presentation)& prs, int mode)
                 const Quantity_Color id(rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0, Quantity_TOC_RGB);
                 addElement(*arr, i, true, &id);
             } else {
-                addElement(*arr, i, colours);
+                addElement(*arr, i, colours, nullptr, only);
             }
         }
         Handle(Graphic3d_Group) group = prs->NewGroup();

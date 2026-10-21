@@ -26,6 +26,26 @@ QJsonObject tablesFromBridge()
 class TestGraphics : public QObject {
     Q_OBJECT
 private slots:
+    // D96: layered elements' bands come with the state; malformed ones are dropped.
+    void parsesLayerBands()
+    {
+        const QJsonObject w{{"origin", QJsonArray{1, 2, 0}}, {"axis", QJsonArray{0, 1, 0}},
+            {"bounds", QJsonArray{-0.15, -0.05, 0.15}}, {"fills", QJsonArray{"#ff0000", QJsonValue()}}};
+        const QJsonObject bad{{"origin", QJsonArray{0, 0, 0}}, {"axis", QJsonArray{0, 1, 0}},
+            {"bounds", QJsonArray{0, 1}}, {"fills", QJsonArray{"#ff0000", "#00ff00"}}};
+        const QJsonObject state{{"ok", true}, {"styles", QJsonArray()}, {"elements", QJsonObject()},
+            {"hidden", QJsonArray()}, {"layers", QJsonObject{{"W", w}, {"Bad", bad}}}};
+        const kimbim::Graphics g = kimbim::Graphics::fromJson(state);
+        const kimbim::LayerBands* lb = g.layersOf("W");
+        QVERIFY(lb);
+        QCOMPARE(lb->bounds.size(), 3);
+        QCOMPARE(lb->origin[1], 2.0);
+        QCOMPARE(lb->fills[0], QColor("#ff0000"));
+        QVERIFY(!lb->fills[1].isValid());
+        QVERIFY(!g.layersOf("Bad"));
+        QVERIFY(!g.layersOf("missing"));
+    }
+
     void parsesStylesHiddenAndPens()
     {
         const QByteArray json = R"({"ok": true, "purpose": "Working", "current_pen": 26, "annotation_pen": 23,

@@ -57,6 +57,24 @@ Graphics Graphics::fromJson(const QJsonObject& state)
     }
     for (const auto& h : state.value("hidden").toArray())
         g.m_hidden.insert(h.toString());
+    const QJsonObject layers = state.value("layers").toObject();
+    for (auto it = layers.constBegin(); it != layers.constEnd(); ++it) {
+        const QJsonObject o = it.value().toObject();
+        const QJsonArray origin = o.value("origin").toArray(), axis = o.value("axis").toArray();
+        const QJsonArray bounds = o.value("bounds").toArray(), fills = o.value("fills").toArray();
+        if (origin.size() != 3 || axis.size() != 3 || bounds.size() < 3 || fills.size() != bounds.size() - 1)
+            continue;
+        LayerBands b;
+        for (int k = 0; k < 3; ++k) {
+            b.origin[k] = origin[k].toDouble();
+            b.axis[k] = axis[k].toDouble();
+        }
+        for (const auto& v : bounds)
+            b.bounds << v.toDouble();
+        for (const auto& v : fills)
+            b.fills << QColor(v.toString()); // null: invalid = no fill
+        g.m_layers.insert(it.key(), b);
+    }
     for (const auto& v : state.value("legend").toArray()) {
         const QJsonObject e = v.toObject();
         g.m_legend.push_back({e.value("label").toString(), e.value("source").toString(), e.value("key").toString(),
@@ -69,6 +87,12 @@ Graphics Graphics::fromJson(const QJsonObject& state)
     for (auto it = names.constBegin(); it != names.constEnd(); ++it)
         g.m_penNames.insert(it.key().toInt(), it.value().toString());
     return g;
+}
+
+const LayerBands* Graphics::layersOf(const QString& guid) const
+{
+    const auto it = m_layers.constFind(guid);
+    return it == m_layers.constEnd() ? nullptr : &*it;
 }
 
 const ElementStyle* Graphics::styleOf(const QString& guid) const

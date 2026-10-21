@@ -114,32 +114,54 @@ def start_meshing(threads: int = 0) -> str:
     return _dump({"ok": True, "total": len(_model.by_type("IfcProduct"))})
 
 
-def next_mesh_chunk(max_elements: int = 1000):
-    """Next batch of element meshes as (meta_json, verts f32 LE, tris u32 LE, chunk-local), or None when done."""
-    global _iterator_done
+def _collect_meshes(it, max_elements=None):
+    """Element meshes from a geometry iterator as (meta_json, verts f32 LE, tris u32 LE, face colours
+    u16 LE), chunk-local, or None without any. Stops after `max_elements` (returns done=True at the end).
+    D96: each triangle has a palette index (`meta.palette`: [r, g, b, transparency] rows); 0xFFFF is
+    no surface (the app's class colour)."""
     import numpy as np
 
-    if _iterator is None or _iterator_done:
-        return None
-    guids, types, verts, tris, voff, toff = [], [], [], [], [0], [0]
-    while len(guids) < int(max_elements):
-        shape = _iterator.get()
+    from . import materials
+
+    palette = materials.Palette()
+    guids, types, verts, tris, colours, voff, toff = [], [], [], [], [], [0], [0]
+    done = False
+    while max_elements is None or len(guids) < int(max_elements):
+        shape = it.get()
         t = np.asarray(shape.geometry.faces, dtype=np.uint32)
         if len(t):
             v = np.asarray(shape.geometry.verts, dtype=np.float32)
+            try:
+                c = materials.face_colours(_model.by_id(shape.id), shape.geometry, v, t, palette)
+            except Exception:  # a colour problem must never stop the model from showing
+                c = np.full(len(t) // 3, materials.NO_COLOUR, dtype=np.uint32)
             verts.append(v)
             tris.append(t + voff[-1])
+            colours.append(c)
             voff.append(voff[-1] + len(v) // 3)
             toff.append(toff[-1] + len(t) // 3)
             guids.append(shape.guid)
             types.append(shape.type)
-        if not _iterator.next():
-            _iterator_done = True
+        if not it.next():
+            done = True
             break
     if not guids:
+        return None, done
+    meta = _dump({"guids": guids, "types": types, "voff": voff, "toff": toff, "palette": palette.rows})
+    return (meta, np.concatenate(verts).astype("<f4").tobytes(), np.concatenate(tris).astype("<u4").tobytes(),
+            np.concatenate(colours).astype("<u2").tobytes()), done
+
+
+def next_mesh_chunk(max_elements: int = 1000):
+    """Next batch of element meshes (see _collect_meshes), or None when done."""
+    global _iterator_done
+
+    if _iterator is None or _iterator_done:
         return None
-    meta = _dump({"guids": guids, "types": types, "voff": voff, "toff": toff})
-    return meta, np.concatenate(verts).astype("<f4").tobytes(), np.concatenate(tris).astype("<u4").tobytes()
+    parts, done = _collect_meshes(_iterator, max_elements)
+    if done:
+        _iterator_done = True
+    return parts
 
 
 def _mesh_settings():
@@ -153,7 +175,6 @@ def _mesh_settings():
 def mesh_elements(guids_json: str):
     """Meshes of specific elements (after an edit), in the next_mesh_chunk format, or None."""
     import ifcopenshell.geom
-    import numpy as np
 
     if _model is None:
         return None
@@ -164,24 +185,7 @@ def mesh_elements(guids_json: str):
                                     geometry_library="hybrid-cgal-simple-opencascade")
     if not it.initialize():
         return None
-    guids, types, verts, tris, voff, toff = [], [], [], [], [0], [0]
-    while True:
-        shape = it.get()
-        t = np.asarray(shape.geometry.faces, dtype=np.uint32)
-        if len(t):
-            v = np.asarray(shape.geometry.verts, dtype=np.float32)
-            verts.append(v)
-            tris.append(t + voff[-1])
-            voff.append(voff[-1] + len(v) // 3)
-            toff.append(toff[-1] + len(t) // 3)
-            guids.append(shape.guid)
-            types.append(shape.type)
-        if not it.next():
-            break
-    if not guids:
-        return None
-    meta = _dump({"guids": guids, "types": types, "voff": voff, "toff": toff})
-    return meta, np.concatenate(verts).astype("<f4").tobytes(), np.concatenate(tris).astype("<u4").tobytes()
+    return _collect_meshes(it)[0]
 
 
 # ---------------------------------------------------------------- editing (M2, D49)
@@ -865,6 +869,7 @@ def properties_multi(guids_json: str) -> str:
         "types": sorted({e.is_a() for e in elements}),
         "name": {"value": names[0] if same_name else None, "varies": not same_name},
         "status": status,
+        "material": _materials.merged(elements),  # D96: the Material row (None: not shown)
         "psets": psets,
     })
 
@@ -952,6 +957,7 @@ from . import symbols as _symbols  # noqa: E402
 from . import tags as _tags  # noqa: E402
 from . import stairs as _stairs  # noqa: E402
 from . import showon as _showon  # noqa: E402
+from . import materials as _materials  # noqa: E402
 
 _EXPORTS = {
     "authoring": (
@@ -1225,6 +1231,14 @@ _EXPORTS = {
         "underlay_probe",
         "underlay_raster",
         "underlays",
+    ),
+    "materials": (
+        "add_standard_materials",
+        "apply_materials",
+        "assign_material",
+        "element_material",
+        "materials_state",
+        "purge_materials",
     ),
     "library": (
         "library_objects",

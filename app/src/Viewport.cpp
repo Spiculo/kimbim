@@ -1089,7 +1089,41 @@ void Viewport::rebuildSections()
                     part.width = std::max(Graphics::pixels(st->cut.weight, true), 1.0f); // cuts stay bold
                     part.pattern = Graphics::pattern(st->cut.dash);
                 }
-                const QString key = st ? QStringLiteral("%1|%2|%3|%4|%5").arg(st->fill.isValid() ? st->fill.name() : QString(),
+                // D96: a composite is cut layer by layer (Archicad): each layer's fill with thin separator
+                // lines, then the element's outline over them with the cut pen.
+                const LayerBands* bands = st && st->fill.isValid() ? g.layersOf(b->guid(i)) : nullptr;
+                if (bands) {
+                    const gp_Dir axis(bands->axis[0], bands->axis[1], bands->axis[2]);
+                    const gp_Pnt origin(bands->origin[0], bands->origin[1], bands->origin[2]);
+                    for (int k = 0; k + 1 < bands->bounds.size(); ++k) {
+                        const double lo = std::min(bands->bounds[k], bands->bounds[k + 1]);
+                        const double hi = std::max(bands->bounds[k], bands->bounds[k + 1]);
+                        if (hi - lo < 1e-6)
+                            continue;
+                        const gp_Pln from(origin.Translated(gp_Vec(axis) * lo), axis);
+                        const gp_Pln to(origin.Translated(gp_Vec(axis) * hi), axis.Reversed());
+                        SectionPart layer;
+                        layer.fill = bands->fills[k].isValid() ? std::optional<Quantity_Color>(occ(bands->fills[k])) : std::nullopt;
+                        layer.line = part.line;
+                        layer.width = 1.0f;
+                        const QString lkey = QStringLiteral("layer|%1|%2").arg(
+                            bands->fills[k].isValid() ? bands->fills[k].name() : QString(), st->cut.color.name());
+                        auto lit = partOf.constFind(lkey);
+                        if (lit == partOf.constEnd()) {
+                            lit = partOf.insert(lkey, parts.size());
+                            parts.push_back(layer);
+                        }
+                        for (const auto& l : clipped) {
+                            std::vector<gp_Pnt> piece = clipLoop(clipLoop(l, from), to);
+                            if (piece.size() >= 3) {
+                                parts[*lit].loops.push_back(std::move(piece));
+                                ++loopCount;
+                            }
+                        }
+                    }
+                    part.fill = std::nullopt; // the outline only: the layers are filled
+                }
+                const QString key = st ? QStringLiteral("%1|%2|%3|%4|%5").arg(part.fill ? st->fill.name() : QString(),
                     st->cut.color.name()).arg(part.width).arg(part.pattern).arg(0) : QStringLiteral("default");
                 auto it = partOf.constFind(key);
                 if (it == partOf.constEnd()) {

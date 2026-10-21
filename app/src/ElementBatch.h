@@ -132,6 +132,11 @@ public:
     // The colour the element is shaded with: Compare's override, then the surface override, then the
     // calm palette by IFC class.
     Quantity_Color surfaceColor(int i) const;
+    // D96: one triangle's colour and transparency (t is the chunk-wide triangle index): an element
+    // override (Compare, a graphics rule) colours every face; otherwise the face's own surface (its
+    // material), else the class colour.
+    Quantity_Color triangleColor(int i, uint32_t t) const;
+    double triangleTransparency(int i, uint32_t t) const;
     // The visible elements' border lines grouped by style (one OCCT group each); `fallback` colours the
     // unstyled ones (1 px, solid).
     struct LineBucket {
@@ -165,7 +170,9 @@ public:
     void ComputeSelection(const Handle(SelectMgr_Selection)& selection, const int mode) override;
 
 private:
-    void addElement(Graphic3d_ArrayOfTriangles& out, int i, bool withColors, const Quantity_Color* fixed = nullptr) const;
+    // Appends element i's triangles; with `onlyAlpha` only those whose transparency is that value.
+    void addElement(Graphic3d_ArrayOfTriangles& out, int i, bool withColors, const Quantity_Color* fixed = nullptr,
+        std::optional<double> onlyAlpha = std::nullopt) const;
 
     MeshChunk m_chunk;
     QHash<QString, int> m_index;

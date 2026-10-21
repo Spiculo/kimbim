@@ -22,6 +22,7 @@
 
 #include "Cuts.h"
 #include "DockLayout.h"
+#include "MaterialsDialog.h"
 #include "Preferences.h"
 #include <QThread>
 
@@ -462,6 +463,9 @@ private:
     void refreshLevels();
     void addLevelDialog();
     void levelsDialog(); // D79: Model > Levels..., the levels table
+    void materialsDialog(MaterialsEdits::Kind kind); // D96: Graphics > Building materials / Surfaces / Composites
+    void materialsCommand(const char* command, const QString& done);
+    bool setElementMaterial(const QString& kind, const QString& name); // D96: the Properties panel's Material row
     void setPlanView(bool plan);
     void buildModelingToolbar();
     void buildPalette();

@@ -97,6 +97,7 @@
 #include "LayersPanel.h"
 #include "LevelsBar.h"
 #include "LevelsDialog.h"
+#include "MaterialsDialog.h"
 #include "InputAidsController.h"
 #include "MeasureController.h"
 #include "HostTool.h"
@@ -230,6 +231,9 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     connect(m_properties, &PropertiesPanel::statusEdited, this, [this](const QString& s) {
         // after the drop-down's own signal: setRenovationStatus rebuilds the panel
         QMetaObject::invokeMethod(this, [this, s] { setRenovationStatus(s); }, Qt::QueuedConnection);
+    });
+    connect(m_properties, &PropertiesPanel::materialEdited, this, [this](const QString& kind, const QString& name) {
+        QMetaObject::invokeMethod(this, [this, kind, name] { setElementMaterial(kind, name); }, Qt::QueuedConnection);
     });
     connect(m_properties, &PropertiesPanel::nameEdited, this, &MainWindow::applyName);
     connect(m_properties, &PropertiesPanel::propertyRemoved, this, &MainWindow::removeProperty);
@@ -666,6 +670,22 @@ void MainWindow::buildMenus()
     editor("actionPenSets", tr("&Pen sets..."), [this](const QJsonObject& r) { return new PenSetsDialog(r, this); });
     editor("actionLineTypes", tr("&Line types..."), [this](const QJsonObject& r) { return new LineTypesDialog(r, this); });
     editor("actionElementStyles", tr("&Element styles..."), [this](const QJsonObject& r) { return new ElementStylesDialog(r, this); });
+    graphics->addSeparator();
+    // D96: Archicad's element attributes (Surfaces, Building Materials, Composites), one dialog.
+    auto materials = [this, graphics](const char* name, const QString& text, MaterialsEdits::Kind kind) {
+        QAction* a = graphics->addAction(text);
+        a->setObjectName(QLatin1String(name));
+        connect(a, &QAction::triggered, this, [this, kind] { materialsDialog(kind); });
+    };
+    materials("actionBuildingMaterials", tr("Building &materials..."), MaterialsEdits::Materials);
+    materials("actionSurfaces", tr("&Surfaces..."), MaterialsEdits::Surfaces);
+    materials("actionComposites", tr("&Composites..."), MaterialsEdits::Composites);
+    QAction* standard = graphics->addAction(tr("Add standard materials"));
+    standard->setObjectName(QStringLiteral("actionStandardMaterials"));
+    connect(standard, &QAction::triggered, this, [this] { materialsCommand("add_standard_materials", tr("Standard materials added")); });
+    QAction* purge = graphics->addAction(tr("Purge unused materials"));
+    purge->setObjectName(QStringLiteral("actionPurgeMaterials"));
+    connect(purge, &QAction::triggered, this, [this] { materialsCommand("purge_materials", tr("Unused materials removed")); });
     graphics->addSeparator();
     editor("actionVisibilitySets", tr("&Visibility sets..."), [this](const QJsonObject& r) { return new VisibilitySetsDialog(r, this); });
     editor("actionOverrides", tr("Graphic &overrides..."), [this](const QJsonObject& r) { return new OverridesDialog(r, this); });
@@ -1636,6 +1656,56 @@ void MainWindow::levelsDialog()
     }
     afterEdit(r);
     m_status->showMessage(tr("Levels changed"));
+}
+
+void MainWindow::materialsDialog(MaterialsEdits::Kind kind)
+{
+    // D96: edited in the dialog, applied on OK as one undo step (like the Levels dialog).
+    const QJsonObject state = bridge("materials_state");
+    if (!state.value("ok").toBool()) {
+        showError(tr("Materials"), state.value("error").toString());
+        return;
+    }
+    MaterialsDialog dialog(state, m_viewport->graphics().pens(), this);
+    dialog.showTab(kind);
+    if (dialog.exec() != QDialog::Accepted || !dialog.edits().modified())
+        return;
+    const QJsonObject r = bridge("apply_materials",
+        {QString::fromUtf8(QJsonDocument(dialog.edits().changes()).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not change the materials"), r.value("error").toString());
+        return;
+    }
+    afterEdit(r);
+    refreshGraphics(); // cut fills come from the materials
+    m_status->showMessage(tr("Materials changed"));
+}
+
+bool MainWindow::setElementMaterial(const QString& kind, const QString& name)
+{
+    if (m_selection.isEmpty())
+        return false;
+    const QJsonObject r = bridge("assign_material", {jsonList(m_selection), kind, name});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(r.value("error").toString());
+        refreshProperties();
+        return false;
+    }
+    afterEdit(r);
+    refreshGraphics(); // the cut fill follows the material
+    m_status->showMessage(tr("%n element(s) changed", nullptr, r.value("changed").toInt()));
+    return true;
+}
+
+void MainWindow::materialsCommand(const char* command, const QString& done)
+{
+    const QJsonObject r = bridge(command);
+    if (!r.value("ok").toBool()) {
+        showError(tr("Materials"), r.value("error").toString());
+        return;
+    }
+    afterEdit(r);
+    m_status->showMessage(done);
 }
 
 void MainWindow::setPlanView(bool plan)

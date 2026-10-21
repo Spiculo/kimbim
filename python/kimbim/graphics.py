@@ -370,6 +370,8 @@ def validate(key: str, value) -> str | None:
                     return f"{kind} {part}: a pen (1-255) and a line type"
             if not _pen_no(st.get("fill")):
                 return f"{kind} fill: pens are 1-255"
+            if st.get("fill_source", "material") not in ("material", "style"):
+                return f"{kind} fill source: material or style"
     elif key in ("visibility_sets", "override_sets"):
         for set_name, v in value.items():
             if not isinstance(v, dict) or not isinstance(v.get("rules", []), list):
@@ -650,6 +652,45 @@ def _line(pens, line_types, pen_no, line_name) -> dict:
     return {"color": p["color"], "weight": p["weight"], "dash": dash(line_types, line_name), "pen": pen_no}
 
 
+def _material_fill(element, cache: dict, fallback):
+    """The cut fill pen of the element's building material (D96), else `fallback`."""
+    from . import materials
+
+    try:
+        m = materials.main_material(element)
+    except Exception:  # an odd material assignment must not stop the drawing
+        return fallback
+    if m is None:
+        return fallback
+    if m.id() not in cache:
+        pen_no = materials.properties(m).get("pen")
+        cache[m.id()] = pen_no if _pen_no(pen_no) else None
+    return cache[m.id()] if cache[m.id()] is not None else fallback
+
+
+def _layer_fills(element, cache: dict, fallback, pens) -> dict | None:
+    """A layered element's layer bands with each layer's fill colour (its material's pen, else the
+    element style's), or None (one layer, or not layered)."""
+    from . import materials
+
+    try:
+        bands = materials.layer_bands(element)
+    except Exception:  # odd placements or usages: drawn as one fill
+        return None
+    if bands is None:
+        return None
+    fills = []
+    for m in bands.pop("materials"):
+        if m is not None and m.id() not in cache:
+            pen_no = materials.properties(m).get("pen")
+            cache[m.id()] = pen_no if _pen_no(pen_no) else None
+        pen_no = cache.get(m.id()) if m is not None else None
+        pen_no = pen_no if pen_no is not None else fallback
+        fills.append(pen(pens, pen_no)["color"] if pen_no is not None else None)
+    bands["fills"] = fills
+    return bands
+
+
 def resolve(purpose: str | None = None, model=None, settings: dict | None = None) -> dict:
     from . import app_bridge as B
 
@@ -693,6 +734,8 @@ def resolve(purpose: str | None = None, model=None, settings: dict | None = None
 
     styles, index, elements, hidden = [], {}, {}, []
     shared: dict = {}
+    material_fills: dict = {}  # material id -> its cut fill pen (or None)
+    layer_bands: dict = {}  # D96: guid -> each layer's place and fill (composite cuts)
     legend_hits: dict = {}  # (source, key) -> [style of the first element it applied to, [guids]]
     for e in _products(model) if model is not None else ():
         facts = _Facts(e, shared)
@@ -707,8 +750,14 @@ def resolve(purpose: str | None = None, model=None, settings: dict | None = None
         base = styles_by_kind.get(facts.kind) or builtin_styles[facts.kind]
         cut_pen, proj_pen = base["cut"]["pen"], base["projection"]["pen"]
         cut_line, proj_line, fill_pen = base["cut"]["line"], base["projection"]["line"], base["fill"]
+        bands = None
         if facts.kind in NO_FILL:
             fill_pen = None
+        elif base.get("fill_source", "material") == "material":  # D96: Archicad's cut fill comes from the material
+            style_fill = fill_pen
+            fill_pen = _material_fill(e, material_fills, fill_pen)
+            bands = _layer_fills(e, material_fills, style_fill, pens)
+        fill_before = fill_pen
         surface = transparency = None
         if treatment.get("show") == "override":
             then = {**palette.get(status, {}), **treatment}  # the palette's style, the filter's fields win
@@ -734,6 +783,8 @@ def resolve(purpose: str | None = None, model=None, settings: dict | None = None
                  "projection": _line(pens, line_types, proj_pen, proj_line),
                  "fill": pen(pens, fill_pen)["color"] if fill_pen is not None else None,
                  "surface": surface, "transparency": transparency}
+        if bands is not None and fill_pen == fill_before:  # an override's fill covers the layers
+            layer_bands[e.GlobalId] = bands
         k = json.dumps(style, sort_keys=True)
         if k not in index:
             index[k] = len(styles)
@@ -788,7 +839,7 @@ def resolve(purpose: str | None = None, model=None, settings: dict | None = None
            "pens": {str(n): pen(pens, n) for n in range(1, 256)},
            "pen_names": {n: p["name"] for n, p in pens.items() if isinstance(p, dict) and p.get("name")},
            "current_pen": st.get("current_pen", 23), "annotation_pen": ann["projection"]["pen"],
-           "styles": styles, "elements": elements, "hidden": hidden,
+           "styles": styles, "elements": elements, "hidden": hidden, "layers": layer_bands,
            "renovation": flt_name, "renovation_preset": preset_name, "renovation_presets": list(style_presets),
            "legend": legend, "legend_members": members,
            "legend_all": legend_all, "legend_members_all": members_all,
@@ -964,6 +1015,23 @@ def style_svg(svg: str, resolved: dict, k: float = 1.0) -> str:
         pos = m.end()
     out.append(svg[pos:])
     svg = "".join(out)
+    # D96: a composite's layers take their own fills, with thin separator lines.
+    layers = resolved.get("layers", {})
+    if layers and "data-layer=" in svg:
+        thin = _fmt(0.1 / k)
+
+        def layer_fills(m):
+            guid = m.group(1)
+            fills = (layers.get(guid) or {}).get("fills") or []
+            fallback = styles[elements[guid]]["fill"] if guid in elements else None
+
+            def one(p):
+                i = int(p.group(1))
+                fill = fills[i] if i < len(fills) else fallback
+                return f'<path fill="{fill or "none"}" stroke-width="{thin}"'
+            return re.sub(r'<path data-layer="(\d+)"', one, m.group(0))
+
+        svg = re.sub(r'<g ifc:guid="([^"]+)"[^>]*>.*?</g>', layer_fills, svg, flags=re.S)
     # Annotation text is filled in its pen's colour (the overlay writes black text).
     svg = re.sub(r'(<g data-kind="annotation"[^>]* color="(#[0-9a-fA-F]{6})"[^>]*>)(.*?)(</g>)',
                  lambda m: m.group(1) + m.group(3).replace('fill="#000000"', f'fill="{m.group(2)}"')

@@ -101,6 +101,7 @@ void PropertiesPanel::clear()
     m_tree->clear(); // deletes the status drop-down (an item widget) too
     m_name = nullptr;
     m_status = nullptr;
+    m_material = nullptr;
     m_building = false;
 }
 
@@ -157,6 +158,30 @@ void PropertiesPanel::showMulti(const QJsonObject& merged)
                 emit statusEdited(key);
         });
         m_tree->setItemWidget(item, 1, m_status);
+    }
+    // D96: the element's composite (walls, slabs) or building material, changed from a list.
+    const QJsonObject material = merged.value("material").toObject();
+    if (!material.isEmpty()) {
+        const QString kind = material.value("kind").toString();
+        auto* item = new QTreeWidgetItem(element, {kind == QLatin1String("composite") ? tr("Composite") : tr("Building material"), QString()});
+        m_material = new QComboBox(m_tree);
+        m_material->setObjectName(QStringLiteral("elementMaterial"));
+        if (material.value("varies").toBool())
+            m_material->addItem(variesText(), QString());
+        else if (material.value("value").toString().isEmpty())
+            m_material->addItem(tr("(none)"), QString());
+        for (const auto& c : material.value("choices").toArray())
+            m_material->addItem(c.toString(), c.toString());
+        m_material->setCurrentIndex(std::max(0, m_material->findData(material.value("value").toString())));
+        m_material->setEnabled(material.value("editable").toBool());
+        if (!m_material->isEnabled())
+            m_material->setToolTip(tr("Set by the element's profile or layers: edit them in Graphics > Composites"));
+        connect(m_material, &QComboBox::currentIndexChanged, this, [this, kind](int i) {
+            const QString name = m_material ? m_material->itemData(i).toString() : QString();
+            if (!m_building && !name.isEmpty())
+                emit materialEdited(kind, name);
+        });
+        m_tree->setItemWidget(item, 1, m_material);
     }
     element->setExpanded(true);
 

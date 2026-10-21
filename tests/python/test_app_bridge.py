@@ -66,10 +66,12 @@ def _chunks(max_elements):
 
     out = []
     while (c := app_bridge.next_mesh_chunk(max_elements)) is not None:
-        meta, verts, tris = c
+        meta, verts, tris, colours = c
         meta = json.loads(meta)
         nv, nt = len(verts) // 12, len(tris) // 12
         assert meta["voff"][-1] == nv and meta["toff"][-1] == nt
+        assert len(colours) == 2 * nt  # D96: one palette index per triangle
+        assert all(i == 0xFFFF or i < len(meta["palette"]) for i in struct.unpack(f"<{nt}H", colours))
         assert len(meta["guids"]) == len(meta["types"]) == len(meta["voff"]) - 1 == len(meta["toff"]) - 1
         idx = struct.unpack(f"<{nt * 3}I", tris)
         assert max(idx) < nv

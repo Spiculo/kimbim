@@ -23,14 +23,31 @@ struct MeshChunk {
     std::vector<uint32_t> toff; // size elementCount()+1
     std::vector<float> verts;   // xyz per vertex
     std::vector<uint32_t> tris; // 3 indices per triangle
+    // D96: each triangle's surface as an index into `palette` (kNoColor: none, the class colour).
+    // Empty when the producer sent no colours.
+    struct Surface {
+        float r = 0, g = 0, b = 0; // sRGB 0-1
+        float transparency = 0;    // 0 opaque - 1 invisible
+    };
+    static constexpr uint16_t kNoColor = 0xFFFF;
+    std::vector<uint16_t> faceColors;
+    std::vector<Surface> palette;
 
     int elementCount() const { return int(guids.size()); }
     int vertexCount() const { return int(verts.size() / 3); }
     int triangleCount() const { return int(tris.size() / 3); }
+    // The surface of triangle t (chunk-wide index), or nullptr without one.
+    const Surface* surfaceOf(uint32_t t) const
+    {
+        if (t >= faceColors.size() || faceColors[t] == kNoColor || faceColors[t] >= palette.size())
+            return nullptr;
+        return &palette[faceColors[t]];
+    }
 
-    // Validates sizes, offsets and index ranges; returns nullopt and sets *error otherwise.
+    // Validates sizes, offsets and index ranges; returns nullopt and sets *error otherwise. `colors`
+    // (one little-endian uint16 per triangle) may be empty.
     static std::optional<MeshChunk> parse(const QByteArray& metaJson, const QByteArray& verts,
-        const QByteArray& tris, QString* error);
+        const QByteArray& tris, QString* error, const QByteArray& colors = QByteArray());
 };
 
 // Pulls the next chunk from Python. Returns false on error; sets *done when meshing is finished.

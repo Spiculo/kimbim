@@ -23,7 +23,7 @@ def volume(guid):
 
 
 def bbox(guid):
-    meta, verts, _ = b.mesh_elements(json.dumps([guid]))
+    meta, verts, _, _ = b.mesh_elements(json.dumps([guid]))
     v = np.frombuffer(verts, dtype="<f4").reshape(-1, 3)
     return v.min(axis=0), v.max(axis=0)
 
@@ -182,7 +182,7 @@ def test_snap_data_mesh_vertices_are_optional(project):
 
 def test_mesh_elements_matches_the_chunk_format(project):
     a = wall(project, 0, 0, 5, 0)
-    meta, verts, tris = b.mesh_elements(json.dumps([a["guid"], "not-a-guid"]))
+    meta, verts, tris, _ = b.mesh_elements(json.dumps([a["guid"], "not-a-guid"]))
     m = json.loads(meta)
     assert m["guids"] == [a["guid"]] and m["types"] == ["IfcWall"]
     assert m["voff"][-1] * 12 == len(verts) and m["toff"][-1] * 12 == len(tris)

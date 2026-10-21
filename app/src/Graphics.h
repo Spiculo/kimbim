@@ -26,6 +26,14 @@ struct ElementStyle {
     std::optional<QColor> surface;
     std::optional<double> transparency;
 };
+// D96: a layered element's layers (Archicad's composite cut): band k lies between bounds[k] and
+// bounds[k + 1] metres along `axis` from `origin`, filled with fills[k] (invalid: none).
+struct LayerBands {
+    double origin[3] = {0, 0, 0};
+    double axis[3] = {0, 1, 0};
+    QVector<double> bounds;
+    QVector<QColor> fills;
+};
 // D74: one legend row: what the purpose changes (a renovation status or an override rule) and its style.
 struct LegendEntry {
     QString label, source, key; // source: "renovation" or "override"; key: the status or the rule name
@@ -36,6 +44,7 @@ public:
     static Graphics fromJson(const QJsonObject& state); // graphics_state's reply
     const ElementStyle* styleOf(const QString& guid) const;   // null: no style (keep defaults)
     bool isHidden(const QString& guid) const { return m_hidden.contains(guid); }
+    const LayerBands* layersOf(const QString& guid) const; // null: drawn as one fill
     const QSet<QString>& hidden() const { return m_hidden; }
     const QHash<int, LineStyle>& pens() const { return m_pens; }
     const QHash<int, QString>& penNames() const { return m_penNames; }
@@ -55,6 +64,7 @@ private:
     QVector<ElementStyle> m_styles;
     QHash<QString, int> m_elements;
     QSet<QString> m_hidden;
+    QHash<QString, LayerBands> m_layers;
     QHash<int, LineStyle> m_pens;
     QHash<int, QString> m_penNames;
     int m_currentPen = 23, m_annotationPen = 23;
