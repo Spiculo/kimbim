@@ -329,6 +329,40 @@ def _set_slab_outline(slab, outline):
     A._replace_body(slab, representation)
 
 
+def slab_outlines(storey_guid: str) -> str:
+    """[{guid, points}]: the outlines of a level's slabs (world metres), for editing their corners."""
+    storey = A._by_guid(storey_guid) if B._model is not None else None
+    out = []
+    for e in (A._contained(storey) if storey is not None else ()):
+        if e.is_a("IfcSlab") and (pts := _slab_outline_world(e)):
+            out.append({"guid": e.GlobalId, "points": [[round(x, 6), round(y, 6)] for x, y in pts]})
+    return B._dump({"slabs": out})
+
+
+def set_slab_outline(guid: str, points_json: str) -> str:
+    """A slab's outline from new points (world metres, D98: a corner moved, added or deleted), its
+    thickness and level kept (one undo step). At least three points, not crossing itself."""
+    from . import drafting
+
+    slab = A._by_guid(guid) if B._model is not None else None
+    if slab is None or not slab.is_a("IfcSlab") or not _slab_outline_world(slab):
+        return A._fail("not a slab with an outline")
+    try:
+        points = [(float(x), float(y)) for x, y in json.loads(points_json)]
+    except (TypeError, ValueError) as ex:
+        return A._fail(f"bad points: {ex}")
+    if len(points) < 3:
+        return A._fail("a slab needs at least three corners")
+    if not drafting.is_simple(points) or abs(drafting.area(points)) < 1e-6:
+        return A._fail("the outline would cross itself")
+
+    def action():
+        _set_slab_outline(slab, points)
+        return 1, [slab.GlobalId], []
+
+    return B._dump(B._run(action))
+
+
 def slab_outline(guid: str) -> str:
     slab = A._by_guid(guid) if B._model is not None else None
     if slab is None or not slab.is_a("IfcSlab"):
@@ -576,3 +610,121 @@ def offset_elements(guids_json: str, distance) -> str:
     except Exception as ex:
         return A._fail(f"{type(ex).__name__}: {ex}")
     return B._dump({**r, "guids": made["copies"]})
+
+
+def resize_elements(guids_json: str, cx, cy, factor) -> str:
+    """Archicad's Resize: the selection scaled by `factor` about (cx, cy) in plan (metres). Walls,
+    slabs and 2D shapes take the new lengths and outlines (thicknesses and heights stay); doors and
+    windows keep their size, their place along the wall scaled; other elements move (one undo step)."""
+    from . import annotations as N
+    from . import curved_walls, drafting
+
+    if B._model is None:
+        return A._fail("no model open")
+    picked = [e for e in B._elements(guids_json) if e.is_a("IfcProduct")]
+    try:
+        k = float(factor)
+        if str(cx).strip() == "" or str(cy).strip() == "":  # about the selection's middle
+            pts = []
+            for e in picked:
+                if e.is_a("IfcWall") and A._axis_world(e) is not None:
+                    pts += list(A._axis_world(e))
+                elif getattr(e, "ObjectPlacement", None) is not None:
+                    pts.append(tuple(ifcopenshell.util.placement.get_local_placement(e.ObjectPlacement)[:2, 3] * A._scale()))
+            pts = np.array(pts, dtype=float) if pts else np.zeros((1, 2))
+            c = (pts.min(axis=0) + pts.max(axis=0)) / 2
+        else:
+            c = np.array([float(cx), float(cy)])
+    except (TypeError, ValueError) as ex:
+        return A._fail(str(ex))
+    if k <= 0 or abs(k - 1.0) < 1e-12:
+        return A._fail("the factor must be more than 0 and not 1")
+    hosted = {x for e in picked for x in A._hosted(e)}
+    elements = [e for e in picked if e not in hosted]
+    if not elements:
+        return A._fail("select what to resize")
+    scaled = lambda p: c + (np.asarray(p, dtype=float)[:2] - c) * k  # noqa: E731
+    plans = []
+    for e in elements:
+        if e.is_a("IfcWall") and curved_walls.is_curved(e):
+            plans.append(("curved", e, None))
+        elif e.is_a("IfcWall") and A._axis_world(e) is not None and A._layer_set(e) is not None:
+            a, b = (np.array(p, dtype=float) for p in A._axis_world(e))
+            if np.linalg.norm(b - a) * k < A.MIN_WALL_LENGTH:
+                return A._fail(f"{e.Name or 'a wall'} would have no length")
+            plans.append(("wall", e, (scaled(a), scaled(b))))
+        elif e.is_a("IfcSlab") and _slab_outline_world(e):
+            plans.append(("slab", e, [tuple(scaled(p)) for p in _slab_outline_world(e)]))
+        elif e.is_a("IfcAnnotation") and (data := N._read(e)) and data[0] in drafting.KINDS + ("dimension",):
+            plans.append(("shape", e, [tuple(scaled(p)) for p in N.world_points(e)]))
+        elif getattr(e, "ObjectPlacement", None) is not None:
+            plans.append(("move", e, None))
+    openings = {}
+    for kind, e, _ in plans:
+        if kind in ("wall", "curved"):
+            openings[e] = [(fill, opening, along, width) + tuple(A._opening_info(fill)[4:])
+                           for fill, opening, along, width in _fills(e)]
+
+    def action():
+        f = B._model
+        s = A._scale()
+        walls = []
+        for kind, e, data in plans:
+            if kind == "wall":
+                A._reaxis(e, *data)
+                walls.append(e)
+            elif kind == "curved":
+                m = ifcopenshell.util.placement.get_local_placement(e.ObjectPlacement)
+                inverse = np.linalg.inv(m)
+                local = []
+                for x, y in curved_walls.arc_of(e):
+                    w = (m @ np.array([x / s, y / s, 0.0, 1.0]))[:2] * s
+                    w = scaled(w)
+                    local.append(list((inverse @ np.array([w[0] / s, w[1] / s, 0.0, 1.0]))[:2] * s))
+                from . import configure
+
+                configure._write_pset(e, curved_walls.WALL_PSET, {"Arc": json.dumps(local)})
+                walls.append(e)
+            elif kind == "slab":
+                _set_slab_outline(e, data)
+            elif kind == "shape":
+                N.replace_points(e, data)
+                read = N._read(e)
+                if read[0] == "dimension":  # it measures again
+                    origin = data[0]
+                    local = [(x - origin[0], y - origin[1]) for x, y in data]
+                    text = N._measure(local)
+                    N._set(e, read[0], text, local, read[3], read[4])
+                    e.Name = text[:60]
+            else:
+                m = ifcopenshell.util.placement.get_local_placement(e.ObjectPlacement)
+                moved = m.copy()
+                moved[:2, 3] = scaled(m[:2, 3] * s) / s
+                ifcopenshell.api.geometry.edit_object_placement(f, product=e, matrix=moved, is_si=False,
+                                                                should_transform_children=True)
+        for w in walls:
+            A._regenerate(f, w, length=A._wall_length(w), height=A._wall_height(w) or 3.0)
+        for w in walls:
+            for fill, opening, along, width, height, sill in openings.get(w, ()):
+                along = min(max(along * k, width / 2), A._wall_length(w) - width / 2)
+                A._apply_opening_edit(fill, opening, w, along, width, height, sill)
+        return len(plans), [e.GlobalId for _, e, _ in plans] + [x.GlobalId for e in walls for x in A._hosted(e)
+                                                               if not x.is_a("IfcOpeningElement")], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return A._fail(str(ex) if isinstance(ex, ValueError) else f"{type(ex).__name__}: {ex}")
+    return B._dump(r)
+
+
+def _fills(wall):
+    """(door/window, opening, along, width) in a wall."""
+    out = []
+    for rel in getattr(wall, "HasOpenings", ()) or ():
+        opening = rel.RelatedOpeningElement
+        for fill in getattr(opening, "HasFillings", ()) or ():
+            info = A._opening_info(fill.RelatedBuildingElement)
+            if info is not None:
+                out.append((fill.RelatedBuildingElement, opening, info[2], info[3]))
+    return out

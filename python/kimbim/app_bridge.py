@@ -982,6 +982,7 @@ from . import showon as _showon  # noqa: E402
 from . import materials as _materials  # noqa: E402
 from . import configure as _configure  # noqa: E402
 from . import curved_walls as _curved_walls  # noqa: E402
+from . import sun as _sun  # noqa: E402
 from . import worksheets as _worksheets  # noqa: E402
 
 _EXPORTS = {
@@ -1056,6 +1057,7 @@ _EXPORTS = {
     ),
     "annotations": (
         "add_annotation",
+        "auto_dimension",
         "annotations",
         "set_annotation_pen",
         "set_annotation_size",
@@ -1110,8 +1112,11 @@ _EXPORTS = {
         "duplicate_elements",
         "fillet_corners",
         "mirror_elements",
+        "resize_elements",
         "offset_elements",
+        "set_slab_outline",
         "slab_outline",
+        "slab_outlines",
     ),
     "modify": (
         "join_elements",
@@ -1269,6 +1274,7 @@ _EXPORTS = {
         "worksheets",
     ),
     "curved_walls": ("create_curved_wall",),
+    "sun": ("sun_state",),
     "configure": (
         "flip_walls",
         "inject",
@@ -1284,6 +1290,7 @@ _EXPORTS = {
         "assign_material",
         "element_material",
         "materials_state",
+        "place_picture_3d",
         "purge_materials",
     ),
     "library": (

@@ -95,6 +95,23 @@ void Scene::setShadows(bool on)
     emit redrawRequested();
 }
 
+void Scene::setSunDirection(double x, double y, double z)
+{
+    const double length = std::sqrt(x * x + y * y + z * z);
+    if (length < 1e-9)
+        return;
+    // the light travels from the sun towards the model; a low sun still lights from just above
+    const double up = std::max(z / length, 0.05);
+    m_sun->SetDirection(gp_Dir(-x / length, -y / length, -up));
+    m_viewer->UpdateLights();
+    emit redrawRequested();
+}
+
+gp_Dir Scene::sunDirection() const
+{
+    return m_sun->Direction();
+}
+
 void Scene::changed()
 {
     emit redrawRequested();

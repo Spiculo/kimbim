@@ -47,9 +47,16 @@ DEFAULT_SLAB_TYPES = [
 ]
 # Doors and windows: (name, width, height, sill) in metres. IFC types have no size attributes, so
 # the defaults live in a custom pset on the type (D53); occurrences carry OverallWidth/Height.
+# (name, width, height, sill, operation (doors) or partitioning (windows)); D97: Archicad's door and
+# window variety (double, sliding, several panels)
 DEFAULT_OPENING_TYPES = {
-    "door": [("Door 900x2100", 0.9, 2.1, 0.0), ("Door 800x2100", 0.8, 2.1, 0.0)],
-    "window": [("Window 1200x1200", 1.2, 1.2, 0.9), ("Window 600x600", 0.6, 0.6, 1.5)],
+    "door": [("Door 900x2100", 0.9, 2.1, 0.0, "SINGLE_SWING_LEFT"), ("Door 800x2100", 0.8, 2.1, 0.0, "SINGLE_SWING_LEFT"),
+             ("Double door 1600x2100", 1.6, 2.1, 0.0, "DOUBLE_DOOR_SINGLE_SWING"),
+             ("Sliding door 1800x2100", 1.8, 2.1, 0.0, "SLIDING_TO_LEFT"),
+             ("Double sliding door 2400x2100", 2.4, 2.1, 0.0, "DOUBLE_DOOR_SLIDING")],
+    "window": [("Window 1200x1200", 1.2, 1.2, 0.9, "SINGLE_PANEL"), ("Window 600x600", 0.6, 0.6, 1.5, "SINGLE_PANEL"),
+               ("Window 2400x1200, two panels", 2.4, 1.2, 0.9, "DOUBLE_PANEL_VERTICAL"),
+               ("Window 3000x1500, three panels", 3.0, 1.5, 0.9, "TRIPLE_PANEL_VERTICAL")],
 }
 OPENING_PSET = "KIMBIM_OpeningDefaults"
 OPENING_CLASSES = {"door": ("IfcDoor", "IfcDoorType"), "window": ("IfcWindow", "IfcWindowType")}
@@ -292,9 +299,11 @@ def create_wall(storey_guid: str, type_guid: str, x1, y1, x2, y2, height, join_s
         return _fail(f"unknown reference line {reference}")
     from . import curved_walls
 
-    # D97: curved walls are not joined (the regenerator's joins are straight)
+    # D97: a curved wall is joined in KimBim's own mitre (the regenerator's joins are straight)
+    curved_joins = [(w, point) for guid, point in ((join_start_guid, p1), (join_end_guid, p2))
+                    if guid and (w := _by_guid(guid)) is not None and w.is_a("IfcWall") and curved_walls.is_curved(w)]
     joins = [(guid, point) for guid, point in ((join_start_guid, p1), (join_end_guid, p2))
-             if guid and not ((w := _by_guid(guid)) is not None and w.is_a("IfcWall") and curved_walls.is_curved(w))]
+             if guid and not any(w.GlobalId == guid for w, _ in curved_joins)]
     for guid, _ in joins:
         other = _by_guid(guid)
         if other is None or not other.is_a("IfcWall"):
@@ -311,6 +320,11 @@ def create_wall(storey_guid: str, type_guid: str, x1, y1, x2, y2, height, join_s
             neighbours.append(other)
         for w in [wall, *neighbours]:
             _regenerate(f, w, length=length, height=height)
+        for curved, point in curved_joins:
+            if curved_walls.join_to_curved(wall, curved, np.asarray(point, dtype=float)):
+                _regenerate(f, wall, length=length, height=height)
+                curved_walls.rebuild(curved)
+                neighbours.append(curved)
         layers.assign_active(wall)
         renovation.stamp_new(wall)
         made["wall"] = wall
@@ -462,12 +476,28 @@ def _body_centre(wall) -> float:
     return off + total / 2 if usage.DirectionSense != "NEGATIVE" else off - total / 2
 
 
+def _arc_world(wall) -> dict:
+    """A curved wall's arc in world metres for the app (D97): centre, radius, start angle and sweep
+    (radians, counter-clockwise positive)."""
+    from . import curved_walls
+
+    (cx, cy), radius, a0, sweep = curved_walls.frame(*curved_walls.arc_of(wall))
+    m = ifcopenshell.util.placement.get_local_placement(wall.ObjectPlacement)
+    s = _scale()
+    c = (m @ np.array([cx / s, cy / s, 0.0, 1.0]))[:2] * s
+    turn = math.atan2(m[1][0], m[0][0])
+    return {"cx": round(float(c[0]), 6), "cy": round(float(c[1]), 6), "r": round(radius, 6),
+            "a0": round(a0 + turn, 9), "sweep": round(sweep, 9)}
+
+
 def snap_data(storey_guid: str, mesh_vertices: str = "") -> str:
     """Wall axes on a level, in world metres, for snapping while drawing. With `mesh_vertices`
     (D92, truthful), the level's element mesh vertices are added to the snapping points."""
     storey = _by_guid(storey_guid) if B._model is not None else None
     if storey is None:
         return B._dump({"walls": []})
+    from . import curved_walls
+
     walls, openings = [], []
     for rel in getattr(storey, "ContainsElements", ()) or ():
         for e in rel.RelatedElements:
@@ -479,7 +509,8 @@ def snap_data(storey_guid: str, mesh_vertices: str = "") -> str:
                 continue
             walls.append({"guid": e.GlobalId, "x1": axis[0][0], "y1": axis[0][1], "x2": axis[1][0], "y2": axis[1][1],
                           "thickness": round(_thickness(layer_set), 6) if layer_set else 0.0,
-                          "centre": round(_body_centre(e), 6)})  # D97: the body beside its reference line
+                          "centre": round(_body_centre(e), 6),  # D97: the body beside its reference line
+                          **({"arc": _arc_world(e)} if curved_walls.is_curved(e) else {})})
             for void in getattr(e, "HasOpenings", ()) or ():
                 opening = void.RelatedOpeningElement
                 fill = next((r.RelatedBuildingElement for r in getattr(opening, "HasFillings", ()) or ()), None)
@@ -658,13 +689,13 @@ def opening_types(kind: str) -> str:
     f = B._model
     if not f.by_type(type_class):
         import ifcopenshell.api.pset
-        for name, width, height, sill in DEFAULT_OPENING_TYPES[kind]:
+        for name, width, height, sill, operation in DEFAULT_OPENING_TYPES[kind]:
             t = ifcopenshell.api.root.create_entity(f, ifc_class=type_class, name=name,
                                                     predefined_type="DOOR" if kind == "door" else "WINDOW")
             if kind == "door":
-                t.OperationType = "SINGLE_SWING_LEFT"
+                t.OperationType = operation
             else:
-                t.PartitioningType = "SINGLE_PANEL"
+                t.PartitioningType = operation
             pset = ifcopenshell.api.pset.add_pset(f, product=t, name=OPENING_PSET)
             ifcopenshell.api.pset.edit_pset(f, pset=pset, properties={
                 "Width": f.createIfcPositiveLengthMeasure(width / _scale()),
@@ -682,6 +713,24 @@ def _wall_frame(wall):
     from the axis start, `across` to the left of the axis, `up` from the wall base (all metres)."""
     s = _scale()
     wm = ifcopenshell.util.placement.get_local_placement(wall.ObjectPlacement)
+    from . import curved_walls
+
+    if curved_walls.is_curved(wall):  # D97: along the arc, across it radially
+        (cx, cy), radius, a0, sweep = curved_walls.frame(*curved_walls.arc_of(wall))
+        turn = 1.0 if sweep > 0 else -1.0
+
+        def placed_on_arc(along_m, across_m, up_m):
+            angle = a0 + turn * along_m / radius
+            tangent = np.array([-math.sin(angle), math.cos(angle)]) * turn
+            left = np.array([-tangent[1], tangent[0]])
+            local = (np.array([cx, cy]) + radius * np.array([math.cos(angle), math.sin(angle)]) + left * across_m) / s
+            matrix = wm.copy()
+            matrix[:3, 3] = wm[:3, 3] + wm[:3, :3] @ np.array([local[0], local[1], up_m / s])
+            matrix[:3, 0] = wm[:3, :3] @ np.array([tangent[0], tangent[1], 0.0])
+            matrix[:3, 1] = wm[:3, :3] @ np.array([left[0], left[1], 0.0])
+            return matrix
+
+        return placed_on_arc
     line = ifcopenshell.util.representation.get_reference_line(wall)
     start = np.array([float(line[0][0]), float(line[0][1])])
     direction = np.array([float(line[-1][0]), float(line[-1][1])]) - start
@@ -707,9 +756,14 @@ def _filling_representation(kind, element_type, width, height):
             f, context=_body_context(), overall_height=height / s, overall_width=width / s,
             operation_type=getattr(element_type, "OperationType", None) or "SINGLE_SWING_LEFT")
     else:
+        partition = getattr(element_type, "PartitioningType", None) or "SINGLE_PANEL"
+        panels = 3 if partition.startswith("TRIPLE") else 2 if partition.startswith("DOUBLE") else 1
         representation = ifcopenshell.api.geometry.add_window_representation(
             f, context=_body_context(), overall_height=height / s, overall_width=width / s,
-            partition_type=getattr(element_type, "PartitioningType", None) or "SINGLE_PANEL")
+            partition_type=partition, panel_properties=[{} for _ in range(panels)],  # one per panel
+            lining_properties={"FirstMullionOffset": width / panels / s,  # equal panels
+                               "SecondMullionOffset": 2 * width / 3 / s,
+                               "FirstTransomOffset": height / panels / s, "SecondTransomOffset": 2 * height / 3 / s})
     materials.style_filling(kind, representation, element_type)  # D96: frame, glass, leaf in 3D
     return representation
 
@@ -750,12 +804,27 @@ def _regenerate(f, wall, **kwargs):
     from . import configure, curved_walls
 
     if curved_walls.is_curved(wall):  # D97: its arc's body, rebuilt from its layers
-        return curved_walls.rebuild(wall)
+        done = curved_walls.rebuild(wall)
+        _refit_openings(wall)
+        for j in curved_walls.arc_joins(wall):  # the straight walls mitred into it follow
+            partner = curved_walls._partner(j)
+            if not curved_walls.is_curved(partner):
+                _regenerate(f, partner, length=_wall_length(partner), height=_wall_height(partner) or 3.0)
+        return done
     if configure.is_double_slanted(wall):  # D97: its own swept section, rebuilt at the new length
-        return configure.rebuild_double_slant(wall, kwargs.get("length"))
+        done = configure.rebuild_double_slant(wall, kwargs.get("length"))
+        _refit_openings(wall)
+        return done
     _body_context()  # the regenerator needs the Body/MODEL_VIEW context
     _patch_regenerator()
-    return ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=wall, **kwargs)
+    body = ifcopenshell.api.geometry.regenerate_wall_representation(f, wall=wall, **kwargs)
+    if curved_walls.arc_joins(wall):  # D97: mitred into curved walls; they follow this wall
+        curved_walls.adjust_straight(wall)
+        for j in curved_walls.arc_joins(wall):
+            curved_walls.rebuild(curved_walls._partner(j))
+            _refit_openings(curved_walls._partner(j))
+    _refit_openings(wall)  # D97: doors and windows follow the body (reference line, flip, composite)
+    return body
 
 
 def _replace_body(product, representation):
@@ -791,10 +860,6 @@ def insert_opening(kind: str, wall_guid: str, type_guid: str, along, width, heig
     wall, opening_type = _by_guid(wall_guid), _by_guid(type_guid)
     if wall is None or not wall.is_a("IfcWall"):
         return _fail("not a wall")
-    from . import curved_walls
-
-    if (why := curved_walls.refusal([wall])) is not None:  # D97: openings follow straight axes
-        return _fail(why)
     if opening_type is None or not opening_type.is_a(type_class):
         return _fail(f"not a {kind} type")
     try:
@@ -805,7 +870,7 @@ def insert_opening(kind: str, wall_guid: str, type_guid: str, along, width, heig
     layer_set = _layer_set(wall)
     if axis is None or layer_set is None:
         return _fail("the wall has no axis or layers")
-    length = math.dist(axis[0], axis[1])
+    length = _wall_length(wall)
     if width <= 0 or height <= 0 or along - width / 2 < -1e-6 or along + width / 2 > length + 1e-6:
         return _fail("the opening doesn't fit in the wall")
     wall_height = _wall_height(wall)
@@ -817,14 +882,7 @@ def insert_opening(kind: str, wall_guid: str, type_guid: str, along, width, heig
     def action():
         f = B._model
         s = _scale()
-        placed = _wall_frame(wall)
-        context = _body_context()
         opening = ifcopenshell.api.root.create_entity(f, ifc_class="IfcOpeningElement", name=f"{kind} opening")
-        opening_rep = ifcopenshell.api.geometry.add_wall_representation(
-            f, context=context, length=width, height=height, thickness=thickness + 0.02)
-        ifcopenshell.api.geometry.assign_representation(f, product=opening, representation=opening_rep)
-        ifcopenshell.api.geometry.edit_object_placement(
-            f, product=opening, matrix=placed(along - width / 2, -(thickness / 2 + 0.01), sill), is_si=False)
         ifcopenshell.api.feature.add_feature(f, feature=opening, element=wall)
 
         element = ifcopenshell.api.root.create_entity(f, ifc_class=element_class, name=opening_type.Name,
@@ -833,8 +891,7 @@ def insert_opening(kind: str, wall_guid: str, type_guid: str, along, width, heig
         ifcopenshell.api.type.assign_type(f, related_objects=[element], relating_type=opening_type)
         representation = _filling_representation(kind, opening_type, width, height)
         ifcopenshell.api.geometry.assign_representation(f, product=element, representation=representation)
-        ifcopenshell.api.geometry.edit_object_placement(
-            f, product=element, matrix=placed(along - width / 2, -thickness / 2, sill), is_si=False)
+        _place_opening(element, opening, wall, along, width, height, sill)  # D97: through the body as it lies
         ifcopenshell.api.feature.add_filling(f, opening=opening, element=element)
         container = ifcopenshell.util.element.get_container(wall)
         if container is not None:
@@ -1323,12 +1380,12 @@ def set_wall_axis(wall_guid: str, x1, y1, x2, y2) -> str:
         return _fail("not a wall with an axis")
     from . import curved_walls
 
-    if (why := curved_walls.refusal([wall])) is not None:
-        return _fail(why)
     try:
         p1, p2 = np.array([float(x1), float(y1)]), np.array([float(x2), float(y2)])
     except (TypeError, ValueError) as ex:
         return _fail(str(ex))
+    if curved_walls.is_curved(wall):  # D97: its ends move round its circle
+        return curved_walls.set_ends(wall, p1, p2)
     length = float(np.linalg.norm(p2 - p1))
     if length < MIN_WALL_LENGTH:
         return _fail("the wall has no length")
@@ -1437,18 +1494,38 @@ def _opening_info(element):
     m = ifcopenshell.util.placement.get_local_placement(opening.ObjectPlacement)
     wm = ifcopenshell.util.placement.get_local_placement(wall.ObjectPlacement)
     corner = np.array([m[0][3], m[1][3]]) * s
-    u = np.array(axis[1]) - np.array(axis[0])
-    u = u / np.linalg.norm(u)
-    along = float(np.dot(corner - np.array(axis[0]), u)) + width / 2
+    from . import curved_walls
+
+    if curved_walls.is_curved(wall):  # D97: how far round the arc its middle is
+        (cx, cy), radius, a0, sweep = curved_walls.frame(*curved_walls.arc_of(wall))
+        middle = corner + np.array([m[0][0], m[1][0]]) * (width / 2)
+        centre = (wm @ np.array([cx / s, cy / s, 0.0, 1.0]))[:2] * s
+        turned = math.atan2(middle[1] - centre[1], middle[0] - centre[0]) - (a0 + math.atan2(wm[1][0], wm[0][0]))
+        turned = (turned * (1 if sweep > 0 else -1)) % (2 * math.pi)
+        along = radius * turned
+    else:
+        u = np.array(axis[1]) - np.array(axis[0])
+        u = u / np.linalg.norm(u)
+        along = float(np.dot(corner - np.array(axis[0]), u)) + width / 2
     sill = float(m[2][3] - wm[2][3]) * s
     return opening, wall, along, width, height, sill
+
+
+def _wall_length(wall) -> float:
+    """Along the wall's axis (metres): its line's length, or a curved wall's arc (D97)."""
+    from . import curved_walls
+
+    if curved_walls.is_curved(wall):
+        return curved_walls.length(wall)
+    axis = _axis_world(wall)
+    return math.dist(axis[0], axis[1]) if axis else 0.0
 
 
 def _opening_fit_error(wall, along, width, height, sill) -> str:
     axis = _axis_world(wall)
     if axis is None or _layer_set(wall) is None:
         return "the host wall has no axis or layers"
-    length = math.dist(axis[0], axis[1])
+    length = _wall_length(wall)
     if width <= 0 or height <= 0 or along - width / 2 < -1e-6 or along + width / 2 > length + 1e-6:
         return "the opening doesn't fit in the wall"
     wall_height = _wall_height(wall)
@@ -1457,21 +1534,111 @@ def _opening_fit_error(wall, along, width, height, sill) -> str:
     return ""
 
 
+def _set_wall_height(e, metres: float):
+    """Inside an action: a wall `metres` high (its body's depth; swept and curved walls keep theirs)."""
+    from . import configure
+
+    f = B._model
+    if configure.is_double_slanted(e) or configure._pset(e, configure.WALL_PSET).get("Arc"):
+        # D97: swept and curved walls keep their height themselves (the depth is their length)
+        configure._write_pset(e, configure.WALL_PSET, {"Height": float(metres)})
+        _regenerate(f, e, height=metres)
+        return
+    body = ifcopenshell.util.representation.get_representation(e, "Model", "Body", "MODEL_VIEW")
+    for solid in (f.traverse(body) if body is not None else ()):
+        if solid.is_a("IfcExtrudedAreaSolid"):
+            solid.Depth = metres / _scale()
+    _regenerate(f, e, height=metres)
+
+
 def _apply_opening_edit(element, opening, wall, along, width, height, sill):
     """Inside an action: re-place and resize a door/window and its opening."""
     f = B._model
     s = _scale()
     thickness = _thickness(_layer_set(wall))
     kind = "door" if element.is_a("IfcDoor") else "window"
-    placed = _wall_frame(wall)
-    _replace_body(opening, ifcopenshell.api.geometry.add_wall_representation(
-        f, context=_body_context(), length=width, height=height, thickness=thickness + 0.02))
-    ifcopenshell.api.geometry.edit_object_placement(
-        f, product=opening, matrix=placed(along - width / 2, -(thickness / 2 + 0.01), sill), is_si=False)
     _replace_body(element, _filling_representation(kind, ifcopenshell.util.element.get_type(element), width, height))
-    ifcopenshell.api.geometry.edit_object_placement(
-        f, product=element, matrix=placed(along - width / 2, -thickness / 2, sill), is_si=False)
+    _place_opening(element, opening, wall, along, width, height, sill)
     element.OverallWidth, element.OverallHeight = width / s, height / s
+
+
+def _place_opening(element, opening, wall, along, width, height, sill):
+    """Inside an action: an opening through the wall's body as it is now (its thickness and where it lies
+    from the reference line, D97) and its door/window in it, `along` its axis and `sill` up."""
+    f = B._model
+    thickness = _thickness(_layer_set(wall))
+    side = _body_centre(wall) - thickness / 2
+    placed = _wall_frame(wall)
+    start, depth = _opening_band(wall, width, side, thickness)
+    _replace_body(opening, ifcopenshell.api.geometry.add_wall_representation(
+        f, context=_body_context(), length=width, height=height, thickness=depth))
+    ifcopenshell.api.geometry.edit_object_placement(
+        f, product=opening, matrix=_corner(placed, along, width, start, sill), is_si=False)
+    ifcopenshell.api.geometry.edit_object_placement(
+        f, product=element, matrix=_corner(placed, along, width, side, sill), is_si=False)
+
+
+def _corner(placed, along, width, across, sill):
+    """The placement of a straight box `width` long centred `along` the wall (its left front corner):
+    on an arc the box is square to the arc at its middle, so the corner is half a width back along
+    that tangent (on a straight wall the same as placed(along - width / 2, ...))."""
+    m = placed(along, across, sill)
+    m[:3, 3] = m[:3, 3] - m[:3, 0] * (width / 2 / _scale())
+    return m
+
+
+def _opening_band(wall, width, side, thickness):
+    """(start across, depth) of an opening box through the body: 1 cm past each face, and on an arc
+    deeper by the bulge of the inner face over the opening's width (towards the arc's centre)."""
+    from . import curved_walls
+
+    if not curved_walls.is_curved(wall):
+        return side - 0.01, thickness + 0.02
+    _c, radius, _a0, sweep = curved_walls.frame(*curved_walls.arc_of(wall))
+    left = 1.0 if sweep > 0 else -1.0  # where the centre is, across the axis
+    inner = max(radius - left * (side + (thickness if left > 0 else 0.0)), 0.01)
+    half = width / 2
+    bulge = inner - math.sqrt(max(inner * inner - half * half, 0.0)) if half < inner else inner
+    return (side - 0.01 if left > 0 else side - 0.01 - bulge), thickness + 0.02 + bulge
+
+
+def _refit_openings(wall):
+    """Inside an action: a wall's doors and windows follow its body after a change of reference line,
+    flip or composite (the opening's depth and side), each keeping its place along the wall."""
+    if _layer_set(wall) is None:
+        return
+    for void in list(getattr(wall, "HasOpenings", ()) or ()):
+        opening = void.RelatedOpeningElement
+        fill = next((r.RelatedBuildingElement for r in getattr(opening, "HasFillings", ()) or ()), None)
+        info = _opening_info(fill) if fill is not None else None
+        if info is None:
+            continue
+        _, _, along, width, height, sill = info
+        if not _opening_fits(fill, opening, wall, along, width, sill):
+            _place_opening(fill, opening, wall, along, width, height, sill)
+
+
+def _opening_fits(element, opening, wall, along, width, sill) -> bool:
+    """True when an opening already goes through the wall's body as it is (depth and side) and its
+    door/window sits in it: nothing to redo (most regenerations)."""
+    thickness = _thickness(_layer_set(wall))
+    side = _body_centre(wall) - thickness / 2
+    placed = _wall_frame(wall)
+    start, depth = _opening_band(wall, width, side, thickness)
+    want_opening = _corner(placed, along, width, start, sill)[:3, 3]
+    want_element = _corner(placed, along, width, side, sill)[:3, 3]
+    have_opening = ifcopenshell.util.placement.get_local_placement(opening.ObjectPlacement)[:3, 3]
+    have_element = ifcopenshell.util.placement.get_local_placement(element.ObjectPlacement)[:3, 3]
+    tol = 1e-6 / _scale()
+    if not (np.allclose(want_opening, have_opening, atol=tol) and np.allclose(want_element, have_element, atol=tol)):
+        return False
+    body = ifcopenshell.util.representation.get_representation(opening, "Model", "Body", "MODEL_VIEW")
+    for item in (body.Items if body is not None else ()):
+        curve = getattr(getattr(item, "SweptArea", None), "OuterCurve", None)
+        if curve is not None and curve.is_a("IfcPolyline"):
+            ys = [float(p.Coordinates[1]) for p in curve.Points]
+            return abs((max(ys) - min(ys)) * _scale() - depth) < 1e-6
+    return False
 
 
 def edit_opening(guid: str, along, width, height, sill) -> str:
@@ -1732,7 +1899,7 @@ def element_dimensions(e) -> list[tuple[str, float, bool]]:
 
     if e.is_a("IfcWall") and curved_walls.is_curved(e):  # D97: the arc's length, set by its points
         layer_set = _layer_set(e)
-        return [("Length", curved_walls.length(e), False), ("Height", _wall_height(e), True),
+        return [("Length", curved_walls.length(e), True), ("Height", _wall_height(e), True),
                 ("Thickness", _thickness(layer_set) if layer_set else 0.0, False)]
     if e.is_a("IfcWall") and _axis_world(e) is not None:
         a, b = _axis_world(e)
@@ -1787,6 +1954,8 @@ def set_dimension(guids_json: str, name: str, value) -> str:
     from . import stairs
 
     elements = stairs.drop_parts(B._elements(guids_json))
+    from . import curved_walls
+
     parametric = stairs.set_dimension(elements, name, metres)  # D88: stairs, ramps, railings
     if isinstance(parametric, str):
         return _fail(parametric)
@@ -1811,6 +1980,10 @@ def set_dimension(guids_json: str, name: str, value) -> str:
             if error:
                 return _fail(error)
             plan.append(("opening", e, (opening, wall, along, width, height, sill)))
+        elif e.is_a("IfcWall") and name == "Length" and curved_walls.is_curved(e):
+            if len(elements) > 1:
+                return _fail("change a curved wall's length on its own")
+            return curved_walls.set_length(e, metres)  # D97: its end goes round its circle
         elif e.is_a("IfcWall") and name == "Length":
             a, b = (np.array(p, dtype=float) for p in _axis_world(e))
             p2 = a + (b - a) / np.linalg.norm(b - a) * metres
@@ -1854,17 +2027,8 @@ def set_dimension(guids_json: str, name: str, value) -> str:
             elif kind == "wall-height":
                 from . import configure
 
-                if configure.is_double_slanted(e) or configure._pset(e, configure.WALL_PSET).get("Arc"):
-                    # D97: swept and curved walls keep their height themselves (the depth is their length)
-                    configure._write_pset(e, configure.WALL_PSET, {"Height": float(data)})
-                    _regenerate(f, e, height=data)
-                    changed.append(e.GlobalId)
-                    continue
-                body = ifcopenshell.util.representation.get_representation(e, "Model", "Body", "MODEL_VIEW")
-                for solid in (f.traverse(body) if body is not None else ()):
-                    if solid.is_a("IfcExtrudedAreaSolid"):
-                        solid.Depth = data / _scale()
-                _regenerate(f, e, height=data)
+                configure._write_pset(e, configure.WALL_PSET, {"TopLink": None})  # typed: no longer linked
+                _set_wall_height(e, data)
                 changed.append(e.GlobalId)
             else:  # column height / beam length: a new extrusion of the type's profile
                 profile, metres_, beam = data

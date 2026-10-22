@@ -148,6 +148,8 @@ std::optional<MainWindow::ObjectFit> MainWindow::fitObjectToWall(QPointF p, doub
     std::optional<ObjectFit> best;
     double bestDistance = reach;
     for (const SnapWall& w : m_wallTool->snapper().walls()) {
+        if (w.arc)
+            continue; // D97: a curved wall's face is no line to stand against
         const QPointF d = w.b - w.a;
         const double len = std::hypot(d.x(), d.y());
         if (len < 1e-9)

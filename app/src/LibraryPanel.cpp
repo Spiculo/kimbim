@@ -270,7 +270,7 @@ QJsonObject LibraryPanel::currentInfo() const
     return info;
 }
 
-void LibraryPanel::setParam(const QString& key, double value)
+void LibraryPanel::setParam(const QString& key, const QJsonValue& value)
 {
     m_params.insert(key, value);
     showParams();

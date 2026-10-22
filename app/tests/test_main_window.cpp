@@ -53,6 +53,7 @@
 #include "HostTool.h"
 #include "Graphics.h"
 #include "MainWindow.h"
+#include "LibraryPanel.h"
 #include "Snapper.h"
 #include "PropertiesPanel.h"
 #include "PolygonTool.h"
@@ -237,6 +238,137 @@ private slots:
         QCOMPARE(plan->constructionLineCount(), 0);
         snap->setChecked(false);
         show->setChecked(true);
+        QVERIFY(w.close());
+    }
+
+    // D98: a slab's corners with the Stretch tool: move one, add one on an edge, delete one.
+    void slabCornersByStretch()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        auto& py = kimbim::PythonEngine::instance();
+        const QString floor = py.callJson("slab_types", {}, nullptr).object().value("types").toArray().first()
+            .toObject().value("guid").toString();
+        const QString slab = py.callJson("create_slab", {w.levelsBar()->activeStorey(), floor,
+            QStringLiteral("[[0,0],[4,0],[4,4],[0,4]]"), QStringLiteral("0")}, nullptr).object().value("guid").toString();
+        auto corners = [&] {
+            return py.callJson("slab_outline", {slab}, nullptr).object().value("points").toArray().size();
+        };
+        QVERIFY(w.draftGripClick({2, 0}, 0.1, false)); // the bottom edge's middle: a new corner, picked up
+        QVERIFY(w.draftGripClick({2, -1}, 0.1, false)); // put down below
+        QCOMPARE(corners(), 5);
+        QVERIFY(w.draftGripClick({2, -1}, 0.1, false, true)); // Ctrl+click: deleted
+        QCOMPARE(corners(), 4);
+        QVERIFY(w.close());
+    }
+
+    // D98: a picture standing in the model, its picture on its faces.
+    void pictureIn3d()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("tree.png"));
+        QImage img(20, 40, QImage::Format_RGB32);
+        img.fill(Qt::darkGreen);
+        QVERIFY(img.save(path));
+        const int before = w.viewport()->elementCount();
+        QVERIFY(w.placePicture3d(path, 2.0, QPointF(1, 1)));
+        QCOMPARE(w.viewport()->elementCount(), before + 1);
+        QCOMPARE(w.selection().size(), 1);
+        QVERIFY(w.close());
+    }
+
+    // D96: the sun's place drives the 3D light.
+    void sunPosition()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        QVERIFY(w.setSun(QJsonObject{{"mode", "custom"}, {"azimuth", 90.0}, {"altitude", 30.0}}));
+        const gp_Dir d = w.viewport()->scene()->sunDirection(); // light travels from the east, downwards
+        QVERIFY(d.X() < -0.8 && std::abs(d.Y()) < 1e-6 && d.Z() < -0.4);
+        QVERIFY(!w.setSun(QJsonObject{{"altitude", 120.0}}));
+        QVERIFY(w.close());
+    }
+
+    // D98: Resize the selection about its middle.
+    void resizeSelection()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        w.setTool(kimbim::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({4, 0});
+        w.wallTool()->finish();
+        w.setTool(kimbim::MainWindow::Tool::None);
+        w.setSelection(w.viewport()->guids());
+        QVERIFY(w.resizeSelection(1.5));
+        const QJsonObject dims = kimbim::PythonEngine::instance().callJson("properties_multi",
+            {QStringLiteral("[\"%1\"]").arg(w.viewport()->guids().first())}, nullptr).object().value("psets").toObject()
+            .value("Dimensions").toObject();
+        QVERIFY(std::abs(dims.value("Length").toObject().value("value").toDouble() - 6.0) < 1e-6);
+        QVERIFY(!w.resizeSelection(1.0));
+        QVERIFY(w.close());
+    }
+
+    // D98: Automatic Dimensioning of the selected walls.
+    void autoDimensionWalls()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        QVERIFY(!w.autoDimension(0.8)); // nothing selected
+        w.setTool(kimbim::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({5, 0});
+        w.wallTool()->click({5, 4});
+        w.wallTool()->finish();
+        w.setTool(kimbim::MainWindow::Tool::None);
+        w.setSelection(w.viewport()->guids());
+        QVERIFY(w.autoDimension(0.8));
+        int dims = 0;
+        for (const auto& v : kimbim::PythonEngine::instance().callJson("annotations", {w.levelsBar()->activeStorey()},
+                 nullptr).object().value("annotations").toArray())
+            dims += v.toObject().value("kind").toString() == QLatin1String("dimension");
+        QCOMPARE(dims, 2);
+        QVERIFY(w.close());
+    }
+
+    // D97: Archicad's Favourites: the Wall tool's settings saved by name and applied again.
+    void favourites()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        w.setTool(kimbim::MainWindow::Tool::Wall);
+        auto* height = w.findChild<QDoubleSpinBox*>(QStringLiteral("wallHeight"));
+        auto* reference = w.findChild<QComboBox*>(QStringLiteral("wallReference"));
+        auto* geometry = w.findChild<QComboBox*>(QStringLiteral("wallGeometry"));
+        height->setValue(4.25);
+        reference->setCurrentIndex(reference->findData(QStringLiteral("Core centre")));
+        geometry->setCurrentIndex(geometry->findData(QStringLiteral("curved")));
+        QVERIFY(w.saveFavourite(QStringLiteral("Tall curved")));
+        QVERIFY(w.favouriteNames().contains(QStringLiteral("Tall curved")));
+        height->setValue(2.5);
+        reference->setCurrentIndex(0);
+        geometry->setCurrentIndex(0);
+        w.setTool(kimbim::MainWindow::Tool::Slab);
+        QVERIFY(w.favouriteNames().isEmpty()); // the slab tool has none
+        QVERIFY(w.favouriteNames(false).contains(QStringLiteral("Tall curved")));
+        QVERIFY(w.applyFavourite(QStringLiteral("Tall curved"))); // back to the wall tool, as saved
+        QCOMPARE(w.tool(), kimbim::MainWindow::Tool::Wall);
+        QCOMPARE(height->value(), 4.25);
+        QCOMPARE(reference->currentData().toString(), QStringLiteral("Core centre"));
+        QVERIFY(w.wallTool()->curved());
+        QVERIFY(w.projectSettings().value("favourites").toObject().contains(QStringLiteral("Tall curved")));
+        QVERIFY(w.deleteFavourite(QStringLiteral("Tall curved")));
+        QVERIFY(w.favouriteNames(false).isEmpty());
+        // an object and its parameters
+        QVERIFY(w.chooseObject(QStringLiteral("table"), {{"width", 2.2}}));
+        QVERIFY(w.saveFavourite(QStringLiteral("Long table")));
+        QVERIFY(w.chooseObject(QStringLiteral("chair"), {}));
+        QVERIFY(w.applyFavourite(QStringLiteral("Long table")));
+        QCOMPARE(w.libraryPanel()->currentObject(), QStringLiteral("table"));
+        QCOMPARE(w.libraryPanel()->currentParams().value("width").toDouble(), 2.2);
+        w.setTool(kimbim::MainWindow::Tool::None);
         QVERIFY(w.close());
     }
 

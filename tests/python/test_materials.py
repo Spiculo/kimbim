@@ -538,3 +538,21 @@ def test_layers_in_3d_can_be_turned_off(project):
     assert call("set_project_settings", json.dumps({"layers_in_3d": False}))["ok"]
     assert len(colours(g)[1]) < sliced  # the ends and top are whole again
     assert not call("set_project_settings", json.dumps({"layers_in_3d": "yes"}))["ok"]
+
+
+def test_a_picture_standing_in_the_model(project, tmp_path):
+    """D98: Archicad's Picture object: an image on a thin panel, its own material carrying it."""
+    from kimbim import underlays
+
+    png = tmp_path / "person.png"
+    png.write_bytes(underlays.png_bytes(40, 80, [bytes([200, 100, 50]) * 40 for _ in range(80)]))
+    r = call("place_picture_3d", project["level"], str(png), 0.9, 2.0, 3.0, 0, 0)
+    assert r["ok"], r
+    assert r["height"] == pytest.approx(1.8)  # 0.9 wide, twice as tall
+    palette, idx, v, _ = colours(r["guid"])
+    assert v[:, 0].max() - v[:, 0].min() == pytest.approx(0.9, abs=1e-3)
+    assert v[:, 2].max() - v[:, 2].min() == pytest.approx(1.8, abs=1e-3)
+    textured = [palette[i] for i in set(idx.tolist()) if len(palette[i]) > 4]
+    assert textured and textured[0][5:7] == [0.9, 1.8]  # the picture once across its face
+    assert call("element_material", r["guid"])["name"].startswith("Picture: person")
+    assert not call("place_picture_3d", project["level"], str(tmp_path / "x.txt"), 1, 0, 0, 0, 0)["ok"]

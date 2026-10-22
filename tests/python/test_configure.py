@@ -350,3 +350,67 @@ def test_snap_data_knows_where_the_body_is(project):
     data = call("snap_data", project["level"])
     w = next(x for x in data["walls"] if x["guid"] == g)
     assert w["centre"] == pytest.approx(0.15) and w["thickness"] == pytest.approx(0.3)
+
+
+def _through(guid, x, z=1.0):
+    """Where a ray across the wall at (x, z) meets its faces (y, metres)."""
+    _, _, v, t = mesh(guid)
+    out = []
+    p, d = np.array([x, -5.0, z]), np.array([0.0, 1.0, 0.0])
+    for a, b_, c_ in v[t]:
+        e1, e2 = b_ - a, c_ - a
+        h = np.cross(d, e2)
+        det = e1 @ h
+        if abs(det) < 1e-12:
+            continue
+        f = 1 / det
+        s = p - a
+        u = f * (s @ h)
+        q = np.cross(s, e1)
+        w = f * (d @ q)
+        if u < 0 or w < 0 or u + w > 1:
+            continue
+        if f * (e2 @ q) > 0:
+            out.append(round(float(p[1] + f * (e2 @ q)), 3))
+    return sorted(set(out))
+
+
+@pytest.mark.parametrize("reference", ["Outside face", "Inside face", "Core centre", "Centre"])
+def test_doors_go_right_through_walls_drawn_by_any_line(project, reference):
+    """D97: an opening cuts the whole body, wherever the wall's reference line is; it follows changes."""
+    g = wall(project, reference)
+    d = call("opening_types", "door")["types"][0]
+    r = call("insert_opening", "door", g, d["guid"], 2.5, d["width"], d["height"], d["sill"])
+    assert r["ok"], r
+    assert _through(g, 2.5) == []  # nothing left in the doorway
+    assert len(_through(g, 0.5)) == 2  # the wall beside it is solid
+    assert call("set_element_setting", json.dumps([g]), C.GEOMETRY, "Reference line", "Inside face")["ok"]
+    assert _through(g, 2.5) == []
+    assert call("flip_walls", json.dumps([g]))["ok"]
+    assert _through(g, 2.5) == []
+
+
+def test_wall_tops_linked_to_the_level_above(project):
+    """D97: Archicad's top link: the wall's height follows the level above."""
+    from kimbim import authoring
+
+    if len(call("storeys")["storeys"]) < 2:
+        assert call("insert_storey", "Level 2", "3.0")["ok"]
+    storeys = sorted(call("storeys")["storeys"], key=lambda s: s["elevation"])
+    lower, upper = storeys[0], storeys[1]
+    g = wall(project, "Outside face")
+    assert call("set_element_setting", json.dumps([g]), C.GEOMETRY, "Top link", "Level above")["ok"]
+    assert call("set_element_setting", json.dumps([g]), C.GEOMETRY, "Top offset", "-0.2")["ok"]
+    expected = upper["elevation"] - lower["elevation"] - 0.2
+    assert authoring._wall_height(b._model.by_guid(g)) == pytest.approx(expected)
+    assert props(g)[C.GEOMETRY]["Top link"]["value"] == "Level above"
+    # the level above goes up: the wall follows
+    assert call("set_storey_elevation", upper["guid"], str(upper["elevation"] + 0.5))["ok"]
+    assert authoring._wall_height(b._model.by_guid(g)) == pytest.approx(expected + 0.5)
+    _, _, v, _ = mesh(g)
+    assert v[:, 2].max() == pytest.approx(lower["elevation"] + expected + 0.5, abs=1e-3)
+    # a typed height unlinks it
+    assert call("set_dimension", json.dumps([g]), "Height", "2.5")["ok"]
+    assert props(g)[C.GEOMETRY]["Top link"]["value"] == "Unlinked"
+    assert call("set_storey_elevation", upper["guid"], str(upper["elevation"] + 1.0))["ok"]
+    assert authoring._wall_height(b._model.by_guid(g)) == pytest.approx(2.5)

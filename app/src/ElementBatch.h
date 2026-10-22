@@ -140,9 +140,12 @@ public:
     double triangleTransparency(int i, uint32_t t) const;
     // D96: the palette index of triangle t's textured surface, or -1 (none, or an override colours it).
     int triangleTexture(int i, uint32_t t) const;
-    // Box-mapped texture coordinates of a point on a face with this normal (Archicad's default mapping):
-    // the two world axes the face is most parallel to, in texture repeats.
-    static std::pair<double, double> boxTexel(const gp_Pnt& p, const gp_Dir& normal, double w, double h);
+    // Texture coordinates of a point on a face with this normal, in texture repeats (Archicad's box mapping,
+    // D96): floors and roofs by plan x, y; other faces along their own horizontal direction (as seen from
+    // the side they face) and up. Measured from `origin` (an element's middle, base height): a picture as
+    // big as its face shows once, the right way round.
+    static std::pair<double, double> boxTexel(const gp_Pnt& p, const gp_Dir& normal, double w, double h,
+        const gp_Pnt& origin = gp_Pnt(0, 0, 0));
     // The visible elements' border lines grouped by style (one OCCT group each); `fallback` colours the
     // unstyled ones (1 px, solid).
     struct LineBucket {

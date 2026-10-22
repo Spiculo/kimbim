@@ -269,10 +269,14 @@ private slots:
         b->setSurface(2, Quantity_Color(0, 1, 0, Quantity_TOC_RGB)); // an override colours it plainly
         QCOMPARE(b->triangleTexture(2, 2), -1);
         auto uv = kimbim::ElementBatch::boxTexel(gp_Pnt(1.0, 2.0, 3.0), gp_Dir(0, -1, 0), 0.5, 0.25); // a wall facing -y
-        QCOMPARE(uv.first, 2.0);  // x / 0.5
+        QCOMPARE(uv.first, 2.5);  // x / 0.5 from the middle, plus half a picture: seen from -y, x runs right
         QCOMPARE(uv.second, 12.0); // z / 0.25
-        uv = kimbim::ElementBatch::boxTexel(gp_Pnt(1.0, 2.0, 3.0), gp_Dir(0, 0, 1), 1.0, 1.0); // a floor
-        QCOMPARE(uv.second, 2.0);
+        uv = kimbim::ElementBatch::boxTexel(gp_Pnt(1.0, 2.0, 3.0), gp_Dir(0, 1, 0), 0.5, 0.25); // facing +y
+        QCOMPARE(uv.first, -1.5); // seen from +y, x runs left
+        uv = kimbim::ElementBatch::boxTexel(gp_Pnt(1.0, 1.0, 0.0), gp_Dir(-M_SQRT1_2, M_SQRT1_2, 0), 1.0, 1.0);
+        QVERIFY(std::abs(uv.first - (0.5 - M_SQRT2)) < 1e-9); // a face at 45 degrees: along itself, not stretched
+        uv = kimbim::ElementBatch::boxTexel(gp_Pnt(1.0, 2.0, 3.0), gp_Dir(0, 0, 1), 1.0, 1.0, gp_Pnt(1.0, 1.0, 0)); // a floor
+        QCOMPARE(uv.second, 1.5);
     }
 
     void acceptsShadedIdLinesAndWhiteModes()

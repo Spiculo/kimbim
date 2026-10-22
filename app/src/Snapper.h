@@ -15,11 +15,22 @@ class InputAids;
 class UnderlaySnapIndex;
 
 // A wall's axis on the active level (from app_bridge.snap_data), in metres.
+// D97: a curved wall's arc (world metres, radians; the sweep counter-clockwise positive).
+struct SnapArc {
+    QPointF c;
+    double r = 0.0, a0 = 0.0, sweep = 0.0;
+    QPointF at(double t) const; // t in 0..1 along the arc
+    double length() const { return std::abs(r * sweep); }
+    // The nearest point on the arc and how far along it is (0..1); false when beyond its ends.
+    bool project(QPointF p, QPointF* q, double* t = nullptr) const;
+};
+
 struct SnapWall {
     QString guid;
     QPointF a, b;
     double thickness = 0.0;
     double centre = 0.0; // D97: the body's middle, to the axis' left (a wall drawn by a face)
+    std::optional<SnapArc> arc; // D97: a curved wall (a and b its ends)
 };
 
 // A grid axis (from app_bridge.snap_data "grid"), in metres.

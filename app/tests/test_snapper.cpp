@@ -3,6 +3,7 @@
 #include <QJsonObject>
 #include <QtTest>
 
+#include "HostTool.h"
 #include "Snapper.h"
 
 #include <cmath>
@@ -93,6 +94,27 @@ private slots:
         Snapper w = withWalls();
         w.setSnapGrid(QPointF(0, 0), 0.0, 1.0);
         QCOMPARE(w.snap(QPointF(3.98, 0.02), 0.1).kind, Snap::Endpoint);
+    }
+
+    // D97: a curved wall snaps at its ends, its arc's middle and anywhere along the arc.
+    void curvedWalls()
+    {
+        Snapper s;
+        s.setWalls(Snapper::parse(QJsonDocument::fromJson(R"({"walls":[{"guid":"A","x1":5,"y1":0,"x2":-5,"y2":0,
+            "thickness":0.3,"centre":0,"arc":{"cx":0,"cy":0,"r":5,"a0":0,"sweep":3.141592653589793}}]})").object()));
+        QCOMPARE(s.snap(QPointF(4.98, 0.03), 0.1).kind, Snap::Endpoint);
+        const Snap mid = s.snap(QPointF(0.02, 5.03), 0.1);
+        QCOMPARE(mid.kind, Snap::Midpoint);
+        QVERIFY(near(mid.point, QPointF(0, 5), 1e-9));
+        const Snap on = s.snap(QPointF(3.0, 4.05), 0.1);
+        QCOMPARE(on.kind, Snap::OnWall);
+        QVERIFY(std::abs(std::hypot(on.point.x(), on.point.y()) - 5.0) < 1e-9);
+        QCOMPARE(s.snap(QPointF(0.0, 0.0), 0.1).kind == Snap::OnWall, false); // the chord is no wall
+        // doors: along the arc, across from the body
+        const auto host = kimbim::HostTool::locate(s.walls(), QPointF(0.0, 4.95), 0.9, 0.05);
+        QVERIFY(host);
+        QVERIFY(std::abs(host->along - M_PI * 2.5) < 0.02);
+        QVERIFY(std::hypot(host->centre.x(), host->centre.y() - 5.0) < 0.06);
     }
 
     // D97: a wall drawn by a face: its faces are where the body is, not about the axis.

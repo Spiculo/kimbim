@@ -7,6 +7,7 @@
 #include "Scene.h"
 #include "Icons.h"
 #include "StatusStrip.h"
+#include "LibraryPanel.h"
 #include "ToolOptionsBar.h"
 #include "ToolPalette.h"
 #include "ViewCube.h"
@@ -39,6 +40,7 @@
 #include <QListWidget>
 #include <QDir>
 #include <QFormLayout>
+#include <QDateTimeEdit>
 #include <QDialogButtonBox>
 #include <QDialog>
 #include <QMenu>
@@ -119,6 +121,29 @@
 #include "DraftTool.h"
 
 namespace kimbim {
+
+namespace {
+
+// D97: the tools whose settings can be favourites, by a name kept in the project.
+QString favouriteTool(MainWindow::Tool tool)
+{
+    using T = MainWindow::Tool;
+    switch (tool) {
+    case T::Wall: return QStringLiteral("wall");
+    case T::Slab: return QStringLiteral("slab");
+    case T::Door: return QStringLiteral("door");
+    case T::Window: return QStringLiteral("window");
+    case T::Column: return QStringLiteral("column");
+    case T::Beam: return QStringLiteral("beam");
+    case T::Roof: return QStringLiteral("roof");
+    case T::Stair: return QStringLiteral("stair");
+    case T::Railing: return QStringLiteral("railing");
+    case T::Object: return QStringLiteral("object");
+    default: return QString();
+    }
+}
+
+} // namespace
 
 void readDrafting(const QJsonObject& o, Viewport::Annotation* a); // D84, DraftTools.cpp
 void readStairSymbols(const QJsonObject& data, QVector<Viewport::Annotation>* list); // D88, StairTools.cpp
@@ -493,6 +518,18 @@ void MainWindow::buildMenus()
         ->setToolTip(tr("Mirror the selection: click two points of the mirror line (hold Ctrl on the second click to mirror a copy)"));
     editAction(tr("Multi&ply..."), "actionMultiply", QKeySequence(Qt::CTRL | Qt::Key_U), [this] { multiplyDialog(); });
     editAction(tr("&Offset..."), "actionOffset", QKeySequence(), [this] { offsetDialog(); });
+    editAction(tr("Resi&ze..."), "actionResize", QKeySequence(), [this] { // D98: Archicad's Resize
+        if (m_selection.isEmpty()) {
+            m_status->showMessage(tr("Select what to resize first"));
+            return;
+        }
+        bool ok = false;
+        const double factor = QInputDialog::getDouble(this, tr("Resize"),
+            tr("Scale factor (lengths and positions, about the selection's middle; thicknesses and door sizes stay):"),
+            1.0, 0.01, 100.0, 3, &ok);
+        if (ok)
+            resizeSelection(factor);
+    })->setToolTip(tr("Scale the selection: walls, slabs and 2D shapes take new lengths, other elements move"));
     editAction(tr("&Fillet/Chamfer..."), "actionFillet", QKeySequence(), [this] { filletDialog(); }) // D98
         ->setToolTip(tr("Round or cut the corners of the selected slabs, polylines and fills, or of two walls meeting at a corner"));
     // D78: selection tools (Archicad's Find & Select; Revit's Select All Instances).
@@ -563,6 +600,10 @@ void MainWindow::buildMenus()
     shadows->setCheckable(true);
     shadows->setToolTip(tr("The sun casts shadows in the 3D views"));
     connect(shadows, &QAction::toggled, m_viewport, &Viewport::setShadows);
+    QAction* sunAction = view->addAction(tr("S&un...")); // D96: Archicad's Sun settings
+    sunAction->setObjectName(QStringLiteral("actionSun"));
+    sunAction->setToolTip(tr("Where the sun is: an azimuth and altitude, or a place, date and time"));
+    connect(sunAction, &QAction::triggered, this, &MainWindow::sunDialog);
     QAction* trueWeights = view->addAction(tr("&True line weights"));
     trueWeights->setObjectName(QStringLiteral("actionTrueLineWeights"));
     trueWeights->setCheckable(true);
@@ -2164,6 +2205,17 @@ void MainWindow::buildModelingToolbar()
         if (!m_levels->activeStorey().isEmpty())
             tagAll();
     });
+    // D98: Archicad's Automatic Dimensioning: the selected walls' ends and openings, outside their faces.
+    QAction* autoDims = model->addAction(tr("&Dimension selected walls..."));
+    autoDims->setObjectName(QStringLiteral("actionAutoDimension"));
+    autoDims->setToolTip(tr("A dimension chain along each selected wall: its ends and its doors' and windows' edges"));
+    connect(autoDims, &QAction::triggered, this, [this] {
+        bool ok = false;
+        const double offset = QInputDialog::getDouble(this, tr("Dimension selected walls"),
+            tr("Distance of the dimension line from the wall's outside face (m):"), 0.8, 0.0, 100.0, 2, &ok);
+        if (ok)
+            autoDimension(offset);
+    });
     model->addSeparator();
     model->addAction(m_levels->addLevelAction()); // D75: also in the level drop-down
     model->addAction(m_levels->levelsAction());   // D79: the levels table, also in the drop-down
@@ -2245,6 +2297,36 @@ void MainWindow::buildModelingToolbar()
     for (const QString& k : {QStringLiteral("existing"), QStringLiteral("demolish")})
         connect(unmarkedMenu->addAction(renovationLabel(k)), &QAction::triggered, this, [this, k] { markUnmarked(k); });
 
+    // D97: Archicad's Favourites: saved settings of the active tool, first in its strip.
+    m_favourites = new QToolButton(bar);
+    m_favourites->setObjectName(QStringLiteral("favouritesButton"));
+    m_favourites->setText(tr("Favourites"));
+    m_favourites->setToolTip(tr("Favourites: apply saved settings of this tool, or save the current ones"));
+    m_favourites->setPopupMode(QToolButton::InstantPopup);
+    auto* favMenu = new QMenu(m_favourites);
+    m_favourites->setMenu(favMenu);
+    connect(favMenu, &QMenu::aboutToShow, this, [this, favMenu] {
+        favMenu->clear();
+        const QStringList names = favouriteNames();
+        for (const QString& name : names)
+            connect(favMenu->addAction(name), &QAction::triggered, this, [this, name] { applyFavourite(name); });
+        if (names.isEmpty())
+            favMenu->addAction(tr("(none for this tool yet)"))->setEnabled(false);
+        favMenu->addSeparator();
+        connect(favMenu->addAction(tr("Save current settings as...")), &QAction::triggered, this, [this] {
+            bool ok = false;
+            const QString name = QInputDialog::getText(this, tr("Favourites"), tr("Name:"), QLineEdit::Normal,
+                QString(), &ok);
+            if (ok && !name.trimmed().isEmpty())
+                saveFavourite(name.trimmed());
+        });
+        if (!names.isEmpty()) {
+            QMenu* remove = favMenu->addMenu(tr("Delete"));
+            for (const QString& name : names)
+                connect(remove->addAction(name), &QAction::triggered, this, [this, name] { deleteFavourite(name); });
+        }
+    });
+    bar->addField(m_favourites);
     m_types = new QComboBox(bar);
     m_types->setObjectName(QStringLiteral("typeCombo"));
     m_types->setToolTip(tr("Type"));
@@ -2580,7 +2662,7 @@ void MainWindow::buildModelingToolbar()
             m_rotateTool->click(p);
             break;
         case Tool::Stretch:
-            if (!m_gripTool->isDragging() && draftGripClick(p, tolerance, ortho))
+            if (!m_gripTool->isDragging() && draftGripClick(p, tolerance, ortho, mods & Qt::ControlModifier))
                 break; // D84: a drafting shape's point
             m_gripTool->setTolerance(tolerance);
             m_gripTool->setOrtho(ortho);
@@ -2977,6 +3059,7 @@ void MainWindow::setTool(Tool tool)
     m_wallGeometry->setVisible(tool == Tool::Wall);
     m_objectGravity->setVisible(tool == Tool::Object);
     m_objectFit->setVisible(tool == Tool::Object);
+    m_favourites->setVisible(!favouriteTool(tool).isEmpty());
     if (tool == Tool::Wall) {
         const int i = m_wallReference->findData(m_settings.value("wall_reference_line").toString(QStringLiteral("Outside face")));
         m_wallReference->setCurrentIndex(std::max(0, i));
@@ -6109,6 +6192,154 @@ bool MainWindow::saveWallProfile(const QString& shapeGuid, const QString& name)
     return true;
 }
 
+
+QJsonObject MainWindow::captureToolSettings() const
+{
+    QJsonObject fields;
+    for (QWidget* w : m_toolOptions->findChildren<QWidget*>()) {
+        const QString name = w->objectName();
+        if (name.isEmpty() || name == QLatin1String("favouritesButton") || !w->isVisibleTo(m_toolOptions))
+            continue;
+        if (auto* combo = qobject_cast<QComboBox*>(w)) {
+            // types by name (their ids are the project's); other choices by their key, else their text
+            const QVariant data = combo->currentData();
+            fields.insert(name, combo == m_types || !data.isValid() || data.typeId() == QMetaType::QJsonObject
+                    ? combo->currentText() : data.toString());
+        } else if (auto* spin = qobject_cast<QDoubleSpinBox*>(w)) {
+            fields.insert(name, spin->value());
+        } else if (auto* ispin = qobject_cast<QSpinBox*>(w)) {
+            fields.insert(name, ispin->value());
+        } else if (auto* check = qobject_cast<QCheckBox*>(w)) {
+            fields.insert(name, check->isChecked());
+        }
+    }
+    QJsonObject out{{"tool", favouriteTool(m_tool)}, {"fields", fields}};
+    if (m_tool == Tool::Object && m_library && !m_library->currentObject().isEmpty())
+        out.insert("object", QJsonObject{{"id", m_library->currentObject()}, {"params", m_library->currentParams()}});
+    return out;
+}
+
+bool MainWindow::applyToolSettings(const QJsonObject& favourite)
+{
+    const QString key = favourite.value("tool").toString();
+    Tool tool = Tool::None;
+    for (Tool t : {Tool::Wall, Tool::Slab, Tool::Door, Tool::Window, Tool::Column, Tool::Beam, Tool::Roof, Tool::Stair,
+             Tool::Railing, Tool::Object})
+        if (favouriteTool(t) == key)
+            tool = t;
+    if (tool == Tool::None)
+        return false;
+    if (tool == Tool::Object) { // the object first: choosing it starts the tool
+        const QJsonObject o = favourite.value("object").toObject();
+        if (!chooseObject(o.value("id").toString(), {}))
+            return false;
+        const QJsonObject params = o.value("params").toObject();
+        for (auto it = params.begin(); it != params.end(); ++it)
+            m_library->setParam(it.key(), it.value());
+    } else if (m_tool != tool) {
+        setTool(tool);
+    }
+    const QJsonObject fields = favourite.value("fields").toObject();
+    for (auto it = fields.begin(); it != fields.end(); ++it) {
+        QWidget* w = m_toolOptions->findChild<QWidget*>(it.key());
+        if (auto* combo = qobject_cast<QComboBox*>(w)) {
+            int i = combo->findData(it.value().toString());
+            if (i < 0)
+                i = combo->findText(it.value().toString());
+            if (i >= 0)
+                combo->setCurrentIndex(i);
+        } else if (auto* spin = qobject_cast<QDoubleSpinBox*>(w)) {
+            spin->setValue(it.value().toDouble());
+        } else if (auto* ispin = qobject_cast<QSpinBox*>(w)) {
+            ispin->setValue(it.value().toInt());
+        } else if (auto* check = qobject_cast<QCheckBox*>(w)) {
+            check->setChecked(it.value().toBool());
+        }
+    }
+    updateToolPreview();
+    return true;
+}
+
+QStringList MainWindow::favouriteNames(bool forThisTool) const
+{
+    QStringList out;
+    const QJsonObject all = m_settings.value("favourites").toObject();
+    for (auto it = all.begin(); it != all.end(); ++it)
+        if (!forThisTool || it.value().toObject().value("tool").toString() == favouriteTool(m_tool))
+            out << it.key();
+    return out;
+}
+
+bool MainWindow::saveFavourite(const QString& name)
+{
+    if (favouriteTool(m_tool).isEmpty() || name.trimmed().isEmpty())
+        return false;
+    QJsonObject all = m_settings.value("favourites").toObject();
+    all.insert(name.trimmed(), captureToolSettings());
+    const QJsonObject r = bridge("set_project_settings", {QString::fromUtf8(QJsonDocument(
+        QJsonObject{{"favourites", all}}).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(r.value("error").toString());
+        return false;
+    }
+    m_settings = r.value("settings").toObject();
+    setWindowModified(isDirty());
+    m_status->showMessage(tr("Favourite %1 saved").arg(name.trimmed()));
+    return true;
+}
+
+bool MainWindow::applyFavourite(const QString& name)
+{
+    const QJsonObject favourite = m_settings.value("favourites").toObject().value(name).toObject();
+    if (favourite.isEmpty() || !applyToolSettings(favourite))
+        return false;
+    m_status->showMessage(tr("Favourite %1").arg(name));
+    return true;
+}
+
+bool MainWindow::deleteFavourite(const QString& name)
+{
+    QJsonObject all = m_settings.value("favourites").toObject();
+    if (!all.contains(name))
+        return false;
+    all.remove(name);
+    const QJsonObject r = bridge("set_project_settings", {QString::fromUtf8(QJsonDocument(
+        QJsonObject{{"favourites", all}}).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool())
+        return false;
+    m_settings = r.value("settings").toObject();
+    setWindowModified(isDirty());
+    return true;
+}
+
+bool MainWindow::resizeSelection(double factor)
+{
+    const QJsonObject r = bridge("resize_elements", {jsonList(m_selection), QString(), QString(),
+        QString::number(factor, 'g', 17)});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(tr("Could not resize: %1").arg(r.value("error").toString()));
+        return false;
+    }
+    afterEdit(r);
+    return true;
+}
+
+bool MainWindow::autoDimension(double offset)
+{
+    if (m_selection.isEmpty()) {
+        m_status->showMessage(tr("Select the walls to dimension"));
+        return false;
+    }
+    const QJsonObject r = bridge("auto_dimension", {jsonList(m_selection), QString::number(offset, 'g', 17)});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
+    m_status->showMessage(tr("%n dimension chain(s) added", nullptr, r.value("guids").toArray().size()));
+    return true;
+}
+
 bool MainWindow::pickUpSettings()
 {
     if (m_selection.size() != 1) {
@@ -6537,6 +6768,7 @@ void MainWindow::loadProjectSettings()
     const QSignalBlocker block(m_cutHeight);
     m_cutHeight->setValue(m_settings.value("plan_cut_height").toDouble(1.2));
     m_cutLabel->setText(formatLength(m_cutHeight->value()));
+    applySun(); // D96: the project's sun
     if (m_draftTool) { // D92: typed lengths (and a rectangle's width;height) in the project unit
         const QString unit = m_settings.value("length_unit").toString(QStringLiteral("m"));
         const double intoMetres = unit == QLatin1String("mm") ? 0.001 : unit == QLatin1String("cm") ? 0.01 : 1.0;
@@ -6555,6 +6787,86 @@ bool MainWindow::setProjectSettings(const QJsonObject& changes)
     m_settings = r.value("settings").toObject();
     setWindowModified(isDirty());
     refreshGraphics();
+    if (changes.contains("sun"))
+        applySun();
+    return true;
+}
+
+void MainWindow::applySun()
+{
+    const QJsonObject s = bridge("sun_state");
+    const QJsonArray d = s.value("direction").toArray();
+    if (d.size() == 3 && m_viewport)
+        m_viewport->scene()->setSunDirection(d[0].toDouble(), d[1].toDouble(), d[2].toDouble());
+}
+
+void MainWindow::sunDialog()
+{
+    // D96: Archicad's Sun: by azimuth and altitude, or for a place, date and time.
+    const QJsonObject current = m_settings.value("sun").toObject();
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Sun"));
+    dialog.setObjectName(QStringLiteral("sunDialog"));
+    auto* form = new QFormLayout(&dialog);
+    auto* mode = new QComboBox(&dialog);
+    mode->setObjectName(QStringLiteral("sunMode"));
+    mode->addItem(tr("By azimuth and altitude"), QStringLiteral("custom"));
+    mode->addItem(tr("By place, date and time"), QStringLiteral("time"));
+    mode->setCurrentIndex(std::max(0, mode->findData(current.value("mode").toString(QStringLiteral("custom")))));
+    form->addRow(tr("Sun:"), mode);
+    auto number = [&](const char* name, double value, double lo, double hi, int decimals, const QString& suffix) {
+        auto* s = new QDoubleSpinBox(&dialog);
+        s->setObjectName(QLatin1String(name));
+        s->setRange(lo, hi);
+        s->setDecimals(decimals);
+        s->setSuffix(suffix);
+        s->setValue(value);
+        return s;
+    };
+    auto* azimuth = number("sunAzimuth", current.value("azimuth").toDouble(135), 0, 360, 1, QStringLiteral(" °"));
+    auto* altitude = number("sunAltitude", current.value("altitude").toDouble(40), 0, 90, 1, QStringLiteral(" °"));
+    auto* latitude = number("sunLatitude", current.value("latitude").toDouble(-34.9), -90, 90, 4, QStringLiteral(" °"));
+    auto* longitude = number("sunLongitude", current.value("longitude").toDouble(-56.2), -180, 180, 4, QStringLiteral(" °"));
+    auto* offset = number("sunUtcOffset", current.value("utc_offset").toDouble(-3), -14, 14, 1, QStringLiteral(" h"));
+    auto* when = new QDateTimeEdit(QDateTime(QDate::fromString(current.value("date").toString(QStringLiteral("2026-12-21")), Qt::ISODate),
+        QTime::fromString(current.value("time").toString(QStringLiteral("15:00")), QStringLiteral("HH:mm"))), &dialog);
+    when->setObjectName(QStringLiteral("sunWhen"));
+    when->setDisplayFormat(QStringLiteral("yyyy-MM-dd HH:mm"));
+    form->addRow(tr("Azimuth (clockwise from north):"), azimuth);
+    form->addRow(tr("Altitude:"), altitude);
+    form->addRow(tr("Latitude:"), latitude);
+    form->addRow(tr("Longitude:"), longitude);
+    form->addRow(tr("Date and time:"), when);
+    form->addRow(tr("Hours from UTC:"), offset);
+    auto show = [&] {
+        const bool custom = mode->currentData().toString() == QLatin1String("custom");
+        for (QWidget* w : {static_cast<QWidget*>(azimuth), static_cast<QWidget*>(altitude)})
+            form->setRowVisible(w, custom);
+        for (QWidget* w : {static_cast<QWidget*>(latitude), static_cast<QWidget*>(longitude),
+                 static_cast<QWidget*>(when), static_cast<QWidget*>(offset)})
+            form->setRowVisible(w, !custom);
+    };
+    connect(mode, &QComboBox::currentIndexChanged, &dialog, show);
+    show();
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    form->addRow(buttons);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    setSun(QJsonObject{{"mode", mode->currentData().toString()}, {"azimuth", azimuth->value()},
+        {"altitude", altitude->value()}, {"latitude", latitude->value()}, {"longitude", longitude->value()},
+        {"date", when->date().toString(Qt::ISODate)}, {"time", when->time().toString(QStringLiteral("HH:mm"))},
+        {"utc_offset", offset->value()}});
+}
+
+bool MainWindow::setSun(const QJsonObject& sun)
+{
+    if (!setProjectSettings(QJsonObject{{"sun", sun}}))
+        return false;
+    const QJsonObject s = bridge("sun_state");
+    m_status->showMessage(tr("Sun at %1° azimuth, %2° altitude").arg(s.value("azimuth").toDouble(), 0, 'f', 1)
+                              .arg(s.value("altitude").toDouble(), 0, 'f', 1));
     return true;
 }
 

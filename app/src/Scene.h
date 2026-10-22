@@ -51,6 +51,9 @@ public:
         return linesOnly ? ElementBatch::LinesOnly : whiteModel ? ElementBatch::White : ElementBatch::Shaded;
     }
     void setShadows(bool on); // D96: the sun casts shadows (shadow map) in shaded and white views
+    // D96: where the sun is (a unit vector towards it, world plan axes); below the horizon it only lights.
+    void setSunDirection(double x, double y, double z);
+    gp_Dir sunDirection() const;
     bool shadows() const { return m_shadows; }
     Graphics graphics;        // D73: the current purpose, resolved
     bool trueWeights = false; // D73: View > True line weights

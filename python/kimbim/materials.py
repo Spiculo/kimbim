@@ -404,7 +404,12 @@ def face_colours(element, geometry, verts: np.ndarray, faces: np.ndarray, palett
             out[d < -SIDE] = palette.of_material(layers[0].Material)
             out[d > SIDE] = palette.of_material(layers[-1].Material)
     else:
-        styled = _iterator_colours(geometry, palette, n) if geometry is not None else None
+        single = ifcopenshell.util.element.get_material(element, should_skip_usage=True)
+        if single is not None and single.is_a("IfcMaterial") and texture_of(surface_of(single)).get("texture"):
+            out[:] = palette.of_material(single)  # D98: a textured material (a picture) shows its picture
+            styled = None
+        else:
+            styled = _iterator_colours(geometry, palette, n) if geometry is not None else None
         if styled is not None:
             out = styled
         missing = out == NO_COLOUR
@@ -1423,3 +1428,73 @@ def element_material(guid: str) -> str:
     info = _info(e)
     info.pop("for")
     return B._dump({"ok": True, **info})
+
+
+def place_picture_3d(storey_guid: str, path: str, width, x=0.0, y=0.0, angle=0.0, elevation=0.0) -> str:
+    """Archicad's Picture object (D98): a PNG or JPEG standing in the model, `width` metres wide (its
+    height from the picture's proportions), its bottom middle at (x, y), `elevation` metres above the
+    level, facing `angle` degrees from the plan's -Y (0: seen from the south). A thin panel whose own
+    building material carries the picture as its surface, so it shows once on each face (one undo step)."""
+    import pathlib
+
+    import ifcopenshell.api.root
+    import ifcopenshell.api.spatial
+
+    from . import authoring as A
+    from . import layers, underlays
+
+    if B._model is None:
+        return _fail("no model open")
+    p = pathlib.Path(path)
+    if p.suffix.lower() not in (".png", ".jpg", ".jpeg"):
+        return _fail("choose a PNG or JPEG picture")
+    try:
+        width, x, y, angle, elevation = float(width), float(x), float(y), float(angle), float(elevation)
+        pw, ph, _dpi = underlays._image_size(p)
+    except (OSError, ValueError, TypeError) as ex:
+        return _fail(str(ex))
+    if width <= 0 or pw <= 0 or ph <= 0:
+        return _fail("the picture needs a width and a size")
+    height = width * ph / pw
+    storey = A._by_guid(storey_guid)
+    if storey is None or not storey.is_a("IfcBuildingStorey"):
+        return _fail("unknown level")
+    f = B._model
+    made = {}
+
+    def action():
+        s = A._scale()
+        name = f"Picture: {p.stem}"
+        n, k = name, 2
+        while _material_by_name(f, n) is not None:
+            n, k = f"{name} ({k})", k + 1
+        material = ifcopenshell.api.material.add_material(f, name=n, category="picture" if _ifc4(f) else None)
+        style = make_surface(f, n, {"colour": "#ffffff", "transparency": 0.0, "shine": 0.0, "reflectance": "MATT"})
+        _write_texture(f, style, {"texture_path": str(p), "texture_size": [width, height]})
+        attach_surface(f, material, style)
+        e = ifcopenshell.api.root.create_entity(f, ifc_class="IfcBuildingElementProxy", name=n)
+        thickness = 0.01
+        profile = f.createIfcRectangleProfileDef("AREA", None, f.createIfcAxis2Placement2D(
+            f.createIfcCartesianPoint((0.0, 0.0)), None), width / s, thickness / s)
+        solid = f.createIfcExtrudedAreaSolid(profile, f.createIfcAxis2Placement3D(f.createIfcCartesianPoint((0.0, 0.0, 0.0)), None, None),
+                                             f.createIfcDirection((0.0, 0.0, 1.0)), height / s)
+        ifcopenshell.api.geometry.assign_representation(f, product=e, representation=f.createIfcShapeRepresentation(
+            A._body_context(), "Body", "SweptSolid", [solid]))
+        matrix = np.eye(4)
+        a = math.radians(angle)
+        matrix[:3, 0] = [math.cos(a), math.sin(a), 0.0]
+        matrix[:3, 1] = [-math.sin(a), math.cos(a), 0.0]
+        matrix[:3, 3] = [x, y, A._elevation(storey) + elevation]
+        ifcopenshell.api.geometry.edit_object_placement(f, product=e, matrix=matrix, is_si=True)
+        ifcopenshell.api.spatial.assign_container(f, products=[e], relating_structure=storey)
+        ifcopenshell.api.material.assign_material(f, products=[e], material=material)
+        layers.assign_active(e)
+        _sync_texture_files()
+        made["guid"] = e.GlobalId
+        return 1, [e.GlobalId], []
+
+    try:
+        r = B._run_settings(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "guid": made["guid"], "height": round(height, 6)})

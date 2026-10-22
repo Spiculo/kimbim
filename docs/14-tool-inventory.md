@@ -55,18 +55,18 @@ release notes, so check before relying on a single cell.
 | Touchpad navigation | all | ✅ | P0 | D89: two-finger scroll pans, Shift orbits, pinch zooms; scroll preference |
 | Walk / fly mode | AC RV VW SU | ⬜ | P2 | |
 | Hide, isolate, show all (per element, per level) | all | ✅ | P0 | |
-| Hide / isolate by class or type | all | ⬜ | P0 | |
+| Hide / isolate by class or type | all | ✅ | P0 | View › Hide / Isolate selected (I); Edit › Select all of this class / Select similar first |
 | Plan cut height | AC RV VW BB | ✅ | P1 | Slider beside the view |
 | Poché on cut elements | AC RV VW | ✅ | P1 | D96: fill from the building material; composites cut layer by layer |
 | Section box | AC RV VW BB | 🟡 | P0 | Around the selection; no drag handles |
-| Free clipping planes, several at once | AC RV BB | ⬜ | P0 | |
+| Free clipping planes, several at once | AC RV BB | ✅ | P0 | D95: the Cut planes panel (several, oblique, flip, offset) |
 | Saved views (layers, level, plan/3D, cut) | AC RV VW BB | ✅ | P1 | D57 |
 | Lines-only / hidden-line display | all | ✅ | — | L |
 | Visual styles: shaded, textured, sketch, X-ray | all | 🟡 | new | Shaded and lines only |
-| Shadows and sun position | AC RV VW SU | ⬜ | new | |
+| Shadows and sun position | AC RV VW SU | ✅ | new | D96: View › Sun shadows, View › Sun... (azimuth/altitude or place, date, time), White model |
 | Hover info (name, type, level) | AC RV VW | ✅ | — | |
 | Colour by property, class or type | AC RV VW BB | ✅ | P1 | D73 override rules (property, class, kind, layer, material) |
-| Show multiple levels at once (ghost story / underlay) | AC RV VW | ⬜ | new | Archicad Trace & Reference, Revit underlay |
+| Show multiple levels at once (ghost story / underlay) | AC RV VW | ✅ | new | D98: View › Trace reference (level below or above, snappable); Level above/below Ctrl+Up/Down |
 | Split views / several windows side by side | AC RV VW | ⬜ | new | |
 | Navigator / project browser (tree of views, sheets) | AC RV VW | 🟡 | new | Model tree, levels, views; no sheets |
 
@@ -81,7 +81,7 @@ release notes, so check before relying on a single cell.
 | Find & Select / query (by property values) | AC RV VW BB | ✅ | P0 | D78: Ctrl+F panel; class, kind, type, property, layer, level, status, material; AND/OR; saved criteria |
 | Selection sets (saved selections) | AC VW BB | ✅ | new | D78: in the project settings (versioned) |
 | Marquee (area selection for 2D export or editing) | AC | ⬜ | new | |
-| Magic wand (pick a shape from existing lines or edges) | AC VW | ⬜ | new | |
+| Magic wand (pick a shape from existing lines or edges) | AC VW | 🟡 | new | D84: fill from a closed shape or the area clicked in (fill_at) |
 | Tab cycling through overlapping elements | RV AC | ✅ | new | D89: Tab / Shift+Tab, the click selects the highlighted one |
 
 ## 4. Editing tools (general)
@@ -101,9 +101,9 @@ release notes, so check before relying on a single cell.
 | Trim, extend to boundary, split, join | all | 🟡 | new | D80: walls and beams (split, trim/extend to an element, a grid line or a corner, join/merge, unjoin; Shift+S, Shift+T, Shift+J). Not yet: 2D lines, curved walls |
 | Align (to an edge or face) | RV VW | ⬜ | new | |
 | Elevate (change vertical position) | AC RV | 🟡 | new | Wall height; no general elevate |
-| Resize / scale | AC VW SU | ⬜ | new | |
-| Pick up and inject settings (eyedropper / match properties) | AC RV VW | ⬜ | new | |
-| Edit by polygon points (add, move, delete vertices; curve an edge) | AC RV VW | ⬜ | new | Archicad pet palette |
+| Resize / scale | AC VW SU | ✅ | new | D98: Edit › Resize (about the selection's middle) |
+| Pick up and inject settings (eyedropper / match properties) | AC RV VW | ✅ | new | D97: Edit › Pick up / Inject settings (Ctrl+Alt+C / V) |
+| Edit by polygon points (add, move, delete vertices; curve an edge) | AC RV VW | 🟡 | new | D98: Stretch tool on slabs and 2D shapes: move, add at an edge's middle, Ctrl+click delete; no curved edges |
 | Solid element operations (subtract, intersect, add) | AC RV VW | ⬜ | new | |
 | Lock / pin elements | AC RV VW | 🟡 | new | Layers can be locked; elements cannot |
 | Group / ungroup | AC VW SU | 🟡 | P1 | Models (D58) do the repeated-unit job; no plain groups |
@@ -120,24 +120,24 @@ release notes, so check before relying on a single cell.
 | Guide lines, temporary references, inference lines | AC VW SU | 🟡 | new | D89: temporary guides (rest 0.5 s on a snap point), extensions and parallels; no dragged or permanent guide lines |
 | Snap to perpendicular, tangent, intersection, wall faces | all | 🟡 | P0 | D89: intersections and parallels added; no tangent |
 | Work planes (custom drawing planes) | AC RV VW SU | 🟡 | P0 | The active level only; D98 construction grid (spacing, angle, origin, grid snap) |
-| Tool presets / favourites (saved tool settings) | AC VW | ⬜ | new | Archicad Favourites |
+| Tool presets / favourites (saved tool settings) | AC VW | ✅ | new | D97: the Favourites button in the tool strip, kept in the project |
 
 ## 6. Building elements
 
 | Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Walls: straight, layered, L/T joins | all | ✅ | P0 | |
-| Walls: curved | all | ⬜ | new | |
+| Walls: curved | all | ✅ | new | D97: Wall tool › Curved (3 points), layered, doors/windows, stretch, split, fillet, mitred joins with straight and curved walls |
 | Walls: slanted, trapezoid, custom profile | AC RV VW | 🟡 | new | D97: slant angle; no double-slanted or complex profiles yet |
 | Wall flip, reference line (core / face) | all | ✅ | P0 | D97: six reference lines (outside face default), Model › Flip walls |
 | Junction priorities (which layers run through) | AC RV | ✅ | new | D97: building-material priority → `IfcMaterialLayer.Priority`, used by the wall regenerator |
-| Wall attached to a slab or roof above | AC RV | ⬜ | new | |
+| Wall attached to a slab or roof above | AC RV | 🟡 | new | D97: top linked to the level above (Properties › Geometry › Top link); Model › Trim walls to roof |
 | Slabs by outline or from walls | all | ✅ | P0 | |
 | Slab openings | all | ✅ | P0 | |
 | Sloped slabs, slab edges | AC RV VW | ⬜ | new | |
 | Doors and windows in walls (parametric) | all | ✅ | P0 | Basic types |
-| Door/window variety: sliding, double, corner window, skylight, storefront | all | ⬜ | new | |
-| Door swing and window symbols in plan | all | ⬜ | new | Check what the plan draws today |
+| Door/window variety: sliding, double, corner window, skylight, storefront | all | 🟡 | new | D97: double, sliding, double sliding doors; two- and three-panel windows; no corner windows, skylights or storefronts |
+| Door swing and window symbols in plan | all | ✅ | new | Door leaves and swing arcs in plan drawings (drawgen.door_swings) |
 | Generic opening (wall or slab hole without a filling) | AC RV VW | 🟡 | new | Slab openings only |
 | Columns, beams from profiles | all | ✅ | P0 | |
 | Slanted, tapered, segmented columns and beams | AC RV | ⬜ | new | |
@@ -240,7 +240,7 @@ release notes, so check before relying on a single cell.
 | Marks (circle with a tag) | AC | ✅ | P1 | |
 | Dimension chains, overall dimensions | all | 🟡 | P1 | Slice 15: chains (Shift+click); no overall dimension yet |
 | Snap dimensions to wall faces, openings and layers | all | 🟡 | P1 | Slice 15: wall faces; openings and layer lines later |
-| Automatic dimensioning of walls and openings | AC RV VW | ⬜ | new | |
+| Automatic dimensioning of walls and openings | AC RV VW | 🟡 | new | D98: Model › Dimension selected walls (a chain per straight wall: ends and openings); no overall or grid chains yet |
 | Angle, radius, arc-length, level and spot-elevation dimensions | all | 🟡 | P1 | D87: angle, radius, diameter, level (plan: slab top or level; sections: story levels) and spot elevation; no arc length yet |
 | Associative labels and tags (show a property, follow the element) | all | ✅ | P1 | D87: Tag tool and Tag all; templates of schedule fields; styles (door/window marker, wall tag, room stamp, mark, label) in project settings; IfcRelAssignsToProduct |
 | Leaders and arrows | all | ✅ | P1 | Slice 15: Leader tool (Shift+A) |
@@ -278,7 +278,7 @@ release notes, so check before relying on a single cell.
 
 | Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
-| Real-time textured 3D | all | ⬜ | new | |
+| Real-time textured 3D | all | ✅ | new | D96: surface pictures box-mapped; drawn defaults for brick, timber, tiles, stone, roof tiles |
 | Photorealistic rendering | AC RV VW | ⬜ | new | Archicad CineRender, Revit cloud render, Twinmotion link. Could export to Blender |
 | AI visualiser (sketch to image) | AC VW | 🔮 | new | |
 | Sun / shadow studies, animations | all | ⬜ | new | |

@@ -226,6 +226,20 @@ public:
     void setTraceMode(const QString& mode); // D98: "below", "above" or "" (off): Trace & Reference
     QString traceMode() const { return m_traceMode; }
     int traceSegments(const QString& storey); // D98: the shown trace's segment count (0: none)
+    // D97: Archicad's Favourites: the active tool's settings (its options bar's fields; the library
+    // object and its parameters) saved under a name in the project, and applied again.
+    QJsonObject captureToolSettings() const;
+    bool applyToolSettings(const QJsonObject& favourite);
+    bool saveFavourite(const QString& name);
+    bool applyFavourite(const QString& name);
+    bool deleteFavourite(const QString& name);
+    QStringList favouriteNames(bool forThisTool = true) const;
+    bool autoDimension(double offset); // D98: the selected walls, `offset` metres out from their faces
+    bool resizeSelection(double factor); // D98: Archicad's Resize, about the selection's middle
+    bool placePicture3d(const QString& path, double widthMetres, QPointF at); // D98: Archicad's Picture object
+    bool setSun(const QJsonObject& sun);  // D96: the project's sun (sun.py's setting), applied to the 3D light
+    void applySun();
+    void sunDialog();
     bool pickUpSettings(); // D97: Archicad's eyedropper, from the one selected element
     bool injectSettings(); // and syringe, into the selection
     // D98: Archicad's Grid System on the active level (one undo step).
@@ -355,7 +369,10 @@ public:
     QJsonObject draftOptions(const QString& kind) const;
     // Stretch tool on a drafting shape (D84 grips): a click near one of its points picks it up, the
     // next click puts it down. False when nothing was near (the wall stretch goes on).
-    bool draftGripClick(QPointF p, double tolerance, bool ortho);
+    // The Stretch tool on outlines (drafting shapes, D84; slabs, D98, Archicad's pet palette): a click on a
+    // point picks it up and the next puts it down; Ctrl+click on a point deletes it; a click on the middle
+    // of an edge adds a point there and picks it up.
+    bool draftGripClick(QPointF p, double tolerance, bool ortho, bool remove = false);
     bool draftGripActive() const { return m_gripIndex >= 0; }
     // D87: the annotation pack (MarkupTools.cpp). Tag: click an element (with the leader on, then where
     // the text goes); north arrow, scale bar, revision cloud (drawn like a fill), angle (vertex, a point
@@ -673,6 +690,7 @@ private:
     QSpinBox* m_draftOutline = nullptr; // D92: -1 the fill's pen, 0 none
     QComboBox* m_draftPatternScale = nullptr; // D92: paper or model
     bool m_gripRect = false; // D92: the gripped shape is a rectangle (stays rectangular when asked)
+    bool m_gripSlab = false; // D98: the gripped outline is a slab's
     QComboBox* m_tagStyle = nullptr;   // D87: Automatic (by kind) or a tag style
     QComboBox* m_tagShape = nullptr;   // the style's, or none / circle / box / hexagon
     QToolButton* m_tagLeader = nullptr;
@@ -708,6 +726,7 @@ private:
     QCheckBox* m_objectGravity = nullptr; // D97: objects land on the slab under them
     QCheckBox* m_objectFit = nullptr;     // D97: objects stand against the wall they are dropped by
     QComboBox* m_wallGeometry = nullptr;  // D97: straight or curved walls
+    QToolButton* m_favourites = nullptr;  // D97: Archicad's Favourites for the active tool
     // D98: Trace & Reference: the mode, and the traced plans by "storey|mode" (rebuilt after edits)
     QString m_traceMode;
     struct TraceEntry {

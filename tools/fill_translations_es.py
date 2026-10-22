@@ -1659,6 +1659,49 @@ ES = {
         "Redondear o cortar las esquinas de las losas, polilíneas y rellenos seleccionados, o de dos muros que forman una esquina",
     "Select slabs, polylines or fills, or the two walls of a corner, first":
         "Primero seleccione losas, polilíneas o rellenos, o los dos muros de una esquina",
+    "Favourites": "Favoritos",
+    "Favourites: apply saved settings of this tool, or save the current ones":
+        "Favoritos: aplicar parámetros guardados de esta herramienta o guardar los actuales",
+    "(none for this tool yet)": "(ninguno para esta herramienta aún)",
+    "Save current settings as...": "Guardar parámetros actuales como...",
+    "Favourite %1 saved": "Favorito %1 guardado",
+    "Favourite %1": "Favorito %1",
+    "&Dimension selected walls...": "A&cotar muros seleccionados...",
+    "A dimension chain along each selected wall: its ends and its doors' and windows' edges":
+        "Una cadena de cotas a lo largo de cada muro seleccionado: sus extremos y los bordes de sus puertas y ventanas",
+    "Dimension selected walls": "Acotar muros seleccionados",
+    "Distance of the dimension line from the wall's outside face (m):": "Distancia de la línea de cota a la cara exterior del muro (m):",
+    "Select the walls to dimension": "Seleccione los muros a acotar",
+    "%n dimension chain(s) added": ("%n cadena de cotas agregada", "%n cadenas de cotas agregadas"),
+    "Resi&ze...": "Redimen&sionar...",
+    "Select what to resize first": "Primero seleccione lo que desea redimensionar",
+    "Resize": "Redimensionar",
+    "Scale factor (lengths and positions, about the selection's middle; thicknesses and door sizes stay):":
+        "Factor de escala (longitudes y posiciones, respecto al centro de la selección; espesores y tamaños de puertas se mantienen):",
+    "Scale the selection: walls, slabs and 2D shapes take new lengths, other elements move":
+        "Escalar la selección: muros, losas y formas 2D cambian de longitud, los demás elementos se desplazan",
+    "Could not resize: %1": "No se pudo redimensionar: %1",
+    "S&un...": "S&ol...",
+    "Where the sun is: an azimuth and altitude, or a place, date and time": "Dónde está el sol: acimut y altura, o lugar, fecha y hora",
+    "Sun": "Sol",
+    "By azimuth and altitude": "Por acimut y altura",
+    "By place, date and time": "Por lugar, fecha y hora",
+    "Sun:": "Sol:",
+    "Azimuth (clockwise from north):": "Acimut (horario desde el norte):",
+    "Altitude:": "Altura:",
+    "Latitude:": "Latitud:",
+    "Longitude:": "Longitud:",
+    "Date and time:": "Fecha y hora:",
+    "Hours from UTC:": "Horas respecto a UTC:",
+    "Sun at %1° azimuth, %2° altitude": "Sol a %1° de acimut y %2° de altura",
+    "It needs the points it has": "Necesita los puntos que tiene",
+    "Place picture in &3D...": "Colocar imagen en &3D...",
+    "A picture standing in the model at the origin of the active level: move it into place":
+        "Una imagen de pie en el modelo, en el origen del nivel activo: muévala a su lugar",
+    "Place picture in 3D": "Colocar imagen en 3D",
+    "Could not place the picture": "No se pudo colocar la imagen",
+    "Picture placed: move it into place (it faces south; rotate it to turn it)":
+        "Imagen colocada: muévala a su lugar (mira al sur; gírela para orientarla)",
 }
 
 

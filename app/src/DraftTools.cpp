@@ -268,8 +268,22 @@ bool MainWindow::fillAt(QPointF p)
     return true;
 }
 
-bool MainWindow::draftGripClick(QPointF p, double tolerance, bool ortho)
+bool MainWindow::draftGripClick(QPointF p, double tolerance, bool ortho, bool remove)
 {
+    auto send = [this](const QVector<QPointF>& pts) {
+        QJsonArray arr;
+        for (const QPointF& q : pts)
+            arr.append(QJsonArray{q.x(), q.y()});
+        const QJsonObject r = m_gripSlab ? bridge("set_slab_outline", {m_gripGuid, compact(arr)})
+                                         : bridge("set_annotation_points", {m_gripGuid, compact(arr)});
+        if (!r.value("ok").toBool()) {
+            m_status->showMessage(tr("Could not move the point: %1").arg(r.value("error").toString()));
+            return false;
+        }
+        afterEdit(r);
+        refreshSnapData();
+        return true;
+    };
     if (m_gripIndex >= 0) { // put the point down, snapped
         QVector<QPointF> pts = m_gripPoints;
         const QPointF from = pts[(m_gripIndex + 1) % pts.size()];
@@ -289,43 +303,86 @@ bool MainWindow::draftGripClick(QPointF p, double tolerance, bool ortho)
         m_gripIndex = -1;
         m_gripRect = false;
         m_viewport->setPreviewBoxes({});
-        QJsonArray arr;
-        for (const QPointF& q : pts)
-            arr.append(QJsonArray{q.x(), q.y()});
-        const QJsonObject r = bridge("set_annotation_points", {m_gripGuid, compact(arr)});
-        if (!r.value("ok").toBool()) {
-            m_status->showMessage(tr("Could not move the point: %1").arg(r.value("error").toString()));
-            return true;
-        }
-        afterEdit(r);
-        refreshSnapData();
+        send(pts);
         return true;
     }
-    // Pick up the nearest point of a drafting shape on the level (selected shapes first).
-    double best = tolerance;
+    // The outlines on the level: drafting shapes and (D98) slabs.
+    struct Outline {
+        QString guid;
+        QVector<QPointF> pts;
+        bool closed = false, rect = false, slab = false;
+    };
+    QVector<Outline> outlines;
     for (const auto& v : bridge("annotations", {m_levels->activeStorey()}).value("annotations").toArray()) {
         const QJsonObject o = v.toObject();
         Viewport::Annotation a;
         a.kind = o.value("kind").toString();
         if (!a.isDrafting() || m_viewport->isLocked(o.value("guid").toString()))
             continue;
-        QVector<QPointF> pts;
+        Outline out{o.value("guid").toString(), {}, o.value("closed").toBool(), o.value("rect").toBool(), false};
         for (const auto& q : o.value("points").toArray())
-            pts << point(q);
-        for (int i = 0; i < pts.size(); ++i) {
-            const double d = std::hypot(pts[i].x() - p.x(), pts[i].y() - p.y());
+            out.pts << point(q);
+        outlines << out;
+    }
+    for (const auto& v : bridge("slab_outlines", {m_levels->activeStorey()}).value("slabs").toArray()) {
+        const QJsonObject o = v.toObject();
+        if (m_viewport->isLocked(o.value("guid").toString()))
+            continue;
+        Outline out{o.value("guid").toString(), {}, true, false, true};
+        for (const auto& q : o.value("points").toArray())
+            out.pts << point(q);
+        outlines << out;
+    }
+    // the nearest point, or (adding a point) the nearest edge's middle
+    double best = tolerance;
+    const Outline* hit = nullptr;
+    int index = -1;
+    bool middle = false;
+    for (const Outline& o : outlines) {
+        for (int i = 0; i < o.pts.size(); ++i) {
+            const double d = std::hypot(o.pts[i].x() - p.x(), o.pts[i].y() - p.y());
             if (d <= best) {
                 best = d;
-                m_gripGuid = o.value("guid").toString();
-                m_gripIndex = i;
-                m_gripPoints = pts;
-                m_gripRect = o.value("rect").toBool();
+                hit = &o;
+                index = i;
+                middle = false;
+            }
+        }
+        const int edges = o.closed ? o.pts.size() : o.pts.size() - 1;
+        for (int i = 0; !remove && !o.rect && i < edges; ++i) {
+            const QPointF m = (o.pts[i] + o.pts[(i + 1) % o.pts.size()]) / 2;
+            const double d = std::hypot(m.x() - p.x(), m.y() - p.y());
+            if (d <= best) {
+                best = d;
+                hit = &o;
+                index = i;
+                middle = true;
             }
         }
     }
-    if (m_gripIndex >= 0)
-        m_status->showMessage(tr("Click the point's new position (Esc: leave it)"));
-    return m_gripIndex >= 0;
+    if (!hit)
+        return false;
+    m_gripGuid = hit->guid;
+    m_gripSlab = hit->slab;
+    m_gripRect = hit->rect;
+    if (remove) { // D98: delete the point
+        if (hit->pts.size() <= (hit->closed ? 3 : 2)) {
+            m_status->showMessage(tr("It needs the points it has"));
+            return true;
+        }
+        QVector<QPointF> pts = hit->pts;
+        pts.remove(index);
+        send(pts);
+        return true;
+    }
+    m_gripPoints = hit->pts;
+    m_gripIndex = index;
+    if (middle) { // D98: a new point in the edge's middle, picked up
+        m_gripPoints.insert(index + 1, (hit->pts[index] + hit->pts[(index + 1) % hit->pts.size()]) / 2);
+        m_gripIndex = index + 1;
+    }
+    m_status->showMessage(tr("Click the point's new position (Esc: leave it)"));
+    return true;
 }
 
 void MainWindow::updateDraftPreview()

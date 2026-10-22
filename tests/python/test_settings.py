@@ -103,3 +103,13 @@ def test_new_dimensions_are_labelled_in_the_project_unit():
 def _defaults(settings: dict) -> bool:
     """The defaults, but for the pictures a new project's catalogue surfaces carry (D96)."""
     return {k: v for k, v in settings.items() if k != "texture_files"} ==         {k: v for k, v in S.DEFAULTS.items() if k != "texture_files"}
+
+
+def test_favourites_are_kept_with_the_project():
+    """D97: Archicad's Favourites: named tool settings, saved in the project's settings."""
+    assert json.loads(b.new_project("Fav"))["ok"]
+    fav = {"Brick 3 m": {"tool": "wall", "fields": {"wallHeight": 3.0, "wallReference": "Outside face"}}}
+    assert json.loads(b.set_project_settings(json.dumps({"favourites": fav})))["ok"]
+    assert json.loads(b.project_settings())["settings"]["favourites"] == fav
+    assert not json.loads(b.set_project_settings(json.dumps({"favourites": {"x": {"fields": {}}}})))["ok"]
+    assert not json.loads(b.set_project_settings(json.dumps({"favourites": []})))["ok"]

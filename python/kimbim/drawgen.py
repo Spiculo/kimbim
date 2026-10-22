@@ -410,6 +410,16 @@ def door_swings(door, to_paper):
         return to_paper(p[0], p[1], z)
 
     op = _operation(door)
+    if "SLIDING" in op:  # D97: sliding leaves, as two overlapping panels in the wall's middle
+        panels = 2 if op == "DOUBLE_DOOR_SLIDING" else 1
+        lap = 0.05
+        out = []
+        for i in range(panels * 2 if panels == 2 else 2):
+            lo = width / (panels * 2) * i - (lap if i else 0.0)
+            hi = width / (panels * 2) * (i + 1) + (lap if i < (panels * 2 if panels == 2 else 2) - 1 else 0.0)
+            y = t / 2 + (0.02 if i % 2 else -0.02)
+            out.append(_path([world(max(lo, 0.0), y), world(min(hi, width), y)]))
+        return out
     if op.startswith("DOUBLE_DOOR"):
         leaves = [(0.0, width / 2, 1), (width, width / 2, -1)]
     elif op.endswith("RIGHT"):
