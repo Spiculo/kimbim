@@ -1,0 +1,1520 @@
+{
+ "base_cabinets": {
+  "default": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    2.4,
+    0.6,
+    0.9
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    2.4,
+    0.6
+   ],
+   "symbol_length": 6.24,
+   "values": {
+    "depth": 0.6,
+    "height": 0.9,
+    "units": 4,
+    "width": 2.4
+   },
+   "volume": 1.24752
+  },
+  "large": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    3.0,
+    0.75,
+    1.125
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    3.0,
+    0.75
+   ],
+   "symbol_length": 7.82,
+   "values": {
+    "depth": 0.75,
+    "height": 1.125,
+    "units": 5,
+    "width": 3.0
+   },
+   "volume": 2.45715
+  },
+  "small": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    1.92,
+    0.48,
+    0.72
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    1.92,
+    0.48
+   ],
+   "symbol_length": 4.8,
+   "values": {
+    "depth": 0.48,
+    "height": 0.72,
+    "units": 1,
+    "width": 1.92
+   },
+   "volume": 0.63168
+  }
+ },
+ "bathtub": {
+  "default": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    1.7,
+    0.75,
+    0.55
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    1.7,
+    0.75
+   ],
+   "symbol_length": 9.009929,
+   "values": {
+    "depth": 0.75,
+    "height": 0.55,
+    "width": 1.7
+   },
+   "volume": 0.213504
+  },
+  "large": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    2.125,
+    0.9375,
+    0.6875
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    2.125,
+    0.9375
+   ],
+   "symbol_length": 11.311728,
+   "values": {
+    "depth": 0.9375,
+    "height": 0.6875,
+    "width": 2.125
+   },
+   "volume": 0.3411015
+  },
+  "small": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    1.36,
+    0.6,
+    0.44
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    1.36,
+    0.6
+   ],
+   "symbol_length": 7.168595,
+   "values": {
+    "depth": 0.6,
+    "height": 0.44,
+    "width": 1.36
+   },
+   "volume": 0.132864
+  }
+ },
+ "bed_double": {
+  "default": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    1.6,
+    2.0,
+    0.9
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    1.6,
+    2.0
+   ],
+   "symbol_length": 15.813158,
+   "values": {
+    "depth": 2.0,
+    "height": 0.5,
+    "width": 1.6
+   },
+   "volume": 1.321
+  },
+  "large": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    2.0,
+    2.5,
+    1.025
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    2.0,
+    2.5
+   ],
+   "symbol_length": 19.605937,
+   "values": {
+    "depth": 2.5,
+    "height": 0.625,
+    "width": 2.0
+   },
+   "volume": 2.676
+  },
+  "small": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    1.28,
+    1.6,
+    0.8
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    1.28,
+    1.6
+   ],
+   "symbol_length": 12.781675,
+   "values": {
+    "depth": 1.6,
+    "height": 0.4,
+    "width": 1.28
+   },
+   "volume": 0.6474
+  }
+ },
+ "bed_single": {
+  "default": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.9,
+    2.0,
+    0.9
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    0.9,
+    2.0
+   ],
+   "symbol_length": 10.550402,
+   "values": {
+    "depth": 2.0,
+    "height": 0.5,
+    "width": 0.9
+   },
+   "volume": 0.7435
+  },
+  "large": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    1.125,
+    2.5,
+    1.025
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    1.125,
+    2.5
+   ],
+   "symbol_length": 13.114938,
+   "values": {
+    "depth": 2.5,
+    "height": 0.625,
+    "width": 1.125
+   },
+   "volume": 1.5056875
+  },
+  "small": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.72,
+    1.6,
+    0.8
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    0.72,
+    1.6
+   ],
+   "symbol_length": 8.50182,
+   "values": {
+    "depth": 1.6,
+    "height": 0.4,
+    "width": 0.72
+   },
+   "volume": 0.3646
+  }
+ },
+ "bidet": {
+  "default": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.38,
+    0.55,
+    0.4
+   ],
+   "symbol_bbox": [
+    0,
+    0.0,
+    0.38,
+    0.55
+   ],
+   "symbol_length": 3.367658,
+   "values": {
+    "depth": 0.55,
+    "height": 0.4,
+    "width": 0.38
+   },
+   "volume": 0.0703
+  },
+  "large": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.475,
+    0.6875,
+    0.5
+   ],
+   "symbol_bbox": [
+    0,
+    0.0,
+    0.475,
+    0.6875
+   ],
+   "symbol_length": 4.289243,
+   "values": {
+    "depth": 0.6875,
+    "height": 0.5,
+    "width": 0.475
+   },
+   "volume": 0.134335938
+  },
+  "small": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.304,
+    0.44,
+    0.32
+   ],
+   "symbol_bbox": [
+    0,
+    0.0,
+    0.304,
+    0.44
+   ],
+   "symbol_length": 2.630682,
+   "values": {
+    "depth": 0.44,
+    "height": 0.32,
+    "width": 0.304
+   },
+   "volume": 0.0369664
+  }
+ },
+ "car": {
+  "default": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    1.8,
+    4.5,
+    1.5
+   ],
+   "symbol_bbox": [
+    0.0,
+    0.0,
+    1.8,
+    4.5
+   ],
+   "symbol_length": 18.46347,
+   "values": {
+    "depth": 4.5,
+    "height": 1.5,
+    "width": 1.8
+   },
+   "volume": 7.05325927
+  },
+  "large": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    2.25,
+    5.625,
+    1.875
+   ],
+   "symbol_bbox": [
+    0.0,
+    0.0,
+    2.25,
+    5.625
+   ],
+   "symbol_length": 23.41347,
+   "values": {
+    "depth": 5.625,
+    "height": 1.875,
+    "width": 2.25
+   },
+   "volume": 14.426031145
+  },
+  "small": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    1.44,
+    3.6,
+    1.2
+   ],
+   "symbol_bbox": [
+    0.0,
+    0.0,
+    1.44,
+    3.6
+   ],
+   "symbol_length": 14.50347,
+   "values": {
+    "depth": 3.6,
+    "height": 1.2,
+    "width": 1.44
+   },
+   "volume": 3.44344567
+  }
+ },
+ "chair": {
+  "default": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.45,
+    0.5,
+    0.85
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    0.45,
+    0.5
+   ],
+   "symbol_length": 2.35,
+   "values": {
+    "depth": 0.5,
+    "height": 0.85,
+    "seat": 0.45,
+    "width": 0.45
+   },
+   "volume": 0.018824
+  },
+  "large": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.5625,
+    0.625,
+    1.0625
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    0.5625,
+    0.625
+   ],
+   "symbol_length": 2.9375,
+   "values": {
+    "depth": 0.625,
+    "height": 1.0625,
+    "seat": 0.5625,
+    "width": 0.5625
+   },
+   "volume": 0.0286565
+  },
+  "small": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.36,
+    0.4,
+    0.68
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    0.36,
+    0.4
+   ],
+   "symbol_length": 1.88,
+   "values": {
+    "depth": 0.4,
+    "height": 0.68,
+    "seat": 0.36,
+    "width": 0.36
+   },
+   "volume": 0.012416
+  }
+ },
+ "cooker": {
+  "default": {
+   "bbox": [
+    0.0,
+    0.02,
+    0.0,
+    0.6,
+    0.6,
+    0.9
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    0.6,
+    0.6
+   ],
+   "symbol_length": 6.547125,
+   "values": {
+    "burners": 4,
+    "depth": 0.6,
+    "height": 0.9,
+    "width": 0.6
+   },
+   "volume": 0.31242
+  },
+  "large": {
+   "bbox": [
+    0.0,
+    0.02,
+    0.0,
+    0.75,
+    0.75,
+    1.125
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    0.75,
+    0.75
+   ],
+   "symbol_length": 7.990104,
+   "values": {
+    "burners": 5,
+    "depth": 0.75,
+    "height": 1.125,
+    "width": 0.75
+   },
+   "volume": 0.6149475
+  },
+  "small": {
+   "bbox": [
+    0.0,
+    0.02,
+    0.0,
+    0.48,
+    0.48,
+    0.72
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    0.48,
+    0.48
+   ],
+   "symbol_length": 4.27186,
+   "values": {
+    "burners": 1,
+    "depth": 0.48,
+    "height": 0.72,
+    "width": 0.48
+   },
+   "volume": 0.158364
+  }
+ },
+ "desk": {
+  "default": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    1.4,
+    0.7,
+    0.75
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    1.4,
+    0.7
+   ],
+   "symbol_length": 4.2,
+   "values": {
+    "depth": 0.7,
+    "height": 0.75,
+    "width": 1.4
+   },
+   "volume": 0.06414
+  },
+  "large": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    1.75,
+    0.875,
+    0.9375
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    1.75,
+    0.875
+   ],
+   "symbol_length": 5.25,
+   "values": {
+    "depth": 0.875,
+    "height": 0.9375,
+    "width": 1.75
+   },
+   "volume": 0.104026875
+  },
+  "small": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    1.12,
+    0.56,
+    0.6
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    1.12,
+    0.56
+   ],
+   "symbol_length": 3.36,
+   "values": {
+    "depth": 0.56,
+    "height": 0.6,
+    "width": 1.12
+   },
+   "volume": 0.039129
+  }
+ },
+ "fridge": {
+  "default": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.6,
+    0.65,
+    1.85
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    0.6,
+    0.65
+   ],
+   "symbol_length": 3.955628,
+   "values": {
+    "depth": 0.65,
+    "height": 1.85,
+    "width": 0.6
+   },
+   "volume": 0.7203
+  },
+  "large": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.75,
+    0.8125,
+    2.3125
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    0.75,
+    0.8125
+   ],
+   "symbol_length": 4.951688,
+   "values": {
+    "depth": 0.8125,
+    "height": 2.3125,
+    "width": 0.75
+   },
+   "volume": 1.407679687
+  },
+  "small": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.48,
+    0.52,
+    1.48
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    0.48,
+    0.52
+   ],
+   "symbol_length": 3.158823,
+   "values": {
+    "depth": 0.52,
+    "height": 1.48,
+    "width": 0.48
+   },
+   "volume": 0.368448
+  }
+ },
+ "person": {
+  "default": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.5,
+    0.3,
+    1.75
+   ],
+   "symbol_bbox": [
+    0.0,
+    0.0,
+    0.5,
+    0.3
+   ],
+   "symbol_length": 1.980985,
+   "values": {
+    "depth": 0.3,
+    "height": 1.75,
+    "width": 0.5
+   },
+   "volume": 0.108335773
+  },
+  "large": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.625,
+    0.375,
+    2.1875
+   ],
+   "symbol_bbox": [
+    0.0,
+    0.0,
+    0.625,
+    0.375
+   ],
+   "symbol_length": 2.4759,
+   "values": {
+    "depth": 0.375,
+    "height": 2.1875,
+    "width": 0.625
+   },
+   "volume": 0.211593306
+  },
+  "small": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.4,
+    0.24,
+    1.4
+   ],
+   "symbol_bbox": [
+    0.0,
+    0.0,
+    0.4,
+    0.24
+   ],
+   "symbol_length": 1.584697,
+   "values": {
+    "depth": 0.24,
+    "height": 1.4,
+    "width": 0.4
+   },
+   "volume": 0.055467916
+  }
+ },
+ "shelf": {
+  "default": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.9,
+    0.35,
+    2.0
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    0.9,
+    0.35
+   ],
+   "symbol_length": 3.46566,
+   "values": {
+    "depth": 0.35,
+    "height": 2.0,
+    "shelves": 5,
+    "width": 0.9
+   },
+   "volume": 0.07444
+  },
+  "large": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    1.125,
+    0.4375,
+    2.5
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    1.125,
+    0.4375
+   ],
+   "symbol_length": 4.332075,
+   "values": {
+    "depth": 0.4375,
+    "height": 2.5,
+    "shelves": 6,
+    "width": 1.125
+   },
+   "volume": 0.1265355
+  },
+  "small": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.72,
+    0.28,
+    1.6
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    0.72,
+    0.28
+   ],
+   "symbol_length": 2.772528,
+   "values": {
+    "depth": 0.28,
+    "height": 1.6,
+    "shelves": 2,
+    "width": 0.72
+   },
+   "volume": 0.036144
+  }
+ },
+ "shower_tray": {
+  "default": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.9,
+    0.9,
+    0.05
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    0.9,
+    0.9
+   ],
+   "symbol_length": 6.396096,
+   "values": {
+    "depth": 0.9,
+    "height": 0.05,
+    "width": 0.9
+   },
+   "volume": 0.0405
+  },
+  "large": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    1.125,
+    1.125,
+    0.0625
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    1.125,
+    1.125
+   ],
+   "symbol_length": 7.932492,
+   "values": {
+    "depth": 1.125,
+    "height": 0.0625,
+    "width": 1.125
+   },
+   "volume": 0.079101562
+  },
+  "small": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.72,
+    0.72,
+    0.04
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    0.72,
+    0.72
+   ],
+   "symbol_length": 5.166979,
+   "values": {
+    "depth": 0.72,
+    "height": 0.04,
+    "width": 0.72
+   },
+   "volume": 0.020736
+  }
+ },
+ "sink_unit": {
+  "default": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    1.2,
+    0.6,
+    0.9
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    1.2,
+    0.6
+   ],
+   "symbol_length": 7.708201,
+   "values": {
+    "bowls": 1,
+    "depth": 0.6,
+    "height": 0.9,
+    "width": 1.2
+   },
+   "volume": 0.62376
+  },
+  "large": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    1.5,
+    0.75,
+    1.125
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    1.5,
+    0.75
+   ],
+   "symbol_length": 10.371219,
+   "values": {
+    "bowls": 2,
+    "depth": 0.75,
+    "height": 1.125,
+    "width": 1.5
+   },
+   "volume": 1.228575
+  },
+  "small": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.96,
+    0.48,
+    0.72
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    0.96,
+    0.48
+   ],
+   "symbol_length": 5.788201,
+   "values": {
+    "bowls": 1,
+    "depth": 0.48,
+    "height": 0.72,
+    "width": 0.96
+   },
+   "volume": 0.31584
+  }
+ },
+ "sofa": {
+  "default": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    2.0,
+    0.9,
+    0.8
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    2.0,
+    0.9
+   ],
+   "symbol_length": 10.6,
+   "values": {
+    "depth": 0.9,
+    "height": 0.8,
+    "seats": 3,
+    "width": 2.0
+   },
+   "volume": 0.9338
+  },
+  "large": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    2.5,
+    1.125,
+    1.0
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    2.5,
+    1.125
+   ],
+   "symbol_length": 14.325,
+   "values": {
+    "depth": 1.125,
+    "height": 1.0,
+    "seats": 4,
+    "width": 2.5
+   },
+   "volume": 1.547825
+  },
+  "small": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    1.6,
+    0.72,
+    0.64
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    1.6,
+    0.72
+   ],
+   "symbol_length": 7.38,
+   "values": {
+    "depth": 0.72,
+    "height": 0.64,
+    "seats": 1,
+    "width": 1.6
+   },
+   "volume": 0.554
+  }
+ },
+ "table": {
+  "default": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    1.6,
+    0.9,
+    0.75
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    1.6,
+    0.9
+   ],
+   "symbol_length": 5.0,
+   "values": {
+    "depth": 0.9,
+    "height": 0.75,
+    "width": 1.6
+   },
+   "volume": 0.067824
+  },
+  "large": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    2.0,
+    1.125,
+    0.9375
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    2.0,
+    1.125
+   ],
+   "symbol_length": 6.25,
+   "values": {
+    "depth": 1.125,
+    "height": 0.9375,
+    "width": 2.0
+   },
+   "volume": 0.102924
+  },
+  "small": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    1.28,
+    0.72,
+    0.6
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    1.28,
+    0.72
+   ],
+   "symbol_length": 4.0,
+   "values": {
+    "depth": 0.72,
+    "height": 0.6,
+    "width": 1.28
+   },
+   "volume": 0.044928
+  }
+ },
+ "tree": {
+  "default": {
+   "bbox": [
+    0.0,
+    0.097887,
+    0,
+    4.0,
+    3.902113,
+    6.0
+   ],
+   "symbol_bbox": [
+    0.0,
+    0.0,
+    4.0,
+    4.0
+   ],
+   "symbol_length": 23.47003,
+   "values": {
+    "height": 6.0,
+    "trunk": 0.3,
+    "width": 4.0
+   },
+   "volume": 32.954001716
+  },
+  "large": {
+   "bbox": [
+    0.0,
+    0.122359,
+    0,
+    5.0,
+    4.877641,
+    7.5
+   ],
+   "symbol_bbox": [
+    0.0,
+    0.0,
+    5.0,
+    5.0
+   ],
+   "symbol_length": 29.337708,
+   "values": {
+    "height": 7.5,
+    "trunk": 0.375,
+    "width": 5.0
+   },
+   "volume": 64.363284603
+  },
+  "small": {
+   "bbox": [
+    0.0,
+    0.07831,
+    0,
+    3.2,
+    3.12169,
+    4.8
+   ],
+   "symbol_bbox": [
+    0.0,
+    0.0,
+    3.2,
+    3.2
+   ],
+   "symbol_length": 18.776235,
+   "values": {
+    "height": 4.8,
+    "trunk": 0.24,
+    "width": 3.2
+   },
+   "volume": 16.872448879
+  }
+ },
+ "wall_cabinets": {
+  "default": {
+   "bbox": [
+    0.0,
+    0.0,
+    1.45,
+    1.2,
+    0.35,
+    2.15
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    1.2,
+    0.35
+   ],
+   "symbol_length": 5.95,
+   "values": {
+    "depth": 0.35,
+    "elevation": 1.45,
+    "height": 0.7,
+    "units": 2,
+    "width": 1.2
+   },
+   "volume": 0.294
+  },
+  "large": {
+   "bbox": [
+    0.0,
+    0.0,
+    1.8125,
+    1.5,
+    0.4375,
+    2.6875
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    1.5,
+    0.4375
+   ],
+   "symbol_length": 7.875,
+   "values": {
+    "depth": 0.4375,
+    "elevation": 1.8125,
+    "height": 0.875,
+    "units": 3,
+    "width": 1.5
+   },
+   "volume": 0.57421875
+  },
+  "small": {
+   "bbox": [
+    0.0,
+    0.0,
+    1.16,
+    0.96,
+    0.28,
+    1.72
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    0.96,
+    0.28
+   ],
+   "symbol_length": 4.48,
+   "values": {
+    "depth": 0.28,
+    "elevation": 1.16,
+    "height": 0.56,
+    "units": 1,
+    "width": 0.96
+   },
+   "volume": 0.150528
+  }
+ },
+ "wardrobe": {
+  "default": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    1.2,
+    0.6,
+    2.2
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    1.2,
+    0.6
+   ],
+   "symbol_length": 8.815451,
+   "values": {
+    "depth": 0.6,
+    "doors": 2,
+    "height": 2.2,
+    "width": 1.2
+   },
+   "volume": 1.584
+  },
+  "large": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    1.5,
+    0.75,
+    2.75
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    1.5,
+    0.75
+   ],
+   "symbol_length": 11.151294,
+   "values": {
+    "depth": 0.75,
+    "doors": 3,
+    "height": 2.75,
+    "width": 1.5
+   },
+   "volume": 3.09375
+  },
+  "small": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.96,
+    0.48,
+    1.76
+   ],
+   "symbol_bbox": [
+    0,
+    0,
+    0.96,
+    0.48
+   ],
+   "symbol_length": 6.779608,
+   "values": {
+    "depth": 0.48,
+    "doors": 1,
+    "height": 1.76,
+    "width": 0.96
+   },
+   "volume": 0.811008
+  }
+ },
+ "washbasin": {
+  "default": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.6,
+    0.45,
+    0.85
+   ],
+   "symbol_bbox": [
+    0.0,
+    0.0,
+    0.6,
+    0.45
+   ],
+   "symbol_length": 3.194268,
+   "values": {
+    "depth": 0.45,
+    "height": 0.85,
+    "width": 0.6
+   },
+   "volume": 0.067229144
+  },
+  "large": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.75,
+    0.5625,
+    1.0625
+   ],
+   "symbol_bbox": [
+    0.0,
+    0.0,
+    0.75,
+    0.5625
+   ],
+   "symbol_length": 4.055957,
+   "values": {
+    "depth": 0.5625,
+    "height": 1.0625,
+    "width": 0.75
+   },
+   "volume": 0.099719787
+  },
+  "small": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.48,
+    0.36,
+    0.68
+   ],
+   "symbol_bbox": [
+    0.0,
+    0.0,
+    0.48,
+    0.36
+   ],
+   "symbol_length": 2.505242,
+   "values": {
+    "depth": 0.36,
+    "height": 0.68,
+    "width": 0.48
+   },
+   "volume": 0.045333532
+  }
+ },
+ "wc": {
+  "default": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.38,
+    0.7,
+    0.8
+   ],
+   "symbol_bbox": [
+    0,
+    0.0,
+    0.38,
+    0.7
+   ],
+   "symbol_length": 3.642241,
+   "values": {
+    "depth": 0.7,
+    "height": 0.4,
+    "width": 0.38
+   },
+   "volume": 0.11856
+  },
+  "large": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.475,
+    0.875,
+    0.9
+   ],
+   "symbol_bbox": [
+    0,
+    0.0,
+    0.475,
+    0.875
+   ],
+   "symbol_length": 4.692051,
+   "values": {
+    "depth": 0.875,
+    "height": 0.5,
+    "width": 0.475
+   },
+   "volume": 0.207871875
+  },
+  "small": {
+   "bbox": [
+    0.0,
+    0.0,
+    0.0,
+    0.304,
+    0.56,
+    0.72
+   ],
+   "symbol_bbox": [
+    0,
+    0.0,
+    0.304,
+    0.56
+   ],
+   "symbol_length": 2.819785,
+   "values": {
+    "depth": 0.56,
+    "height": 0.32,
+    "width": 0.304
+   },
+   "volume": 0.06829056
+  }
+ }
+}
