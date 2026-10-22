@@ -18,7 +18,7 @@
  "symbol": [
   {"rect": {"x": 0, "y": 0, "dx": "width", "dy": "depth"}},
   {"line": {"points": [[0, "depth - 0.05"], ["width", "depth - 0.05"]]}},
-  {"repeat": {"count": 1}, "line": {"points": [{"rounded_rect": ["0.1 + i * ((width - 0.2) / 1 + 0.1)", "depth - 0.5", "(width - 0.2) / 1", 0.35, 0.06], "n": 3}], "closed": true}},
+  {"repeat": {"count": 1}, "line": {"points": [{"rounded_rect": ["0.1 + i * ((width - 0.2) / 1 + 0.1)", "depth - 0.5", "(width - 0.2) / 1", 0.35, 0.06], "n": 2}], "closed": true}},
   {"line": {"points": [[0, "depth * 0.62"], ["width", "depth * 0.62"]]}},
   {"line": {"points": [[0, "depth * 0.62"], ["width * 0.25", "depth * 0.62 - 0.18"], ["width", "depth * 0.62 - 0.18"]]}}
  ]

@@ -58,6 +58,10 @@ def test_point_generators():
     assert len(s.solids[0]["points"]) == 12
     s = shape(obj([{"id": "p", "prism": {"points": [{"rounded_rect": [0, 0, 1, 1, 0.2], "n": 4}], "h": 1}}]))
     assert len(s.solids[0]["points"]) == 20
+    s = shape(obj([{"id": "p", "prism": {"points": [{"rounded_rect": [0, 0, 1, 1, 0.2], "n": 1}], "h": 1}}]))
+    assert len(s.solids[0]["points"]) == 8
+    with pytest.raises(ObjectError, match="n between 3"):
+        shape(obj([{"id": "p", "prism": {"points": [{"ellipse": [0.5, 0.5, 0.5, 0.25], "n": 2}], "h": 1}}]))
 
 
 def test_thin_shapes_are_skipped():

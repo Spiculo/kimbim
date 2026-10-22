@@ -12,7 +12,7 @@
  "parts": [
   {"id": "trunk_post", "cylinder": {"cx": "width / 2", "cy": "width / 2", "r": "trunk / 2", "h": "height * 0.45"}},
   {"id": "crown1", "prism": {"points": [{"ellipse": ["width / 2", "width / 2", "width / 2 * 0.8", "width / 2 * 0.8"], "n": 10}], "z": "height * 0.3", "h": "height * 0.2"}},
-  {"id": "crown2", "prism": {"points": [{"ellipse": ["width / 2", "width / 2", "width / 2 * 1.0", "width / 2 * 1.0"], "n": 10}], "z": "height * 0.5", "h": "height * 0.2"}},
+  {"id": "crown2", "prism": {"points": [{"ellipse": ["width / 2", "width / 2", "width / 2", "width / 2"], "n": 10}], "z": "height * 0.5", "h": "height * 0.2"}},
   {"id": "crown3", "prism": {"points": [{"ellipse": ["width / 2", "width / 2", "width / 2 * 0.75", "width / 2 * 0.75"], "n": 10}], "z": "height * 0.7", "h": "height * 0.2"}},
   {"id": "crown4", "prism": {"points": [{"ellipse": ["width / 2", "width / 2", "width / 2 * 0.4", "width / 2 * 0.4"], "n": 10}], "z": "height * 0.85", "h": "height * 0.15"}}
  ],

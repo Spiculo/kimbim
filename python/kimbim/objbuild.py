@@ -109,8 +109,9 @@ def _points(spec, env, dims, where):
     for item in spec:
         if isinstance(item, dict):
             n = int(value_of(item.get("n", CIRCLE_POINTS), env))
-            if not 3 <= n <= MAX_GENERATOR_POINTS:
-                raise ObjectError(f"{where}: n between 3 and {MAX_GENERATOR_POINTS}")
+            low = 1 if "rounded_rect" in item else 3
+            if not low <= n <= MAX_GENERATOR_POINTS:
+                raise ObjectError(f"{where}: n between {low} and {MAX_GENERATOR_POINTS}")
             if "ellipse" in item:
                 cx, cy, rx, ry = (float(value_of(v, env)) for v in item["ellipse"])
                 a0, a1 = (math.radians(float(value_of(item.get(k, d), env))) for k, d in (("a0", 0), ("a1", 360)))
