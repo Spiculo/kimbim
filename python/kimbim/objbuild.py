@@ -5,7 +5,6 @@ repeats, `when`, `use` for components and other library objects, and the plan sy
 outline of the parts seen from above). Pure: no IFC, no model."""
 from __future__ import annotations
 
-import json
 import math
 import re
 
@@ -16,6 +15,7 @@ from .objexpr import FormulaError, value_of
 MAX_SOLIDS = 5000
 MAX_USE_DEPTH = 50
 MAX_POINTS = 2000
+MAX_WORK = 4 * MAX_SOLIDS  # part copies evaluated, solid or not, nested included
 MAX_GENERATOR_POINTS = 256
 SAMPLES = 64  # circle samples for bounding boxes and outlines (Task 1's golden uses the same)
 SYMBOL_CIRCLE_POINTS = 24
@@ -33,10 +33,12 @@ _FIELDS = {  # kind: (required, optional with defaults)
 _POINT_FIELDS = {"points", "profile", "path"}
 _SYMBOL_KINDS = {"line": (("points",), {"closed": False}), "polygon": (("points",), {}),
                  "rect": (("x", "y", "dx", "dy"), {}), "circle": (("cx", "cy", "r"), {}),
-                 "ellipse": (("cx", "cy", "rx", "ry"), {"a0": 0, "a1": 360})}
+                 "ellipse": (("cx", "cy", "rx", "ry"), {"a0": 0, "a1": 360}),
+                 "arc": (("cx", "cy", "r", "a0", "a1"), {})}
 _DIRS = {"up": (0, 0, 1), "down": (0, 0, -1), "front": (0, -1, 0), "back": (0, 1, 0),
          "left": (-1, 0, 0), "right": (1, 0, 0)}
 _AXES = {"x": (1, 0, 0), "y": (0, 1, 0), "z": (0, 0, 1), "-x": (-1, 0, 0), "-y": (0, -1, 0), "-z": (0, 0, -1)}
+_ID = re.compile(r"^[a-z][a-z0-9_]*$")
 _TEMPLATE = re.compile(r"\{([a-z][a-z0-9_]*)\}")
 
 
@@ -245,6 +247,8 @@ def _check_parts(parts, where, components, seen_components):
     for part in parts:
         if not isinstance(part, dict) or not isinstance(part.get("id"), str):
             raise ObjectError(f"{where}: every part has an id")
+        if not _ID.match(part["id"]):
+            raise ObjectError(f"{where}: id {part['id']!r} must be lower-case letters, digits and _")
         w = f"{where}.{part['id']}"
         if part["id"] in ids:
             raise ObjectError(f"{w}: the id is used twice")
@@ -273,8 +277,8 @@ def _check_parts(parts, where, components, seen_components):
         if "axes" in part:
             axes = part["axes"]
             if (not isinstance(axes, list) or len(axes) != 3 or any(a not in _AXES for a in axes)
-                    or abs(np.linalg.det(np.array([_AXES[a] for a in axes], dtype=float))) < 0.5):
-                raise ObjectError(f"{w}.axes: three different axes among x, y, z, -x, -y, -z")
+                    or np.linalg.det(np.array([_AXES[a] for a in axes], dtype=float)) < 0.5):
+                raise ObjectError(f"{w}.axes: a right-handed set of three different axes among x, y, z, -x, -y, -z")
         if "use" in part and "{" not in part["use"] and part["use"] in components:
             name = part["use"]
             if name in seen_components:
@@ -286,15 +290,25 @@ def check(defn) -> None:
     _check_parts(defn.parts, "parts", defn.components, [])
     for name, comp in defn.components.items():
         _check_parts(comp.parts, f"components.{name}.parts", defn.components, [name])
-    if defn.symbol is not None and not isinstance(defn.symbol, list):
-        raise ObjectError("symbol: a list of 2D items")
+    if defn.symbol is not None:
+        if not isinstance(defn.symbol, list):
+            raise ObjectError("symbol: a list of 2D items")
+        for k, item in enumerate(defn.symbol):
+            if not isinstance(item, dict):
+                raise ObjectError(f"symbol[{k}]: an object")
 
 
 # ---------------------------------------------------------------- build
 
 class _Ctx:
-    def __init__(self, resolve):
+    def __init__(self, resolve, all_anchors=False):
         self.shape, self.resolve, self.material = Shape(), resolve, None
+        self.all_anchors, self.work, self.checked = all_anchors, 0, set()
+
+    def tick(self, where):
+        self.work += 1
+        if self.work > MAX_WORK:
+            raise ObjectError(f"{where}: more than {MAX_WORK} part copies (over the limit)")
 
     def add(self, solid):
         if len(self.shape.solids) >= MAX_SOLIDS:
@@ -317,10 +331,14 @@ def _fields(kind, raw, env, where):
         v = raw.get(f, optional.get(f))
         if v is None:
             out[f] = None
-        elif f in _POINT_FIELDS:
-            out[f] = _points(v, env, 3 if f == "path" else 2, f"{where}.{f}")
         else:
-            out[f] = float(value_of(v, env))
+            try:
+                if f in _POINT_FIELDS:
+                    out[f] = _points(v, env, 3 if f == "path" else 2, f"{where}.{f}")
+                else:
+                    out[f] = float(value_of(v, env))
+            except FormulaError as ex:
+                raise ObjectError(f"{where}.{f}: {ex}") from None
     return out
 
 
@@ -366,6 +384,8 @@ def _pattern(spec, env, count, bbox):
         return [_dir_frame(spec, env, [a[j] + (b[j] - a[j]) * t for j in range(3)]) for t in ts]
     elif kind == "grid":
         nx, ny = int(ev("nx")), int(ev("ny"))
+        if nx < 1 or ny < 1:
+            raise ObjectError("nx and ny must be positive")
         if nx * ny > MAX_SOLIDS:
             raise ObjectError(f"grid over the limit of {MAX_SOLIDS}")
         x, y, dx, dy = ev("x", 0), ev("y", 0), ev("dx"), ev("dy")
@@ -422,12 +442,15 @@ def _copies(part, env, anchors, base, where):
 class _Pattern:
     """A pattern anchor: frames made when a repeat asks, with its count."""
 
-    def __init__(self, spec, env, bbox, base):
-        self.spec, self.env, self.bbox, self.base = spec, env, bbox, base
+    def __init__(self, spec, env, bbox, base, where=""):
+        self.spec, self.env, self.bbox, self.base, self.where = spec, env, bbox, base, where
         self.counted = spec["pattern"] in ("circle", "line")
 
     def frames(self, count):
-        return [self.base @ f for f in _pattern(self.spec, self.env, count or 0, self.bbox)]
+        try:
+            return [self.base @ f for f in _pattern(self.spec, self.env, count or 0, self.bbox)]
+        except (FormulaError, ObjectError, KeyError) as ex:
+            raise ObjectError(f"{self.where}: {ex}") from None
 
 
 def _local(part, env, frame, centroid, where):
@@ -462,7 +485,7 @@ def _local(part, env, frame, centroid, where):
     return m
 
 
-def _anchors(part, env, m, solid_fields, kind, base_inv):
+def _anchors(part, env, m, solid_fields, kind, base_inv, eager=False):
     out = {}
     bbox = None
     if kind is not None:
@@ -477,11 +500,17 @@ def _anchors(part, env, m, solid_fields, kind, base_inv):
                                 ("right", (hi[0], c[1], c[2]), "right")):
             out[name] = m @ _frame(origin, _DIRS[d])
     for name, spec in (part.get("anchors") or {}).items():
-        if "pattern" in spec:
-            out[name] = _Pattern(spec, env, bbox, m)
-        else:
-            origin = [float(value_of(spec.get(k, 0), env)) for k in ("x", "y", "z")]
-            out[name] = m @ _dir_frame(spec, env, origin)
+        where = f"parts.{part['id']}.anchors.{name}"
+        try:
+            if "pattern" in spec:
+                out[name] = _Pattern(spec, env, bbox, m, where)
+                if eager:
+                    out[name].frames(1)
+            else:
+                origin = [float(value_of(spec.get(k, 0), env)) for k in ("x", "y", "z")]
+                out[name] = m @ _dir_frame(spec, env, origin)
+        except (FormulaError, ObjectError) as ex:
+            raise ObjectError(str(ex) if str(ex).startswith(where) else f"{where}: {ex}") from None
     coords = {}
     for name, f in out.items():
         if not isinstance(f, _Pattern):
@@ -490,16 +519,42 @@ def _anchors(part, env, m, solid_fields, kind, base_inv):
     return out, coords
 
 
+def _strings(node):
+    if isinstance(node, str):
+        yield node
+    elif isinstance(node, dict):
+        for k, v in node.items():
+            yield from _strings(k)
+            yield from _strings(v)
+    elif isinstance(node, list | tuple):
+        for v in node:
+            yield from _strings(v)
+
+
+def _needing_anchors(defn):
+    """Ids of the parts whose anchors something refers to (None: all, a templated reference)."""
+    for part in defn.parts:
+        on = (part.get("repeat") or {}).get("on")
+        for ref in (part.get("attach"), on):
+            if isinstance(ref, str) and "{" in ref:
+                return None
+    text = list(_strings(defn.parts)) + list(_strings(getattr(defn, "symbol", None)))
+    return {p["id"] for p in defn.parts if any(f"{p['id']}." in t for t in text)}
+
+
 def _parts(ctx, defn, components, env, base, stack, where):
     """Build `defn.parts` in the frame `base`; `components` are the object file's components (a
     component may use its siblings)."""
     anchors = {}
     env = dict(env)
     base_inv = np.linalg.inv(base)
-    text = json.dumps(defn.parts)
+    full = ctx.all_anchors and id(defn) not in ctx.checked  # a component's anchors are checked once
+    ctx.checked.add(id(defn))
+    needed = None if full else _needing_anchors(defn)
     for part in defn.parts:
         w = f"{where}.{part['id']}"
         try:
+            ctx.tick(w)
             if "when" in part and not value_of(part["when"], env):
                 continue
             frames = _copies(part, env, anchors, base, w)
@@ -508,6 +563,7 @@ def _parts(ctx, defn, components, env, base, stack, where):
             kind = next((k for k in SHAPES if k in part), None)
             first = None
             for i, frame in enumerate(frames):
+                ctx.tick(w)
                 e = {**env, "i": i, "n": n}
                 m = frame @ _local(part, e, frame, centroid, w)
                 if "use" in part:
@@ -523,12 +579,13 @@ def _parts(ctx, defn, components, env, base, stack, where):
                 e = {**env, "i": 0, "n": 0}
                 first = (base @ _local(part, e, base, np.zeros(3), w), e,
                          _fields(kind, part[kind], e, f"{w}.{kind}") if kind else None)
-            if f"{part['id']}." in text:  # anchors only for parts something refers to (cheap when nested)
-                found, coords = _anchors(part, first[1], first[0], first[2], kind, base_inv)
+            if needed is None or part["id"] in needed:  # anchors only for parts something refers to
+                found, coords = _anchors(part, first[1], first[0], first[2], kind, base_inv, full)
                 anchors[part["id"]] = found
                 env.update(coords)
         except FormulaError as ex:
             raise ObjectError(f"{w}: {ex}") from None
+    return env
 
 
 def _use(ctx, components, part, env, m, stack, where):
@@ -559,6 +616,8 @@ def _symbol(defn, env):
     curves = []
     for k, item in enumerate(defn.symbol):
         where = f"symbol[{k}]"
+        if not isinstance(item, dict):
+            raise ObjectError(f"{where}: an object")
         kinds = [s for s in _SYMBOL_KINDS if s in item]
         if len(kinds) != 1:
             raise ObjectError(f"{where}: one of {', '.join(_SYMBOL_KINDS)}")
@@ -584,7 +643,11 @@ def _symbol(defn, env):
                 elif kind == "circle":
                     curves.append(("circle", *(float(value_of(raw[f], e)) for f in ("cx", "cy", "r"))))
                 else:
-                    cx, cy, rx, ry = (float(value_of(raw[f], e)) for f in ("cx", "cy", "rx", "ry"))
+                    if kind == "arc":
+                        cx, cy, rx = (float(value_of(raw[f], e)) for f in ("cx", "cy", "r"))
+                        ry = rx
+                    else:
+                        cx, cy, rx, ry = (float(value_of(raw[f], e)) for f in ("cx", "cy", "rx", "ry"))
                     a0, a1 = (math.radians(float(value_of(raw.get(f, d), e))) for f, d in (("a0", 0), ("a1", 360)))
                     closed = abs(a1 - a0 - 2 * math.pi) < 1e-9
                     n = CIRCLE_POINTS if closed else max(4, int(CIRCLE_POINTS * abs(a1 - a0) / (2 * math.pi)) + 1)
@@ -617,10 +680,10 @@ def _outline(shape):
     return curves
 
 
-def build(defn, values, resolve=None) -> Shape:
-    ctx = _Ctx(resolve)
+def build(defn, values, resolve=None, all_anchors=False) -> Shape:
+    ctx = _Ctx(resolve, all_anchors)
     env = {**values, "pi": math.pi}
-    _parts(ctx, defn, defn.components, env, np.eye(4), [], "parts")
+    env = _parts(ctx, defn, defn.components, env, np.eye(4), [], "parts")
     shape = ctx.shape
     shape.curves = _symbol(defn, env) if defn.symbol is not None else _outline(shape)
     ox, oy = getattr(defn, "origin", (0.0, 0.0))

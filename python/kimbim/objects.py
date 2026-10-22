@@ -254,7 +254,7 @@ class ObjectDef:
         self.data = data
         if check:
             objbuild.check(self)
-            self.shape(self.values())  # a definition must build at its defaults
+            self.shape(self.values(), all_anchors=True)  # a definition must build at its defaults
 
     def param(self, key_or_label: str):
         k = (key_or_label or "").strip().lower()
@@ -275,8 +275,8 @@ class ObjectDef:
                 out.append(p.key)
         return out
 
-    def shape(self, values: dict):
-        return objbuild.build(self, values)
+    def shape(self, values: dict, all_anchors: bool = False):
+        return objbuild.build(self, values, all_anchors=all_anchors)
 
     def material_of(self, values: dict, part: str) -> str | None:
         """The building material of one slot: its parameter, else the object's main one, else None."""

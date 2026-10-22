@@ -185,12 +185,17 @@ def test_repeat_over_the_limit_fails_before_looping():
 @pytest.mark.parametrize("parts, message", [
     ([{"id": "b", "box": {"dx": 1, "dy": 1}}], "parts.b.box: dz is missing"),
     ([{"id": "b", "box": {"dx": 1, "dy": 1, "dz": 1, "colour": 2}}], "parts.b.box: unknown field 'colour'"),
-    ([{"id": "b", "box": {"dx": "wdth", "dy": 1, "dz": 1}}], "parts.b: unknown name 'wdth'"),
+    ([{"id": "b", "box": {"dx": "wdth", "dy": 1, "dz": 1}}], "parts.b.box.dx: unknown name 'wdth'"),
     ([{"id": "b", "box": {"dx": 1, "dy": 1, "dz": 1}, "cylinder": {"r": 1, "h": 1}}], "parts.b: one shape"),
     ([{"id": "b", "box": {"dx": 1, "dy": 1, "dz": 1}}, {"id": "b", "box": {"dx": 1, "dy": 1, "dz": 1}}], "twice"),
     ([{"id": "b", "attach": "nothing.top", "box": {"dx": 1, "dy": 1, "dz": 1}}], "unknown part 'nothing'"),
     ([{"id": "b", "use": "ghost"}], "unknown component or object 'ghost'"),
     ([{"id": "b", "axes": ["x", "x", "z"], "box": {"dx": 1, "dy": 1, "dz": 1}}], "axes"),
+    ([{"id": "b", "axes": ["y", "x", "z"], "box": {"dx": 1, "dy": 1, "dz": 1}}], "right-handed"),
+    ([{"id": "Baño", "box": {"dx": 1, "dy": 1, "dz": 1}}], "must be lower-case"),
+    ([{"id": "b", "box": {"dx": 1, "dy": 1, "dz": 1}, "anchors": {"e": {"x": "zz"}}}], "parts.b.anchors.e: unknown name 'zz'"),
+    ([{"id": "b", "box": {"dx": 1, "dy": 1, "dz": 1}, "anchors": {"g": {"pattern": "grid", "nx": -1, "ny": 2, "dx": 1, "dy": 1}}}],
+     "parts.b.anchors.g: nx and ny must be positive"),
 ])
 def test_part_errors_name_the_field(parts, message):
     with pytest.raises(ObjectError, match=message):
@@ -224,3 +229,39 @@ def test_origin_shifts_solids_and_curves():
     s = shape(d)
     assert s.metrics()["bbox"][:2] == pytest.approx([-0.5, -0.5])
     assert s.curves[0][1][0] == pytest.approx((-0.5, -0.5))
+
+
+def test_anchor_selection_is_sound():
+    # templated references, anchors with no reference, and symbol references all resolve
+    parts = [{"id": "front", "box": {"dx": 1, "dy": 1, "dz": 1}}, {"id": "back_", "box": {"y": 2, "dx": 1, "dy": 1, "dz": 1}},
+             {"id": "knob", "attach": "{which}.top", "box": {"dx": 0.1, "dy": 0.1, "dz": 0.1}}]
+    d = obj(parts, params=[{"key": "which", "kind": "choice", "label": "W", "default": "front",
+                            "options": [{"id": "front", "label": "F"}, {"id": "back_", "label": "B"}]}])
+    assert origin(shape(d, which="back_").solids[2])[1] == pytest.approx(2.5)
+    d = obj([SEAT], symbol=[{"line": {"points": [[0, 0], [0, "seat.back_edge.y"]]}}])
+    assert shape(d).curves[0][1][1] == (0, pytest.approx(0.48))
+
+
+def test_work_budget_counts_thin_and_anchor_only_parts():
+    import time
+    start = time.perf_counter()
+    thin = {"id": "o", "repeat": {"count": 300}, "use": "row"}
+    with pytest.raises(ObjectError, match="limit"):
+        obj([thin], components={"row": {"parts": [{"id": "t", "repeat": {"count": 300}, "box": {"dx": 1, "dy": 0, "dz": 1}}]}})
+    nest = {"id": "o", "repeat": {"count": 30}, "use": "a"}
+    comps = {"a": {"parts": [{"id": "x", "repeat": {"count": 30}, "use": "b"}]},
+             "b": {"parts": [{"id": "y", "repeat": {"count": 30}, "anchors": {"p": {"x": 0}}}]}}
+    with pytest.raises(ObjectError, match="limit"):
+        obj([nest], components=comps)
+    assert time.perf_counter() - start < 2
+
+
+def test_arc_symbol():
+    d = obj([{"id": "b", "box": {"dx": 1, "dy": 1, "dz": 1}}], symbol=[{"arc": {"cx": 0, "cy": 0, "r": 1, "a0": 0, "a1": 90}}])
+    pts = shape(d).curves[0][1]
+    assert pts[0] == pytest.approx((1, 0)) and pts[-1] == pytest.approx((0, 1), abs=1e-9)
+
+
+def test_symbol_item_must_be_an_object():
+    with pytest.raises(ObjectError, match=r"symbol\[0\]: an object"):
+        obj([{"id": "b", "box": {"dx": 1, "dy": 1, "dz": 1}}], symbol=[5])
