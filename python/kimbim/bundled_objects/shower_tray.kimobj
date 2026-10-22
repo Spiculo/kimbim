@@ -1,0 +1,22 @@
+{
+ "format": "kimbim-object/1",
+ "id": "shower_tray",
+ "name": {"en": "Shower tray", "es": "Plato de ducha"},
+ "category": "sanitary",
+ "ifc": {"IFC4": ["IfcSanitaryTerminalType", "SHOWER", null]},
+ "params": [
+  {"key": "width", "kind": "length", "label": {"en": "Width", "es": "Ancho"}, "default": 0.9},
+  {"key": "depth", "kind": "length", "label": {"en": "Depth", "es": "Fondo"}, "default": 0.9},
+  {"key": "height", "kind": "length", "label": {"en": "Height", "es": "Altura"}, "default": 0.05}
+ ],
+ "materials": {"body": {"label": {"en": "Material", "es": "Material"}, "default": "Porcelain"}},
+ "parts": [
+  {"id": "tray", "box": {"dx": "width", "dy": "depth", "dz": "height"}}
+ ],
+ "symbol": [
+  {"rect": {"x": 0, "y": 0, "dx": "width", "dy": "depth"}},
+  {"line": {"points": [[0, 0], ["width", "depth"]]}},
+  {"line": {"points": [["width", 0], [0, "depth"]]}},
+  {"circle": {"cx": "width / 2", "cy": "depth / 2", "r": 0.04}}
+ ]
+}

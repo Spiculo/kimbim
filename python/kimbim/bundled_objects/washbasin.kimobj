@@ -1,0 +1,22 @@
+{
+ "format": "kimbim-object/1",
+ "id": "washbasin",
+ "name": {"en": "Washbasin", "es": "Lavabo"},
+ "category": "sanitary",
+ "ifc": {"IFC4": ["IfcSanitaryTerminalType", "WASHHANDBASIN", null]},
+ "params": [
+  {"key": "width", "kind": "length", "label": {"en": "Width", "es": "Ancho"}, "default": 0.6},
+  {"key": "depth", "kind": "length", "label": {"en": "Depth", "es": "Fondo"}, "default": 0.45},
+  {"key": "height", "kind": "length", "label": {"en": "Height", "es": "Altura"}, "default": 0.85}
+ ],
+ "materials": {"body": {"label": {"en": "Material", "es": "Material"}, "default": "Porcelain"}},
+ "parts": [
+  {"id": "basin", "prism": {"points": [{"rounded_rect": [0, 0, "width", "depth", "min(width, depth) * 0.3"], "n": 4}], "z": "height - 0.18", "h": 0.18}},
+  {"id": "pedestal", "box": {"x": "width / 2 - 0.09", "y": "depth - 0.2", "dx": 0.18, "dy": 0.18, "dz": "height - 0.18"}}
+ ],
+ "symbol": [
+  {"line": {"points": [{"rounded_rect": [0, 0, "width", "depth", "min(width, depth) * 0.3"], "n": 4}], "closed": true}},
+  {"ellipse": {"cx": "width / 2", "cy": "depth * 0.45", "rx": "width / 2 - 0.07", "ry": "depth * 0.45 - 0.05"}},
+  {"circle": {"cx": "width / 2", "cy": "depth - 0.06", "r": 0.02}}
+ ]
+}

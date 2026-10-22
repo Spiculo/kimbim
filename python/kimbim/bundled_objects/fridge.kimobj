@@ -1,0 +1,22 @@
+{
+ "format": "kimbim-object/1",
+ "id": "fridge",
+ "name": {"en": "Fridge", "es": "Frigorífico"},
+ "category": "kitchen",
+ "ifc": {"IFC4": ["IfcElectricApplianceType", "FRIDGE_FREEZER", null]},
+ "params": [
+  {"key": "width", "kind": "length", "label": {"en": "Width", "es": "Ancho"}, "default": 0.6},
+  {"key": "depth", "kind": "length", "label": {"en": "Depth", "es": "Fondo"}, "default": 0.65},
+  {"key": "height", "kind": "length", "label": {"en": "Height", "es": "Altura"}, "default": 1.85}
+ ],
+ "materials": {"body": {"label": {"en": "Material", "es": "Material"}, "default": "Timber - finish"}},
+ "parts": [
+  {"id": "body", "box": {"y": 0.04, "dx": "width", "dy": "depth - 0.04", "dz": "height"}},
+  {"id": "door", "box": {"z": 0.05, "dx": "width", "dy": 0.04, "dz": "height - 0.05"}}
+ ],
+ "symbol": [
+  {"rect": {"x": 0, "y": 0, "dx": "width", "dy": "depth"}},
+  {"line": {"points": [[0, 0.04], ["width", 0.04]]}},
+  {"line": {"points": [[0, 0.04], ["width", "depth"]]}}
+ ]
+}

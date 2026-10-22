@@ -1,0 +1,24 @@
+{
+ "format": "kimbim-object/1",
+ "id": "wardrobe",
+ "name": {"en": "Wardrobe", "es": "Armario"},
+ "category": "furniture",
+ "ifc": {"IFC4": ["IfcFurnitureType", "USERDEFINED", "WARDROBE"], "IFC2X3": ["IfcFurnitureType", null, "WARDROBE"]},
+ "params": [
+  {"key": "width", "kind": "length", "label": {"en": "Width", "es": "Ancho"}, "default": 1.2},
+  {"key": "depth", "kind": "length", "label": {"en": "Depth", "es": "Fondo"}, "default": 0.6},
+  {"key": "height", "kind": "length", "label": {"en": "Height", "es": "Altura"}, "default": 2.2},
+  {"key": "doors", "kind": "count", "label": {"en": "Doors", "es": "Puertas"}, "default": 2, "min": 1, "max": 8}
+ ],
+ "materials": {"body": {"label": {"en": "Material", "es": "Material"}, "default": "Timber - finish"}},
+ "parts": [
+  {"id": "body", "box": {"dx": "width", "dy": "depth", "dz": "height"}}
+ ],
+ "symbol": [
+  {"rect": {"x": 0, "y": 0, "dx": "width", "dy": "depth"}},
+  {"line": {"points": [[0, 0.02], ["width", 0.02]]}},
+  {"line": {"points": [[0.03, "depth / 2"], ["width - 0.03", "depth / 2"]]}},
+  {"repeat": {"count": "floor(width / 0.15) - 1"}, "line": {"points": [["(i + 1) * 0.15 - 0.04", "depth / 2 - 0.2"], ["(i + 1) * 0.15 + 0.04", "depth / 2 + 0.2"]]}},
+  {"repeat": {"count": "doors - 1"}, "line": {"points": [["width * (i + 1) / doors", 0], ["width * (i + 1) / doors", 0.02]]}}
+ ]
+}

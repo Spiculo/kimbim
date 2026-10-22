@@ -1,0 +1,21 @@
+{
+ "format": "kimbim-object/1",
+ "id": "person",
+ "name": {"en": "Person", "es": "Persona"},
+ "category": "site",
+ "ifc": {"IFC4": ["IfcBuildingElementProxyType", "USERDEFINED", "PERSON"], "IFC2X3": ["IfcBuildingElementProxyType", "USERDEFINED", "PERSON"]},
+ "params": [
+  {"key": "width", "kind": "length", "label": {"en": "Width", "es": "Ancho"}, "default": 0.5},
+  {"key": "depth", "kind": "length", "label": {"en": "Depth", "es": "Fondo"}, "default": 0.3},
+  {"key": "height", "kind": "length", "label": {"en": "Height", "es": "Altura"}, "default": 1.75}
+ ],
+ "parts": [
+  {"id": "leg", "repeat": {"count": 2}, "box": {"x": "width * (0.2 + 0.35 * i)", "y": "depth * 0.25", "dx": "width * 0.25", "dy": "depth * 0.5", "dz": "height * 0.47"}},
+  {"id": "torso", "prism": {"points": [{"ellipse": ["width / 2", "depth / 2", "width / 2", "depth / 2"], "n": 8}], "z": "height * 0.47", "h": "height * 0.36"}},
+  {"id": "head", "cylinder": {"cx": "width / 2", "cy": "depth / 2", "z": "height * 0.85", "r": "height * 0.065", "h": "height * 0.15"}}
+ ],
+ "symbol": [
+  {"ellipse": {"cx": "width / 2", "cy": "depth / 2", "rx": "width / 2", "ry": "depth / 2"}},
+  {"circle": {"cx": "width / 2", "cy": "depth / 2", "r": "height * 0.065"}}
+ ]
+}

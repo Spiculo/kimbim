@@ -1,0 +1,23 @@
+{
+ "format": "kimbim-object/1",
+ "id": "chair",
+ "name": {"en": "Chair", "es": "Silla"},
+ "category": "furniture",
+ "ifc": {"IFC4": ["IfcFurnitureType", "CHAIR", null], "IFC2X3": ["IfcFurnitureType", null, "Chair"]},
+ "params": [
+  {"key": "width", "kind": "length", "label": {"en": "Width", "es": "Ancho"}, "default": 0.45},
+  {"key": "depth", "kind": "length", "label": {"en": "Depth", "es": "Fondo"}, "default": 0.5},
+  {"key": "height", "kind": "length", "label": {"en": "Height", "es": "Altura"}, "default": 0.85},
+  {"key": "seat", "kind": "length", "label": {"en": "Seat height", "es": "Altura del asiento"}, "default": 0.45}
+ ],
+ "materials": {"frame": {"label": {"en": "Frame material", "es": "Material de la estructura"}, "default": "Steel"}, "seat": {"label": {"en": "Seat material", "es": "Material del asiento"}, "default": "Timber - finish"}},
+ "parts": [
+  {"id": "leg", "material": "frame", "repeat": {"count": 4}, "box": {"x": "if(i < 2, 0, width - 0.04)", "y": "if(i % 2 == 0, 0, depth - 0.04)", "dx": 0.04, "dy": 0.04, "dz": "seat - 0.04"}},
+  {"id": "seat_board", "material": "seat", "box": {"z": "seat - 0.04", "dx": "width", "dy": "depth", "dz": 0.04}},
+  {"id": "back", "material": "seat", "box": {"y": "depth - 0.04", "z": "seat", "dx": "width", "dy": 0.04, "dz": "max(height - seat, 0.01)"}}
+ ],
+ "symbol": [
+  {"rect": {"x": 0, "y": 0, "dx": "width", "dy": "depth"}},
+  {"line": {"points": [[0, "depth - 0.04"], ["width", "depth - 0.04"]]}}
+ ]
+}

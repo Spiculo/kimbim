@@ -1,0 +1,23 @@
+{
+ "format": "kimbim-object/1",
+ "id": "base_cabinets",
+ "name": {"en": "Base cabinets", "es": "Muebles bajos"},
+ "category": "kitchen",
+ "ifc": {"IFC4": ["IfcFurnitureType", "USERDEFINED", "KITCHENCABINET"], "IFC2X3": ["IfcFurnitureType", null, "KITCHENCABINET"]},
+ "params": [
+  {"key": "width", "kind": "length", "label": {"en": "Width", "es": "Ancho"}, "default": 2.4},
+  {"key": "depth", "kind": "length", "label": {"en": "Depth", "es": "Fondo"}, "default": 0.6},
+  {"key": "height", "kind": "length", "label": {"en": "Height", "es": "Altura"}, "default": 0.9},
+  {"key": "units", "kind": "count", "label": {"en": "Units", "es": "Módulos"}, "default": 4, "min": 1, "max": 12}
+ ],
+ "materials": {"body": {"label": {"en": "Material", "es": "Material"}, "default": "Timber - finish"}},
+ "parts": [
+  {"id": "plinth", "box": {"y": 0.05, "dx": "width", "dy": "depth - 0.05", "dz": 0.1}},
+  {"id": "carcass", "box": {"y": 0.02, "z": 0.1, "dx": "width", "dy": "depth - 0.02", "dz": "height - 0.14"}},
+  {"id": "counter", "box": {"z": "height - 0.04", "dx": "width", "dy": "depth", "dz": 0.04}}
+ ],
+ "symbol": [
+  {"rect": {"x": 0, "y": 0, "dx": "width", "dy": "depth"}},
+  {"repeat": {"count": "units - 1"}, "line": {"points": [["width * (i + 1) / units", 0], ["width * (i + 1) / units", 0.08]]}}
+ ]
+}

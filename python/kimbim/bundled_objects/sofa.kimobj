@@ -1,0 +1,27 @@
+{
+ "format": "kimbim-object/1",
+ "id": "sofa",
+ "name": {"en": "Sofa", "es": "Sofá"},
+ "category": "furniture",
+ "ifc": {"IFC4": ["IfcFurnitureType", "SOFA", null], "IFC2X3": ["IfcFurnitureType", null, "Sofa"]},
+ "params": [
+  {"key": "width", "kind": "length", "label": {"en": "Width", "es": "Ancho"}, "default": 2.0},
+  {"key": "depth", "kind": "length", "label": {"en": "Depth", "es": "Fondo"}, "default": 0.9},
+  {"key": "height", "kind": "length", "label": {"en": "Height", "es": "Altura"}, "default": 0.8},
+  {"key": "seats", "kind": "count", "label": {"en": "Seats", "es": "Plazas"}, "default": 3, "min": 1, "max": 6}
+ ],
+ "materials": {"body": {"label": {"en": "Material", "es": "Material"}, "default": "Fabric"}},
+ "parts": [
+  {"id": "arm_left", "box": {"dx": 0.15, "dy": "depth", "dz": "height * 0.75"}},
+  {"id": "arm_right", "box": {"x": "width - 0.15", "dx": 0.15, "dy": "depth", "dz": "height * 0.75"}},
+  {"id": "back", "box": {"x": 0.15, "y": "depth - 0.2", "dx": "width - 0.3", "dy": 0.2, "dz": "height"}},
+  {"id": "seat", "box": {"x": 0.15, "dx": "width - 0.3", "dy": "depth - 0.2", "dz": 0.42}}
+ ],
+ "symbol": [
+  {"rect": {"x": 0, "y": 0, "dx": "width", "dy": "depth"}},
+  {"line": {"points": [[0.15, 0], [0.15, "depth"]]}},
+  {"line": {"points": [["width - 0.15", 0], ["width - 0.15", "depth"]]}},
+  {"line": {"points": [[0.15, "depth - 0.2"], ["width - 0.15", "depth - 0.2"]]}},
+  {"repeat": {"count": "seats - 1"}, "line": {"points": [["0.15 + (width - 0.3) * (i + 1) / seats", 0.05], ["0.15 + (width - 0.3) * (i + 1) / seats", "depth - 0.2"]]}}
+ ]
+}

@@ -1,0 +1,23 @@
+{
+ "format": "kimbim-object/1",
+ "id": "bidet",
+ "name": {"en": "Bidet", "es": "Bidé"},
+ "category": "sanitary",
+ "ifc": {"IFC4": ["IfcSanitaryTerminalType", "BIDET", null]},
+ "params": [
+  {"key": "width", "kind": "length", "label": {"en": "Width", "es": "Ancho"}, "default": 0.38},
+  {"key": "depth", "kind": "length", "label": {"en": "Depth", "es": "Fondo"}, "default": 0.55},
+  {"key": "height", "kind": "length", "label": {"en": "Height", "es": "Altura"}, "default": 0.4}
+ ],
+ "materials": {"body": {"label": {"en": "Material", "es": "Material"}, "default": "Porcelain"}},
+ "parts": [
+  {"id": "tank", "box": {"y": "depth - 0.08", "dx": "width", "dy": 0.08, "dz": "height"}},
+  {"id": "bowl", "prism": {"points": [{"ellipse": ["width / 2", "(depth - 0.08) / 2 + 0.02", "width / 2", "(depth - 0.08) / 2 + 0.02"], "n": 12}], "z": 0, "h": "height"}}
+ ],
+ "symbol": [
+  {"rect": {"x": 0, "y": "depth - 0.08", "dx": "width", "dy": 0.08}},
+  {"ellipse": {"cx": "width / 2", "cy": "(depth - 0.08) / 2 + 0.02", "rx": "width / 2", "ry": "(depth - 0.08) / 2 + 0.02"}},
+  {"ellipse": {"cx": "width / 2", "cy": "(depth - 0.08) / 2 + 0.03", "rx": "width / 2 - 0.06", "ry": "(depth - 0.08) / 2 - 0.06"}},
+  {"circle": {"cx": "width / 2", "cy": "depth - 0.12", "r": 0.015}}
+ ]
+}

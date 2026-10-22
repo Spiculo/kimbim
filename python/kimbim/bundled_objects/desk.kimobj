@@ -1,0 +1,22 @@
+{
+ "format": "kimbim-object/1",
+ "id": "desk",
+ "name": {"en": "Desk", "es": "Escritorio"},
+ "category": "furniture",
+ "ifc": {"IFC4": ["IfcFurnitureType", "DESK", null], "IFC2X3": ["IfcFurnitureType", null, "Desk"]},
+ "params": [
+  {"key": "width", "kind": "length", "label": {"en": "Width", "es": "Ancho"}, "default": 1.4},
+  {"key": "depth", "kind": "length", "label": {"en": "Depth", "es": "Fondo"}, "default": 0.7},
+  {"key": "height", "kind": "length", "label": {"en": "Height", "es": "Altura"}, "default": 0.75}
+ ],
+ "materials": {"top": {"label": {"en": "Top material", "es": "Material del tablero"}, "default": "Timber - finish"}, "frame": {"label": {"en": "Frame material", "es": "Material de la estructura"}, "default": "Timber - finish"}},
+ "parts": [
+  {"id": "side_left", "material": "frame", "box": {"y": 0.05, "dx": 0.025, "dy": "depth - 0.05", "dz": "height - 0.03"}},
+  {"id": "side_right", "material": "frame", "box": {"x": "width - 0.025", "y": 0.05, "dx": 0.025, "dy": "depth - 0.05", "dz": "height - 0.03"}},
+  {"id": "modesty", "material": "frame", "box": {"x": 0.025, "y": "depth - 0.03", "z": 0.3, "dx": "width - 0.05", "dy": 0.02, "dz": "height - 0.33"}},
+  {"id": "top", "material": "top", "box": {"z": "height - 0.03", "dx": "width", "dy": "depth", "dz": 0.03}}
+ ],
+ "symbol": [
+  {"rect": {"x": 0, "y": 0, "dx": "width", "dy": "depth"}}
+ ]
+}

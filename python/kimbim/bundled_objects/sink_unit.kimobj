@@ -1,0 +1,27 @@
+{
+ "format": "kimbim-object/1",
+ "id": "sink_unit",
+ "name": {"en": "Sink unit", "es": "Mueble fregadero"},
+ "category": "kitchen",
+ "ifc": {"IFC4": ["IfcSanitaryTerminalType", "SINK", null]},
+ "params": [
+  {"key": "width", "kind": "length", "label": {"en": "Width", "es": "Ancho"}, "default": 1.2},
+  {"key": "depth", "kind": "length", "label": {"en": "Depth", "es": "Fondo"}, "default": 0.6},
+  {"key": "height", "kind": "length", "label": {"en": "Height", "es": "Altura"}, "default": 0.9},
+  {"key": "bowls", "kind": "count", "label": {"en": "Bowls", "es": "Senos"}, "default": 1, "min": 1, "max": 2}
+ ],
+ "materials": {"body": {"label": {"en": "Material", "es": "Material"}, "default": "Timber - finish"}},
+ "parts": [
+  {"id": "plinth", "box": {"y": 0.05, "dx": "width", "dy": "depth - 0.05", "dz": 0.1}},
+  {"id": "carcass", "box": {"y": 0.02, "z": 0.1, "dx": "width", "dy": "depth - 0.02", "dz": "height - 0.14"}},
+  {"id": "counter", "box": {"z": "height - 0.04", "dx": "width", "dy": "depth", "dz": 0.04}}
+ ],
+ "symbol": [
+  {"rect": {"x": 0, "y": 0, "dx": "width", "dy": "depth"}},
+  {"repeat": {"count": "max(1, round(width / 0.6)) - 1"}, "line": {"points": [["width * (i + 1) / max(1, round(width / 0.6))", 0], ["width * (i + 1) / max(1, round(width / 0.6))", 0.08]]}},
+  {"repeat": {"count": "bowls"}, "line": {"points": [{"rounded_rect": ["0.08 + i * (min(0.4, (width * 0.6 - 0.05 * (bowls + 1)) / bowls) + 0.05)", 0.1, "min(0.4, (width * 0.6 - 0.05 * (bowls + 1)) / bowls)", "depth - 0.2", 0.05], "n": 3}], "closed": true}},
+  {"repeat": {"count": "bowls"}, "circle": {"cx": "0.08 + i * (min(0.4, (width * 0.6 - 0.05 * (bowls + 1)) / bowls) + 0.05) + min(0.4, (width * 0.6 - 0.05 * (bowls + 1)) / bowls) / 2", "cy": "depth / 2", "r": 0.025}},
+  {"repeat": {"count": 4}, "line": {"points": [["0.08 + bowls * (min(0.4, (width * 0.6 - 0.05 * (bowls + 1)) / bowls) + 0.05) + 0.03", "0.15 + (depth - 0.3) * i / 3"], ["width - 0.08", "0.15 + (depth - 0.3) * i / 3"]]}},
+  {"circle": {"cx": "0.08 + bowls * (min(0.4, (width * 0.6 - 0.05 * (bowls + 1)) / bowls) + 0.05) / 2", "cy": "depth - 0.06", "r": 0.02}}
+ ]
+}

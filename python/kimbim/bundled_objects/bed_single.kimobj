@@ -1,0 +1,25 @@
+{
+ "format": "kimbim-object/1",
+ "id": "bed_single",
+ "name": {"en": "Single bed", "es": "Cama individual"},
+ "category": "furniture",
+ "ifc": {"IFC4": ["IfcFurnitureType", "BED", null], "IFC2X3": ["IfcFurnitureType", null, "Bed"]},
+ "params": [
+  {"key": "width", "kind": "length", "label": {"en": "Width", "es": "Ancho"}, "default": 0.9},
+  {"key": "depth", "kind": "length", "label": {"en": "Depth", "es": "Fondo"}, "default": 2.0},
+  {"key": "height", "kind": "length", "label": {"en": "Height", "es": "Altura"}, "default": 0.5}
+ ],
+ "materials": {"body": {"label": {"en": "Material", "es": "Material"}, "default": "Timber - finish"}},
+ "parts": [
+  {"id": "mattress", "box": {"z": 0.1, "dx": "width", "dy": "depth - 0.05", "dz": "height - 0.1"}},
+  {"id": "foot", "repeat": {"count": 4}, "box": {"x": "if(i < 2, 0.02, width - 0.07)", "y": "if(i % 2 == 0, 0.02, depth - 0.12)", "dx": 0.05, "dy": 0.05, "dz": 0.1}},
+  {"id": "headboard", "box": {"y": "depth - 0.05", "dx": "width", "dy": 0.05, "dz": "height + 0.4"}}
+ ],
+ "symbol": [
+  {"rect": {"x": 0, "y": 0, "dx": "width", "dy": "depth"}},
+  {"line": {"points": [[0, "depth - 0.05"], ["width", "depth - 0.05"]]}},
+  {"repeat": {"count": 1}, "line": {"points": [{"rounded_rect": ["0.1 + i * ((width - 0.2) / 1 + 0.1)", "depth - 0.5", "(width - 0.2) / 1", 0.35, 0.06], "n": 3}], "closed": true}},
+  {"line": {"points": [[0, "depth * 0.62"], ["width", "depth * 0.62"]]}},
+  {"line": {"points": [[0, "depth * 0.62"], ["width * 0.25", "depth * 0.62 - 0.18"], ["width", "depth * 0.62 - 0.18"]]}}
+ ]
+}

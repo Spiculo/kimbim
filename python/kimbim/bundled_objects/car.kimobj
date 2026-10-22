@@ -1,0 +1,24 @@
+{
+ "format": "kimbim-object/1",
+ "id": "car",
+ "name": {"en": "Car", "es": "Coche"},
+ "category": "site",
+ "ifc": {"IFC4": ["IfcBuildingElementProxyType", "USERDEFINED", "CAR"], "IFC2X3": ["IfcBuildingElementProxyType", "USERDEFINED", "CAR"]},
+ "params": [
+  {"key": "width", "kind": "length", "label": {"en": "Width", "es": "Ancho"}, "default": 1.8},
+  {"key": "depth", "kind": "length", "label": {"en": "Depth", "es": "Fondo"}, "default": 4.5},
+  {"key": "height", "kind": "length", "label": {"en": "Height", "es": "Altura"}, "default": 1.5}
+ ],
+ "parts": [
+  {"id": "wheel", "repeat": {"count": 4}, "axes": ["y", "z", "x"], "cylinder": {"cx": "if(i < 2, depth * 0.18, depth * 0.78)", "cy": 0.32, "z": "if(i % 2 == 0, 0.05, width - 0.25)", "r": 0.32, "h": 0.2}},
+  {"id": "body", "box": {"z": 0.25, "dx": "width", "dy": "depth", "dz": "max(height * 0.55 - 0.25, 0.1)"}},
+  {"id": "cabin", "axes": ["y", "z", "x"], "prism": {"points": [["depth * 0.3", "height * 0.55"], ["depth * 0.85", "height * 0.55"], ["depth * 0.75", "height"], ["depth * 0.42", "height"]], "z": 0.1, "h": "width - 0.2"}}
+ ],
+ "symbol": [
+  {"line": {"points": [{"rounded_rect": [0, 0, "width", "depth", 0.3], "n": 3}], "closed": true}},
+  {"line": {"points": [[0.1, "depth * 0.3"], ["width - 0.1", "depth * 0.3"]]}},
+  {"line": {"points": [[0.1, "depth * 0.42"], ["width - 0.1", "depth * 0.42"]]}},
+  {"line": {"points": [[0.1, "depth * 0.75"], ["width - 0.1", "depth * 0.75"]]}},
+  {"line": {"points": [[0.1, "depth * 0.85"], ["width - 0.1", "depth * 0.85"]]}}
+ ]
+}

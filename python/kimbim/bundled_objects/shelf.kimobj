@@ -1,0 +1,24 @@
+{
+ "format": "kimbim-object/1",
+ "id": "shelf",
+ "name": {"en": "Shelf", "es": "Estantería"},
+ "category": "furniture",
+ "ifc": {"IFC4": ["IfcFurnitureType", "SHELF", null], "IFC2X3": ["IfcFurnitureType", null, "Shelf"]},
+ "params": [
+  {"key": "width", "kind": "length", "label": {"en": "Width", "es": "Ancho"}, "default": 0.9},
+  {"key": "depth", "kind": "length", "label": {"en": "Depth", "es": "Fondo"}, "default": 0.35},
+  {"key": "height", "kind": "length", "label": {"en": "Height", "es": "Altura"}, "default": 2.0},
+  {"key": "shelves", "kind": "count", "label": {"en": "Shelves", "es": "Baldas"}, "default": 5, "min": 2, "max": 12}
+ ],
+ "materials": {"body": {"label": {"en": "Material", "es": "Material"}, "default": "Timber - finish"}},
+ "parts": [
+  {"id": "side_left", "box": {"dx": 0.02, "dy": "depth", "dz": "height"}},
+  {"id": "side_right", "box": {"x": "width - 0.02", "dx": 0.02, "dy": "depth", "dz": "height"}},
+  {"id": "back", "box": {"x": 0.02, "y": "depth - 0.01", "dx": "width - 0.04", "dy": 0.01, "dz": "height"}},
+  {"id": "board", "repeat": {"count": "shelves"}, "box": {"x": 0.02, "z": "0.05 + (height - 0.07) * i / max(shelves - 1, 1)", "dx": "width - 0.04", "dy": "depth - 0.01", "dz": 0.02}}
+ ],
+ "symbol": [
+  {"rect": {"x": 0, "y": 0, "dx": "width", "dy": "depth"}},
+  {"line": {"points": [[0, 0], ["width", "depth"]]}}
+ ]
+}

@@ -1,0 +1,20 @@
+{
+ "format": "kimbim-object/1",
+ "id": "table",
+ "name": {"en": "Table", "es": "Mesa"},
+ "category": "furniture",
+ "ifc": {"IFC4": ["IfcFurnitureType", "TABLE", null], "IFC2X3": ["IfcFurnitureType", null, "Table"]},
+ "params": [
+  {"key": "width", "kind": "length", "label": {"en": "Width", "es": "Ancho"}, "default": 1.6},
+  {"key": "depth", "kind": "length", "label": {"en": "Depth", "es": "Fondo"}, "default": 0.9},
+  {"key": "height", "kind": "length", "label": {"en": "Height", "es": "Altura"}, "default": 0.75}
+ ],
+ "materials": {"top": {"label": {"en": "Top material", "es": "Material del tablero"}, "default": "Timber - finish"}, "legs": {"label": {"en": "Legs material", "es": "Material de las patas"}, "default": "Steel"}},
+ "parts": [
+  {"id": "leg", "material": "legs", "repeat": {"count": 4}, "box": {"x": "if(i < 2, 0.03, width - 0.09)", "y": "if(i % 2 == 0, 0.03, depth - 0.09)", "dx": 0.06, "dy": 0.06, "dz": "height - 0.04"}},
+  {"id": "top", "material": "top", "box": {"z": "height - 0.04", "dx": "width", "dy": "depth", "dz": 0.04}}
+ ],
+ "symbol": [
+  {"rect": {"x": 0, "y": 0, "dx": "width", "dy": "depth"}}
+ ]
+}

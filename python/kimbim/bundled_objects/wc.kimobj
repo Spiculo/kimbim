@@ -1,0 +1,22 @@
+{
+ "format": "kimbim-object/1",
+ "id": "wc",
+ "name": {"en": "WC", "es": "Inodoro"},
+ "category": "sanitary",
+ "ifc": {"IFC4": ["IfcSanitaryTerminalType", "TOILETPAN", null]},
+ "params": [
+  {"key": "width", "kind": "length", "label": {"en": "Width", "es": "Ancho"}, "default": 0.38},
+  {"key": "depth", "kind": "length", "label": {"en": "Depth", "es": "Fondo"}, "default": 0.7},
+  {"key": "height", "kind": "length", "label": {"en": "Height", "es": "Altura"}, "default": 0.4}
+ ],
+ "materials": {"body": {"label": {"en": "Material", "es": "Material"}, "default": "Porcelain"}},
+ "parts": [
+  {"id": "tank", "box": {"y": "depth - min(0.18, depth * 0.3)", "dx": "width", "dy": "min(0.18, depth * 0.3)", "dz": "height + 0.4"}},
+  {"id": "bowl", "prism": {"points": [{"ellipse": ["width / 2", "(depth - min(0.18, depth * 0.3)) / 2 + 0.02", "width / 2", "(depth - min(0.18, depth * 0.3)) / 2 + 0.02"], "n": 12}], "z": 0, "h": "height"}}
+ ],
+ "symbol": [
+  {"rect": {"x": 0, "y": "depth - min(0.18, depth * 0.3)", "dx": "width", "dy": "min(0.18, depth * 0.3)"}},
+  {"ellipse": {"cx": "width / 2", "cy": "(depth - min(0.18, depth * 0.3)) / 2 + 0.02", "rx": "width / 2", "ry": "(depth - min(0.18, depth * 0.3)) / 2 + 0.02"}},
+  {"ellipse": {"cx": "width / 2", "cy": "(depth - min(0.18, depth * 0.3)) / 2 + 0.04", "rx": "width / 2 - 0.06", "ry": "(depth - min(0.18, depth * 0.3)) / 2 - 0.06"}}
+ ]
+}
