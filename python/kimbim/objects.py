@@ -79,18 +79,22 @@ class ParamDef:
             raise ObjectError(f"{where}: default {self.default!r} is not one of the options")
         self.where = where
 
-    def bounds(self, env) -> tuple:
-        try:
-            lo = value_of(self.lo, env) if self.lo is not None else None
-            hi = value_of(self.hi, env) if self.hi is not None else None
-        except FormulaError as ex:
-            raise ObjectError(f"{self.where}: {ex}") from None
-        return lo, hi
+    def bounds(self, env, lenient: bool = False) -> tuple:
+        """The limits; lenient: one that cannot evaluate yet (names a later parameter) is absent."""
+        out = []
+        for raw in (self.lo, self.hi):
+            try:
+                out.append(value_of(raw, env) if raw is not None else None)
+            except FormulaError as ex:
+                if not lenient:
+                    raise ObjectError(f"{self.where}: {ex}") from None
+                out.append(None)
+        return tuple(out)
 
     def option_label(self, value_id: str, lang: str = "en") -> str:
         return next((label[lang] for i, label in self.options if i == value_id), str(value_id))
 
-    def clean(self, value, env):
+    def clean(self, value, env, lenient: bool = False):
         """The value as this kind (text from the UI too), clamped to the limits."""
         if self.kind == "material":
             return str(value).strip() or str(self.default)
@@ -108,7 +112,7 @@ class ParamDef:
         v = float(str(value).replace(",", ".")) if isinstance(value, str) else float(value)
         if not math.isfinite(v):
             raise ValueError("not a finite number")
-        lo, hi = self.bounds(env)
+        lo, hi = self.bounds(env, lenient)
         if self.kind == "count":
             v = int(round(v))
             lo = math.ceil(lo) if lo is not None else None
@@ -147,31 +151,34 @@ def _params(raw, where) -> list:
 
 
 def _values(params, given) -> dict:
-    """Defaults (formulas over earlier values) or the given values, then each cleaned."""
+    """Two passes, both over cleaned values. Pass 1 in order: the given value, else the default (a formula
+    over the values before it), cleaned; a limit that names a later parameter is skipped. Pass 2 cleans
+    every value again with all of them known, so such limits apply. A given value that cannot be read
+    falls back to the default."""
     given = given or {}
-    raw = {"pi": math.pi}
-    for p in params:
-        if p.key in given:
-            raw[p.key] = given[p.key]
-        elif isinstance(p.default, str) and p.kind not in ("choice", "material"):
+    done = {"pi": math.pi}
+
+    def default_of(p):
+        if isinstance(p.default, str) and p.kind not in ("choice", "material"):
             try:
-                raw[p.key] = value_of(p.default, raw)
+                return value_of(p.default, done)
             except FormulaError as ex:
                 raise ObjectError(f"{p.where}.default: {ex}") from None
-        else:
-            raw[p.key] = p.default
-    out = {}
-    for p in params:
-        env = {**raw, **out}
+        return p.default
+
+    def clean(p, value, env, lenient):
         try:
-            out[p.key] = p.clean(raw[p.key], env)
-        except ObjectError:
-            raise
-        except (TypeError, ValueError):  # a given value that cannot be read: the default
-            default = (value_of(p.default, raw) if isinstance(p.default, str) and p.kind not in ("choice", "material")
-                       else p.default)
-            out[p.key] = p.clean(default, env)
-    return out
+            return p.clean(value, env, lenient)
+        except (TypeError, ValueError, FormulaError):
+            return p.clean(default_of(p), env, lenient)
+
+    for p in params:
+        done[p.key] = clean(p, given[p.key] if p.key in given else default_of(p), done, True)
+    final = dict(done)
+    for p in params:
+        final[p.key] = clean(p, done[p.key], final, False)
+    final.pop("pi")
+    return final
 
 
 class ComponentDef:
@@ -212,10 +219,17 @@ class ObjectDef:
         if self.category not in CATEGORIES:
             raise ObjectError(f"category: one of {', '.join(CATEGORIES)}")
         ifc = data.get("ifc") or {}
+        if not isinstance(ifc, dict) or not all(isinstance(v, (list, tuple)) for v in ifc.values()):
+            raise ObjectError("ifc: an object of schema -> [type class, predefined type, element type]")
         if "IFC4" not in ifc:
             raise ObjectError("ifc: an IFC4 entry [type class, predefined type, element type] is required")
         self.ifc = {k: tuple(v) for k, v in ifc.items()}
-        self.origin = tuple(float(v) for v in data.get("origin", (0.0, 0.0)))
+        try:
+            self.origin = tuple(float(v) for v in data.get("origin", (0.0, 0.0)))
+            if len(self.origin) != 2:
+                raise ValueError
+        except (TypeError, ValueError):
+            raise ObjectError("origin: two numbers [x, y]") from None
         self.params = _params(data.get("params", []), "params")
         self.materials = {}
         for slot, m in (data.get("materials") or {}).items():

@@ -114,3 +114,43 @@ def test_load_file_limits_size(tmp_path):
 def test_from_text_is_cached():
     text = objects.canonical(minimal())
     assert objects.from_text(text, "project") is objects.from_text(text, "project")
+
+
+def derived(**over):
+    d = minimal()
+    d["params"] = [
+        {"key": "base", "kind": "length", "label": "Base", "default": 0.4},
+        {"key": "w2", "kind": "length", "label": "Double", "default": "base * 2", "max": 100},
+        {"key": "wide", "kind": "length", "label": "Wide", "default": 0.3, "max": "tall * 3"},
+        {"key": "tall", "kind": "length", "label": "Tall", "default": 0.5},
+    ]
+    d.update(over)
+    return objects.load(d)
+
+
+def test_formula_default_from_text_value():
+    assert derived().values({"base": "0,5"})["w2"] == pytest.approx(1.0)
+
+
+def test_formula_default_with_junk_value_uses_default():
+    v = derived().values({"base": "abc"})
+    assert v["base"] == 0.4 and v["w2"] == pytest.approx(0.8)
+
+
+def test_clamped_value_propagates():
+    v = derived().values({"base": 99})
+    assert v["base"] == 50 and v["w2"] == 100
+
+
+def test_forward_limit_with_text_input():
+    d = derived()
+    assert d.values({"tall": "0,9", "wide": 5})["wide"] == pytest.approx(2.7)
+
+
+def test_malformed_ifc_and_origin():
+    with pytest.raises(ObjectError, match="ifc"):
+        objects.load(minimal(ifc="IFC4"))
+    with pytest.raises(ObjectError, match="ifc"):
+        objects.load(minimal(ifc={"IFC4": "chair"}))
+    with pytest.raises(ObjectError, match="origin"):
+        objects.load(minimal(origin="here"))
