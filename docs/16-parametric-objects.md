@@ -114,12 +114,15 @@ is written for KimBim (a small recursive-descent parser in `kimbim/objexpr.py`);
 |-------|--------|----------|
 | `box` | x, y, z, dx, dy, dz | IfcExtrudedAreaSolid, rectangle profile |
 | `cylinder` | r, h (axis +z from the part origin) | IfcExtrudedAreaSolid, circle profile |
-| `cone` | r1 (bottom), r2 (top), h; or `taper` on a box | IfcExtrudedAreaSolidTapered |
+| `cone` | r1 (at the part's origin), r2 (at the far end), h | IfcRevolvedAreaSolid |
+| `box` with `taper` | the far end's size as a fraction (0–1) | IfcExtrudedAreaSolidTapered |
 | `prism` | points (polygon in x, y), z, h | IfcExtrudedAreaSolid, arbitrary closed profile |
 | `revolve` | profile (points in x, z), angle (360 default) | IfcRevolvedAreaSolid |
-| `sweep` | profile (points) or `r` (a tube), path (points, optional fillet radius) | IfcFixedReferenceSweptAreaSolid; IfcSweptDiskSolid for tubes |
+| `sweep` | `r` (a tube) or profile (points), path (3D points) | IfcSweptDiskSolid for tubes; a profile becomes one extrusion per path segment |
 
-Points are lists of numbers or formulas. A shape too thin to exist (a size ≤ 0.1 mm) is skipped, as
+Points are lists of numbers or formulas, or generators: `{"ellipse": [cx, cy, rx, ry], "n": 12}`,
+`{"rounded_rect": [x, y, dx, dy, r], "n": 4}`. Box, cylinder, cone and prism take positions in the part's
+frame (`cylinder: {cx, cy, z, r, h}`). A shape too thin to exist (a size ≤ 0.1 mm) is skipped, as
 `Shape.box` does today.
 
 ### Placement
@@ -131,8 +134,11 @@ Points are lists of numbers or formulas. A shape too thin to exist (a size ≤ 0
  "rotate": {"axis": "away_from_centre", "angle": "splay"}}
 ```
 
+- `axes: ["y", "z", "x"]` names the world axes the part's local x, y and z run along (signed: `"-x"`),
+  for profiles drawn in an upright plane (a car's side, its wheels).
 - `at: [x, y, z]` moves the part; `rotate: {axis, angle}` turns it about its own origin. `axis` is `x`, `y`,
-  `z`, a vector, or `away_from_centre` (horizontal, pointing from the parent's centre to this copy: splayed legs).
+  `z`, a vector, or `away_from_centre` (each copy of a repeat tilts its far end away from the copies' centroid: splayed legs;
+  a single copy does not tilt).
 - `attach: "seat.anchors.back_edge"` sets the part's origin and orientation on an anchor; `at` and `rotate` then
   apply in the anchor's frame.
 - `when: "back != 'none'"` leaves the part out when false.
@@ -141,7 +147,7 @@ Points are lists of numbers or formulas. A shape too thin to exist (a size ≤ 0
 
 ### Anchors
 
-A part may declare named anchors: a point, an x direction and a z direction, in formulas.
+A part may have only anchors and no shape (a frame other parts hang from). A part may declare named anchors: a point, an x direction and a z direction, in formulas.
 
 ```json
 {"id": "seat", "box": {"x": 0, "y": 0, "z": "seat_h - 0.04", "dx": "width", "dy": "depth", "dz": 0.04},
@@ -154,7 +160,7 @@ A part may declare named anchors: a point, an x direction and a z direction, in 
 
 - Every shape has built-in anchors: `centre`, `top`, `bottom`, and for boxes `front`, `back`, `left`, `right`
   (face centres, facing out).
-- `pattern` anchors are a set of frames: `rect_corners` (the four corners, inset), `circle` (`count` spread
+- `pattern` anchors are a set of frames: `rect_corners` (always the four corners, inset; a repeat on it ignores `count`), `circle` (`count` spread
   evenly, from the repeat), `line` (from, to, count), `grid` (nx, ny, dx, dy). A repeat `on` a pattern anchor
   gets one copy per frame; `count` asks the pattern for that many.
 
@@ -195,8 +201,8 @@ Unchanged from D86 except the geometry:
   occurrences with mapped items, so repeats share geometry and schedules count by type.
 - Each shape is a native solid (table in §2), placed by an `IfcAxis2Placement3D` per copy; Body's
   representation type is `SweptSolid`, or `AdvancedSweptSolid` when it has tapered extrusions or sweeps.
-  IFC2X3 has no `IfcExtrudedAreaSolidTapered` or fixed-reference sweep: cones become revolves, profiled sweeps
-  become segments of extrusions.
+  Cones are revolves in both schemas. IFC2X3 has no `IfcExtrudedAreaSolidTapered`: a tapered box is written
+  untapered at its mean size there.
 - `KIMBIM_LibraryObject` on the type: `Object` (source and id, `office:chair`), `Parameters` (JSON, metres and
   degrees), `Library`, **`DefinitionHash`** (BLAKE3 of the definition's canonical JSON) and **`Definition`**
   (the full JSON as IfcText). So a plain IFC or a shared `.kim` holds everything needed to edit its objects
@@ -207,7 +213,7 @@ Unchanged from D86 except the geometry:
 
 | Source | Where | Notes |
 |--------|-------|-------|
-| **bundled** | `python/kimbim/objects/*.kimobj`, shipped | the 21 objects of D86, ported (§8) |
+| **bundled** | `python/kimbim/bundled_objects/*.kimobj`, shipped | the 21 objects of D86, ported (§8) |
 | **office** | the office library folder (preference, D86) | `.kimobj` files and IFC type files; **`.py` files are no longer read** |
 | **project** | the definitions carried by the model's types (§4) | what placed objects were made from |
 
