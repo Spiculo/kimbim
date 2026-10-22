@@ -91,3 +91,24 @@ def test_value_of():
     assert value_of("w / 2", {"w": 1.0}) == 0.5
     with pytest.raises(FormulaError):
         value_of([1, 2], {})
+
+
+def test_function_overflow_is_a_formula_error():
+    with pytest.raises(FormulaError, match="too large"):
+        ev("floor(1e308 * 10)")
+    with pytest.raises(FormulaError, match="too large"):
+        ev("round(1e308 * 10)")
+
+
+def test_deep_parse_is_a_formula_error(monkeypatch):
+    import inspect
+    import sys
+
+    monkeypatch.setattr(sys, "getrecursionlimit", sys.getrecursionlimit)
+    old = sys.getrecursionlimit()
+    sys.setrecursionlimit(len(inspect.stack(0)) + 60)
+    try:
+        with pytest.raises(FormulaError, match="nested"):
+            compile_formula("not " * 120 + "1")
+    finally:
+        sys.setrecursionlimit(old)

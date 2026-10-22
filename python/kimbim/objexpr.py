@@ -224,6 +224,8 @@ def _eval(node, env):
             return _FUNCTIONS[name][2](*values)
         except ValueError:
             raise FormulaError(f"math domain error in {name}", pos) from None
+        except OverflowError:
+            raise FormulaError("number too large", pos) from None
     a, b = _eval(node[1], env), _eval(node[2], env)
     if op == "==":
         return a == b
@@ -256,8 +258,12 @@ class Formula:
     def __init__(self, text: str):
         if len(text) > MAX_LENGTH:
             raise FormulaError(f"formula too long ({len(text)} characters, at most {MAX_LENGTH})")
-        parser = _Parser(text)
-        self.text, self.tree, self.names = text, parser.parse(), frozenset(parser.names)
+        try:
+            parser = _Parser(text)
+            tree = parser.parse()
+        except RecursionError:
+            raise FormulaError("formula nested too deeply") from None
+        self.text, self.tree, self.names = text, tree, frozenset(parser.names)
 
     def eval(self, env: Mapping[str, object]):
         try:
