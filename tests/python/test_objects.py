@@ -118,6 +118,8 @@ def test_from_text_is_cached():
 
 def derived(**over):
     d = minimal()
+    d["parts"] = [{"id": "b", "box": {"dx": "base", "dy": "base", "dz": "tall"}}]
+    d.pop("symbol", None)
     d["params"] = [
         {"key": "base", "kind": "length", "label": "Base", "default": 0.4},
         {"key": "w2", "kind": "length", "label": "Double", "default": "base * 2", "max": 100},

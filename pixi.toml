@@ -13,6 +13,7 @@ ifcopenshell = "0.9.0.*"
 occt = { version = "8.0.1.*", build = "novtk*" }
 blake3 = ">=1.0"
 numpy = "*"
+shapely = "*"
 maturin = ">=1.15,<2"
 pytest = ">=8"
 rust = ">=1.85"
