@@ -52,7 +52,7 @@ Measured (`kimbim-app --self-test`, integrated GPU): Duplex at 60 fps (vsync); a
 
 Not yet: colour by property, walk mode, measure, saved views, a "show spaces" toggle, section-box handles (the box is around the selection), and a fix for vsync double-waits in a bare top-level viewport.
 
-### M2 — Object data editor 🟡 (core done)
+### M2 — Object data editor 🟡 (classifications and a type manager left)
 Command/undo framework, property and pset editing, materials, types, classifications, bulk edit, schedules, save IFC (Plain mode).
 **Exit:** edit → save → reopen preserves everything; round-trip tests pass on the saved file.
 
@@ -64,7 +64,8 @@ Done in Slice 3 ([plan](superpowers/plans/2026-10-05-slice3-navigation-and-data-
 - Save / Save As with an unsaved-changes guard; the saved file round-trips;
 - Revit/ArchiCAD navigation; multi-select by Ctrl/Shift-click, box and tree.
 
-Not yet: materials, types (assign/edit), classifications, schedules, quantity take-off.
+Done since: building materials, surfaces and composites (D96), schedules and quantities with CSV/XLSX (D77), object types from the library (D86).
+Not yet: classifications (Uniclass, OmniClass), a type manager (assign, edit, update all).
 
 ### M3 — Modeler ✅ (automatic exit checks pass; the owner's check in Bonsai + a commercial viewer is pending — [12](12-m3-exit.md))
 Levels and grids, walls (layered, joins), slabs, openings, doors/windows, columns/beams, snapping, precise input, move/rotate/stretch.
@@ -75,11 +76,12 @@ Done in Slice 6: profile-based columns and beams, grid axes per level (auto tags
 Done in Slice 5: layered slab types, slabs by outline (concave too) or from a closed wall loop (outer faces), parametric doors and windows in walls with real openings, cascading deletes; a saved test house (walls, slab, door, window) validates against the IFC4 schema with 0 issues.
 Done in Slice 4: new IFC4 project (mm), levels, plan view, layered wall types, wall tool (snapping, typed lengths, ortho), L/T joins, delete, live 3D updates with undo/redo.
 
-### M4 — Libraries, cloning, drawings 🟡 (drawings done: Slices 14–16; the exit test passes in CI, `pixi run m4`)
+### M4 — Libraries, cloning, drawings ✅ (the exit test passes in CI, `pixi run m4`)
 Library browser and bundled library, copy/paste/duplicate/array/mirror/copy-to-storeys, plan/section/elevation generation, annotations, sheets, PDF export.
 **Exit:** the M3 house produces a plan, a section and an elevation on a sheet with a title block, exported to PDF. CI checks this automatically, as it checks M3.
 
 Slices (numbering continues after the architect-feedback track, Slices 9–13): **14 ✅ sections and elevations** → **15 ✅ plan drawings and annotation on drawings** ([plan](superpowers/plans/2026-10-07-slice15-plan-drawings-annotation.md)) → **16 ✅ sheets and PDF export (= M4 exit)** ([plan](superpowers/plans/2026-10-07-slice16-sheets-pdf.md)) → **17 ✅ everyday editing** (copy/paste, duplicate, Ctrl+drag copy, mirror, arrays, offset; [plan](superpowers/plans/2026-10-07-slice17-everyday-editing.md)).
+Libraries: the Library panel, Object tool and a bundled parametric library (D86); authoring objects without code is the next step for libraries ([16](16-parametric-objects.md)).
 M4 comes before the end of M5 (owner plan, 2026-10-07): drawings are what an architect hands to a client, and Combine options (Slice 22) needs the R4 merge engine, which is easier to judge once real projects with drawings exist.
 
 ### After M4: modeling gaps
@@ -120,11 +122,21 @@ Slices: **8 ✅ enable/open, Save version, History, Compare (colours + list), de
 Enable/disable versioning, Save version, history timeline, Compare (viewport coloring and before/after), design options, milestones, Combine options with conflict UI, object history panel, re-import with reconciliation review.
 **Exit:** two design options of the house are created, edited separately, compared and combined with one conflict resolved in the UI.
 
-## M6 — Checking
+## Archicad parity track ✅ (D74–D98, 2026-10-09 to 2026-10-22)
+After M5 the owner asked for Archicad feature parity before checking. Done: renovation status (D74), one-row window chrome and the Versions menu (D75), view cube, preset views and perspective (D76), schedules (D77), selection tools (D78), measure and the levels table (D79), split/trim/join (D80), checks (D81), the Python console (D82), DXF export (D83), 2D drafting (D84), underlays (D85), the object library (D86), tags and more dimensions (D87), stairs, ramps and railings (D88), input aids and touchpad (D89), the compact palette (D90), the owner's answers and configurable behaviour (D91–D93), the rename to KimBim (D94), 3D cut planes (D95), materials (D96), wall and object configuration, curved walls (D97) and tooling (D98). Status per tool: [14](14-tool-inventory.md).
+
+## M6 — Checking 🟡 (in-app checks done, D81; pre-commit checks left)
 Schema validation, IDS checks with IfcTester, clash between selections, configurable local pre-commit checks.
+
+Done in D81: the Checks panel runs schema validation (EXPRESS rules included), IDS files kept in the project, hard and clearance clashes between classes or Find & Select criteria, and model checks (duplicates, rooms, zero-length walls, elements not on a level, hostless openings), with HTML/JSON reports.
+Not yet: checks chosen per project that run when a version is saved and warn or block it; BCF export of the results.
+**Exit:** a project's chosen checks run on Save version; a failing blocking check stops the save with a list of the elements, and a warning check saves and records the result with the version.
 
 ## After the MVP: full IFC4X3
 New IFC4X3 projects, schema upgrade command, IFC4X3 test suites become release-blocking ([02](02-data-model-and-format.md#ifc-schema-version)).
+
+## Next (2026-10-22)
+In order: finish **M6** (pre-commit checks, the exit above) → **parametric object authoring** ([16](16-parametric-objects.md)) → **R4 reconciliation** (re-import with regenerated GlobalIds) → **R3** property-level diff and the speed benchmark → the M2 leftovers. [14](14-tool-inventory.md#largest-gaps) lists the largest remaining tool gaps (DWG, imperial units, curtain walls). The owner's M3 check in Bonsai and a commercial viewer is still open ([12](12-m3-exit.md)).
 
 ## Then
 See [08-future.md](08-future.md). Push/pull to Git remotes is the cheapest next step, because the storage is already Git.

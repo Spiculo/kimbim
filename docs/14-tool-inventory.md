@@ -5,7 +5,7 @@ A checklist of the tools that mainstream BIM and CAD apps give architects, with 
 Use it to pick the next slices. [04](04-app-features.md) stays the source of decided priorities; this document is
 wider and lists tools 04 does not mention yet.
 
-**Status as of branch `slice-9` (commit 619f876, 2026-10-06).**
+**Status as of `main` (commit 22e2d84, 2026-10-22).**
 
 ## How to read it
 
@@ -34,9 +34,9 @@ release notes, so check before relying on a single cell.
 |------|-----|--------|-----|-------|
 | Open / save IFC | AC RV VW BB | ✅ | P0 | IFC4; IFC2X3 import through IfcOpenShell (not tested yet) |
 | New project | all | ✅ | P0 | IFC4 in mm, levels |
-| Project templates (units, levels, types, views, title blocks) | AC RV VW | ⬜ | P0 | |
-| Autosave, crash recovery | AC RV VW | ⬜ | P0 | oplog ([03](03-versioning.md)) |
-| Recent projects | all | ⬜ | P0 | |
+| Project templates (units, levels, types, views, title blocks) | AC RV VW | ✅ | P0 | D72: office templates (File › New from template, Save as template) |
+| Autosave, crash recovery | AC RV VW | ✅ | P0 | D72: recovery copies on a timer, offered again after a crash; no oplog yet ([03](03-versioning.md)) |
+| Recent projects | all | ✅ | P0 | File › Recent files |
 | Imperial units, unit preferences | all | ⬜ | P0 | Metric only today |
 | Project info (address, client, number) used in title blocks | AC RV VW | ✅ | new | Slice 16: *File › Project info…*, in IFC fields (D63) |
 | Survey point, project base point, georeferencing | AC RV VW BB | ⬜ | P2 | `ifcopenshell.api.georeference` |
@@ -62,7 +62,7 @@ release notes, so check before relying on a single cell.
 | Free clipping planes, several at once | AC RV BB | ✅ | P0 | D95: the Cut planes panel (several, oblique, flip, offset) |
 | Saved views (layers, level, plan/3D, cut) | AC RV VW BB | ✅ | P1 | D57 |
 | Lines-only / hidden-line display | all | ✅ | — | L |
-| Visual styles: shaded, textured, sketch, X-ray | all | 🟡 | new | Shaded and lines only |
+| Visual styles: shaded, textured, sketch, X-ray | all | 🟡 | new | Shaded, textured (D96), white model, lines only; no sketch or X-ray |
 | Shadows and sun position | AC RV VW SU | ✅ | new | D96: View › Sun shadows, View › Sun... (azimuth/altitude or place, date, time), White model |
 | Hover info (name, type, level) | AC RV VW | ✅ | — | |
 | Colour by property, class or type | AC RV VW BB | ✅ | P1 | D73 override rules (property, class, kind, layer, material) |
@@ -98,7 +98,7 @@ release notes, so check before relying on a single cell.
 | Mirror | all | ✅ | P1 | Slice 17 (Ctrl+M; Ctrl mirrors a copy) |
 | Array: linear, rectangular, polar | all | 🟡 | P1 | Slice 17: linear and polar (Ctrl+U); rectangular = two linear |
 | Offset (parallel copy) | all | ✅ | new | Slice 17: walls (parallel copy), slabs (grow/shrink) |
-| Trim, extend to boundary, split, join | all | 🟡 | new | D80: walls and beams (split, trim/extend to an element, a grid line or a corner, join/merge, unjoin; Shift+S, Shift+T, Shift+J). Not yet: 2D lines, curved walls |
+| Trim, extend to boundary, split, join | all | 🟡 | new | D80: walls and beams (split, trim/extend to an element, a grid line or a corner, join/merge, unjoin; Shift+S, Shift+T, Shift+J). D98: curved walls split. Not yet: 2D lines, trimming curved walls |
 | Align (to an edge or face) | RV VW | ⬜ | new | |
 | Elevate (change vertical position) | AC RV | 🟡 | new | Wall height; no general elevate |
 | Resize / scale | AC VW SU | ✅ | new | D98: Edit › Resize (about the selection's middle) |
@@ -128,9 +128,9 @@ release notes, so check before relying on a single cell.
 |------|-----|--------|-----|-------|
 | Walls: straight, layered, L/T joins | all | ✅ | P0 | |
 | Walls: curved | all | ✅ | new | D97: Wall tool › Curved (3 points), layered, doors/windows, stretch, split, fillet, mitred joins with straight and curved walls |
-| Walls: slanted, trapezoid, custom profile | AC RV VW | 🟡 | new | D97: slant angle; no double-slanted or complex profiles yet |
+| Walls: slanted, trapezoid, custom profile | AC RV VW | ✅ | new | D97: slant angle, double slant, complex profiles (Model › Save shape as wall profile) |
 | Wall flip, reference line (core / face) | all | ✅ | P0 | D97: six reference lines (outside face default), Model › Flip walls |
-| Junction priorities (which layers run through) | AC RV | ✅ | new | D97: building-material priority → `IfcMaterialLayer.Priority`, used by the wall regenerator |
+| Junction priorities (which layers run through) | AC RV | ✅ | new | D97: building-material priority → `IfcMaterialLayer.Priority`, used by the wall regenerator; Model › Wall junctions overrides per wall |
 | Wall attached to a slab or roof above | AC RV | 🟡 | new | D97: top linked to the level above (Properties › Geometry › Top link); Model › Trim walls to roof |
 | Slabs by outline or from walls | all | ✅ | P0 | |
 | Slab openings | all | ✅ | P0 | |
@@ -146,14 +146,14 @@ release notes, so check before relying on a single cell.
 | Stairs: landings, L/U shapes, spiral, by sketch | all | 🟡 | P1 | D88: L, U, by sketch with landings, risers from the height, code warnings, floor opening, plan symbol; no winders or spiral yet |
 | Railings | all | ✅ | P1 | D88: on a stair or ramp's sides (they follow it) or by path; posts, top rail, balusters |
 | Ramps | AC RV VW | ✅ | new | D88: straight and L, slope with a 1:12 warning, plan arrow |
-| Roofs: flat | all | ⬜ | P1 | |
-| Roofs: pitched, hip, gable, multi-plane, by footprint | all | ⬜ | P1 | |
+| Roofs: flat | all | ✅ | P1 | Slice 19 (D66) |
+| Roofs: pitched, hip, gable, multi-plane, by footprint | all | ✅ | P1 | Slice 19 (D66): shed, gable, hip, a slope per edge; walls trimmed to the roof |
 | Shell / free-form roof | AC RV | ⬜ | new | |
 | Curtain walls (grids, mullions, panels) | AC RV VW | ⬜ | P2 | |
 | Ceilings | RV VW | ⬜ | new | Archicad uses slabs |
-| Zones / rooms / spaces (auto from walls, area, name, number) | all | ⬜ | P1 | Needed for area schedules and room tags |
+| Zones / rooms / spaces (auto from walls, area, name, number) | all | ✅ | P1 | Slice 18 (D65): Room tool (Z), stamps, room schedule |
 | Area plans (gross, rentable) | RV VW | ⬜ | new | |
-| Generic object (extrusion, revolve, mesh import) | all | ⬜ | P1 | |
+| Generic object (extrusion, revolve, mesh import) | all | ⬜ | P1 | Part of the parametric object system ([16](16-parametric-objects.md)) |
 | Morph / free-form modelling, push/pull | AC SU VW | ⬜ | new | Massing and odd shapes |
 | Conceptual massing with floor areas | RV VW | ⬜ | new | |
 | Models / modules placed on several levels | AC RV VW | ✅ | — | D58 (Archicad Hotlinked Modules, Revit Groups) |
@@ -166,16 +166,16 @@ release notes, so check before relying on a single cell.
 | Building pad / cut-and-fill | RV VW | ⬜ | new | |
 | Hardscape, paths, parking | VW RV | ⬜ | new | |
 | Plants and landscape | VW AC | ⬜ | new | |
-| North direction, sun study | all | ⬜ | new | |
+| North direction, sun study | all | ✅ | new | D87: north arrow from IFC TrueNorth; D96: View › Sun... by place, date and time; no animation (§16) |
 
 ## 8. Objects and libraries
 
 | Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Library browser (thumbnails, search, categories) | all | ✅ | P0 | D86: Library panel |
-| Bundled library: furniture, sanitary, kitchen, lighting, people, trees, cars | all | 🟡 | P0 | D86: 21 parametric objects generated in code; no lighting yet |
+| Bundled library: furniture, sanitary, kitchen, lighting, people, trees, cars | all | 🟡 | P0 | D86: 21 parametric objects generated in code, a material per part (D97); no lighting yet |
 | Place a library object | all | ✅ | P0 | D86: Object tool (Shift+O), Tab turns |
-| Parametric object authoring | AC RV VW | ⬜ | new | Archicad GDL, Revit Family Editor, Vectorworks plug-in objects. Bonsai uses IFC types plus Python |
+| Parametric object authoring | AC RV VW | ⬜ | new | Archicad GDL, Revit Family Editor, Vectorworks plug-in objects. Bonsai uses IFC types plus Python. Today only Python `define()` files (D86). Design: [16](16-parametric-objects.md) |
 | Office libraries (shared folder or repo) | AC RV VW | 🟡 | P1 | D86: a folder of Python objects and IFC type files |
 | Online object catalogues (BIMobject and others) | AC RV VW | 🔮 | new | |
 | Paste between projects (with types and materials) | all | ⬜ | P1 | |
@@ -185,8 +185,8 @@ release notes, so check before relying on a single cell.
 | Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Layers (shown, locked, active) | AC VW | ✅ | — | D57 |
-| Layer combinations / view templates | AC RV VW | 🟡 | new | Saved views store layer states; no reusable templates |
-| Graphic overrides / view filters (rules by property) | AC RV VW | ⬜ | new | Doc 13 lists per-view overrides as open |
+| Layer combinations / view templates | AC RV VW | 🟡 | new | D73: layer combinations in purposes; saved views store layer states; no view templates |
+| Graphic overrides / view filters (rules by property) | AC RV VW | ✅ | new | D73: override rules by property, class, kind, layer, material, chosen per purpose |
 | Classifications (Uniclass, OmniClass, local) | AC RV VW BB | ⬜ | P1 | |
 | Element types: assign, edit type, update all | all | 🟡 | P0 | Type values and overrides ✅ (D50); no type manager |
 | Property editing, psets, bulk edit | all | ✅ | P0 | |
@@ -203,7 +203,7 @@ release notes, so check before relying on a single cell.
 | Material editor (cut fill, surface, physical data) | all | ✅ | P0 | D96: Graphics › Building materials / Surfaces / Composites; IFC materials, styles and psets |
 | Pen sets / line weights by scale | AC RV VW | 🟡 | new | D73: pen sets (255 pens), element styles, purposes; weights don't change with the scale yet |
 | Graphic overrides and model view options (visibility by kind, rules) | AC RV VW | ✅ | new | D73: visibility sets, override rules (property, layer, material), layer combinations in purposes |
-| Line types and fill patterns (hatches) | all | 🟡 | new | D73: line types (dash patterns in mm); cut fills are solid, no hatches yet |
+| Line types and fill patterns (hatches) | all | ✅ | new | D73: line types (dash patterns in mm); D84: fill patterns; D96: cut fills hatched on screen, in print and DXF |
 | Surfaces / textures for 3D and rendering | all | ✅ | new | D96: surfaces (colour, transparency, shine, picture texture, box-mapped) per face in 3D, per-side overrides (D97); no rendering |
 | Attribute manager (import/export standards between projects) | AC RV VW | ⬜ | new | |
 
@@ -281,7 +281,7 @@ release notes, so check before relying on a single cell.
 | Real-time textured 3D | all | ✅ | new | D96: surface pictures box-mapped; drawn defaults for brick, timber, tiles, stone, roof tiles |
 | Photorealistic rendering | AC RV VW | ⬜ | new | Archicad CineRender, Revit cloud render, Twinmotion link. Could export to Blender |
 | AI visualiser (sketch to image) | AC VW | 🔮 | new | |
-| Sun / shadow studies, animations | all | ⬜ | new | |
+| Sun / shadow studies, animations | all | 🟡 | new | D96: sun shadows for a place, date and time; no animations |
 | Walkthrough video, VR | AC RV VW | ⬜ | P2 | |
 
 ## 17. Collaboration and versions
@@ -290,7 +290,7 @@ release notes, so check before relying on a single cell.
 |------|-----|--------|-----|-------|
 | Save version, History, Compare (colours and list) | — | ✅ | P0 | KimBim's own feature (Slice 8). Competitors have backups and Revit compare add-ins at most |
 | Milestones, object history, before/after | — | ✅ | P0 | Slice 20 (M5) |
-| Combine options with conflict UI | — | ⬜ | P1 | M5 exit |
+| Combine options with conflict UI | — | ✅ | P1 | Slice 22 (D69), M5 exit |
 | Several people on one project (Teamwork, Worksharing, Project Sharing) | AC RV VW | 🔮 | P2 | Git remotes first ([08](08-future.md)) |
 | External references (link another IFC/project, hotlinks, xrefs) | all | ⬜ | new | Models (D58) cover models inside one project only |
 | Copy / monitor linked elements | RV | ⬜ | new | |
@@ -306,7 +306,7 @@ release notes, so check before relying on a single cell.
 | IFC export settings (what to export, property mapping) | AC RV VW | ⬜ | new | |
 | Re-import with reconciliation report | — | ⬜ | P1 | |
 | DWG/DXF import (underlay and convert) | all | 🟡 | new | D85: DXF as an underlay (units, exploded blocks, snapping to ends, midpoints, crossings). No DWG yet, no convert to 2D elements. Architects receive most survey and consultant data as DWG |
-| PDF import | AC RV VW | ⬜ | new | |
+| PDF import | AC RV VW | 🟡 | new | D85: a PDF page as an underlay (an image); no vectors |
 | SketchUp, Rhino, OBJ, FBX import | AC RV VW | ⬜ | new | |
 | Point clouds | AC RV VW | ⬜ | new | |
 | Rhino / Grasshopper live link | AC RV VW | ⬜ | new | |
@@ -338,18 +338,20 @@ release notes, so check before relying on a single cell.
 
 ## Largest gaps
 
-These are the gaps that most often stop an architect from finishing a real project in KimBim, roughly in the order
-they would come up:
+The first list (2026-10-07) is done except DWG: drawings and sheets (M4), rooms, roofs, everyday editing, the
+object library, 2D drafting and fills, pen sets and cut fills, the navigation backlog and renovation status.
 
-1. **Drawings and sheets** (§11, §13, §14): sections, elevations, sheets with title blocks and PDF export. This is the M4 exit and the deliverable clients pay for.
-2. **Rooms / zones with areas**, plus tags and room schedules (§6, §13, §15).
-3. **Roofs** (§6). Almost every house has one.
-4. **Everyday editing**: copy/paste, duplicate, mirror, array, offset, trim/extend (§4).
-5. **Library objects and furniture** (§8).
-6. **DWG import as an underlay** (§18, §12). Most projects start from a survey in DWG.
-7. **2D drafting and fills** for details (§12).
-8. **Pen sets, line types and material cut fills** (§10), so printed drawings look professional.
-9. **Navigation backlog**: ~~view cube, preset views, perspective~~ done (D76); touchpad (§2).
-10. ~~**Renovation status** (§9), needed for refurbishment projects.~~ Done (D74).
+What now most often stops an architect from finishing a real project, roughly in the order it would come up:
 
-Next step: the owner confirms or reorders this list, and gives priorities to the `new` rows. 04 is then updated to match.
+1. **DWG in and out** (§14, §18). DXF works both ways (D83, D85); most surveys and consultants send DWG.
+2. **Parametric object authoring** (§8): make and customise objects (a chair's legs, their angle, where they meet the seat, the backrest) without writing Python. Design: [16](16-parametric-objects.md).
+3. **Imperial units** (§1). Metric only; blocks every US office.
+4. **Curtain walls** (§6) and **sloped slabs / slab edges** (§6).
+5. **Detail views and markers** linked to the model (§11, §13), and **title block templates** (§14).
+6. **Schedules on sheets** and **drawing/sheet lists** (§14, §15).
+7. **Re-import with reconciliation** (§18): the R4 half of the roadmap still to do.
+8. **Classifications and a type manager** (§9): the M2 leftovers.
+9. **Terrain** (§7).
+10. **BCF issues** (§17), for working with consultants.
+
+Next step: the owner confirms or reorders this list. 04 is then updated to match.

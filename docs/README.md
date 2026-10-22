@@ -24,6 +24,7 @@ These documents guide development. They come from the original spec (`../doc.md`
 | 13 | [Architect Feedback](13-architect-feedback.md) | The owner's first hands-on notes and what changed |
 | 14 | [Tool Inventory](14-tool-inventory.md) | The tools Archicad, Revit, Vectorworks and Bonsai give architects, and which ones KimBim still lacks |
 | 15 | [Scripting](15-scripting.md) | The Python console: the open model, selection, undoable edits, running scripts |
+| 16 | [Parametric Objects](16-parametric-objects.md) | Customisable library objects as data: parameters, formulas, parts, anchors, the Object Editor |
 | — | [Decision Log](decisions.md) | Every architectural decision and its status |
 | — | [Open Questions](open-questions.md) | What is still undecided |
 | — | [Glossary](glossary.md) | BIM / IFC / VCS terms |
