@@ -1,13 +1,13 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 # 16 — Parametric objects: customisable library objects as data
 
-**Status: Proposed (D99, 2026-10-22).** Approved by the owner in conversation; the implementation plans come next.
+**Status: Decided (D99, 2026-10-22); part A built.** Part B (the Object Editor, §6) is next.
 
 ## Why
 
-Today's library (D86) is 21 Python functions in `python/kimbim/library.py`, each with a short, fixed list of
-parameters. The chair has width, depth, height and seat height, and always four square legs at the corners
-(`_legs()`). Offices add objects by writing Python files that call `define()`, which KimBim runs in-process.
+Before D99 the library (D86) was 21 Python functions in `python/kimbim/library.py`, each with a short, fixed list of
+parameters. The chair had width, depth, height and seat height, and always four square legs at the corners
+(`_legs()`). Offices added objects by writing Python files that called `define()`, which KimBim ran in-process.
 
 Two problems:
 
@@ -84,7 +84,10 @@ Object Editor writes it, so nobody needs to type it by hand.
   as `Param.clean` does today, `count` rounded first.
 - `show_when` hides a parameter whose condition is false (the backrest's settings when the back is *none*). Hidden
   parameters keep their values.
-- `group` (optional) puts parameters under a heading in Properties (*Legs*, *Back*).
+- `group` (optional) puts parameters under a heading in Properties (*Legs*, *Back*). (Part A stores and lists
+  `group`; the panels show the headings with part B.)
+- Parameter labels are unique within an object. An unreadable `choice` or `bool` value in an edit fails the edit;
+  it never silently takes the default.
 - `width`, `depth` and `height` keep their meaning: the type name (`Chair 450x520x850`) and the placement preview
   box use them, as today.
 
@@ -102,11 +105,13 @@ is written for KimBim (a small recursive-descent parser in `kimbim/objexpr.py`);
 - No assignment, no loops, no attribute access beyond the names above, no strings other than literals.
 - Limits: 500 characters per formula, nesting depth 32, **5,000 solids per object** after repeats, 50 parts deep
   through `use`. Going over is an error for that object (§7), never a hang.
+- Work budget: every part copy evaluated counts against 4 × 5,000 = 20,000, including copies that end up
+  skipped (`when` false, too thin), so a hostile file cannot burn time inside the solid limit.
 - Errors name the field: `parts.leg.cylinder.h: unknown name "seat_hh"`.
 
 ## 2. Parts
 
-`parts` is a list; each part has a unique `id` and one shape, or a `use` (below).
+`parts` is a list; each part has a unique `id` (matching `^[a-z][a-z0-9_]*$`) and one shape, or a `use` (below).
 
 ### Shapes
 
@@ -121,7 +126,7 @@ is written for KimBim (a small recursive-descent parser in `kimbim/objexpr.py`);
 | `sweep` | `r` (a tube) or profile (points), path (3D points) | IfcSweptDiskSolid for tubes; a profile becomes one extrusion per path segment |
 
 Points are lists of numbers or formulas, or generators: `{"ellipse": [cx, cy, rx, ry], "n": 12}`,
-`{"rounded_rect": [x, y, dx, dy, r], "n": 4}`. Box, cylinder, cone and prism take positions in the part's
+`{"rounded_rect": [x, y, dx, dy, r], "n": 4}` (`rounded_rect` needs n ≥ 1, `ellipse` n ≥ 3). Box, cylinder, cone and prism take positions in the part's
 frame (`cylinder: {cx, cy, z, r, h}`). A shape too thin to exist (a size ≤ 0.1 mm) is skipped, as
 `Shape.box` does today.
 
@@ -135,7 +140,8 @@ frame (`cylinder: {cx, cy, z, r, h}`). A shape too thin to exist (a size ≤ 0.1
 ```
 
 - `axes: ["y", "z", "x"]` names the world axes the part's local x, y and z run along (signed: `"-x"`),
-  for profiles drawn in an upright plane (a car's side, its wheels).
+  for profiles drawn in an upright plane (a car's side, its wheels). The three axes must be distinct and form a
+  right-handed set; a left-handed one is an error.
 - `at: [x, y, z]` moves the part; `rotate: {axis, angle}` turns it about its own origin. `axis` is `x`, `y`,
   `z`, a vector, or `away_from_centre` (each copy of a repeat tilts its far end away from the copies' centroid: splayed legs;
   a single copy does not tilt).
@@ -186,7 +192,7 @@ copy's index and the count (slat `k` at `x: "0.05 + i * (width - 0.1) / (n - 1)"
 
 ## 3. The plan symbol
 
-- `symbol` (optional) is 2D in object metres: `line`, `rect`, `circle`, `arc`, `polygon`, with formulas,
+- `symbol` (optional) is 2D in object metres: kinds `line`, `rect`, `circle`, `arc`, `polygon`, with formulas,
   `when` and `repeat` as parts have. The bundled objects keep their drawn symbols (the WC's bowl, the bed's
   pillows).
 - Without `symbol`, the symbol is the **outline of the parts seen from above**: each solid's plan footprint,
@@ -200,13 +206,18 @@ Unchanged from D86 except the geometry:
 - One **IFC type per object and parameter set** (D50), with the Body and Plan representation maps; placements are
   occurrences with mapped items, so repeats share geometry and schedules count by type.
 - Each shape is a native solid (table in §2), placed by an `IfcAxis2Placement3D` per copy; Body's
-  representation type is `SweptSolid`, or `AdvancedSweptSolid` when it has tapered extrusions or sweeps.
+  representation type is `SweptSolid`, or `AdvancedSweptSolid` when it has tapered extrusions or sweeps. In
+  IFC2X3 a body containing a disk sweep uses `SolidModel` instead (IFC2X3's `AdvancedSweptSolid` rejects area
+  sweeps beside a disk sweep).
   Cones are revolves in both schemas. IFC2X3 has no `IfcExtrudedAreaSolidTapered`: a tapered box is written
   untapered at its mean size there.
 - `KIMBIM_LibraryObject` on the type: `Object` (source and id, `office:chair`), `Parameters` (JSON, metres and
   degrees), `Library`, **`DefinitionHash`** (BLAKE3 of the definition's canonical JSON) and **`Definition`**
   (the full JSON as IfcText). So a plain IFC or a shared `.kim` holds everything needed to edit its objects
   again; the store keeps identical text once (records are content-addressed).
+- Each type also stores **`Uses`**: every library definition reached through `use`, transitively. The
+  `DefinitionHash` covers the definition plus its Uses. A project definition resolves `use` only from its own
+  stored Uses, never from the library, so a project stays self-contained.
 - Materials per part as D97 (the constituent set and styled items by slot).
 
 ## 5. Where definitions come from
@@ -219,8 +230,9 @@ Unchanged from D86 except the geometry:
 
 - A placed object's parameters always regenerate from **its own definition** (the one on its type), so
   changing a library file never changes a project silently.
-- When the library has the same `source:id` with another hash, the Library panel and Properties show
-  *Update from library*: it regenerates the selected objects' types from the library's definition, keeping
+- When the library has the same `source:id` with another hash (the hash of the definition plus its Uses),
+  Properties shows *Update from library* for the selection, and *Model › Update library objects* updates every
+  placed object. It regenerates the selected objects' types from the library's definition, keeping
   parameter values whose key and kind still exist (one undo step). Archicad reloads library parts on open; KimBim
   asks, because a project is versioned and a silent change would show up as an unexplained diff.
 - Library files that fail to load (bad JSON, unknown kind, formula error at the defaults) are listed in the Library

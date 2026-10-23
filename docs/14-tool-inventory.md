@@ -173,10 +173,10 @@ release notes, so check before relying on a single cell.
 | Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
 | Library browser (thumbnails, search, categories) | all | ✅ | P0 | D86: Library panel |
-| Bundled library: furniture, sanitary, kitchen, lighting, people, trees, cars | all | 🟡 | P0 | D86: 21 parametric objects generated in code, a material per part (D97); no lighting yet |
+| Bundled library: furniture, sanitary, kitchen, lighting, people, trees, cars | all | 🟡 | P0 | D86/D99: 21 objects as `.kimobj`, a material per part (D97); the chair fully customisable; no lighting yet |
 | Place a library object | all | ✅ | P0 | D86: Object tool (Shift+O), Tab turns |
-| Parametric object authoring | AC RV VW | ⬜ | new | Archicad GDL, Revit Family Editor, Vectorworks plug-in objects. Bonsai uses IFC types plus Python. Today only Python `define()` files (D86). Design: [16](16-parametric-objects.md) |
-| Office libraries (shared folder or repo) | AC RV VW | 🟡 | P1 | D86: a folder of Python objects and IFC type files |
+| Parametric object authoring | AC RV VW | 🟡 | new | D99: `.kimobj` definitions (parameters, formulas, parts, anchors, repeats, variants), stored on their types; Object Editor next. Archicad GDL, Revit Family Editor, Vectorworks plug-in objects. Design: [16](16-parametric-objects.md) |
+| Office libraries (shared folder or repo) | AC RV VW | 🟡 | P1 | D99: a folder of `.kimobj` files and IFC type files |
 | Online object catalogues (BIMobject and others) | AC RV VW | 🔮 | new | |
 | Paste between projects (with types and materials) | all | ⬜ | P1 | |
 
@@ -344,7 +344,7 @@ object library, 2D drafting and fills, pen sets and cut fills, the navigation ba
 What now most often stops an architect from finishing a real project, roughly in the order it would come up:
 
 1. **DWG in and out** (§14, §18). DXF works both ways (D83, D85); most surveys and consultants send DWG.
-2. **Parametric object authoring** (§8): make and customise objects (a chair's legs, their angle, where they meet the seat, the backrest) without writing Python. Design: [16](16-parametric-objects.md).
+2. **Parametric object authoring** (§8): make and customise objects without writing code. Part A (the `.kimobj` engine, D99) is built; the Object Editor (part B) is next. Design: [16](16-parametric-objects.md).
 3. **Imperial units** (§1). Metric only; blocks every US office.
 4. **Curtain walls** (§6) and **sloped slabs / slab edges** (§6).
 5. **Detail views and markers** linked to the model (§11, §13), and **title block templates** (§14).
