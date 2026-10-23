@@ -270,6 +270,7 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     connect(m_properties, &PropertiesPanel::addPropertyRequested, this, &MainWindow::addPropertyDialog);
     connect(m_properties, &PropertiesPanel::addPropertySetRequested, this, &MainWindow::addPropertySetDialog);
     connect(m_properties, &PropertiesPanel::typeEditRequested, this, &MainWindow::typeEditDialog);
+    connect(m_properties, &PropertiesPanel::updateFromLibraryRequested, this, [this] { updateFromLibrary(); });
     connect(m_properties, &PropertiesPanel::resetToTypeRequested, this, &MainWindow::resetToType);
     connect(m_tree, &ModelTreePanel::isolateRequested, m_viewport, &Viewport::isolate);
     onEachView([this](Viewport* v) { connect(v, &Viewport::dragMoved, this, &MainWindow::dragMoveTo); });
@@ -2236,6 +2237,10 @@ void MainWindow::buildModelingToolbar()
     flipAction->setObjectName(QStringLiteral("actionFlipWalls"));
     flipAction->setToolTip(tr("Mirror the selected walls' layers about their reference lines"));
     connect(flipAction, &QAction::triggered, this, [this] { flipWalls(m_selection); });
+    QAction* updateObjects = model->addAction(tr("Update library objects"));
+    updateObjects->setObjectName(QStringLiteral("actionUpdateLibraryObjects"));
+    updateObjects->setToolTip(tr("Regenerate every placed object whose library definition changed"));
+    connect(updateObjects, &QAction::triggered, this, [this] { updateFromLibrary(true); });
     // D98: Archicad's Grid System: a rectangular set of grid axes at once.
     QAction* gridSystem = model->addAction(tr("Grid s&ystem..."));
     gridSystem->setObjectName(QStringLiteral("actionGridSystem"));
@@ -6403,6 +6408,16 @@ bool MainWindow::flipWalls(const QStringList& guids)
     refreshSnapData();
     m_status->showMessage(tr("%n wall(s) flipped", nullptr, r.value("changed").toInt()));
     return true;
+}
+
+void MainWindow::updateFromLibrary(bool all)
+{
+    const QJsonObject r = bridge("update_from_library", {all ? QString() : jsonList(m_selection)});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not update from the library"), r.value("error").toString());
+        return;
+    }
+    afterEdit(r);
 }
 
 bool MainWindow::deleteSelection()

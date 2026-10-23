@@ -4,6 +4,7 @@
 #include <QAction>
 #include <QComboBox>
 #include <QJsonArray>
+#include <QPushButton>
 #include <QSignalSpy>
 #include <QTreeWidgetItem>
 #include <QtTest>
@@ -45,6 +46,24 @@ QJsonObject withChoices()
 class TestPropertiesPanel : public QObject {
     Q_OBJECT
 private slots:
+    void updateFromLibraryButton()
+    {
+        kimbim::PropertiesPanel panel;
+        QSignalSpy spy(&panel, &kimbim::PropertiesPanel::updateFromLibraryRequested);
+        QJsonObject merged{{"count", 1}, {"guids", QJsonArray{"g"}}, {"types", QJsonArray{"IfcFurniture"}},
+                           {"name", QJsonObject{{"value", "Stool"}, {"varies", false}}},
+                           {"psets", QJsonObject{}}, {"library_update", 1}};
+        panel.showMulti(merged);
+        auto* button = panel.findChild<QPushButton*>(QStringLiteral("libraryUpdate"));
+        QVERIFY(button);
+        button->click();
+        QCOMPARE(spy.count(), 1);
+        merged.remove("library_update");
+        panel.showMulti(merged);
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete); // the old item widgets go
+        QVERIFY(!panel.findChild<QPushButton*>(QStringLiteral("libraryUpdate")));
+    }
+
     // D96/D97: list values (reference line, surfaces, the composite) are drop-downs.
     void choicesAreDropDowns()
     {

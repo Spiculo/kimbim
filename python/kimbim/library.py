@@ -885,4 +885,78 @@ def set_object_parameter(guids_json: str, name: str, value, scope: str = "") -> 
     return B._dump(r)
 
 
+def _outdated(elements) -> list:
+    """[(element, project definition, values, type, library definition)] whose library has another version
+    (its text or the text of an object it uses differs: the DefinitionHash)."""
+    out = []
+    for e in elements:
+        found = _object_of(e)
+        if found is None:
+            continue
+        obj, values, t = found
+        current = get(obj.ref)
+        if isinstance(current, objects.ObjectDef) and _hash_of(current) != _hash_of(obj):
+            out.append((e, obj, values, t, current))
+    return out
+
+
+def _targets(guids_json: str):
+    from . import app_bridge as B
+
+    if guids_json in ("", "[]"):
+        return [e for e in B._model.by_type("IfcElement") if _object_of(e) is not None]
+    return B._elements(guids_json)
+
+
+def library_updates(guids_json: str = "") -> str:
+    """How many of these placed objects (all, given "") have a newer definition in the library (D99)."""
+    from . import app_bridge as B
+    from . import authoring as A
+
+    if B._model is None:
+        return A._fail("no model open")
+    return B._dump({"ok": True, "outdated": len(_outdated(_targets(guids_json)))})
+
+
+def update_from_library(guids_json: str = "") -> str:
+    """Regenerate these placed objects (all, given "") from the library's definition, keeping every
+    parameter value whose key and kind still exist. One undo step."""
+    import ifcopenshell.api.type
+
+    from . import app_bridge as B
+    from . import authoring as A
+
+    if B._model is None:
+        return A._fail("no model open")
+    todo = _outdated(_targets(guids_json))
+    if not todo:
+        return A._fail("these objects already match the library")
+    groups: dict = {}
+    for e, obj, values, t, current in todo:
+        kinds = {p.key: p.kind for p in current.params}
+        kept = {k: v for k, v in values.items() if k in kinds and obj.param(k) is not None and kinds[k] == obj.param(k).kind}
+        try:
+            new_values = current.values(kept)
+            current.shape(new_values)
+        except (ObjectError, ValueError) as ex:
+            return A._fail(f"{current.name}: {ex}")
+        key = (t.id(), json.dumps(new_values, sort_keys=True))
+        groups.setdefault(key, (t, current, new_values, []))[3].append(e)
+
+    def action():
+        changed = []
+        for t, current, new_values, elements in groups.values():
+            target = _type_for(current, new_values)
+            ifcopenshell.api.type.assign_type(B._model, related_objects=elements, relating_type=target)
+            _remove_type_if_unused(t)
+            changed += [e.GlobalId for e in elements]
+        return len(changed), changed, []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return A._fail(f"{type(ex).__name__}: {ex}")
+    return B._dump(r)
+
+
 _load_bundled()

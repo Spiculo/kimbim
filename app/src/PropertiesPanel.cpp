@@ -8,6 +8,7 @@
 #include <QLocale>
 #include <QMenu>
 #include <QPalette>
+#include <QPushButton>
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
@@ -138,6 +139,16 @@ void PropertiesPanel::showMulti(const QJsonObject& merged)
         m_name->setFont(1, italic);
     } else {
         m_name->setText(1, name.value("value").toString());
+    }
+    // D99: placed objects whose library definition changed since they were placed.
+    if (const int outdated = merged.value("library_update").toInt(); outdated > 0) {
+        auto* row = new QTreeWidgetItem(element, {tr("Library"), QString()});
+        row->setFlags(row->flags() & ~Qt::ItemIsEditable);
+        auto* button = new QPushButton(tr("Update from library (%n)", nullptr, outdated), m_tree);
+        button->setObjectName(QStringLiteral("libraryUpdate"));
+        button->setToolTip(tr("The library has a newer version of this object; values that still exist are kept"));
+        connect(button, &QPushButton::clicked, this, &PropertiesPanel::updateFromLibraryRequested);
+        m_tree->setItemWidget(row, 1, button);
     }
     if (count == 1 && !merged.value("guids").toArray().isEmpty())
         new QTreeWidgetItem(element, {QStringLiteral("GlobalId"), merged.value("guids").toArray().first().toString()});

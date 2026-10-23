@@ -457,3 +457,48 @@ def test_place_fails_cleanly_when_the_values_do_not_build(project, tmp_path):
     r = call("place_object", project, "office:stool", json.dumps({"height": 0.3}), 0, 0, 0)
     assert not r["ok"] and "parts.seat" in r["error"] and not r["error"].startswith("ObjectError")
     assert len(b._model.by_type("IfcFurnitureType")) == types
+
+
+def test_update_from_library_keeps_values_and_is_one_undo_step(project, tmp_path):
+    folder = tmp_path / "office"
+    write_office(folder)
+    call("set_library_paths", json.dumps({"folder": str(folder)}))
+    guid = call("place_object", project, "office:stool", json.dumps({"legs": 5}), 0, 0, 0)["guid"]
+    assert call("library_updates", json.dumps([guid]))["outdated"] == 0
+    assert "library_update" not in call("properties_multi", json.dumps([guid]))
+    changed = json.loads(json.dumps(STOOL))
+    changed["params"][1]["default"] = 0.75  # the office edits its stool
+    changed["params"].append({"key": "glides", "kind": "bool", "label": "Glides", "default": True})
+    write_office(folder, changed)
+    call("set_library_paths", json.dumps({"folder": str(folder)}))
+    assert call("library_updates", json.dumps([guid]))["outdated"] == 1
+    assert call("properties_multi", json.dumps([guid]))["library_update"] == 1
+    r = call("update_from_library", json.dumps([guid]))
+    assert r["ok"], r
+    t = ifcopenshell.util.element.get_type(b._model.by_guid(guid))
+    ps = ifcopenshell.util.element.get_pset(t, library.PSET)
+    values = json.loads(ps["Parameters"])
+    assert values["legs"] == 5 and values["height"] == pytest.approx(0.6) and values["glides"] is True
+    assert ps["DefinitionHash"] == library._hash_of(library.get("office:stool"))
+    assert call("library_updates", "")["outdated"] == 0
+    assert not call("update_from_library", "")["ok"]
+    assert call("undo")["ok"]
+    assert call("library_updates", "")["outdated"] == 1
+    library.load_office()
+
+
+def test_a_changed_used_object_makes_the_user_outdated(project, tmp_path):
+    folder = tmp_path / "office"
+    write_office(folder, LEG, "leg.kimobj")
+    write_office(folder, TOP, "top.kimobj")
+    call("set_library_paths", json.dumps({"folder": str(folder)}))
+    guid = call("place_object", project, "office:top", "", 0, 0, 0)["guid"]
+    assert call("library_updates", "")["outdated"] == 0
+    wider = json.loads(json.dumps(LEG))
+    wider["parts"][0]["box"]["dx"] = 0.08
+    write_office(folder, wider, "leg.kimobj")
+    call("set_library_paths", json.dumps({"folder": str(folder)}))
+    assert call("library_updates", json.dumps([guid]))["outdated"] == 1
+    assert call("update_from_library", json.dumps([guid]))["ok"]
+    assert call("library_updates", "")["outdated"] == 0
+    library.load_office()

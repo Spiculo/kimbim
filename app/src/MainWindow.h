@@ -512,6 +512,7 @@ private:
     void refreshConstructionGrid(); // D98
     void gridOptionsDialog();
     void gridSystemDialog(); // D98: Model > Grid system...
+    void updateFromLibrary(bool all = false); // D99: selection (or every library object) from the library
     bool flipWalls(const QStringList& guids); // D97: Model > Flip walls
     bool setJunctions(const QString& mode);    // D97: through, butt or materials, for the selection
     void setPlanView(bool plan);

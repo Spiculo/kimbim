@@ -1702,6 +1702,14 @@ ES = {
     "Could not place the picture": "No se pudo colocar la imagen",
     "Picture placed: move it into place (it faces south; rotate it to turn it)":
         "Imagen colocada: muévala a su lugar (mira al sur; gírela para orientarla)",
+    "Library": "Biblioteca",
+    "Update from library (%n)": ("Actualizar desde la biblioteca (%n)", "Actualizar desde la biblioteca (%n)"),
+    "The library has a newer version of this object; values that still exist are kept":
+        "La biblioteca tiene una versión más nueva de este objeto; se conservan los valores que siguen existiendo",
+    "Could not update from the library": "No se pudo actualizar desde la biblioteca",
+    "Update library objects": "Actualizar objetos de biblioteca",
+    "Regenerate every placed object whose library definition changed":
+        "Regenera cada objeto colocado cuya definición en la biblioteca cambió",
 }
 
 

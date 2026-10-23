@@ -876,13 +876,14 @@ def properties_multi(guids_json: str) -> str:
         if group:
             psets = {**{k: v for k, v in psets.items() if k == authoring.DIMENSIONS}, library.PARAMETERS: group,
                      **{k: v for k, v in psets.items() if k != authoring.DIMENSIONS}}
+    outdated = len(library._outdated(elements))  # D99: objects whose library definition changed
     from . import renovation
 
     statuses = [renovation.status_of(e) for e in elements if not e.is_a("IfcAnnotation")]
     status = {"value": statuses[0] if statuses and len(set(statuses)) == 1 else None, "varies": len(set(statuses)) > 1}
     names = [e.Name or "" for e in elements]
     same_name = all(n == names[0] for n in names)
-    return _dump({
+    payload = {
         "count": len(elements),
         "guids": [e.GlobalId for e in elements],
         "types": sorted({e.is_a() for e in elements}),
@@ -890,7 +891,10 @@ def properties_multi(guids_json: str) -> str:
         "status": status,
         "material": _materials.merged(elements),  # D96: the Material row (None: not shown)
         "psets": _with_settings(psets, elements),
-    })
+    }
+    if outdated:
+        payload["library_update"] = outdated
+    return _dump(payload)
 
 
 def _with_settings(psets: dict, elements) -> dict:
@@ -1300,6 +1304,7 @@ _EXPORTS = {
     ),
     "library": (
         "library_objects",
+        "library_updates",
         "object_form",
         "object_parameter_usage",
         "object_symbol",
@@ -1307,6 +1312,7 @@ _EXPORTS = {
         "set_library_paths",
         "set_object_parameter",
         "set_plan_display",
+        "update_from_library",
     ),
 }
 _EXPORTED = {name: module for module, names in _EXPORTS.items() for name in names}
