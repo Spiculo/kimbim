@@ -555,3 +555,24 @@ def test_chair_variants_are_valid_ifc(project, tmp_path, given):
     assert len(shape.geometry.faces) > 0
     top = 0.85 if given.get("back") != "none" else 0.45
     assert max(zs) - min(zs) == pytest.approx(top, rel=0.02)
+
+
+@pytest.mark.parametrize("leg_style", ["square", "sled"])
+@pytest.mark.parametrize("back", ["panel", "slats", "upholstered"])
+def test_chair_round_seat_keeps_legs_back_and_arms_on_it(leg_style, back):
+    d, s = chair(seat_shape="round", leg_style=leg_style, back=back, arms=True)
+    v = d.values({"seat_shape": "round", "leg_style": leg_style, "back": back, "arms": True})
+    w, dp = v["width"], v["depth"]
+    cx, cy, r = w / 2, dp / 2, min(w, dp) / 2
+    for x in s.solids:
+        if x["part"] == "seat" and x["kind"] == "cylinder":
+            continue
+        m = np.array(x["matrix"])
+        if x["kind"] == "box":
+            pts = [m @ [x["x"] + a * x["dx"], x["y"] + b * x["dy"], 0, 1] for a in (0, 1) for b in (0, 1)]
+        elif x["kind"] == "sweep":
+            pts = [m @ [*q, 1] for q in x["path"]]
+        else:
+            pts = [m @ [0, 0, 0, 1]]
+        for p in pts:  # in plan, inside the seat circle (the inscribed square's corners touch it)
+            assert math.dist(p[:2], (cx, cy)) <= r + 1e-6, (x["part"], p)
