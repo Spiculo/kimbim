@@ -860,14 +860,19 @@ def properties_multi(guids_json: str) -> str:
     per_params = library.parameters_of(elements)
     if all(p is not None for p in per_params):
         group = {}
-        for label, value, kind in per_params[0]:
-            present = [next((v for n, v, _ in params if n == label), _MISSING) for params in per_params]
+        ifc_types = {"length": "IfcLengthMeasure", "angle": "IfcPlaneAngleMeasure", "count": "IfcInteger",
+                     "bool": "IfcBoolean", "choice": "IfcLabel", "material": "IfcLabel"}
+        for row in per_params[0]:  # D99: the visible parameters of the first, by label
+            label = row["label"]
+            present = [next((r["value"] for r in rows if r["label"] == label), _MISSING) for rows in per_params]
             varies = any(v is _MISSING or v != present[0] for v in present)
             group[label] = {"value": None if varies else present[0], "varies": varies,
-                            "ifc_type": {"length": "IfcLengthMeasure", "material": "IfcLabel"}.get(kind, "IfcInteger"),
-                            "editable": True, "source": "dimension", "type_value": None}
-            if kind == "material":  # D97: a part's building material, picked from a list
+                            "ifc_type": ifc_types[row["kind"]], "editable": True, "source": "dimension",
+                            "type_value": None}
+            if row["kind"] == "material":  # D97: a part's building material, picked from a list
                 group[label]["choices"] = library._material_choices(present[0] if isinstance(present[0], str) else "")
+            elif row["kind"] == "choice":
+                group[label]["choices"] = row["choices"]
         if group:
             psets = {**{k: v for k, v in psets.items() if k == authoring.DIMENSIONS}, library.PARAMETERS: group,
                      **{k: v for k, v in psets.items() if k != authoring.DIMENSIONS}}
@@ -1295,6 +1300,7 @@ _EXPORTS = {
     ),
     "library": (
         "library_objects",
+        "object_form",
         "object_parameter_usage",
         "object_symbol",
         "place_object",

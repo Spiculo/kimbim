@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """The object library (D86): every object makes a valid IFC type with a body and a plan symbol,
 placements share their type (mapped items), parameters re-generate it, plans draw the symbol, IFC2X3
-gets its own classes, and the office library adds Python objects and IFC types."""
+gets its own classes, and the office library adds .kimobj definitions and IFC types (D99). Types carry
+their definition, so a project edits its objects without the library that made them."""
 import json
+import pathlib
 
 import ifcopenshell
 import ifcopenshell.geom
@@ -132,15 +134,18 @@ def test_parameter_scope_can_change_every_placement_or_only_the_selection(projec
     assert ifcopenshell.util.element.get_type(b._model.by_guid(a)) != tc
 
 
-def test_an_object_can_have_its_own_origin(project):
+def test_an_object_can_have_its_own_origin(project, tmp_path):
     """D92: the library keeps the left front corner, but an object may set another insertion point."""
-    def build(s, p):
-        s.box(0, 0, 0, p["width"], p["depth"], p["height"])
-        s.rect(0, 0, p["width"], p["depth"])
-
-    library.define("origin_box", "Origin box", "furniture", {"IFC4": ("IfcFurnitureType", "USERDEFINED", None)},
-                   [library.W(0.6), library.D(0.4), library.H(0.5)], build, origin=(0.3, 0.2))
-    r = call("place_object", project, "origin_box", "", 1.0, 2.0, 0)
+    box = {"format": "kimbim-object/1", "id": "origin_box", "name": "Origin box", "category": "furniture",
+           "ifc": {"IFC4": ["IfcFurnitureType", "USERDEFINED", None]}, "origin": [0.3, 0.2],
+           "params": [{"key": "width", "kind": "length", "label": "Width", "default": 0.6},
+                      {"key": "depth", "kind": "length", "label": "Depth", "default": 0.4},
+                      {"key": "height", "kind": "length", "label": "Height", "default": 0.5}],
+           "parts": [{"id": "body", "box": {"dx": "width", "dy": "depth", "dz": "height"}}],
+           "symbol": [{"rect": {"x": 0, "y": 0, "dx": "width", "dy": "depth"}}]}
+    write_office(tmp_path / "office", box, "origin_box.kimobj")
+    assert call("set_library_paths", json.dumps({"folder": str(tmp_path / "office")}))["errors"] == []
+    r = call("place_object", project, "office:origin_box", "", 1.0, 2.0, 0)
     assert r["ok"], r
     e = b._model.by_guid(r["guid"])
     settings = ifcopenshell.geom.settings()
@@ -206,15 +211,42 @@ def test_ifc2x3_classes(tmp_path):
 
 
 
-def test_office_library_python_and_ifc_types(project, tmp_path):
+STOOL = {
+    "format": "kimbim-object/1", "id": "stool", "name": {"en": "Stool", "es": "Taburete"}, "category": "furniture",
+    "ifc": {"IFC4": ["IfcFurnitureType", "CHAIR", None]},
+    "params": [{"key": "width", "kind": "length", "label": "Width", "default": 0.35},
+               {"key": "height", "kind": "length", "label": "Height", "default": 0.6},
+               {"key": "legs", "kind": "count", "label": "Legs", "default": 3, "min": 3, "max": 6},
+               {"key": "foot", "kind": "choice", "label": "Foot", "default": "round",
+                "options": [{"id": "round", "label": "Round"}, {"id": "square", "label": "Square"}]},
+               {"key": "ring", "kind": "bool", "label": "Foot ring", "default": False},
+               {"key": "splay", "kind": "angle", "label": "Splay", "default": 0, "max": 15}],
+    "parts": [
+        {"id": "seat", "cylinder": {"cx": "width / 2", "cy": "width / 2", "z": "height - 0.03", "r": "width / 2", "h": 0.03},
+         "anchors": {"ring": {"pattern": "circle", "cx": "width / 2", "cy": "width / 2", "r": "width / 2 - 0.04",
+                              "z": "height - 0.03", "dir": "down"}}},
+        {"id": "leg", "repeat": {"on": "seat.anchors.ring", "count": "legs"},
+         "rotate": {"axis": "away_from_centre", "angle": "splay"}, "use": "leg_{foot}", "with": {"h": "height - 0.03"}},
+        {"id": "hoop", "when": "ring", "sweep": {"r": 0.008, "path": [
+            ["width / 2 + 0.12", "width / 2", 0.2], ["width / 2", "width / 2 + 0.12", 0.2], ["width / 2 - 0.12", "width / 2", 0.2],
+            ["width / 2", "width / 2 - 0.12", 0.2], ["width / 2 + 0.12", "width / 2", 0.2]]}}],
+    "components": {
+        "leg_round": {"params": [{"key": "h", "kind": "length", "label": "H", "default": 0.5}],
+                      "parts": [{"id": "p", "cone": {"r1": 0.015, "r2": 0.011, "h": "h"}}]},
+        "leg_square": {"params": [{"key": "h", "kind": "length", "label": "H", "default": 0.5}],
+                       "parts": [{"id": "p", "box": {"x": -0.015, "y": -0.015, "dx": 0.03, "dy": 0.03, "dz": "h", "taper": 0.7}}]}},
+}
+
+
+def write_office(folder, data=STOOL, name="stool.kimobj"):
+    folder.mkdir(exist_ok=True)
+    (folder / name).write_text(json.dumps(data), encoding="utf-8")
+
+
+def test_office_library_kimobj_and_ifc_types(project, tmp_path):
     folder = tmp_path / "office"
-    folder.mkdir()
-    (folder / "stool.py").write_text(
-        "def build(s, p):\n"
-        "    s.cylinder(p['width'] / 2, p['width'] / 2, 0, p['width'] / 2, p['height'])\n"
-        "    s.circle(p['width'] / 2, p['width'] / 2, p['width'] / 2)\n"
-        "define('office_stool', 'Stool', 'office', FURNITURE('CHAIR'), [W(0.35), H(0.6)], build)\n",
-        encoding="utf-8")
+    write_office(folder)
+    (folder / "old.py").write_text("raise SystemExit('must never run')\n", encoding="utf-8")
     # An IFC type library made from a placed bundled object.
     call("place_object", project, "desk", "", 0, 0, 0)
     b.save(str(folder / "types.ifc"))
@@ -224,11 +256,120 @@ def test_office_library_python_and_ifc_types(project, tmp_path):
     r = call("set_library_paths", json.dumps({"folder": str(folder)}))
     assert r["ok"] and r["errors"] == [], r
     listed = {o["id"]: o for o in call("library_objects")["objects"]}
-    assert listed["office_stool"]["category"] == "office" and listed["office_stool"]["symbol"]
+    assert "office:stool" in listed and listed["office:stool"]["category"] == "office"
+    assert listed["office:stool"]["name_es"] == "Taburete" and listed["office:stool"]["symbol"]
+    assert listed["office:stool"]["library"] == str(folder / "stool.kimobj")
+    assert listed["chair"]["library"] == "bundled"
+    assert not any("old" in key for key in listed)  # .py files are not read
+    assert call("place_object", storey, "office:stool", "", 0, 0, 0)["ok"]
     ifc_key = next(k for k in listed if k.startswith("ifc:") and k.endswith(desk_type))
-    assert call("place_object", storey, "office_stool", "", 0, 0, 0)["ok"]
     first = call("place_object", storey, ifc_key, "", 2, 0, 0)
     second = call("place_object", storey, ifc_key, "", 4, 0, 0)
     assert first["ok"] and first["type"] == second["type"] == desk_type  # copied once, then reused
     assert validate(b._model) == []
-    assert "office_stool" not in library.OBJECTS  # office objects stay out of the bundled list
+    assert "office:stool" not in library.OBJECTS  # office objects stay out of the bundled list
+
+
+def test_types_carry_their_definition(project):
+    r = call("place_object", project, "chair", "", 0, 0, 0)
+    t = b._model.by_guid(r["type"])
+    ps = ifcopenshell.util.element.get_pset(t, library.PSET)
+    assert ps["Object"] == "chair" and ps["DefinitionHash"] == library.OBJECTS["chair"].hash
+    assert ps["Library"] == "bundled"
+    assert json.loads(ps["Definition"])["id"] == "chair"
+
+
+def test_project_objects_edit_without_the_library(project, tmp_path):
+    folder = tmp_path / "office"
+    write_office(folder)
+    call("set_library_paths", json.dumps({"folder": str(folder)}))
+    guid = call("place_object", project, "office:stool", "", 0, 0, 0)["guid"]
+    path = tmp_path / "with_stool.ifc"
+    b.save(str(path))
+    library.load_office()  # the consultant has no office library
+    assert call("open_model", str(path))["ok"]
+    r = call("set_object_parameter", json.dumps([guid]), "Legs", "5", "")
+    assert r["ok"], r
+    t = ifcopenshell.util.element.get_type(b._model.by_guid(guid))
+    assert json.loads(ifcopenshell.util.element.get_pset(t, library.PSET)["Parameters"])["legs"] == 5
+    assert "Legs 5" in t.Name
+
+
+def test_new_kinds_in_properties(project, tmp_path):
+    folder = tmp_path / "office"
+    write_office(folder)
+    call("set_library_paths", json.dumps({"folder": str(folder)}))
+    guid = call("place_object", project, "office:stool", "", 0, 0, 0)["guid"]
+    group = call("properties_multi", json.dumps([guid]))["psets"]["Parameters"]
+    assert group["Foot"]["choices"] == ["Round", "Square"] and group["Foot"]["value"] == "Round"
+    assert group["Foot ring"]["ifc_type"] == "IfcBoolean" and group["Foot ring"]["value"] is False
+    assert group["Splay"]["ifc_type"] == "IfcPlaneAngleMeasure"
+    for name, value in (("Foot", "Square"), ("Foot ring", "true"), ("Splay", "8")):
+        assert call("set_object_parameter", json.dumps([guid]), name, value, "")["ok"]
+    t = ifcopenshell.util.element.get_type(b._model.by_guid(guid))
+    values = json.loads(ifcopenshell.util.element.get_pset(t, library.PSET)["Parameters"])
+    assert values["foot"] == "square" and values["ring"] is True and values["splay"] == 8
+
+
+def test_bad_value_keeps_the_old_type(project, tmp_path):
+    data = json.loads(json.dumps(STOOL))
+    data["parts"][0]["cylinder"]["h"] = "sqrt(height - 0.5) * 0.1"  # breaks below 0.5 m
+    folder = tmp_path / "office"
+    write_office(folder, data)
+    call("set_library_paths", json.dumps({"folder": str(folder)}))
+    r = call("place_object", project, "office:stool", "", 0, 0, 0)
+    before = ifcopenshell.util.element.get_type(b._model.by_guid(r["guid"])).GlobalId
+    bad = call("set_object_parameter", json.dumps([r["guid"]]), "Height", "0.3", "")
+    assert not bad["ok"] and "parts.seat" in bad["error"]
+    assert ifcopenshell.util.element.get_type(b._model.by_guid(r["guid"])).GlobalId == before
+
+
+def test_broken_office_files_are_listed_not_loaded(tmp_path):
+    folder = tmp_path / "office"
+    write_office(folder)
+    (folder / "big.kimobj").write_text(json.dumps({**STOOL, "id": "big", "parts": [
+        {"id": "b", "repeat": {"count": 1e9}, "box": {"dx": 1, "dy": 1, "dz": 1}}]}), encoding="utf-8")
+    (folder / "cycle.kimobj").write_text(json.dumps({**STOOL, "id": "cyc", "parts": [{"id": "a", "use": "x"}],
+                                                     "components": {"x": {"parts": [{"id": "b", "use": "x"}]}}}), encoding="utf-8")
+    (folder / "junk.kimobj").write_text("{", encoding="utf-8")
+    r = call("set_library_paths", json.dumps({"folder": str(folder)}))
+    assert sorted(pathlib.Path(e["file"]).name for e in r["errors"]) == ["big.kimobj", "cycle.kimobj", "junk.kimobj"]
+    assert r["objects"] == 1
+    library.load_office()
+
+
+def test_object_form_follows_the_values():
+    form = call("object_form", "chair", "")
+    assert form["params"] and set(form["visible"]) <= {p["key"] for p in form["params"]}
+    assert all({"key", "label", "label_es", "value", "kind", "min", "max", "group"} <= set(p) for p in form["params"])
+    assert call("object_form", "no_such_object", "")["params"] == []
+
+
+@pytest.mark.parametrize("schema", ["IFC4", "IFC2X3"])
+def test_every_shape_kind_is_valid_ifc(tmp_path, schema):
+    from kimbim import testing
+
+    try:
+        f = testing.build_model(schema, walls=1)
+        storey = f.by_type("IfcBuildingStorey")[0].GlobalId
+        model = tmp_path / f"base-{schema}.ifc"
+        f.write(str(model))
+        assert call("open_model", str(model))["ok"]
+        folder = tmp_path / "office"
+        write_office(folder)
+        call("set_library_paths", json.dumps({"folder": str(folder)}))
+        for given in ({}, {"foot": "square", "ring": True, "splay": 10}):
+            r = call("place_object", storey, "office:stool", json.dumps(given), 0, 0, 0)
+            assert r["ok"], r
+            settings = ifcopenshell.geom.settings()
+            settings.set("use-world-coords", True)
+            shape = ifcopenshell.geom.create_shape(settings, b._model.by_guid(r["guid"]))
+            zs = shape.geometry.verts[2::3]
+            assert len(shape.geometry.faces) > 0
+            assert max(zs) - min(zs) == pytest.approx(0.6, abs=0.01)  # a cone on its side would not be 0.6 m tall
+        path = tmp_path / f"shapes-{schema}.ifc"
+        b.save(str(path))
+        assert validate(ifcopenshell.open(str(path))) == []
+    finally:
+        testing._reset_owner()
+        library.load_office()

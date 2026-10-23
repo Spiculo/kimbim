@@ -1,7 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""The object library (doc 14 §8, D86): furniture, sanitary, kitchen and site objects generated in
-code, as Archicad's GDL library objects are: each object has parameters (width, depth, height and a
-few of its own), a 3D body made of extrusions and a 2D plan symbol.
+"""The object library (doc 14 §8, D86; doc 16, D99): furniture, sanitary, kitchen and site objects as
+Archicad's GDL library objects are: each object has parameters (width, depth, height and a few of its
+own), a 3D body made of swept solids and a 2D plan symbol.
+
+Objects are `.kimobj` definitions (D99, objects.py and objbuild.py): JSON the app reads, nothing in it
+runs. The bundled ones are in bundled_objects/; the office library (a folder set in the preferences)
+adds `.kimobj` files and IFC files, whose types (with their representation maps) are copied into the
+model when placed.
 
 Objects become IFC types (IfcFurnitureType, IfcSanitaryTerminalType, IfcElectricApplianceType,
 IfcGeographicElementType, IfcBuildingElementProxyType; IFC2X3 equivalents), one type per object and
@@ -9,16 +14,13 @@ parameter set (D50's type/occurrence pattern), so repeated placements share thei
 mapped items and schedules count them by type. The type carries two representation maps: Body
 (Model/Body/MODEL_VIEW, swept solids) and the plan symbol (Plan/Annotation/PLAN_VIEW, an
 IfcGeometricCurveSet), and the KIMBIM_LibraryObject property set (Object, Parameters as JSON in
-metres, Library).
+metres, Library, DefinitionHash and Definition: the definition's text, so a project opens and edits
+its objects without the library that made them).
 
 Object coordinates (metres): x along the width, y along the depth, z up from the level; the front
 is the side at y = 0 (Archicad's convention), the origin its left front corner.
 
-The office library (a folder set in the preferences) adds objects: Python files that call
-`define(...)` like the bundled ones below, and IFC files whose types (with their representation
-maps) are copied into the model when placed.
-
-This module's object definitions are pure; the bridge functions import app_bridge when called.
+The bridge functions import app_bridge when called.
 """
 from __future__ import annotations
 
@@ -27,40 +29,40 @@ import math
 import os
 import pathlib
 
+import numpy as np
+
+from . import objbuild, objects
+from .objbuild import ObjectError, _translate
+
 PSET = "KIMBIM_LibraryObject"
 PARAMETERS = "Parameters"  # the Properties panel group (its edits go to set_object_parameter)
 CATEGORIES = (("furniture", "Furniture"), ("sanitary", "Sanitary"), ("kitchen", "Kitchen"),
               ("site", "People, trees and cars"), ("office", "Office library"))
-CIRCLE_POINTS = 16  # ellipses and arcs in plan symbols and prism outlines
+
+BUNDLED = pathlib.Path(__file__).with_name("bundled_objects")
+OBJECTS: dict = {}  # ref -> objects.ObjectDef (bundled)
 
 
-# ---------------------------------------------------------------- definitions
+def _load_bundled() -> None:
+    OBJECTS.clear()
+    for path in sorted(BUNDLED.glob("*.kimobj")):
+        d = objects.load_file(str(path), "bundled")
+        OBJECTS[d.ref] = d
 
-class Param:
-    """A parameter: `kind` is "length" (metres), "count" (a whole number) or "material" (D97: a building
-    material's name, for one part of the object)."""
 
-    def __init__(self, key, label, default, kind="length", lo=None, hi=None):
-        self.key, self.label, self.default, self.kind = key, label, default, kind
-        self.lo = lo if lo is not None else (0.01 if kind == "length" else 1)
-        self.hi = hi if hi is not None else (50.0 if kind == "length" else 20)
+def _resolve(ref: str):
+    """`use` of another library object: bundled ids, office refs, or office ids without the prefix."""
+    found = OBJECTS.get(ref) or _office.get(ref) or _office.get(f"office:{ref}")
+    return found if isinstance(found, objects.ObjectDef) else None
 
-    def clean(self, value):
-        if self.kind == "material":
-            return str(value).strip() or str(self.default)
-        v = float(value)
-        if self.kind == "count":
-            v = int(round(v))
-        else:
-            v = round(v, 4)
-        return min(max(v, self.lo), self.hi)
 
-    def listing(self) -> dict:
-        out = {"key": self.key, "label": self.label, "value": self.default, "kind": self.kind,
-               "min": self.lo, "max": self.hi}
-        if self.kind == "material":
-            out["choices"] = _material_choices(self.default)
-        return out
+objects.ObjectDef.resolver = staticmethod(_resolve)
+
+
+def _library_of(obj) -> str:
+    """The Library a type and the listing name: "bundled", else the definition's file (or the library
+    a project's own definition came from)."""
+    return "bundled" if obj.source == "bundled" else (obj.library or obj.source)
 
 
 def _material_choices(default: str) -> list:
@@ -72,511 +74,7 @@ def _material_choices(default: str) -> list:
     return names if default in names else [default, *names]
 
 
-class Shape:
-    """What a build function makes: solids (3D) and curves (the plan symbol), in object metres."""
-
-    def __init__(self):
-        self.solids, self.curves = [], []
-        # D97: each solid's part (its material is the object's "<part> material" parameter); a build
-        # function sets `part` before the solids of that part ("body" otherwise)
-        self.part, self.parts = "body", []
-
-    def _add(self, solid):
-        self.solids.append(solid)
-        self.parts.append(self.part)
-
-    # 3D
-    def box(self, x, y, z, dx, dy, dz):
-        if dx > 1e-6 and dy > 1e-6 and dz > 1e-6:
-            self._add(("box", x, y, z, dx, dy, dz))
-
-    def prism(self, points, z, dz):
-        """A polygon (x, y) extruded up from z."""
-        if dz > 1e-6 and len(points) >= 3:
-            self._add(("prism", [tuple(p) for p in points], z, dz))
-
-    def cylinder(self, cx, cy, z, r, dz):
-        if r > 1e-6 and dz > 1e-6:
-            self._add(("cylinder", cx, cy, z, r, dz))
-
-    def side_prism(self, points, x, dx):
-        """A polygon in the (y, z) plane extruded along x from x."""
-        if dx > 1e-6 and len(points) >= 3:
-            self._add(("side", [tuple(p) for p in points], x, dx))
-
-    def side_cylinder(self, cy, cz, x, r, dx):
-        """A cylinder along x (wheels)."""
-        if r > 1e-6 and dx > 1e-6:
-            self._add(("side_cylinder", cy, cz, x, r, dx))
-
-    # plan symbol
-    def line(self, *points, closed=False):
-        pts = [tuple(p) for p in points]
-        if closed:
-            pts.append(pts[0])
-        self.curves.append(("poly", pts))
-
-    def rect(self, x, y, dx, dy):
-        self.line((x, y), (x + dx, y), (x + dx, y + dy), (x, y + dy), closed=True)
-
-    def circle(self, cx, cy, r):
-        self.curves.append(("circle", cx, cy, r))
-
-    def ellipse(self, cx, cy, rx, ry, a0=0.0, a1=2 * math.pi):
-        closed = abs(a1 - a0 - 2 * math.pi) < 1e-9
-        n = CIRCLE_POINTS if closed else max(4, int(CIRCLE_POINTS * abs(a1 - a0) / (2 * math.pi)) + 1)
-        pts = ellipse_points(cx, cy, rx, ry, a0, a1, n, closed)
-        self.line(*pts, closed=closed)
-
-
-def ellipse_points(cx, cy, rx, ry, a0=0.0, a1=2 * math.pi, n=CIRCLE_POINTS, closed=True):
-    count = n if closed else n
-    step = (a1 - a0) / (n if closed else n - 1)
-    return [(cx + rx * math.cos(a0 + i * step), cy + ry * math.sin(a0 + i * step)) for i in range(count)]
-
-
-def rounded_rect(x, y, dx, dy, r, n=4):
-    """A rectangle with rounded corners as a polygon (r clipped to fit)."""
-    r = max(0.0, min(r, dx / 2 - 1e-4, dy / 2 - 1e-4))
-    if r <= 1e-4:
-        return [(x, y), (x + dx, y), (x + dx, y + dy), (x, y + dy)]
-    pts = []
-    for cx, cy, start in ((x + dx - r, y + r, -90), (x + dx - r, y + dy - r, 0), (x + r, y + dy - r, 90), (x + r, y + r, 180)):
-        for i in range(n + 1):
-            a = math.radians(start + 90 * i / n)
-            pts.append((cx + r * math.cos(a), cy + r * math.sin(a)))
-    return pts
-
-
-class Obj:
-    """A library object: `ifc` maps a schema family ("IFC4", "IFC2X3") to (type class, predefined
-    type or None, element type text or None). `origin` (D92): where the object's insertion point sits
-    in its own coordinates (metres, from its left front corner, the library's default)."""
-
-    def __init__(self, key, name, category, ifc, params, build, library="bundled", origin=None, materials=None):
-        self.key, self.name, self.category, self.ifc = key, name, category, ifc
-        self.params, self.build, self.library = list(params), build, library
-        self.origin = tuple(float(v) for v in (origin or (0.0, 0.0)))
-        # D97 (Archicad's object surfaces/materials): {part: (label, default building material)}
-        if materials is None and category in DEFAULT_MATERIALS:
-            materials = {"body": ("Material", DEFAULT_MATERIALS[category])}
-        self.materials = dict(materials or {})
-        for part, (label, default) in self.materials.items():
-            self.params.append(Param(f"mat_{part}", label, default, "material"))
-
-    def material_of(self, values: dict, part: str) -> str | None:
-        """The building material of one part: its parameter, else the object's main one, else None."""
-        if f"mat_{part}" in values:
-            return values[f"mat_{part}"]
-        if "mat_body" in values:
-            return values["mat_body"]
-        first = next(iter(self.materials), None)
-        return values.get(f"mat_{first}") if first else None
-
-    def param(self, key_or_label: str):
-        k = (key_or_label or "").strip().lower()
-        return next((p for p in self.params if p.key == k or p.label.lower() == k), None)
-
-    def values(self, given=None) -> dict:
-        """All parameter values, defaults filled in and clamped."""
-        given = given or {}
-        out = {}
-        for p in self.params:
-            v = given.get(p.key, p.default)
-            try:
-                out[p.key] = p.clean(v)
-            except (TypeError, ValueError):
-                out[p.key] = p.clean(p.default)
-        return out
-
-    def shape(self, values) -> Shape:
-        s = Shape()
-        self.build(s, dict(values))
-        ox, oy = self.origin
-        if abs(ox) > 1e-12 or abs(oy) > 1e-12:  # D92: the object's own origin goes to (0, 0)
-            s.solids = [_shift_solid(solid, -ox, -oy) for solid in s.solids]
-            s.curves = [_shift_curve(curve, -ox, -oy) for curve in s.curves]
-        return s
-
-    def type_name(self, values) -> str:
-        mm = lambda v: str(int(round(v * 1000)))  # noqa: E731
-        name = f"{self.name} {'x'.join(mm(values[k]) for k in ('width', 'depth', 'height') if k in values)}"
-        extra = [f"{p.label} {values[p.key] if p.kind in ('count', 'material') else mm(values[p.key])}"
-                 for p in self.params if p.key not in ("width", "depth", "height") and values[p.key] != p.clean(p.default)]
-        return name + (f" ({', '.join(extra)})" if extra else "")
-
-    def ifc_for(self, schema: str):
-        return self.ifc.get("IFC2X3" if schema == "IFC2X3" else "IFC4") or self.ifc["IFC4"]
-
-
-OBJECTS: dict = {}
-
-
-DEFAULT_MATERIALS = {"furniture": "Timber - finish", "sanitary": "Porcelain", "kitchen": "Timber - finish"}
-
-
-def define(key, name, category, ifc, params, build, library="bundled", origin=None, materials=None):
-    """Add an object to the library (the office library's Python files call this too). `origin` (D92)
-    is where its insertion point sits, in object metres from the left front corner (the default).
-    `materials` (D97): {part: (label, default building material)} for the parts the build function
-    names (Shape.part); furniture, sanitary and kitchen objects get one "Material" by default."""
-    if isinstance(ifc, (tuple, list)):
-        ifc = {"IFC4": tuple(ifc)}
-    OBJECTS[key] = Obj(key, name, category, dict(ifc), list(params), build, library, origin, materials)
-    return OBJECTS[key]
-
-
-def _shift_point(p, dx, dy):
-    return (p[0] + dx, p[1] + dy)
-
-
-def _shift_solid(solid, dx, dy):
-    kind = solid[0]
-    if kind == "box":
-        return (kind, solid[1] + dx, solid[2] + dy, *solid[3:])
-    if kind == "prism":
-        return (kind, [_shift_point(p, dx, dy) for p in solid[1]], *solid[2:])
-    if kind == "cylinder":
-        return (kind, solid[1] + dx, solid[2] + dy, *solid[3:])
-    if kind == "side":  # a polygon in (y, z), extruded along x
-        return (kind, [(p[0] + dy, p[1]) for p in solid[1]], solid[2] + dx, solid[3])
-    if kind == "side_cylinder":  # along x: cy, cz, x, r, dx
-        return (kind, solid[1] + dy, solid[2], solid[3] + dx, *solid[4:])
-    return solid
-
-
-def _shift_curve(curve, dx, dy):
-    kind = curve[0]
-    if kind == "poly":
-        return (kind, [_shift_point(p, dx, dy) for p in curve[1]])
-    if kind == "circle":
-        return (kind, curve[1] + dx, curve[2] + dy, *curve[3:])
-    return curve
-
-
-W = lambda d=1.0: Param("width", "Width", d)  # noqa: E731
-D = lambda d=1.0: Param("depth", "Depth", d)  # noqa: E731
-H = lambda d=1.0: Param("height", "Height", d)  # noqa: E731
-FURNITURE = lambda pre, element=None: {  # noqa: E731
-    "IFC4": ("IfcFurnitureType", pre, element),
-    "IFC2X3": ("IfcFurnitureType", None, element or pre.title())}
-SANITARY = lambda pre: {"IFC4": ("IfcSanitaryTerminalType", pre, None)}  # noqa: E731
-APPLIANCE = lambda pre: {"IFC4": ("IfcElectricApplianceType", pre, None)}  # noqa: E731
-PROXY = lambda element: {"IFC4": ("IfcBuildingElementProxyType", "USERDEFINED", element),  # noqa: E731
-                         "IFC2X3": ("IfcBuildingElementProxyType", "USERDEFINED", element)}
-
-
-# ---------------------------------------------------------------- furniture
-
-def _legs(s, w, d, h, leg, inset=0.03):
-    for x in (inset, w - inset - leg):
-        for y in (inset, d - inset - leg):
-            s.box(x, y, 0, leg, leg, h)
-
-
-def _table(s, p):
-    w, d, h, top = p["width"], p["depth"], p["height"], 0.04
-    s.part = "legs"
-    _legs(s, w, d, h - top, 0.06)
-    s.part = "top"
-    s.box(0, 0, h - top, w, d, top)
-    s.rect(0, 0, w, d)
-
-
-def _chair(s, p):
-    w, d, h, seat = p["width"], p["depth"], p["height"], p["seat"]
-    s.part = "frame"
-    _legs(s, w, d, seat - 0.04, 0.04, 0.0)
-    s.part = "seat"
-    s.box(0, 0, seat - 0.04, w, d, 0.04)
-    s.box(0, d - 0.04, seat, w, 0.04, max(h - seat, 0.01))
-    s.rect(0, 0, w, d)
-    s.line((0, d - 0.04), (w, d - 0.04))
-
-
-def _sofa(s, p):
-    w, d, h, n = p["width"], p["depth"], p["height"], p["seats"]
-    arm, back, seat = 0.15, 0.2, 0.42
-    s.box(0, 0, 0, arm, d, h * 0.75)
-    s.box(w - arm, 0, 0, arm, d, h * 0.75)
-    s.box(arm, d - back, 0, w - 2 * arm, back, h)
-    s.box(arm, 0, 0, w - 2 * arm, d - back, seat)
-    s.rect(0, 0, w, d)
-    s.line((arm, 0), (arm, d))
-    s.line((w - arm, 0), (w - arm, d))
-    s.line((arm, d - back), (w - arm, d - back))
-    for i in range(1, n):
-        x = arm + (w - 2 * arm) * i / n
-        s.line((x, 0.05), (x, d - back))
-
-
-def _bed(pillows):
-    def build(s, p):
-        w, d, h = p["width"], p["depth"], p["height"]
-        head = 0.05
-        s.box(0, 0, 0.1, w, d - head, h - 0.1)
-        for x in (0.02, w - 0.07):
-            for y in (0.02, d - head - 0.07):
-                s.box(x, y, 0, 0.05, 0.05, 0.1)
-        s.box(0, d - head, 0, w, head, h + 0.4)
-        s.rect(0, 0, w, d)
-        s.line((0, d - head), (w, d - head))
-        pw = (w - 0.1 * (pillows + 1)) / pillows
-        for i in range(pillows):
-            x = 0.1 + i * (pw + 0.1)
-            s.line(*rounded_rect(x, d - head - 0.45, pw, 0.35, 0.06, 2), closed=True)
-        fold = d * 0.62
-        s.line((0, fold), (w, fold))  # the turned-down sheet
-        s.line((0, fold), (w * 0.25, fold - 0.18), (w, fold - 0.18))
-    return build
-
-
-def _wardrobe(s, p):
-    w, d, h, doors = p["width"], p["depth"], p["height"], p["doors"]
-    s.box(0, 0, 0, w, d, h)
-    s.rect(0, 0, w, d)
-    s.line((0, 0.02), (w, 0.02))
-    s.line((0.03, d / 2), (w - 0.03, d / 2))  # hanging rail
-    for i in range(1, int(w / 0.15)):
-        x = i * 0.15
-        s.line((x - 0.04, d / 2 - 0.2), (x + 0.04, d / 2 + 0.2))  # hangers
-    for i in range(1, doors):
-        s.line((w * i / doors, 0), (w * i / doors, 0.02))
-
-
-def _desk(s, p):
-    w, d, h, top, side = p["width"], p["depth"], p["height"], 0.03, 0.025
-    s.part = "frame"
-    s.box(0, 0.05, 0, side, d - 0.05, h - top)
-    s.box(w - side, 0.05, 0, side, d - 0.05, h - top)
-    s.box(side, d - 0.03, 0.3, w - 2 * side, 0.02, h - top - 0.3)
-    s.part = "top"
-    s.box(0, 0, h - top, w, d, top)
-    s.rect(0, 0, w, d)
-
-
-def _shelf(s, p):
-    w, d, h, n, t = p["width"], p["depth"], p["height"], p["shelves"], 0.02
-    s.box(0, 0, 0, t, d, h)
-    s.box(w - t, 0, 0, t, d, h)
-    s.box(t, d - 0.01, 0, w - 2 * t, 0.01, h)
-    for i in range(n):
-        z = 0.05 + (h - 0.05 - t) * i / max(n - 1, 1)
-        s.box(t, 0, z, w - 2 * t, d - 0.01, t)
-    s.rect(0, 0, w, d)
-    s.line((0, 0), (w, d))
-
-
-define("table", "Table", "furniture", FURNITURE("TABLE"), [W(1.6), D(0.9), H(0.75)], _table,
-       materials={"top": ("Top material", "Timber - finish"), "legs": ("Legs material", "Steel")})
-define("chair", "Chair", "furniture", FURNITURE("CHAIR"),
-       [W(0.45), D(0.5), H(0.85), Param("seat", "Seat height", 0.45)], _chair,
-       materials={"frame": ("Frame material", "Steel"), "seat": ("Seat material", "Timber - finish")})
-define("sofa", "Sofa", "furniture", FURNITURE("SOFA"),
-       [W(2.0), D(0.9), H(0.8), Param("seats", "Seats", 3, "count", 1, 6)], _sofa,
-       materials={"body": ("Material", "Fabric")})
-define("bed_single", "Single bed", "furniture", FURNITURE("BED"), [W(0.9), D(2.0), H(0.5)], _bed(1))
-define("bed_double", "Double bed", "furniture", FURNITURE("BED"), [W(1.6), D(2.0), H(0.5)], _bed(2))
-define("wardrobe", "Wardrobe", "furniture", FURNITURE("USERDEFINED", "WARDROBE"),
-       [W(1.2), D(0.6), H(2.2), Param("doors", "Doors", 2, "count", 1, 8)], _wardrobe)
-define("desk", "Desk", "furniture", FURNITURE("DESK"), [W(1.4), D(0.7), H(0.75)], _desk,
-       materials={"top": ("Top material", "Timber - finish"), "frame": ("Frame material", "Timber - finish")})
-define("shelf", "Shelf", "furniture", FURNITURE("SHELF"),
-       [W(0.9), D(0.35), H(2.0), Param("shelves", "Shelves", 5, "count", 2, 12)], _shelf)
-
-
-# ---------------------------------------------------------------- sanitary
-
-def _wc(s, p):
-    w, d, h = p["width"], p["depth"], p["height"]
-    tank = min(0.18, d * 0.3)
-    s.box(0, d - tank, 0, w, tank, h + 0.4)
-    bowl = ellipse_points(w / 2, (d - tank) / 2 + 0.02, w / 2, (d - tank) / 2 + 0.02, n=12)
-    s.prism(bowl, 0, h)
-    s.rect(0, d - tank, w, tank)
-    s.ellipse(w / 2, (d - tank) / 2 + 0.02, w / 2, (d - tank) / 2 + 0.02)
-    s.ellipse(w / 2, (d - tank) / 2 + 0.04, w / 2 - 0.06, (d - tank) / 2 - 0.06)
-
-
-def _washbasin(s, p):
-    w, d, h = p["width"], p["depth"], p["height"]
-    outline = rounded_rect(0, 0, w, d, min(w, d) * 0.3)
-    s.prism(outline, h - 0.18, 0.18)
-    s.box(w / 2 - 0.09, d - 0.2, 0, 0.18, 0.18, h - 0.18)  # pedestal
-    s.line(*outline, closed=True)
-    s.ellipse(w / 2, d * 0.45, w / 2 - 0.07, d * 0.45 - 0.05)
-    s.circle(w / 2, d - 0.06, 0.02)
-
-
-def _bathtub(s, p):
-    w, d, h, t = p["width"], p["depth"], p["height"], 0.06
-    s.box(0, 0, 0, w, d, 0.06)
-    s.box(0, 0, 0.06, w, t, h - 0.06)
-    s.box(0, d - t, 0.06, w, t, h - 0.06)
-    s.box(0, t, 0.06, t, d - 2 * t, h - 0.06)
-    s.box(w - t, t, 0.06, t, d - 2 * t, h - 0.06)
-    s.rect(0, 0, w, d)
-    s.line(*rounded_rect(t, t, w - 2 * t, d - 2 * t, (d - 2 * t) * 0.45), closed=True)
-    s.circle(w - 0.2, d / 2, 0.03)
-
-
-def _shower(s, p):
-    w, d, h = p["width"], p["depth"], p["height"]
-    s.box(0, 0, 0, w, d, h)
-    s.rect(0, 0, w, d)
-    s.line((0, 0), (w, d))
-    s.line((w, 0), (0, d))
-    s.circle(w / 2, d / 2, 0.04)
-
-
-def _bidet(s, p):
-    w, d, h = p["width"], p["depth"], p["height"]
-    s.box(0, d - 0.08, 0, w, 0.08, h)
-    s.prism(ellipse_points(w / 2, (d - 0.08) / 2 + 0.02, w / 2, (d - 0.08) / 2 + 0.02, n=12), 0, h)
-    s.rect(0, d - 0.08, w, 0.08)
-    s.ellipse(w / 2, (d - 0.08) / 2 + 0.02, w / 2, (d - 0.08) / 2 + 0.02)
-    s.ellipse(w / 2, (d - 0.08) / 2 + 0.03, w / 2 - 0.06, (d - 0.08) / 2 - 0.06)
-    s.circle(w / 2, d - 0.12, 0.015)
-
-
-define("wc", "WC", "sanitary", SANITARY("TOILETPAN"), [W(0.38), D(0.7), H(0.4)], _wc)
-define("washbasin", "Washbasin", "sanitary", SANITARY("WASHHANDBASIN"), [W(0.6), D(0.45), H(0.85)], _washbasin)
-define("bathtub", "Bathtub", "sanitary", SANITARY("BATH"), [W(1.7), D(0.75), H(0.55)], _bathtub)
-define("shower_tray", "Shower tray", "sanitary", SANITARY("SHOWER"), [W(0.9), D(0.9), H(0.05)], _shower)
-define("bidet", "Bidet", "sanitary", SANITARY("BIDET"), [W(0.38), D(0.55), H(0.4)], _bidet)
-
-
-# ---------------------------------------------------------------- kitchen
-
-def _cabinets(s, w, d, h, units, counter=0.04, plinth=0.1):
-    s.box(0, 0.05, 0, w, d - 0.05, plinth)
-    s.box(0, 0.02, plinth, w, d - 0.02, h - counter - plinth)
-    s.box(0, 0, h - counter, w, d, counter)
-    s.rect(0, 0, w, d)
-    for i in range(1, units):
-        x = w * i / units
-        s.line((x, 0), (x, 0.08))  # the doors' joints along the front
-
-
-def _base_cabinets(s, p):
-    _cabinets(s, p["width"], p["depth"], p["height"], p["units"])
-
-
-def _wall_cabinets(s, p):
-    w, d, h, z, units = p["width"], p["depth"], p["height"], p["elevation"], p["units"]
-    s.box(0, 0, z, w, d, h)
-    s.rect(0, 0, w, d)
-    s.line((0, 0), (w, d))  # above the plan cut: crossed, as drawn by hand
-    s.line((w, 0), (0, d))
-    for i in range(1, units):
-        s.line((w * i / units, 0), (w * i / units, d))
-
-
-def _sink_unit(s, p):
-    w, d, h, bowls = p["width"], p["depth"], p["height"], p["bowls"]
-    _cabinets(s, w, d, h, max(1, round(w / 0.6)))
-    bw = min(0.4, (w * 0.6 - 0.05 * (bowls + 1)) / bowls)
-    for i in range(bowls):
-        x = 0.08 + i * (bw + 0.05)
-        s.line(*rounded_rect(x, 0.1, bw, d - 0.2, 0.05, 2), closed=True)
-        s.circle(x + bw / 2, d / 2, 0.025)
-    drainer = 0.08 + bowls * (bw + 0.05) + 0.03
-    for k in range(4):  # the drainer's grooves
-        y = 0.15 + (d - 0.3) * k / 3
-        s.line((drainer, y), (w - 0.08, y))
-    s.circle(0.08 + bowls * (bw + 0.05) / 2, d - 0.06, 0.02)
-
-
-def _fridge(s, p):
-    w, d, h = p["width"], p["depth"], p["height"]
-    s.box(0, 0.04, 0, w, d - 0.04, h)
-    s.box(0, 0, 0.05, w, 0.04, h - 0.05)
-    s.rect(0, 0, w, d)
-    s.line((0, 0.04), (w, 0.04))
-    s.line((0, 0.04), (w, d))
-
-
-def _cooker(s, p):
-    w, d, h, burners = p["width"], p["depth"], p["height"], p["burners"]
-    s.box(0, 0.02, 0, w, d - 0.02, h - 0.01)
-    s.box(0.03, 0.05, h - 0.01, w - 0.06, d - 0.1, 0.01)
-    s.rect(0, 0, w, d)
-    s.rect(0.03, 0.05, w - 0.06, d - 0.1)
-    cols = 1 if burners == 1 else 2
-    rows = max(1, math.ceil(burners / cols))
-    r = min((w - 0.12) / (2 * cols), (d - 0.16) / (2 * rows)) * 0.75
-    k = 0
-    for row in range(rows):
-        for col in range(cols):
-            if k < burners:
-                s.circle(0.06 + (w - 0.12) * (col + 0.5) / cols, 0.08 + (d - 0.16) * (row + 0.5) / rows, r)
-                k += 1
-
-
-KITCHEN_FURNITURE = FURNITURE("USERDEFINED", "KITCHENCABINET")
-define("base_cabinets", "Base cabinets", "kitchen", KITCHEN_FURNITURE,
-       [W(2.4), D(0.6), H(0.9), Param("units", "Units", 4, "count", 1, 12)], _base_cabinets)
-define("wall_cabinets", "Wall cabinets", "kitchen", KITCHEN_FURNITURE,
-       [W(1.2), D(0.35), H(0.7), Param("elevation", "Mounting height", 1.45, "length", 0.0, 3.0),
-        Param("units", "Units", 2, "count", 1, 12)], _wall_cabinets)
-define("sink_unit", "Sink unit", "kitchen", SANITARY("SINK"),
-       [W(1.2), D(0.6), H(0.9), Param("bowls", "Bowls", 1, "count", 1, 2)], _sink_unit)
-define("fridge", "Fridge", "kitchen", APPLIANCE("FRIDGE_FREEZER"), [W(0.6), D(0.65), H(1.85)], _fridge)
-define("cooker", "Cooktop and oven", "kitchen", APPLIANCE("ELECTRICCOOKER"),
-       [W(0.6), D(0.6), H(0.9), Param("burners", "Burners", 4, "count", 1, 6)], _cooker)
-
-
-# ---------------------------------------------------------------- people, trees and cars
-
-def _person(s, p):
-    w, d, h = p["width"], p["depth"], p["height"]
-    leg = h * 0.47
-    s.box(w * 0.2, d * 0.25, 0, w * 0.25, d * 0.5, leg)
-    s.box(w * 0.55, d * 0.25, 0, w * 0.25, d * 0.5, leg)
-    s.prism(ellipse_points(w / 2, d / 2, w / 2, d / 2, n=8), leg, h * 0.36)
-    s.cylinder(w / 2, d / 2, leg + h * 0.38, h * 0.065, h * 0.15)
-    s.ellipse(w / 2, d / 2, w / 2, d / 2)
-    s.circle(w / 2, d / 2, h * 0.065)
-
-
-def _tree(s, p):
-    crown, h, trunk = p["width"], p["height"], p["trunk"]
-    c = crown / 2
-    s.cylinder(c, c, 0, trunk / 2, h * 0.45)
-    for i, (z, r) in enumerate(((0.3, 0.8), (0.5, 1.0), (0.7, 0.75), (0.85, 0.4))):
-        s.prism(ellipse_points(c, c, c * r, c * r, n=10), h * z, h * (0.2 if i < 3 else 0.15))
-    s.circle(c, c, c)
-    s.circle(c, c, trunk / 2)
-    for k in range(8):  # the classic star of branches
-        a = 2 * math.pi * k / 8
-        s.line((c + trunk / 2 * math.cos(a), c + trunk / 2 * math.sin(a)), (c + c * 0.7 * math.cos(a), c + c * 0.7 * math.sin(a)))
-
-
-def _car(s, p):
-    w, d, h = p["width"], p["depth"], p["height"]  # the car is `depth` long, front at y = 0
-    wheel = 0.32
-    for y in (d * 0.18, d * 0.78):
-        for x in (0.05, w - 0.25):
-            s.side_cylinder(y, wheel, x, wheel, 0.2)
-    s.box(0, 0, 0.25, w, d, max(h * 0.55 - 0.25, 0.1))
-    cabin = [(d * 0.3, h * 0.55), (d * 0.85, h * 0.55), (d * 0.75, h), (d * 0.42, h)]
-    s.side_prism(cabin, 0.1, w - 0.2)
-    s.line(*rounded_rect(0, 0, w, d, 0.3, 3), closed=True)
-    s.line((0.1, d * 0.3), (w - 0.1, d * 0.3))  # windscreen
-    s.line((0.1, d * 0.42), (w - 0.1, d * 0.42))
-    s.line((0.1, d * 0.75), (w - 0.1, d * 0.75))  # rear window
-    s.line((0.1, d * 0.85), (w - 0.1, d * 0.85))
-
-
-define("person", "Person", "site", PROXY("PERSON"), [W(0.5), D(0.3), H(1.75)], _person)
-define("tree", "Tree", "site",
-       {"IFC4": ("IfcGeographicElementType", "USERDEFINED", "TREE"),
-        "IFC2X3": ("IfcBuildingElementProxyType", "USERDEFINED", "TREE")},
-       [Param("width", "Crown diameter", 4.0), H(6.0), Param("trunk", "Trunk diameter", 0.3)], _tree)
-define("car", "Car", "site", PROXY("CAR"), [W(1.8), D(4.5), H(1.5)], _car)
-
-
-def footprint(obj: Obj, values: dict) -> tuple[float, float]:
+def footprint(obj, values: dict) -> tuple[float, float]:
     """Width and depth (metres) of an object's plan box."""
     w = values.get("width", 1.0)
     return w, values.get("depth", w)
@@ -584,7 +82,7 @@ def footprint(obj: Obj, values: dict) -> tuple[float, float]:
 
 # ---------------------------------------------------------------- office library
 
-_office: dict = {}  # key -> Obj or IFC type entry {"path", "guid", "name", "ifc_class"}
+_office: dict = {}  # ref -> objects.ObjectDef or IFC type entry {"path", "guid", "name", "ifc_class"}
 _office_paths = {"folder": "", "files": []}
 _office_errors: list = []
 _ifc_cache: dict = {}  # path -> (mtime, ifcopenshell.file)
@@ -612,74 +110,95 @@ def _load_ifc_types(path: str, category: str):
 
 
 def load_office(folder: str = "", files=()) -> None:
-    """(Re)load the office library: *.py files that call define(), and *.ifc files' types."""
+    """(Re)load the office library: *.kimobj definitions (D99) and *.ifc files' types. A file that does
+    not load or build is listed in the errors and left out; the rest load."""
     _office.clear()
     _office_errors.clear()
     _office_paths["folder"], _office_paths["files"] = folder or "", list(files or ())
     paths = []
     if folder and os.path.isdir(folder):
-        paths += sorted(str(p) for p in pathlib.Path(folder).iterdir() if p.suffix.lower() in (".py", ".ifc"))
+        paths += sorted(str(p) for p in pathlib.Path(folder).iterdir() if p.suffix.lower() in (".kimobj", ".ifc"))
     paths += [p for p in files or () if p not in paths]
+    parsed = []
     for path in paths:
         try:
-            if path.lower().endswith(".py"):
-                before = set(OBJECTS)
-                namespace = {"define": define, "Param": Param, "W": W, "D": D, "H": H, "FURNITURE": FURNITURE,
-                             "SANITARY": SANITARY, "APPLIANCE": APPLIANCE, "PROXY": PROXY, "math": math,
-                             "rounded_rect": rounded_rect, "ellipse_points": ellipse_points, "__file__": path}
-                code = pathlib.Path(path).read_text(encoding="utf-8")
-                exec(compile(code, path, "exec"), namespace)  # the office's own object scripts (like GDL)
-                for key in set(OBJECTS) - before:
-                    OBJECTS[key].category, OBJECTS[key].library = "office", path
-                    _office[key] = OBJECTS.pop(key)
+            if path.lower().endswith(".kimobj"):
+                d = objects.load_file(path, "office", check=False)
+                d.category = "office"
+                _office[d.ref] = d
+                parsed.append((path, d))
             elif os.path.isfile(path):
                 _load_ifc_types(path, "office")
+        except ObjectError as ex:
+            _office_errors.append({"file": path, "error": str(ex)})
         except Exception as ex:  # a broken file must not break the library
+            _office_errors.append({"file": path, "error": f"{type(ex).__name__}: {ex}"})
+    for path, d in parsed:  # built once all are known, so office objects may use each other
+        try:
+            objbuild.check(d)
+            objbuild.build(d, d.values(), _resolve, all_anchors=True)
+        except ObjectError as ex:
+            _office.pop(d.ref, None)
+            _office_errors.append({"file": path, "error": str(ex)})
+        except Exception as ex:  # e.g. a formula giving a non-number where a length goes
+            _office.pop(d.ref, None)
             _office_errors.append({"file": path, "error": f"{type(ex).__name__}: {ex}"})
 
 
 def get(key: str):
-    """The object definition (Obj) or an office IFC type entry (dict), or None."""
+    """The object definition (objects.ObjectDef) or an office IFC type entry (dict), or None."""
     return OBJECTS.get(key) or _office.get(key)
 
 
 # ---------------------------------------------------------------- listing (the Library panel)
 
-def _symbol(shape: Shape) -> list:
-    """The plan symbol as polylines (object metres), circles tessellated."""
+def _param_listing(obj, values) -> list:
+    visible = set(obj.visible(values))
+    env = {**values, "pi": math.pi}
     out = []
-    for c in shape.curves:
-        if c[0] == "poly":
-            out.append([[round(x, 4), round(y, 4)] for x, y in c[1]])
-        else:
-            _, cx, cy, r = c
-            pts = ellipse_points(cx, cy, r, r, n=24)
-            out.append([[round(x, 4), round(y, 4)] for x, y in pts + pts[:1]])
+    for p in obj.params:
+        lo, hi = p.bounds(env)
+        item = {"key": p.key, "label": p.label["en"], "label_es": p.label["es"], "value": values[p.key],
+                "kind": p.kind, "min": lo, "max": hi, "group": p.group, "visible": p.key in visible}
+        if p.kind == "choice":
+            item["options"] = [{"id": i, "label": label["en"], "label_es": label["es"]} for i, label in p.options]
+        if p.kind == "material":
+            item["choices"] = _material_choices(p.default)
+        out.append(item)
     return out
 
 
-def _listing(obj: Obj) -> dict:
+def _listing(obj) -> dict:
     values = obj.values()
     w, d = footprint(obj, values)
-    return {"id": obj.key, "name": obj.name, "category": obj.category, "ifc_class": obj.ifc["IFC4"][0],
-            "params": [p.listing() for p in obj.params], "symbol": _symbol(obj.shape(values)),
-            "width": w, "depth": d, "height": values.get("height", 1.0), "library": obj.library}
+    return {"id": obj.ref, "name": obj.name, "name_es": obj.names["es"], "category": obj.category,
+            "ifc_class": obj.ifc["IFC4"][0], "params": _param_listing(obj, values),
+            "symbol": obj.shape(values).polylines(), "width": w, "depth": d,
+            "height": values.get("height", 1.0), "library": _library_of(obj)}
 
 
 def library_objects() -> str:
     from . import app_bridge as B
 
-    objects = [_listing(o) for o in OBJECTS.values()]
+    listed = [_listing(o) for o in OBJECTS.values()]
     for key, entry in _office.items():
-        if isinstance(entry, Obj):
+        if isinstance(entry, objects.ObjectDef):
             item = _listing(entry)
-            item["id"] = key
         else:
-            item = {"id": key, "name": entry["name"], "category": entry["category"], "ifc_class": entry["ifc_class"],
-                    "params": [], "symbol": [], "width": 1.0, "depth": 1.0, "height": 1.0, "library": entry["path"]}
-        objects.append(item)
-    return B._dump({"categories": [{"id": k, "name": n} for k, n in CATEGORIES], "objects": objects,
+            item = {"id": key, "name": entry["name"], "name_es": entry["name"], "category": entry["category"],
+                    "ifc_class": entry["ifc_class"], "params": [], "symbol": [], "width": 1.0, "depth": 1.0,
+                    "height": 1.0, "library": entry["path"]}
+        listed.append(item)
+    return B._dump({"categories": [{"id": k, "name": n} for k, n in CATEGORIES], "objects": listed,
                     "office": dict(_office_paths), "errors": list(_office_errors)})
+
+
+def _given(params_json: str) -> dict:
+    try:
+        given = json.loads(params_json) if params_json else {}
+    except ValueError:
+        return {}
+    return given if isinstance(given, dict) else {}
 
 
 def object_symbol(key: str, params_json: str = "") -> str:
@@ -687,19 +206,30 @@ def object_symbol(key: str, params_json: str = "") -> str:
     from . import app_bridge as B
 
     obj = get(key)
-    if not isinstance(obj, Obj):
+    if not isinstance(obj, objects.ObjectDef):
         return B._dump({"symbol": [], "width": 1.0, "depth": 1.0})
-    try:
-        given = json.loads(params_json) if params_json else {}
-    except ValueError:
-        given = {}
-    values = obj.values(given)
+    values = obj.values(_given(params_json))
     w, d = footprint(obj, values)
-    return B._dump({"symbol": _symbol(obj.shape(values)), "width": w, "depth": d, "params": values})
+    try:
+        symbol = obj.shape(values).polylines()
+    except ObjectError:  # values the definition cannot build: no thumbnail rather than an error
+        symbol = []
+    return B._dump({"symbol": symbol, "width": w, "depth": d, "params": values})
+
+
+def object_form(key: str, params_json: str = "") -> str:
+    """The Library panel's parameter form for these values (D99): kinds, limits, which are shown."""
+    from . import app_bridge as B
+
+    obj = get(key)
+    if not isinstance(obj, objects.ObjectDef):
+        return B._dump({"params": [], "visible": []})
+    values = obj.values(_given(params_json))
+    return B._dump({"params": _param_listing(obj, values), "visible": obj.visible(values), "values": values})
 
 
 def set_library_paths(data: str) -> str:
-    """The office library: {"folder": path, "files": [IFC or .py files]} (from the preferences)."""
+    """The office library: {"folder": path, "files": [IFC or .kimobj files]} (from the preferences)."""
     from . import app_bridge as B
 
     try:
@@ -717,13 +247,19 @@ def _schema_family(f) -> str:
 
 
 class _Writer:
-    """Writes a Shape as IFC items in the model's length unit."""
+    """Writes a Shape as IFC items in the model's length unit (D99 solids: a kind, fields in the solid's
+    own frame, and the frame as a 4×4 matrix in object metres)."""
 
     def __init__(self, f, unit_scale):
+        import ifcopenshell.util.unit
+
         self.f, self.k = f, 1.0 / unit_scale
-        self.z = f.createIfcDirection((0.0, 0.0, 1.0))
-        self.x = f.createIfcDirection((1.0, 0.0, 0.0))
-        self.y = f.createIfcDirection((0.0, 1.0, 0.0))
+        self.ifc2x3 = f.schema == "IFC2X3"
+        unit = ifcopenshell.util.unit.get_project_unit(f, "PLANEANGLEUNIT")
+        self.degrees = unit is not None and unit.is_a("IfcConversionBasedUnit") and (unit.Name or "").upper() == "DEGREE"
+
+    def angle(self, degrees):
+        return float(degrees) if self.degrees else math.radians(degrees)
 
     def p2(self, x, y):
         return self.f.createIfcCartesianPoint((float(x) * self.k, float(y) * self.k))
@@ -731,38 +267,69 @@ class _Writer:
     def p3(self, x, y, z):
         return self.f.createIfcCartesianPoint((float(x) * self.k, float(y) * self.k, float(z) * self.k))
 
+    def d3(self, v):
+        return self.f.createIfcDirection(tuple(float(c) for c in v))
+
     def a2(self, x=0.0, y=0.0):
         return self.f.createIfcAxis2Placement2D(self.p2(x, y), None)
+
+    def placement(self, m):
+        m = np.asarray(m)
+        return self.f.createIfcAxis2Placement3D(self.p3(*m[:3, 3]), self.d3(m[:3, 2]), self.d3(m[:3, 0]))
 
     def polyline2(self, pts):
         return self.f.createIfcPolyline([self.p2(x, y) for x, y in pts])
 
-    def extrude(self, profile, position, depth):
-        return self.f.createIfcExtrudedAreaSolid(profile, position, self.z, float(depth) * self.k)
+    def closed(self, pts):
+        pts = [tuple(p) for p in pts]
+        return self.f.createIfcArbitraryClosedProfileDef("AREA", None, self.polyline2(pts + [pts[0]]))
 
-    def solid(self, s):
-        f, kind = self.f, s[0]
+    def extrude(self, profile, m, depth):
+        return self.f.createIfcExtrudedAreaSolid(profile, self.placement(m), self.d3((0, 0, 1)), float(depth) * self.k)
+
+    def solids(self, s) -> list:
+        f, kind, m = self.f, s["kind"], np.asarray(s["matrix"])
+        up = lambda z: m @ _translate(0, 0, z)  # noqa: E731
         if kind == "box":
-            _, x, y, z, dx, dy, dz = s
-            profile = f.createIfcRectangleProfileDef("AREA", None, self.a2(x + dx / 2, y + dy / 2), dx * self.k, dy * self.k)
-            return self.extrude(profile, f.createIfcAxis2Placement3D(self.p3(0, 0, z), None, None), dz)
+            t = s["taper"] if not self.ifc2x3 else 1.0
+            scale = 1.0 if not self.ifc2x3 else (1 + s["taper"]) / 2  # IFC2X3: untapered at the mean size
+            cx, cy = s["x"] + s["dx"] / 2, s["y"] + s["dy"] / 2
+            profile = f.createIfcRectangleProfileDef("AREA", None, self.a2(cx, cy), s["dx"] * scale * self.k, s["dy"] * scale * self.k)
+            if t < 1 - 1e-9:
+                end = f.createIfcRectangleProfileDef("AREA", None, self.a2(cx, cy), s["dx"] * t * self.k, s["dy"] * t * self.k)
+                return [f.createIfcExtrudedAreaSolidTapered(profile, self.placement(up(s["z"])), self.d3((0, 0, 1)),
+                                                            s["dz"] * self.k, end)]
+            return [self.extrude(profile, up(s["z"]), s["dz"])]
         if kind == "cylinder":
-            _, cx, cy, z, r, dz = s
-            profile = f.createIfcCircleProfileDef("AREA", None, self.a2(cx, cy), r * self.k)
-            return self.extrude(profile, f.createIfcAxis2Placement3D(self.p3(0, 0, z), None, None), dz)
+            profile = f.createIfcCircleProfileDef("AREA", None, self.a2(s["cx"], s["cy"]), s["r"] * self.k)
+            return [self.extrude(profile, up(s["z"]), s["h"])]
         if kind == "prism":
-            _, pts, z, dz = s
-            profile = f.createIfcArbitraryClosedProfileDef("AREA", None, self.polyline2(list(pts) + [pts[0]]))
-            return self.extrude(profile, f.createIfcAxis2Placement3D(self.p3(0, 0, z), None, None), dz)
-        # profiles in the (y, z) plane extruded along x: local X = world Y, local Z = world X
-        position = f.createIfcAxis2Placement3D(self.p3(s[-2] if kind == "side" else s[3], 0, 0), self.x, self.y)
-        if kind == "side":
-            _, pts, x, dx = s
-            profile = f.createIfcArbitraryClosedProfileDef("AREA", None, self.polyline2(list(pts) + [pts[0]]))
-            return self.extrude(profile, position, dx)
-        _, cy, cz, x, r, dx = s  # side_cylinder
-        profile = f.createIfcCircleProfileDef("AREA", None, self.a2(cy, cz), r * self.k)
-        return self.extrude(profile, position, dx)
+            return [self.extrude(self.closed(s["points"]), up(s["z"]), s["h"])]
+        if kind in ("cone", "revolve"):
+            if kind == "cone":
+                profile_pts = [(0, 0), (s["r1"], 0), (s["r2"], s["h"]), (0, s["h"])]
+                base, angle = m @ _translate(s["cx"], s["cy"], s["z"]), 360.0
+            else:
+                profile_pts, base, angle = s["profile"], m, s["angle"]
+            # The profile lies in the frame's x-z plane and turns about the frame's z axis: the placement's
+            # x is the frame's x, its z is -y (so its y, z × x, is the frame's z), and the revolve axis is
+            # the placement's y.
+            plane = base.copy()
+            plane[:3, 0], plane[:3, 1], plane[:3, 2] = base[:3, 0], base[:3, 2], -base[:3, 1]
+            axis = f.createIfcAxis1Placement(self.p3(0, 0, 0), self.d3((0, 1, 0)))
+            return [f.createIfcRevolvedAreaSolid(self.closed(profile_pts), self.placement(plane), axis, self.angle(angle))]
+        # sweep
+        if s.get("r") is not None:
+            path = [tuple((m @ [x, y, z, 1])[:3]) for x, y, z in s["path"]]
+            directrix = f.createIfcPolyline([self.p3(*p) for p in path])
+            # IFC2X3 requires the directrix's parameter range (a polyline's: 0 to its segment count)
+            start, end = (0.0, float(len(path) - 1)) if self.ifc2x3 else (None, None)
+            return [f.createIfcSweptDiskSolid(directrix, s["r"] * self.k, None, start, end)]
+        out = []
+        for p, q in zip(s["path"], s["path"][1:]):
+            seg, length = objbuild._segment_frame(p, q)
+            out.append(self.extrude(self.closed(s["profile"]), m @ seg, length))
+        return out
 
     def curve(self, c):
         if c[0] == "poly":
@@ -777,7 +344,7 @@ def _contexts():
     return authoring._body_context(), annotations._context()
 
 
-def _representations(obj: Obj, values: dict):
+def _representations(obj, values: dict):
     """(body, plan) IfcShapeRepresentations for the object with these values."""
     import ifcopenshell.util.unit
 
@@ -787,9 +354,16 @@ def _representations(obj: Obj, values: dict):
     shape = obj.shape(values)
     writer = _Writer(f, ifcopenshell.util.unit.calculate_unit_scale(f))
     body_context, plan_context = _contexts()
-    items = [writer.solid(s) for s in shape.solids]
-    body = f.createIfcShapeRepresentation(body_context, "Body", "SweptSolid", items)
-    _style_parts(f, obj, values, items, shape.parts)
+    items, parts = [], []
+    for s in shape.solids:
+        for item in writer.solids(s):
+            items.append(item)
+            parts.append(s["part"])
+    advanced = any(i.is_a("IfcSweptDiskSolid") or i.is_a("IfcExtrudedAreaSolidTapered") for i in items)
+    # IFC2X3's AdvancedSweptSolid takes no area sweeps beside a disk sweep: SolidModel takes both
+    kind = ("SolidModel" if writer.ifc2x3 else "AdvancedSweptSolid") if advanced else "SweptSolid"
+    body = f.createIfcShapeRepresentation(body_context, "Body", kind, items)
+    _style_parts(f, obj, values, items, parts)
     plan = None
     if shape.curves:
         curve_set = f.createIfcGeometricCurveSet([writer.curve(c) for c in shape.curves])
@@ -797,7 +371,7 @@ def _representations(obj: Obj, values: dict):
     return body, plan
 
 
-def _style_parts(f, obj: Obj, values: dict, items, parts):
+def _style_parts(f, obj, values: dict, items, parts):
     """D97: every solid shows its part's building material (its surface as the item's style), so the 3D
     view and other IFC viewers colour the parts."""
     import ifcopenshell.api.style
@@ -838,10 +412,14 @@ def _library_types(f):
     return out
 
 
-def _find_type(f, key: str, values: dict):
+def _find_type(f, ref: str, values: dict, digest: str):
+    """The library type made from this definition (its hash) with these values, or None."""
+    import ifcopenshell.util.element
+
     for t in _library_types(f):
         info = _params_of_type(t)
-        if info is not None and info[0] == key and info[1] == values:
+        if info is not None and info[0] == ref and info[1] == values and \
+                ifcopenshell.util.element.get_pset(t, PSET, "DefinitionHash") == digest:
             return t
     return None
 
@@ -855,19 +433,41 @@ def _set_predefined(t, predefined, element):
         t.AssemblyPlace = "NOTDEFINED"
 
 
-def _write_pset(t, key, values, library):
+def _pset_of(t):
     import ifcopenshell.api.pset
 
     from . import app_bridge as B
 
-    f = B._model
-    ps = next((p for p in (t.HasPropertySets or ()) if p.Name == PSET), None) or \
-        ifcopenshell.api.pset.add_pset(f, product=t, name=PSET)
-    ifcopenshell.api.pset.edit_pset(f, pset=ps, properties={
-        "Object": key, "Parameters": json.dumps(values, sort_keys=True), "Library": library})
+    return next((p for p in (t.HasPropertySets or ()) if p.Name == PSET), None) or \
+        ifcopenshell.api.pset.add_pset(B._model, product=t, name=PSET)
 
 
-def _make_type(obj: Obj, values: dict):
+def _write_pset(t, obj, values) -> None:
+    """The type's KIMBIM_LibraryObject: its object, values, library and its definition (D99)."""
+    import ifcopenshell.api.pset
+
+    from . import app_bridge as B
+
+    ifcopenshell.api.pset.edit_pset(B._model, pset=_pset_of(t), properties={
+        "Object": obj.ref, "Parameters": json.dumps(values, sort_keys=True), "Library": _library_of(obj),
+        "DefinitionHash": obj.hash, "Definition": obj.text})
+
+
+def definition_of_type(t):
+    """The definition a library type was made from (D99): the text stored on it, so a project opens and
+    edits without the library that made it."""
+    import ifcopenshell.util.element
+
+    data = ifcopenshell.util.element.get_pset(t, PSET) if t is not None else None
+    if not data or not data.get("Definition"):
+        return None
+    try:
+        return objects.from_text(data["Definition"], "project", data.get("Library") or "", data.get("Object") or "")
+    except (ObjectError, ValueError):
+        return None
+
+
+def _make_type(obj, values: dict):
     import ifcopenshell.api.geometry
     import ifcopenshell.api.root
 
@@ -881,19 +481,20 @@ def _make_type(obj: Obj, values: dict):
     ifcopenshell.api.geometry.assign_representation(f, product=t, representation=body)
     if plan is not None:
         ifcopenshell.api.geometry.assign_representation(f, product=t, representation=plan)
-    _write_pset(t, obj.key, values, obj.library)
+    _write_pset(t, obj, values)
     return t
 
 
-def _type_for(obj: Obj, values: dict):
+def _type_for(obj, values: dict):
     from . import app_bridge as B
 
-    return _find_type(B._model, obj.key, values) or _make_type(obj, values)
+    return _find_type(B._model, obj.ref, values, obj.hash) or _make_type(obj, values)
 
 
 def _ifc_type(entry: dict):
     """The office IFC type copied into the model (once: placing it again reuses it)."""
     import ifcopenshell.api.project
+    import ifcopenshell.api.pset
 
     from . import app_bridge as B
 
@@ -904,7 +505,8 @@ def _ifc_type(entry: dict):
         pass
     library = _open_library_ifc(entry["path"])
     t = ifcopenshell.api.project.append_asset(f, library=library, element=library.by_guid(entry["guid"]))
-    _write_pset(t, f"ifc:{entry['guid']}", {}, entry["path"])
+    ifcopenshell.api.pset.edit_pset(f, pset=_pset_of(t), properties={
+        "Object": f"ifc:{entry['guid']}", "Parameters": "{}", "Library": entry["path"]})
     return t
 
 
@@ -971,7 +573,7 @@ def place_object(storey_guid: str, key: str, params_json: str, x, y, angle=0.0, 
         x, y, angle = float(x), float(y), float(angle or 0.0)
     except (TypeError, ValueError) as ex:
         return A._fail(str(ex))
-    values = obj.values(given) if isinstance(obj, Obj) else {}
+    values = obj.values(given) if isinstance(obj, objects.ObjectDef) else {}
     z = A._elevation(storey)
     if str(gravity) in ("1", "true", "True"):
         from . import symbols
@@ -982,9 +584,9 @@ def place_object(storey_guid: str, key: str, params_json: str, x, y, angle=0.0, 
 
     def action():
         f = B._model
-        t = _type_for(obj, values) if isinstance(obj, Obj) else _ifc_type(obj)
+        t = _type_for(obj, values) if isinstance(obj, objects.ObjectDef) else _ifc_type(obj)
         element = ifcopenshell.api.root.create_entity(f, ifc_class=_occurrence_class(t.is_a(), f.schema),
-                                                      name=obj.name if isinstance(obj, Obj) else (t.Name or ""))
+                                                      name=obj.name if isinstance(obj, objects.ObjectDef) else (t.Name or ""))
         ifcopenshell.api.type.assign_type(f, related_objects=[element], relating_type=t)
         c, s = math.cos(angle), math.sin(angle)
         matrix = np.array([[c, -s, 0, x], [s, c, 0, y], [0, 0, 1, z], [0, 0, 0, 1]], dtype=float)
@@ -1033,21 +635,20 @@ def set_plan_display(guids_json: str, value: str) -> str:
 
 
 def _object_of(e):
-    """(Obj, values, type) of a placed library object, or None."""
+    """(definition, values, type) of a placed library object, or None. The type's own definition (D99)."""
     import ifcopenshell.util.element
 
     t = ifcopenshell.util.element.get_type(e)
+    obj = definition_of_type(t)
     info = _params_of_type(t)
-    if info is None or info[0] not in OBJECTS and info[0] not in _office:
-        return None
-    obj = get(info[0])
-    if not isinstance(obj, Obj):
+    if obj is None or info is None:
         return None
     return obj, obj.values(info[1]), t
 
 
 def parameters_of(elements) -> list:
-    """The Properties panel's Parameters group: [(label, value, kind)] per element (lists)."""
+    """The Properties panel's Parameters group per element: the visible parameters as
+    {"label", "value", "kind", "choices"?} (a choice shows its option's label), or None."""
     out = []
     for e in elements:
         found = _object_of(e)
@@ -1055,7 +656,17 @@ def parameters_of(elements) -> list:
             out.append(None)
             continue
         obj, values, _ = found
-        out.append([(p.label, values[p.key], p.kind) for p in obj.params])
+        visible = set(obj.visible(values))
+        rows = []
+        for p in obj.params:
+            if p.key not in visible:
+                continue
+            row = {"label": p.label["en"], "value": values[p.key], "kind": p.kind}
+            if p.kind == "choice":
+                row["value"] = p.option_label(values[p.key])
+                row["choices"] = [label["en"] for _, label in p.options]
+            rows.append(row)
+        out.append(rows)
     return out
 
 
@@ -1063,7 +674,7 @@ def is_object(e) -> bool:
     return _object_of(e) is not None
 
 
-def _regenerate_type(t, obj: Obj, values: dict) -> None:
+def _regenerate_type(t, obj, values: dict) -> None:
     """New geometry for a type in place: every placement of it follows (mapped items)."""
     import ifcopenshell.util.element
 
@@ -1089,7 +700,7 @@ def _regenerate_type(t, obj: Obj, values: dict) -> None:
             except RuntimeError:
                 pass
     t.Name = obj.type_name(values)
-    _write_pset(t, obj.key, values, obj.library)
+    _write_pset(t, obj, values)
 
 
 def object_parameter_usage(guids_json: str, name: str) -> str:
@@ -1141,15 +752,22 @@ def set_object_parameter(guids_json: str, name: str, value, scope: str = "") -> 
             v = str(value).strip()
             if not v or (materials._material_by_name(B._model, v) is None and v not in materials.CATALOGUE):
                 return A._fail(f"unknown building material {value}")
+        elif p.kind in ("choice", "bool"):
+            v = value
         else:
             try:
                 v = float(str(value).strip().replace(",", "."))
             except ValueError:
                 return A._fail(f"not a number: {value}")
             if p.kind == "length" and v <= 0:
-                return A._fail(f"{p.label} must be more than 0")
+                return A._fail(f"{p.label['en']} must be more than 0")
         new_values = dict(values)
-        new_values[p.key] = p.clean(v)
+        new_values[p.key] = v
+        try:
+            new_values = obj.values(new_values)  # re-cleans every value: limits that are formulas follow
+            obj.shape(new_values)  # a formula that breaks at these values fails the edit (doc 16 §7)
+        except (ObjectError, ValueError) as ex:
+            return A._fail(str(ex))
         groups.setdefault(t.id(), (t, obj, new_values, []))[3].append(e)
     if not groups:
         return A._fail(f"no selected object has a parameter {name}")
@@ -1160,7 +778,7 @@ def set_object_parameter(guids_json: str, name: str, value, scope: str = "") -> 
         for t, obj, new_values, elements in groups.values():
             everyone = set(ifcopenshell.util.element.get_types(t))
             whole_type = scope == "type" or (scope != "selection" and everyone <= set(elements))
-            if whole_type and _find_type(f, obj.key, new_values) is None:
+            if whole_type and _find_type(f, obj.ref, new_values, obj.hash) is None:
                 _regenerate_type(t, obj, new_values)
                 changed += [o.GlobalId for o in everyone]
             elif whole_type:
@@ -1180,3 +798,6 @@ def set_object_parameter(guids_json: str, name: str, value, scope: str = "") -> 
     except Exception as ex:
         return A._fail(f"{type(ex).__name__}: {ex}")
     return B._dump(r)
+
+
+_load_bundled()

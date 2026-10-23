@@ -275,8 +275,10 @@ class ObjectDef:
                 out.append(p.key)
         return out
 
+    resolver = None  # `use` of other library objects: library.py sets it to library._resolve
+
     def shape(self, values: dict, all_anchors: bool = False):
-        return objbuild.build(self, values, all_anchors=all_anchors)
+        return objbuild.build(self, values, type(self).resolver, all_anchors=all_anchors)
 
     def material_of(self, values: dict, part: str) -> str | None:
         """The building material of one slot: its parameter, else the object's main one, else None."""
@@ -318,10 +320,14 @@ def load_file(path: str, source: str, check: bool = True) -> ObjectDef:
 
 
 @functools.lru_cache(maxsize=512)
-def _from_text(text: str, source: str, library: str) -> ObjectDef:
-    return ObjectDef(json.loads(text), source, library, check=False)
+def _from_text(text: str, source: str, library: str, ref: str) -> ObjectDef:
+    d = ObjectDef(json.loads(text), source, library, check=False)
+    if ref:
+        d.ref = ref
+    return d
 
 
-def from_text(text: str, source: str, library: str = "") -> ObjectDef:
-    """A definition stored in a model (its type's Definition): parsed once per text."""
-    return _from_text(text, source, library)
+def from_text(text: str, source: str, library: str = "", ref: str = "") -> ObjectDef:
+    """A definition stored in a model (its type's Definition): parsed once per text and ref (two refs
+    with the same text stay two definitions)."""
+    return _from_text(text, source, library, ref)
