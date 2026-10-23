@@ -2105,8 +2105,12 @@ Intro ejecuta, Mayús+Intro añade una línea, Arriba/Abajo recuperan entradas a
     </message>
     <message>
       <location filename="../src/LibraryPanel.cpp" line="122" />
+      <source>Choose the office library folder: object files (.kimobj) and IFC type libraries (.ifc)</source>
+      <translation>Elija la carpeta de la biblioteca de la oficina: archivos de objetos (.kimobj) y bibliotecas de tipos IFC (.ifc)</translation>
+    </message>
+    <message>
       <source>Choose the office library folder: Python objects (.py) and IFC type libraries (.ifc)</source>
-      <translation>Elija la carpeta de la biblioteca de la oficina: objetos Python (.py) y bibliotecas de tipos IFC (.ifc)</translation>
+      <translation type="vanished">Elija la carpeta de la biblioteca de la oficina: objetos Python (.py) y bibliotecas de tipos IFC (.ifc)</translation>
     </message>
     <message>
       <location filename="../src/LibraryPanel.cpp" line="123" />
@@ -2500,7 +2504,7 @@ Licencia: GPL-3.0 o posterior</translation>
       <translation>Abrir IFC</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6644" />
+      <location filename="../src/MainWindow.cpp" line="6650" />
       <location filename="../src/LibraryTools.cpp" line="106" />
       <source>IFC files (*.ifc)</source>
       <translation>Archivos IFC (*.ifc)</translation>
@@ -2686,7 +2690,7 @@ Licencia: GPL-3.0 o posterior</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="1783" />
-      <location filename="../src/MainWindow.cpp" line="6658" />
+      <location filename="../src/MainWindow.cpp" line="6664" />
       <source>New project</source>
       <translation>Proyecto nuevo</translation>
     </message>
@@ -4815,17 +4819,17 @@ Licencia: GPL-3.0 o posterior</translation>
       <translation type="vanished">Nueva opción...</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6613" />
+      <location filename="../src/MainWindow.cpp" line="6619" />
       <source>Initial import</source>
       <translation>Importación inicial</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6616" />
+      <location filename="../src/MainWindow.cpp" line="6622" />
       <source>Could not enable versioning</source>
       <translation>No se pudieron activar las versiones</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6620" />
+      <location filename="../src/MainWindow.cpp" line="6626" />
       <source>Versioning enabled: first version saved</source>
       <translation>Versiones activadas: primera versión guardada</translation>
     </message>
@@ -4834,7 +4838,7 @@ Licencia: GPL-3.0 o posterior</translation>
       <translation type="vanished">Este modelo ya tiene versiones</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6637" />
+      <location filename="../src/MainWindow.cpp" line="6643" />
       <source>Choose an empty folder for the project</source>
       <translation>Elija una carpeta vacía para el proyecto</translation>
     </message>
@@ -5888,22 +5892,22 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       <translation>No se pudo crear el muro: %1</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6432" />
+      <location filename="../src/MainWindow.cpp" line="6438" />
       <source>Could not delete</source>
       <translation>No se pudo eliminar</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6462" />
+      <location filename="../src/MainWindow.cpp" line="6468" />
       <source>Could not update the 3D view</source>
       <translation>No se pudo actualizar la vista 3D</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6488" />
+      <location filename="../src/MainWindow.cpp" line="6494" />
       <source>The model may be inconsistent</source>
       <translation>El modelo puede estar inconsistente</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6489" />
+      <location filename="../src/MainWindow.cpp" line="6495" />
       <source>An edit failed and could not be undone. Save a copy if you need it, then reopen the file.</source>
       <translation>Una edición falló y no se pudo deshacer. Guarde una copia si la necesita y vuelva a abrir el archivo.</translation>
     </message>
@@ -5912,13 +5916,13 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       <translation type="vanished">Guardado desde KimBim</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6547" />
-      <location filename="../src/MainWindow.cpp" line="6581" />
+      <location filename="../src/MainWindow.cpp" line="6553" />
+      <location filename="../src/MainWindow.cpp" line="6587" />
       <source>Could not save</source>
       <translation>No se pudo guardar</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6571" />
+      <location filename="../src/MainWindow.cpp" line="6577" />
       <source>Saved %1</source>
       <translation>Guardado %1</translation>
     </message>
@@ -5928,7 +5932,7 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="4244" />
-      <location filename="../src/MainWindow.cpp" line="6923" />
+      <location filename="../src/MainWindow.cpp" line="6929" />
       <source>Unsaved changes</source>
       <translation>Cambios sin guardar</translation>
     </message>
@@ -6205,210 +6209,215 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       </translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6420" />
+      <location filename="../src/MainWindow.cpp" line="6421" />
+      <source>The placed objects already match the library</source>
+      <translation>Los objetos colocados ya coinciden con la biblioteca</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6426" />
       <source>Could not update from the library</source>
       <translation>No se pudo actualizar desde la biblioteca</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6564" />
+      <location filename="../src/MainWindow.cpp" line="6570" />
       <source>Automatic version</source>
       <translation>Versión automática</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6579" />
-      <location filename="../src/MainWindow.cpp" line="6601" />
+      <location filename="../src/MainWindow.cpp" line="6585" />
+      <location filename="../src/MainWindow.cpp" line="6607" />
       <source>Saving %1...</source>
       <translation>Guardando %1...</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6593" />
+      <location filename="../src/MainWindow.cpp" line="6599" />
       <source>Save As</source>
       <translation>Guardar como</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6594" />
+      <location filename="../src/MainWindow.cpp" line="6600" />
       <source>KimBim project (*.kim);;IFC file (*.ifc)</source>
       <translation>Proyecto KimBim (*.kim);;Archivo IFC (*.ifc)</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6603" />
+      <location filename="../src/MainWindow.cpp" line="6609" />
       <source>Could not save the project folder</source>
       <translation>No se pudo guardar la carpeta del proyecto</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6614" />
+      <location filename="../src/MainWindow.cpp" line="6620" />
       <source>Saving the first version...</source>
       <translation>Guardando la primera versión...</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6628" />
+      <location filename="../src/MainWindow.cpp" line="6634" />
       <source>Could not export</source>
       <translation>No se pudo exportar</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6631" />
+      <location filename="../src/MainWindow.cpp" line="6637" />
       <source>Exported %1</source>
       <translation>Exportado %1</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6644" />
+      <location filename="../src/MainWindow.cpp" line="6650" />
       <source>Export IFC</source>
       <translation>Exportar IFC</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6660" />
+      <location filename="../src/MainWindow.cpp" line="6666" />
       <source>Start from a template:</source>
       <translation>Empezar desde una plantilla:</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6665" />
+      <location filename="../src/MainWindow.cpp" line="6671" />
       <source>KimBim default</source>
       <translation>Predeterminada de KimBim</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6684" />
-      <location filename="../src/MainWindow.cpp" line="6699" />
+      <location filename="../src/MainWindow.cpp" line="6690" />
+      <location filename="../src/MainWindow.cpp" line="6705" />
       <source>Save as template</source>
       <translation>Guardar como plantilla</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6684" />
+      <location filename="../src/MainWindow.cpp" line="6690" />
       <source>A template called %1 exists. Replace it?</source>
       <translation>Ya existe una plantilla llamada %1. ¿Reemplazarla?</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6689" />
+      <location filename="../src/MainWindow.cpp" line="6695" />
       <source>Could not save the template</source>
       <translation>No se pudo guardar la plantilla</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6692" />
+      <location filename="../src/MainWindow.cpp" line="6698" />
       <source>Template %1 saved</source>
       <translation>Plantilla %1 guardada</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6700" />
+      <location filename="../src/MainWindow.cpp" line="6706" />
       <source>Template name (saved in %1):</source>
       <translation>Nombre de la plantilla (se guarda en %1):</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6712" />
+      <location filename="../src/MainWindow.cpp" line="6718" />
       <source>Project settings changed</source>
       <translation>Configuración del proyecto cambiada</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6753" />
+      <location filename="../src/MainWindow.cpp" line="6759" />
       <source>Could not recover the work</source>
       <translation>No se pudo recuperar el trabajo</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6766" />
+      <location filename="../src/MainWindow.cpp" line="6772" />
       <source>an untitled project</source>
       <translation>un proyecto sin título</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6768" />
+      <location filename="../src/MainWindow.cpp" line="6774" />
       <source>Recover unsaved work</source>
       <translation>Recuperar trabajo sin guardar</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6769" />
+      <location filename="../src/MainWindow.cpp" line="6775" />
       <source>KimBim closed unexpectedly. Recover your work on %1 from %2?</source>
       <translation>KimBim se cerró inesperadamente. ¿Recuperar tu trabajo en %1 de %2?</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6826" />
+      <location filename="../src/MainWindow.cpp" line="6832" />
       <source>Sun</source>
       <translation>Sol</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6831" />
+      <location filename="../src/MainWindow.cpp" line="6837" />
       <source>By azimuth and altitude</source>
       <translation>Por acimut y altura</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6832" />
+      <location filename="../src/MainWindow.cpp" line="6838" />
       <source>By place, date and time</source>
       <translation>Por lugar, fecha y hora</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6834" />
+      <location filename="../src/MainWindow.cpp" line="6840" />
       <source>Sun:</source>
       <translation>Sol:</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6853" />
+      <location filename="../src/MainWindow.cpp" line="6859" />
       <source>Azimuth (clockwise from north):</source>
       <translation>Acimut (horario desde el norte):</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6854" />
+      <location filename="../src/MainWindow.cpp" line="6860" />
       <source>Altitude:</source>
       <translation>Altura:</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6855" />
+      <location filename="../src/MainWindow.cpp" line="6861" />
       <source>Latitude:</source>
       <translation>Latitud:</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6856" />
+      <location filename="../src/MainWindow.cpp" line="6862" />
       <source>Longitude:</source>
       <translation>Longitud:</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6857" />
+      <location filename="../src/MainWindow.cpp" line="6863" />
       <source>Date and time:</source>
       <translation>Fecha y hora:</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6858" />
+      <location filename="../src/MainWindow.cpp" line="6864" />
       <source>Hours from UTC:</source>
       <translation>Horas respecto a UTC:</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6886" />
+      <location filename="../src/MainWindow.cpp" line="6892" />
       <source>Sun at %1° azimuth, %2° altitude</source>
       <translation>Sol a %1° de acimut y %2° de altura</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6924" />
+      <location filename="../src/MainWindow.cpp" line="6930" />
       <source>The model has unsaved changes. Save them?</source>
       <translation>El modelo tiene cambios sin guardar. ¿Guardarlos?</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6934" />
-      <location filename="../src/MainWindow.cpp" line="6938" />
+      <location filename="../src/MainWindow.cpp" line="6940" />
+      <location filename="../src/MainWindow.cpp" line="6944" />
       <source>Add property</source>
       <translation>Añadir propiedad</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6934" />
+      <location filename="../src/MainWindow.cpp" line="6940" />
       <source>Property name in %1:</source>
       <translation>Nombre de la propiedad en %1:</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6938" />
+      <location filename="../src/MainWindow.cpp" line="6944" />
       <source>Value:</source>
       <translation>Valor:</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6953" />
+      <location filename="../src/MainWindow.cpp" line="6959" />
       <source>Add property set</source>
       <translation>Añadir conjunto de propiedades</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6953" />
+      <location filename="../src/MainWindow.cpp" line="6959" />
       <source>Property set (standard or custom):</source>
       <translation>Conjunto de propiedades (estándar o propio):</translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="6977" />
+      <location filename="../src/MainWindow.cpp" line="6983" />
       <source>Loading %1 (%2)...</source>
       <translation>Cargando %1 (%2)...</translation>
     </message>
     <message numerus="yes">
-      <location filename="../src/MainWindow.cpp" line="6987" />
+      <location filename="../src/MainWindow.cpp" line="6993" />
       <source>Loading... %n element(s)</source>
       <translation>
         <numerusform>Cargando... %n elemento</numerusform>
@@ -6416,7 +6425,7 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       </translation>
     </message>
     <message numerus="yes">
-      <location filename="../src/MainWindow.cpp" line="6999" />
+      <location filename="../src/MainWindow.cpp" line="7005" />
       <source>%n element(s) loaded in %1 s</source>
       <translation>
         <numerusform>%n elemento cargado en %1 s</numerusform>
@@ -6424,7 +6433,7 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       </translation>
     </message>
     <message>
-      <location filename="../src/MainWindow.cpp" line="7010" />
+      <location filename="../src/MainWindow.cpp" line="7016" />
       <source>Could not open the model</source>
       <translation>No se pudo abrir el modelo</translation>
     </message>
@@ -8218,9 +8227,13 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       <translation>Carpeta de plantillas:</translation>
     </message>
     <message>
-      <location filename="../src/PreferencesDialog.cpp" line="67" />
       <source>A shared folder of objects (.py) and IFC type libraries (.ifc)</source>
-      <translation>Una carpeta compartida de objetos (.py) y bibliotecas de tipos IFC (.ifc)</translation>
+      <translation type="vanished">Una carpeta compartida de objetos (.py) y bibliotecas de tipos IFC (.ifc)</translation>
+    </message>
+    <message>
+      <location filename="../src/PreferencesDialog.cpp" line="67" />
+      <source>A shared folder of object files (.kimobj) and IFC type libraries (.ifc)</source>
+      <translation>Una carpeta compartida de archivos de objetos (.kimobj) y bibliotecas de tipos IFC (.ifc)</translation>
     </message>
     <message>
       <location filename="../src/PreferencesDialog.cpp" line="70" />

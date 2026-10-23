@@ -6415,7 +6415,13 @@ bool MainWindow::flipWalls(const QStringList& guids)
 
 void MainWindow::updateFromLibrary(bool all)
 {
-    const QJsonObject r = bridge("update_from_library", {all ? QString() : jsonList(m_selection)});
+    const QString guids = all ? QString() : jsonList(m_selection);
+    const QJsonObject pending = bridge("library_updates", {guids});
+    if (pending.value("ok").toBool() && pending.value("outdated").toInt() == 0) {
+        m_status->showMessage(tr("The placed objects already match the library"));  // nothing to do: not an error
+        return;
+    }
+    const QJsonObject r = bridge("update_from_library", {guids});
     if (!r.value("ok").toBool()) {
         showError(tr("Could not update from the library"), r.value("error").toString());
         return;

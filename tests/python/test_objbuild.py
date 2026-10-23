@@ -2,6 +2,7 @@
 """D99 geometry: shapes, frames, anchors and patterns, repeats, when, use/with, axes, symbol and
 auto outline, limits."""
 import math
+import re
 
 import numpy as np
 import pytest
@@ -184,6 +185,85 @@ def test_repeat_over_the_limit_fails_before_looping():
         obj([{"id": "b", "repeat": {"count": MAX_SOLIDS // 2 + 1},
               "use": "two"}], components={"two": {"parts": [{"id": "x", "repeat": {"count": 2}, "box": {"dx": 1, "dy": 1, "dz": 1}}]}})
     assert time.perf_counter() - start < 10  # the limit error is the test; the bound only catches hangs
+
+
+BIG = [{"ellipse": [0, 0, 1, 1], "n": 250}] * 8  # 2,000 points, the most one shape takes
+
+
+def test_symbol_repeat_of_many_points_over_the_limit_fails():
+    import time
+    start = time.perf_counter()
+    with pytest.raises(ObjectError, match="limit"):
+        obj([{"id": "b", "box": {"dx": 1, "dy": 1, "dz": 1}}], symbol=[{"polygon": {"points": BIG}, "repeat": {"count": 200}}])
+    with pytest.raises(ObjectError, match="limit"):  # every symbol copy counts as work too
+        obj([{"id": "b", "box": {"dx": 1, "dy": 1, "dz": 1}}],
+            symbol=[{"rect": {"x": 0, "y": 0, "dx": 1, "dy": 1}, "repeat": {"count": 5000}}] * 5)
+    assert time.perf_counter() - start < 10  # the limit error is the test; the bound only catches hangs
+
+
+def test_many_large_prisms_over_the_point_limit_fail():
+    import time
+    start = time.perf_counter()
+    with pytest.raises(ObjectError, match="limit"):
+        obj([{"id": f"p{k}", "prism": {"points": BIG, "h": 1}} for k in range(200)])
+    with pytest.raises(ObjectError, match="limit"):
+        obj([{"id": "p", "repeat": {"count": 200}, "prism": {"points": BIG, "h": 1}}])
+    assert time.perf_counter() - start < 10  # the limit error is the test; the bound only catches hangs
+
+
+BOX = {"dx": 1, "dy": 1, "dz": 1}
+
+
+@pytest.mark.parametrize("parts, message", [
+    ([{"id": "a", "box": {**BOX, "dx": "'1e400'"}}], "parts.a.box.dx: a number, not '1e400'"),
+    ([{"id": "a", "box": {**BOX, "dy": "'nan'"}}], "parts.a.box.dy: a number, not 'nan'"),
+    ([{"id": "a", "box": {**BOX, "dz": float("inf")}}], "parts.a.box.dz: inf is not a finite number"),
+    ([{"id": "a", "box": {**BOX, "dx": "1e300 * 1e300"}}], "parts.a.box.dx: number too large"),
+    ([{"id": "a", "box": BOX, "at": ["'nan'", 0, 0]}], "parts.a.at: a number"),
+    ([{"id": "a", "box": BOX, "repeat": {"count": "'1e400'"}}], "parts.a.repeat.count: a number"),
+    ([{"id": "a", "box": BOX, "repeat": {"count": float("nan")}}], "parts.a.repeat.count: nan is not a finite number"),
+    ([{"id": "a", "box": BOX, "rotate": {"angle": float("inf")}}], "parts.a.rotate.angle: inf"),
+    ([{"id": "a", "prism": {"points": [[0, 0], [1, 0], ["'inf'", 1]], "h": 1}}], "parts.a.prism.points: a number"),
+    ([{"id": "a", "box": BOX, "anchors": {"p": {"x": 0, "dir": [0, 0, 0]}}},
+      {"id": "b", "attach": "a.p", "box": BOX}], "parts.a.anchors.p.dir: a direction of zero length"),
+    ([{"id": "a", "box": BOX, "anchors": {"p": {"pattern": "line", "from": [0, 0, 0], "to": [1, 0, 0], "dir": [0, 0, 0]}}},
+      {"id": "b", "repeat": {"on": "a.p", "count": 2}, "box": BOX}], "parts.a.anchors.p: dir: a direction of zero length"),
+    ([{"id": "s", "sweep": {"profile": [[0, 0], [0.1, 0], [0.1, 0.1]], "path": [[0, 0, 0], [0, 0, 0], [0, 0, 1]]}}],
+     "parts.s.sweep.path: points 0 and 1 are in the same place"),
+])
+def test_non_finite_and_degenerate_geometry_fails_at_load_naming_the_field(parts, message):
+    with pytest.raises(ObjectError, match=re.escape(message)):
+        obj(parts)
+
+
+def test_non_finite_symbol_values_name_the_field():
+    with pytest.raises(ObjectError, match=r"symbol\[0\]\.rect\.dx: a number"):
+        obj([{"id": "b", "box": BOX}], symbol=[{"rect": {"x": 0, "y": 0, "dx": "'inf'", "dy": 1}}])
+
+
+def test_a_build_never_returns_non_finite_numbers():
+    d = obj([{"id": "a", "box": BOX}])
+    s = d.shape(d.values())
+    s.solids[0]["matrix"][0][3] = float("nan")
+    from kimbim.objbuild import _check_finite
+    with pytest.raises(ObjectError, match=re.escape("solid 1 (box): a value that is not a finite number")):
+        _check_finite(s)
+
+
+@pytest.mark.parametrize("part, message", [
+    ({"id": "a", "use": 5}, "parts.a.use: a name"),
+    ({"id": "a", "box": BOX, "rotate": 5}, "parts.a.rotate: an object"),
+    ({"id": "a", "box": BOX, "anchors": [{"x": 0}]}, "parts.a.anchors: an object of named anchors"),
+    ({"id": "a", "box": BOX, "anchors": {"p": 5}}, "parts.a.anchors.p: an object"),
+    ({"id": "a", "box": BOX, "repeat": {}}, "parts.a.repeat: count or on is missing"),
+    ({"id": "a", "box": BOX, "repeat": 3}, "parts.a.repeat: an object"),
+    ({"id": "a", "box": BOX, "at": 1}, "parts.a.at: a list of numbers"),
+])
+def test_wrong_json_types_name_the_field(part, message):
+    with pytest.raises(ObjectError, match=message):
+        obj([part])
+    with pytest.raises(ObjectError, match=r"symbol\[0\]\.repeat: an object with a count"):
+        obj([{"id": "b", "box": BOX}], symbol=[{"rect": {"x": 0, "y": 0, "dx": 1, "dy": 1}, "repeat": {}}])
 
 
 @pytest.mark.parametrize("parts, message", [

@@ -60,11 +60,11 @@ PreferencesDialog::PreferencesDialog(Preferences& prefs, QWidget* parent)
     templatesRow->addWidget(browse);
     form->addRow(tr("Templates folder:"), templatesRow);
 
-    // D86: the office library, another category of the Library panel (Python objects and IFC types).
+    // D86: the office library, another category of the Library panel (.kimobj objects and IFC types).
     auto* officeRow = new QHBoxLayout;
     m_officeLibrary = new QLineEdit(prefs.value(QStringLiteral("office_library")).toString(), this);
     m_officeLibrary->setObjectName(QStringLiteral("officeLibrary"));
-    m_officeLibrary->setPlaceholderText(tr("A shared folder of objects (.py) and IFC type libraries (.ifc)"));
+    m_officeLibrary->setPlaceholderText(tr("A shared folder of object files (.kimobj) and IFC type libraries (.ifc)"));
     auto* browseOffice = new QPushButton(tr("Browse..."), this);
     connect(browseOffice, &QPushButton::clicked, this, [this] {
         const QString folder = QFileDialog::getExistingDirectory(this, tr("Office library"), m_officeLibrary->text());

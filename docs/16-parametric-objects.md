@@ -106,7 +106,12 @@ is written for KimBim (a small recursive-descent parser in `kimbim/objexpr.py`);
 - Limits: 500 characters per formula, nesting depth 32, **5,000 solids per object** after repeats, 50 parts deep
   through `use`. Going over is an error for that object (§7), never a hang.
 - Work budget: every part copy evaluated counts against 4 × 5,000 = 20,000, including copies that end up
-  skipped (`when` false, too thin), so a hostile file cannot burn time inside the solid limit.
+  skipped (`when` false, too thin), so a hostile file cannot burn time inside the solid limit. Every symbol
+  copy counts too, and one build evaluates at most 200,000 points (solids' point lists, profiles and paths,
+  and the symbol's curves together).
+- Every number a field takes must be finite (a string such as `'1e400'` is not a number); a zero direction
+  or a profile sweep's path with two points in one place is an error naming the field, at load or for the
+  edit that makes it, never inside the model.
 - Errors name the field: `parts.leg.cylinder.h: unknown name "seat_hh"`.
 
 ## 2. Parts
@@ -217,7 +222,10 @@ Unchanged from D86 except the geometry:
   again; the store keeps identical text once (records are content-addressed).
 - Each type also stores **`Uses`**: every library definition reached through `use`, transitively. The
   `DefinitionHash` covers the definition plus its Uses. A project definition resolves `use` only from its own
-  stored Uses, never from the library, so a project stays self-contained.
+  stored Uses, never from the library, so a project stays self-contained. A templated `use` (`leg_{foot}`)
+  reaches the names its choice parameters' options give; only when a name in it is not a choice does it take
+  every library object its name can match. Names of the file's own components are never library objects.
+  `Parameters`, `Definition` and `Uses` are IfcText (IfcLabel holds at most 255 characters).
 - Materials per part as D97 (the constituent set and styled items by slot).
 
 ## 5. Where definitions come from

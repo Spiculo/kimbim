@@ -12,6 +12,7 @@
 #include "LibraryPanel.h"
 #include "MainWindow.h"
 #include "PythonEngine.h"
+#include "StatusStrip.h"
 #include "ToolPalette.h"
 #include "Viewport.h"
 
@@ -134,6 +135,17 @@ private slots:
         const QJsonObject props = kimbim::PythonEngine::instance()
             .callJson("properties_multi", {QStringLiteral("[\"%1\"]").arg(made[0])}).object();
         QCOMPARE(props.value("psets").toObject().value("Parameters").toObject().value("Arms").toObject().value("value").toBool(), true);
+    }
+
+    void updateLibraryObjectsWithNothingOutdatedIsNotAnError()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        QVERIFY(w.chooseObject(QStringLiteral("chair"), QJsonObject{}));
+        emit w.viewport()->workPointClicked(QPointF(1, 1), 0.01, Qt::NoModifier);
+        w.setTool(kimbim::MainWindow::Tool::None);
+        action(w, "actionUpdateLibraryObjects")->trigger();
+        QCOMPARE(w.statusStrip()->message(), QStringLiteral("The placed objects already match the library"));
     }
 };
 

@@ -2101,7 +2101,7 @@ Enter runs, Shift+Enter adds a line, Up/Down recall earlier input</source>
     </message>
     <message>
         <location filename="../src/LibraryPanel.cpp" line="122"/>
-        <source>Choose the office library folder: Python objects (.py) and IFC type libraries (.ifc)</source>
+        <source>Choose the office library folder: object files (.kimobj) and IFC type libraries (.ifc)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -2495,37 +2495,37 @@ License: GPL-3.0-or-later</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6564"/>
+        <location filename="../src/MainWindow.cpp" line="6570"/>
         <source>Automatic version</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6593"/>
+        <location filename="../src/MainWindow.cpp" line="6599"/>
         <source>Save As</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6594"/>
+        <location filename="../src/MainWindow.cpp" line="6600"/>
         <source>KimBim project (*.kim);;IFC file (*.ifc)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6603"/>
+        <location filename="../src/MainWindow.cpp" line="6609"/>
         <source>Could not save the project folder</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6628"/>
+        <location filename="../src/MainWindow.cpp" line="6634"/>
         <source>Could not export</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6631"/>
+        <location filename="../src/MainWindow.cpp" line="6637"/>
         <source>Exported %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6644"/>
+        <location filename="../src/MainWindow.cpp" line="6650"/>
         <location filename="../src/LibraryTools.cpp" line="106"/>
         <source>IFC files (*.ifc)</source>
         <translation type="unfinished"></translation>
@@ -2770,7 +2770,7 @@ License: GPL-3.0-or-later</source>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="1783"/>
-        <location filename="../src/MainWindow.cpp" line="6658"/>
+        <location filename="../src/MainWindow.cpp" line="6664"/>
         <source>New project</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4637,84 +4637,89 @@ Editing the IFC directly opens it at once, without version history, options, com
         </translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6420"/>
+        <location filename="../src/MainWindow.cpp" line="6421"/>
+        <source>The placed objects already match the library</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="6426"/>
         <source>Could not update from the library</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6579"/>
-        <location filename="../src/MainWindow.cpp" line="6601"/>
+        <location filename="../src/MainWindow.cpp" line="6585"/>
+        <location filename="../src/MainWindow.cpp" line="6607"/>
         <source>Saving %1...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6614"/>
+        <location filename="../src/MainWindow.cpp" line="6620"/>
         <source>Saving the first version...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6644"/>
+        <location filename="../src/MainWindow.cpp" line="6650"/>
         <source>Export IFC</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6660"/>
+        <location filename="../src/MainWindow.cpp" line="6666"/>
         <source>Start from a template:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6665"/>
+        <location filename="../src/MainWindow.cpp" line="6671"/>
         <source>KimBim default</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6684"/>
-        <location filename="../src/MainWindow.cpp" line="6699"/>
+        <location filename="../src/MainWindow.cpp" line="6690"/>
+        <location filename="../src/MainWindow.cpp" line="6705"/>
         <source>Save as template</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6684"/>
+        <location filename="../src/MainWindow.cpp" line="6690"/>
         <source>A template called %1 exists. Replace it?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6689"/>
+        <location filename="../src/MainWindow.cpp" line="6695"/>
         <source>Could not save the template</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6692"/>
+        <location filename="../src/MainWindow.cpp" line="6698"/>
         <source>Template %1 saved</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6700"/>
+        <location filename="../src/MainWindow.cpp" line="6706"/>
         <source>Template name (saved in %1):</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6712"/>
+        <location filename="../src/MainWindow.cpp" line="6718"/>
         <source>Project settings changed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6753"/>
+        <location filename="../src/MainWindow.cpp" line="6759"/>
         <source>Could not recover the work</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6766"/>
+        <location filename="../src/MainWindow.cpp" line="6772"/>
         <source>an untitled project</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6768"/>
+        <location filename="../src/MainWindow.cpp" line="6774"/>
         <source>Recover unsaved work</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6769"/>
+        <location filename="../src/MainWindow.cpp" line="6775"/>
         <source>KimBim closed unexpectedly. Recover your work on %1 from %2?</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5262,22 +5267,22 @@ Editing the IFC directly opens it at once, without version history, options, com
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6613"/>
+        <location filename="../src/MainWindow.cpp" line="6619"/>
         <source>Initial import</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6616"/>
+        <location filename="../src/MainWindow.cpp" line="6622"/>
         <source>Could not enable versioning</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6620"/>
+        <location filename="../src/MainWindow.cpp" line="6626"/>
         <source>Versioning enabled: first version saved</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6637"/>
+        <location filename="../src/MainWindow.cpp" line="6643"/>
         <source>Choose an empty folder for the project</source>
         <translation type="unfinished"></translation>
     </message>
@@ -6088,135 +6093,135 @@ Open it read-only?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6432"/>
+        <location filename="../src/MainWindow.cpp" line="6438"/>
         <source>Could not delete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6462"/>
+        <location filename="../src/MainWindow.cpp" line="6468"/>
         <source>Could not update the 3D view</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6488"/>
+        <location filename="../src/MainWindow.cpp" line="6494"/>
         <source>The model may be inconsistent</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6489"/>
+        <location filename="../src/MainWindow.cpp" line="6495"/>
         <source>An edit failed and could not be undone. Save a copy if you need it, then reopen the file.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6547"/>
-        <location filename="../src/MainWindow.cpp" line="6581"/>
+        <location filename="../src/MainWindow.cpp" line="6553"/>
+        <location filename="../src/MainWindow.cpp" line="6587"/>
         <source>Could not save</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6571"/>
+        <location filename="../src/MainWindow.cpp" line="6577"/>
         <source>Saved %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="4244"/>
-        <location filename="../src/MainWindow.cpp" line="6923"/>
+        <location filename="../src/MainWindow.cpp" line="6929"/>
         <source>Unsaved changes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6826"/>
+        <location filename="../src/MainWindow.cpp" line="6832"/>
         <source>Sun</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6831"/>
+        <location filename="../src/MainWindow.cpp" line="6837"/>
         <source>By azimuth and altitude</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6832"/>
+        <location filename="../src/MainWindow.cpp" line="6838"/>
         <source>By place, date and time</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6834"/>
+        <location filename="../src/MainWindow.cpp" line="6840"/>
         <source>Sun:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6853"/>
+        <location filename="../src/MainWindow.cpp" line="6859"/>
         <source>Azimuth (clockwise from north):</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6854"/>
+        <location filename="../src/MainWindow.cpp" line="6860"/>
         <source>Altitude:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6855"/>
+        <location filename="../src/MainWindow.cpp" line="6861"/>
         <source>Latitude:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6856"/>
+        <location filename="../src/MainWindow.cpp" line="6862"/>
         <source>Longitude:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6857"/>
+        <location filename="../src/MainWindow.cpp" line="6863"/>
         <source>Date and time:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6858"/>
+        <location filename="../src/MainWindow.cpp" line="6864"/>
         <source>Hours from UTC:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6886"/>
+        <location filename="../src/MainWindow.cpp" line="6892"/>
         <source>Sun at %1° azimuth, %2° altitude</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6924"/>
+        <location filename="../src/MainWindow.cpp" line="6930"/>
         <source>The model has unsaved changes. Save them?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6934"/>
-        <location filename="../src/MainWindow.cpp" line="6938"/>
+        <location filename="../src/MainWindow.cpp" line="6940"/>
+        <location filename="../src/MainWindow.cpp" line="6944"/>
         <source>Add property</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6934"/>
+        <location filename="../src/MainWindow.cpp" line="6940"/>
         <source>Property name in %1:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6938"/>
+        <location filename="../src/MainWindow.cpp" line="6944"/>
         <source>Value:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6953"/>
+        <location filename="../src/MainWindow.cpp" line="6959"/>
         <source>Add property set</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6953"/>
+        <location filename="../src/MainWindow.cpp" line="6959"/>
         <source>Property set (standard or custom):</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="6977"/>
+        <location filename="../src/MainWindow.cpp" line="6983"/>
         <source>Loading %1 (%2)...</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="6987"/>
+        <location filename="../src/MainWindow.cpp" line="6993"/>
         <source>Loading... %n element(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -6224,7 +6229,7 @@ Open it read-only?</source>
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="6999"/>
+        <location filename="../src/MainWindow.cpp" line="7005"/>
         <source>%n element(s) loaded in %1 s</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -6232,7 +6237,7 @@ Open it read-only?</source>
         </translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="7010"/>
+        <location filename="../src/MainWindow.cpp" line="7016"/>
         <source>Could not open the model</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8010,11 +8015,6 @@ Open it read-only?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/PreferencesDialog.cpp" line="67"/>
-        <source>A shared folder of objects (.py) and IFC type libraries (.ifc)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../src/PreferencesDialog.cpp" line="70"/>
         <source>Office library</source>
         <translation type="unfinished"></translation>
@@ -8449,6 +8449,11 @@ Open it read-only?</source>
     <message>
         <location filename="../src/PreferencesDialog.cpp" line="140"/>
         <source>Two-finger scroll with Shift orbits the 3D view</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/PreferencesDialog.cpp" line="67"/>
+        <source>A shared folder of object files (.kimobj) and IFC type libraries (.ifc)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

@@ -576,3 +576,94 @@ def test_chair_round_seat_keeps_legs_back_and_arms_on_it(leg_style, back):
             pts = [m @ [0, 0, 0, 1]]
         for p in pts:  # in plan, inside the seat circle (the inscribed square's corners touch it)
             assert math.dist(p[:2], (cx, cy)) <= r + 1e-6, (x["part"], p)
+
+
+def test_geometry_that_goes_degenerate_fails_the_edit_not_the_model(project, tmp_path):
+    """A value that makes a zero direction or a sweep path with two points in one place fails the edit
+    with the field's name, before the model's transaction: the model stays consistent."""
+    folder = tmp_path / "office"
+    profile = [[0, 0], [0.02, 0], [0.02, 0.02], [0, 0.02]]
+    rail = {**LEG, "id": "rail", "params": [{"key": "gap", "kind": "count", "label": "Gap", "default": 1, "min": 0, "max": 5}],
+            "parts": [{"id": "r", "sweep": {"profile": profile, "path": [[0, 0, 0], [0, 0, "gap * 0.1"], [0, 0, 1]]}}]}
+    lean = {**LEG, "id": "lean", "params": [{"key": "up", "kind": "count", "label": "Up", "default": 1, "min": 0, "max": 5}],
+            "parts": [{"id": "a", "box": {"dx": 0.1, "dy": 0.1, "dz": 0.1}, "anchors": {"p": {"z": 0.1, "dir": [0, 0, "up"]}}},
+                      {"id": "b", "attach": "a.p", "box": {"dx": 0.1, "dy": 0.1, "dz": 0.1}}]}
+    write_office(folder, rail, "rail.kimobj")
+    write_office(folder, lean, "lean.kimobj")
+    assert call("set_library_paths", json.dumps({"folder": str(folder)}))["errors"] == []
+    for key, label, field in (("office:rail", "Gap", "parts.r.sweep.path"), ("office:lean", "Up", "parts.a.anchors.p.dir")):
+        r = call("place_object", project, key, "", 0, 0, 0)
+        assert r["ok"], r
+        bad = call("set_object_parameter", json.dumps([r["guid"]]), label, "0", "")
+        assert not bad["ok"] and bad["error"].startswith(field), bad
+        placed = call("place_object", project, key, json.dumps({label.lower(): 0}), 1, 0, 0)
+        assert not placed["ok"] and placed["error"].startswith(field), placed
+        assert not b._inconsistent
+        assert call("set_object_parameter", json.dumps([r["guid"]]), label, "2", "")["ok"]  # a normal edit still works
+    chair = call("place_object", project, "chair", "", 3, 0, 0)
+    assert chair["ok"] and call("set_object_parameter", json.dumps([chair["guid"]]), "Width", "0.5", "")["ok"]
+    library.load_office()
+
+
+def test_an_office_object_named_like_a_template_leaves_the_chair_alone(project, tmp_path):
+    """The chair's `use` "leg_{leg_style}" names its own components (the choice's options): an office
+    object called leg_rest is not part of it, so the chair's hash and placed chairs do not change."""
+    chair = library.OBJECTS["chair"]
+    before = library._hash_of(chair)
+    guid = call("place_object", project, "chair", "", 0, 0, 0)["guid"]
+    write_office(tmp_path / "office", {**LEG, "id": "leg_rest"}, "leg_rest.kimobj")
+    assert call("set_library_paths", json.dumps({"folder": str(tmp_path / "office")}))["errors"] == []
+    assert library._hash_of(chair) == before == chair.hash
+    assert call("library_updates", "")["outdated"] == 0
+    fresh = call("place_object", project, "chair", json.dumps({"width": 0.5}), 2, 0, 0)
+    ps = ifcopenshell.util.element.get_pset(b._model.by_guid(fresh["type"]), library.PSET)
+    assert json.loads(ps["Uses"]) == {}
+    assert call("set_object_parameter", json.dumps([guid]), "Width", "0.5", "")["ok"]
+    # a choice whose options name library objects takes exactly those
+    picker = {**TOP, "id": "picker", "params": [
+        *TOP["params"], {"key": "which", "kind": "choice", "label": "Which", "default": "leg",
+                         "options": [{"id": "leg", "label": "Leg"}]}],
+        "parts": [{"id": "l", "use": "office:{which}", "with": {"h": "height"}}]}
+    write_office(tmp_path / "office", LEG, "leg.kimobj")
+    write_office(tmp_path / "office", picker, "picker.kimobj")
+    assert call("set_library_paths", json.dumps({"folder": str(tmp_path / "office")}))["errors"] == []
+    assert list(library._uses_of(library.get("office:picker"))) == ["office:leg"]
+    library.load_office()
+
+
+def test_long_texts_are_ifc_text_and_round_trip(project, tmp_path):
+    """Definition, Uses and Parameters are IfcText (IfcLabel holds 255 characters): a 10 kB definition
+    survives a save and reopen and still edits."""
+    big = json.loads(json.dumps(STOOL))
+    big["symbol"] = [{"line": {"points": [[round(k * 0.001, 3), round((k % 7) * 0.01, 3)] for k in range(1500)]}}]
+    write_office(tmp_path / "office", big)
+    call("set_library_paths", json.dumps({"folder": str(tmp_path / "office")}))
+    obj = library.get("office:stool")
+    assert len(obj.text) >= 10_000
+    r = call("place_object", project, "office:stool", "", 0, 0, 0)
+    t = b._model.by_guid(r["type"])
+    pset = next(p for p in t.HasPropertySets if p.Name == library.PSET)
+    kinds = {p.Name: p.NominalValue.is_a() for p in pset.HasProperties}
+    assert kinds["Definition"] == kinds["Uses"] == kinds["Parameters"] == "IfcText"
+    assert kinds["Object"] == "IfcLabel"
+    path = tmp_path / "long.ifc"
+    b.save(str(path))
+    library.load_office()
+    assert call("open_model", str(path))["ok"]
+    t = ifcopenshell.util.element.get_type(b._model.by_guid(r["guid"]))
+    assert ifcopenshell.util.element.get_pset(t, library.PSET)["Definition"] == obj.text
+    assert call("set_object_parameter", json.dumps([r["guid"]]), "Legs", "5", "")["ok"]
+
+
+def test_a_tampered_stored_definition_is_not_an_object(project):
+    import ifcopenshell.api.pset
+
+    r = call("place_object", project, "chair", "", 0, 0, 0)
+    t = b._model.by_guid(r["type"])
+    data = json.loads(ifcopenshell.util.element.get_pset(t, library.PSET)["Definition"])
+    data["parts"][0]["repeat"] = {}
+    pset = next(p for p in t.HasPropertySets if p.Name == library.PSET)
+    ifcopenshell.api.pset.edit_pset(b._model, pset=pset, properties={"Definition": b._model.createIfcText(json.dumps(data))})
+    assert library.definition_of_type(t) is None
+    bad = call("set_object_parameter", json.dumps([r["guid"]]), "Width", "0.5", "")
+    assert not bad["ok"] and "no selected object" in bad["error"]

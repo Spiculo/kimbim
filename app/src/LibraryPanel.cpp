@@ -119,7 +119,7 @@ LibraryPanel::LibraryPanel(QWidget* parent)
     auto* row = new QHBoxLayout;
     auto* office = new QPushButton(tr("Office library..."), this);
     office->setObjectName(QStringLiteral("libraryOffice"));
-    office->setToolTip(tr("Choose the office library folder: Python objects (.py) and IFC type libraries (.ifc)"));
+    office->setToolTip(tr("Choose the office library folder: object files (.kimobj) and IFC type libraries (.ifc)"));
     auto* ifc = new QPushButton(tr("Load IFC types..."), this);
     ifc->setObjectName(QStringLiteral("libraryIfc"));
     ifc->setToolTip(tr("Add the types of an IFC file (e.g. IfcFurnitureType definitions) to the office library"));

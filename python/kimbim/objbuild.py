@@ -16,6 +16,7 @@ MAX_SOLIDS = 5000
 MAX_USE_DEPTH = 50
 MAX_POINTS = 2000
 MAX_WORK = 4 * MAX_SOLIDS  # part copies evaluated, solid or not, nested included
+MAX_BUILD_POINTS = 200_000  # points one build evaluates: solids' point lists, profiles and paths, and the symbol
 MAX_GENERATOR_POINTS = 256
 SAMPLES = 64  # circle samples for bounding boxes and outlines (Task 1's golden uses the same)
 SYMBOL_CIRCLE_POINTS = 24
@@ -71,7 +72,10 @@ def _rotation(axis, degrees):
 
 def _frame(origin, zdir, xdir=(1, 0, 0)):
     z = np.asarray(zdir, dtype=float)
-    z = z / np.linalg.norm(z)
+    length = float(np.linalg.norm(z))
+    if not math.isfinite(length) or length < 1e-12:
+        raise ObjectError("a direction of zero length")
+    z = z / length
     x = np.asarray(xdir, dtype=float)
     if abs(float(np.dot(x, z))) > 0.999:
         x = np.array([0.0, 1.0, 0.0])
@@ -102,28 +106,46 @@ def rounded_rect(x, y, dx, dy, r, n=4):
     return pts
 
 
+def _num(v, env, where) -> float:
+    """A numeric field's value (a number or a formula): a finite number, else an ObjectError naming the
+    field. A formula error goes up as it is (the caller names the field)."""
+    x = value_of(v, env)
+    if not isinstance(x, bool | int | float):
+        raise ObjectError(f"{where}: a number, not {x!r}")
+    x = float(x)
+    if not math.isfinite(x):
+        raise ObjectError(f"{where}: {x} is not a finite number")
+    return x
+
+
+def _nums(spec, env, where, count=None) -> list:
+    if not isinstance(spec, list | tuple) or (count is not None and len(spec) != count):
+        raise ObjectError(f"{where}: a list of {count} numbers" if count else f"{where}: a list of numbers")
+    return [_num(v, env, where) for v in spec]
+
+
 def _points(spec, env, dims, where):
     if not isinstance(spec, list):
         raise ObjectError(f"{where}: a list of points")
     out = []
     for item in spec:
         if isinstance(item, dict):
-            n = int(value_of(item.get("n", CIRCLE_POINTS), env))
+            n = int(_num(item.get("n", CIRCLE_POINTS), env, f"{where}.n"))
             low = 1 if "rounded_rect" in item else 3
             if not low <= n <= MAX_GENERATOR_POINTS:
                 raise ObjectError(f"{where}: n between {low} and {MAX_GENERATOR_POINTS}")
             if "ellipse" in item:
-                cx, cy, rx, ry = (float(value_of(v, env)) for v in item["ellipse"])
-                a0, a1 = (math.radians(float(value_of(item.get(k, d), env))) for k, d in (("a0", 0), ("a1", 360)))
+                cx, cy, rx, ry = _nums(item["ellipse"], env, f"{where}.ellipse", 4)
+                a0, a1 = (math.radians(_num(item.get(k, d), env, f"{where}.{k}")) for k, d in (("a0", 0), ("a1", 360)))
                 full = abs(a1 - a0 - 2 * math.pi) < 1e-9
                 out += ellipse_points(cx, cy, rx, ry, a0, a1, n, closed=full)
             elif "rounded_rect" in item:
-                x, y, dx, dy, r = (float(value_of(v, env)) for v in item["rounded_rect"])
+                x, y, dx, dy, r = _nums(item["rounded_rect"], env, f"{where}.rounded_rect", 5)
                 out += rounded_rect(x, y, dx, dy, r, n)
             else:
                 raise ObjectError(f"{where}: a point generator is ellipse or rounded_rect")
         elif isinstance(item, list | tuple) and len(item) == dims:
-            out.append(tuple(float(value_of(v, env)) for v in item))
+            out.append(tuple(_num(v, env, where) for v in item))
         else:
             raise ObjectError(f"{where}: each point has {dims} numbers")
         if len(out) > MAX_POINTS:
@@ -148,6 +170,8 @@ def _circle(cx, cy, r, n=SAMPLES):
 
 def _segment_frame(p, q):
     d = np.asarray(q, dtype=float) - np.asarray(p, dtype=float)
+    if not np.linalg.norm(d) > 1e-9:
+        raise ObjectError("sweep: two path points in the same place")
     return _frame(p, d, (1, 0, 0) if abs(d[0]) < 0.9 * np.linalg.norm(d) else (0, 1, 0)), float(np.linalg.norm(d))
 
 
@@ -178,17 +202,25 @@ def _local_points(s):
         return [(x + dx, y + dy, z + dz) for x, y, z in path
                 for dx, dy, dz in ((r, 0, 0), (-r, 0, 0), (0, r, 0), (0, -r, 0), (0, 0, r), (0, 0, -r))]
     out = []
+    profile = np.asarray(s["profile"], dtype=float).reshape(-1, 2)
     for p, q in zip(path, path[1:]):
         f, length = _segment_frame(p, q)
-        for u, v in s["profile"]:
-            for w in (0.0, length):
-                out.append(tuple((f @ [u, v, w, 1])[:3]))
+        for w in (0.0, length):
+            local = np.column_stack([profile, np.full(len(profile), w)])
+            out += [tuple(r) for r in _apply(f, local)]
     return out
 
 
+def _apply(m, pts):
+    """Points (an n×3 array) through a 4×4 matrix: one matrix product."""
+    return np.asarray(pts, dtype=float).reshape(-1, 3) @ m[:3, :3].T + m[:3, 3]
+
+
 def solid_points(s) -> list:
-    m = np.asarray(s["matrix"])
-    return [tuple((m @ [x, y, z, 1])[:3]) for x, y, z in _local_points(s)]
+    pts = _local_points(s)
+    if not pts:
+        return []
+    return [tuple(r) for r in _apply(np.asarray(s["matrix"], dtype=float), pts).tolist()]
 
 
 def solid_volume(s) -> float:
@@ -275,6 +307,19 @@ def _check_parts(parts, where, components, seen_components):
                     raise ObjectError(f"{w}.{k}: {f} is missing")
             if k == "sweep" and (fields.get("r") is None) == (fields.get("profile") is None):
                 raise ObjectError(f"{w}.sweep: r (a tube) or profile, not both")
+        for key, types, text in (("use", str, "a name"), ("attach", str, "an anchor name"),
+                                 ("material", str, "a material slot"), ("rotate", dict, "an object {angle, axis}"),
+                                 ("anchors", dict, "an object of named anchors"), ("with", dict, "an object of values"),
+                                 ("repeat", dict, "an object {count, ...} or {on, ...}"), ("at", list, "a list of numbers")):
+            if key in part and not isinstance(part[key], types):
+                raise ObjectError(f"{w}.{key}: {text}")
+        for name, spec in (part.get("anchors") or {}).items():
+            if not isinstance(spec, dict):
+                raise ObjectError(f"{w}.anchors.{name}: an object")
+        if "repeat" in part and "count" not in part["repeat"] and "on" not in part["repeat"]:
+            raise ObjectError(f"{w}.repeat: count or on is missing")
+        if "repeat" in part and "on" in part["repeat"] and not isinstance(part["repeat"]["on"], str):
+            raise ObjectError(f"{w}.repeat.on: an anchor name")
         if "axes" in part:
             axes = part["axes"]
             if (not isinstance(axes, list) or len(axes) != 3 or any(a not in _AXES for a in axes)
@@ -297,6 +342,8 @@ def check(defn) -> None:
         for k, item in enumerate(defn.symbol):
             if not isinstance(item, dict):
                 raise ObjectError(f"symbol[{k}]: an object")
+            if "repeat" in item and (not isinstance(item["repeat"], dict) or "count" not in item["repeat"]):
+                raise ObjectError(f"symbol[{k}].repeat: an object with a count")
 
 
 # ---------------------------------------------------------------- build
@@ -304,12 +351,20 @@ def check(defn) -> None:
 class _Ctx:
     def __init__(self, resolve, all_anchors=False):
         self.shape, self.resolve, self.material = Shape(), resolve, None
-        self.all_anchors, self.work, self.checked = all_anchors, 0, set()
+        self.all_anchors, self.work, self.checked, self.points = all_anchors, 0, set(), 0
 
     def tick(self, where):
         self.work += 1
         if self.work > MAX_WORK:
             raise ObjectError(f"{where}: more than {MAX_WORK} part copies (over the limit)")
+
+    def count_points(self, n, where):
+        self.points += n
+        if self.points > MAX_BUILD_POINTS:
+            raise ObjectError(f"{where}: more than {MAX_BUILD_POINTS} points in the object (over the limit)")
+
+    def count_fields(self, fields, where):
+        self.count_points(sum(len(fields[f]) for f in _POINT_FIELDS if fields.get(f)), where)
 
     def add(self, solid):
         if len(self.shape.solids) >= MAX_SOLIDS:
@@ -337,7 +392,7 @@ def _fields(kind, raw, env, where):
                 if f in _POINT_FIELDS:
                     out[f] = _points(v, env, 3 if f == "path" else 2, f"{where}.{f}")
                 else:
-                    out[f] = float(value_of(v, env))
+                    out[f] = _num(v, env, f"{where}.{f}")
             except FormulaError as ex:
                 raise ObjectError(f"{where}.{f}: {ex}") from None
     return out
@@ -357,17 +412,28 @@ def _solid_ok(kind, s):
     return len(s["path"]) >= 2 and (s["r"] is None or s["r"] > 1e-6)
 
 
-def _dir_frame(spec, env, origin):
+def _check_solid(kind, s, where):
+    """A solid the IFC writer can take: a profile sweep's path has no two points in the same place."""
+    if kind == "sweep" and s.get("profile") is not None:
+        for k, (p, q) in enumerate(zip(s["path"], s["path"][1:])):
+            if math.dist(p, q) <= 1e-9:
+                raise ObjectError(f"{where}.path: points {k} and {k + 1} are in the same place")
+
+
+def _dir_frame(spec, env, origin, where="dir"):
     d = spec.get("dir", "up")
-    zdir = _DIRS.get(d) if isinstance(d, str) else tuple(float(value_of(v, env)) for v in d)
+    zdir = _DIRS.get(d) if isinstance(d, str) else _nums(d, env, where, 3)
     if zdir is None:
         raise ObjectError(f"unknown direction {d!r} (up, down, front, back, left, right or a vector)")
-    return _frame(origin, zdir)
+    try:
+        return _frame(origin, zdir)
+    except ObjectError as ex:
+        raise ObjectError(f"{where}: {ex}") from None
 
 
 def _pattern(spec, env, count, bbox):
     kind = spec["pattern"]
-    ev = lambda k, d=None: float(value_of(spec.get(k, d), env))  # noqa: E731
+    ev = lambda k, d=None: _num(spec.get(k, d), env, k)  # noqa: E731
     z = ev("z", bbox[2] if bbox else 0)
     if kind == "rect_corners":
         x, y = ev("x", bbox[0] if bbox else 0), ev("y", bbox[1] if bbox else 0)
@@ -379,8 +445,7 @@ def _pattern(spec, env, count, bbox):
         pts = [(cx + r * math.cos(math.radians(start + 360 * k / count)), cy + r * math.sin(math.radians(start + 360 * k / count)))
                for k in range(count)]
     elif kind == "line":
-        a = [float(value_of(v, env)) for v in spec["from"]]
-        b = [float(value_of(v, env)) for v in spec["to"]]
+        a, b = _nums(spec["from"], env, "from", 3), _nums(spec["to"], env, "to", 3)
         ts = [0.5] if count == 1 else [k / (count - 1) for k in range(count)]
         return [_dir_frame(spec, env, [a[j] + (b[j] - a[j]) * t for j in range(3)]) for t in ts]
     elif kind == "grid":
@@ -409,7 +474,7 @@ def _ref(text, anchors, where):
 
 def _count(v, env, where):
     try:
-        n = float(value_of(v, env))
+        n = _num(v, env, where)
     except FormulaError as ex:
         raise ObjectError(f"{where}: {ex}") from None
     if n > MAX_SOLIDS:
@@ -435,8 +500,8 @@ def _copies(part, env, anchors, base, where):
         count = _count(r.get("count", 0), env, f"{where}.repeat.count") if target.counted else None
         return target.frames(count)
     count = _count(r["count"], env, f"{where}.repeat.count")
-    step = [float(value_of(v, env)) for v in r.get("step", (0, 0, 0))]
-    turn = float(value_of(r.get("turn", 0), env))
+    step = _nums(r.get("step", (0, 0, 0)), env, f"{where}.repeat.step", 3)
+    turn = _num(r.get("turn", 0), env, f"{where}.repeat.turn")
     return [frame @ _translate(*(k * s for s in step)) @ _rotation((0, 0, 1), k * turn) for k in range(count)]
 
 
@@ -457,10 +522,10 @@ class _Pattern:
 def _local(part, env, frame, centroid, where):
     m = np.eye(4)
     if "at" in part:
-        m = m @ _translate(*(float(value_of(v, env)) for v in part["at"]))
+        m = m @ _translate(*_nums(part["at"], env, f"{where}.at"))
     rot = part.get("rotate")
     if rot:
-        angle = float(value_of(rot.get("angle", 0), env))
+        angle = _num(rot.get("angle", 0), env, f"{where}.rotate.angle")
         axis = rot.get("axis", "z")
         if axis == "away_from_centre":
             p = (frame @ m)[:3, 3]
@@ -475,7 +540,7 @@ def _local(part, env, frame, centroid, where):
             if vec is None:
                 raise ObjectError(f"{where}.rotate: axis x, y, z, a vector or away_from_centre")
         else:
-            vec = [float(value_of(v, env)) for v in axis]
+            vec = _nums(axis, env, f"{where}.rotate.axis", 3)
         if vec is not None:
             m = m @ _rotation(vec, angle)
     if "axes" in part:
@@ -508,8 +573,8 @@ def _anchors(part, env, m, solid_fields, kind, base_inv, eager=False):
                 if eager:
                     out[name].frames(1)
             else:
-                origin = [float(value_of(spec.get(k, 0), env)) for k in ("x", "y", "z")]
-                out[name] = m @ _dir_frame(spec, env, origin)
+                origin = [_num(spec.get(k, 0), env, f"{where}.{k}") for k in ("x", "y", "z")]
+                out[name] = m @ _dir_frame(spec, env, origin, f"{where}.dir")
         except (FormulaError, ObjectError) as ex:
             raise ObjectError(str(ex) if str(ex).startswith(where) else f"{where}: {ex}") from None
     coords = {}
@@ -567,19 +632,24 @@ def _parts(ctx, defn, components, env, base, stack, where):
                 ctx.tick(w)
                 e = {**env, "i": i, "n": n}
                 m = frame @ _local(part, e, frame, centroid, w)
+                fields = None
                 if "use" in part:
                     _use(ctx, components, part, e, m, stack, w)
                 elif kind is not None:
                     fields = _fields(kind, part[kind], e, f"{w}.{kind}")
+                    ctx.count_fields(fields, f"{w}.{kind}")
                     if _solid_ok(kind, fields):
+                        _check_solid(kind, fields, f"{w}.{kind}")
                         ctx.add({"kind": kind, **fields, "matrix": m.tolist(),
                                  "part": ctx.material or part.get("material", "body")})
                 if first is None:
-                    first = (m, e, _fields(kind, part[kind], e, f"{w}.{kind}") if kind else None)
+                    first = (m, e, fields)
             if first is None:  # no copies: anchors still exist, at the base, for later parts
                 e = {**env, "i": 0, "n": 0}
-                first = (base @ _local(part, e, base, np.zeros(3), w), e,
-                         _fields(kind, part[kind], e, f"{w}.{kind}") if kind else None)
+                fields = _fields(kind, part[kind], e, f"{w}.{kind}") if kind else None
+                if fields is not None:
+                    ctx.count_fields(fields, f"{w}.{kind}")
+                first = (base @ _local(part, e, base, np.zeros(3), w), e, fields)
             if needed is None or part["id"] in needed:  # anchors only for parts something refers to
                 found, coords = _anchors(part, first[1], first[0], first[2], kind, base_inv, full)
                 anchors[part["id"]] = found
@@ -613,7 +683,7 @@ def _use(ctx, components, part, env, m, stack, where):
     ctx.material = saved
 
 
-def _symbol(defn, env):
+def _symbol(ctx, defn, env):
     curves = []
     for k, item in enumerate(defn.symbol):
         where = f"symbol[{k}]"
@@ -628,6 +698,7 @@ def _symbol(defn, env):
                 continue
             count = _count(item["repeat"]["count"], env, f"{where}.repeat.count") if "repeat" in item else 1
             for i in range(count):
+                ctx.tick(where)
                 e = {**env, "i": i, "n": count}
                 raw = item[kind]
                 required, optional = _SYMBOL_KINDS[kind]
@@ -639,21 +710,23 @@ def _symbol(defn, env):
                     closed = kind == "polygon" or bool(raw.get("closed", False))
                     curves.append(("poly", pts + pts[:1] if closed else pts))
                 elif kind == "rect":
-                    x, y, dx, dy = (float(value_of(raw[f], e)) for f in ("x", "y", "dx", "dy"))
+                    x, y, dx, dy = (_num(raw[f], e, f"{where}.{kind}.{f}") for f in ("x", "y", "dx", "dy"))
                     curves.append(("poly", [(x, y), (x + dx, y), (x + dx, y + dy), (x, y + dy), (x, y)]))
                 elif kind == "circle":
-                    curves.append(("circle", *(float(value_of(raw[f], e)) for f in ("cx", "cy", "r"))))
+                    curves.append(("circle", *(_num(raw[f], e, f"{where}.{kind}.{f}") for f in ("cx", "cy", "r"))))
                 else:
                     if kind == "arc":
-                        cx, cy, rx = (float(value_of(raw[f], e)) for f in ("cx", "cy", "r"))
+                        cx, cy, rx = (_num(raw[f], e, f"{where}.{kind}.{f}") for f in ("cx", "cy", "r"))
                         ry = rx
                     else:
-                        cx, cy, rx, ry = (float(value_of(raw[f], e)) for f in ("cx", "cy", "rx", "ry"))
-                    a0, a1 = (math.radians(float(value_of(raw.get(f, d), e))) for f, d in (("a0", 0), ("a1", 360)))
+                        cx, cy, rx, ry = (_num(raw[f], e, f"{where}.{kind}.{f}") for f in ("cx", "cy", "rx", "ry"))
+                    a0, a1 = (math.radians(_num(raw.get(f, d), e, f"{where}.{kind}.{f}")) for f, d in (("a0", 0), ("a1", 360)))
                     closed = abs(a1 - a0 - 2 * math.pi) < 1e-9
                     n = CIRCLE_POINTS if closed else max(4, int(CIRCLE_POINTS * abs(a1 - a0) / (2 * math.pi)) + 1)
                     pts = ellipse_points(cx, cy, rx, ry, a0, a1, n, closed)
                     curves.append(("poly", pts + pts[:1] if closed else pts))
+                last = curves[-1]
+                ctx.count_points(len(last[1]) if last[0] == "poly" else SYMBOL_CIRCLE_POINTS, where)
         except FormulaError as ex:
             raise ObjectError(f"{where}: {ex}") from None
     return curves
@@ -686,7 +759,7 @@ def build(defn, values, resolve=None, all_anchors=False) -> Shape:
     env = {**values, "pi": math.pi}
     env = _parts(ctx, defn, defn.components, env, np.eye(4), [], "parts")
     shape = ctx.shape
-    shape.curves = _symbol(defn, env) if defn.symbol is not None else _outline(shape)
+    shape.curves = _symbol(ctx, defn, env) if defn.symbol is not None else _outline(shape)
     ox, oy = getattr(defn, "origin", (0.0, 0.0))
     if abs(ox) > 1e-12 or abs(oy) > 1e-12:  # D92: the object's own origin goes to (0, 0)
         shift = _translate(-ox, -oy, 0)
@@ -694,4 +767,19 @@ def build(defn, values, resolve=None, all_anchors=False) -> Shape:
             s["matrix"] = (shift @ np.asarray(s["matrix"])).tolist()
         shape.curves = [("poly", [(x - ox, y - oy) for x, y in c[1]]) if c[0] == "poly" else (c[0], c[1] - ox, c[2] - oy, c[3])
                         for c in shape.curves]
+    _check_finite(shape)
     return shape
+
+
+def _check_finite(shape):
+    """Nothing that is not a finite number reaches the IFC writer (it would fail inside the model's
+    transaction): every solid's matrix and numbers, and every curve."""
+    for k, s in enumerate(shape.solids):
+        numbers = [v for f, v in s.items() if f not in ("kind", "part", "matrix") and isinstance(v, int | float)]
+        points = [c for f in _POINT_FIELDS if s.get(f) for p in s[f] for c in p]
+        if not (np.isfinite(s["matrix"]).all() and np.isfinite(numbers).all() and np.isfinite(points).all()):
+            raise ObjectError(f"solid {k + 1} ({s['kind']}): a value that is not a finite number")
+    for k, c in enumerate(shape.curves):
+        values = [v for p in c[1] for v in p] if c[0] == "poly" else list(c[1:])
+        if not np.isfinite(values).all():
+            raise ObjectError(f"symbol curve {k + 1}: a value that is not a finite number")

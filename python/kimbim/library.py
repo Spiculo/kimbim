@@ -25,6 +25,7 @@ The bridge functions import app_bridge when called.
 from __future__ import annotations
 
 import copy
+import functools
 import json
 import math
 import os
@@ -88,10 +89,29 @@ def _library_refs():
     return out
 
 
+def _template_names(defn, name: str):
+    """The names a templated `use` gives when every {name} in it is a choice parameter (of the object
+    or one of its components; a key in several takes all their options): one per combination of the
+    options; else None."""
+    choices = {}
+    for p in [*defn.params, *(p for c in defn.components.values() for p in c.params)]:
+        if p.kind == "choice":
+            choices.setdefault(p.key, {}).update(dict.fromkeys(i for i, _ in p.options))
+    keys = objbuild._TEMPLATE.findall(name)
+    if not keys or any(k not in choices for k in keys):
+        return None
+    out = [name]
+    for k in dict.fromkeys(keys):
+        out = [n.replace("{" + k + "}", option) for n in out for option in choices[k]]
+    return out
+
+
 def _uses_of(obj) -> dict:
     """{ref: definition text} of every library object `obj` may `use`, transitively (D99): a project keeps
     them on the type, so it builds without the library and a changed library does not change it. A
-    templated `use` ("leg_{foot}") takes every library object its name can match."""
+    templated `use` ("leg_{foot}") takes the names its choice parameters' options give, or, when a name in
+    it is not a choice, every library object its name can match; names of the file's components are its
+    own parts, never library objects."""
     stored = getattr(obj, "uses", None)
     if stored is not None:
         return dict(stored)
@@ -104,10 +124,13 @@ def _uses_of(obj) -> dict:
                     continue
                 found = [_resolve(name)]
             else:
-                names = names if names is not None else _library_refs()
-                texts = objbuild._TEMPLATE.split(name)[::2]  # the text between the {names}
-                pattern = re.compile("^" + ".+".join(re.escape(t) for t in texts) + "$")
-                found = [names[n] for n in names if pattern.match(n)]
+                expanded = _template_names(d, name)
+                if expanded is None:
+                    names = names if names is not None else _library_refs()
+                    texts = objbuild._TEMPLATE.split(name)[::2]  # the text between the {names}
+                    pattern = re.compile("^" + ".+".join(re.escape(t) for t in texts) + "$")
+                    expanded = [n for n in names if pattern.match(n)]
+                found = [_resolve(n) for n in expanded if n not in d.components]
             for u in found:
                 if u is not None and u.ref != obj.ref and u.ref not in seen:
                     seen.add(u.ref)
@@ -513,10 +536,22 @@ def _write_pset(t, obj, values) -> None:
 
     from . import app_bridge as B
 
-    uses = _uses_of(obj)
-    ifcopenshell.api.pset.edit_pset(B._model, pset=_pset_of(t), properties={
-        "Object": obj.ref, "Parameters": json.dumps(values, sort_keys=True), "Library": _library_of(obj),
-        "DefinitionHash": _hash_of(obj), "Definition": obj.text, "Uses": objects.canonical(uses)})
+    f, uses = B._model, _uses_of(obj)
+    # the long texts are IfcText (doc 16 §4): an IfcLabel holds at most 255 characters
+    ifcopenshell.api.pset.edit_pset(f, pset=_pset_of(t), properties={
+        "Object": obj.ref, "Parameters": f.createIfcText(json.dumps(values, sort_keys=True)),
+        "Library": _library_of(obj), "DefinitionHash": _hash_of(obj), "Definition": f.createIfcText(obj.text),
+        "Uses": f.createIfcText(objects.canonical(uses))})
+
+
+@functools.lru_cache(maxsize=512)
+def _checked(text) -> bool:
+    """Whether a definition text stored in a project parses and passes objbuild.check (once per text)."""
+    try:
+        objbuild.check(objects.from_text(text, "project"))
+        return True
+    except Exception:
+        return False
 
 
 def definition_of_type(t):
@@ -529,10 +564,12 @@ def definition_of_type(t):
         return None
     try:
         uses = json.loads(data.get("Uses") or "{}")
+        if not all(_checked(text) for text in [data["Definition"], *uses.values()]):
+            return None  # a stored text that is not a definition (edited by hand): not an object
         stored = {ref: objects.from_text(text, "project", "", ref) for ref, text in uses.items()}
         # a copy: the parsed definition is shared by every type with this text, the Uses are this type's
         d = copy.copy(objects.from_text(data["Definition"], "project", data.get("Library") or "", data.get("Object") or ""))
-    except (ObjectError, ValueError, TypeError, AttributeError):
+    except Exception:  # whatever a tampered pset holds, the element is just not an editable object
         return None
     d.uses = uses
     # `use` resolves only from the definitions stored with it, never the live library
@@ -579,7 +616,7 @@ def _ifc_type(entry: dict):
     library = _open_library_ifc(entry["path"])
     t = ifcopenshell.api.project.append_asset(f, library=library, element=library.by_guid(entry["guid"]))
     ifcopenshell.api.pset.edit_pset(f, pset=_pset_of(t), properties={
-        "Object": f"ifc:{entry['guid']}", "Parameters": "{}", "Library": entry["path"]})
+        "Object": f"ifc:{entry['guid']}", "Parameters": f.createIfcText("{}"), "Library": entry["path"]})
     return t
 
 

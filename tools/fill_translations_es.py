@@ -1118,7 +1118,7 @@ ES = {
     'Search objects': 'Buscar objetos',
     'Place': 'Colocar',
     'Click in the view to place the object; Tab turns it 90 degrees, a typed number sets its angle': 'Haga clic en la vista para colocar el objeto; Tab lo gira 90 grados, un número escrito fija su ángulo',
-    'Choose the office library folder: Python objects (.py) and IFC type libraries (.ifc)': 'Elija la carpeta de la biblioteca de la oficina: objetos Python (.py) y bibliotecas de tipos IFC (.ifc)',
+    'Choose the office library folder: object files (.kimobj) and IFC type libraries (.ifc)': 'Elija la carpeta de la biblioteca de la oficina: archivos de objetos (.kimobj) y bibliotecas de tipos IFC (.ifc)',
     'Load IFC types...': 'Cargar tipos IFC...',
     'Load IFC types': 'Cargar tipos IFC',
     'Add the types of an IFC file (e.g. IfcFurnitureType definitions) to the office library': 'Añade los tipos de un archivo IFC (p. ej. definiciones IfcFurnitureType) a la biblioteca de la oficina',
@@ -1132,7 +1132,7 @@ ES = {
     'Object angle: %1 degrees': 'Ángulo del objeto: %1 grados',
     'Pick an object in the Library panel first': 'Elija primero un objeto en el panel Biblioteca',
     '%1 placed': '%1 colocado',
-    'A shared folder of objects (.py) and IFC type libraries (.ifc)': 'Una carpeta compartida de objetos (.py) y bibliotecas de tipos IFC (.ifc)',
+    'A shared folder of object files (.kimobj) and IFC type libraries (.ifc)': 'Una carpeta compartida de archivos de objetos (.kimobj) y bibliotecas de tipos IFC (.ifc)',
     # D89: input aids
     "intersection": "intersección",
     "guide crossing": "cruce de guías",
@@ -1707,6 +1707,7 @@ ES = {
     "The library has a newer version of this object; values that still exist are kept":
         "La biblioteca tiene una versión más nueva de este objeto; se conservan los valores que siguen existiendo",
     "Could not update from the library": "No se pudo actualizar desde la biblioteca",
+    "The placed objects already match the library": "Los objetos colocados ya coinciden con la biblioteca",
     "Update library objects": "Actualizar objetos de biblioteca",
     "Regenerate every placed object whose library definition changed":
         "Regenera cada objeto colocado cuya definición en la biblioteca cambió",
