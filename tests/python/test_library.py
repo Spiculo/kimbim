@@ -4,12 +4,14 @@ placements share their type (mapped items), parameters re-generate it, plans dra
 gets its own classes, and the office library adds .kimobj definitions and IFC types (D99). Types carry
 their definition, so a project edits its objects without the library that made them."""
 import json
+import math
 import pathlib
 
 import ifcopenshell
 import ifcopenshell.geom
 import ifcopenshell.util.element
 import ifcopenshell.validate
+import numpy as np
 import pytest
 
 from kimbim import app_bridge as b
@@ -502,3 +504,54 @@ def test_a_changed_used_object_makes_the_user_outdated(project, tmp_path):
     assert call("update_from_library", json.dumps([guid]))["ok"]
     assert call("library_updates", "")["outdated"] == 0
     library.load_office()
+
+
+def chair(**given):
+    d = library.OBJECTS["chair"]
+    return d, d.shape(d.values(given))
+
+
+def test_chair_defaults_are_the_old_chair():
+    d, s = chair()
+    assert len(s.solids) == 6  # 4 legs, seat, back
+    assert d.visible(d.values()) == [k for k in (p.key for p in d.params) if k not in ("legs", "radius", "slats", "arm_height")]
+
+
+def test_chair_three_splayed_tapered_legs_on_a_circle():
+    d, s = chair(layout="circle", legs=3, splay=8, leg_style="tapered", seat_shape="round")
+    legs = [x for x in s.solids if x["part"] == "frame"]
+    assert len(legs) == 3 and all(x["kind"] == "cone" for x in legs)
+    assert s.metrics()["bbox"][2] == pytest.approx(0, abs=0.01)  # feet on the floor (within the splay's lift)
+    feet = [np.array(x["matrix"]) @ [0, 0, x["h"], 1] for x in legs]
+    assert all(math.dist(f[:2], (0.225, 0.25)) > 0.2 for f in feet)  # out past the 0.18 m leg circle
+
+
+def test_chair_backs_and_arms():
+    _, slats = chair(back="slats", slats=5)
+    _, none = chair(back="none")
+    _, arms = chair(arms=True)
+    _, sled = chair(leg_style="sled")
+    assert len(slats.solids) == 4 + 1 + 2 + 1 + 5  # legs, seat, two posts, top rail, slats
+    assert len(none.solids) == 5
+    assert len(arms.solids) == 6 + 4
+    assert sum(1 for x in sled.solids if x["kind"] == "sweep") == 2
+
+
+@pytest.mark.parametrize("given", [
+    {"layout": "circle", "legs": 3, "splay": 8, "leg_style": "tapered", "seat_shape": "round", "back": "slats"},
+    {"leg_style": "sled", "back": "upholstered", "arms": True},
+    {"layout": "circle", "legs": 1, "radius": 0.05, "leg_style": "round", "back": "none"},
+])
+def test_chair_variants_are_valid_ifc(project, tmp_path, given):
+    r = call("place_object", project, "chair", json.dumps(given), 0, 0, 0)
+    assert r["ok"], r
+    path = tmp_path / "chair.ifc"
+    b.save(str(path))
+    assert validate(ifcopenshell.open(str(path))) == []
+    settings = ifcopenshell.geom.settings()
+    settings.set("use-world-coords", True)
+    shape = ifcopenshell.geom.create_shape(settings, b._model.by_guid(r["guid"]))
+    zs = shape.geometry.verts[2::3]  # metres
+    assert len(shape.geometry.faces) > 0
+    top = 0.85 if given.get("back") != "none" else 0.45
+    assert max(zs) - min(zs) == pytest.approx(top, rel=0.02)
