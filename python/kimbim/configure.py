@@ -820,7 +820,7 @@ def pick_up(guid: str) -> str:
         st.update(reference=reference_of(e), slant=slant_of(e), opposite=opposite_slant_of(e), profile=profile_of(e))
     if kind == "object":
         obj, values, _t = library._object_of(e)
-        st.update(object=obj.key, parameters=values)
+        st.update(object=obj.ref, parameters=values)
     return B._dump({"ok": True, "kind": kind, "name": e.Name or e.is_a(), "settings": st})
 
 
@@ -878,7 +878,7 @@ def inject(guids_json: str, picked_json: str) -> str:
     try:
         if kind == "object":  # the parameters (sizes, part materials): the object's own command per value
             obj_key = st.get("object")
-            same = [e for e in targets if library._object_of(e) and library._object_of(e)[0].key == obj_key]
+            same = [e for e in targets if library._object_of(e) and library._object_of(e)[0].ref == obj_key]
             if not same:
                 return _fail("select objects of the same kind to inject into")
             for name, value in (st.get("parameters") or {}).items():

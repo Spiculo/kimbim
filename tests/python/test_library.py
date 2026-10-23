@@ -373,3 +373,87 @@ def test_every_shape_kind_is_valid_ifc(tmp_path, schema):
     finally:
         testing._reset_owner()
         library.load_office()
+
+
+LEG = {"format": "kimbim-object/1", "id": "leg", "name": {"en": "Leg", "es": "Pata"}, "category": "furniture",
+       "ifc": {"IFC4": ["IfcFurnitureType", "NOTDEFINED", None]},
+       "params": [{"key": "h", "kind": "length", "label": "H", "default": 0.5}],
+       "parts": [{"id": "p", "box": {"dx": 0.05, "dy": 0.05, "dz": "h"}}]}
+TOP = {"format": "kimbim-object/1", "id": "top", "name": {"en": "Top", "es": "Top"}, "category": "furniture",
+       "ifc": {"IFC4": ["IfcFurnitureType", "NOTDEFINED", None]},
+       "params": [{"key": "height", "kind": "length", "label": "Height", "default": 0.7}],
+       "parts": [{"id": "l", "use": "office:leg", "with": {"h": "height"}}]}
+
+
+def _width(guid):
+    shape = ifcopenshell.geom.create_shape(ifcopenshell.geom.settings(), b._model.by_guid(guid))
+    xs = shape.geometry.verts[0::3]
+    return max(xs) - min(xs)
+
+
+def test_types_keep_the_objects_they_use(project, tmp_path):
+    """D99: a type stores the library objects its definition uses (Uses), so the project edits without
+    the library, and a changed library object does not change the project (until Update)."""
+    folder = tmp_path / "office"
+    write_office(folder, LEG, "leg.kimobj")
+    write_office(folder, TOP, "top.kimobj")
+    assert call("set_library_paths", json.dumps({"folder": str(folder)}))["errors"] == []
+    r = call("place_object", project, "office:top", "", 0, 0, 0)
+    assert r["ok"], r
+    ps = ifcopenshell.util.element.get_pset(b._model.by_guid(r["type"]), library.PSET)
+    assert list(json.loads(ps["Uses"])) == ["office:leg"]
+    path = tmp_path / "with_top.ifc"
+    b.save(str(path))
+    library.load_office()  # no office library
+    assert call("open_model", str(path))["ok"]
+    edit = call("set_object_parameter", json.dumps([r["guid"]]), "Height", "0.9", "")
+    assert edit["ok"], edit
+    # The office changes its leg: the project's top keeps the leg it was made with.
+    write_office(folder, {**LEG, "parts": [{"id": "p", "box": {"dx": 0.5, "dy": 0.05, "dz": "h"}}]}, "leg.kimobj")
+    call("set_library_paths", json.dumps({"folder": str(folder)}))
+    assert call("set_object_parameter", json.dumps([r["guid"]]), "Height", "0.8", "")["ok"]
+    assert _width(r["guid"]) == pytest.approx(0.05, abs=1e-6)
+    t = ifcopenshell.util.element.get_type(b._model.by_guid(r["guid"]))
+    fresh = call("place_object", project, "office:top", json.dumps({"height": 0.8}), 2, 0, 0)
+    assert fresh["ok"] and fresh["type"] != t.GlobalId  # same values, another definition: another type
+    assert _width(fresh["guid"]) == pytest.approx(0.5, abs=1e-6)
+    old_hash = ifcopenshell.util.element.get_pset(t, library.PSET)["DefinitionHash"]
+    new_hash = ifcopenshell.util.element.get_pset(b._model.by_guid(fresh["type"]), library.PSET)["DefinitionHash"]
+    assert old_hash != new_hash
+
+
+def test_unreadable_choice_or_bool_fails_the_edit(project, tmp_path):
+    write_office(tmp_path / "office")
+    call("set_library_paths", json.dumps({"folder": str(tmp_path / "office")}))
+    guid = call("place_object", project, "office:stool", "", 0, 0, 0)["guid"]
+    before = ifcopenshell.util.element.get_type(b._model.by_guid(guid)).GlobalId
+    bad = call("set_object_parameter", json.dumps([guid]), "Foot", "Bogus", "")
+    assert not bad["ok"] and bad["error"] == "unknown option Bogus for Foot"
+    bad = call("set_object_parameter", json.dumps([guid]), "Foot ring", "maybe", "")
+    assert not bad["ok"] and bad["error"] == "Foot ring: not on or off"
+    assert ifcopenshell.util.element.get_type(b._model.by_guid(guid)).GlobalId == before
+    assert call("set_object_parameter", json.dumps([guid]), "Foot", "cuadrado", "")["ok"] is False  # no es label given
+    assert call("set_object_parameter", json.dumps([guid]), "Foot", "square", "")["ok"]
+
+
+def test_objects_using_a_broken_office_object_go_too(tmp_path):
+    """The office checks repeat until nothing more goes: a uses b, b (later in the order) fails."""
+    folder = tmp_path / "office"
+    write_office(folder)
+    write_office(folder, {**TOP, "id": "a", "parts": [{"id": "l", "use": "office:b", "with": {"h": "height"}}]}, "a.kimobj")
+    write_office(folder, {**LEG, "id": "b", "symbol": [{"circle": {"cx": "nosuchname", "cy": 0, "r": 1}}]}, "b.kimobj")
+    r = call("set_library_paths", json.dumps({"folder": str(folder)}))
+    assert sorted(pathlib.Path(e["file"]).name for e in r["errors"]) == ["a.kimobj", "b.kimobj"]
+    assert r["objects"] == 1
+    library.load_office()
+
+
+def test_place_fails_cleanly_when_the_values_do_not_build(project, tmp_path):
+    data = json.loads(json.dumps(STOOL))
+    data["parts"][0]["cylinder"]["h"] = "sqrt(height - 0.5) * 0.1"  # breaks below 0.5 m
+    write_office(tmp_path / "office", data)
+    call("set_library_paths", json.dumps({"folder": str(tmp_path / "office")}))
+    types = len(b._model.by_type("IfcFurnitureType"))
+    r = call("place_object", project, "office:stool", json.dumps({"height": 0.3}), 0, 0, 0)
+    assert not r["ok"] and "parts.seat" in r["error"] and not r["error"].startswith("ObjectError")
+    assert len(b._model.by_type("IfcFurnitureType")) == types

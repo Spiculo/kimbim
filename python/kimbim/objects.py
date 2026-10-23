@@ -275,10 +275,12 @@ class ObjectDef:
                 out.append(p.key)
         return out
 
-    resolver = None  # `use` of other library objects: library.py sets it to library._resolve
+    # `use` of other library objects: library.py sets the class's to library._resolve; a definition
+    # stored in a project gets its own, over the definitions stored with it (KIMBIM_LibraryObject.Uses)
+    resolver = None
 
     def shape(self, values: dict, all_anchors: bool = False):
-        return objbuild.build(self, values, type(self).resolver, all_anchors=all_anchors)
+        return objbuild.build(self, values, self.resolver, all_anchors=all_anchors)
 
     def material_of(self, values: dict, part: str) -> str | None:
         """The building material of one slot: its parameter, else the object's main one, else None."""

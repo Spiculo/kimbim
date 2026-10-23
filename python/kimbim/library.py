@@ -24,10 +24,12 @@ The bridge functions import app_bridge when called.
 """
 from __future__ import annotations
 
+import copy
 import json
 import math
 import os
 import pathlib
+import re
 
 import numpy as np
 
@@ -63,6 +65,61 @@ def _library_of(obj) -> str:
     """The Library a type and the listing name: "bundled", else the definition's file (or the library
     a project's own definition came from)."""
     return "bundled" if obj.source == "bundled" else (obj.library or obj.source)
+
+
+def _use_names(defn) -> list:
+    """Every `use` text in a definition's parts and its components' parts."""
+    out = []
+    for parts in [defn.parts, *(c.parts for c in defn.components.values())]:
+        for part in parts if isinstance(parts, list) else ():
+            if isinstance(part, dict) and isinstance(part.get("use"), str):
+                out.append(part["use"])
+    return out
+
+
+def _library_refs():
+    """name -> definition for every name `_resolve` answers (bundled ids, office refs and ids)."""
+    out = {}
+    for ref, d in _office.items():
+        if isinstance(d, objects.ObjectDef):
+            out.setdefault(ref.split(":", 1)[1] if ref.startswith("office:") else ref, d)
+            out[ref] = d
+    out.update(OBJECTS)
+    return out
+
+
+def _uses_of(obj) -> dict:
+    """{ref: definition text} of every library object `obj` may `use`, transitively (D99): a project keeps
+    them on the type, so it builds without the library and a changed library does not change it. A
+    templated `use` ("leg_{foot}") takes every library object its name can match."""
+    stored = getattr(obj, "uses", None)
+    if stored is not None:
+        return dict(stored)
+    names, out, todo, seen = None, {}, [obj], set()
+    while todo:
+        d = todo.pop()
+        for name in _use_names(d):
+            if "{" not in name:
+                if name in d.components:
+                    continue
+                found = [_resolve(name)]
+            else:
+                names = names if names is not None else _library_refs()
+                texts = objbuild._TEMPLATE.split(name)[::2]  # the text between the {names}
+                pattern = re.compile("^" + ".+".join(re.escape(t) for t in texts) + "$")
+                found = [names[n] for n in names if pattern.match(n)]
+            for u in found:
+                if u is not None and u.ref != obj.ref and u.ref not in seen:
+                    seen.add(u.ref)
+                    out[u.ref] = u.text
+                    todo.append(u)
+    return out
+
+
+def _hash_of(obj) -> str:
+    """The DefinitionHash: the definition's text and the texts of the objects it uses."""
+    uses = _uses_of(obj)
+    return obj.hash if not uses else objects.digest(obj.text + objects.canonical(uses))
 
 
 def _material_choices(default: str) -> list:
@@ -133,16 +190,24 @@ def load_office(folder: str = "", files=()) -> None:
             _office_errors.append({"file": path, "error": str(ex)})
         except Exception as ex:  # a broken file must not break the library
             _office_errors.append({"file": path, "error": f"{type(ex).__name__}: {ex}"})
-    for path, d in parsed:  # built once all are known, so office objects may use each other
-        try:
-            objbuild.check(d)
-            objbuild.build(d, d.values(), _resolve, all_anchors=True)
-        except ObjectError as ex:
+    # Built once all are known, so office objects may use each other; again while any goes, so an object
+    # using one that failed later in the order goes too.
+    removed = True
+    while removed:
+        removed = False
+        for path, d in list(parsed):
+            try:
+                objbuild.check(d)
+                objbuild.build(d, d.values(), _resolve, all_anchors=True)
+                continue
+            except ObjectError as ex:
+                error = str(ex)
+            except Exception as ex:  # e.g. a formula giving a non-number where a length goes
+                error = f"{type(ex).__name__}: {ex}"
             _office.pop(d.ref, None)
-            _office_errors.append({"file": path, "error": str(ex)})
-        except Exception as ex:  # e.g. a formula giving a non-number where a length goes
-            _office.pop(d.ref, None)
-            _office_errors.append({"file": path, "error": f"{type(ex).__name__}: {ex}"})
+            _office_errors.append({"file": path, "error": error})
+            parsed.remove((path, d))
+            removed = True
 
 
 def get(key: str):
@@ -413,7 +478,7 @@ def _library_types(f):
 
 
 def _find_type(f, ref: str, values: dict, digest: str):
-    """The library type made from this definition (its hash) with these values, or None."""
+    """The library type made from this definition (its DefinitionHash) with these values, or None."""
     import ifcopenshell.util.element
 
     for t in _library_types(f):
@@ -448,9 +513,10 @@ def _write_pset(t, obj, values) -> None:
 
     from . import app_bridge as B
 
+    uses = _uses_of(obj)
     ifcopenshell.api.pset.edit_pset(B._model, pset=_pset_of(t), properties={
         "Object": obj.ref, "Parameters": json.dumps(values, sort_keys=True), "Library": _library_of(obj),
-        "DefinitionHash": obj.hash, "Definition": obj.text})
+        "DefinitionHash": _hash_of(obj), "Definition": obj.text, "Uses": objects.canonical(uses)})
 
 
 def definition_of_type(t):
@@ -462,9 +528,16 @@ def definition_of_type(t):
     if not data or not data.get("Definition"):
         return None
     try:
-        return objects.from_text(data["Definition"], "project", data.get("Library") or "", data.get("Object") or "")
-    except (ObjectError, ValueError):
+        uses = json.loads(data.get("Uses") or "{}")
+        stored = {ref: objects.from_text(text, "project", "", ref) for ref, text in uses.items()}
+        # a copy: the parsed definition is shared by every type with this text, the Uses are this type's
+        d = copy.copy(objects.from_text(data["Definition"], "project", data.get("Library") or "", data.get("Object") or ""))
+    except (ObjectError, ValueError, TypeError, AttributeError):
         return None
+    d.uses = uses
+    # `use` resolves only from the definitions stored with it, never the live library
+    d.resolver = lambda name: stored.get(name) or stored.get(f"office:{name}")
+    return d
 
 
 def _make_type(obj, values: dict):
@@ -475,9 +548,9 @@ def _make_type(obj, values: dict):
 
     f = B._model
     type_class, predefined, element = obj.ifc_for(f.schema)
+    body, plan = _representations(obj, values)  # first: a definition that fails leaves no empty type
     t = ifcopenshell.api.root.create_entity(f, ifc_class=type_class, name=obj.type_name(values))
     _set_predefined(t, predefined, element)
-    body, plan = _representations(obj, values)
     ifcopenshell.api.geometry.assign_representation(f, product=t, representation=body)
     if plan is not None:
         ifcopenshell.api.geometry.assign_representation(f, product=t, representation=plan)
@@ -488,7 +561,7 @@ def _make_type(obj, values: dict):
 def _type_for(obj, values: dict):
     from . import app_bridge as B
 
-    return _find_type(B._model, obj.ref, values, obj.hash) or _make_type(obj, values)
+    return _find_type(B._model, obj.ref, values, _hash_of(obj)) or _make_type(obj, values)
 
 
 def _ifc_type(entry: dict):
@@ -574,6 +647,11 @@ def place_object(storey_guid: str, key: str, params_json: str, x, y, angle=0.0, 
     except (TypeError, ValueError) as ex:
         return A._fail(str(ex))
     values = obj.values(given) if isinstance(obj, objects.ObjectDef) else {}
+    if isinstance(obj, objects.ObjectDef):
+        try:
+            obj.shape(values)  # a definition that does not build at these values places nothing
+        except (ObjectError, ValueError) as ex:
+            return A._fail(str(ex))
     z = A._elevation(storey)
     if str(gravity) in ("1", "true", "True"):
         from . import symbols
@@ -752,7 +830,14 @@ def set_object_parameter(guids_json: str, name: str, value, scope: str = "") -> 
             v = str(value).strip()
             if not v or (materials._material_by_name(B._model, v) is None and v not in materials.CATALOGUE):
                 return A._fail(f"unknown building material {value}")
-        elif p.kind in ("choice", "bool"):
+        elif p.kind == "choice":  # an option's id or label (either language)
+            v = str(value).strip().lower()
+            if not any(v in (i.lower(), label["en"].lower(), label["es"].lower()) for i, label in p.options):
+                return A._fail(f"unknown option {value} for {p.label['en']}")
+            v = value
+        elif p.kind == "bool":
+            if not isinstance(value, bool) and str(value).strip().lower() not in objects._TRUE | objects._FALSE:
+                return A._fail(f"{p.label['en']}: not on or off")
             v = value
         else:
             try:
@@ -778,7 +863,7 @@ def set_object_parameter(guids_json: str, name: str, value, scope: str = "") -> 
         for t, obj, new_values, elements in groups.values():
             everyone = set(ifcopenshell.util.element.get_types(t))
             whole_type = scope == "type" or (scope != "selection" and everyone <= set(elements))
-            if whole_type and _find_type(f, obj.ref, new_values, obj.hash) is None:
+            if whole_type and _find_type(f, obj.ref, new_values, _hash_of(obj)) is None:
                 _regenerate_type(t, obj, new_values)
                 changed += [o.GlobalId for o in everyone]
             elif whole_type:
