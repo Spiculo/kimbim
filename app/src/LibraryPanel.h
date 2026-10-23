@@ -38,7 +38,7 @@ public:
     QTreeWidget* tree() const { return m_tree; }
     // A plan symbol drawn as an icon (cached by the caller); `size` pixels square.
     static QIcon symbolIcon(const QJsonArray& symbol, double width, double depth, int size = 48);
-    static QString translated(const QString& english); // object, category and parameter names
+    static QString translated(const QString& english, const QString& spanish = {}); // object, category and parameter names
 
 signals:
     void placeRequested();

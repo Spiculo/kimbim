@@ -1656,12 +1656,15 @@ bool MainWindow::applyPropertyEdit(const QString& pset, const QString& prop, con
             scope = box.clickedButton() == whole ? QStringLiteral("type") : QStringLiteral("selection");
         }
     }
+    auto asText = [](const QJsonValue& v) {
+        if (v.isBool())
+            return v.toBool() ? QStringLiteral("true") : QStringLiteral("false");
+        return v.isDouble() ? QString::number(v.toDouble(), 'g', 17) : v.toString();
+    };
     const QJsonObject r = dimension || parameter
         ? bridge(parameter ? "set_object_parameter" : "set_dimension",
-              parameter ? QStringList{jsonList(m_selection), prop,
-                  value.isDouble() ? QString::number(value.toDouble(), 'g', 17) : value.toString(), scope}
-                        : QStringList{jsonList(m_selection), prop,
-                              value.isDouble() ? QString::number(value.toDouble(), 'g', 17) : value.toString()})
+              parameter ? QStringList{jsonList(m_selection), prop, asText(value), scope}
+                        : QStringList{jsonList(m_selection), prop, asText(value)})
         : bridge("set_property", {jsonList(m_selection), pset, prop, jsonValue(value)});
     if (!r.value("ok").toBool())
         showError(tr("Could not change %1").arg(prop), r.value("error").toString());

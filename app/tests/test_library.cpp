@@ -2,6 +2,9 @@
 // D86: the Library panel and the Object tool: list and search objects, place one with the tool
 // (turned with Tab or a typed angle), edit its parameters in Properties, undo it as one step.
 #include <QAction>
+#include <QCheckBox>
+#include <QComboBox>
+#include <QDoubleSpinBox>
 #include <QLineEdit>
 #include <QStandardPaths>
 #include <QtTest>
@@ -92,6 +95,45 @@ private slots:
         QCOMPARE(added(before, w.viewport()->guids()).size(), 1);
         action(w, "actionUndo")->trigger();
         QVERIFY(added(before, w.viewport()->guids()).isEmpty());
+    }
+    void panelShowsNewKindsAndHidesByCondition()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        action(w, "actionObjectLibrary")->trigger();
+        kimbim::LibraryPanel* panel = w.libraryPanel();
+        QVERIFY(panel->selectObject(QStringLiteral("chair")));
+        auto* layout = panel->findChild<QComboBox*>(QStringLiteral("param:layout"));
+        QVERIFY(layout);
+        QVERIFY(panel->findChild<QWidget*>(QStringLiteral("param:radius"))->isHidden());
+        layout->setCurrentIndex(layout->findData(QStringLiteral("circle")));
+        QCOMPARE(panel->currentParams().value("layout").toString(), QStringLiteral("circle"));
+        QCoreApplication::processEvents(); // the form is rebuilt queued
+        QVERIFY(!panel->findChild<QWidget*>(QStringLiteral("param:radius"))->isHidden());
+        auto* arms = panel->findChild<QCheckBox*>(QStringLiteral("param:arms"));
+        QVERIFY(arms);
+        arms->setChecked(true);
+        QCOMPARE(panel->currentParams().value("arms").toBool(), true);
+        QCoreApplication::processEvents();
+        auto* splay = panel->findChild<QDoubleSpinBox*>(QStringLiteral("param:splay"));
+        QVERIFY(splay && splay->suffix() == QStringLiteral("°"));
+    }
+
+    void boolParameterEditsFromProperties()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        QVERIFY(w.chooseObject(QStringLiteral("chair"), QJsonObject{}));
+        const QStringList before = w.viewport()->guids();
+        emit w.viewport()->workPointClicked(QPointF(1, 1), 0.01, Qt::NoModifier);
+        const QStringList made = added(before, w.viewport()->guids());
+        QCOMPARE(made.size(), 1);
+        w.setTool(kimbim::MainWindow::Tool::None);
+        w.setSelection(made);
+        QVERIFY(w.applyPropertyEdit(QStringLiteral("Parameters"), QStringLiteral("Arms"), QJsonValue(true)));
+        const QJsonObject props = kimbim::PythonEngine::instance()
+            .callJson("properties_multi", {QStringLiteral("[\"%1\"]").arg(made[0])}).object();
+        QCOMPARE(props.value("psets").toObject().value("Parameters").toObject().value("Arms").toObject().value("value").toBool(), true);
     }
 };
 

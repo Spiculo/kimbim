@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "LibraryPanel.h"
 
+#include "PythonEngine.h"
+#include "Translations.h"
+
+#include <QCheckBox>
 #include <QComboBox>
 
 #include <QCoreApplication>
@@ -8,6 +12,7 @@
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QJsonDocument>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPainter>
@@ -27,38 +32,20 @@ namespace {
 
 enum { IdRole = Qt::UserRole + 1 };
 
-// The library's English names (kimbim/library.py), so lupdate finds them for translation.
+// The category names (kimbim/library.py), so lupdate finds them; object and parameter names come
+// from the object files (D99).
 [[maybe_unused]] const char* const kNames[] = {
     QT_TRANSLATE_NOOP("LibraryPanel", "Furniture"), QT_TRANSLATE_NOOP("LibraryPanel", "Sanitary"),
     QT_TRANSLATE_NOOP("LibraryPanel", "Kitchen"), QT_TRANSLATE_NOOP("LibraryPanel", "People, trees and cars"),
-    QT_TRANSLATE_NOOP("LibraryPanel", "Office library"), QT_TRANSLATE_NOOP("LibraryPanel", "Table"),
-    QT_TRANSLATE_NOOP("LibraryPanel", "Chair"), QT_TRANSLATE_NOOP("LibraryPanel", "Sofa"),
-    QT_TRANSLATE_NOOP("LibraryPanel", "Single bed"), QT_TRANSLATE_NOOP("LibraryPanel", "Double bed"),
-    QT_TRANSLATE_NOOP("LibraryPanel", "Wardrobe"), QT_TRANSLATE_NOOP("LibraryPanel", "Desk"),
-    QT_TRANSLATE_NOOP("LibraryPanel", "Shelf"), QT_TRANSLATE_NOOP("LibraryPanel", "WC"),
-    QT_TRANSLATE_NOOP("LibraryPanel", "Washbasin"), QT_TRANSLATE_NOOP("LibraryPanel", "Bathtub"),
-    QT_TRANSLATE_NOOP("LibraryPanel", "Shower tray"), QT_TRANSLATE_NOOP("LibraryPanel", "Bidet"),
-    QT_TRANSLATE_NOOP("LibraryPanel", "Base cabinets"), QT_TRANSLATE_NOOP("LibraryPanel", "Wall cabinets"),
-    QT_TRANSLATE_NOOP("LibraryPanel", "Sink unit"), QT_TRANSLATE_NOOP("LibraryPanel", "Fridge"),
-    QT_TRANSLATE_NOOP("LibraryPanel", "Cooktop and oven"), QT_TRANSLATE_NOOP("LibraryPanel", "Person"),
-    QT_TRANSLATE_NOOP("LibraryPanel", "Tree"), QT_TRANSLATE_NOOP("LibraryPanel", "Car"),
-    QT_TRANSLATE_NOOP("LibraryPanel", "Width"), QT_TRANSLATE_NOOP("LibraryPanel", "Depth"),
-    QT_TRANSLATE_NOOP("LibraryPanel", "Height"), QT_TRANSLATE_NOOP("LibraryPanel", "Seat height"),
-    QT_TRANSLATE_NOOP("LibraryPanel", "Seats"), QT_TRANSLATE_NOOP("LibraryPanel", "Doors"),
-    QT_TRANSLATE_NOOP("LibraryPanel", "Shelves"), QT_TRANSLATE_NOOP("LibraryPanel", "Units"),
-    QT_TRANSLATE_NOOP("LibraryPanel", "Mounting height"), QT_TRANSLATE_NOOP("LibraryPanel", "Bowls"),
-    QT_TRANSLATE_NOOP("LibraryPanel", "Burners"), QT_TRANSLATE_NOOP("LibraryPanel", "Crown diameter"),
-    QT_TRANSLATE_NOOP("LibraryPanel", "Trunk diameter"),
-    // D97: the parts' building materials
-    QT_TRANSLATE_NOOP("LibraryPanel", "Material"), QT_TRANSLATE_NOOP("LibraryPanel", "Top material"),
-    QT_TRANSLATE_NOOP("LibraryPanel", "Legs material"), QT_TRANSLATE_NOOP("LibraryPanel", "Frame material"),
-    QT_TRANSLATE_NOOP("LibraryPanel", "Seat material"),
+    QT_TRANSLATE_NOOP("LibraryPanel", "Office library"),
 };
 
 } // namespace
 
-QString LibraryPanel::translated(const QString& english)
+QString LibraryPanel::translated(const QString& english, const QString& spanish)
 {
+    if (!spanish.isEmpty() && currentLanguage() == QLatin1String("es"))
+        return spanish;
     return QCoreApplication::translate("LibraryPanel", english.toUtf8().constData());
 }
 
@@ -172,7 +159,7 @@ void LibraryPanel::setListing(const QJsonObject& listing)
     QHash<QString, QTreeWidgetItem*> categories;
     for (const auto& c : listing.value("categories").toArray()) {
         const QJsonObject o = c.toObject();
-        auto* item = new QTreeWidgetItem(m_tree, {translated(o.value("name").toString())});
+        auto* item = new QTreeWidgetItem(m_tree, {translated(o.value("name").toString(), o.value("name_es").toString())});
         item->setFlags(Qt::ItemIsEnabled);
         categories.insert(o.value("id").toString(), item);
     }
@@ -185,7 +172,7 @@ void LibraryPanel::setListing(const QJsonObject& listing)
             parent = categories.value(QStringLiteral("office"));
         if (!parent)
             continue;
-        auto* item = new QTreeWidgetItem(parent, {translated(o.value("name").toString())});
+        auto* item = new QTreeWidgetItem(parent, {translated(o.value("name").toString(), o.value("name_es").toString())});
         item->setData(0, IdRole, id);
         item->setToolTip(0, o.value("ifc_class").toString());
         if (!m_icons.contains(id)) // drawn once per object (default sizes), not on every refresh
@@ -251,7 +238,8 @@ bool LibraryPanel::selectObject(const QString& id)
 
 QString LibraryPanel::currentName() const
 {
-    return translated(m_objects.value(m_current).value("name").toString());
+    const QJsonObject o = m_objects.value(m_current);
+    return translated(o.value("name").toString(), o.value("name_es").toString());
 }
 
 QJsonObject LibraryPanel::currentParams() const
@@ -281,40 +269,76 @@ void LibraryPanel::showParams()
     while (m_form->rowCount() > 0)
         m_form->removeRow(0);
     const QJsonObject o = m_objects.value(m_current);
-    m_title->setText(o.isEmpty() ? QString() : translated(o.value("name").toString()));
-    for (const auto& v : o.value("params").toArray()) {
+    m_title->setText(o.isEmpty() ? QString() : translated(o.value("name").toString(), o.value("name_es").toString()));
+    if (o.isEmpty())
+        return;
+    // D99: limits that are formulas and show_when depend on the current values, so Python makes the form.
+    const QJsonObject form = PythonEngine::instance()
+        .callJson("object_form", {m_current, QString::fromUtf8(QJsonDocument(m_params).toJson(QJsonDocument::Compact))})
+        .object();
+    for (const auto& v : form.value("params").toArray()) {
         const QJsonObject p = v.toObject();
-        const QString key = p.value("key").toString();
-        const double value = m_params.value(key).toDouble(p.value("value").toDouble());
+        const QString key = p.value("key").toString(), kind = p.value("kind").toString();
+        const QJsonValue value = m_params.contains(key) ? m_params.value(key) : p.value("value");
         QWidget* field = nullptr;
-        if (p.value("kind").toString() == QLatin1String("material")) { // D97: a part's building material
+        if (kind == QLatin1String("material")) { // D97: a part's building material
             auto* combo = new QComboBox(m_formHost);
             for (const auto& c : p.value("choices").toArray())
                 combo->addItem(c.toString());
-            combo->setCurrentText(m_params.value(key).toString(p.value("value").toString()));
+            combo->setCurrentText(value.toString());
             connect(combo, &QComboBox::currentTextChanged, this, [this, key](const QString& name) {
                 m_params.insert(key, name);
                 emit currentChanged();
             });
             field = combo;
-        } else if (p.value("kind").toString() == QLatin1String("count")) {
+        } else if (kind == QLatin1String("choice")) {
+            auto* combo = new QComboBox(m_formHost);
+            for (const auto& c : p.value("options").toArray()) {
+                const QJsonObject opt = c.toObject();
+                combo->addItem(translated(opt.value("label").toString(), opt.value("label_es").toString()), opt.value("id").toString());
+            }
+            combo->setCurrentIndex(std::max(0, combo->findData(value.toString())));
+            connect(combo, &QComboBox::currentIndexChanged, this, [this, combo, key](int i) {
+                m_params.insert(key, combo->itemData(i).toString());
+                QMetaObject::invokeMethod(this, &LibraryPanel::showParams, Qt::QueuedConnection); // show_when may change
+                emit currentChanged();
+            });
+            field = combo;
+        } else if (kind == QLatin1String("bool")) {
+            auto* check = new QCheckBox(m_formHost);
+            check->setChecked(value.toBool());
+            connect(check, &QCheckBox::toggled, this, [this, key](bool on) {
+                m_params.insert(key, on);
+                QMetaObject::invokeMethod(this, &LibraryPanel::showParams, Qt::QueuedConnection);
+                emit currentChanged();
+            });
+            field = check;
+        } else if (kind == QLatin1String("count")) {
             auto* spin = new QSpinBox(m_formHost);
             spin->setRange(p.value("min").toInt(1), p.value("max").toInt(20));
-            spin->setValue(int(std::lround(value)));
+            spin->setValue(int(std::lround(value.toDouble())));
             connect(spin, &QSpinBox::valueChanged, this, [this, key](int n) { m_params.insert(key, n); emit currentChanged(); });
             field = spin;
         } else {
             auto* spin = new QDoubleSpinBox(m_formHost);
-            spin->setDecimals(3);
-            spin->setSingleStep(0.05);
-            spin->setRange(p.value("min").toDouble(0.01), p.value("max").toDouble(50.0));
-            spin->setSuffix(QStringLiteral(" m"));
-            spin->setValue(value);
+            if (kind == QLatin1String("angle")) {
+                spin->setDecimals(1);
+                spin->setSingleStep(1.0);
+                spin->setSuffix(QStringLiteral("°"));
+                spin->setRange(p.value("min").toDouble(-360), p.value("max").toDouble(360));
+            } else {
+                spin->setDecimals(3);
+                spin->setSingleStep(0.05);
+                spin->setRange(p.value("min").toDouble(0.01), p.value("max").toDouble(50.0));
+                spin->setSuffix(QStringLiteral(" m"));
+            }
+            spin->setValue(value.toDouble());
             connect(spin, &QDoubleSpinBox::valueChanged, this, [this, key](double d) { m_params.insert(key, d); emit currentChanged(); });
             field = spin;
         }
-        field->setObjectName(QStringLiteral("libraryParam_") + key);
-        m_form->addRow(translated(p.value("label").toString()) + QLatin1Char(':'), field);
+        field->setObjectName(QStringLiteral("param:%1").arg(key));
+        m_form->addRow(translated(p.value("label").toString(), p.value("label_es").toString()) + QLatin1Char(':'), field);
+        m_form->setRowVisible(field, p.value("visible").toBool(true));
     }
 }
 
