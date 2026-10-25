@@ -1751,9 +1751,10 @@ ES = {
         "Cambia la configuración de estos objetos, o páselos a otra versión guardada",
     "The selection holds objects of more than one type": "La selección tiene objetos de más de un tipo",
     "Could not edit the objects": "No se pudieron editar los objetos",
-    "%n object(s) use this type; %1 of them are selected.": (
-        "%n objeto usa este tipo; %1 de ellos está seleccionado.",
-        "%n objetos usan este tipo; %1 de ellos están seleccionados."),
+    "%n object(s) use this type;": ("%n objeto usa este tipo;", "%n objetos usan este tipo;"),
+    "1 of them is selected.": "1 de ellos está seleccionado.",
+    "%1 of them are selected.": "%1 de ellos están seleccionados.",
+    "A copy of a version of the office library": "Una copia de una versión de la biblioteca de la oficina",
     "Modify all %n objects of this type": ("Modificar el %n objeto de este tipo", "Modificar los %n objetos de este tipo"),
     "Create a new type...": "Crear un tipo nuevo...",
     "Create a new type": "Crear un tipo nuevo",

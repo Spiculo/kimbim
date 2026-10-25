@@ -316,13 +316,14 @@ bool MainWindow::objectSettingsDialog(const QString& key)
         loadObjectVersion();
     if (!placed)
         return false;
+    const QString picked = d.versionId() == ObjectSettingsDialog::defaultId() ? QString() : d.versionId();
     QJsonObject custom;
-    if (d.versionId().isEmpty()) { // the Default, or unsaved values (Custom)
+    if (picked.isEmpty()) { // the Default, or unsaved values (Custom)
         const QJsonObject values = d.values();
         if (values != bridge("object_versions", {key}).value("default").toObject())
             custom = values;
     }
-    setObjectVersion(key, d.versionId(), custom);
+    setObjectVersion(key, picked, custom);
     setTool(Tool::Object);
     return true;
 }
@@ -341,9 +342,10 @@ bool MainWindow::editObjectSettings()
     const QString version = of.value("version").toString(); // "" for an unnamed type
     const QJsonObject values = of.value("values").toObject();
     ObjectSettingsDialog d(this, key, ObjectSettingsDialog::Mode::Edit, this);
-    d.selectVersion(version); // highlighted in the list
-    if (version.isEmpty() || d.versionId() != version)
-        d.setValues(values); // the type's own values
+    if (!version.isEmpty())
+        d.selectVersion(version); // highlighted in the list
+    if (version.isEmpty() || d.versionId() != version) // the type's own values and stored definition
+        d.editType(of.value("source").toString(), values);
     const bool accepted = d.exec() == QDialog::Accepted;
     refreshObjectLabels(); // versions renamed or deleted in the dialog
     if (m_library && m_library->currentObject() == key)
@@ -351,11 +353,14 @@ bool MainWindow::editObjectSettings()
     if (!accepted)
         return false;
     const QString picked = d.versionId();
-    if (picked.isEmpty() ? d.values() == values : picked == version)
+    const bool isDefault = picked == ObjectSettingsDialog::defaultId();
+    if (isDefault ? version.isEmpty() && d.values() == values : picked.isEmpty() ? d.values() == values : picked == version)
         return false; // nothing changed
     QJsonObject r;
     if (!picked.isEmpty()) {
-        r = bridge("assign_version", {guids, picked}); // another saved version: the selection moves to it
+        // Another saved version, or Default (the unnamed type of the default values, found or made; a
+        // saved version left stays as it is): only the selection moves.
+        r = bridge("assign_version", {guids, picked});
     } else {
         const QString params = compactJson(d.values());
         r = bridge("apply_object_settings", {guids, params, QStringLiteral("auto")});
@@ -365,8 +370,7 @@ bool MainWindow::editObjectSettings()
             const int uses = of.value("uses").toInt();
             if (!m_quiet) {
                 QMessageBox box(QMessageBox::Question, tr("Change the object's type"),
-                    tr("%n object(s) use this type; %1 of them are selected.", nullptr, uses).arg(of.value("selected").toInt()),
-                    QMessageBox::NoButton, this);
+                    editSharedTypeText(uses, of.value("selected").toInt()), QMessageBox::NoButton, this);
                 QPushButton* all = box.addButton(tr("Modify all %n objects of this type", nullptr, uses), QMessageBox::AcceptRole);
                 QPushButton* create = box.addButton(tr("Create a new type..."), QMessageBox::AcceptRole);
                 box.addButton(QMessageBox::Cancel);
@@ -406,7 +410,25 @@ bool MainWindow::editObjectSettings()
         return false;
     }
     afterEdit(r);
+    refreshObjectVersions(); // a new type made here is a version the switcher lists
     return true;
+}
+
+QString MainWindow::editSharedTypeText(int uses, int selected)
+{
+    // Each count takes its own grammatical number (English shows the source text: no "(s)" here).
+    return tr("%n object(s) use this type;", nullptr, uses) + QLatin1Char(' ')
+        + (selected == 1 ? tr("1 of them is selected.") : tr("%1 of them are selected.").arg(selected));
+}
+
+void MainWindow::refreshObjectVersions()
+{
+    if (!m_library)
+        return;
+    refreshObjectLabels();
+    loadObjectVersion();
+    if (m_tool == Tool::Object)
+        updateToolPreview();
 }
 
 void MainWindow::setObjectAngle(double degrees)
@@ -466,6 +488,16 @@ bool MainWindow::placeObjectAt(QPointF p, bool turned)
         m_dock->raisePanel(QStringLiteral("library"));
         return false;
     }
+    // D100: a saved (or office) version places its own type; Custom values an unnamed type (D99).
+    const QString key = panel->currentObject();
+    QString version = currentObjectVersion();
+    if (!version.isEmpty())
+        m_objectVersions = bridge("object_versions", {key}); // fresh: the version may have gone since
+    if (!version.isEmpty() && versionEntry(version).isEmpty()) { // gone (undone, deleted): the Default
+        m_objectVersion.clear();
+        m_objectValues = m_objectVersions.value("default").toObject();
+        version.clear();
+    }
     double angle = (m_objectAngle + (turned ? 90.0 : 0.0)) * M_PI / 180.0;
     const QJsonObject info = panel->currentInfo(merged(m_objectVersions.value("default").toObject(), m_objectValues));
     const double width = info.value("width").toDouble(1.0);
@@ -473,9 +505,6 @@ bool MainWindow::placeObjectAt(QPointF p, bool turned)
         p = fit->origin;
         angle = fit->angle * M_PI / 180.0;
     }
-    // D100: a saved (or office) version places its own type; Custom values an unnamed type (D99).
-    const QString key = panel->currentObject();
-    const QString version = currentObjectVersion();
     const QJsonObject custom = m_objectCustom ? m_objectValues : QJsonObject();
     const QJsonObject r = bridge("place_object", {m_levels->activeStorey(), key, compactJson(custom),
         num(p.x()), num(p.y()), num(angle),

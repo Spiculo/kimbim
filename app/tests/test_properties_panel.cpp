@@ -239,6 +239,13 @@ private slots:
                 ++rows;
         }
         QVERIFY(rows <= 7); // the type and at most 6 parameters
+        // No property set behind the summary: nothing to add to it or remove from it (D100 final review).
+        for (QTreeWidgetItem* item : {type, type->parent(), type->parent()->child(1)}) {
+            QStringList names;
+            for (QAction* a : panel->actionsFor(item))
+                names << a->objectName();
+            QVERIFY2(!names.contains("addProperty") && !names.contains("removeProperty"), qPrintable(names.join(',')));
+        }
         for (const QComboBox* c : panel->findChildren<QComboBox*>())
             QVERIFY(!c->objectName().startsWith(QLatin1String("choice:Parameters/"))); // no inline editors
         auto* edit = panel->findChild<QPushButton*>(QStringLiteral("objectSettingsEdit"));

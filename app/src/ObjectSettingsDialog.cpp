@@ -376,7 +376,7 @@ void ObjectSettingsDialog::loadVersions(const QString& select)
     const QSignalBlocker block(m_list);
     m_list->clear();
     auto* def = new QListWidgetItem(tr("Default"), m_list);
-    def->setData(IdRole, QString());
+    def->setData(IdRole, defaultId());
     def->setToolTip(tr("The object as its definition ships"));
     bool office = false;
     for (const auto& v : m_versions) {
@@ -392,9 +392,12 @@ void ObjectSettingsDialog::loadVersions(const QString& select)
         item->setData(IdRole, o.value("id").toString());
         item->setData(SourceRole, source);
         const int uses = o.value("uses").toInt();
-        if (source == QLatin1String("project"))
-            item->setToolTip(tr("%n placed object(s) use it", nullptr, uses));
-        else
+        if (source == QLatin1String("project")) {
+            QString tip = tr("%n placed object(s) use it", nullptr, uses);
+            if (!o.value("office_id").toString().isEmpty()) // a copy of an office version (listed once)
+                tip += QLatin1Char('\n') + tr("A copy of a version of the office library");
+            item->setToolTip(tip);
+        } else
             item->setToolTip(tr("From the office library"));
     }
     for (int i = 0; i < m_list->count(); ++i)
@@ -406,19 +409,35 @@ void ObjectSettingsDialog::selectVersion(const QString& id)
 {
     if (m_fixed)
         return;
-    const QJsonObject version = versionById(id);
-    if (!id.isEmpty() && version.isEmpty())
+    const bool isDefault = id.isEmpty() || id == defaultId();
+    const QJsonObject version = isDefault ? QJsonObject() : versionById(id);
+    if (!isDefault && version.isEmpty())
         return; // not one of this object's versions
-    m_versionId = id;
-    m_source = id;
+    m_versionId = isDefault ? defaultId() : id;
+    m_source = isDefault ? QString() : id;
     m_lastEdited.clear();
     {
         const QSignalBlocker block(m_list);
         for (int i = 0; i < m_list->count(); ++i)
-            if ((m_list->item(i)->flags() & Qt::ItemIsSelectable) && m_list->item(i)->data(IdRole).toString() == id)
+            if ((m_list->item(i)->flags() & Qt::ItemIsSelectable) && m_list->item(i)->data(IdRole).toString() == m_versionId)
                 m_list->setCurrentItem(m_list->item(i));
     }
-    m_form->setObject(m_key, id.isEmpty() ? m_default : version.value("values").toObject(), id);
+    m_form->setObject(m_key, isDefault ? m_default : version.value("values").toObject(), m_source);
+    schedulePreview();
+}
+
+void ObjectSettingsDialog::editType(const QString& source, const QJsonObject& values)
+{
+    if (m_fixed)
+        return;
+    m_versionId.clear();
+    m_source = source;
+    m_lastEdited.clear();
+    {
+        const QSignalBlocker block(m_list);
+        m_list->setCurrentItem(nullptr);
+    }
+    m_form->setObject(m_key, values, source);
     schedulePreview();
 }
 
@@ -586,7 +605,11 @@ void ObjectSettingsDialog::fillVersionMenu(QMenu* menu, const QString& id)
         if (ok)
             renameVersion(id, text);
     });
-    menu->addAction(tr("Delete"), this, [this, id] { deleteVersion(id); });
+    QAction* remove = menu->addAction(tr("Delete"), this, [this, id] { deleteVersion(id); });
+    const int uses = versionById(id).value("uses").toInt();
+    remove->setEnabled(uses == 0); // only a version nothing uses
+    if (uses > 0)
+        remove->setToolTip(tr("%n placed object(s) use this version. Change them to another version first.", nullptr, uses));
     QAction* move = menu->addAction(tr("Move to library"), this, [this, id] { moveToLibrary(id); });
     menu->setToolTipsVisible(true);
     const bool office = m_window && !m_window->preferences().value(QStringLiteral("office_library")).toString().trimmed().isEmpty();

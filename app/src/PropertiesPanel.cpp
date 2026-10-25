@@ -271,6 +271,7 @@ void PropertiesPanel::showMulti(const QJsonObject& merged)
         // D100: a library object's Parameters are a summary; Edit... opens the Object settings dialog
         // (off when the selection holds more than one type).
         if (p.key() == QLatin1String("Parameters") && merged.contains("object_settings")) {
+            group->setData(0, SourceRole, QStringLiteral("parameter")); // no pset: nothing to add to it
             for (int i = 1; i < group->childCount(); ++i) // the type first (JSON objects come sorted)
                 if (group->child(i)->data(0, PropRole).toString() == QLatin1String("Type"))
                     group->insertChild(0, group->takeChild(i));
@@ -358,7 +359,10 @@ QList<QAction*> PropertiesPanel::actionsFor(QTreeWidgetItem* item, QObject* pare
         add("editTypeValue", tr("Edit type value..."), [this, pset, prop] { emit typeEditRequested(pset, prop); });
     if (!prop.isEmpty() && (source == QLatin1String("override") || source == QLatin1String("mixed")))
         add("resetToType", tr("Reset to type value"), [this, pset, prop] { emit resetToTypeRequested(pset, prop); });
-    const bool dimension = source == QLatin1String("dimension") || pset == QLatin1String("Dimensions");
+    // Measured dimensions and a library object's Parameters summary (D100) are no property set: no
+    // property to add or remove.
+    const bool dimension = source == QLatin1String("dimension") || source == QLatin1String("parameter")
+        || pset == QLatin1String("Dimensions");
     if (!pset.isEmpty() && !dimension)
         add("addProperty", tr("Add property to %1...").arg(pset), [this, pset] { emit addPropertyRequested(pset); });
     if (!prop.isEmpty() && editable && !dimension && source != QLatin1String("type")) // inherited values have nothing to remove

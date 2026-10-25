@@ -80,10 +80,18 @@ public:
     enum class Mode { Place, Edit }; // the accept button: Place, or Apply (placed objects)
     ObjectSettingsDialog(MainWindow* window, const QString& key, Mode mode, QWidget* parent = nullptr);
 
-    void selectVersion(const QString& id); // "" is Default; its values go to the controls and the preview
+    // The id versionId() gives for Default (assign_version takes it too: the object's default values).
+    static QString defaultId() { return QStringLiteral("#default"); }
+    // A saved or office version's id, or Default ("" or defaultId()); its values go to the controls and
+    // the preview.
+    void selectVersion(const QString& id);
     void setValues(const QJsonObject& values); // unsaved values (merged over the current ones)
+    // Edit mode on placements of a type that is not one of the listed versions: its values, unsaved, with
+    // the definition stored on it (`source` "type:<GlobalId>", object_settings_of) for the form and previews.
+    void editType(const QString& source, const QJsonObject& values);
     QJsonObject values() const;
-    // The chosen saved (or office) version's id; "" for Default, or values edited since it was picked.
+    // The chosen saved (or office) version's id; defaultId() for Default; "" for values edited since a
+    // version (or Default) was picked.
     QString versionId() const { return m_versionId; }
     bool valid() const { return m_valid; } // the current values build
     QString objectKey() const { return m_key; }
@@ -94,8 +102,9 @@ public:
     bool renameVersion(const QString& id, const QString& name);
     bool deleteVersion(const QString& id);
     bool moveToLibrary(const QString& id, bool replace = false);
-    // The right-click menu of a project version: Rename..., Delete, Move to library (disabled, with
-    // the reason as its tooltip, without an office library folder).
+    // The right-click menu of a project version: Rename..., Delete (disabled, with how many objects use
+    // it as its tooltip, while any does), Move to library (disabled, with the reason as its tooltip,
+    // without an office library folder).
     void fillVersionMenu(QMenu* menu, const QString& id);
 
 private:
@@ -116,7 +125,7 @@ private:
     QJsonArray m_versions;
     QString m_versionId;
     // The version whose stored definition the form and previews use: the one picked last, kept while
-    // its values are edited ("" for Default: the object's definition).
+    // its values are edited ("" for Default: the object's definition; "type:<GlobalId>" for editType).
     QString m_source;
     QString m_lastEdited; // the parameter the user changed last (marked when the values fail)
     bool m_valid = true;

@@ -32,6 +32,11 @@ QString saveVersion(const QString& name, const QJsonObject& values)
     return r.value("id").toString();
 }
 
+QJsonObject py(const char* fn, const QStringList& args = {})
+{
+    return kimbim::PythonEngine::instance().callJson(fn, args).object();
+}
+
 QStringList versionNames(const kimbim::ObjectSettingsDialog& d)
 {
     QStringList out;
@@ -112,7 +117,7 @@ private slots:
         QVERIFY(w.newProject());
         const QString id = saveVersion(QStringLiteral("Dining"), {{"width", 0.5}});
         kimbim::ObjectSettingsDialog d(&w, QStringLiteral("chair"), kimbim::ObjectSettingsDialog::Mode::Place);
-        QVERIFY(d.versionId().isEmpty()); // Default
+        QCOMPARE(d.versionId(), kimbim::ObjectSettingsDialog::defaultId()); // Default: its own marker
         d.selectVersion(id);
         QCOMPARE(d.values().value("width").toDouble(), 0.5);
         QCOMPARE(d.versionId(), id);
@@ -125,6 +130,10 @@ private slots:
         QVERIFY(d.versionId().isEmpty()); // edited since it was picked: unsaved values
         d.selectVersion(QString());
         QCOMPARE(d.values().value("width").toDouble(), 0.45);
+        QCOMPARE(d.versionId(), kimbim::ObjectSettingsDialog::defaultId());
+        // values edited from Default: unsaved, not Default (the form was rebuilt: its controls are new)
+        d.findChild<QDoubleSpinBox*>(QStringLiteral("param_width"))->setValue(0.5);
+        QVERIFY(d.versionId().isEmpty());
     }
 
     // Focus entering the versions list (the dialog shown, Tab) makes an item current without the user
@@ -148,7 +157,7 @@ private slots:
         QCOMPARE(d.versionId(), id);
         QCOMPARE(d.values().value("width").toDouble(), 0.5);
         list->setCurrentRow(0); // Default
-        QVERIFY(d.versionId().isEmpty());
+        QCOMPARE(d.versionId(), kimbim::ObjectSettingsDialog::defaultId());
         QCOMPARE(d.values().value("width").toDouble(), 0.45);
     }
 
@@ -215,6 +224,90 @@ private slots:
         QVERIFY(versionNames(d).contains(QStringLiteral("Dinner")));
         QVERIFY(d.deleteVersion(id));
         QCOMPARE(versionNames(d), QStringList{QStringLiteral("Default")});
+    }
+
+    // D100 final review: Delete on a version placed objects use is disabled, saying how many.
+    void deleteIsDisabledForAUsedVersion()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        const QString id = saveVersion(QStringLiteral("Dining"), {{"width", 0.5}});
+        const QString storey = kimbim::PythonEngine::instance().callJson("storeys", {}).object()
+            .value("storeys").toArray().at(0).toObject().value("guid").toString();
+        for (int i = 0; i < 2; ++i)
+            QVERIFY(py("place_object", {storey, QStringLiteral("chair"), QString(), QString::number(i), QStringLiteral("0"),
+                QStringLiteral("0"), QString(), id}).value("ok").toBool());
+        kimbim::ObjectSettingsDialog d(&w, QStringLiteral("chair"), kimbim::ObjectSettingsDialog::Mode::Place);
+        QMenu menu;
+        d.fillVersionMenu(&menu, id);
+        QAction* remove = menu.actions().at(1);
+        QCOMPARE(remove->text(), QStringLiteral("Delete"));
+        QVERIFY(!remove->isEnabled());
+        QVERIFY2(remove->toolTip().contains(QStringLiteral("2 placed object")), qPrintable(remove->toolTip()));
+        QVERIFY(menu.actions().at(0)->isEnabled()); // Rename still works
+        const QString unused = saveVersion(QStringLiteral("Spare"), {{"width", 0.6}});
+        kimbim::ObjectSettingsDialog again(&w, QStringLiteral("chair"), kimbim::ObjectSettingsDialog::Mode::Place);
+        QMenu spare;
+        again.fillVersionMenu(&spare, unused);
+        QVERIFY(spare.actions().at(1)->isEnabled()); // nothing uses it
+        QVERIFY(!spare.actions().at(1)->toolTip().contains(QStringLiteral("placed object")));
+    }
+
+    // D100 final review: a project copy of an office version is marked in the list.
+    void officeCopyIsMarked()
+    {
+        QTemporaryDir dir;
+        setOfficeFolder(dir.path());
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        const QString id = saveVersion(QStringLiteral("Cafe"), {{"width", 0.5}});
+        const QString mine = saveVersion(QStringLiteral("Mine"), {{"width", 0.6}});
+        QVERIFY(py("move_version_to_library", {id, QString()}).value("ok").toBool());
+        kimbim::ObjectSettingsDialog d(&w, QStringLiteral("chair"), kimbim::ObjectSettingsDialog::Mode::Place);
+        auto* list = d.findChild<QListWidget*>(QStringLiteral("objectSettingsVersions"));
+        QString cafe, plain;
+        for (int i = 0; i < list->count(); ++i) {
+            if (list->item(i)->text() == QLatin1String("Cafe"))
+                cafe = list->item(i)->toolTip();
+            if (list->item(i)->text() == QLatin1String("Mine"))
+                plain = list->item(i)->toolTip();
+        }
+        QVERIFY2(cafe.contains(QStringLiteral("office library")), qPrintable(cafe));
+        QVERIFY2(!plain.isEmpty() && !plain.contains(QStringLiteral("office library")), qPrintable(plain));
+        QVERIFY(!mine.isEmpty());
+        setOfficeFolder(QString());
+    }
+
+    // D100 final review: Edit mode on placements of an unnamed type uses the definition stored on the
+    // type, also when the library's has moved on (an outdated placement): no parameter it lacks.
+    void editTypeUsesTheTypesOwnDefinition()
+    {
+        QTemporaryDir dir;
+        writeBlock(dir, QStringLiteral("block"));
+        setOfficeFolder(dir.path());
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        const QString storey = kimbim::PythonEngine::instance().callJson("storeys", {}).object()
+            .value("storeys").toArray().at(0).toObject().value("guid").toString();
+        const QJsonObject placed = py("place_object", {storey, QStringLiteral("office:block"), QStringLiteral("{\"height\": 0.3}"),
+            QStringLiteral("0"), QStringLiteral("0"), QStringLiteral("0")});
+        QVERIFY(placed.value("ok").toBool());
+        writeBlock(dir, QStringLiteral("block"), {QJsonObject{{"key", "top"}, {"kind", "length"}, {"label", "Top"}, {"default", 0.02}}});
+        setOfficeFolder(dir.path());
+        const QJsonObject of = py("object_settings_of", {QStringLiteral("[\"%1\"]").arg(placed.value("guid").toString())});
+        QCOMPARE(of.value("source").toString(), QStringLiteral("type:") + placed.value("type").toString());
+        kimbim::ObjectSettingsDialog d(&w, QStringLiteral("office:block"), kimbim::ObjectSettingsDialog::Mode::Edit);
+        QVERIFY(d.findChild<QWidget*>(QStringLiteral("param_top"))); // Default: the library's definition
+        d.editType(of.value("source").toString(), of.value("values").toObject());
+        QVERIFY(d.versionId().isEmpty());
+        QVERIFY(!d.findChild<QWidget*>(QStringLiteral("param_top")));
+        QCOMPARE(d.findChild<QDoubleSpinBox*>(QStringLiteral("param_height"))->value(), 0.3);
+        d.findChild<QDoubleSpinBox*>(QStringLiteral("param_height"))->setValue(0.5);
+        QVERIFY(!d.findChild<QWidget*>(QStringLiteral("param_top"))); // still the type's definition
+        QTRY_VERIFY(d.findChild<kimbim::Viewport*>(QStringLiteral("objectSettingsPreview"))->elementCount() > 0);
+        QVERIFY(d.valid());
+        QVERIFY(!d.values().contains(QStringLiteral("top")));
+        setOfficeFolder(QString());
     }
 
     void formFollowsTheVersionsOwnDefinition()

@@ -487,12 +487,18 @@ void MainWindow::buildMenus()
     m_undo->setObjectName(QStringLiteral("actionUndo"));
     m_undo->setShortcut(QKeySequence::Undo);
     m_undo->setEnabled(false);
-    connect(m_undo, &QAction::triggered, this, [this] { afterEdit(bridge("undo")); });
+    connect(m_undo, &QAction::triggered, this, [this] {
+        afterEdit(bridge("undo"));
+        refreshObjectVersions(); // D100: saved versions come and go with undo
+    });
     m_redo = editMenu->addAction(tr("&Redo"));
     m_redo->setObjectName(QStringLiteral("actionRedo"));
     m_redo->setShortcuts({QKeySequence(Qt::CTRL | Qt::Key_Y), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Z)});
     m_redo->setEnabled(false);
-    connect(m_redo, &QAction::triggered, this, [this] { afterEdit(bridge("redo")); });
+    connect(m_redo, &QAction::triggered, this, [this] {
+        afterEdit(bridge("redo"));
+        refreshObjectVersions();
+    });
     editMenu->addSeparator();
     QAction* del = editMenu->addAction(tr("&Delete"));
     del->setObjectName(QStringLiteral("actionDelete"));

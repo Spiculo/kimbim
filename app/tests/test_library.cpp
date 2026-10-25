@@ -447,6 +447,149 @@ private slots:
         QCOMPARE(w.currentObjectVersion(), dining);
     }
 
+    // D100 final review: Default in edit mode moves the selection to an unnamed type of the default
+    // values; the saved version it leaves keeps its values.
+    void editDefaultLeavesTheSavedVersion()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        const QString id = saveVersion(QStringLiteral("chair"), QStringLiteral("Dining"), {{"width", 0.5}});
+        const QStringList made = placeTwo(w, id);
+        QCOMPARE(made.size(), 2);
+        w.setSelection({made[0]});
+        w.setEditChoiceForTests(QStringLiteral("all")); // were the question asked, the version would change
+        QVERIFY(editWith(w, [](kimbim::ObjectSettingsDialog* d) {
+            d->selectVersion(kimbim::ObjectSettingsDialog::defaultId());
+            QCOMPARE(d->versionId(), kimbim::ObjectSettingsDialog::defaultId());
+        }));
+        QVERIFY(typeName(made[0]) != QLatin1String("Dining"));
+        QCOMPARE(placedWidth(made[0]), 0.45); // the chair's default
+        QCOMPARE(typeName(made[1]), QStringLiteral("Dining"));
+        QCOMPARE(placedWidth(made[1]), 0.5);
+        const QJsonObject dining = versionNamed(QStringLiteral("chair"), QStringLiteral("Dining"));
+        QCOMPARE(dining.value("values").toObject().value("width").toDouble(), 0.5);
+        QCOMPARE(dining.value("uses").toInt(), 1);
+        // Default again on the unnamed type with the default values: nothing to do.
+        w.setSelection({made[0]});
+        QVERIFY(!editWith(w, [](kimbim::ObjectSettingsDialog* d) { d->selectVersion(QString()); }));
+    }
+
+    // D100 final review: Edit... on an outdated unnamed placement (the library's definition moved on)
+    // edits it with the definition stored on its type.
+    void editAnOutdatedUnnamedPlacement()
+    {
+        QTemporaryDir dir;
+        auto write = [&](bool top) {
+            QJsonArray params{QJsonObject{{"key", "width"}, {"kind", "length"}, {"label", "Width"}, {"default", 0.4}}};
+            if (top)
+                params.append(QJsonObject{{"key", "top"}, {"kind", "length"}, {"label", "Top"}, {"default", 0.02}});
+            const QJsonObject block{{"format", "kimbim-object/1"}, {"id", "block"}, {"name", "Block"}, {"category", "furniture"},
+                {"ifc", QJsonObject{{"IFC4", QJsonArray{"IfcFurnitureType", "NOTDEFINED", QJsonValue()}}}}, {"params", params},
+                {"parts", QJsonArray{QJsonObject{{"id", "body"}, {"box", QJsonObject{{"dx", "width"}, {"dy", 0.4}, {"dz", 0.4}}}}}}};
+            QFile file(dir.filePath(QStringLiteral("block.kimobj")));
+            QVERIFY(file.open(QIODevice::WriteOnly));
+            file.write(QJsonDocument(block).toJson());
+            file.close();
+            kimbim::PythonEngine::instance().callJson("set_library_paths",
+                {QString::fromUtf8(QJsonDocument(QJsonObject{{"folder", dir.path()}}).toJson(QJsonDocument::Compact))});
+        };
+        write(false);
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        const QString storey = kimbim::PythonEngine::instance().callJson("storeys", {}).object()
+            .value("storeys").toArray().at(0).toObject().value("guid").toString();
+        const QString guid = kimbim::PythonEngine::instance().callJson("place_object", {storey, QStringLiteral("office:block"),
+            QString(), QStringLiteral("0"), QStringLiteral("0"), QStringLiteral("0")}).object().value("guid").toString();
+        QVERIFY(!guid.isEmpty());
+        write(true); // the office adds a parameter: the placement is outdated
+        w.setSelection({guid});
+        QVERIFY(editWith(w, [](kimbim::ObjectSettingsDialog* d) {
+            QVERIFY(!d->findChild<QWidget*>(QStringLiteral("param_top")));
+            setWidth(d, 0.6);
+        }));
+        QCOMPARE(placedWidth(guid), 0.6);
+        kimbim::PythonEngine::instance().callJson("set_library_paths", {QStringLiteral("{}")});
+    }
+
+    // D100 final review: undo and redo refresh what a click places and the versions listed: a version
+    // undone away places the Default, a rename undone shows the old name, a type Edit... made is listed.
+    void undoRefreshesTheVersions()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        kimbim::LibraryPanel* panel = w.libraryPanel();
+        const QString id = saveVersion(QStringLiteral("chair"), QStringLiteral("Dining"), {{"width", 0.5}});
+        w.setObjectVersion(QStringLiteral("chair"), id);
+        w.setTool(kimbim::MainWindow::Tool::Object);
+        QStringList before = w.viewport()->guids();
+        QVERIFY(w.placeObjectAt(QPointF(1, 1)));
+        QCOMPARE(added(before, w.viewport()->guids()).size(), 1);
+        action(w, "actionUndo")->trigger(); // the placement
+        action(w, "actionUndo")->trigger(); // the version
+        QVERIFY(versionNamed(QStringLiteral("chair"), QStringLiteral("Dining")).isEmpty());
+        QVERIFY(w.currentObjectVersion().isEmpty());
+        QVERIFY(!itemText(panel, QStringLiteral("chair")).contains(QStringLiteral("Dining")));
+        before = w.viewport()->guids();
+        QVERIFY(w.placeObjectAt(QPointF(2, 1))); // the Default
+        QStringList made = added(before, w.viewport()->guids());
+        QCOMPARE(made.size(), 1);
+        QCOMPARE(placedWidth(made[0]), 0.45);
+        action(w, "actionRedo")->trigger(); // nothing to redo after a new edit: harmless
+
+        // A version gone behind the window's back (no refresh): a click still places, the Default.
+        const QString other = saveVersion(QStringLiteral("chair"), QStringLiteral("Bar"), {{"width", 0.55}});
+        w.setObjectVersion(QStringLiteral("chair"), other);
+        QVERIFY(kimbim::PythonEngine::instance().callJson("undo", {}).object().value("ok").toBool());
+        QCOMPARE(w.currentObjectVersion(), other); // stale
+        before = w.viewport()->guids();
+        QVERIFY(w.placeObjectAt(QPointF(3, 1)));
+        made = added(before, w.viewport()->guids());
+        QCOMPARE(made.size(), 1);
+        QCOMPARE(placedWidth(made[0]), 0.45);
+        QVERIFY(w.currentObjectVersion().isEmpty());
+        w.setTool(kimbim::MainWindow::Tool::None);
+
+        // A rename undone: the panel shows the old name again.
+        const QString kept = saveVersion(QStringLiteral("chair"), QStringLiteral("Kept"), {{"width", 0.5}});
+        w.setObjectVersion(QStringLiteral("chair"), kept);
+        QVERIFY(kimbim::PythonEngine::instance().callJson("rename_version", {kept, QStringLiteral("Renamed")}).object()
+                .value("ok").toBool());
+        w.applyLibraryPaths(); // the labels again, as closing the dialog does
+        QVERIFY(itemText(panel, QStringLiteral("chair")).contains(QStringLiteral("Renamed")));
+        action(w, "actionUndo")->trigger();
+        QVERIFY(itemText(panel, QStringLiteral("chair")).contains(QStringLiteral("Kept")));
+        action(w, "actionRedo")->trigger();
+        QVERIFY(itemText(panel, QStringLiteral("chair")).contains(QStringLiteral("Renamed")));
+
+        // A new type made by Edit...: the quick switcher lists it at once.
+        const QStringList two = placeTwo(w, kept);
+        QCOMPARE(two.size(), 2);
+        w.setSelection({two[0]});
+        w.setEditChoiceForTests(QStringLiteral("new"), QStringLiteral("Wide"));
+        QVERIFY(editWith(w, [](kimbim::ObjectSettingsDialog* d) { setWidth(d, 0.6); }));
+        auto switcher = [&] {
+            QMenu menu;
+            w.fillObjectVersionMenu(&menu);
+            QStringList texts;
+            for (QAction* a : menu.actions())
+                texts << a->text();
+            return texts;
+        };
+        QVERIFY(switcher().contains(QStringLiteral("Wide")));
+        auto* combo = w.findChild<QComboBox*>(QStringLiteral("objectVersionCombo"));
+        QVERIFY(combo && combo->findText(QStringLiteral("Wide")) > 0);
+        action(w, "actionUndo")->trigger();
+        QVERIFY(!switcher().contains(QStringLiteral("Wide")));
+    }
+
+    // D100 final review: the question's counts each take their own grammatical number.
+    void sharedTypeQuestionGrammar()
+    {
+        QVERIFY(kimbim::MainWindow::editSharedTypeText(3, 1).endsWith(QStringLiteral("1 of them is selected.")));
+        QVERIFY(kimbim::MainWindow::editSharedTypeText(3, 2).endsWith(QStringLiteral("2 of them are selected.")));
+        QVERIFY(kimbim::MainWindow::editSharedTypeText(3, 2).startsWith(QStringLiteral("3 ")));
+    }
+
     // D100: outdated saved versions that nothing uses still update (Update from library).
     void updateLibraryObjectsUpdatesUnusedVersions()
     {

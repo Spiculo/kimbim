@@ -456,9 +456,12 @@ public:
     // D100: Edit... (Properties): the dialog in edit mode on the selection's type (one library type).
     // Apply moves the selection to the version picked in the list, or applies the values: directly
     // when only the selection uses the type, else after asking whether to modify every object of the
-    // type or create a new type (named) for the selection. One undo step; the last version used (what
-    // a click places) stays. False if nothing changed.
+    // type or create a new type (named) for the selection. Default moves the selection to the unnamed
+    // type of the object's default values (a saved version it leaves stays as it is). One undo step;
+    // the last version used (what a click places) stays. False if nothing changed.
     bool editObjectSettings();
+    // That question's text: how many objects use the type, and how many of them are selected.
+    static QString editSharedTypeText(int uses, int selected);
     // Quiet mode: the answer that question gets ("all", "new" with `name`, or "" to cancel).
     void setEditChoiceForTests(const QString& mode, const QString& name = {})
     {
@@ -672,6 +675,9 @@ private:
     void loadObjectVersion();   // the current object's last used (object_versions)
     void showObjectVersion();   // into the panel label and the Version dropdown
     void refreshObjectLabels(); // every listed object's current version in the panel
+    // Both, and the current object's versions and last used again (undo, redo, Edit...: versions may
+    // have come or gone); nothing without the Library panel.
+    void refreshObjectVersions();
     QString objectVersionName(const QJsonObject& last, const QJsonArray& versions) const;
     QJsonObject versionEntry(const QString& id) const; // of the current object (an office copy too)
     bool m_libraryPathsSent = false;

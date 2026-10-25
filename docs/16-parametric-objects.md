@@ -256,15 +256,25 @@ A value that breaks the object turns its field red, the preview keeps the last g
 stays disabled until it is fixed.
 
 - **Saved versions** are named types in the project that stay when unused, each with a stable id. *Save as...*
-  names the current values; right click a version for Rename, Delete (only when unused) and *Move to library*,
-  which copies it into `<office folder>/kimbim-versions.ifc`. Office versions appear in an *Office* section;
-  placing one copies it into the project once, and that copy follows only the office version for updates.
-  *Update from library* (§5) covers saved versions too.
+  names the current values (replacing a version keeps the definition stored on it); right click a version for
+  Rename, Delete (disabled while objects use it, the tooltip says how many) and *Move to library*, which copies
+  it into `<office folder>/kimbim-versions.ifc`. Office versions appear in an *Office* section; placing one
+  copies it into the project once, and the list marks that copy (tooltip). The copy follows only the office
+  version for updates, and only when the office version changed since the copy was made, moved to the office
+  or last updated: the project type keeps that office state as `OfficeHash` in `KIMBIM_LibraryObject` (a hash
+  of the office values and `DefinitionHash`), so a local edit of the copy is not outdated. *Update from
+  library* (§5) covers saved versions too.
 - **Placing**: a click in the Library panel or the viewport places the last version used (project setting
   `object_last_used`; a stale entry means *Default*). In the Object tool a right click opens the quick switcher
   (versions and *Settings...*), the tool options bar has a *Version* dropdown, and Esc ends the tool.
 - **Editing placed objects**: Properties shows a read-only summary of the *Parameters* group with **Edit...**.
-  Saving asks *modify all N objects of this type* (the type regenerates in place) or *create a new type*.
+  The dialog opens on the type's values and the definition stored on the type (`object_settings_of` gives it as
+  the source `type:<GlobalId>`), so an outdated placement edits and previews as the model has it. Saving
+  changed values asks *modify all N objects of this type* (the type regenerates in place) or *create a new
+  type*. Picking another version moves the selection to it; picking *Default* (its own id, `#default`, in
+  `assign_version`) moves the selection to the unnamed type of the default values, found or made as placing
+  finds it, and leaves a saved version it came from untouched. Undo and redo refresh the versions a click
+  places and the switcher lists.
 
 ### In Properties (every placed object)
 
