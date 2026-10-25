@@ -40,7 +40,8 @@ from .objbuild import ObjectError, _translate
 PSET = "KIMBIM_LibraryObject"
 PARAMETERS = "Parameters"  # the Properties panel group (its edits go to set_object_parameter)
 CATEGORIES = (("furniture", "Furniture"), ("sanitary", "Sanitary"), ("kitchen", "Kitchen"),
-              ("site", "People, trees and cars"), ("office", "Office library"))
+              ("site", "People, trees and cars"), ("office", "Office library"),
+              ("project", "Project"))
 
 BUNDLED = pathlib.Path(__file__).with_name("bundled_objects")
 OBJECTS: dict = {}  # ref -> objects.ObjectDef (bundled)
@@ -300,6 +301,24 @@ def _listing(obj) -> dict:
             "height": values.get("height", 1.0), "library": _library_of(obj)}
 
 
+def _project_listings(f) -> list:
+    """The project's own objects (D101): each `project:` ref found on a library type, once, from the
+    definition stored on a type of it. Never one the library has."""
+    from . import objversions
+
+    refs = {}
+    for t in _library_types(f) if f is not None else ():
+        info = _params_of_type(t)
+        if info is not None and info[0].startswith("project:") and get(info[0]) is None:
+            refs.setdefault(info[0], None)
+    out = []
+    for ref in sorted(refs):
+        obj = objversions._definition(ref)
+        if isinstance(obj, objects.ObjectDef):
+            out.append({**_listing(obj), "category": "project", "library": "project"})
+    return out
+
+
 def library_objects() -> str:
     from . import app_bridge as B
 
@@ -312,6 +331,7 @@ def library_objects() -> str:
                     "ifc_class": entry["ifc_class"], "params": [], "symbol": [], "width": 1.0, "depth": 1.0,
                     "height": 1.0, "library": entry["path"]}
         listed.append(item)
+    listed += _project_listings(B._model)
     return B._dump({"categories": [{"id": k, "name": n} for k, n in CATEGORIES], "objects": listed,
                     "office": dict(_office_paths), "errors": list(_office_errors)})
 
@@ -771,7 +791,9 @@ def place_object(storey_guid: str, key: str, params_json: str, x, y, angle=0.0, 
             name = obj.name
         params_json = ""
     else:
-        obj = get(key)
+        from . import objversions
+
+        obj = get(key) or objversions._definition(key)  # else a project's own, or one gone from the library
         if obj is None:
             return A._fail(f"no library object {key}")
     try:
