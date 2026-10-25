@@ -17,6 +17,7 @@ class QTimer;
 
 namespace kimbim {
 
+class JsonTreeEditor;
 class MainWindow;
 class ParameterForm;
 class PlanSymbolView;
@@ -27,8 +28,8 @@ class Viewport;
 // material slots as tables. Middle: the draft drawn by the app's own 3D view in a scratch scene, or its
 // plan symbol. Right: Try values, a parameter form that changes the preview, never the defaults. Any edit
 // checks the draft after a short pause: the fields whose path has an error turn red (the message as their
-// tooltip), the preview keeps the last good shape and both saves are disabled until it is fixed. What the
-// tables don't show (parts, components, symbol, ...) is kept as it came.
+// tooltip), the preview keeps the last good shape and both saves are disabled until it is fixed. The parts,
+// components and symbol are a tree of their JSON (JsonTreeEditor); what no tab shows is kept as it came.
 class ObjectEditorDialog : public QDialog {
     Q_OBJECT
 public:
@@ -40,7 +41,8 @@ public:
     void setDraft(const QJsonObject& draft); // fills the fields; the draft as it is now counts as unchanged
     QStringList errorPaths() const { return m_errorPaths; } // the last check's field paths
     // Saves the draft to "office" (a .kimobj file in the office folder) or "project" (one undo step). An
-    // object the office library has asks to replace it, unless `replace`. On success the dialog accepts.
+    // object the office library has asks to replace it, unless `replace` or it is the office object the
+    // dialog opened, its id unchanged. On success the dialog accepts.
     bool saveTo(const QString& target, bool replace = false);
     // How many placed objects the last office save left outdated (MainWindow offers Update from library).
     int outdatedAfterSave() const { return m_outdated; }
@@ -82,6 +84,7 @@ private:
     QLineEdit* m_predefined;
     QTableWidget* m_params;
     QTableWidget* m_materials;
+    JsonTreeEditor* m_parts;
     Viewport* m_preview;
     PlanSymbolView* m_plan;
     QStackedWidget* m_views;
@@ -90,6 +93,7 @@ private:
     QPushButton* m_saveProject;
     QPushButton* m_saveOffice;
     QTimer* m_timer;
+    QString m_source; // as object_draft took it
 };
 
 } // namespace kimbim

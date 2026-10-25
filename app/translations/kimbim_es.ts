@@ -1782,6 +1782,122 @@ Intro ejecuta, Mayús+Intro añade una línea, Arriba/Abajo recuperan entradas a
     </message>
   </context>
   <context>
+    <name>kimbim::JsonTreeEditor</name>
+    <message>
+      <location filename="../src/JsonTreeEditor.cpp" line="108" />
+      <source>Add part</source>
+      <translation>Añadir pieza</translation>
+    </message>
+    <message>
+      <location filename="../src/JsonTreeEditor.cpp" line="109" />
+      <location filename="../src/JsonTreeEditor.cpp" line="156" />
+      <location filename="../src/JsonTreeEditor.cpp" line="159" />
+      <source>Add field</source>
+      <translation>Añadir campo</translation>
+    </message>
+    <message>
+      <location filename="../src/JsonTreeEditor.cpp" line="110" />
+      <source>Remove</source>
+      <translation>Quitar</translation>
+    </message>
+    <message>
+      <location filename="../src/JsonTreeEditor.cpp" line="111" />
+      <source>Up</source>
+      <translation>Subir</translation>
+    </message>
+    <message>
+      <location filename="../src/JsonTreeEditor.cpp" line="112" />
+      <source>Down</source>
+      <translation>Bajar</translation>
+    </message>
+    <message>
+      <location filename="../src/JsonTreeEditor.cpp" line="116" />
+      <source>Key</source>
+      <translation>Clave</translation>
+    </message>
+    <message>
+      <location filename="../src/JsonTreeEditor.cpp" line="116" />
+      <source>Value</source>
+      <translation>Valor</translation>
+    </message>
+    <message>
+      <location filename="../src/JsonTreeEditor.cpp" line="116" />
+      <source>Error</source>
+      <translation>Error</translation>
+    </message>
+    <message>
+      <location filename="../src/JsonTreeEditor.cpp" line="117" />
+      <source>A number, true/false, a list as [ ], or a formula</source>
+      <translation>Un número, true/false, una lista entre [ ] o una fórmula</translation>
+    </message>
+    <message>
+      <location filename="../src/JsonTreeEditor.cpp" line="122" />
+      <location filename="../src/JsonTreeEditor.cpp" line="150" />
+      <source>Add component</source>
+      <translation>Añadir componente</translation>
+    </message>
+    <message>
+      <location filename="../src/JsonTreeEditor.cpp" line="124" />
+      <source>Box</source>
+      <translation>Caja</translation>
+    </message>
+    <message>
+      <location filename="../src/JsonTreeEditor.cpp" line="124" />
+      <source>Cylinder</source>
+      <translation>Cilindro</translation>
+    </message>
+    <message>
+      <location filename="../src/JsonTreeEditor.cpp" line="124" />
+      <source>Cone</source>
+      <translation>Cono</translation>
+    </message>
+    <message>
+      <location filename="../src/JsonTreeEditor.cpp" line="125" />
+      <source>Prism</source>
+      <translation>Prisma</translation>
+    </message>
+    <message>
+      <location filename="../src/JsonTreeEditor.cpp" line="125" />
+      <source>Revolve</source>
+      <translation>Revolución</translation>
+    </message>
+    <message>
+      <location filename="../src/JsonTreeEditor.cpp" line="125" />
+      <source>Sweep</source>
+      <translation>Barrido</translation>
+    </message>
+    <message>
+      <location filename="../src/JsonTreeEditor.cpp" line="125" />
+      <source>Anchors only</source>
+      <translation>Solo anclajes</translation>
+    </message>
+    <message>
+      <location filename="../src/JsonTreeEditor.cpp" line="125" />
+      <source>Use</source>
+      <translation>Usar</translation>
+    </message>
+    <message>
+      <location filename="../src/JsonTreeEditor.cpp" line="129" />
+      <source>A part that builds as it is, into the selected component or the object</source>
+      <translation>Una pieza que se construye tal cual, en el componente seleccionado o en el objeto</translation>
+    </message>
+    <message>
+      <location filename="../src/JsonTreeEditor.cpp" line="150" />
+      <source>Component name:</source>
+      <translation>Nombre del componente:</translation>
+    </message>
+    <message>
+      <location filename="../src/JsonTreeEditor.cpp" line="156" />
+      <source>Key:</source>
+      <translation>Clave:</translation>
+    </message>
+    <message>
+      <location filename="../src/JsonTreeEditor.cpp" line="159" />
+      <source>Value:</source>
+      <translation>Valor:</translation>
+    </message>
+  </context>
+  <context>
     <name>kimbim::LayerCombinationsDialog</name>
     <message>
       <location filename="../src/PurposeDialogs.cpp" line="26" />
@@ -8146,261 +8262,266 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       <translation>No se pudo previsualizar el objeto</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="178" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="181" />
       <source>Save to project</source>
       <translation>Guardar en el proyecto</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="179" />
-      <location filename="../src/ObjectEditorDialog.cpp" line="710" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="182" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="732" />
       <source>Save to office library</source>
       <translation>Guardar en la biblioteca de la oficina</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="199" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="203" />
       <source>Furniture</source>
       <translation>Mobiliario</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="200" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="204" />
       <source>Sanitary</source>
       <translation>Sanitarios</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="201" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="205" />
       <source>Kitchen</source>
       <translation>Cocina</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="202" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="206" />
       <source>Site</source>
       <translation>Exterior</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="206" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="210" />
       <source>Id:</source>
       <translation>Id:</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="207" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="211" />
       <source>Name:</source>
       <translation>Nombre:</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="208" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="212" />
       <source>Name (ES):</source>
       <translation>Nombre (ES):</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="209" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="213" />
       <source>Category:</source>
       <translation>Categoría:</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="210" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="214" />
       <source>IFC class:</source>
       <translation>Clase IFC:</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="211" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="215" />
       <source>Predefined type:</source>
       <translation>Tipo predefinido:</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="212" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="216" />
       <source>The id names the object's file and its reference: lower-case letters, digits and _.</source>
       <translation>El id da nombre al archivo del objeto y a su referencia: minúsculas, dígitos y _.</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="215" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="219" />
       <source>Object</source>
       <translation>Objeto</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="221" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="225" />
       <source>Key</source>
       <translation>Clave</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="221" />
-      <location filename="../src/ObjectEditorDialog.cpp" line="243" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="225" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="247" />
       <source>Label</source>
       <translation>Etiqueta</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="221" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="225" />
       <source>Label (ES)</source>
       <translation>Etiqueta (ES)</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="221" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="225" />
       <source>Kind</source>
       <translation>Tipo</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="221" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="225" />
       <source>Default</source>
-      <translation>Predeterminado</translation>
+      <translation>Predeterminada</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="221" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="225" />
       <source>Min</source>
       <translation>Mín</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="222" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="226" />
       <source>Max</source>
       <translation>Máx</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="222" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="226" />
       <source>Group</source>
       <translation>Grupo</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="222" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="226" />
       <source>Show when</source>
       <translation>Mostrar si</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="222" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="226" />
       <source>Options</source>
       <translation>Opciones</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="223" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="227" />
       <source>A choice's options: id: Label, id2: Label 2</source>
       <translation>Las opciones de una elección: id: Etiqueta, id2: Etiqueta 2</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="224" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="228" />
       <source>A formula: the parameter shows while it is true</source>
       <translation>Una fórmula: el parámetro se muestra mientras es verdadera</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="229" />
-      <location filename="../src/ObjectEditorDialog.cpp" line="249" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="233" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="253" />
       <source>Add</source>
-      <translation>Añadir</translation>
+      <translation>Agregar</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="230" />
-      <location filename="../src/ObjectEditorDialog.cpp" line="250" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="234" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="254" />
       <source>Remove</source>
       <translation>Quitar</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="231" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="235" />
       <source>Up</source>
       <translation>Subir</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="232" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="236" />
       <source>Down</source>
       <translation>Bajar</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="237" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="241" />
       <source>Parameters</source>
       <translation>Parámetros</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="243" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="247" />
       <source>Slot</source>
       <translation>Ranura</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="243" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="247" />
       <source>Default material</source>
       <translation>Material predeterminado</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="255" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="259" />
       <source>Materials</source>
       <translation>Materiales</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="267" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="260" />
+      <source>Parts</source>
+      <translation>Piezas</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="272" />
       <source>3D</source>
       <translation>3D</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="268" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="273" />
       <source>Plan</source>
       <translation>Planta</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="284" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="289" />
       <source>Try values</source>
       <translation>Probar valores</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="285" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="290" />
       <source>Values to preview the object with; they don't change the defaults</source>
       <translation>Valores con los que previsualizar el objeto; no cambian los predeterminados</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="305" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="310" />
       <source>Keep the object in this project: its placed objects follow</source>
       <translation>Guarda el objeto en este proyecto: sus objetos colocados lo siguen</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="316" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="321" />
       <source>Write the object's file to the office library, for every project</source>
       <translation>Escribe el archivo del objeto en la biblioteca de la oficina, para todos los proyectos</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="317" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="322" />
       <source>Set an office library folder in Preferences › Office library</source>
       <translation>Indica una carpeta de biblioteca de la oficina en Preferencias › Biblioteca de la oficina</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="328" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="333" />
       <source>Object editor — %1</source>
       <translation>Editor de objetos — %1</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="361" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="367" />
       <source>The object could not be opened</source>
       <translation>No se pudo abrir el objeto</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="517" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="531" />
       <source>Parameter</source>
       <translation>Parámetro</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="547" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="561" />
       <source>Material</source>
       <translation>Material</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="577" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="591" />
       <source>The object could not be checked</source>
       <translation>No se pudo comprobar el objeto</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="624" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="638" />
       <source>Try values: %1</source>
       <translation>Probar valores: %1</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="711" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="733" />
       <source>The office library already has an object %1. Replace it?</source>
       <translation>La biblioteca de la oficina ya tiene un objeto %1. ¿Reemplazarlo?</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="721" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="743" />
       <source>Could not save the object</source>
       <translation>No se pudo guardar el objeto</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="735" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="757" />
       <source>Object editor</source>
       <translation>Editor de objetos</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="735" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="757" />
       <source>Discard the changes to this object?</source>
       <translation>¿Descartar los cambios de este objeto?</translation>
     </message>

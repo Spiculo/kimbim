@@ -60,7 +60,7 @@ qt_add_library(kimbim_core STATIC
     src/UnderlayDialogs.cpp src/UnderlayDialogs.h src/Underlays.cpp
     src/LibraryPanel.cpp src/LibraryPanel.h src/LibraryTools.cpp
     src/ObjectSettingsDialog.cpp src/ObjectSettingsDialog.h
-    src/ObjectEditorDialog.cpp src/ObjectEditorDialog.h
+    src/ObjectEditorDialog.cpp src/ObjectEditorDialog.h src/JsonTreeEditor.cpp src/JsonTreeEditor.h
     src/MaterialsDialog.cpp src/MaterialsDialog.h
 )
 target_include_directories(kimbim_core PUBLIC src)

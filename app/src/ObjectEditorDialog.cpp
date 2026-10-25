@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "ObjectEditorDialog.h"
 
+#include "JsonTreeEditor.h"
 #include "LibraryPanel.h"
 #include "MainWindow.h"
 #include "MeshChunk.h"
@@ -38,6 +39,7 @@ enum MaterialColumn { Slot, SlotLabel, SlotDefault, MaterialColumns };
 const char* const kKinds[] = {"length", "angle", "count", "bool", "choice", "material"};
 const char* const kIfcClasses[] = {"IfcFurnitureType", "IfcSanitaryTerminalType", "IfcElectricApplianceType",
     "IfcBuildingElementProxyType", "IfcGeographicElementType"};
+const char* const kTreeRoots[] = {"parts", "components", "symbol"}; // the Parts tab's
 const char* const kInvalidStyle = "background-color: #f8d7da; border: 1px solid #c0392b;";
 const QColor kInvalidColor(0xf8, 0xd7, 0xda);
 
@@ -170,6 +172,7 @@ ObjectEditorDialog::ObjectEditorDialog(MainWindow* window, const QString& source
     , m_predefined(new QLineEdit(this))
     , m_params(new QTableWidget(this))
     , m_materials(new QTableWidget(this))
+    , m_parts(new JsonTreeEditor(this))
     , m_preview(new Viewport(this))
     , m_plan(new PlanSymbolView(this))
     , m_views(new QStackedWidget(this))
@@ -178,13 +181,14 @@ ObjectEditorDialog::ObjectEditorDialog(MainWindow* window, const QString& source
     , m_saveProject(new QPushButton(tr("Save to project"), this))
     , m_saveOffice(new QPushButton(tr("Save to office library"), this))
     , m_timer(new QTimer(this))
+    , m_source(source)
 {
     setObjectName(QStringLiteral("objectEditorDialog"));
     setModal(true);
     resize(1320, 680);
 
     auto* columns = new QHBoxLayout;
-    // Left: the object, its parameters and materials.
+    // Left: the object, its parameters, materials and parts.
     auto* tabs = new QTabWidget(this);
     tabs->setObjectName(QStringLiteral("editorTabs"));
     tabs->setMinimumWidth(560);
@@ -253,6 +257,7 @@ ObjectEditorDialog::ObjectEditorDialog(MainWindow* window, const QString& source
     materialButtons->addStretch();
     materialsLayout->addLayout(materialButtons);
     tabs->addTab(materialsTab, tr("Materials"));
+    tabs->addTab(m_parts, tr("Parts"));
     columns->addWidget(tabs);
 
     // Middle: the 3D preview or the plan symbol.
@@ -329,6 +334,7 @@ ObjectEditorDialog::ObjectEditorDialog(MainWindow* window, const QString& source
         });
     connect(m_params, &QTableWidget::itemChanged, this, &ObjectEditorDialog::scheduleCheck);
     connect(m_materials, &QTableWidget::itemChanged, this, &ObjectEditorDialog::scheduleCheck);
+    connect(m_parts, &JsonTreeEditor::changed, this, &ObjectEditorDialog::scheduleCheck);
     connect(paramAdd, &QPushButton::clicked, this, &ObjectEditorDialog::addParam);
     connect(paramRemove, &QPushButton::clicked, this, [this] {
         if (m_params->currentRow() >= 0) {
@@ -387,6 +393,11 @@ void ObjectEditorDialog::setDraft(const QJsonObject& draft)
     m_name->setText(english(draft.value("name"))); // the window title follows
     fillParams(draft.value("params").toArray());
     fillMaterials(draft.value("materials").toObject());
+    QJsonObject roots;
+    for (const char* key : kTreeRoots)
+        if (draft.contains(QLatin1String(key)))
+            roots.insert(QLatin1String(key), draft.value(QLatin1String(key)));
+    m_parts->setRoots(roots);
     m_clean = this->draft();
     m_checked.clear();
     m_tried = {};
@@ -416,6 +427,9 @@ QJsonObject ObjectEditorDialog::draft() const
         d.remove(QLatin1String("materials"));
     else
         d.insert("materials", mats);
+    const QJsonObject roots = m_parts->roots();
+    for (const char* key : kTreeRoots)
+        put(d, key, roots.contains(QLatin1String(key)) ? roots.value(QLatin1String(key)) : QJsonValue(QJsonValue::Undefined));
     return d;
 }
 
@@ -646,10 +660,13 @@ void ObjectEditorDialog::markErrors(const QJsonArray& errors)
         f->setStyleSheet(QString());
         f->setToolTip(QString());
     }
+    QList<QPair<QString, QString>> treeErrors;
 
-    // params[k].field (or params.<key> for a key used twice), materials.<slot>, the object's own fields
+    // params[k].field (or params.<key> for a key used twice), materials.<slot>, the parts tree's paths, the
+    // object's own fields
     static const QRegularExpression paramPath(QStringLiteral(R"(^params(?:\[(\d+)\]|\.(\w+))(?:\.(\w+))?)"));
     static const QRegularExpression slotPath(QStringLiteral(R"(^materials\.(\w+))"));
+    static const QRegularExpression treePath(QStringLiteral(R"(^(?:parts|components|symbol)\b)"));
     static const QHash<QString, int> columnOf{{"key", Key}, {"label", Label}, {"kind", Kind}, {"default", Default},
         {"min", Min}, {"max", Max}, {"group", Group}, {"show_when", ShowWhen}, {"options", Options}};
     const QHash<QString, QList<QWidget*>> fieldsOf{{"id", {m_id}}, {"name", {m_name, m_nameEs}}, {"category", {m_category}},
@@ -682,6 +699,8 @@ void ObjectEditorDialog::markErrors(const QJsonArray& errors)
                 if (m_materials->item(r, Slot) && m_materials->item(r, Slot)->text().trimmed() == s.captured(1))
                     for (int c = 0; c < MaterialColumns; ++c)
                         markCell(m_materials, r, c, message);
+        } else if (treePath.match(path).hasMatch()) {
+            treeErrors.append({path, message});
         } else {
             for (QWidget* f : fieldsOf.value(path.section(QLatin1Char('.'), 0, 0).section(QLatin1Char('['), 0, 0))) {
                 f->setStyleSheet(QString::fromLatin1(kInvalidStyle));
@@ -689,6 +708,7 @@ void ObjectEditorDialog::markErrors(const QJsonArray& errors)
             }
         }
     }
+    m_parts->markErrors(treeErrors);
 }
 
 // ---------------------------------------------------------------- save and cancel
@@ -703,6 +723,8 @@ bool ObjectEditorDialog::saveTo(const QString& target, bool replace)
         return false;
     const QJsonObject d = draft();
     const QString id = d.value("id").toString();
+    if (target == QLatin1String("office") && m_source == QLatin1String("office:") + id)
+        replace = true; // the office object it opened: saved over its own file without asking
     const QJsonObject r = m_window->bridge("save_draft", {compact(d), target, replace ? id : QString()});
     if (r.contains("exists") && !replace) {
         if (m_window->m_quiet)

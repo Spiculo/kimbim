@@ -1765,6 +1765,24 @@ ES = {
     "Updated from the library: %1": "Actualizado desde la biblioteca: %1",
     "%n placed object(s)": ("%n objeto colocado", "%n objetos colocados"),
     "%n saved version(s)": ("%n versión guardada", "%n versiones guardadas"),
+    # D101: the Object Editor's Parts tab
+    "Parts": "Piezas",
+    "Add part": "Añadir pieza",
+    "Add component": "Añadir componente",
+    "Add field": "Añadir campo",
+    "Key": "Clave",
+    "Key:": "Clave:",
+    "Component name:": "Nombre del componente:",
+    "A number, true/false, a list as [ ], or a formula": "Un número, true/false, una lista entre [ ] o una fórmula",
+    "A part that builds as it is, into the selected component or the object":
+        "Una pieza que se construye tal cual, en el componente seleccionado o en el objeto",
+    "Cylinder": "Cilindro",
+    "Cone": "Cono",
+    "Prism": "Prisma",
+    "Revolve": "Revolución",
+    "Sweep": "Barrido",
+    "Anchors only": "Solo anclajes",
+    "Use": "Usar",
 }
 
 # Words that mean something else in another context ("Back" is the view cube's "Posterior"): by
@@ -1775,6 +1793,8 @@ ES_IN = {
     ("LibraryPanel", "Legs"): "Patas",
     ("LibraryPanel", "Back"): "Respaldo",
     ("LibraryPanel", "Arms"): "Brazos",
+    # D101: a part's shape, a solid (elsewhere "Box" is a plan rectangle)
+    ("kimbim::JsonTreeEditor", "Box"): "Caja",
 }
 
 
