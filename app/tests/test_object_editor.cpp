@@ -621,6 +621,167 @@ private slots:
         QVERIFY(panel->objectIds().contains(QStringLiteral("project:crate")));
     }
 
+    // D101 final review 1: saving a placed project object again redraws its placements in 3D, and undo
+    // and redo redraw them too.
+    void projectSaveRedrawsPlacements()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        {
+            kimbim::ObjectEditorDialog d(&w, QStringLiteral("new"));
+            d.findChild<QLineEdit*>(QStringLiteral("editorId"))->setText(QStringLiteral("crate"));
+            QVERIFY(d.saveTo(QStringLiteral("project")));
+        }
+        w.libraryPanel()->setListing(kimbim::PythonEngine::instance().callJson("library_objects", {}).object());
+        QVERIFY(w.chooseObject(QStringLiteral("project:crate")));
+        const QStringList before = w.viewport()->guids();
+        QVERIFY(w.placeObjectAt(QPointF(1, 1)));
+        w.setTool(kimbim::MainWindow::Tool::None);
+        QStringList made;
+        for (const QString& g : w.viewport()->guids())
+            if (!before.contains(g))
+                made << g;
+        QCOMPARE(made.size(), 1);
+        const auto height = [&] {
+            double x0, y0, z0, x1, y1, z1;
+            w.viewport()->boundsOf({made[0]}).Get(x0, y0, z0, x1, y1, z1);
+            return z1 - z0;
+        };
+        const double tall = height();
+        QVERIFY2(std::abs(tall - 0.75) < 0.01, qPrintable(QString::number(tall)));
+
+        kimbim::ObjectEditorDialog d(&w, QStringLiteral("project:crate"));
+        QTreeWidgetItem* dz = node(d, QStringLiteral("parts.body.box.dz"));
+        QVERIFY(dz);
+        dz->setText(1, QStringLiteral("height / 2"));
+        QVERIFY(d.saveTo(QStringLiteral("project"))); // the project object it opened: no question
+        QVERIFY2(std::abs(height() - tall / 2) < 0.01, qPrintable(QString::number(height())));
+        w.findChild<QAction*>(QStringLiteral("actionUndo"))->trigger();
+        QVERIFY2(std::abs(height() - tall) < 0.01, qPrintable(QString::number(height())));
+        w.findChild<QAction*>(QStringLiteral("actionRedo"))->trigger();
+        QVERIFY(std::abs(height() - tall / 2) < 0.01);
+    }
+
+    // D101 final review 2: a second new object gets its own id; saving over another project object asks,
+    // worded for the project.
+    void secondNewObjectGetsItsOwnId()
+    {
+        {
+            kimbim::MainWindow clean(nullptr, true); // a new model first: the window below would ask to save the last test's
+            QVERIFY(clean.newProject());
+        }
+        kimbim::MainWindow w; // not quiet: the question shows
+        QVERIFY(w.newProject());
+        const auto idOf = [](const kimbim::ObjectEditorDialog& d) { return d.findChild<QLineEdit*>(QStringLiteral("editorId"))->text(); };
+        {
+            kimbim::ObjectEditorDialog d(&w, QStringLiteral("new"));
+            QCOMPARE(idOf(d), QStringLiteral("new_object"));
+            QVERIFY(d.saveTo(QStringLiteral("project")));
+        }
+        {
+            kimbim::ObjectEditorDialog d(&w, QStringLiteral("new"));
+            QCOMPARE(idOf(d), QStringLiteral("new_object2"));
+            QVERIFY(d.saveTo(QStringLiteral("project")));
+        }
+        QStringList listed;
+        for (const auto& o : kimbim::PythonEngine::instance().callJson("library_objects", {}).object().value("objects").toArray())
+            listed << o.toObject().value("id").toString();
+        QVERIFY(listed.contains(QStringLiteral("project:new_object")));
+        QVERIFY(listed.contains(QStringLiteral("project:new_object2")));
+
+        kimbim::ObjectEditorDialog d(&w, QStringLiteral("new"));
+        d.show();
+        d.findChild<QLineEdit*>(QStringLiteral("editorId"))->setText(QStringLiteral("new_object"));
+        QString asked;
+        QTimer::singleShot(0, &d, [&] {
+            if (auto* box = qobject_cast<QMessageBox*>(QApplication::activeModalWidget())) {
+                asked = box->text();
+                box->button(QMessageBox::No)->click();
+            }
+        });
+        QVERIFY(!d.saveTo(QStringLiteral("project")));
+        QCOMPARE(asked, QStringLiteral("A project object with the id new_object exists. Replace it?"));
+        QVERIFY(d.saveTo(QStringLiteral("project"), true));
+
+        kimbim::ObjectEditorDialog own(&w, QStringLiteral("project:new_object2")); // its own: saved without asking
+        QVERIFY(own.saveTo(QStringLiteral("project")));
+    }
+
+    // D101 final review 6: renaming an opened object's id says it saves a new object.
+    void renamedIdHint()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        {
+            kimbim::ObjectEditorDialog d(&w, QStringLiteral("new"));
+            d.findChild<QLineEdit*>(QStringLiteral("editorId"))->setText(QStringLiteral("crate"));
+            QVERIFY(d.findChild<QLabel*>(QStringLiteral("editorIdHint"))->isHidden()); // nothing opened
+            QVERIFY(d.saveTo(QStringLiteral("project")));
+        }
+        kimbim::ObjectEditorDialog d(&w, QStringLiteral("project:crate"));
+        auto* hint = d.findChild<QLabel*>(QStringLiteral("editorIdHint"));
+        QVERIFY(hint && hint->isHidden());
+        d.findChild<QLineEdit*>(QStringLiteral("editorId"))->setText(QStringLiteral("crate2"));
+        QVERIFY(!hint->isHidden());
+        QCOMPARE(hint->text(), QStringLiteral("Changing the id saves a new object"));
+        d.findChild<QLineEdit*>(QStringLiteral("editorId"))->setText(QStringLiteral("crate"));
+        QVERIFY(hint->isHidden());
+    }
+
+    // D101 final review 3: a component made in the editor gets parameters and parts, the object uses it
+    // with a value; the symbol gets items; any other list takes typed JSON.
+    void treeAddsItems()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        kimbim::ObjectEditorDialog d(&w, QStringLiteral("new"));
+        QTRY_VERIFY(button(d, "editorSaveProject")->isEnabled());
+        kimbim::JsonTreeEditor* tree = partsTree(d);
+        auto* qtree = tree->findChild<QTreeWidget*>();
+        QVERIFY(button(d, "partsAddItem"));
+        tree->addComponent(QStringLiteral("leg"));
+        qtree->setCurrentItem(node(d, QStringLiteral("components.leg.params")));
+        QVERIFY(button(d, "partsAddItem")->isEnabled());
+        QVERIFY(tree->addItem(QString()));
+        QVERIFY(tree->addItem(QString()));
+        const QJsonArray params = d.draft().value("components").toObject().value("leg").toObject().value("params").toArray();
+        QCOMPARE(params.size(), 2);
+        QCOMPARE(params.at(0).toObject().value("key").toString(), QStringLiteral("p"));
+        QCOMPARE(params.at(1).toObject().value("key").toString(), QStringLiteral("p2")); // unique
+        qtree->setCurrentItem(node(d, QStringLiteral("components.leg.params[1]")));
+        tree->addPart(QStringLiteral("box")); // into the component's parts
+        QTreeWidgetItem* dz = node(d, QStringLiteral("components.leg.parts.part.box.dz"));
+        QVERIFY(dz);
+        dz->setText(1, QStringLiteral("p"));
+        qtree->setCurrentItem(node(d, QStringLiteral("parts")));
+        tree->addPart(QStringLiteral("use"));
+        node(d, QStringLiteral("parts.part.use"))->setText(1, QStringLiteral("leg"));
+        qtree->setCurrentItem(node(d, QStringLiteral("parts.part")));
+        tree->addField(QStringLiteral("with"), QStringLiteral("{\"p\": 0.3}"));
+        QCOMPARE(draftPart(d, QStringLiteral("part")).value("with").toObject().value("p"), QJsonValue(0.3));
+
+        qtree->setCurrentItem(node(d, QStringLiteral("symbol")));
+        QVERIFY(button(d, "partsAddItem")->isEnabled());
+        QVERIFY(tree->addItem(QStringLiteral("rect")));
+        const QJsonArray symbol = d.draft().value("symbol").toArray();
+        QCOMPARE(symbol.size(), 1);
+        QVERIFY(symbol.at(0).toObject().contains(QStringLiteral("rect")));
+
+        qtree->setCurrentItem(node(d, QStringLiteral("parts")));
+        QVERIFY(!tree->addItem(QStringLiteral("{nope")));
+        QVERIFY(tree->addItem(QStringLiteral("{\"id\": \"lid\", \"box\": {\"dx\": 0.1, \"dy\": 0.1, \"dz\": 0.1}}")));
+        QVERIFY(node(d, QStringLiteral("parts.lid")));
+        qtree->setCurrentItem(node(d, QStringLiteral("parts.lid.box.dx")));
+        QVERIFY(!button(d, "partsAddItem")->isEnabled()); // a leaf: no list to add to
+
+        const QJsonObject r = kimbim::PythonEngine::instance().callJson("check_draft",
+            {QString::fromUtf8(QJsonDocument(d.draft()).toJson(QJsonDocument::Compact))}).object();
+        QVERIFY2(r.value("ok").toBool(), QJsonDocument(r).toJson().constData());
+        QTest::qWait(500);
+        QTRY_VERIFY2(d.errorPaths().isEmpty() && button(d, "editorSaveProject")->isEnabled(),
+            qPrintable(d.errorPaths().join(QLatin1Char(','))));
+    }
+
     // D101: Customise a copy (Properties, beside Edit..., and the Model menu) opens the editor on the
     // selection's type; it starts from the type's values.
     void customiseACopyOfThePlacedType()

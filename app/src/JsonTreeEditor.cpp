@@ -10,6 +10,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QMenu>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QStyledItemDelegate>
 #include <QTreeWidget>
@@ -92,6 +93,14 @@ QTreeWidgetItem* childOf(QTreeWidgetItem* item, const QString& key)
     return nullptr;
 }
 
+// The list Add item appends to: the selected list, or the list of the selected item.
+QTreeWidgetItem* itemListOf(QTreeWidgetItem* item)
+{
+    if (item && kindOf(item) == List)
+        return item;
+    return item && item->parent() && kindOf(item->parent()) == List ? item->parent() : nullptr;
+}
+
 QPushButton* treeButton(const QString& text, const char* name, QWidget* parent)
 {
     auto* b = new QPushButton(text, parent);
@@ -107,6 +116,7 @@ JsonTreeEditor::JsonTreeEditor(QWidget* parent)
     , m_tree(new QTreeWidget(this))
     , m_addPart(treeButton(tr("Add part"), "partsAddPart", this))
     , m_addField(treeButton(tr("Add field"), "partsAddField", this))
+    , m_addItem(treeButton(tr("Add item..."), "partsAddItem", this))
     , m_remove(treeButton(tr("Remove"), "partsRemove", this))
     , m_up(treeButton(tr("Up"), "partsUp", this))
     , m_down(treeButton(tr("Down"), "partsDown", this))
@@ -127,12 +137,13 @@ JsonTreeEditor::JsonTreeEditor(QWidget* parent)
         connect(menu->addAction(text), &QAction::triggered, this, [this, shape = QLatin1String(shape)] { addPart(shape); });
     m_addPart->setMenu(menu);
     m_addPart->setToolTip(tr("A part that builds as it is, into the selected component or the object"));
+    m_addItem->setToolTip(tr("An item at the end of the selected list: a parameter, a symbol line or shape, or JSON"));
 
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->addWidget(m_tree, 1);
     auto* buttons = new QHBoxLayout;
-    for (QPushButton* b : {m_addPart, componentButton, m_addField, m_remove, m_up, m_down})
+    for (QPushButton* b : {m_addPart, componentButton, m_addField, m_addItem, m_remove, m_up, m_down})
         buttons->addWidget(b);
     buttons->addStretch();
     layout->addLayout(buttons);
@@ -159,6 +170,29 @@ JsonTreeEditor::JsonTreeEditor(QWidget* parent)
         const QString value = QInputDialog::getText(this, tr("Add field"), tr("Value:"), QLineEdit::Normal, QString(), &ok);
         if (ok)
             addField(key.trimmed(), value);
+    });
+    connect(m_addItem, &QPushButton::clicked, this, [this] {
+        QTreeWidgetItem* list = itemListOf(m_tree->currentItem());
+        if (!list)
+            return;
+        bool ok = true;
+        QString what;
+        const bool symbol = keyOf(list) == QLatin1String("symbol") && !list->parent();
+        const bool asJson = !symbol && keyOf(list) != QLatin1String("params");
+        if (symbol) {
+            const QPair<QString, const char*> kinds[] = {{tr("Line"), "line"}, {tr("Rectangle"), "rect"}, {tr("Circle"), "circle"}, {tr("Arc"), "arc"}};
+            QStringList names;
+            for (const auto& k : kinds)
+                names << k.first;
+            const QString name = QInputDialog::getItem(this, tr("Add item"), tr("Symbol item:"), names, 0, false, &ok);
+            for (const auto& [text, kind] : kinds)
+                if (text == name)
+                    what = QLatin1String(kind);
+        } else if (asJson) {
+            what = QInputDialog::getText(this, tr("Add item"), tr("Item (JSON):"), QLineEdit::Normal, QString(), &ok);
+        }
+        if (ok && !addItem(what) && asJson)
+            QMessageBox::warning(this, tr("Add item"), tr("The item is not JSON: %1").arg(what));
     });
     connect(m_remove, &QPushButton::clicked, this, [this] {
         QTreeWidgetItem* item = m_tree->currentItem();
@@ -384,6 +418,46 @@ void JsonTreeEditor::addField(const QString& key, const QString& value)
     emit changed();
 }
 
+bool JsonTreeEditor::addItem(const QString& what)
+{
+    QTreeWidgetItem* list = itemListOf(m_tree->currentItem());
+    if (!list)
+        return false;
+    QJsonValue item;
+    if (keyOf(list) == QLatin1String("params")) { // a parameter with a key of its own
+        QStringList keys;
+        for (int k = 0; k < list->childCount(); ++k)
+            if (QTreeWidgetItem* key = childOf(list->child(k), QStringLiteral("key")); key && kindOf(key) == Leaf)
+                keys << valueOf(key).toString();
+        QString key = QStringLiteral("p");
+        for (int k = 2; keys.contains(key); ++k)
+            key = QStringLiteral("p%1").arg(k);
+        item = QJsonObject{{"key", key}, {"kind", "length"}, {"label", key.toUpper()}, {"default", 0.1}};
+    } else if (keyOf(list) == QLatin1String("symbol") && !list->parent()) {
+        const QJsonObject r = PythonEngine::instance().callJson("object_symbol_template", {what}).object();
+        if (!r.value("ok").toBool())
+            return false;
+        item = r.value("item");
+    } else {
+        QJsonParseError error;
+        const QJsonDocument doc = QJsonDocument::fromJson(QByteArray("[") + what.trimmed().toUtf8() + "]", &error);
+        if (what.trimmed().isEmpty() || error.error != QJsonParseError::NoError || doc.array().size() != 1)
+            return false;
+        item = doc.array().at(0);
+    }
+    QTreeWidgetItem* added;
+    {
+        const QSignalBlocker block(m_tree);
+        added = addNode(list, QString(), item);
+        relabel(list);
+        list->setExpanded(true);
+        added->setExpanded(true);
+    }
+    m_tree->setCurrentItem(added);
+    emit changed();
+    return true;
+}
+
 void JsonTreeEditor::move(int by)
 {
     QTreeWidgetItem* item = m_tree->currentItem();
@@ -409,6 +483,7 @@ void JsonTreeEditor::updateButtons()
 {
     QTreeWidgetItem* item = m_tree->currentItem();
     m_addField->setEnabled(item && kindOf(item) == Object);
+    m_addItem->setEnabled(itemListOf(item) != nullptr);
     for (QPushButton* b : {m_remove, m_up, m_down})
         b->setEnabled(item && item->parent());
 }

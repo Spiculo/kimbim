@@ -41,8 +41,8 @@ public:
     void setDraft(const QJsonObject& draft); // fills the fields; the draft as it is now counts as unchanged
     QStringList errorPaths() const { return m_errorPaths; } // the last check's field paths
     // Saves the draft to "office" (a .kimobj file in the office folder) or "project" (one undo step). An
-    // object the office library has asks to replace it, unless `replace` or it is the office object the
-    // dialog opened, its id unchanged. On success the dialog accepts.
+    // object the target has asks to replace it, unless `replace` or it is the object the dialog opened from
+    // that target, its id unchanged. On success the dialog accepts.
     bool saveTo(const QString& target, bool replace = false);
     // The placed objects of this object that the last office save left outdated: their GUIDs (MainWindow
     // offers to update just those) and how many.
@@ -78,6 +78,8 @@ private:
     bool m_office = false; // an office library folder is set
     QStringList m_outdated;
     QLineEdit* m_id;
+    QLabel* m_idHint; // "Changing the id saves a new object"
+    QString m_openedId; // the id of the office or project object opened, else empty
     QLineEdit* m_name;
     QLineEdit* m_nameEs;
     QComboBox* m_category;

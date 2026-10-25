@@ -165,6 +165,7 @@ ObjectEditorDialog::ObjectEditorDialog(MainWindow* window, const QString& source
     : QDialog(parent ? parent : window)
     , m_window(window)
     , m_id(new QLineEdit(this))
+    , m_idHint(new QLabel(tr("Changing the id saves a new object"), this))
     , m_name(new QLineEdit(this))
     , m_nameEs(new QLineEdit(this))
     , m_category(new QComboBox(this))
@@ -208,6 +209,10 @@ ObjectEditorDialog::ObjectEditorDialog(MainWindow* window, const QString& source
     for (const char* c : kIfcClasses)
         m_ifcClass->addItem(QLatin1String(c));
     objectForm->addRow(tr("Id:"), m_id);
+    m_idHint->setObjectName(QStringLiteral("editorIdHint"));
+    m_idHint->setStyleSheet(QStringLiteral("color: #b9770e;"));
+    m_idHint->hide(); // while an opened object's id is changed
+    objectForm->addRow(QString(), m_idHint);
     objectForm->addRow(tr("Name:"), m_name);
     objectForm->addRow(tr("Name (ES):"), m_nameEs);
     objectForm->addRow(tr("Category:"), m_category);
@@ -332,6 +337,9 @@ ObjectEditorDialog::ObjectEditorDialog(MainWindow* window, const QString& source
         connect(field, &QLineEdit::textChanged, this, [this] {
             setWindowTitle(tr("Object editor — %1").arg(LibraryPanel::translated(m_name->text(), m_nameEs->text())));
         });
+    connect(m_id, &QLineEdit::textChanged, this, [this](const QString& id) {
+        m_idHint->setVisible(!m_openedId.isEmpty() && id.trimmed() != m_openedId);
+    });
     connect(m_params, &QTableWidget::itemChanged, this, &ObjectEditorDialog::scheduleCheck);
     connect(m_materials, &QTableWidget::itemChanged, this, &ObjectEditorDialog::scheduleCheck);
     connect(m_parts, &JsonTreeEditor::changed, this, &ObjectEditorDialog::scheduleCheck);
@@ -371,6 +379,8 @@ ObjectEditorDialog::ObjectEditorDialog(MainWindow* window, const QString& source
         return;
     }
     setDraft(r.value("draft").toObject());
+    if (source.startsWith(QLatin1String("office:")) || source.startsWith(QLatin1String("project:")))
+        m_openedId = m_id->text(); // a new id saves a new object: the hint says so
 }
 
 // ---------------------------------------------------------------- the fields and the draft
@@ -727,14 +737,16 @@ bool ObjectEditorDialog::saveTo(const QString& target, bool replace)
         return false;
     const QJsonObject d = draft();
     const QString id = d.value("id").toString();
-    if (target == QLatin1String("office") && m_source == QLatin1String("office:") + id)
-        replace = true; // the office object it opened: saved over its own file without asking
+    const bool office = target == QLatin1String("office");
+    if (m_source == target + QLatin1Char(':') + id)
+        replace = true; // the object it opened, its id unchanged: saved over without asking
     const QJsonObject r = m_window->bridge("save_draft", {compact(d), target, replace ? id : QString()});
     if (r.contains("exists") && !replace) {
         if (m_window->m_quiet)
             return false;
-        const auto answer = QMessageBox::question(this, tr("Save to office library"),
-            tr("The office library already has an object %1. Replace it?").arg(id));
+        const auto answer = QMessageBox::question(this, office ? tr("Save to office library") : tr("Save to project"),
+            office ? tr("The office library already has an object %1. Replace it?").arg(id)
+                   : tr("A project object with the id %1 exists. Replace it?").arg(id));
         return answer == QMessageBox::Yes && saveTo(target, true);
     }
     if (!r.value("ok").toBool()) {
@@ -747,10 +759,10 @@ bool ObjectEditorDialog::saveTo(const QString& target, bool replace)
             QMessageBox::warning(this, tr("Could not save the object"), r.value("error").toString());
         return false;
     }
-    if (target == QLatin1String("project"))
-        m_window->afterEdit(r); // undo, the window's unsaved mark
+    if (!office)
+        m_window->afterEdit(r); // the placements redrawn, undo, the window's unsaved mark
     m_outdated.clear();
-    if (target == QLatin1String("office"))
+    if (office)
         for (const auto& g : r.value("guids").toArray())
             m_outdated << g.toString();
     m_clean = d;

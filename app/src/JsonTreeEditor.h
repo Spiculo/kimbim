@@ -34,6 +34,11 @@ public:
     void addPart(const QString& shape); // object_part_template's shape, into the selected node's parts list
     void addComponent(const QString& name);
     void addField(const QString& key, const QString& value); // on the selected object node
+    // Appends an item to the selected list node, or to the list of the selected item: a parameter on a
+    // `params` list (`what` unused), a plan symbol item of kind `what` (object_symbol_template) on the
+    // `symbol` list, else `what` read as JSON. False when nothing was added (no list, an unknown kind, text
+    // that is not JSON).
+    bool addItem(const QString& what);
 
 signals:
     void changed();
@@ -49,6 +54,7 @@ private:
     QTreeWidget* m_tree;
     QPushButton* m_addPart;
     QPushButton* m_addField;
+    QPushButton* m_addItem;
     QPushButton* m_remove;
     QPushButton* m_up;
     QPushButton* m_down;

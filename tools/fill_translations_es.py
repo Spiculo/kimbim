@@ -1783,6 +1783,19 @@ ES = {
     "Sweep": "Barrido",
     "Anchors only": "Solo anclajes",
     "Use": "Usar",
+    # D101 final review: Add item in the Parts tab, saving over a project object, the id hint
+    "Add item...": "Añadir elemento...",
+    "Add item": "Añadir elemento",
+    "An item at the end of the selected list: a parameter, a symbol line or shape, or JSON":
+        "Un elemento al final de la lista seleccionada: un parámetro, una línea o figura del símbolo, o JSON",
+    "Line": "Línea",
+    "Rectangle": "Rectángulo",
+    "Arc": "Arco",
+    "Symbol item:": "Elemento del símbolo:",
+    "Item (JSON):": "Elemento (JSON):",
+    "The item is not JSON: %1": "El elemento no es JSON: %1",
+    "A project object with the id %1 exists. Replace it?": "Ya existe un objeto del proyecto con el id %1. ¿Reemplazarlo?",
+    "Changing the id saves a new object": "Cambiar el id guarda un objeto nuevo",
     # D101: the Object Editor in the Library panel, Properties and the Model menu
     "New object...": "Objeto nuevo...",
     "Make a new library object in the Object Editor": "Crea un objeto de biblioteca nuevo en el Editor de objetos",
