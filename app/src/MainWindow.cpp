@@ -272,6 +272,7 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     connect(m_properties, &PropertiesPanel::typeEditRequested, this, &MainWindow::typeEditDialog);
     connect(m_properties, &PropertiesPanel::updateFromLibraryRequested, this, [this] { updateFromLibrary(); });
     connect(m_properties, &PropertiesPanel::objectSettingsRequested, this, [this] { editObjectSettings(); });
+    connect(m_properties, &PropertiesPanel::customiseCopyRequested, this, [this] { customiseObjectCopy(); });
     connect(m_properties, &PropertiesPanel::resetToTypeRequested, this, &MainWindow::resetToType);
     connect(m_tree, &ModelTreePanel::isolateRequested, m_viewport, &Viewport::isolate);
     onEachView([this](Viewport* v) { connect(v, &Viewport::dragMoved, this, &MainWindow::dragMoveTo); });
@@ -489,7 +490,7 @@ void MainWindow::buildMenus()
     m_undo->setEnabled(false);
     connect(m_undo, &QAction::triggered, this, [this] {
         afterEdit(bridge("undo"));
-        refreshObjectVersions(); // D100: saved versions come and go with undo
+        refreshLibraryListing(); // D100: saved versions come and go with undo; D101: project objects too
     });
     m_redo = editMenu->addAction(tr("&Redo"));
     m_redo->setObjectName(QStringLiteral("actionRedo"));
@@ -497,7 +498,7 @@ void MainWindow::buildMenus()
     m_redo->setEnabled(false);
     connect(m_redo, &QAction::triggered, this, [this] {
         afterEdit(bridge("redo"));
-        refreshObjectVersions();
+        refreshLibraryListing();
     });
     editMenu->addSeparator();
     QAction* del = editMenu->addAction(tr("&Delete"));
@@ -2227,6 +2228,11 @@ void MainWindow::buildModelingToolbar()
     updateObjects->setObjectName(QStringLiteral("actionUpdateLibraryObjects"));
     updateObjects->setToolTip(tr("Regenerate every placed object whose library definition changed"));
     connect(updateObjects, &QAction::triggered, this, [this] { updateFromLibrary(true); });
+    // D101: the Object Editor on a copy of the selected object's type (also in Properties, beside Edit...)
+    QAction* customiseCopy = model->addAction(tr("Customise a copy of the object..."));
+    customiseCopy->setObjectName(QStringLiteral("actionCustomiseObjectCopy"));
+    customiseCopy->setToolTip(tr("A new library object made from the selected object's type, in the Object Editor"));
+    connect(customiseCopy, &QAction::triggered, this, [this] { customiseObjectCopy(); });
     // D98: Archicad's Grid System: a rectangular set of grid axes at once.
     QAction* gridSystem = model->addAction(tr("Grid s&ystem..."));
     gridSystem->setObjectName(QStringLiteral("actionGridSystem"));

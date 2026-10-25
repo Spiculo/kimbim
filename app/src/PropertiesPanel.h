@@ -51,6 +51,7 @@ signals:
     void resetToTypeRequested(const QString& pset, const QString& prop); // drop the element's override
     void updateFromLibraryRequested(); // D99: the selection's objects have a newer library definition
     void objectSettingsRequested();    // D100: Edit... under a library object's Parameters summary
+    void customiseCopyRequested();     // D101: Customise a copy..., beside Edit...
 
 private:
     void onItemChanged(QTreeWidgetItem* item, int column);

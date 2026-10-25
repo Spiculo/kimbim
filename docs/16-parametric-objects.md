@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 # 16 — Parametric objects: customisable library objects as data
 
-**Status: Decided (D99, 2026-10-22); part A built.** Part B (the Object Editor, §6) is next.
+**Status: Decided (D99, 2026-10-22); part A built; part B, the Object Editor (§6), built (D101, 2026-10-25).**
 
 ## Why
 
@@ -279,23 +279,57 @@ stays disabled until it is fixed.
 ### In Properties (every placed object)
 
 The *Parameters* group is a summary (type and up to six parameters, read-only) with **Edit...**, which opens the
-dialog above. D92's edit-scope preference is gone; the save choice replaces it.
+dialog above, and **Customise a copy...** beside it, which opens the Object Editor below on a copy of the type
+(D101). D92's edit-scope preference is gone; the save choice replaces it.
 
-### Object Editor
+### Object Editor (D101)
 
-Library panel › *New object...*, *Edit...* (office or project objects; bundled ones open as a copy), or
-right-click on a placed object › *Customise a copy...* (Archicad's *Save selection as...*).
+One modal dialog makes and edits a library object's definition, the `.kimobj` JSON (a *draft*). It opens from:
 
-- **Parameters** table: key, label (EN/ES), kind, default, min, max, group, show when; add, remove, reorder.
-- **Parts** tree: each part with its shape and fields, placement, repeat, attach, when, material slot, anchors;
-  add a part, a component, a `use`. Every field takes a number or a formula and shows its error beside it.
-- **Preview**: live 3D (orbit) and plan symbol, redrawn 0.3 s after a change from the current parameter values;
-  a *Try values* strip changes them without changing the defaults. A broken formula keeps the last good shape
-  and marks the field red.
-- **Save** to the project (the open model's types carry it) or to the office library (writes the `.kimobj`).
-  Save is refused while any field has an error.
-- The editor edits the JSON through `kimbim.objects`; nothing in it is C++-only, so the console and tests can do
-  the same.
+- the Library panel: **New object...** (an empty draft), or the right-click menu on an object, which holds
+  *Settings...* and then **Edit object...** for office and project objects or **Customise a copy...** for bundled
+  ones. Bundled objects always open as a copy (`chair_copy`); office IFC types are fixed geometry and offer
+  neither;
+- Properties: **Customise a copy...** beside *Edit...* in the *Parameters* summary, enabled when *Edit...* is;
+- *Model › Customise a copy of the object...*. Both start from the selection's type, the source `type:<GlobalId>`
+  of `object_settings_of`: the definition stored on the type, with the type's values as the copy's defaults
+  (Archicad's *Save selection as...*). The viewport has no right-click menu outside drawing, so the command
+  lives in Properties and the menu.
+
+The dialog:
+
+- **Object**: id, name (EN/ES), category, IFC class and predefined type. Changing the IFC4 class carries to the
+  IFC2X3 class; IFC2X3 has no geographic elements, so `IfcGeographicElementType` becomes
+  `IfcBuildingElementProxyType` there.
+- **Parameters** table: key, label (EN/ES), kind, default, min, max, group, show when, options; add, remove,
+  reorder. A choice's options are typed as `id: Label, id2: Label 2`. Spanish option labels are not editable yet;
+  they survive a round trip when the file has them. **Materials** table: slot, label, default material.
+- **Parts** tab: the parts, components and symbol in one generic JSON tree with three columns, key, value and
+  error (a per-shape form would be more work for no gain: every field takes a number or a formula). *Add part*
+  (from a template per shape), *Add component*, *Add field*, remove, reorder. What no tab shows is kept as it
+  came.
+- **Preview**: the app's own 3D view in a scratch scene (orbit) or the plan symbol, redrawn 0.3 s after a change
+  from the current *Try values*, a parameter form that never changes the defaults. A broken formula keeps the
+  last good shape, marks its field red (the message as its tooltip, and in the tree's error column) and
+  disables both saves.
+- **Save to project**: one undo step. The draft is stored on a saved version (D100) named after the object, so
+  the project keeps it while nothing is placed; the Library panel lists it under **Project** as `project:<id>`,
+  and placing it builds only from what its types store. Saving a project object again regenerates every type
+  of that ref from the new definition, keeping values whose key and kind still exist. Undo takes the object
+  away again, listing included.
+- **Save to office library**: writes `<office folder>/<id>.kimobj` (disabled without an office folder). An
+  office object opened for editing saves over its own file without asking; another id that the office has asks
+  before replacing it. When placed objects now use an older version, the app asks *N placed objects use an
+  older version of this object. Update them now?* and runs *Update library objects* on yes.
+- After a save the Library panel's listing, its thumbnails, the object's versions and the Object tool's form
+  follow. Cancel asks before discarding changes.
+- Placing by key falls back to the definition stored on a type (`objversions._definition`): project objects are
+  placeable, and so are objects gone from the library (this reverses D100 ruling 8). Office versions are read
+  only from `kimbim-versions.ifc`; other IFC files in the office folder give fixed IFC types (D86), never
+  versions.
+- The editor edits the JSON through `kimbim.objects` and `kimbim.objedit` (`object_draft`, `check_draft`,
+  `draft_form`, `draft_symbol`, `draft_preview`, `object_part_template`, `save_draft`); nothing in it is
+  C++-only, so the console and tests can do the same.
 
 ## 7. Errors and limits
 

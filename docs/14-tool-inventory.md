@@ -177,7 +177,7 @@ release notes, so check before relying on a single cell.
 | Place a library object | all | ✅ | P0 | D86: Object tool (Shift+O), Tab turns |
 | Object settings dialog with live preview; place or edit a placed object | AC RV | ✅ | P0 | D100: Library panel right click, Properties *Edit...*; modify all or create a new type |
 | Saved object versions (project types, shared through the office library, quick switcher, last used) | RV | ✅ | P0 | D100: `kimbim-versions.ifc` in the office folder; a click places the last version, a right click in the Object tool switches |
-| Parametric object authoring | AC RV VW | 🟡 | new | D99: `.kimobj` definitions (parameters, formulas, parts, anchors, repeats, variants), stored on their types; Object Editor next. Archicad GDL, Revit Family Editor, Vectorworks plug-in objects. Design: [16](16-parametric-objects.md) |
+| Parametric object authoring | AC RV VW | ✅ | new | D99: `.kimobj` definitions (parameters, formulas, parts, anchors, repeats, variants), stored on their types; D101: the Object Editor (new objects, edit office and project objects, *Customise a copy* of bundled or placed ones, save to the project or the office library). Archicad GDL, Revit Family Editor, Vectorworks plug-in objects. Design: [16](16-parametric-objects.md) |
 | Office libraries (shared folder or repo) | AC RV VW | 🟡 | P1 | D99: a folder of `.kimobj` files and IFC type files |
 | Online object catalogues (BIMobject and others) | AC RV VW | 🔮 | new | |
 | Paste between projects (with types and materials) | all | ⬜ | P1 | |
@@ -346,7 +346,7 @@ object library, 2D drafting and fills, pen sets and cut fills, the navigation ba
 What now most often stops an architect from finishing a real project, roughly in the order it would come up:
 
 1. **DWG in and out** (§14, §18). DXF works both ways (D83, D85); most surveys and consultants send DWG.
-2. **Parametric object authoring** (§8): make and customise objects without writing code. Part A (the `.kimobj` engine, D99) is built; the Object Editor (part B) is next. Design: [16](16-parametric-objects.md).
+2. ✅ **Parametric object authoring** (§8): make and customise objects without writing code. Done: the `.kimobj` engine (D99), the settings dialog with saved versions (D100) and the Object Editor (D101). Design: [16](16-parametric-objects.md).
 3. **Imperial units** (§1). Metric only; blocks every US office.
 4. **Curtain walls** (§6) and **sloped slabs / slab edges** (§6).
 5. **Detail views and markers** linked to the model (§11, §13), and **title block templates** (§14).

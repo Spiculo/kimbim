@@ -15,9 +15,11 @@ namespace kimbim {
 
 // The object library (D86, Archicad's Library): categories with the objects' plan symbols as
 // thumbnails and a search field. Each entry shows the version a click places next to its name
-// ("Chair · Dining", D100); a click starts the Object tool with it, a right click asks for the Object
-// settings dialog. The panel only lists; the main window places (kimbim.library), keeps each
-// object's current version and the office library paths.
+// ("Chair · Dining", D100); a click starts the Object tool with it. A right click shows a menu: Settings...
+// (the Object settings dialog), then (D101) Edit object... for an office or project object, or Customise a
+// copy... for a bundled one (an office IFC type has fixed geometry: neither); New object... opens an empty
+// Object Editor. The panel only lists; the main window places (kimbim.library), keeps each object's current
+// version and the office library paths, and opens the editor.
 class LibraryPanel : public QWidget {
     Q_OBJECT
 public:
@@ -44,13 +46,16 @@ public:
 
 signals:
     void placeRequested(); // a click on an object (the current one)
-    void settingsRequested(const QString& id); // a right click on an object: its Object settings
+    void settingsRequested(const QString& id); // the right-click menu's Settings...: its Object settings
+    void editorRequested(const QString& source); // D101: Edit object... / Customise a copy... (objedit's source)
+    void newObjectRequested(); // D101: New object...
     void currentChanged();
     void officeLibraryRequested(); // choose the office library folder
     void ifcLibraryRequested();    // load an IFC type library file
 
 private:
     QTreeWidgetItem* itemOf(const QString& id) const;
+    void showObjectMenu(const QString& id, const QPoint& globalPos);
     QString entryText(const QString& id) const;
     QTreeWidget* m_tree;
     QLineEdit* m_search;

@@ -7,6 +7,7 @@
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLineEdit>
+#include <QMenu>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPixmap>
@@ -28,7 +29,7 @@ enum { IdRole = Qt::UserRole + 1 };
 [[maybe_unused]] const char* const kNames[] = {
     QT_TRANSLATE_NOOP("LibraryPanel", "Furniture"), QT_TRANSLATE_NOOP("LibraryPanel", "Sanitary"),
     QT_TRANSLATE_NOOP("LibraryPanel", "Kitchen"), QT_TRANSLATE_NOOP("LibraryPanel", "People, trees and cars"),
-    QT_TRANSLATE_NOOP("LibraryPanel", "Office library"),
+    QT_TRANSLATE_NOOP("LibraryPanel", "Office library"), QT_TRANSLATE_NOOP("LibraryPanel", "Project"),
     // the bundled objects' parameter group headings (D100; an object file may give its own Spanish)
     QT_TRANSLATE_NOOP("LibraryPanel", "Seat"), QT_TRANSLATE_NOOP("LibraryPanel", "Legs"),
     QT_TRANSLATE_NOOP("LibraryPanel", "Back"), QT_TRANSLATE_NOOP("LibraryPanel", "Arms"),
@@ -96,9 +97,13 @@ LibraryPanel::LibraryPanel(QWidget* parent)
     m_tree->setHeaderHidden(true);
     m_tree->setIconSize(QSize(36, 36));
     m_tree->setContextMenuPolicy(Qt::CustomContextMenu);
-    m_tree->setToolTip(tr("Click an object to place it; right-click for its settings and saved versions"));
+    m_tree->setToolTip(tr("Click an object to place it; right-click for its settings and saved versions, or to edit it"));
     layout->addWidget(m_tree, 1);
     auto* row = new QHBoxLayout;
+    auto* create = new QPushButton(tr("New object..."), this);
+    create->setObjectName(QStringLiteral("libraryNewObject"));
+    create->setToolTip(tr("Make a new library object in the Object Editor"));
+    row->addWidget(create);
     auto* office = new QPushButton(tr("Office library..."), this);
     office->setObjectName(QStringLiteral("libraryOffice"));
     office->setToolTip(tr("Choose the office library folder: object files (.kimobj) and IFC type libraries (.ifc)"));
@@ -131,15 +136,34 @@ LibraryPanel::LibraryPanel(QWidget* parent)
         if (id.isEmpty())
             return;
         m_tree->setCurrentItem(item);
-        emit settingsRequested(id);
+        showObjectMenu(id, m_tree->viewport()->mapToGlobal(pos));
     });
+    connect(create, &QPushButton::clicked, this, &LibraryPanel::newObjectRequested);
     connect(office, &QPushButton::clicked, this, &LibraryPanel::officeLibraryRequested);
     connect(ifc, &QPushButton::clicked, this, &LibraryPanel::ifcLibraryRequested);
+}
+
+void LibraryPanel::showObjectMenu(const QString& id, const QPoint& globalPos)
+{
+    QMenu menu(this);
+    menu.setObjectName(QStringLiteral("libraryObjectMenu"));
+    connect(menu.addAction(tr("Settings...")), &QAction::triggered, this, [this, id] { emit settingsRequested(id); });
+    // D101: office and project objects open for editing, bundled ones as a copy; an office IFC type is
+    // fixed geometry, nothing to edit.
+    if (!id.startsWith(QLatin1String("ifc:"))) {
+        const bool own = id.startsWith(QLatin1String("office:")) || id.startsWith(QLatin1String("project:"));
+        QAction* edit = menu.addAction(own ? tr("Edit object...") : tr("Customise a copy..."));
+        edit->setToolTip(own ? tr("Change this object's definition in the Object Editor")
+                             : tr("A new object made from this one in the Object Editor; the bundled object stays as it is"));
+        connect(edit, &QAction::triggered, this, [this, id] { emit editorRequested(id); });
+    }
+    menu.exec(globalPos);
 }
 
 void LibraryPanel::setListing(const QJsonObject& listing)
 {
     const QString keep = m_current;
+    const QHash<QString, QJsonObject> before = m_objects;
     m_tree->clear();
     m_objects.clear();
     QHash<QString, QTreeWidgetItem*> categories;
@@ -161,7 +185,10 @@ void LibraryPanel::setListing(const QJsonObject& listing)
         auto* item = new QTreeWidgetItem(parent, {entryText(id)});
         item->setData(0, IdRole, id);
         item->setToolTip(0, o.value("ifc_class").toString());
-        if (!m_icons.contains(id)) // drawn once per object (default sizes), not on every refresh
+        // drawn once per object (default sizes), again when its symbol changed (an edited object, D101)
+        const QJsonObject old = before.value(id);
+        if (!m_icons.contains(id) || old.value("symbol") != o.value("symbol") || old.value("width") != o.value("width")
+            || old.value("depth") != o.value("depth"))
             m_icons.insert(id, symbolIcon(o.value("symbol").toArray(), o.value("width").toDouble(1.0), o.value("depth").toDouble(1.0)));
         item->setIcon(0, m_icons.value(id));
     }

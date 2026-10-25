@@ -463,6 +463,17 @@ public:
     bool editObjectSettings();
     // That question's text: how many objects use the type, and how many of them are selected.
     static QString editSharedTypeText(int uses, int selected);
+    // D101: the Object Editor (ObjectEditorDialog) on `source` ("new", a library id, "office:<id>",
+    // "project:<id>" or "type:<GlobalId>"), modal. On a save: the Library panel's listing and thumbnails,
+    // the object versions and the Object tool's form follow; an office save that left placed objects
+    // outdated offers to update them. False if cancelled.
+    bool openObjectEditor(const QString& source);
+    // Customise a copy (Properties, Model menu): the editor on the selection's type. False without one.
+    bool customiseObjectCopy();
+    // "N placed objects use an older version of this object. Update them now?"; yes runs Update library
+    // objects. Quiet mode: the answer setUpdateAnswerForTests gave (none: no).
+    void offerLibraryUpdate(int outdated);
+    void setUpdateAnswerForTests(bool yes) { m_updateAnswer = yes; }
     // Quiet mode: the answer that question gets ("all", "new" with `name`, or "" to cancel).
     void setEditChoiceForTests(const QString& mode, const QString& name = {})
     {
@@ -679,6 +690,9 @@ private:
     // Both, and the current object's versions and last used again (undo, redo, Edit...: versions may
     // have come or gone); nothing without the Library panel.
     void refreshObjectVersions();
+    // D101: the panel's listing again (project objects come and go with saves and undo; edited objects
+    // redraw their thumbnails), then refreshObjectVersions. The office paths are not sent again.
+    void refreshLibraryListing();
     QString objectVersionName(const QJsonObject& last, const QJsonArray& versions) const;
     QJsonObject versionEntry(const QString& id) const; // of the current object (an office copy too)
     bool m_libraryPathsSent = false;
@@ -697,6 +711,7 @@ private:
     bool m_quiet;
     QString m_importStatusAnswer;
     QString m_editChoice, m_editChoiceName; // D100: setEditChoiceForTests
+    bool m_updateAnswer = false; // D101: setUpdateAnswerForTests
     bool m_askImportStatus = false; // an IFC is loading: ask about unmarked elements when it's done
     std::function<LargeIfc(const QString&, double)> m_largeIfcAnswer;
     Preferences m_prefs; // D72: user preferences (in memory only in quiet mode)

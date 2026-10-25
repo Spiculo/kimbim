@@ -81,7 +81,7 @@ Library browser and bundled library, copy/paste/duplicate/array/mirror/copy-to-s
 **Exit:** the M3 house produces a plan, a section and an elevation on a sheet with a title block, exported to PDF. CI checks this automatically, as it checks M3.
 
 Slices (numbering continues after the architect-feedback track, Slices 9–13): **14 ✅ sections and elevations** → **15 ✅ plan drawings and annotation on drawings** ([plan](superpowers/plans/2026-10-07-slice15-plan-drawings-annotation.md)) → **16 ✅ sheets and PDF export (= M4 exit)** ([plan](superpowers/plans/2026-10-07-slice16-sheets-pdf.md)) → **17 ✅ everyday editing** (copy/paste, duplicate, Ctrl+drag copy, mirror, arrays, offset; [plan](superpowers/plans/2026-10-07-slice17-everyday-editing.md)).
-Libraries: the Library panel, Object tool and a bundled parametric library (D86); authoring objects without code is the next step for libraries ([16](16-parametric-objects.md)).
+Libraries: the Library panel, Object tool and a bundled parametric library (D86); authoring objects without code is done: the `.kimobj` engine (D99), saved versions (D100) and the Object Editor (D101) ([16](16-parametric-objects.md)).
 M4 comes before the end of M5 (owner plan, 2026-10-07): drawings are what an architect hands to a client, and Combine options (Slice 22) needs the R4 merge engine, which is easier to judge once real projects with drawings exist.
 
 ### After M4: modeling gaps
@@ -136,7 +136,7 @@ Not yet: checks chosen per project that run when a version is saved and warn or 
 New IFC4X3 projects, schema upgrade command, IFC4X3 test suites become release-blocking ([02](02-data-model-and-format.md#ifc-schema-version)).
 
 ## Next (2026-10-25)
-Done since: the Object settings dialog and saved object versions (D100). In order: finish **M6** (pre-commit checks, the exit above) → **parametric object authoring** ([16](16-parametric-objects.md); part A, the `.kimobj` engine, and the settings dialog with saved versions, D100, are done; part B, the Object Editor, is next) → **R4 reconciliation** (re-import with regenerated GlobalIds) → **R3** property-level diff and the speed benchmark → the M2 leftovers. [14](14-tool-inventory.md#largest-gaps) lists the largest remaining tool gaps (DWG, imperial units, curtain walls). The owner's M3 check in Bonsai and a commercial viewer is still open ([12](12-m3-exit.md)).
+Done since: the Object settings dialog and saved object versions (D100), and the Object Editor (D101), which completes **parametric object authoring** ([16](16-parametric-objects.md)). In order: finish **M6** (pre-commit checks, the exit above) → **R4 reconciliation** (re-import with regenerated GlobalIds) → **R3** property-level diff and the speed benchmark → the M2 leftovers. [14](14-tool-inventory.md#largest-gaps) lists the largest remaining tool gaps (DWG, imperial units, curtain walls). The owner's M3 check in Bonsai and a commercial viewer is still open ([12](12-m3-exit.md)).
 
 ## Then
 See [08-future.md](08-future.md). Push/pull to Git remotes is the cheapest next step, because the storage is already Git.

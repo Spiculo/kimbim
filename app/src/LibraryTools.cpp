@@ -2,6 +2,8 @@
 // D86: the object library in the main window (doc 14 §8): the Library panel and the Object tool.
 // The objects, their types and plan symbols are python/kimbim/library.py's; one undo step each.
 // D100: each object's current version (the last one used, a project setting) is what a click places.
+// D101: the Object Editor opens from the panel (New object..., the right-click menu), Properties and the
+// Model menu (Customise a copy).
 #include <QAction>
 #include <QCheckBox>
 #include <QComboBox>
@@ -19,6 +21,7 @@
 #include "LevelsBar.h"
 #include "LibraryPanel.h"
 #include "MainWindow.h"
+#include "ObjectEditorDialog.h"
 #include "ObjectSettingsDialog.h"
 #include "Snapper.h"
 #include "StatusStrip.h"
@@ -108,6 +111,8 @@ LibraryPanel* MainWindow::libraryPanel()
     refreshObjectLabels();
     connect(m_library, &LibraryPanel::placeRequested, this, [this] { setTool(Tool::Object); });
     connect(m_library, &LibraryPanel::settingsRequested, this, [this](const QString& id) { objectSettingsDialog(id); });
+    connect(m_library, &LibraryPanel::editorRequested, this, [this](const QString& source) { openObjectEditor(source); });
+    connect(m_library, &LibraryPanel::newObjectRequested, this, [this] { openObjectEditor(QStringLiteral("new")); });
     connect(m_library, &LibraryPanel::currentChanged, this, [this] {
         loadObjectVersion();
         if (m_tool == Tool::Object)
@@ -429,6 +434,56 @@ void MainWindow::refreshObjectVersions()
     loadObjectVersion();
     if (m_tool == Tool::Object)
         updateToolPreview();
+}
+
+void MainWindow::refreshLibraryListing()
+{
+    if (!m_library)
+        return;
+    m_library->setListing(bridge("library_objects"));
+    refreshObjectVersions();
+}
+
+bool MainWindow::openObjectEditor(const QString& source)
+{
+    ObjectEditorDialog d(this, source, this);
+    if (d.exec() != QDialog::Accepted)
+        return false;
+    // Saved: a new or changed object to list (its thumbnail redrawn), its versions and the Object tool's
+    // form again. A project save was one undo step already (the dialog ran afterEdit).
+    libraryPanel();
+    refreshLibraryListing();
+    if (d.outdatedAfterSave() > 0)
+        offerLibraryUpdate(d.outdatedAfterSave());
+    return true;
+}
+
+bool MainWindow::customiseObjectCopy()
+{
+    if (m_selection.isEmpty()) {
+        m_status->showMessage(tr("Select a library object first"));
+        return false;
+    }
+    const QString guids = QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(m_selection)).toJson(QJsonDocument::Compact));
+    const QJsonObject of = bridge("object_settings_of", {guids}); // the selection's one type: "type:<GlobalId>"
+    if (!of.value("ok").toBool()) {
+        m_status->showMessage(tr("Could not edit the objects") + QStringLiteral(": ") + of.value("error").toString());
+        return false;
+    }
+    return openObjectEditor(of.value("source").toString());
+}
+
+void MainWindow::offerLibraryUpdate(int outdated)
+{
+    if (outdated <= 0)
+        return;
+    bool yes = m_updateAnswer;
+    if (!m_quiet)
+        yes = QMessageBox::question(this, tr("Update from library"),
+                  tr("%n placed object(s) use an older version of this object. Update them now?", nullptr, outdated))
+            == QMessageBox::Yes;
+    if (yes)
+        updateFromLibrary(true);
 }
 
 void MainWindow::setObjectAngle(double degrees)

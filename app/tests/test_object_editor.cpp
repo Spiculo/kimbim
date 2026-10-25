@@ -3,6 +3,7 @@
 // components and symbol as a tree, the live preview at the Try values, and saving to the project or the
 // office library. A draft with errors marks the fields, keeps the last preview and disables both saves.
 #include <Bnd_Box.hxx>
+#include <QAction>
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -18,10 +19,13 @@
 #include <QTreeWidget>
 #include <QTreeWidgetItemIterator>
 #include <QtTest>
+#include <cmath>
 
 #include "JsonTreeEditor.h"
+#include "LibraryPanel.h"
 #include "MainWindow.h"
 #include "ObjectEditorDialog.h"
+#include "PropertiesPanel.h"
 #include "PythonEngine.h"
 #include "Viewport.h"
 
@@ -100,6 +104,17 @@ double topOf(const kimbim::ObjectEditorDialog& d)
     double x0, y0, z0, x1, y1, z1;
     box.Get(x0, y0, z0, x1, y1, z1);
     return z1;
+}
+
+// The heading of the Library panel category that lists object `id`, or "".
+QString categoryOf(kimbim::LibraryPanel* panel, const QString& id)
+{
+    QTreeWidget* tree = panel->tree();
+    for (int i = 0; i < tree->topLevelItemCount(); ++i)
+        for (int j = 0; j < tree->topLevelItem(i)->childCount(); ++j)
+            if (tree->topLevelItem(i)->child(j)->data(0, Qt::UserRole + 1).toString() == id)
+                return tree->topLevelItem(i)->text(0);
+    return {};
 }
 
 } // namespace
@@ -380,6 +395,195 @@ private slots:
         for (const auto& o : kimbim::PythonEngine::instance().callJson("library_objects", {}).object().value("objects").toArray())
             listed = listed || o.toObject().value("id").toString() == QLatin1String("project:crate");
         QVERIFY(listed);
+    }
+
+    // D101, doc 16 §9: the Object Editor makes a 3-leg chair, saves it to the office library, the Object
+    // tool places it, the 3D and the plan show three legs; Update from library after the file changes.
+    void threeLegChairEndToEnd()
+    {
+        QTemporaryDir dir;
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        kimbim::LibraryPanel* panel = w.libraryPanel(); // it sends the (empty) preferences' paths: first
+        setOfficeFolder(dir.path());
+        bool edited = false;
+        QTimer::singleShot(0, &w, [&] {
+            auto* d = qobject_cast<kimbim::ObjectEditorDialog*>(QApplication::activeModalWidget());
+            if (!d) {
+                if (QWidget* other = QApplication::activeModalWidget())
+                    other->close();
+                return;
+            }
+            // The chair's legs follow `legs` on a circle; splayed 8° under a round seat, each foot sticks
+            // out past the seat. Without its drawn symbol the plan is the parts' outline (doc 16 §3).
+            QJsonObject draft = d->draft();
+            draft.remove(QStringLiteral("symbol"));
+            d->setDraft(draft);
+            auto* table = d->findChild<QTableWidget*>(QStringLiteral("editorParams"));
+            const auto setDefault = [&](const char* key, const char* value) {
+                table->item(paramRow(*d, QLatin1String(key)), 4)->setText(QLatin1String(value));
+            };
+            setDefault("legs", "3");
+            setDefault("layout", "circle");
+            setDefault("seat_shape", "round");
+            setDefault("splay", "8");
+            edited = draftParam(*d, QStringLiteral("legs")).value("default").toInt() == 3
+                && draftParam(*d, QStringLiteral("layout")).value("default").toString() == QLatin1String("circle");
+            d->saveTo(QStringLiteral("office"));
+        });
+        QVERIFY(w.openObjectEditor(QStringLiteral("chair")));
+        QVERIFY(edited);
+        QVERIFY(QFile::exists(dir.filePath(QStringLiteral("chair_copy.kimobj"))));
+        QVERIFY(panel->objectIds().contains(QStringLiteral("office:chair_copy"))); // the listing follows
+
+        QVERIFY(panel->selectObject(QStringLiteral("office:chair_copy")));
+        w.setTool(kimbim::MainWindow::Tool::Object);
+        const QStringList before = w.viewport()->guids();
+        QVERIFY(w.placeObjectAt(QPointF(1, 1)));
+        w.setTool(kimbim::MainWindow::Tool::None);
+        QStringList made;
+        for (const QString& g : w.viewport()->guids())
+            if (!before.contains(g))
+                made << g;
+        QCOMPARE(made.size(), 1);
+
+        // 3D: the solids of the placed type's Body, counted by their building material. The legs are the
+        // only parts of the frame material (Steel; no arms), the seat and back are Timber, so the count
+        // is the legs' and does not depend on how many other parts the chair has.
+        const QJsonObject legs = w.runConsole(QStringLiteral(
+            "import ifcopenshell.util.element as U\n"
+            "t = U.get_type(ifc.by_guid('%1'))\n"
+            "body = next(m.MappedRepresentation for m in t.RepresentationMaps if m.MappedRepresentation.RepresentationIdentifier == 'Body')\n"
+            "names = [s.Name for i in body.Items for st in i.StyledByItem for s in (getattr(st, 'Styles', None) or ())]\n"
+            "names.count('Steel'), len(body.Items)").arg(made[0]));
+        QVERIFY2(legs.value("ok").toBool(), qPrintable(legs.value("traceback").toString()));
+        QCOMPARE(legs.value("output").toString(), QStringLiteral("(3, 5)\n")); // 3 legs, the seat, the back
+
+        // Plan: the placed type's symbol (its stored definition) is one outline, the round seat with a bump
+        // where each splayed foot sticks out past it: three runs of points outside the seat's circle.
+        const QJsonObject of = kimbim::PythonEngine::instance()
+            .callJson("object_settings_of", {QStringLiteral("[\"%1\"]").arg(made[0])}).object();
+        QVERIFY(of.value("source").toString().startsWith(QLatin1String("type:")));
+        const QJsonObject symbol = kimbim::PythonEngine::instance()
+            .callJson("object_symbol", {of.value("key").toString(), QString(), of.value("source").toString()}).object();
+        const QJsonArray lines = symbol.value("symbol").toArray();
+        QCOMPARE(lines.size(), 1);
+        const double cx = 0.45 / 2, cy = 0.5 / 2, r = 0.45 / 2; // the chair's width and depth
+        QJsonArray ring = lines.at(0).toArray();
+        ring.removeLast(); // closed: the first point again
+        QList<bool> outside;
+        for (const auto& p : ring)
+            outside << (std::hypot(p.toArray().at(0).toDouble() - cx, p.toArray().at(1).toDouble() - cy) > r + 1e-3);
+        int runs = 0;
+        for (int i = 0; i < outside.size(); ++i)
+            runs += outside[i] && !outside[(i + outside.size() - 1) % outside.size()] ? 1 : 0;
+        QCOMPARE(runs, 3);
+
+        // The office edits the file (width 0.5): Update from library offers the placed chair, then it is 0.5.
+        QFile file(dir.filePath(QStringLiteral("chair_copy.kimobj")));
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QJsonObject def = QJsonDocument::fromJson(file.readAll()).object();
+        file.close();
+        QJsonArray params = def.value("params").toArray();
+        for (int i = 0; i < params.size(); ++i)
+            if (params[i].toObject().value("key").toString() == QLatin1String("width")) {
+                QJsonObject p = params[i].toObject();
+                p.insert("default", 0.5);
+                params[i] = p;
+            }
+        def.insert("params", params);
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        file.write(QJsonDocument(def).toJson());
+        file.close();
+        setOfficeFolder(dir.path()); // read again
+        const QJsonObject pending = kimbim::PythonEngine::instance().callJson("library_updates", {QString()}).object();
+        QCOMPARE(pending.value("outdated").toInt(), 1);
+        w.setUpdateAnswerForTests(true);
+        w.offerLibraryUpdate(pending.value("outdated").toInt());
+        QCOMPARE(kimbim::PythonEngine::instance().callJson("library_updates", {QString()}).object().value("outdated").toInt(), 0);
+        // The placed chair's type now carries the new definition: its width default is 0.5. Its own width
+        // stays 0.45: Update from library keeps every value whose key and kind still exist (D99).
+        const QJsonObject stored = w.runConsole(QStringLiteral(
+            "import ifcopenshell.util.element as U\n"
+            "from kimbim import library\n"
+            "t = U.get_type(ifc.by_guid('%1'))\n"
+            "library.definition_of_type(t).param('width').default, library._params_of_type(t)[1]['width']").arg(made[0]));
+        QVERIFY2(stored.value("ok").toBool(), qPrintable(stored.value("traceback").toString()));
+        QCOMPARE(stored.value("output").toString(), QStringLiteral("(0.5, 0.45)\n"));
+        setOfficeFolder(QString());
+    }
+
+    // D101: an object saved to the project is listed under Project; undo takes it away, listing too.
+    void projectObjectUndo()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        kimbim::LibraryPanel* panel = w.libraryPanel();
+        QTimer::singleShot(0, &w, [&] {
+            auto* d = qobject_cast<kimbim::ObjectEditorDialog*>(QApplication::activeModalWidget());
+            if (!d) {
+                if (QWidget* other = QApplication::activeModalWidget())
+                    other->close();
+                return;
+            }
+            d->findChild<QLineEdit*>(QStringLiteral("editorId"))->setText(QStringLiteral("crate"));
+            d->saveTo(QStringLiteral("project"));
+        });
+        QSignalSpy asked(panel, &kimbim::LibraryPanel::newObjectRequested);
+        panel->findChild<QPushButton*>(QStringLiteral("libraryNewObject"))->click(); // opens the editor on "new"
+        QCOMPARE(asked.count(), 1);
+        QCOMPARE(categoryOf(panel, QStringLiteral("project:crate")), QStringLiteral("Project"));
+        w.findChild<QAction*>(QStringLiteral("actionUndo"))->trigger();
+        QVERIFY(!panel->objectIds().contains(QStringLiteral("project:crate")));
+        w.findChild<QAction*>(QStringLiteral("actionRedo"))->trigger();
+        QVERIFY(panel->objectIds().contains(QStringLiteral("project:crate")));
+    }
+
+    // D101: Customise a copy (Properties, beside Edit..., and the Model menu) opens the editor on the
+    // selection's type; it starts from the type's values.
+    void customiseACopyOfThePlacedType()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        QVERIFY(w.chooseObject(QStringLiteral("chair"), QJsonObject{{"width", 0.6}}));
+        const QStringList before = w.viewport()->guids();
+        QVERIFY(w.placeObjectAt(QPointF(1, 1)));
+        w.setTool(kimbim::MainWindow::Tool::None);
+        QStringList made;
+        for (const QString& g : w.viewport()->guids())
+            if (!before.contains(g))
+                made << g;
+        QCOMPARE(made.size(), 1);
+        w.setSelection(made);
+        auto* copy = w.propertiesPanel()->findChild<QPushButton*>(QStringLiteral("objectCustomiseCopy"));
+        QVERIFY(copy);
+        QVERIFY(copy->isEnabled());
+        QCOMPARE(copy->text(), QStringLiteral("Customise a copy..."));
+        QString title;
+        double width = 0;
+        const auto look = [&] {
+            QTimer::singleShot(0, &w, [&] {
+                auto* d = qobject_cast<kimbim::ObjectEditorDialog*>(QApplication::activeModalWidget());
+                if (!d) {
+                    if (QWidget* other = QApplication::activeModalWidget())
+                        other->close();
+                    return;
+                }
+                title = d->windowTitle();
+                width = draftParam(*d, QStringLiteral("width")).value("default").toDouble();
+                d->reject(); // unchanged: no question
+            });
+        };
+        look();
+        copy->click();
+        QVERIFY(title.startsWith(QStringLiteral("Object editor")));
+        QCOMPARE(width, 0.6); // the type's values are the copy's defaults
+        title.clear();
+        look();
+        w.findChild<QAction*>(QStringLiteral("actionCustomiseObjectCopy"))->trigger();
+        QVERIFY(title.startsWith(QStringLiteral("Object editor")));
+        w.setSelection({}); // nothing selected: no editor
+        QVERIFY(!w.customiseObjectCopy());
     }
 };
 

@@ -128,6 +128,40 @@ QStringList placeTwo(kimbim::MainWindow& w, const QString& id)
     return made;
 }
 
+// D101: right-clicks object `id` in the panel and returns the texts of the menu that shows
+// (`libraryObjectMenu`), triggering the action called `trigger` if given; the menu then closes.
+QStringList rightClickMenu(kimbim::LibraryPanel* panel, const QString& id, const QString& trigger = {})
+{
+    QTreeWidgetItem* item = nullptr;
+    QTreeWidget* tree = panel->tree();
+    for (int i = 0; i < tree->topLevelItemCount(); ++i)
+        for (int j = 0; j < tree->topLevelItem(i)->childCount(); ++j)
+            if (tree->topLevelItem(i)->child(j)->data(0, Qt::UserRole + 1).toString() == id)
+                item = tree->topLevelItem(i)->child(j);
+    if (!item)
+        return {};
+    QStringList texts;
+    QTimer::singleShot(0, panel, [&] {
+        auto* menu = qobject_cast<QMenu*>(QApplication::activePopupWidget());
+        if (!menu)
+            return;
+        if (menu->objectName() == QLatin1String("libraryObjectMenu"))
+            for (QAction* a : menu->actions())
+                if (!a->isSeparator())
+                    texts << a->text();
+        QAction* chosen = nullptr;
+        for (QAction* a : menu->actions())
+            if (!trigger.isEmpty() && a->text() == trigger)
+                chosen = a;
+        if (chosen)
+            chosen->trigger(); // as a click: the action fires, the menu closes
+        menu->close();
+    });
+    tree->scrollToItem(item);
+    emit tree->customContextMenuRequested(tree->visualItemRect(item).center());
+    return texts;
+}
+
 } // namespace
 
 class TestLibrary : public QObject {
@@ -157,9 +191,9 @@ private slots:
         QCOMPARE(place.count(), 1);
         QCOMPARE(w.tool(), kimbim::MainWindow::Tool::Object);
         w.setTool(kimbim::MainWindow::Tool::None);
-        // a right click: the Object settings dialog (asked for; the window opens it)
+        // a right click: a menu whose Settings... asks for the Object settings dialog (the window opens it)
         QObject::disconnect(panel, &kimbim::LibraryPanel::settingsRequested, &w, nullptr);
-        emit panel->tree()->customContextMenuRequested(panel->tree()->visualItemRect(sofa).center());
+        QVERIFY(rightClickMenu(panel, QStringLiteral("sofa"), QStringLiteral("Settings...")).contains(QStringLiteral("Settings...")));
         QCOMPARE(settings.count(), 1);
         QCOMPARE(settings.at(0).at(0).toString(), QStringLiteral("sofa"));
         QVERIFY(!kimbim::LibraryPanel::symbolIcon(QJsonArray{QJsonArray{QJsonArray{0, 0}, QJsonArray{1, 1}}}, 1, 1).isNull());
@@ -588,6 +622,46 @@ private slots:
         QVERIFY(kimbim::MainWindow::editSharedTypeText(3, 1).endsWith(QStringLiteral("1 of them is selected.")));
         QVERIFY(kimbim::MainWindow::editSharedTypeText(3, 2).endsWith(QStringLiteral("2 of them are selected.")));
         QVERIFY(kimbim::MainWindow::editSharedTypeText(3, 2).startsWith(QStringLiteral("3 ")));
+    }
+
+    // D101: the right click's menu: Settings..., then Edit object... for office and project objects or
+    // Customise a copy... for bundled ones; an office IFC type (fixed geometry) has neither.
+    void rightClickOffersEditOrCopy()
+    {
+        kimbim::LibraryPanel panel;
+        const auto entry = [](const char* id, const char* category) {
+            return QJsonObject{{"id", id}, {"name", id}, {"category", category}, {"symbol", QJsonArray{}}, {"width", 1.0}, {"depth", 1.0}};
+        };
+        panel.setListing(QJsonObject{
+            {"categories", QJsonArray{QJsonObject{{"id", "furniture"}, {"name", "Furniture"}},
+                               QJsonObject{{"id", "office"}, {"name", "Office library"}}, QJsonObject{{"id", "project"}, {"name", "Project"}}}},
+            {"objects", QJsonArray{entry("chair", "furniture"), entry("office:stool", "furniture"), entry("project:crate", "project"),
+                            entry("ifc:C:/lib.ifc::0abc", "office")}}});
+        panel.show();
+        QSignalSpy editor(&panel, &kimbim::LibraryPanel::editorRequested);
+        QSignalSpy settings(&panel, &kimbim::LibraryPanel::settingsRequested);
+        const QStringList chair = rightClickMenu(&panel, QStringLiteral("chair"), QStringLiteral("Customise a copy..."));
+        QCOMPARE(chair, (QStringList{QStringLiteral("Settings..."), QStringLiteral("Customise a copy...")}));
+        QCOMPARE(editor.count(), 1);
+        QCOMPARE(editor.at(0).at(0).toString(), QStringLiteral("chair"));
+        const QStringList office = rightClickMenu(&panel, QStringLiteral("office:stool"), QStringLiteral("Edit object..."));
+        QCOMPARE(office, (QStringList{QStringLiteral("Settings..."), QStringLiteral("Edit object...")}));
+        QCOMPARE(editor.count(), 2);
+        QCOMPARE(editor.at(1).at(0).toString(), QStringLiteral("office:stool"));
+        QCOMPARE(rightClickMenu(&panel, QStringLiteral("project:crate")),
+            (QStringList{QStringLiteral("Settings..."), QStringLiteral("Edit object...")}));
+        const QStringList ifc = rightClickMenu(&panel, QStringLiteral("ifc:C:/lib.ifc::0abc"));
+        QVERIFY(!ifc.contains(QStringLiteral("Edit object...")));
+        QVERIFY(!ifc.contains(QStringLiteral("Customise a copy...")));
+        QCOMPARE(settings.count(), 0);
+        QCOMPARE(editor.count(), 2);
+        // New object... asks for an empty editor.
+        QSignalSpy created(&panel, &kimbim::LibraryPanel::newObjectRequested);
+        auto* add = panel.findChild<QPushButton*>(QStringLiteral("libraryNewObject"));
+        QVERIFY(add);
+        QCOMPARE(add->text(), QStringLiteral("New object..."));
+        add->click();
+        QCOMPARE(created.count(), 1);
     }
 
     // D100: outdated saved versions that nothing uses still update (Update from library).

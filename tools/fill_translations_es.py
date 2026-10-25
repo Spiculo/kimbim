@@ -1740,8 +1740,8 @@ ES = {
     "Share this version with every project through the office library": "Comparte esta versión con todos los proyectos a través de la biblioteca de la oficina",
     "Set the office library folder in the preferences first": "Primero defina la carpeta de la biblioteca de la oficina en las preferencias",
     # D100: placing: the last version used, the quick switcher and the Version dropdown
-    "Click an object to place it; right-click for its settings and saved versions":
-        "Haga clic en un objeto para colocarlo; clic derecho para su configuración y versiones guardadas",
+    "Click an object to place it; right-click for its settings and saved versions, or to edit it":
+        "Haga clic en un objeto para colocarlo; clic derecho para su configuración y versiones guardadas, o para editarlo",
     "Custom": "Personalizada",
     "Settings...": "Configuración...",
     "Version: what a click places (right-click in the view to switch it while placing)":
@@ -1783,6 +1783,24 @@ ES = {
     "Sweep": "Barrido",
     "Anchors only": "Solo anclajes",
     "Use": "Usar",
+    # D101: the Object Editor in the Library panel, Properties and the Model menu
+    "New object...": "Objeto nuevo...",
+    "Make a new library object in the Object Editor": "Crea un objeto de biblioteca nuevo en el Editor de objetos",
+    "Edit object...": "Editar objeto...",
+    "Customise a copy...": "Personalizar una copia...",
+    "Change this object's definition in the Object Editor": "Cambia la definición de este objeto en el Editor de objetos",
+    "A new object made from this one in the Object Editor; the bundled object stays as it is":
+        "Un objeto nuevo hecho a partir de este en el Editor de objetos; el objeto incluido queda como está",
+    "A new library object made from this one in the Object Editor":
+        "Un objeto de biblioteca nuevo hecho a partir de este en el Editor de objetos",
+    "Customise a copy of the object...": "Personalizar una copia del objeto...",
+    "A new library object made from the selected object's type, in the Object Editor":
+        "Un objeto de biblioteca nuevo hecho a partir del tipo del objeto seleccionado, en el Editor de objetos",
+    "Select a library object first": "Primero seleccione un objeto de biblioteca",
+    "Update from library": "Actualizar desde la biblioteca",
+    "%n placed object(s) use an older version of this object. Update them now?":
+        ("%n objeto colocado usa una versión anterior de este objeto. ¿Actualizarlo ahora?",
+         "%n objetos colocados usan una versión anterior de este objeto. ¿Actualizarlos ahora?"),
 }
 
 # Words that mean something else in another context ("Back" is the view cube's "Posterior"): by

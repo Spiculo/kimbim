@@ -3,6 +3,7 @@
 
 #include <QComboBox>
 #include <QCoreApplication>
+#include <QHBoxLayout>
 #include <QHeaderView>
 #include <QJsonArray>
 #include <QLocale>
@@ -277,14 +278,27 @@ void PropertiesPanel::showMulti(const QJsonObject& merged)
                     group->insertChild(0, group->takeChild(i));
             auto* row = new QTreeWidgetItem(group, {QString(), QString()});
             row->setFlags(row->flags() & ~Qt::ItemIsEditable);
-            auto* button = new QPushButton(tr("Edit..."), m_tree);
+            auto* buttons = new QWidget(m_tree);
+            auto* layout = new QHBoxLayout(buttons);
+            layout->setContentsMargins(0, 0, 0, 0);
+            auto* button = new QPushButton(tr("Edit..."), buttons);
             button->setObjectName(QStringLiteral("objectSettingsEdit"));
             const bool enabled = merged.value("object_settings").toObject().value("enabled").toBool();
             button->setEnabled(enabled);
             button->setToolTip(enabled ? tr("Change these objects' settings, or move them to another saved version")
                                        : tr("The selection holds objects of more than one type"));
             connect(button, &QPushButton::clicked, this, &PropertiesPanel::objectSettingsRequested);
-            m_tree->setItemWidget(row, 1, button);
+            // D101: the Object Editor on a copy of the selection's type (its values as the defaults)
+            auto* copy = new QPushButton(tr("Customise a copy..."), buttons);
+            copy->setObjectName(QStringLiteral("objectCustomiseCopy"));
+            copy->setEnabled(enabled);
+            copy->setToolTip(enabled ? tr("A new library object made from this one in the Object Editor")
+                                     : tr("The selection holds objects of more than one type"));
+            connect(copy, &QPushButton::clicked, this, &PropertiesPanel::customiseCopyRequested);
+            layout->addWidget(button);
+            layout->addWidget(copy);
+            layout->addStretch();
+            m_tree->setItemWidget(row, 1, buttons);
         }
         group->setExpanded(true);
     }
