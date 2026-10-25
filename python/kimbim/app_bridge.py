@@ -1334,6 +1334,7 @@ _EXPORTS = {
         "draft_symbol",
         "object_draft",
         "object_part_template",
+        "save_draft",
     ),
     "objversions": (
         "apply_object_settings",

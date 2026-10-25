@@ -216,3 +216,118 @@ def test_a_hostile_draft_never_raises(project):
     r = call("check_draft", _text(d))
     assert r["ok"] is False and r["errors"]
     assert call("draft_form", "[" * 100000, "{}")["ok"] is False
+
+
+# ---------------------------------------------------------------- saving a draft (Task 4)
+
+
+def _chair_copy(legs=3):
+    d = _draft("chair")
+    for q in d["params"]:
+        if q["key"] == "legs":
+            q["default"] = legs
+    return d
+
+
+def test_save_to_office_writes_and_lists(project, tmp_path):
+    d = _chair_copy()
+    assert call("save_draft", _text(d), "office")["error"].startswith("no office library folder")
+    library.load_office(str(tmp_path))
+    r = call("save_draft", _text(d), "office")
+    assert r["ok"] and r["ref"] == "office:chair_copy" and r["outdated"] == 0, r
+    path = tmp_path / "chair_copy.kimobj"
+    assert r["path"] == str(path) and path.read_text(encoding="utf-8").endswith("}\n")
+    assert json.loads(path.read_text(encoding="utf-8")) == d and list(json.loads(path.read_text(encoding="utf-8"))) == list(d)
+    assert library.get("office:chair_copy").values()["legs"] == 3
+    assert call("save_draft", _text(d), "office") == {"ok": False, "exists": "chair_copy"}
+    assert call("save_draft", _text(d), "office", "chair_copy")["ok"]
+    other = {**d, "id": "other"}  # a file with another name holding the same id is replaced in place
+    (tmp_path / "elsewhere.kimobj").write_text(json.dumps({**d, "id": "stool_x"}), encoding="utf-8")
+    library.load_office(str(tmp_path))
+    assert call("save_draft", _text({**d, "id": "stool_x"}), "office")["exists"] == "stool_x"
+    assert call("save_draft", _text({**d, "id": "stool_x"}), "office", "stool_x")["path"] == str(tmp_path / "elsewhere.kimobj")
+    assert not (tmp_path / "stool_x.kimobj").exists() and call("save_draft", _text(other), "office")["ok"]
+    assert call("save_draft", _text(d), "elsewhere")["ok"] is False
+
+
+def test_saving_a_bundled_id_is_refused(project, tmp_path):
+    library.load_office(str(tmp_path))
+    d = _draft("chair")
+    d["id"] = "chair"
+    for target in ("office", "project"):
+        r = call("save_draft", _text(d), target)
+        assert r == {"ok": False, "error": "chair is a bundled object: give the copy another id"}
+    assert not list(tmp_path.iterdir())
+
+
+def test_save_with_errors_is_refused(project, tmp_path):
+    library.load_office(str(tmp_path))
+    d = _draft("new")
+    d["parts"][0]["box"]["dx"] = "nothing"
+    n = len(b._model.by_type("IfcTypeProduct"))
+    for target in ("office", "project"):
+        r = call("save_draft", _text(d), target)
+        assert r["ok"] is False and r["error"] == "the object has errors" and r["errors"]
+    assert not list(tmp_path.iterdir()) and len(b._model.by_type("IfcTypeProduct")) == n
+    assert call("save_draft", "{nope", "project")["ok"] is False
+
+
+def test_save_to_project_keeps_the_object_and_undoes(project):
+    d = _text(_draft("new"))
+    r = call("save_draft", d, "project")
+    assert r == {"ok": True, "ref": "project:new_object", "types": 1}, r
+
+    def listed():
+        return [o["id"] for o in call("library_objects")["objects"]]
+    assert "project:new_object" in listed()
+    assert call("save_draft", d, "project")["types"] == 1  # saving again regenerates, it adds no type
+    assert call("undo")["ok"] and "project:new_object" in listed()
+    assert call("undo")["ok"] and "project:new_object" not in listed()
+    assert call("redo")["ok"] and "project:new_object" in listed()
+
+
+def _height(t, values):
+    return library.definition_of_type(t).shape(values).metrics()["bbox"][5]
+
+
+def test_saving_a_project_object_regenerates_its_types(project):
+    d = _draft("new")
+    assert call("save_draft", _text(d), "project")["ok"]
+    p1 = call("place_object", project, "project:new_object", '{"width": 0.7}', 0, 0)
+    p2 = call("place_object", project, "project:new_object", '{"width": 0.7}', 2, 0)
+    assert p1["ok"] and p2["ok"] and p1["type"] == p2["type"]
+    t = b._model.by_guid(p1["type"])
+    assert _height(t, library._params_of_type(t)[1]) == pytest.approx(0.75)
+    d["parts"][0]["box"]["dz"] = "height / 2"
+    r = call("save_draft", _text(d), "project")
+    assert r["ok"] and r["types"] == 2, r  # the saved version anchor and the placed type
+    t = b._model.by_guid(p1["type"])
+    assert b._model.by_guid(p2["type"]) == t
+    values = library._params_of_type(t)[1]
+    assert values["width"] == 0.7 and _height(t, values) == pytest.approx(0.375)
+
+
+def test_a_failing_type_changes_nothing(project):
+    d = _draft("new")
+    assert call("save_draft", _text(d), "project")["ok"]
+    p = call("place_object", project, "project:new_object", '{"width": 0.7}', 0, 0)
+    t = b._model.by_guid(p["type"])
+    before = ifcopenshell.util.element.get_pset(t, library.PSET, "Definition")
+    d["parts"][0]["box"]["dz"] = "1 / (width - 0.7)"  # builds at the defaults, not at width 0.7
+    r = call("save_draft", _text(d), "project")
+    assert r["ok"] is False and t.Name in r["error"], r
+    assert ifcopenshell.util.element.get_pset(t, library.PSET, "Definition") == before
+
+
+def test_an_edited_office_file_offers_an_update(project, tmp_path):
+    library.load_office(str(tmp_path))
+    d = _chair_copy()
+    assert call("save_draft", _text(d), "office")["ok"]
+    assert call("place_object", project, "office:chair_copy", "", 0, 0)["ok"]
+    assert call("library_updates", "")["outdated"] == 0
+    for q in d["params"]:
+        if q["key"] == "seat":
+            q["default"] = 0.5
+    r = call("save_draft", _text(d), "office", "chair_copy")
+    assert r["ok"] and r["outdated"] == 1, r
+    assert call("library_updates", "")["outdated"] == 1

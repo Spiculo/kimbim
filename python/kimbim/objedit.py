@@ -11,11 +11,15 @@ library.OBJECTS, library._office or the open model (the preview builds in a scra
   real loader says (structure, names, limits, a build at the defaults).
 - `draft_form`, `draft_symbol`, `draft_preview`, `draft_preview_error`: the Library's object_form,
   object_symbol, object_preview and object_preview_error for the draft, at the dialog's trial values.
-- `object_part_template(shape)`: a part to add that builds as it is."""
+- `object_part_template(shape)`: a part to add that builds as it is.
+- `save_draft(draft, target, replace)`: the draft kept in the office library (a `.kimobj` file) or in the
+  project (its types, one undo step)."""
 from __future__ import annotations
 
 import copy
 import json
+import os
+import uuid
 
 from . import library, objbuild, objects
 from .objbuild import ObjectError
@@ -342,3 +346,76 @@ def object_part_template(shape: str) -> str:
     if shape == "sweep":
         fields["r"] = 0.05  # a sweep is a tube (r) or a profile
     return _dump({"ok": True, "part": {"id": "part", shape: fields}})
+
+
+# ---------------------------------------------------------------- saving a draft
+
+def _save_office(obj, draft_json: str, replace: str) -> str:
+    folder = library._office_paths["folder"]
+    if not folder:
+        return _fail("no office library folder (Preferences › Office library)")
+    ref = f"office:{obj.key}"
+    path = os.path.join(folder, f"{obj.key}.kimobj")
+    known = library._office.get(ref)  # an object loaded from a file with another name is replaced in place
+    if isinstance(known, objects.ObjectDef) and known.library:
+        path = known.library
+    if (os.path.exists(path) or known is not None) and replace != obj.key:
+        return _dump({"ok": False, "exists": obj.key})
+    text = json.dumps(json.loads(draft_json), indent=2, ensure_ascii=False) + "\n"
+    try:
+        with open(path, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(text)
+    except OSError as ex:
+        return _fail(f"cannot write {path}: {ex}")
+    library.load_office(folder, library._office_paths["files"])
+    from . import app_bridge as B
+
+    placed = [e for e in B._model.by_type("IfcElement")
+              if (found := library._object_of(e)) is not None and found[0].ref == ref] if B._model is not None else []
+    return _dump({"ok": True, "ref": ref, "path": path, "outdated": len(library._outdated(placed))})
+
+
+def _save_project(obj) -> str:
+    from . import app_bridge as B
+    from . import objversions
+
+    if B._model is None:
+        return _fail("no model open")
+    types = [t for t in library._library_types(B._model)
+             if (info := library._params_of_type(t)) is not None and info[0] == obj.ref]
+    plans = []
+    for t in types:  # every type must build before any changes
+        old = library.definition_of_type(t) or obj
+        values = library._kept_values(old, library._params_of_type(t)[1], obj)
+        try:
+            obj.shape(values)
+        except (ObjectError, ValueError) as ex:
+            return _fail(f"{t.Name}: {ex}")
+        plans.append((t, values))
+
+    def action():
+        if not plans:  # kept in the project by a saved version named after the object
+            objversions._write_version(library._make_type(obj, obj.values()), uuid.uuid4().hex, obj.name)
+        for t, values in plans:
+            library._regenerate_type(t, obj, values)
+        return max(len(plans), 1), [], []
+
+    try:
+        B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return _dump({"ok": True, "ref": obj.ref, "types": max(len(plans), 1)})
+
+
+def save_draft(draft_json: str, target: str, replace: str = "") -> str:
+    try:
+        obj, errors = _load(draft_json)
+        if obj is None or errors:
+            return _dump({"ok": False, "error": "the object has errors", "errors": errors})
+        if target not in ("office", "project"):
+            return _fail(f"unknown target {target!r}")
+        if obj.key in library.OBJECTS:
+            return _fail(f"{obj.key} is a bundled object: give the copy another id")
+        return _save_office(obj, draft_json, replace) if target == "office" else _save_project(obj)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
