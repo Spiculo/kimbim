@@ -21,6 +21,7 @@ Same protocol as app_bridge for the bridge functions (strings in, JSON out, neve
 from __future__ import annotations
 
 import json
+import os
 import uuid
 
 from . import library, objects
@@ -53,9 +54,21 @@ def version_of(t) -> dict | None:
         values = json.loads(data.get("Parameters") or "{}")
     except ValueError:
         values = {}
-    return {"id": data[VERSION_ID], "name": data.get(VERSION_NAME) or t.Name or "", "object": data.get("Object") or "",
+    vid = data[VERSION_ID]
+    return {"id": vid, "name": data.get(VERSION_NAME) or t.Name or "", "object": data.get("Object") or "",
             "values": values if isinstance(values, dict) else {}, "type": t.GlobalId,
-            "uses": len(ifcopenshell.util.element.get_types(t)), "source": "project", "office_id": None}
+            "uses": len(ifcopenshell.util.element.get_types(t)), "source": "project",
+            "office_id": vid if vid in library._office_versions else None}
+
+
+def office_versions(ref: str) -> list[dict]:
+    """The office library's saved versions of an object the project has no copy of (a project type with
+    the same VersionId), by name. Listed like project versions, with no type and no uses."""
+    mine = {_pset(t).get(VERSION_ID) for t in _saved_types(ref)}
+    found = [{"id": e["id"], "name": e["name"], "object": e["object"], "values": e["values"], "type": None,
+              "uses": 0, "source": "office", "office_id": e["id"]}
+             for e in library._office_versions.values() if e["object"] == ref and e["id"] not in mine]
+    return sorted(found, key=lambda v: (v["name"].casefold(), v["id"]))
 
 
 def _saved_types(ref: str | None = None) -> list:
@@ -81,7 +94,8 @@ def find_version(version_id: str):
 
 def _definition(key: str):
     """The definition to build versions of `key`: the library's, else the one stored on a project type
-    of that object (its object is gone from the library: the project still has it, D99)."""
+    of that object (its object is gone from the library: the project still has it, D99), else an office
+    version's."""
     obj = library.get(key)
     if isinstance(obj, objects.ObjectDef):
         return obj
@@ -89,11 +103,13 @@ def _definition(key: str):
         return None  # an office IFC type: fixed geometry, no parameters to save
     from . import app_bridge as B
 
-    if B._model is None:
-        return None
-    for t in sorted(_saved_types(key), key=lambda t: t.id()) + library._library_types(B._model):
-        info = library._params_of_type(t)
-        if info is not None and info[0] == key and (d := library.definition_of_type(t)) is not None:
+    if B._model is not None:
+        for t in sorted(_saved_types(key), key=lambda t: t.id()) + library._library_types(B._model):
+            info = library._params_of_type(t)
+            if info is not None and info[0] == key and (d := library.definition_of_type(t)) is not None:
+                return d
+    for entry in library._office_versions.values():
+        if entry["object"] == key and (d := library.office_definition(entry)) is not None:
             return d
     return None
 
@@ -125,8 +141,9 @@ def _write_version(t, version_id: str, name: str) -> None:
 # ---------------------------------------------------------------- bridge
 
 def object_versions(key: str) -> str:
-    """The dialog's versions list for an object: its default values, the project's saved versions, and
-    the last one used (`object_last_used`)."""
+    """The dialog's versions list for an object: its default values, the project's saved versions, then
+    the office library's ("source": "office"; one the project has a copy of is listed once, as the
+    project's, with its "office_id"), and the last one used (`object_last_used`)."""
     from . import app_bridge as B
     from . import authoring as A
     from . import settings
@@ -135,9 +152,10 @@ def object_versions(key: str) -> str:
     if obj is None:
         return A._fail(f"no library object {key}")
     last = settings.current().get("object_last_used", {}).get(key, {})
-    if "version" in last and find_version(last["version"]) is None:
-        last = {}  # a version no longer in the project: a plain click places the Default
-    return B._dump({"ok": True, "default": obj.values(), "versions": project_versions(key), "last": last})
+    if "version" in last and find_version(last["version"]) is None and last["version"] not in library._office_versions:
+        last = {}  # a version no longer in the project or the office: a plain click places the Default
+    return B._dump({"ok": True, "default": obj.values(), "versions": project_versions(key) + office_versions(key),
+                    "last": last})
 
 
 def save_object_version(key: str, name: str, params_json: str, replace: str = "") -> str:
@@ -383,6 +401,105 @@ def assign_version(guids_json: str, version_id: str) -> str:
     except Exception as ex:
         return A._fail(f"{type(ex).__name__}: {ex}")
     return B._dump({**r, "type": target.GlobalId})
+
+
+# ---------------------------------------------------------------- the office library
+
+VERSIONS_FILE = "kimbim-versions.ifc"  # in the office folder: the versions every project sees
+
+
+def _office_copy_name(ref: str, name: str) -> str:
+    """`name`, or "<name> (office)" when another project version of `ref` has it (then "(office 2)", ...)."""
+    candidate, n = name, 1
+    while _clash(ref, candidate) is not None:
+        suffix = " (office)" if n == 1 else f" (office {n})"
+        candidate, n = name[:NAME_LIMIT - len(suffix)] + suffix, n + 1
+    return candidate
+
+
+def copy_office_version(entry: dict, obj, values: dict):
+    """An office version copied into the project (library.place_object, inside its undo step): a project
+    type built from the office type's stored definition and values, keeping the office VersionId, so later
+    placements find and reuse it and the project never depends on the office library."""
+    t = library._make_type(obj, values)
+    _write_version(t, entry["id"], _office_copy_name(obj.ref, entry["name"]))
+    return t
+
+
+def _new_versions_file(model):
+    """An empty office versions file in the project's schema, with its units. Its IfcProject is made
+    directly: the api's owner history would point at the open model's person (IFC2X3 takes the copied
+    type's, move_version_to_library)."""
+    import ifcopenshell.api.project
+    import ifcopenshell.guid
+
+    f = ifcopenshell.api.project.create_file(version=model.schema)
+    project = f.create_entity("IfcProject", GlobalId=ifcopenshell.guid.new(), Name="KimBim versions")
+    units = next(iter(model.by_type("IfcProject")), None)
+    if units is not None and units.UnitsInContext is not None:
+        project.UnitsInContext = f.add(units.UnitsInContext)
+    return f
+
+
+def move_version_to_library(version_id: str, replace: str = "") -> str:
+    """Copy a project version into the office library's versions file (<office folder>/kimbim-versions.ifc,
+    made in the project's schema if missing), keeping its VersionId. An office version with the same id,
+    or the same object and name, fails with {"exists": id} unless `replace` ("1"), which replaces it. The
+    office library reloads after. Not an undo step: the project does not change."""
+    import ifcopenshell
+    import ifcopenshell.api.project
+    import ifcopenshell.api.root
+
+    from . import app_bridge as B
+    from . import authoring as A
+
+    if B._model is None:
+        return A._fail("no model open")
+    t = find_version(version_id)
+    if t is None:
+        return A._fail("unknown version")
+    folder = library._office_paths["folder"]
+    if not folder:
+        return A._fail("no office library folder: set one in Preferences › Office library")
+    if not os.path.isdir(folder):
+        return A._fail(f"the office library folder {folder} is missing")
+    if B._model.schema not in ("IFC4", "IFC2X3"):
+        return A._fail("the office library shares versions of IFC4 and IFC2X3 projects")
+    path = os.path.join(folder, VERSIONS_FILE)
+    try:
+        office = ifcopenshell.open(path) if os.path.isfile(path) else _new_versions_file(B._model)
+    except Exception as ex:
+        return A._fail(f"cannot read {path}: {type(ex).__name__}: {ex}")
+    if office.schema != B._model.schema:
+        return A._fail(f"the office versions file is {office.schema}, this project is {B._model.schema}")
+    mine = version_of(t)
+    same = [o for o in library._library_types(office) if (d := _pset(o)).get(VERSION_ID) and (
+        d[VERSION_ID] == version_id or (d.get("Object") == mine["object"] and
+                                        (d.get(VERSION_NAME) or o.Name or "").casefold() == mine["name"].casefold()))]
+    if same and str(replace) not in ("1", "true", "True"):
+        theirs = _pset(same[0])
+        return B._dump({"ok": False, "error": "the office library already has a version called "
+                        f"{theirs.get(VERSION_NAME) or same[0].Name}", "exists": theirs[VERSION_ID]})
+    temp = path + ".tmp"
+    try:
+        for o in same:
+            ifcopenshell.api.root.remove_product(office, product=o)
+        copied = ifcopenshell.api.project.append_asset(office, library=B._model, element=t)  # the pset comes with it
+        for p in office.by_type("IfcProject"):
+            if p.OwnerHistory is None and office.schema == "IFC2X3":  # required in IFC2X3
+                p.OwnerHistory = copied.OwnerHistory
+        office.write(temp, format=".ifc")
+        os.replace(temp, path)
+    except Exception as ex:
+        if os.path.exists(temp):
+            try:
+                os.remove(temp)
+            except OSError:
+                pass
+        return A._fail(f"cannot write {path}: {type(ex).__name__}: {ex}")
+    library._ifc_cache.pop(path, None)
+    library.load_office(folder, library._office_paths["files"])
+    return B._dump({"ok": True, "id": version_id, "path": path})
 
 
 def set_last_used(key: str, data_json: str) -> str:

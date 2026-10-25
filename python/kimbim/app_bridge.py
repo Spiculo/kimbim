@@ -1318,6 +1318,7 @@ _EXPORTS = {
         "apply_object_settings",
         "assign_version",
         "delete_version",
+        "move_version_to_library",
         "object_settings_of",
         "object_versions",
         "rename_version",

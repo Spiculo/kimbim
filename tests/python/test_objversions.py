@@ -282,3 +282,133 @@ def test_a_whole_type_parameter_edit_of_a_saved_version_regenerates_it(project):
     assert b._model.by_guid(loose)
     t = ifcopenshell.util.element.get_type(b._model.by_guid(a))
     assert t.GlobalId == k["type"] and t.Name == "Kitchen" and b._model.by_guid(d["type"])
+
+
+# ---------------------------------------------------------------- the office library (Task 3)
+
+def test_move_to_library_and_use_in_another_project(project, tmp_path):
+    library.load_office(str(tmp_path))
+    v = call("save_object_version", "chair", "Café", json.dumps({"seat_shape": "round"}))
+    assert call("move_version_to_library", v["id"])["ok"]
+    assert (tmp_path / "kimbim-versions.ifc").exists()
+    mine = call("object_versions", "chair")["versions"]
+    assert len(mine) == 1 and mine[0]["source"] == "project"      # listed once
+    assert call("new_project", "Other")["ok"]
+    storey = call("storeys")["storeys"][0]["guid"]
+    office = [x for x in call("object_versions", "chair")["versions"] if x["source"] == "office"]
+    assert office and office[0]["id"] == v["id"]
+    p = call("place_object", storey, "chair", "", 0, 0, 0, "", v["id"])
+    t = b._model.by_guid(p["type"])
+    assert t.Name == "Café"
+    assert call("place_object", storey, "chair", "", 1, 0, 0, "", v["id"])["type"] == p["type"]
+    library.load_office()
+    assert call("place_object", storey, "chair", "", 2, 0, 0, "", v["id"])["type"] == p["type"]  # self-contained
+
+
+def test_office_copy_renamed_on_clash(project, tmp_path):
+    library.load_office(str(tmp_path))
+    v = call("save_object_version", "chair", "Café", "")
+    call("move_version_to_library", v["id"])
+    assert call("new_project", "Other")["ok"]
+    storey = call("storeys")["storeys"][0]["guid"]
+    call("save_object_version", "chair", "Café", json.dumps({"width": 0.6}))
+    p = call("place_object", storey, "chair", "", 0, 0, 0, "", v["id"])
+    assert b._model.by_guid(p["type"]).Name == "Café (office)"
+
+
+def test_replacing_an_office_version_asks(project, tmp_path):
+    library.load_office(str(tmp_path))
+    v = call("save_object_version", "chair", "Café", "")
+    call("move_version_to_library", v["id"])
+    assert call("move_version_to_library", v["id"])["exists"]
+    assert call("move_version_to_library", v["id"], "1")["ok"]
+
+
+def test_move_to_library_without_a_usable_folder_fails_cleanly(project, tmp_path):  # Review Focus 3
+    v = call("save_object_version", "chair", "Café", "")
+    library.load_office("")
+    assert call("move_version_to_library", v["id"])["ok"] is False
+    library.load_office(str(tmp_path / "missing"))
+    assert call("move_version_to_library", v["id"])["ok"] is False
+    assert call("object_versions", "chair")["versions"][0]["name"] == "Café"
+
+
+def test_office_versions_file_details(project, tmp_path):
+    library.load_office(str(tmp_path))
+    v = call("save_object_version", "chair", "Café", json.dumps({"width": 0.55}))
+    assert call("move_version_to_library", v["id"])["ok"]
+    # the versions file is the office's own versions, not fixed ifc: types; a plain office IFC still loads
+    assert not [k for k in library._office if k.startswith("ifc:")]
+    entry = library._office_versions[v["id"]]
+    assert entry["name"] == "Café" and entry["object"] == "chair" and entry["values"]["width"] == 0.55
+    assert entry["hash"] and entry["path"].endswith("kimbim-versions.ifc")
+    office = ifcopenshell.open(str(tmp_path / "kimbim-versions.ifc"))
+    assert office.schema == b._model.schema and not validate(office)
+    mine = call("object_versions", "chair")["versions"]
+    assert mine[0]["office_id"] == v["id"]
+    # another version of the same name and another id: "exists" too
+    assert call("new_project", "Other")["ok"]
+    w = call("save_object_version", "chair", "café", "")
+    assert call("move_version_to_library", w["id"])["exists"] == v["id"]
+    assert call("move_version_to_library", w["id"], "1")["ok"]
+    assert list(library._office_versions) == [w["id"]]
+
+
+def test_placing_an_office_version_is_one_undo_step(project, tmp_path):
+    library.load_office(str(tmp_path))
+    v = call("save_object_version", "chair", "Café", "")
+    call("move_version_to_library", v["id"])
+    assert call("new_project", "Other")["ok"]
+    storey = call("storeys")["storeys"][0]["guid"]
+    p = call("place_object", storey, "chair", "", 0, 0, 0, "", v["id"])
+    assert objversions.find_version(v["id"]).GlobalId == p["type"]
+    assert call("place_object", storey, "table", "", 0, 0, 0, "", v["id"])["ok"] is False  # not a table version
+    assert call("undo")["ok"]
+    assert objversions.find_version(v["id"]) is None
+    assert not validate(b._model)
+
+
+def test_plain_office_ifc_types_still_load(project, tmp_path):
+    library.load_office(str(tmp_path))
+    call("place_object", project, "chair", "", 0, 0, 0)
+    b._model.write(str(tmp_path / "plain.ifc"))      # an unnamed library type: a fixed ifc: entry
+    library.load_office(str(tmp_path))
+    assert [k for k in library._office if k.startswith("ifc:")] and not library._office_versions
+
+
+def test_office_versions_in_ifc2x3_and_a_schema_mismatch(tmp_path):
+    from kimbim import testing
+
+    try:
+        f = testing.build_model("IFC2X3", walls=1)
+        f.write(str(tmp_path / "x3.ifc"))
+        office = tmp_path / "office"
+        office.mkdir()
+        library.load_office(str(office))
+        assert call("open_model", str(tmp_path / "x3.ifc"))["ok"]
+        storey = call("storeys")["storeys"][0]["guid"]
+        v = call("save_object_version", "chair", "Café", json.dumps({"width": 0.55}))
+        assert call("move_version_to_library", v["id"])["ok"]
+        written = ifcopenshell.open(str(office / "kimbim-versions.ifc"))
+        assert written.schema == "IFC2X3" and validate(written) == []
+        assert call("delete_version", v["id"])["ok"]            # gone from the project: placed from the office
+        p = call("place_object", storey, "chair", "", 0, 0, 0, "", v["id"])
+        assert b._model.by_guid(p["type"]).Name == "Café" and validate(b._model) == []
+        assert call("new_project", "Other")["ok"]                # an IFC4 project, an IFC2X3 versions file
+        w = call("save_object_version", "chair", "Bar", "")
+        r = call("move_version_to_library", w["id"])
+        assert r["ok"] is False and "IFC2X3" in r["error"]
+        assert [x["source"] for x in call("object_versions", "chair")["versions"]] == ["project", "office"]
+    finally:
+        testing._reset_owner()
+        library.load_office()
+
+
+def test_move_to_library_when_the_file_cannot_be_written(project, tmp_path):  # Review Focus 3
+    library.load_office(str(tmp_path))
+    (tmp_path / "kimbim-versions.ifc").mkdir()        # in the way: the versions file cannot be written
+    v = call("save_object_version", "chair", "Café", "")
+    r = call("move_version_to_library", v["id"])
+    assert r["ok"] is False and "cannot write" in r["error"]
+    assert not (tmp_path / "kimbim-versions.ifc.tmp").exists() and not library._office_versions
+    assert call("object_versions", "chair")["versions"][0]["source"] == "project"

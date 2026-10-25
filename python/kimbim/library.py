@@ -163,6 +163,9 @@ def footprint(obj, values: dict) -> tuple[float, float]:
 # ---------------------------------------------------------------- office library
 
 _office: dict = {}  # ref -> objects.ObjectDef or IFC type entry {"path", "guid", "name", "ifc_class"}
+# D100: saved versions shared through the office library (types of its IFC files with a VersionId), by id:
+# {"id", "name", "object", "values", "hash", "path", "guid"}
+_office_versions: dict = {}
 _office_paths = {"folder": "", "files": []}
 _office_errors: list = []
 _ifc_cache: dict = {}  # path -> (mtime, ifcopenshell.file)
@@ -180,8 +183,26 @@ def _open_library_ifc(path: str):
 
 
 def _load_ifc_types(path: str, category: str):
+    """An office IFC file's types: fixed `ifc:` entries, or office versions (D100) when they carry a
+    VersionId (kimbim-versions.ifc, written by objversions.move_version_to_library)."""
+    import ifcopenshell.util.element
+
+    from . import objversions
+
     f = _open_library_ifc(path)
     for t in f.by_type("IfcTypeProduct"):
+        data = ifcopenshell.util.element.get_pset(t, PSET) or {}
+        if data.get(objversions.VERSION_ID):
+            try:
+                values = json.loads(data.get("Parameters") or "{}")
+            except ValueError:
+                values = {}
+            vid = data[objversions.VERSION_ID]
+            _office_versions[vid] = {"id": vid, "name": data.get(objversions.VERSION_NAME) or t.Name or "",
+                                     "object": data.get("Object") or "",
+                                     "values": values if isinstance(values, dict) else {},
+                                     "hash": data.get("DefinitionHash") or "", "path": path, "guid": t.GlobalId}
+            continue
         if t.is_a("IfcDoorType") or t.is_a("IfcWindowType") or not getattr(t, "RepresentationMaps", None):
             continue  # doors and windows go in walls; types without a shape place nothing
         key = f"ifc:{path}::{t.GlobalId}"
@@ -193,6 +214,7 @@ def load_office(folder: str = "", files=()) -> None:
     """(Re)load the office library: *.kimobj definitions (D99) and *.ifc files' types. A file that does
     not load or build is listed in the errors and left out; the rest load."""
     _office.clear()
+    _office_versions.clear()
     _office_errors.clear()
     _office_paths["folder"], _office_paths["files"] = folder or "", list(files or ())
     paths = []
@@ -231,6 +253,14 @@ def load_office(folder: str = "", files=()) -> None:
             _office_errors.append({"file": path, "error": error})
             parsed.remove((path, d))
             removed = True
+
+
+def office_definition(entry: dict):
+    """The definition an office version (D100) was made from: the text stored on its type, or None."""
+    try:
+        return definition_of_type(_open_library_ifc(entry["path"]).by_guid(entry["guid"]))
+    except Exception:  # the file went or changed since it loaded
+        return None
 
 
 def get(key: str):
@@ -667,7 +697,9 @@ def place_object(storey_guid: str, key: str, params_json: str, x, y, angle=0.0, 
     `angle` radians. The type with these parameters is reused, or made. One undo step. `gravity`
     (D97, Archicad's Gravity): "1" puts it on the top of the slab under (x, y), if any. `version` (D100):
     a saved version's id; it places that version's type and `params_json` is ignored (it works without
-    the object in the library: the type has everything)."""
+    the object in the library: the type has everything). An office version's id the project has no copy
+    of copies it in first, in the same undo step (objversions.copy_office_version); later placements
+    reuse the copy."""
     import ifcopenshell.api.geometry
     import ifcopenshell.api.root
     import ifcopenshell.api.spatial
@@ -683,18 +715,27 @@ def place_object(storey_guid: str, key: str, params_json: str, x, y, angle=0.0, 
     storey = A._by_guid(storey_guid)
     if storey is None or not storey.is_a("IfcBuildingStorey"):
         return A._fail("unknown level")
-    saved = None
+    saved = office = None
     if version:
         from . import objversions
 
         saved = objversions.find_version(version)
-        if saved is None:
+        office = _office_versions.get(version) if saved is None else None
+        if saved is None and office is None:
             return A._fail("unknown version")
-        info = _params_of_type(saved)
-        if info is None or (key and info[0] != key):
-            return A._fail(f"that version is not one of {key}")
-        obj = definition_of_type(saved)
-        name = obj.name if obj is not None else (saved.Name or "")
+        if saved is not None:
+            info = _params_of_type(saved)
+            if info is None or (key and info[0] != key):
+                return A._fail(f"that version is not one of {key}")
+            obj = definition_of_type(saved)
+            name = obj.name if obj is not None else (saved.Name or "")
+        else:
+            if key and office["object"] != key:
+                return A._fail(f"that version is not one of {key}")
+            obj = office_definition(office)
+            if obj is None:
+                return A._fail(f"the office version {office['name']} has no definition")
+            name = obj.name
         params_json = ""
     else:
         obj = get(key)
@@ -705,8 +746,9 @@ def place_object(storey_guid: str, key: str, params_json: str, x, y, angle=0.0, 
         x, y, angle = float(x), float(y), float(angle or 0.0)
     except (TypeError, ValueError) as ex:
         return A._fail(str(ex))
-    values = obj.values(given) if saved is None and isinstance(obj, objects.ObjectDef) else {}
-    if saved is None and isinstance(obj, objects.ObjectDef):
+    fresh = saved is None and isinstance(obj, objects.ObjectDef)  # values to build: given, or an office version's
+    values = obj.values(office["values"] if office is not None else given) if fresh else {}
+    if fresh:
         try:
             obj.shape(values)  # a definition that does not build at these values places nothing
         except (ObjectError, ValueError) as ex:
@@ -723,6 +765,8 @@ def place_object(storey_guid: str, key: str, params_json: str, x, y, angle=0.0, 
         f = B._model
         if saved is not None:
             t, element_name = saved, name
+        elif office is not None:
+            t, element_name = objversions.copy_office_version(office, obj, values), name
         elif isinstance(obj, objects.ObjectDef):
             t, element_name = _type_for(obj, values), obj.name
         else:
