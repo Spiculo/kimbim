@@ -55,7 +55,7 @@
   - `find_version(version_id: str)`: the project type, or None.
   - Bridge:
     - `object_versions(key: str) -> str`: `{"ok", "default": values, "versions": [version dicts], "last": {"version": id}|{"values": {}}|{}}`. Task 3 adds office entries with `"source": "office"`.
-    - `save_version(key: str, name: str, params_json: str, replace: str = "") -> str`: `{"ok", "id", "type"}`. With a name clash and no `replace`: `{"ok": False, "error": ..., "exists": id}`. With `replace="1"`, the existing version is regenerated with the new values (same id).
+    - `save_object_version(key: str, name: str, params_json: str, replace: str = "") -> str`: `{"ok", "id", "type"}`. With a name clash and no `replace`: `{"ok": False, "error": ..., "exists": id}`. With `replace="1"`, the existing version is regenerated with the new values (same id).
     - `rename_version(version_id: str, name: str) -> str`
     - `delete_version(version_id: str) -> str`: fails with `"used": n` if anything uses it.
     - `set_last_used(key: str, data_json: str) -> str`: stores `{"version": id}` or `{"values": {...}}` in project setting `object_last_used`. It's a settings change, not a model edit.
@@ -66,7 +66,7 @@
 
 ```python
 def test_save_place_and_list_a_version(project):
-    r = call("save_version", "chair", "Dining", json.dumps({"width": 0.5, "back": "slats"}))
+    r = call("save_object_version", "chair", "Dining", json.dumps({"width": 0.5, "back": "slats"}))
     assert r["ok"], r
     vs = call("object_versions", "chair")["versions"]
     assert [v["name"] for v in vs] == ["Dining"] and vs[0]["values"]["width"] == 0.5 and vs[0]["uses"] == 0
@@ -77,29 +77,29 @@ def test_save_place_and_list_a_version(project):
     assert call("object_versions", "chair")["versions"][0]["uses"] == 1
 
 def test_unsaved_values_never_join_a_named_version(project):
-    v = call("save_version", "chair", "Dining", json.dumps({"width": 0.5}))
+    v = call("save_object_version", "chair", "Dining", json.dumps({"width": 0.5}))
     p = call("place_object", project, "chair", json.dumps({"width": 0.5}), 0, 0, 0)
     assert p["type"] != v["type"]
-    k = call("save_version", "chair", "Kitchen", json.dumps({"width": 0.5}))
+    k = call("save_object_version", "chair", "Kitchen", json.dumps({"width": 0.5}))
     assert k["type"] not in (v["type"], p["type"])   # identical values, separate types
 
 def test_an_unused_saved_version_stays(project):
-    v = call("save_version", "chair", "Dining", "")
+    v = call("save_object_version", "chair", "Dining", "")
     p = call("place_object", project, "chair", "", 0, 0, 0, "", v["id"])
     assert call("delete_elements", json.dumps([p["guid"]]))["ok"]
     assert b._model.by_guid(v["type"])               # unnamed types go when unused; saved ones stay
 
 def test_names_are_unique_per_object_and_validated(project):
-    assert call("save_version", "chair", "Dining", "")["ok"]
-    clash = call("save_version", "chair", " dining ", json.dumps({"width": 0.6}))
+    assert call("save_object_version", "chair", "Dining", "")["ok"]
+    clash = call("save_object_version", "chair", " dining ", json.dumps({"width": 0.6}))
     assert clash["ok"] is False and clash["exists"]
-    assert call("save_version", "chair", "Dining", json.dumps({"width": 0.6}), "1")["ok"]
+    assert call("save_object_version", "chair", "Dining", json.dumps({"width": 0.6}), "1")["ok"]
     assert call("object_versions", "chair")["versions"][0]["values"]["width"] == 0.6
-    assert call("save_version", "table", "Dining", "")["ok"]   # another object may reuse the name
-    assert call("save_version", "chair", "   ", "")["ok"] is False
+    assert call("save_object_version", "table", "Dining", "")["ok"]   # another object may reuse the name
+    assert call("save_object_version", "chair", "   ", "")["ok"] is False
 
 def test_rename_and_delete(project):
-    v = call("save_version", "chair", "Dining", "")
+    v = call("save_object_version", "chair", "Dining", "")
     assert call("rename_version", v["id"], "Dinner")["ok"]
     assert b._model.by_guid(v["type"]).Name == "Dinner"
     p = call("place_object", project, "chair", "", 0, 0, 0, "", v["id"])
@@ -110,7 +110,7 @@ def test_rename_and_delete(project):
     assert call("object_versions", "chair")["versions"] == []
 
 def test_each_version_edit_is_one_undo_step(project):            # Review Focus 1
-    v = call("save_version", "chair", "Dining", "")
+    v = call("save_object_version", "chair", "Dining", "")
     assert call("undo")["ok"] and call("object_versions", "chair")["versions"] == []
     assert call("redo")["ok"]
     assert call("rename_version", v["id"], "Dinner")["ok"]
@@ -129,7 +129,7 @@ def test_a_version_of_an_object_gone_from_the_library_still_works(project, tmp_p
 ```
 
 - [ ] **Step 2: Run them and confirm they fail.**
-Run `pixi run pytest tests/python/test_objversions.py -q`. Expect failures (no `save_version`).
+Run `pixi run pytest tests/python/test_objversions.py -q`. Expect failures (no `save_object_version`).
 
 - [ ] **Step 3: Implement `objversions.py` and the `library.py` hooks.**
   - `VersionId` is `uuid.uuid4().hex`, written as IfcIdentifier. `VersionName` is IfcLabel.
@@ -137,7 +137,7 @@ Run `pixi run pytest tests/python/test_objversions.py -q`. Expect failures (no `
   - `_find_type` skips saved types, so unsaved values never resolve to one.
   - `_remove_type_if_unused` never removes a saved type.
   - `_write_pset` must not clear the version fields when it rewrites the pset.
-  - `save_version` builds with `_make_type` and then adds the version fields, all in one `B._run`. Values are cleaned through `obj.values()` and must build (`obj.shape`), or it fails.
+  - `save_object_version` builds with `_make_type` and then adds the version fields, all in one `B._run`. Values are cleaned through `obj.values()` and must build (`obj.shape`), or it fails.
   - `object_versions` for an unknown key that still has project versions uses the stored definition (`definition_of_type`) to report `default`.
   - `set_last_used` goes through `settings` like other project settings. Add `object_last_used: {}` to `settings.DEFAULTS`, with a `_error` rule that requires a dict of dicts.
 
@@ -170,7 +170,7 @@ Run `pixi run pytest tests/python/test_objversions.py -q`. Expect failures (no `
 
 ```python
 def test_modify_all_changes_every_placement_and_keeps_the_version(project):
-    v = call("save_version", "chair", "Dining", "")
+    v = call("save_object_version", "chair", "Dining", "")
     a = call("place_object", project, "chair", "", 0, 0, 0, "", v["id"])["guid"]
     c = call("place_object", project, "chair", "", 1, 0, 0, "", v["id"])["guid"]
     s = call("object_settings_of", json.dumps([a]))
@@ -182,15 +182,15 @@ def test_modify_all_changes_every_placement_and_keeps_the_version(project):
         assert t.GlobalId == v["type"] and t.Name == "Dining"
 
 def test_modify_all_never_merges_named_types(project):
-    d = call("save_version", "chair", "Dining", json.dumps({"width": 0.5}))
-    k = call("save_version", "chair", "Kitchen", json.dumps({"width": 0.6}))
+    d = call("save_object_version", "chair", "Dining", json.dumps({"width": 0.5}))
+    k = call("save_object_version", "chair", "Kitchen", json.dumps({"width": 0.6}))
     a = call("place_object", project, "chair", "", 0, 0, 0, "", k["id"])["guid"]
     assert call("apply_object_settings", json.dumps([a]), json.dumps({"width": 0.5}), "all")["ok"]
     assert ifcopenshell.util.element.get_type(b._model.by_guid(a)).GlobalId == k["type"]
     assert b._model.by_guid(d["type"])
 
 def test_create_a_new_type_moves_only_the_selection(project):
-    v = call("save_version", "chair", "Dining", "")
+    v = call("save_object_version", "chair", "Dining", "")
     a = call("place_object", project, "chair", "", 0, 0, 0, "", v["id"])["guid"]
     c = call("place_object", project, "chair", "", 1, 0, 0, "", v["id"])["guid"]
     r = call("apply_object_settings", json.dumps([a]), json.dumps({"arms": True}), "new", "Armchair")
@@ -206,7 +206,7 @@ def test_an_unshared_type_applies_directly_and_a_mixed_selection_fails(project):
     assert call("object_settings_of", json.dumps([a, t]))["ok"] is False
 
 def test_assign_version(project):
-    v = call("save_version", "chair", "Dining", "")
+    v = call("save_object_version", "chair", "Dining", "")
     a = call("place_object", project, "chair", "", 0, 0, 0)["guid"]
     old = ifcopenshell.util.element.get_type(b._model.by_guid(a)).GlobalId
     assert call("assign_version", json.dumps([a]), v["id"])["ok"]
@@ -256,7 +256,7 @@ def test_values_that_do_not_build_are_refused(project):        # Review Focus 5 
 ```python
 def test_move_to_library_and_use_in_another_project(project, tmp_path):
     library.load_office(str(tmp_path))
-    v = call("save_version", "chair", "Café", json.dumps({"seat_shape": "round"}))
+    v = call("save_object_version", "chair", "Café", json.dumps({"seat_shape": "round"}))
     assert call("move_version_to_library", v["id"])["ok"]
     assert (tmp_path / "kimbim-versions.ifc").exists()
     mine = call("object_versions", "chair")["versions"]
@@ -274,23 +274,23 @@ def test_move_to_library_and_use_in_another_project(project, tmp_path):
 
 def test_office_copy_renamed_on_clash(project, tmp_path):
     library.load_office(str(tmp_path))
-    v = call("save_version", "chair", "Café", "")
+    v = call("save_object_version", "chair", "Café", "")
     call("move_version_to_library", v["id"])
     assert call("new_project", "Other")["ok"]
     storey = call("storeys")["storeys"][0]["guid"]
-    call("save_version", "chair", "Café", json.dumps({"width": 0.6}))
+    call("save_object_version", "chair", "Café", json.dumps({"width": 0.6}))
     p = call("place_object", storey, "chair", "", 0, 0, 0, "", v["id"])
     assert b._model.by_guid(p["type"]).Name == "Café (office)"
 
 def test_replacing_an_office_version_asks(project, tmp_path):
     library.load_office(str(tmp_path))
-    v = call("save_version", "chair", "Café", "")
+    v = call("save_object_version", "chair", "Café", "")
     call("move_version_to_library", v["id"])
     assert call("move_version_to_library", v["id"])["exists"]
     assert call("move_version_to_library", v["id"], "1")["ok"]
 
 def test_move_to_library_without_a_usable_folder_fails_cleanly(project, tmp_path):  # Review Focus 3
-    v = call("save_version", "chair", "Café", "")
+    v = call("save_object_version", "chair", "Café", "")
     library.load_office("")
     assert call("move_version_to_library", v["id"])["ok"] is False
     library.load_office(str(tmp_path / "missing"))
@@ -356,7 +356,7 @@ def test_an_office_copy_follows_its_office_version(project, tmp_path):
 
 **Interfaces:**
 - Consumes:
-  - `object_form`, `object_symbol`, `object_versions`, `save_version`, `rename_version`, `delete_version`, `move_version_to_library` (Tasks 1–3);
+  - `object_form`, `object_symbol`, `object_versions`, `save_object_version`, `rename_version`, `delete_version`, `move_version_to_library` (Tasks 1–3);
   - `Viewport(QWidget*)`, which owns a new Scene;
   - `Viewport::replaceElements`, `Viewport::fitAll`, `Viewport::homeView`.
 - Produces:
@@ -381,7 +381,7 @@ def test_an_office_copy_follows_its_office_version(project, tmp_path):
 
 ```cpp
 void opensWithVersionsPreviewAndControls();   // MainWindow w(nullptr, true); newProject();
-    // save_version via bridge; ObjectSettingsDialog d(&w, "chair", Place); versions list has
+    // save_object_version via bridge; ObjectSettingsDialog d(&w, "chair", Place); versions list has
     // "Default" + "Dining"; preview Viewport has >0 elements after the debounce (QTRY_VERIFY);
     // param_legs hidden until param_layout is set to "circle"
 void selectingAVersionLoadsItsValues();       // selectVersion(id) -> values()["width"] == 0.5, versionId()==id;
