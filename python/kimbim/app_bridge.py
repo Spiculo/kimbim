@@ -992,6 +992,7 @@ from . import documents as _documents  # noqa: E402
 from . import console as _console  # noqa: E402
 from . import library as _library  # noqa: E402
 from . import objversions as _objversions  # noqa: E402
+from . import objedit as _objedit  # noqa: E402
 from . import drafting as _drafting  # noqa: E402
 from . import underlays as _underlays  # noqa: E402
 from . import symbols as _symbols  # noqa: E402
@@ -1324,6 +1325,15 @@ _EXPORTS = {
         "set_object_parameter",
         "set_plan_display",
         "update_from_library",
+    ),
+    "objedit": (
+        "check_draft",
+        "draft_form",
+        "draft_preview",
+        "draft_preview_error",
+        "draft_symbol",
+        "object_draft",
+        "object_part_template",
     ),
     "objversions": (
         "apply_object_settings",

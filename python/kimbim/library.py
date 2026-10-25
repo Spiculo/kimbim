@@ -375,13 +375,17 @@ def object_symbol(key: str, params_json: str = "", version: str = "") -> str:
     obj, base = _definition_for(key, version)
     if not isinstance(obj, objects.ObjectDef):
         return B._dump({"symbol": [], "width": 1.0, "depth": 1.0})
-    values = obj.values({**base, **_given(params_json)})
+    return B._dump(symbol_json(obj, obj.values({**base, **_given(params_json)})))
+
+
+def symbol_json(obj, values: dict) -> dict:
+    """What object_symbol answers for these (cleaned) values; the Object Editor's drafts share it."""
     w, d = footprint(obj, values)
     try:
         symbol = obj.shape(values).polylines()
     except ObjectError:  # values the definition cannot build: no thumbnail rather than an error
         symbol = []
-    return B._dump({"symbol": symbol, "width": w, "depth": d, "params": values})
+    return {"symbol": symbol, "width": w, "depth": d, "params": values}
 
 
 def object_form(key: str, params_json: str = "", version: str = "") -> str:
@@ -394,9 +398,13 @@ def object_form(key: str, params_json: str = "", version: str = "") -> str:
         entry = get(key)  # an office IFC type (fixed geometry): only its name
         name = entry["name"] if isinstance(entry, dict) else key
         return B._dump({"params": [], "visible": [], "name": name, "name_es": name})
-    values = obj.values({**base, **_given(params_json)})
-    return B._dump({"params": _param_listing(obj, values), "visible": obj.visible(values), "values": values,
-                    "name": obj.name, "name_es": obj.names["es"]})
+    return B._dump(form_json(obj, obj.values({**base, **_given(params_json)})))
+
+
+def form_json(obj, values: dict) -> dict:
+    """What object_form answers for these (cleaned) values; the Object Editor's drafts share it."""
+    return {"params": _param_listing(obj, values), "visible": obj.visible(values), "values": values,
+            "name": obj.name, "name_es": obj.names["es"]}
 
 
 def set_library_paths(data: str) -> str:
