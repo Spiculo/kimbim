@@ -45,6 +45,7 @@ DEFAULTS = {
     "renovation_preset": "Uruguay",  # D93: the active renovation-styles preset
     "legend_mode": "auto",  # D91: sheet legends: "auto" (all rules when they fit), "all" or "used"
     "plan_symbols": True,  # D91: plans show library objects' 2D plan symbol (else the 3D body)
+    "object_last_used": {},  # D100: per object ref, what a click places: {"version": id} or {"values": {...}}
     "purpose": "",
     "current_pen": 23,
     "sheet_purposes": {},
@@ -209,6 +210,9 @@ def _error(key: str, value) -> str | None:
         return f"unknown legend mode {value}"
     if key == "plan_symbols" and not isinstance(value, bool):
         return "plan symbols is true or false"
+    if key == "object_last_used" and not (isinstance(value, dict) and all(
+            isinstance(k, str) and isinstance(v, dict) for k, v in value.items())):
+        return "the last used objects are a table by object of {version} or {values}"
     if key == "schedules":  # schedule schemes by id (D77)
         from .schedules import table_error
 

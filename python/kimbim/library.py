@@ -501,13 +501,16 @@ def _library_types(f):
 
 
 def _find_type(f, ref: str, values: dict, digest: str):
-    """The library type made from this definition (its DefinitionHash) with these values, or None."""
+    """The unnamed library type made from this definition (its DefinitionHash) with these values, or None.
+    Saved versions (D100) are never found by their values: they are chosen by their id."""
     import ifcopenshell.util.element
+
+    from . import objversions
 
     for t in _library_types(f):
         info = _params_of_type(t)
         if info is not None and info[0] == ref and info[1] == values and \
-                ifcopenshell.util.element.get_pset(t, PSET, "DefinitionHash") == digest:
+                ifcopenshell.util.element.get_pset(t, PSET, "DefinitionHash") == digest and not objversions.is_saved(t):
             return t
     return None
 
@@ -531,7 +534,8 @@ def _pset_of(t):
 
 
 def _write_pset(t, obj, values) -> None:
-    """The type's KIMBIM_LibraryObject: its object, values, library and its definition (D99)."""
+    """The type's KIMBIM_LibraryObject: its object, values, library and its definition (D99). Only these
+    fields are written: a saved version's VersionId and VersionName (D100) stay."""
     import ifcopenshell.api.pset
 
     from . import app_bridge as B
@@ -621,13 +625,15 @@ def _ifc_type(entry: dict):
 
 
 def _remove_type_if_unused(t) -> None:
-    """A library type nothing uses any more goes, with its geometry (keeps files small)."""
+    """A library type nothing uses any more goes, with its geometry (keeps files small). Saved versions
+    (D100) stay: the project library keeps them until they are deleted."""
     import ifcopenshell.api.root
     import ifcopenshell.util.element
 
     from . import app_bridge as B
+    from . import objversions
 
-    if t is None or not t.id() or ifcopenshell.util.element.get_types(t):
+    if t is None or not t.id() or ifcopenshell.util.element.get_types(t) or objversions.is_saved(t):
         return
     if _params_of_type(t) is None or str(_params_of_type(t)[0]).startswith("ifc:"):
         return  # only types the library generated
@@ -656,10 +662,12 @@ def _scale() -> float:
     return ifcopenshell.util.unit.calculate_unit_scale(B._model)
 
 
-def place_object(storey_guid: str, key: str, params_json: str, x, y, angle=0.0, gravity="") -> str:
+def place_object(storey_guid: str, key: str, params_json: str, x, y, angle=0.0, gravity="", version="") -> str:
     """Place a library object on a level: its origin (left front corner) at (x, y) metres, turned
     `angle` radians. The type with these parameters is reused, or made. One undo step. `gravity`
-    (D97, Archicad's Gravity): "1" puts it on the top of the slab under (x, y), if any."""
+    (D97, Archicad's Gravity): "1" puts it on the top of the slab under (x, y), if any. `version` (D100):
+    a saved version's id; it places that version's type and `params_json` is ignored (it works without
+    the object in the library: the type has everything)."""
     import ifcopenshell.api.geometry
     import ifcopenshell.api.root
     import ifcopenshell.api.spatial
@@ -675,16 +683,30 @@ def place_object(storey_guid: str, key: str, params_json: str, x, y, angle=0.0, 
     storey = A._by_guid(storey_guid)
     if storey is None or not storey.is_a("IfcBuildingStorey"):
         return A._fail("unknown level")
-    obj = get(key)
-    if obj is None:
-        return A._fail(f"no library object {key}")
+    saved = None
+    if version:
+        from . import objversions
+
+        saved = objversions.find_version(version)
+        if saved is None:
+            return A._fail("unknown version")
+        info = _params_of_type(saved)
+        if info is None or (key and info[0] != key):
+            return A._fail(f"that version is not one of {key}")
+        obj = definition_of_type(saved)
+        name = obj.name if obj is not None else (saved.Name or "")
+        params_json = ""
+    else:
+        obj = get(key)
+        if obj is None:
+            return A._fail(f"no library object {key}")
     try:
         given = json.loads(params_json) if params_json else {}
         x, y, angle = float(x), float(y), float(angle or 0.0)
     except (TypeError, ValueError) as ex:
         return A._fail(str(ex))
-    values = obj.values(given) if isinstance(obj, objects.ObjectDef) else {}
-    if isinstance(obj, objects.ObjectDef):
+    values = obj.values(given) if saved is None and isinstance(obj, objects.ObjectDef) else {}
+    if saved is None and isinstance(obj, objects.ObjectDef):
         try:
             obj.shape(values)  # a definition that does not build at these values places nothing
         except (ObjectError, ValueError) as ex:
@@ -699,9 +721,15 @@ def place_object(storey_guid: str, key: str, params_json: str, x, y, angle=0.0, 
 
     def action():
         f = B._model
-        t = _type_for(obj, values) if isinstance(obj, objects.ObjectDef) else _ifc_type(obj)
+        if saved is not None:
+            t, element_name = saved, name
+        elif isinstance(obj, objects.ObjectDef):
+            t, element_name = _type_for(obj, values), obj.name
+        else:
+            t = _ifc_type(obj)
+            element_name = t.Name or ""
         element = ifcopenshell.api.root.create_entity(f, ifc_class=_occurrence_class(t.is_a(), f.schema),
-                                                      name=obj.name if isinstance(obj, objects.ObjectDef) else (t.Name or ""))
+                                                      name=element_name)
         ifcopenshell.api.type.assign_type(f, related_objects=[element], relating_type=t)
         c, s = math.cos(angle), math.sin(angle)
         matrix = np.array([[c, -s, 0, x], [s, c, 0, y], [0, 0, 1, z], [0, 0, 0, 1]], dtype=float)
@@ -790,31 +818,34 @@ def is_object(e) -> bool:
 
 
 def _regenerate_type(t, obj, values: dict) -> None:
-    """New geometry for a type in place: every placement of it follows (mapped items)."""
+    """New geometry for a type in place: every placement of it follows (mapped items). A saved version
+    (D100) keeps its name."""
     import ifcopenshell.util.element
 
     from . import app_bridge as B
+    from . import objversions
 
     f = B._model
     body, plan = _representations(obj, values)
+    leftover = [r for r in (body, plan) if r is not None]
     for rep_map in t.RepresentationMaps or ():
         old = rep_map.MappedRepresentation
         new = body if old.RepresentationIdentifier == "Body" else plan
-        if new is None:
+        if new is None or not any(new is r for r in leftover):
             continue
         old_items = list(old.Items)
         old.Items = new.Items
         old.RepresentationType = new.RepresentationType
+        leftover = [r for r in leftover if r is not new]
         f.remove(new)
         for item in old_items:
             ifcopenshell.util.element.remove_deep2(f, item)
-    for unused in (body, plan):
-        if unused is not None and unused.id() and not unused.OfProductRepresentation and not unused.RepresentationMap:
-            try:
-                f.remove(unused)
-            except RuntimeError:
-                pass
-    t.Name = obj.type_name(values)
+    # Removed once each: removing an entity twice logs it twice in the undo transaction, and undo then
+    # fails re-creating it (D100 review focus 1).
+    for unused in leftover:
+        f.remove(unused)
+    if not objversions.is_saved(t):
+        t.Name = obj.type_name(values)
     _write_pset(t, obj, values)
 
 

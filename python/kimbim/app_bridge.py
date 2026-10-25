@@ -982,6 +982,7 @@ from . import schedules as _schedules  # noqa: E402
 from . import documents as _documents  # noqa: E402
 from . import console as _console  # noqa: E402
 from . import library as _library  # noqa: E402
+from . import objversions as _objversions  # noqa: E402
 from . import drafting as _drafting  # noqa: E402
 from . import underlays as _underlays  # noqa: E402
 from . import symbols as _symbols  # noqa: E402
@@ -1313,6 +1314,13 @@ _EXPORTS = {
         "set_object_parameter",
         "set_plan_display",
         "update_from_library",
+    ),
+    "objversions": (
+        "delete_version",
+        "object_versions",
+        "rename_version",
+        "save_object_version",
+        "set_last_used",
     ),
 }
 _EXPORTED = {name: module for module, names in _EXPORTS.items() for name in names}
