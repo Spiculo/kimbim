@@ -306,8 +306,9 @@ The dialog:
   they survive a round trip when the file has them. **Materials** table: slot, label, default material.
 - **Parts** tab: the parts, components and symbol in one generic JSON tree with three columns, key, value and
   error (a per-shape form would be more work for no gain: every field takes a number or a formula). *Add part*
-  (from a template per shape), *Add component*, *Add field*, remove, reorder. What no tab shows is kept as it
-  came.
+  (from a template per shape), *Add component*, *Add field*, remove, reorder. An empty symbol means the parts'
+  outline (§3): the draft then has no `symbol` at all, so removing a drawn symbol's items gives the outline. What
+  no tab shows is kept as it came.
 - **Preview**: the app's own 3D view in a scratch scene (orbit) or the plan symbol, redrawn 0.3 s after a change
   from the current *Try values*, a parameter form that never changes the defaults. A broken formula keeps the
   last good shape, marks its field red (the message as its tooltip, and in the tree's error column) and
@@ -319,8 +320,9 @@ The dialog:
   away again, listing included.
 - **Save to office library**: writes `<office folder>/<id>.kimobj` (disabled without an office folder). An
   office object opened for editing saves over its own file without asking; another id that the office has asks
-  before replacing it. When placed objects now use an older version, the app asks *N placed objects use an
-  older version of this object. Update them now?* and runs *Update library objects* on yes.
+  before replacing it. When placements of this object now use an older version, the app asks *N placed objects
+  use an older version of this object. Update them now?*; yes updates just those placements (`save_draft` gives
+  their GUIDs), one undo step. Other outdated objects wait for *Update library objects*.
 - After a save the Library panel's listing, its thumbnails, the object's versions and the Object tool's form
   follow. Cancel asks before discarding changes.
 - Placing by key falls back to the definition stored on a type (`objversions._definition`): project objects are

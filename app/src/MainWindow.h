@@ -470,9 +470,10 @@ public:
     bool openObjectEditor(const QString& source);
     // Customise a copy (Properties, Model menu): the editor on the selection's type. False without one.
     bool customiseObjectCopy();
-    // "N placed objects use an older version of this object. Update them now?"; yes runs Update library
-    // objects. Quiet mode: the answer setUpdateAnswerForTests gave (none: no).
-    void offerLibraryUpdate(int outdated);
+    // "N placed objects use an older version of this object. Update them now?" for these placements (an
+    // office save's outdated ones); yes updates just them from the library, one undo step. Quiet mode: the
+    // answer setUpdateAnswerForTests gave (none: no).
+    void offerLibraryUpdate(const QStringList& guids);
     void setUpdateAnswerForTests(bool yes) { m_updateAnswer = yes; }
     // Quiet mode: the answer that question gets ("all", "new" with `name`, or "" to cancel).
     void setEditChoiceForTests(const QString& mode, const QString& name = {})

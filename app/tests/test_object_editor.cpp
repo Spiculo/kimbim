@@ -282,7 +282,7 @@ private slots:
         QVERIFY(d.isDirty());
         QVERIFY(d.saveTo(QStringLiteral("office")));
         QCOMPARE(d.result(), int(QDialog::Accepted));
-        QCOMPARE(d.outdatedAfterSave(), 0);
+        QVERIFY(d.outdatedAfterSave().isEmpty());
         QVERIFY(QFile::exists(dir.filePath(QStringLiteral("chair_copy.kimobj"))));
         bool listed = false;
         for (const auto& o : kimbim::PythonEngine::instance().callJson("library_objects", {}).object().value("objects").toArray())
@@ -390,7 +390,7 @@ private slots:
         kimbim::ObjectEditorDialog d(&w, QStringLiteral("new"));
         d.findChild<QLineEdit*>(QStringLiteral("editorId"))->setText(QStringLiteral("crate"));
         QVERIFY(d.saveTo(QStringLiteral("project")));
-        QCOMPARE(d.outdatedAfterSave(), 0);
+        QVERIFY(d.outdatedAfterSave().isEmpty());
         bool listed = false;
         for (const auto& o : kimbim::PythonEngine::instance().callJson("library_objects", {}).object().value("objects").toArray())
             listed = listed || o.toObject().value("id").toString() == QLatin1String("project:crate");
@@ -415,10 +415,14 @@ private slots:
                 return;
             }
             // The chair's legs follow `legs` on a circle; splayed 8° under a round seat, each foot sticks
-            // out past the seat. Without its drawn symbol the plan is the parts' outline (doc 16 §3).
-            QJsonObject draft = d->draft();
-            draft.remove(QStringLiteral("symbol"));
-            d->setDraft(draft);
+            // out past the seat. Its drawn symbol has no legs: emptied in the Parts tree, the plan is the
+            // parts' outline (doc 16 §3), as a user gets it.
+            QTreeWidgetItem* symbol = node(*d, QStringLiteral("symbol"));
+            auto* tree = partsTree(*d)->findChild<QTreeWidget*>();
+            while (symbol && symbol->childCount() > 0) {
+                tree->setCurrentItem(symbol->child(0));
+                button(*d, "partsRemove")->click();
+            }
             auto* table = d->findChild<QTableWidget*>(QStringLiteral("editorParams"));
             const auto setDefault = [&](const char* key, const char* value) {
                 table->item(paramRow(*d, QLatin1String(key)), 4)->setText(QLatin1String(value));
@@ -427,7 +431,8 @@ private slots:
             setDefault("layout", "circle");
             setDefault("seat_shape", "round");
             setDefault("splay", "8");
-            edited = draftParam(*d, QStringLiteral("legs")).value("default").toInt() == 3
+            edited = symbol && !d->draft().contains(QStringLiteral("symbol")) // empty: no symbol, the outline
+                && draftParam(*d, QStringLiteral("legs")).value("default").toInt() == 3
                 && draftParam(*d, QStringLiteral("layout")).value("default").toString() == QLatin1String("circle");
             d->saveTo(QStringLiteral("office"));
         });
@@ -459,16 +464,27 @@ private slots:
         QVERIFY2(legs.value("ok").toBool(), qPrintable(legs.value("traceback").toString()));
         QCOMPARE(legs.value("output").toString(), QStringLiteral("(3, 5)\n")); // 3 legs, the seat, the back
 
-        // Plan: the placed type's symbol (its stored definition) is one outline, the round seat with a bump
-        // where each splayed foot sticks out past it: three runs of points outside the seat's circle.
-        const QJsonObject of = kimbim::PythonEngine::instance()
-            .callJson("object_settings_of", {QStringLiteral("[\"%1\"]").arg(made[0])}).object();
-        QVERIFY(of.value("source").toString().startsWith(QLatin1String("type:")));
-        const QJsonObject symbol = kimbim::PythonEngine::instance()
-            .callJson("object_symbol", {of.value("key").toString(), QString(), of.value("source").toString()}).object();
-        const QJsonArray lines = symbol.value("symbol").toArray();
+        // Plan: what the plan view and drawings draw, the type's plan representation map (drawgen's
+        // object_symbols), in metres, with the type's own width and depth. One outline, the round seat with
+        // a bump where each splayed foot sticks out past it: three runs of points outside the seat's circle.
+        const QJsonObject planOut = w.runConsole(QStringLiteral(
+            "import json, ifcopenshell.util.element as U, ifcopenshell.util.unit\n"
+            "from kimbim import library\n"
+            "t = U.get_type(ifc.by_guid('%1'))\n"
+            "k = ifcopenshell.util.unit.calculate_unit_scale(ifc)\n"
+            "plan = [m.MappedRepresentation for m in t.RepresentationMaps\n"
+            "        if m.MappedRepresentation.RepresentationType == 'Annotation2D']\n"
+            "lines = [[[p.Coordinates[0] * k, p.Coordinates[1] * k] for p in c.Points]\n"
+            "         for r in plan for i in r.Items for c in i.Elements if c.is_a('IfcPolyline')]\n"
+            "v = library._params_of_type(t)[1]\n"
+            "print(json.dumps({'lines': lines, 'width': v['width'], 'depth': v['depth']}))").arg(made[0]));
+        QVERIFY2(planOut.value("ok").toBool(), qPrintable(planOut.value("traceback").toString()));
+        const QJsonObject plan = QJsonDocument::fromJson(planOut.value("output").toString().toUtf8()).object();
+        const QJsonArray lines = plan.value("lines").toArray();
         QCOMPARE(lines.size(), 1);
-        const double cx = 0.45 / 2, cy = 0.5 / 2, r = 0.45 / 2; // the chair's width and depth
+        const double width = plan.value("width").toDouble(), depth = plan.value("depth").toDouble();
+        QVERIFY(width > 0 && depth > 0);
+        const double cx = width / 2, cy = depth / 2, r = std::min(width, depth) / 2; // the round seat
         QJsonArray ring = lines.at(0).toArray();
         ring.removeLast(); // closed: the first point again
         QList<bool> outside;
@@ -479,7 +495,7 @@ private slots:
             runs += outside[i] && !outside[(i + outside.size() - 1) % outside.size()] ? 1 : 0;
         QCOMPARE(runs, 3);
 
-        // The office edits the file (width 0.5): Update from library offers the placed chair, then it is 0.5.
+        // The office edits the file (width 0.5): the placed chair is outdated; Update library objects updates it.
         QFile file(dir.filePath(QStringLiteral("chair_copy.kimobj")));
         QVERIFY(file.open(QIODevice::ReadOnly));
         QJsonObject def = QJsonDocument::fromJson(file.readAll()).object();
@@ -498,8 +514,7 @@ private slots:
         setOfficeFolder(dir.path()); // read again
         const QJsonObject pending = kimbim::PythonEngine::instance().callJson("library_updates", {QString()}).object();
         QCOMPARE(pending.value("outdated").toInt(), 1);
-        w.setUpdateAnswerForTests(true);
-        w.offerLibraryUpdate(pending.value("outdated").toInt());
+        w.findChild<QAction*>(QStringLiteral("actionUpdateLibraryObjects"))->trigger();
         QCOMPARE(kimbim::PythonEngine::instance().callJson("library_updates", {QString()}).object().value("outdated").toInt(), 0);
         // The placed chair's type now carries the new definition: its width default is 0.5. Its own width
         // stays 0.45: Update from library keeps every value whose key and kind still exist (D99).
@@ -510,6 +525,73 @@ private slots:
             "library.definition_of_type(t).param('width').default, library._params_of_type(t)[1]['width']").arg(made[0]));
         QVERIFY2(stored.value("ok").toBool(), qPrintable(stored.value("traceback").toString()));
         QCOMPARE(stored.value("output").toString(), QStringLiteral("(0.5, 0.45)\n"));
+        setOfficeFolder(QString());
+    }
+
+    // D101 review: saving an office object in the editor offers to update its own outdated placements, and
+    // yes updates only those; another outdated office object stays outdated.
+    void officeSaveUpdatesOnlyItsPlacements()
+    {
+        QTemporaryDir dir;
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        kimbim::LibraryPanel* panel = w.libraryPanel();
+        setOfficeFolder(dir.path());
+        for (const char* id : {"stool", "bench"}) {
+            kimbim::ObjectEditorDialog d(&w, QStringLiteral("new"));
+            d.findChild<QLineEdit*>(QStringLiteral("editorId"))->setText(QLatin1String(id));
+            QVERIFY(d.saveTo(QStringLiteral("office")));
+        }
+        panel->setListing(kimbim::PythonEngine::instance().callJson("library_objects", {}).object()); // saved without the window
+        QStringList placed;
+        for (const char* id : {"office:stool", "office:bench"}) {
+            QVERIFY(panel->selectObject(QLatin1String(id)));
+            w.setTool(kimbim::MainWindow::Tool::Object);
+            const QStringList before = w.viewport()->guids();
+            QVERIFY(w.placeObjectAt(QPointF(placed.size() * 2.0, 0)));
+            for (const QString& g : w.viewport()->guids())
+                if (!before.contains(g))
+                    placed << g;
+        }
+        w.setTool(kimbim::MainWindow::Tool::None);
+        QCOMPARE(placed.size(), 2);
+        const auto outdated = [](const QString& guid) {
+            return kimbim::PythonEngine::instance().callJson("library_updates", {QStringLiteral("[\"%1\"]").arg(guid)}).object()
+                .value("outdated").toInt();
+        };
+        // The bench's file changes on disk: outdated.
+        QFile file(dir.filePath(QStringLiteral("bench.kimobj")));
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QJsonObject def = QJsonDocument::fromJson(file.readAll()).object();
+        file.close();
+        QJsonArray params = def.value("params").toArray();
+        QJsonObject width = params.at(0).toObject();
+        QCOMPARE(width.value("key").toString(), QStringLiteral("width"));
+        width.insert("default", width.value("default").toDouble() + 0.1);
+        params[0] = width;
+        def.insert("params", params);
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        file.write(QJsonDocument(def).toJson());
+        file.close();
+        setOfficeFolder(dir.path());
+        QCOMPARE(outdated(placed[1]), 1);
+        // The stool is edited in the editor and saved: the offer names its placement, yes updates it.
+        w.setUpdateAnswerForTests(true);
+        QTimer::singleShot(0, &w, [&] {
+            auto* d = qobject_cast<kimbim::ObjectEditorDialog*>(QApplication::activeModalWidget());
+            if (!d) {
+                if (QWidget* other = QApplication::activeModalWidget())
+                    other->close();
+                return;
+            }
+            auto* table = d->findChild<QTableWidget*>(QStringLiteral("editorParams"));
+            const int row = paramRow(*d, QStringLiteral("width"));
+            table->item(row, 4)->setText(QString::number(draftParam(*d, QStringLiteral("width")).value("default").toDouble() + 0.2));
+            d->saveTo(QStringLiteral("office"));
+        });
+        QVERIFY(w.openObjectEditor(QStringLiteral("office:stool")));
+        QCOMPARE(outdated(placed[0]), 0); // updated
+        QCOMPARE(outdated(placed[1]), 1); // the bench: not named, not updated
         setOfficeFolder(QString());
     }
 

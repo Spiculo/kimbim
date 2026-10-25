@@ -331,3 +331,27 @@ def test_an_edited_office_file_offers_an_update(project, tmp_path):
     r = call("save_draft", _text(d), "office", "chair_copy")
     assert r["ok"] and r["outdated"] == 1, r
     assert call("library_updates", "")["outdated"] == 1
+
+
+def test_an_office_save_names_its_outdated_placements(project, tmp_path):
+    """D101 review: the update the editor offers covers only this object's placements, so the save
+    gives their GUIDs; another outdated office object's placements are not among them."""
+    library.load_office(str(tmp_path))
+    d = _chair_copy()
+    other = _chair_copy()
+    other["id"] = "stool"
+    for draft in (d, other):
+        assert call("save_draft", _text(draft), "office")["ok"]
+    chair = call("place_object", project, "office:chair_copy", "", 0, 0)
+    stool = call("place_object", project, "office:stool", "", 2, 0)
+    assert chair["ok"] and stool["ok"]
+    for draft in (d, other):
+        for q in draft["params"]:
+            if q["key"] == "seat":
+                q["default"] = 0.5
+    assert call("save_draft", _text(other), "office", "stool")["guids"] == [stool["guid"]]
+    r = call("save_draft", _text(d), "office", "chair_copy")
+    assert r["ok"] and r["outdated"] == 1 and r["guids"] == [chair["guid"]], r
+    assert call("library_updates", "")["outdated"] == 2
+    assert call("update_from_library", json.dumps(r["guids"]))["ok"]
+    assert call("library_updates", "")["outdated"] == 1  # the stool is still outdated

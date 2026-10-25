@@ -453,7 +453,7 @@ bool MainWindow::openObjectEditor(const QString& source)
     // form again. A project save was one undo step already (the dialog ran afterEdit).
     libraryPanel();
     refreshLibraryListing();
-    if (d.outdatedAfterSave() > 0)
+    if (!d.outdatedAfterSave().isEmpty())
         offerLibraryUpdate(d.outdatedAfterSave());
     return true;
 }
@@ -473,17 +473,27 @@ bool MainWindow::customiseObjectCopy()
     return openObjectEditor(of.value("source").toString());
 }
 
-void MainWindow::offerLibraryUpdate(int outdated)
+void MainWindow::offerLibraryUpdate(const QStringList& guids)
 {
-    if (outdated <= 0)
+    if (guids.isEmpty())
         return;
     bool yes = m_updateAnswer;
     if (!m_quiet)
         yes = QMessageBox::question(this, tr("Update from library"),
-                  tr("%n placed object(s) use an older version of this object. Update them now?", nullptr, outdated))
+                  tr("%n placed object(s) use an older version of this object. Update them now?", nullptr, int(guids.size())))
             == QMessageBox::Yes;
-    if (yes)
-        updateFromLibrary(true);
+    if (!yes)
+        return;
+    // Only the placements the question named (and their saved versions); other outdated objects wait for
+    // Model > Update library objects.
+    const QString list = QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(guids)).toJson(QJsonDocument::Compact));
+    const QJsonObject r = bridge("update_from_library", {list});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not update from the library"), r.value("error").toString());
+        return;
+    }
+    afterEdit(r);
+    m_status->showMessage(tr("Updated from the library: %1").arg(tr("%n placed object(s)", nullptr, int(guids.size()))));
 }
 
 void MainWindow::setObjectAngle(double degrees)

@@ -4803,6 +4803,7 @@ Editing the IFC directly opens it at once, without version history, options, com
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="6450"/>
+        <location filename="../src/LibraryTools.cpp" line="492"/>
         <source>Could not update from the library</source>
         <translation type="unfinished"></translation>
     </message>
@@ -6251,7 +6252,7 @@ Open it read-only?</source>
         <location filename="../src/MarkupTools.cpp" line="332"/>
         <location filename="../src/MarkupTools.cpp" line="358"/>
         <location filename="../src/Underlays.cpp" line="225"/>
-        <location filename="../src/LibraryTools.cpp" line="568"/>
+        <location filename="../src/LibraryTools.cpp" line="578"/>
         <source>Could not place it: %1</source>
         <translation type="unfinished"></translation>
     </message>
@@ -6299,6 +6300,7 @@ Open it read-only?</source>
     </message>
     <message numerus="yes">
         <location filename="../src/MainWindow.cpp" line="6456"/>
+        <location filename="../src/LibraryTools.cpp" line="496"/>
         <source>%n placed object(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -6307,6 +6309,7 @@ Open it read-only?</source>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="6459"/>
+        <location filename="../src/LibraryTools.cpp" line="496"/>
         <source>Updated from the library: %1</source>
         <translation type="unfinished"></translation>
     </message>
@@ -7397,17 +7400,17 @@ Open it read-only?</source>
         </translation>
     </message>
     <message>
-        <location filename="../src/LibraryTools.cpp" line="495"/>
+        <location filename="../src/LibraryTools.cpp" line="505"/>
         <source>Object angle: %1 degrees</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryTools.cpp" line="542"/>
+        <location filename="../src/LibraryTools.cpp" line="552"/>
         <source>Pick an object in the Library panel first</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryTools.cpp" line="573"/>
+        <location filename="../src/LibraryTools.cpp" line="583"/>
         <source>%1 placed</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8081,7 +8084,7 @@ Open it read-only?</source>
     </message>
     <message>
         <location filename="../src/ObjectEditorDialog.cpp" line="182"/>
-        <location filename="../src/ObjectEditorDialog.cpp" line="732"/>
+        <location filename="../src/ObjectEditorDialog.cpp" line="736"/>
         <source>Save to office library</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8299,42 +8302,42 @@ Open it read-only?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ObjectEditorDialog.cpp" line="531"/>
+        <location filename="../src/ObjectEditorDialog.cpp" line="535"/>
         <source>Parameter</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ObjectEditorDialog.cpp" line="561"/>
+        <location filename="../src/ObjectEditorDialog.cpp" line="565"/>
         <source>Material</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ObjectEditorDialog.cpp" line="591"/>
+        <location filename="../src/ObjectEditorDialog.cpp" line="595"/>
         <source>The object could not be checked</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ObjectEditorDialog.cpp" line="638"/>
+        <location filename="../src/ObjectEditorDialog.cpp" line="642"/>
         <source>Try values: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ObjectEditorDialog.cpp" line="733"/>
+        <location filename="../src/ObjectEditorDialog.cpp" line="737"/>
         <source>The office library already has an object %1. Replace it?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ObjectEditorDialog.cpp" line="743"/>
+        <location filename="../src/ObjectEditorDialog.cpp" line="747"/>
         <source>Could not save the object</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ObjectEditorDialog.cpp" line="757"/>
+        <location filename="../src/ObjectEditorDialog.cpp" line="764"/>
         <source>Object editor</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ObjectEditorDialog.cpp" line="757"/>
+        <location filename="../src/ObjectEditorDialog.cpp" line="764"/>
         <source>Discard the changes to this object?</source>
         <translation type="unfinished"></translation>
     </message>

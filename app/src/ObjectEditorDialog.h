@@ -44,8 +44,9 @@ public:
     // object the office library has asks to replace it, unless `replace` or it is the office object the
     // dialog opened, its id unchanged. On success the dialog accepts.
     bool saveTo(const QString& target, bool replace = false);
-    // How many placed objects the last office save left outdated (MainWindow offers Update from library).
-    int outdatedAfterSave() const { return m_outdated; }
+    // The placed objects of this object that the last office save left outdated: their GUIDs (MainWindow
+    // offers to update just those) and how many.
+    QStringList outdatedAfterSave() const { return m_outdated; }
     bool isDirty() const;
     void reject() override; // Cancel or Esc: asks before discarding changes
 
@@ -75,7 +76,7 @@ private:
     bool m_valid = false;
     bool m_hasPreview = false;
     bool m_office = false; // an office library folder is set
-    int m_outdated = 0;
+    QStringList m_outdated;
     QLineEdit* m_id;
     QLineEdit* m_name;
     QLineEdit* m_nameEs;

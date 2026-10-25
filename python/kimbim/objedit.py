@@ -12,8 +12,8 @@ library.OBJECTS, library._office or the open model (the preview builds in a scra
 - `draft_form`, `draft_symbol`, `draft_preview`, `draft_preview_error`: the Library's object_form,
   object_symbol, object_preview and object_preview_error for the draft, at the dialog's trial values.
 - `object_part_template(shape)`: a part to add that builds as it is.
-- `save_draft(draft, target, replace)`: the draft kept in the office library (a `.kimobj` file) or in the
-  project (its types, one undo step)."""
+- `save_draft(draft, target, replace)`: the draft kept in the office library (a `.kimobj` file; with the
+  count and GUIDs of this object's placements it left outdated) or in the project (its types, one undo step)."""
 from __future__ import annotations
 
 import copy
@@ -372,7 +372,9 @@ def _save_office(obj, draft_json: str, replace: str) -> str:
 
     placed = [e for e in B._model.by_type("IfcElement")
               if (found := library._object_of(e)) is not None and found[0].ref == ref] if B._model is not None else []
-    return _dump({"ok": True, "ref": ref, "path": path, "outdated": len(library._outdated(placed))})
+    outdated = library._outdated(placed)  # this object's placements only: the app offers to update them
+    return _dump({"ok": True, "ref": ref, "path": path, "outdated": len(outdated),
+                  "guids": [e.GlobalId for e, *_ in outdated]})
 
 
 def _save_project(obj) -> str:

@@ -3276,7 +3276,7 @@ Licencia: GPL-3.0 o posterior</translation>
       <location filename="../src/MarkupTools.cpp" line="332" />
       <location filename="../src/MarkupTools.cpp" line="358" />
       <location filename="../src/Underlays.cpp" line="225" />
-      <location filename="../src/LibraryTools.cpp" line="568" />
+      <location filename="../src/LibraryTools.cpp" line="578" />
       <source>Could not place it: %1</source>
       <translation>No se pudo colocar: %1</translation>
     </message>
@@ -6087,6 +6087,7 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
     </message>
     <message numerus="yes">
       <location filename="../src/MainWindow.cpp" line="6456" />
+      <location filename="../src/LibraryTools.cpp" line="496" />
       <source>%n placed object(s)</source>
       <translation>
         <numerusform>%n objeto colocado</numerusform>
@@ -6095,6 +6096,7 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="6459" />
+      <location filename="../src/LibraryTools.cpp" line="496" />
       <source>Updated from the library: %1</source>
       <translation>Actualizado desde la biblioteca: %1</translation>
     </message>
@@ -6422,6 +6424,7 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="6450" />
+      <location filename="../src/LibraryTools.cpp" line="492" />
       <source>Could not update from the library</source>
       <translation>No se pudo actualizar desde la biblioteca</translation>
     </message>
@@ -7641,17 +7644,17 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       </translation>
     </message>
     <message>
-      <location filename="../src/LibraryTools.cpp" line="495" />
+      <location filename="../src/LibraryTools.cpp" line="505" />
       <source>Object angle: %1 degrees</source>
       <translation>Ángulo del objeto: %1 grados</translation>
     </message>
     <message>
-      <location filename="../src/LibraryTools.cpp" line="542" />
+      <location filename="../src/LibraryTools.cpp" line="552" />
       <source>Pick an object in the Library panel first</source>
       <translation>Elija primero un objeto en el panel Biblioteca</translation>
     </message>
     <message>
-      <location filename="../src/LibraryTools.cpp" line="573" />
+      <location filename="../src/LibraryTools.cpp" line="583" />
       <source>%1 placed</source>
       <translation>%1 colocado</translation>
     </message>
@@ -8341,7 +8344,7 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
     </message>
     <message>
       <location filename="../src/ObjectEditorDialog.cpp" line="182" />
-      <location filename="../src/ObjectEditorDialog.cpp" line="732" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="736" />
       <source>Save to office library</source>
       <translation>Guardar en la biblioteca de la oficina</translation>
     </message>
@@ -8559,42 +8562,42 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       <translation>No se pudo abrir el objeto</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="531" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="535" />
       <source>Parameter</source>
       <translation>Parámetro</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="561" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="565" />
       <source>Material</source>
       <translation>Material</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="591" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="595" />
       <source>The object could not be checked</source>
       <translation>No se pudo comprobar el objeto</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="638" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="642" />
       <source>Try values: %1</source>
       <translation>Probar valores: %1</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="733" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="737" />
       <source>The office library already has an object %1. Replace it?</source>
       <translation>La biblioteca de la oficina ya tiene un objeto %1. ¿Reemplazarlo?</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="743" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="747" />
       <source>Could not save the object</source>
       <translation>No se pudo guardar el objeto</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="757" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="764" />
       <source>Object editor</source>
       <translation>Editor de objetos</translation>
     </message>
     <message>
-      <location filename="../src/ObjectEditorDialog.cpp" line="757" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="764" />
       <source>Discard the changes to this object?</source>
       <translation>¿Descartar los cambios de este objeto?</translation>
     </message>

@@ -427,7 +427,11 @@ QJsonObject ObjectEditorDialog::draft() const
         d.remove(QLatin1String("materials"));
     else
         d.insert("materials", mats);
-    const QJsonObject roots = m_parts->roots();
+    QJsonObject roots = m_parts->roots();
+    // An empty symbol means "the parts' outline seen from above" (doc 16 §3): the draft has no symbol at all
+    // (a `symbol: []` would draw nothing).
+    if (roots.value(QLatin1String("symbol")).isArray() && roots.value(QLatin1String("symbol")).toArray().isEmpty())
+        roots.remove(QLatin1String("symbol"));
     for (const char* key : kTreeRoots)
         put(d, key, roots.contains(QLatin1String(key)) ? roots.value(QLatin1String(key)) : QJsonValue(QJsonValue::Undefined));
     return d;
@@ -745,7 +749,10 @@ bool ObjectEditorDialog::saveTo(const QString& target, bool replace)
     }
     if (target == QLatin1String("project"))
         m_window->afterEdit(r); // undo, the window's unsaved mark
-    m_outdated = target == QLatin1String("office") ? r.value("outdated").toInt() : 0;
+    m_outdated.clear();
+    if (target == QLatin1String("office"))
+        for (const auto& g : r.value("guids").toArray())
+            m_outdated << g.toString();
     m_clean = d;
     accept();
     return true;
