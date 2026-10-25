@@ -1746,6 +1746,24 @@ ES = {
     "Settings...": "Configuración...",
     "Version: what a click places (right-click in the view to switch it while placing)":
         "Versión: lo que coloca un clic (clic derecho en la vista para cambiarla mientras coloca)",
+    # D100: editing placed objects (the Properties summary and Edit...)
+    "Change these objects' settings, or move them to another saved version":
+        "Cambia la configuración de estos objetos, o páselos a otra versión guardada",
+    "The selection holds objects of more than one type": "La selección tiene objetos de más de un tipo",
+    "Could not edit the objects": "No se pudieron editar los objetos",
+    "%n object(s) use this type; %1 of them are selected.": (
+        "%n objeto usa este tipo; %1 de ellos está seleccionado.",
+        "%n objetos usan este tipo; %1 de ellos están seleccionados."),
+    "Modify all %n objects of this type": ("Modificar el %n objeto de este tipo", "Modificar los %n objetos de este tipo"),
+    "Create a new type...": "Crear un tipo nuevo...",
+    "Create a new type": "Crear un tipo nuevo",
+    "Name of the new type (only the selected objects move to it):":
+        "Nombre del tipo nuevo (solo los objetos seleccionados pasan a él):",
+    "There is already a version called %1. Choose another name.": "Ya existe una versión llamada %1. Elija otro nombre.",
+    "Could not change the objects": "No se pudieron cambiar los objetos",
+    "Updated from the library: %1": "Actualizado desde la biblioteca: %1",
+    "%n placed object(s)": ("%n objeto colocado", "%n objetos colocados"),
+    "%n saved version(s)": ("%n versión guardada", "%n versiones guardadas"),
 }
 
 # Words that mean something else in another context ("Back" is the view cube's "Posterior"): by

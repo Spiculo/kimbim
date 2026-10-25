@@ -208,12 +208,6 @@ PreferencesDialog::PreferencesDialog(Preferences& prefs, QWidget* parent)
     m_splitJoin->setChecked(prefs.splitJoin());
     form->addRow(QString(), m_splitJoin);
 
-    m_objectEditScope = choice(this, "objectEditScope", {{tr("Change only the selection"), "selection"},
-                                                         {tr("Ask when the object's type is shared"), "ask"}},
-        prefs.objectEditScope());
-    m_objectEditScope->setToolTip(tr("Editing a library object's parameters: change the selected placements only, "
-                                     "or ask whether to change every placement of its type"));
-    form->addRow(tr("Library object parameters:"), m_objectEditScope);
     m_mergeProps = choice(this, "mergeProps", {{tr("Keep the first element's properties"), "keep"},
         {tr("Refuse when their properties differ"), "refuse"}}, prefs.mergeProps());
     m_mergeProps->setToolTip(tr("Merging two collinear walls (Join): the result keeps the first wall's properties, or the merge is refused if they differ"));
@@ -289,7 +283,6 @@ void PreferencesDialog::apply()
     m_prefs.setValue(QStringLiteral("box_selection"), m_boxSelection->currentData().toString());
     m_prefs.setValue(QStringLiteral("split_join"), m_splitJoin->isChecked());
     m_prefs.setValue(QStringLiteral("merge_props"), m_mergeProps->currentData().toString());
-    m_prefs.setValue(QStringLiteral("object_edit_scope"), m_objectEditScope->currentData().toString());
     m_prefs.setValue(QStringLiteral("mesh_vertex_snaps"), m_meshVertexSnaps->isChecked());
     m_prefs.setValue(QStringLiteral("keep_rectangles_rectangular"), m_keepRectangles->isChecked());
     m_prefs.setValue(QStringLiteral("underlay_opacity"), double(m_underlayOpacity->value()) / 100.0);

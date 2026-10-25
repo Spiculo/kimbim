@@ -370,6 +370,24 @@ def test_placing_an_office_version_is_one_undo_step(project, tmp_path):
     assert not validate(b._model)
 
 
+def test_assigning_an_office_version_copies_it_in(project, tmp_path):
+    """Edit mode lists the office's versions too: picking one moves the selection to a project copy of it."""
+    library.load_office(str(tmp_path))
+    v = call("save_object_version", "chair", "Café", json.dumps({"width": 0.55}))
+    call("move_version_to_library", v["id"])
+    assert call("new_project", "Other")["ok"]
+    storey = call("storeys")["storeys"][0]["guid"]
+    a = call("place_object", storey, "chair", "", 0, 0, 0)["guid"]
+    assert call("assign_version", json.dumps([a]), v["id"])["ok"]
+    t = ifcopenshell.util.element.get_type(b._model.by_guid(a))
+    assert objversions.find_version(v["id"]) == t and t.Name == "Café"
+    assert json.loads(ifcopenshell.util.element.get_pset(t, library.PSET)["Parameters"])["width"] == 0.55
+    assert call("assign_version", json.dumps([a]), "no-such-id")["ok"] is False
+    assert call("undo")["ok"]                                # one step: the copy goes too
+    assert objversions.find_version(v["id"]) is None
+    assert not validate(b._model)
+
+
 def test_plain_office_ifc_types_still_load(project, tmp_path):
     library.load_office(str(tmp_path))
     call("place_object", project, "chair", "", 0, 0, 0)

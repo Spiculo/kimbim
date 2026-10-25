@@ -91,14 +91,29 @@ def test_one_placement_is_one_undo_step(project):
 def test_parameters_show_in_properties_and_regenerate(project):
     a = call("place_object", project, "sofa", "", 0, 0, 0)["guid"]
     c = call("place_object", project, "sofa", "", 3, 0, 0)["guid"]
-    group = call("properties_multi", json.dumps([a]))["psets"]["Parameters"]
+    props = call("properties_multi", json.dumps([a]))
+    group = props["psets"]["Parameters"]
     assert group["Width"]["value"] == 2.0 and group["Seats"]["value"] == 3
+    # D100: a read-only summary (the type name first, at most 6 parameters); Edit... opens the dialog.
+    assert list(group)[0] == "Type" and group["Type"]["value"] == ifcopenshell.util.element.get_type(b._model.by_guid(a)).Name
+    assert len(group) <= 7 and not any(row["editable"] for row in group.values())
+    assert props["object_settings"] == {"enabled": True}
+    both = call("properties_multi", json.dumps([a, c]))
+    assert both["object_settings"] == {"enabled": True}  # one type
+    # Regeneration (set_object_parameter, the Python API).
     # Only one of two placements: it moves to a new type, the other keeps its own.
     r = call("set_object_parameter", json.dumps([a]), "Width", "2.4")
     assert r["ok"], r
     ta = ifcopenshell.util.element.get_type(b._model.by_guid(a))
     tc = ifcopenshell.util.element.get_type(b._model.by_guid(c))
     assert ta != tc and "2400" in ta.Name and "2000" in tc.Name
+    split = call("properties_multi", json.dumps([a, c]))
+    assert split["object_settings"] == {"enabled": False}  # two types: Edit... is off
+    assert split["psets"]["Parameters"]["Type"]["varies"] is True
+    wall_type = call("wall_types")["types"][0]["guid"]
+    wall = call("create_wall", project, wall_type, 0, 5, 4, 5, 3.0, "", "")["guid"]
+    mixed = call("properties_multi", json.dumps([a, wall]))
+    assert "object_settings" not in mixed and "Parameters" not in mixed["psets"]
     # Every placement of the type: it changes in place, keeping its GlobalId.
     guid = tc.GlobalId
     assert call("set_object_parameter", json.dumps([c]), "Seats", "2")["ok"]
@@ -280,7 +295,7 @@ def test_new_kinds_in_properties(project, tmp_path):
     call("set_library_paths", json.dumps({"folder": str(folder)}))
     guid = call("place_object", project, "office:stool", "", 0, 0, 0)["guid"]
     group = call("properties_multi", json.dumps([guid]))["psets"]["Parameters"]
-    assert group["Foot"]["choices"] == ["Round", "Square"] and group["Foot"]["value"] == "Round"
+    assert group["Foot"]["value"] == "Round" and "choices" not in group["Foot"]  # read-only (D100)
     assert group["Foot ring"]["ifc_type"] == "IfcBoolean" and group["Foot ring"]["value"] is False
     assert group["Splay"]["ifc_type"] == "IfcPlaneAngleMeasure"
     for name, value in (("Foot", "Square"), ("Foot ring", "true"), ("Splay", "8")):

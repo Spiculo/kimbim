@@ -197,7 +197,9 @@ def test_objects_have_materials_per_part(project):
     looks = {M._hex(palette[i][:3]) for i in set(idx.tolist())}
     assert looks == {M.CATALOGUE["Timber - finish"]["colour"], M.CATALOGUE["Steel"]["colour"]}
     group = props(table["guid"])[library.PARAMETERS]
-    assert group["Legs material"]["value"] == "Steel" and "Aluminium" in group["Legs material"]["choices"]
+    assert group["Legs material"]["value"] == "Steel"  # D100: a read-only summary; the dialog's form picks
+    form = {p["label"]: p for p in call("object_form", "table")["params"]}
+    assert "Aluminium" in form["Legs material"]["choices"]
     r = call("set_object_parameter", json.dumps([table["guid"]]), "Legs material", "Aluminium", "")
     assert r["ok"], r
     palette, idx, _, _ = mesh(table["guid"])

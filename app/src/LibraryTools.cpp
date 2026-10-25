@@ -6,9 +6,12 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QFileDialog>
+#include <QInputDialog>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QMenu>
+#include <QMessageBox>
+#include <QPushButton>
 
 #include <cmath>
 
@@ -321,6 +324,88 @@ bool MainWindow::objectSettingsDialog(const QString& key)
     }
     setObjectVersion(key, d.versionId(), custom);
     setTool(Tool::Object);
+    return true;
+}
+
+bool MainWindow::editObjectSettings()
+{
+    if (m_selection.isEmpty())
+        return false;
+    const QString guids = QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(m_selection)).toJson(QJsonDocument::Compact));
+    const QJsonObject of = bridge("object_settings_of", {guids});
+    if (!of.value("ok").toBool()) {
+        m_status->showMessage(tr("Could not edit the objects") + QStringLiteral(": ") + of.value("error").toString());
+        return false;
+    }
+    const QString key = of.value("key").toString();
+    const QString version = of.value("version").toString(); // "" for an unnamed type
+    const QJsonObject values = of.value("values").toObject();
+    ObjectSettingsDialog d(this, key, ObjectSettingsDialog::Mode::Edit, this);
+    d.selectVersion(version); // highlighted in the list
+    if (version.isEmpty() || d.versionId() != version)
+        d.setValues(values); // the type's own values
+    const bool accepted = d.exec() == QDialog::Accepted;
+    refreshObjectLabels(); // versions renamed or deleted in the dialog
+    if (m_library && m_library->currentObject() == key)
+        loadObjectVersion();
+    if (!accepted)
+        return false;
+    const QString picked = d.versionId();
+    if (picked.isEmpty() ? d.values() == values : picked == version)
+        return false; // nothing changed
+    QJsonObject r;
+    if (!picked.isEmpty()) {
+        r = bridge("assign_version", {guids, picked}); // another saved version: the selection moves to it
+    } else {
+        const QString params = compactJson(d.values());
+        r = bridge("apply_object_settings", {guids, params, QStringLiteral("auto")});
+        if (!r.value("ok").toBool() && r.value("shared").toBool()) { // others use the type too: ask
+            QString mode = m_editChoice;
+            QString name = m_editChoiceName;
+            const int uses = of.value("uses").toInt();
+            if (!m_quiet) {
+                QMessageBox box(QMessageBox::Question, tr("Change the object's type"),
+                    tr("%n object(s) use this type; %1 of them are selected.", nullptr, uses).arg(of.value("selected").toInt()),
+                    QMessageBox::NoButton, this);
+                QPushButton* all = box.addButton(tr("Modify all %n objects of this type", nullptr, uses), QMessageBox::AcceptRole);
+                QPushButton* create = box.addButton(tr("Create a new type..."), QMessageBox::AcceptRole);
+                box.addButton(QMessageBox::Cancel);
+                box.setDefaultButton(create);
+                box.exec();
+                mode = box.clickedButton() == all ? QStringLiteral("all")
+                    : box.clickedButton() == create ? QStringLiteral("new")
+                                                    : QString();
+                name.clear();
+            }
+            if (mode == QLatin1String("all")) {
+                r = bridge("apply_object_settings", {guids, params, mode});
+            } else if (mode == QLatin1String("new")) {
+                for (;;) { // a name the object has already: ask again
+                    if (!m_quiet) {
+                        bool ok = false;
+                        name = QInputDialog::getText(this, tr("Create a new type"),
+                            tr("Name of the new type (only the selected objects move to it):"), QLineEdit::Normal, name, &ok);
+                        if (!ok)
+                            return false;
+                        if (name.trimmed().isEmpty())
+                            continue;
+                    }
+                    r = bridge("apply_object_settings", {guids, params, mode, name});
+                    if (r.value("ok").toBool() || !r.contains("exists") || m_quiet)
+                        break;
+                    QMessageBox::information(this, tr("Create a new type"),
+                        tr("There is already a version called %1. Choose another name.").arg(name.trimmed()));
+                }
+            } else {
+                return false; // cancelled
+            }
+        }
+    }
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not change the objects"), r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
     return true;
 }
 

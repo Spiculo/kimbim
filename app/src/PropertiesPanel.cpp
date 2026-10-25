@@ -53,6 +53,9 @@ QString valueText(const QJsonValue& v)
     }
     case QJsonValue::Null:
         return QStringLiteral("—");
+    case QJsonValue::Bool: // a read-only on/off (D100: a library object's summary)
+        return v.toBool() ? QCoreApplication::translate("kimbim::PropertiesPanel", "Yes")
+                          : QCoreApplication::translate("kimbim::PropertiesPanel", "No");
     default:
         return {};
     }
@@ -264,6 +267,23 @@ void PropertiesPanel::showMulti(const QJsonObject& merged)
             } else {
                 item->setForeground(1, palette().brush(QPalette::Active, QPalette::Text));
             }
+        }
+        // D100: a library object's Parameters are a summary; Edit... opens the Object settings dialog
+        // (off when the selection holds more than one type).
+        if (p.key() == QLatin1String("Parameters") && merged.contains("object_settings")) {
+            for (int i = 1; i < group->childCount(); ++i) // the type first (JSON objects come sorted)
+                if (group->child(i)->data(0, PropRole).toString() == QLatin1String("Type"))
+                    group->insertChild(0, group->takeChild(i));
+            auto* row = new QTreeWidgetItem(group, {QString(), QString()});
+            row->setFlags(row->flags() & ~Qt::ItemIsEditable);
+            auto* button = new QPushButton(tr("Edit..."), m_tree);
+            button->setObjectName(QStringLiteral("objectSettingsEdit"));
+            const bool enabled = merged.value("object_settings").toObject().value("enabled").toBool();
+            button->setEnabled(enabled);
+            button->setToolTip(enabled ? tr("Change these objects' settings, or move them to another saved version")
+                                       : tr("The selection holds objects of more than one type"));
+            connect(button, &QPushButton::clicked, this, &PropertiesPanel::objectSettingsRequested);
+            m_tree->setItemWidget(row, 1, button);
         }
         group->setExpanded(true);
     }

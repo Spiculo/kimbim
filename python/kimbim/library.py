@@ -987,8 +987,8 @@ def _object_of(e):
 
 
 def parameters_of(elements) -> list:
-    """The Properties panel's Parameters group per element: the visible parameters as
-    {"label", "value", "kind", "choices"?} (a choice shows its option's label), or None."""
+    """The Properties panel's Parameters summary per element: the visible parameters as
+    {"label", "value", "kind"} (a choice shows its option's label), or None."""
     out = []
     for e in elements:
         found = _object_of(e)
@@ -1004,7 +1004,6 @@ def parameters_of(elements) -> list:
             row = {"label": p.label["en"], "value": values[p.key], "kind": p.kind}
             if p.kind == "choice":
                 row["value"] = p.option_label(values[p.key])
-                row["choices"] = [label["en"] for _, label in p.options]
             rows.append(row)
         out.append(rows)
     return out

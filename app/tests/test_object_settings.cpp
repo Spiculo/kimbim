@@ -127,6 +127,31 @@ private slots:
         QCOMPARE(d.values().value("width").toDouble(), 0.45);
     }
 
+    // Focus entering the versions list (the dialog shown, Tab) makes an item current without the user
+    // picking it: the unsaved values stay. Picking an item in the list still selects that version.
+    void focusInTheListKeepsUnsavedValues()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        const QString id = saveVersion(QStringLiteral("Dining"), {{"width", 0.5}});
+        kimbim::ObjectSettingsDialog d(&w, QStringLiteral("chair"), kimbim::ObjectSettingsDialog::Mode::Edit);
+        d.setValues({{"width", 0.6}});
+        d.show();
+        auto* list = d.findChild<QListWidget*>(QStringLiteral("objectSettingsVersions"));
+        QFocusEvent focus(QEvent::FocusIn, Qt::TabFocusReason);
+        QApplication::sendEvent(list, &focus);
+        QCOMPARE(d.values().value("width").toDouble(), 0.6);
+        QVERIFY(d.versionId().isEmpty());
+        for (int i = 0; i < list->count(); ++i)
+            if (list->item(i)->text() == QLatin1String("Dining"))
+                list->setCurrentRow(i);
+        QCOMPARE(d.versionId(), id);
+        QCOMPARE(d.values().value("width").toDouble(), 0.5);
+        list->setCurrentRow(0); // Default
+        QVERIFY(d.versionId().isEmpty());
+        QCOMPARE(d.values().value("width").toDouble(), 0.45);
+    }
+
     void badValueKeepsPreviewAndDisablesAccept() // Review Focus 5
     {
         kimbim::MainWindow w(nullptr, true);

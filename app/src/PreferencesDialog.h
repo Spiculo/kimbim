@@ -49,7 +49,6 @@ private:
     QComboBox* m_mergeProps; // D92
     QCheckBox* m_meshVertexSnaps; // D92
     QCheckBox* m_keepRectangles; // D92
-    QComboBox* m_objectEditScope; // D92
     QComboBox* m_tracker; // D92: tracker and typed input
     QComboBox* m_angleMode;
     QComboBox* m_typedLength;

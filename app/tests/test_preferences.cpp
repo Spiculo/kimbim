@@ -136,7 +136,7 @@ private slots:
         d.findChild<QComboBox*>("selectSimilarScope")->setCurrentIndex(1); // class_predefined, type, class
         d.findChild<QComboBox*>("boxSelection")->setCurrentIndex(2); // direction, partial, entire
         d.findChild<QCheckBox*>("splitJoin")->setChecked(false);
-        d.findChild<QComboBox*>("objectEditScope")->setCurrentIndex(1); // D92: selection, ask
+        QVERIFY(!d.findChild<QComboBox*>("objectEditScope")); // D100: Edit... asks when it matters
         d.findChild<QCheckBox*>("keepRectangles")->setChecked(true);
         d.findChild<QComboBox*>("tracker")->setCurrentIndex(2); // always, typing, off
         d.findChild<QComboBox*>("angleMode")->setCurrentIndex(2); // absolute, relative, bearing
@@ -157,7 +157,6 @@ private slots:
         QCOMPARE(p.fieldOfView(), 60.0);
         QVERIFY(!p.titleBarLevels() && !p.titleBarVersions());
         QCOMPARE(p.selectSimilarScope(), QString("type"));
-        QCOMPARE(p.objectEditScope(), QString("ask"));
         QVERIFY(p.keepRectanglesRectangular());
         QCOMPARE(p.trackerMode(), QString("off"));
         QCOMPARE(p.angleMode(), QString("bearing"));

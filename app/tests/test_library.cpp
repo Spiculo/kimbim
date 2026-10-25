@@ -5,13 +5,18 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
+#include <QFile>
 #include <QJsonDocument>
 #include <QLineEdit>
 #include <QMenu>
 #include <QSignalSpy>
+#include <QPushButton>
 #include <QStandardPaths>
+#include <QTemporaryDir>
+#include <QTimer>
 #include <QTreeWidget>
 #include <QtTest>
+#include <functional>
 
 #include "LibraryPanel.h"
 #include "MainWindow.h"
@@ -66,11 +71,61 @@ QString itemText(kimbim::LibraryPanel* panel, const QString& id)
     return {};
 }
 
+QJsonObject parameters(const QString& guid)
+{
+    return kimbim::PythonEngine::instance()
+        .callJson("properties_multi", {QStringLiteral("[\"%1\"]").arg(guid)}).object()
+        .value("psets").toObject().value("Parameters").toObject();
+}
+
 double placedWidth(const QString& guid)
 {
-    const QJsonObject multi = kimbim::PythonEngine::instance()
-        .callJson("properties_multi", {QStringLiteral("[\"%1\"]").arg(guid)}).object();
-    return multi.value("psets").toObject().value("Parameters").toObject().value("Width").toObject().value("value").toDouble();
+    return parameters(guid).value("Width").toObject().value("value").toDouble();
+}
+
+QString typeName(const QString& guid) // D100: the Parameters summary's first row
+{
+    return parameters(guid).value("Type").toObject().value("value").toString();
+}
+
+// D100: Edit... on the selection: `edit` runs on the Edit-mode dialog, then Apply is pressed. True when
+// the dialog showed and the edit was applied.
+bool editWith(kimbim::MainWindow& w, const std::function<void(kimbim::ObjectSettingsDialog*)>& edit)
+{
+    bool seen = false;
+    QTimer::singleShot(0, &w, [&] {
+        auto* d = qobject_cast<kimbim::ObjectSettingsDialog*>(QApplication::activeModalWidget());
+        if (!d) {
+            if (QWidget* other = QApplication::activeModalWidget())
+                other->close();
+            return;
+        }
+        seen = true;
+        edit(d);
+        d->findChild<QPushButton*>(QStringLiteral("objectSettingsAccept"))->click();
+    });
+    const bool applied = w.editObjectSettings();
+    return seen && applied;
+}
+
+void setWidth(kimbim::ObjectSettingsDialog* d, double width)
+{
+    d->findChild<QDoubleSpinBox*>(QStringLiteral("param_width"))->setValue(width);
+}
+
+// Two chairs placed with the saved version `id`: their guids.
+QStringList placeTwo(kimbim::MainWindow& w, const QString& id)
+{
+    w.setObjectVersion(QStringLiteral("chair"), id);
+    w.setTool(kimbim::MainWindow::Tool::Object);
+    QStringList made;
+    for (QPointF p : {QPointF(1, 1), QPointF(3, 1)}) {
+        const QStringList before = w.viewport()->guids();
+        if (w.placeObjectAt(p))
+            made << added(before, w.viewport()->guids());
+    }
+    w.setTool(kimbim::MainWindow::Tool::None);
+    return made;
 }
 
 } // namespace
@@ -136,13 +191,14 @@ private slots:
         emit w.viewport()->workPointClicked(QPointF(6, 3), 0.01, Qt::NoModifier);
         QCOMPARE(added(before2, w.viewport()->guids()).size(), 1);
 
-        // Parameters in Properties: the selected table gets a new width (a new type; the other keeps its own).
+        // Edit... (D100): the selected table gets a new width in a new type; the other keeps its own.
         w.setTool(kimbim::MainWindow::Tool::None);
         QVERIFY(!action(w, "actionTurnObject")->isEnabled()); // Tab is the focus key again
         w.setSelection({made[0]});
-        QVERIFY(w.applyPropertyEdit(QStringLiteral("Parameters"), QStringLiteral("Width"), 1.8));
-        const QJsonObject multi = kimbim::PythonEngine::instance().callJson("properties_multi", {QStringLiteral("[\"%1\"]").arg(made[0])}).object();
-        QCOMPARE(multi.value("psets").toObject().value("Parameters").toObject().value("Width").toObject().value("value").toDouble(), 1.8);
+        w.setEditChoiceForTests(QStringLiteral("new"), QStringLiteral("Long"));
+        QVERIFY(editWith(w, [](kimbim::ObjectSettingsDialog* d) { setWidth(d, 1.8); }));
+        QCOMPARE(placedWidth(made[0]), 1.8);
+        QCOMPARE(typeName(made[0]), QStringLiteral("Long"));
 
         // Undo: the edit, then the second table, each one step.
         action(w, "actionUndo")->trigger();
@@ -295,7 +351,7 @@ private slots:
         QCOMPARE(context.count(), 1);
     }
 
-    void boolParameterEditsFromProperties()
+    void editOnlyUseAppliesDirectly()
     {
         kimbim::MainWindow w(nullptr, true);
         QVERIFY(w.newProject());
@@ -306,10 +362,118 @@ private slots:
         QCOMPARE(made.size(), 1);
         w.setTool(kimbim::MainWindow::Tool::None);
         w.setSelection(made);
-        QVERIFY(w.applyPropertyEdit(QStringLiteral("Parameters"), QStringLiteral("Arms"), QJsonValue(true)));
-        const QJsonObject props = kimbim::PythonEngine::instance()
-            .callJson("properties_multi", {QStringLiteral("[\"%1\"]").arg(made[0])}).object();
-        QCOMPARE(props.value("psets").toObject().value("Parameters").toObject().value("Arms").toObject().value("value").toBool(), true);
+        // Nothing else uses the type: no question (none is set for the test), the values apply.
+        QVERIFY(editWith(w, [](kimbim::ObjectSettingsDialog* d) {
+            QCOMPARE(d->findChild<QPushButton*>(QStringLiteral("objectSettingsAccept"))->text(), QStringLiteral("Apply"));
+            d->findChild<QCheckBox*>(QStringLiteral("param_arms"))->setChecked(true);
+        }));
+        const QJsonObject now = kimbim::PythonEngine::instance()
+            .callJson("object_settings_of", {QStringLiteral("[\"%1\"]").arg(made[0])}).object();
+        QCOMPARE(now.value("values").toObject().value("arms").toBool(), true); // beyond the summary's rows
+        // Nothing selected: no dialog.
+        w.setSelection({});
+        QVERIFY(!w.editObjectSettings());
+    }
+
+    void editModifyAllChangesEveryPlacement()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        const QString id = saveVersion(QStringLiteral("chair"), QStringLiteral("Dining"), {{"width", 0.5}});
+        const QStringList made = placeTwo(w, id);
+        QCOMPARE(made.size(), 2);
+        w.setSelection({made[0]});
+        w.setEditChoiceForTests(QStringLiteral("all"));
+        QVERIFY(editWith(w, [&](kimbim::ObjectSettingsDialog* d) {
+            QCOMPARE(d->versionId(), id); // opens on the selection's type
+            QCOMPARE(d->values().value("width").toDouble(), 0.5);
+            setWidth(d, 0.55);
+        }));
+        for (const QString& g : made) {
+            QCOMPARE(typeName(g), QStringLiteral("Dining"));
+            QCOMPARE(placedWidth(g), 0.55);
+        }
+        QCOMPARE(versionNamed(QStringLiteral("chair"), QStringLiteral("Dining")).value("uses").toInt(), 2);
+    }
+
+    void editCreateNewTypeMovesOnlySelection()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        const QString id = saveVersion(QStringLiteral("chair"), QStringLiteral("Dining"), {{"width", 0.5}});
+        const QStringList made = placeTwo(w, id);
+        QCOMPARE(made.size(), 2);
+        w.setSelection({made[0]});
+        // A name the object has already (any case): nothing changes.
+        w.setEditChoiceForTests(QStringLiteral("new"), QStringLiteral("dining"));
+        QVERIFY(!editWith(w, [](kimbim::ObjectSettingsDialog* d) { setWidth(d, 0.55); }));
+        QCOMPARE(placedWidth(made[0]), 0.5);
+        w.setEditChoiceForTests(QStringLiteral("new"), QStringLiteral("Wide"));
+        QVERIFY(editWith(w, [](kimbim::ObjectSettingsDialog* d) { setWidth(d, 0.55); }));
+        QCOMPARE(typeName(made[0]), QStringLiteral("Wide"));
+        QCOMPARE(placedWidth(made[0]), 0.55);
+        QCOMPARE(typeName(made[1]), QStringLiteral("Dining"));
+        QCOMPARE(placedWidth(made[1]), 0.5);
+        QVERIFY(!versionNamed(QStringLiteral("chair"), QStringLiteral("Wide")).isEmpty());
+        // Undo: one step.
+        action(w, "actionUndo")->trigger();
+        QCOMPARE(typeName(made[0]), QStringLiteral("Dining"));
+        QCOMPARE(placedWidth(made[0]), 0.5);
+        QVERIFY(versionNamed(QStringLiteral("chair"), QStringLiteral("Wide")).isEmpty());
+        // Cancel in the question (no choice): nothing.
+        w.setSelection({made[0]});
+        w.setEditChoiceForTests(QString());
+        QVERIFY(!editWith(w, [](kimbim::ObjectSettingsDialog* d) { setWidth(d, 0.6); }));
+        QCOMPARE(placedWidth(made[0]), 0.5);
+    }
+
+    void editPickingAnotherVersionAssignsIt()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        const QString dining = saveVersion(QStringLiteral("chair"), QStringLiteral("Dining"), {{"width", 0.5}});
+        const QString wide = saveVersion(QStringLiteral("chair"), QStringLiteral("Wide"), {{"width", 0.6}});
+        const QStringList made = placeTwo(w, dining);
+        QCOMPARE(made.size(), 2);
+        w.setSelection({made[0]});
+        QVERIFY(editWith(w, [&](kimbim::ObjectSettingsDialog* d) { d->selectVersion(wide); }));
+        QCOMPARE(typeName(made[0]), QStringLiteral("Wide"));
+        QCOMPARE(placedWidth(made[0]), 0.6);
+        QCOMPARE(typeName(made[1]), QStringLiteral("Dining"));
+        // Editing placed objects leaves what a click places alone.
+        const QJsonObject last = kimbim::PythonEngine::instance().callJson("object_versions", {QStringLiteral("chair")})
+            .object().value("last").toObject();
+        QCOMPARE(last.value("version").toString(), dining);
+        QCOMPARE(w.currentObjectVersion(), dining);
+    }
+
+    // D100: outdated saved versions that nothing uses still update (Update from library).
+    void updateLibraryObjectsUpdatesUnusedVersions()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        QTemporaryDir dir;
+        auto write = [&](double width) {
+            const QJsonObject block{{"format", "kimbim-object/1"}, {"id", "block"}, {"name", "Block"}, {"category", "furniture"},
+                {"ifc", QJsonObject{{"IFC4", QJsonArray{"IfcFurnitureType", "NOTDEFINED", QJsonValue()}}}},
+                {"params", QJsonArray{QJsonObject{{"key", "width"}, {"kind", "length"}, {"label", "Width"}, {"default", width}}}},
+                {"parts", QJsonArray{QJsonObject{{"id", "body"}, {"box", QJsonObject{{"dx", "width"}, {"dy", 0.4}, {"dz", 0.4}}}}}}};
+            QFile file(dir.filePath(QStringLiteral("block.kimobj")));
+            QVERIFY(file.open(QIODevice::WriteOnly));
+            file.write(QJsonDocument(block).toJson());
+            file.close();
+            kimbim::PythonEngine::instance().callJson("set_library_paths",
+                {QString::fromUtf8(QJsonDocument(QJsonObject{{"folder", dir.path()}}).toJson(QJsonDocument::Compact))});
+        };
+        write(0.4);
+        QVERIFY(!saveVersion(QStringLiteral("office:block"), QStringLiteral("Low"), {{"width", 0.3}}).isEmpty());
+        write(0.5); // the office edits its block
+        const QJsonObject pending = kimbim::PythonEngine::instance().callJson("library_updates", {QString()}).object();
+        QCOMPARE(pending.value("outdated").toInt(), 0);
+        QCOMPARE(pending.value("versions").toInt(), 1);
+        action(w, "actionUpdateLibraryObjects")->trigger();
+        QCOMPARE(kimbim::PythonEngine::instance().callJson("library_updates", {QString()}).object().value("versions").toInt(), 0);
+        QVERIFY(w.statusStrip()->message().contains(QStringLiteral("1 saved version")));
     }
 
     void updateLibraryObjectsWithNothingOutdatedIsNotAnError()

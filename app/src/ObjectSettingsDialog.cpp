@@ -323,9 +323,12 @@ ObjectSettingsDialog::ObjectSettingsDialog(MainWindow* window, const QString& ke
         }
         schedulePreview();
     });
-    connect(m_list, &QListWidget::currentItemChanged, this, [this](QListWidgetItem* item) {
-        if (item && (item->flags() & Qt::ItemIsSelectable))
-            selectVersion(item->data(IdRole).toString());
+    // The selection, not the current item: focus entering the list makes its first item current
+    // without selecting it, and that must not drop unsaved values.
+    connect(m_list, &QListWidget::itemSelectionChanged, this, [this] {
+        const QList<QListWidgetItem*> picked = m_list->selectedItems();
+        if (picked.size() == 1 && (picked.first()->flags() & Qt::ItemIsSelectable))
+            selectVersion(picked.first()->data(IdRole).toString());
     });
     connect(m_list, &QListWidget::customContextMenuRequested, this, [this](const QPoint& pos) {
         QListWidgetItem* item = m_list->itemAt(pos);

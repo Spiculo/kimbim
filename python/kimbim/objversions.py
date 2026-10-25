@@ -405,8 +405,8 @@ def apply_object_settings(guids_json: str, params_json: str, mode: str, name: st
 
 
 def assign_version(guids_json: str, version_id: str) -> str:
-    """Move these placements to a saved version's type (D100). An unnamed type left unused goes. One undo
-    step."""
+    """Move these placements to a saved version's type (D100). An office version the project has no copy
+    of is copied in first (as placing it does). An unnamed type left unused goes. One undo step."""
     import ifcopenshell.api.type
     import ifcopenshell.util.element
 
@@ -416,9 +416,13 @@ def assign_version(guids_json: str, version_id: str) -> str:
     if B._model is None:
         return A._fail("no model open")
     target = find_version(version_id)
-    if target is None:
+    office = library._office_versions.get(version_id) if target is None and version_id else None
+    if target is None and office is None:
         return A._fail("unknown version")
-    ref = _pset(target).get("Object") or ""
+    office_obj = library.office_definition(office) if office is not None else None
+    if office is not None and office_obj is None:
+        return A._fail(f"the office version {office['name']} has no definition")
+    ref = office["object"] if office is not None else _pset(target).get("Object") or ""
     elements = B._elements(guids_json)
     if not elements:
         return A._fail("no library object selected")
@@ -426,9 +430,12 @@ def assign_version(guids_json: str, version_id: str) -> str:
     if any(x is None or x[0].ref != ref for x in found):
         return A._fail(f"that version is not one of every selected object ({ref})")
     old = {x[2].id(): x[2] for x in found if x[2] != target}
+    made = []
 
     def action():
-        ifcopenshell.api.type.assign_type(B._model, related_objects=elements, relating_type=target)
+        relating = target if office is None else copy_office_version(office, office_obj, dict(office["values"]))
+        made.append(relating)
+        ifcopenshell.api.type.assign_type(B._model, related_objects=elements, relating_type=relating)
         for t in old.values():
             library._remove_type_if_unused(t)
         return len(elements), [e.GlobalId for e in elements], []
@@ -437,7 +444,7 @@ def assign_version(guids_json: str, version_id: str) -> str:
         r = B._run(action)
     except Exception as ex:
         return A._fail(f"{type(ex).__name__}: {ex}")
-    return B._dump({**r, "type": target.GlobalId})
+    return B._dump({**r, "type": made[0].GlobalId})
 
 
 # ---------------------------------------------------------------- the office library

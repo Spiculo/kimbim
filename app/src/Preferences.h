@@ -54,7 +54,6 @@ public:
     QString boxSelection() const;       // "direction", "partial" or "entire"
     bool splitJoin() const;             // D92: split/trim pieces are joined (Ctrl inverts)
     QString mergeProps() const;         // D92: merging keeps the first's properties ("keep") or refuses ("refuse")
-    QString objectEditScope() const;    // D92: a library parameter edits the selection ("selection") or asks ("ask")
     double largeIfcMb() const;
     bool askImportStatus() const;       // D74: opening an IFC offers to mark elements without a renovation status          // an IFC this large asks before making a .kim; 0: never asks
     // Drawing generation: how long to wait before giving up (seconds; 0 = no limit) and the

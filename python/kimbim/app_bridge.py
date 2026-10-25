@@ -765,6 +765,7 @@ def pset_templates(ifc_class: str) -> str:
 
 
 _MISSING = object()
+SUMMARY_PARAMETERS = 6  # D100: the Parameters summary shows the first few; Edit... has them all
 
 
 def _element_values(e) -> dict:
@@ -854,28 +855,31 @@ def properties_multi(guids_json: str) -> str:
             group[name] = {"value": None if varies else values[0], "varies": varies, "ifc_type": "IfcLengthMeasure",
                            "editable": all(ed for _, ed in present), "source": "dimension", "type_value": None}
         psets = {authoring.DIMENSIONS: group, **psets}
-    # D86: a library object's parameters, edited through set_object_parameter (its type follows).
+    # D86/D100: a library object's parameters: a read-only summary (its type, then the first visible
+    # parameters); Edit... opens the Object settings dialog, for a selection of one type.
     from . import library
 
     per_params = library.parameters_of(elements)
+    object_settings = None
     if all(p is not None for p in per_params):
-        group = {}
+        import ifcopenshell.util.element
+
+        types = [ifcopenshell.util.element.get_type(e) for e in elements]
+        one_type = all(t == types[0] for t in types)
+        object_settings = {"enabled": one_type}
         ifc_types = {"length": "IfcLengthMeasure", "angle": "IfcPlaneAngleMeasure", "count": "IfcInteger",
                      "bool": "IfcBoolean", "choice": "IfcLabel", "material": "IfcLabel"}
-        for row in per_params[0]:  # D99: the visible parameters of the first, by label
+        group = {"Type": {"value": (types[0].Name or "") if one_type else None, "varies": not one_type,
+                          "ifc_type": "IfcLabel", "editable": False, "source": "parameter", "type_value": None}}
+        for row in per_params[0][:SUMMARY_PARAMETERS]:  # D99: the visible parameters of the first, by label
             label = row["label"]
             present = [next((r["value"] for r in rows if r["label"] == label), _MISSING) for rows in per_params]
             varies = any(v is _MISSING or v != present[0] for v in present)
             group[label] = {"value": None if varies else present[0], "varies": varies,
-                            "ifc_type": ifc_types[row["kind"]], "editable": True, "source": "dimension",
+                            "ifc_type": ifc_types[row["kind"]], "editable": False, "source": "parameter",
                             "type_value": None}
-            if row["kind"] == "material":  # D97: a part's building material, picked from a list
-                group[label]["choices"] = library._material_choices(present[0] if isinstance(present[0], str) else "")
-            elif row["kind"] == "choice":
-                group[label]["choices"] = row["choices"]
-        if group:
-            psets = {**{k: v for k, v in psets.items() if k == authoring.DIMENSIONS}, library.PARAMETERS: group,
-                     **{k: v for k, v in psets.items() if k != authoring.DIMENSIONS}}
+        psets = {**{k: v for k, v in psets.items() if k == authoring.DIMENSIONS}, library.PARAMETERS: group,
+                 **{k: v for k, v in psets.items() if k != authoring.DIMENSIONS}}
     outdated = len(library._outdated(elements))  # D99: objects whose library definition changed
     from . import renovation
 
@@ -894,6 +898,8 @@ def properties_multi(guids_json: str) -> str:
     }
     if outdated:
         payload["library_update"] = outdated
+    if object_settings is not None:
+        payload["object_settings"] = object_settings
     return _dump(payload)
 
 

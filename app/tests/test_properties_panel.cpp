@@ -6,10 +6,13 @@
 #include <QJsonArray>
 #include <QPushButton>
 #include <QSignalSpy>
+#include <QStandardPaths>
 #include <QTreeWidgetItem>
 #include <QtTest>
 
+#include "MainWindow.h"
 #include "PropertiesPanel.h"
+#include "Viewport.h"
 
 namespace {
 
@@ -199,6 +202,66 @@ private slots:
         QCOMPARE(panel.statusCombo()->findText(panel.variesText()), -1);
         panel.showMulti(sample()); // no status (annotations only): no row
         QVERIFY(!panel.statusCombo());
+    }
+
+    // D100: a library object's Parameters are a read-only summary (its type first) with Edit...,
+    // which is off when the selection holds more than one type.
+    void parametersAreASummaryWithEdit()
+    {
+        QStandardPaths::setTestModeEnabled(true);
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        auto place = [&](const QString& key, QPointF p) {
+            const QStringList before = w.viewport()->guids();
+            if (!w.chooseObject(key) || !w.placeObjectAt(p))
+                return QString();
+            for (const QString& g : w.viewport()->guids())
+                if (!before.contains(g))
+                    return g;
+            return QString();
+        };
+        const QString chair = place(QStringLiteral("chair"), QPointF(1, 1));
+        const QString table = place(QStringLiteral("table"), QPointF(4, 1));
+        QVERIFY(!chair.isEmpty() && !table.isEmpty());
+        w.setTool(kimbim::MainWindow::Tool::None);
+        w.setSelection({chair});
+        kimbim::PropertiesPanel* panel = w.propertiesPanel();
+        QTreeWidgetItem* type = panel->itemFor(QStringLiteral("Parameters"), QStringLiteral("Type"));
+        QVERIFY(type);
+        QCOMPARE(type->parent()->indexOfChild(type), 0);
+        QVERIFY(!type->text(1).isEmpty());
+        int rows = 0;
+        for (int i = 0; i < type->parent()->childCount(); ++i) {
+            QTreeWidgetItem* row = type->parent()->child(i);
+            QVERIFY(!(row->flags() & Qt::ItemIsEditable));
+            QVERIFY(row->data(1, Qt::CheckStateRole).isNull()); // no check box either
+            if (!row->data(0, Qt::UserRole + 1).toString().isEmpty())
+                ++rows;
+        }
+        QVERIFY(rows <= 7); // the type and at most 6 parameters
+        for (const QComboBox* c : panel->findChildren<QComboBox*>())
+            QVERIFY(!c->objectName().startsWith(QLatin1String("choice:Parameters/"))); // no inline editors
+        auto* edit = panel->findChild<QPushButton*>(QStringLiteral("objectSettingsEdit"));
+        QVERIFY(edit);
+        QVERIFY(edit->isEnabled());
+        QSignalSpy spy(panel, &kimbim::PropertiesPanel::objectSettingsRequested);
+        QObject::disconnect(panel, &kimbim::PropertiesPanel::objectSettingsRequested, &w, nullptr); // no modal dialog
+        edit->click();
+        QCOMPARE(spy.count(), 1);
+
+        w.setSelection({chair, table});
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete); // the old item widgets go
+        edit = panel->findChild<QPushButton*>(QStringLiteral("objectSettingsEdit"));
+        QVERIFY(edit);
+        QVERIFY(!edit->isEnabled());
+
+        // A read-only on/off reads Yes or No.
+        kimbim::PropertiesPanel standalone;
+        standalone.showMulti(QJsonObject{{"count", 1}, {"guids", QJsonArray{"g"}}, {"types", QJsonArray{"IfcFurniture"}},
+            {"name", QJsonObject{{"value", "Chair"}, {"varies", false}}}, {"object_settings", QJsonObject{{"enabled", true}}},
+            {"psets", QJsonObject{{"Parameters", QJsonObject{{"Arms", QJsonObject{{"value", true}, {"varies", false},
+                {"ifc_type", "IfcBoolean"}, {"editable", false}}}}}}}});
+        QCOMPARE(standalone.itemFor(QStringLiteral("Parameters"), QStringLiteral("Arms"))->text(1), QStringLiteral("Yes"));
     }
 };
 

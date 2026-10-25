@@ -453,6 +453,18 @@ public:
     // The Object settings dialog for placing `key` (its current version selected); Place starts the
     // Object tool with what the dialog shows. False if cancelled.
     bool objectSettingsDialog(const QString& key);
+    // D100: Edit... (Properties): the dialog in edit mode on the selection's type (one library type).
+    // Apply moves the selection to the version picked in the list, or applies the values: directly
+    // when only the selection uses the type, else after asking whether to modify every object of the
+    // type or create a new type (named) for the selection. One undo step; the last version used (what
+    // a click places) stays. False if nothing changed.
+    bool editObjectSettings();
+    // Quiet mode: the answer that question gets ("all", "new" with `name`, or "" to cancel).
+    void setEditChoiceForTests(const QString& mode, const QString& name = {})
+    {
+        m_editChoice = mode;
+        m_editChoiceName = name;
+    }
     struct ObjectFit {
         QPointF origin; // the object's left front corner
         double angle = 0.0; // degrees
@@ -677,6 +689,7 @@ private:
 
     bool m_quiet;
     QString m_importStatusAnswer;
+    QString m_editChoice, m_editChoiceName; // D100: setEditChoiceForTests
     bool m_askImportStatus = false; // an IFC is loading: ask about unmarked elements when it's done
     std::function<LargeIfc(const QString&, double)> m_largeIfcAnswer;
     Preferences m_prefs; // D72: user preferences (in memory only in quiet mode)

@@ -271,6 +271,7 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     connect(m_properties, &PropertiesPanel::addPropertySetRequested, this, &MainWindow::addPropertySetDialog);
     connect(m_properties, &PropertiesPanel::typeEditRequested, this, &MainWindow::typeEditDialog);
     connect(m_properties, &PropertiesPanel::updateFromLibraryRequested, this, [this] { updateFromLibrary(); });
+    connect(m_properties, &PropertiesPanel::objectSettingsRequested, this, [this] { editObjectSettings(); });
     connect(m_properties, &PropertiesPanel::resetToTypeRequested, this, &MainWindow::resetToType);
     connect(m_tree, &ModelTreePanel::isolateRequested, m_viewport, &Viewport::isolate);
     onEachView([this](Viewport* v) { connect(v, &Viewport::dragMoved, this, &MainWindow::dragMoveTo); });
@@ -1638,33 +1639,9 @@ bool MainWindow::applyPropertyEdit(const QString& pset, const QString& prop, con
         afterEdit(r);
         return r.value("ok").toBool();
     }
-    const bool dimension = pset == QLatin1String("Dimensions");
-    const bool parameter = pset == QLatin1String("Parameters"); // D86: a library object's (its type follows)
-    QString scope; // D92: edit the selection (default) or ask when the type is shared
-    if (parameter && !m_quiet && m_prefs.objectEditScope() == QLatin1String("ask")) {
-        const QJsonObject usage = bridge("object_parameter_usage", {jsonList(m_selection), prop});
-        if (usage.value("shared").toBool()) {
-            QMessageBox box(QMessageBox::Question, tr("Change the object's type"),
-                tr("This object's type has %n placement(s) in the model.", nullptr, usage.value("elements").toInt()),
-                QMessageBox::NoButton, this);
-            box.setInformativeText(tr("Change every placement of the type, or only the %n selected one(s)?", nullptr,
-                                      usage.value("selected").toInt()));
-            QPushButton* whole = box.addButton(tr("Change every placement"), QMessageBox::AcceptRole);
-            QPushButton* only = box.addButton(tr("Only the selection"), QMessageBox::AcceptRole);
-            box.setDefaultButton(only);
-            box.exec();
-            scope = box.clickedButton() == whole ? QStringLiteral("type") : QStringLiteral("selection");
-        }
-    }
-    auto asText = [](const QJsonValue& v) {
-        if (v.isBool())
-            return v.toBool() ? QStringLiteral("true") : QStringLiteral("false");
-        return v.isDouble() ? QString::number(v.toDouble(), 'g', 17) : v.toString();
-    };
-    const QJsonObject r = dimension || parameter
-        ? bridge(parameter ? "set_object_parameter" : "set_dimension",
-              parameter ? QStringList{jsonList(m_selection), prop, asText(value), scope}
-                        : QStringList{jsonList(m_selection), prop, asText(value)})
+    const QJsonObject r = pset == QLatin1String("Dimensions")
+        ? bridge("set_dimension", {jsonList(m_selection), prop,
+              value.isDouble() ? QString::number(value.toDouble(), 'g', 17) : value.toString()})
         : bridge("set_property", {jsonList(m_selection), pset, prop, jsonValue(value)});
     if (!r.value("ok").toBool())
         showError(tr("Could not change %1").arg(prop), r.value("error").toString());
@@ -6448,7 +6425,11 @@ void MainWindow::updateFromLibrary(bool all)
 {
     const QString guids = all ? QString() : jsonList(m_selection);
     const QJsonObject pending = bridge("library_updates", {guids});
-    if (pending.value("ok").toBool() && pending.value("outdated").toInt() == 0) {
+    // "outdated" counts placed objects (those of outdated saved versions too); "versions" the saved
+    // versions (D100), which update even when nothing uses them.
+    const int outdated = pending.value("outdated").toInt();
+    const int versions = pending.value("versions").toInt();
+    if (pending.value("ok").toBool() && outdated == 0 && versions == 0) {
         m_status->showMessage(tr("The placed objects already match the library"));  // nothing to do: not an error
         return;
     }
@@ -6458,6 +6439,12 @@ void MainWindow::updateFromLibrary(bool all)
         return;
     }
     afterEdit(r);
+    QStringList done;
+    if (outdated > 0)
+        done << tr("%n placed object(s)", nullptr, outdated);
+    if (versions > 0)
+        done << tr("%n saved version(s)", nullptr, versions);
+    m_status->showMessage(tr("Updated from the library: %1").arg(done.join(QStringLiteral("; "))));
 }
 
 bool MainWindow::deleteSelection()
