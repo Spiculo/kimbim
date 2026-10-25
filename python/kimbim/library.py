@@ -849,32 +849,79 @@ def _regenerate_type(t, obj, values: dict) -> None:
     _write_pset(t, obj, values)
 
 
-def object_parameter_usage(guids_json: str, name: str) -> str:
-    """Whether editing `name` on these objects would also touch other placements: {"elements": all
-    placements of their types, "selected": those selected, "shared": any placement is not selected}."""
+def _checked_value(p, value):
+    """A value for parameter `p` as the UI gives it (text, or JSON from the dialog), checked: ObjectError
+    with the reason when it is not one (values() would quietly fall back to the default, or clamp a length
+    to its limit)."""
+    from . import app_bridge as B
+
+    if p.kind == "material":  # D97: a building material for one part
+        from . import materials
+
+        v = str(value).strip()
+        if not v or (materials._material_by_name(B._model, v) is None and v not in materials.CATALOGUE):
+            raise ObjectError(f"unknown building material {value}")
+        return v
+    if p.kind == "choice":  # an option's id or label (either language)
+        v = str(value).strip().lower()
+        if not any(v in (i.lower(), label["en"].lower(), label["es"].lower()) for i, label in p.options):
+            raise ObjectError(f"unknown option {value} for {p.label['en']}")
+        return value
+    if p.kind == "bool":
+        if not isinstance(value, bool) and str(value).strip().lower() not in objects._TRUE | objects._FALSE:
+            raise ObjectError(f"{p.label['en']}: not on or off")
+        return value
+    try:
+        v = float(str(value).strip().replace(",", "."))
+    except ValueError:
+        raise ObjectError(f"not a number: {value}") from None
+    if not math.isfinite(v):
+        raise ObjectError(f"not a number: {value}")
+    if p.kind == "length" and v <= 0:
+        raise ObjectError(f"{p.label['en']} must be more than 0")
+    return v
+
+
+def _edited_values(obj, values: dict, edits: dict) -> dict:
+    """`values` with `edits` ({parameter key or label: value}) checked and applied, every value re-cleaned
+    (limits that are formulas follow) and built: ObjectError (a ValueError) when a value is not one or the
+    definition cannot build them (doc 16 §7)."""
+    new_values = dict(values)
+    for name, value in edits.items():
+        p = obj.param(name)
+        if p is None:
+            raise ObjectError(f"{obj.name} has no parameter {name}")
+        new_values[p.key] = _checked_value(p, value)
+    new_values = obj.values(new_values)
+    obj.shape(new_values)
+    return new_values
+
+
+def _retype_whole(t, obj, values: dict) -> None:
+    """Every placement of type `t` takes these values (D100 *modify all*). The type regenerates in place,
+    keeping its GlobalId, unless it is unnamed and an unnamed type with these values exists: everyone moves
+    there and `t` goes. A saved version never merges, into any type."""
+    import ifcopenshell.api.type
     import ifcopenshell.util.element
 
     from . import app_bridge as B
-    from . import authoring as A
+    from . import objversions
 
-    if B._model is None:
-        return A._fail("no model open")
-    selected, everyone = 0, set()
-    for e in B._elements(guids_json):
-        found = _object_of(e)
-        if found is None or found[0].param(name) is None:
-            continue
-        selected += 1
-        everyone.update(ifcopenshell.util.element.get_types(found[2]))
-    return B._dump({"ok": True, "elements": len(everyone), "selected": selected,
-                    "shared": len(everyone) > selected})
+    target = None if objversions.is_saved(t) else _find_type(B._model, obj.ref, values, _hash_of(obj))
+    if target is None or target == t:
+        _regenerate_type(t, obj, values)
+        return
+    ifcopenshell.api.type.assign_type(B._model, related_objects=list(ifcopenshell.util.element.get_types(t)),
+                                      relating_type=target)
+    _remove_type_if_unused(t)
 
 
 def set_object_parameter(guids_json: str, name: str, value, scope: str = "") -> str:
     """Change a parameter of the selected library objects. If they are every placement of their
-    type, the type changes in place (keeping its GlobalId); otherwise only the selected ones move to
-    the type with the new value (found or made) and the others keep theirs. `scope` (D92): "selection"
-    (the default behaviour) or "type" (every placement of their types changes). One undo step."""
+    type, the type changes (_retype_whole: in place, keeping its GlobalId, or joining an identical unnamed
+    type); otherwise only the selected ones move to the type with the new value (found or made) and the
+    others keep theirs. `scope` (D92): "selection" (the default behaviour) or "type" (every placement of
+    their types changes). One undo step."""
     import ifcopenshell.api.type
     import ifcopenshell.util.element
 
@@ -892,33 +939,8 @@ def set_object_parameter(guids_json: str, name: str, value, scope: str = "") -> 
         p = obj.param(name)
         if p is None:
             continue
-        if p.kind == "material":  # D97: a building material for one part
-            from . import materials
-
-            v = str(value).strip()
-            if not v or (materials._material_by_name(B._model, v) is None and v not in materials.CATALOGUE):
-                return A._fail(f"unknown building material {value}")
-        elif p.kind == "choice":  # an option's id or label (either language)
-            v = str(value).strip().lower()
-            if not any(v in (i.lower(), label["en"].lower(), label["es"].lower()) for i, label in p.options):
-                return A._fail(f"unknown option {value} for {p.label['en']}")
-            v = value
-        elif p.kind == "bool":
-            if not isinstance(value, bool) and str(value).strip().lower() not in objects._TRUE | objects._FALSE:
-                return A._fail(f"{p.label['en']}: not on or off")
-            v = value
-        else:
-            try:
-                v = float(str(value).strip().replace(",", "."))
-            except ValueError:
-                return A._fail(f"not a number: {value}")
-            if p.kind == "length" and v <= 0:
-                return A._fail(f"{p.label['en']} must be more than 0")
-        new_values = dict(values)
-        new_values[p.key] = v
         try:
-            new_values = obj.values(new_values)  # re-cleans every value: limits that are formulas follow
-            obj.shape(new_values)  # a formula that breaks at these values fails the edit (doc 16 §7)
+            new_values = _edited_values(obj, values, {p.key: value})
         except (ObjectError, ValueError) as ex:
             return A._fail(str(ex))
         groups.setdefault(t.id(), (t, obj, new_values, []))[3].append(e)
@@ -930,14 +952,8 @@ def set_object_parameter(guids_json: str, name: str, value, scope: str = "") -> 
         changed = []
         for t, obj, new_values, elements in groups.values():
             everyone = set(ifcopenshell.util.element.get_types(t))
-            whole_type = scope == "type" or (scope != "selection" and everyone <= set(elements))
-            if whole_type and _find_type(f, obj.ref, new_values, _hash_of(obj)) is None:
-                _regenerate_type(t, obj, new_values)
-                changed += [o.GlobalId for o in everyone]
-            elif whole_type:
-                target = _type_for(obj, new_values)  # every placement moves to the existing type
-                ifcopenshell.api.type.assign_type(f, related_objects=list(everyone), relating_type=target)
-                _remove_type_if_unused(t)
+            if scope == "type" or (scope != "selection" and everyone <= set(elements)):
+                _retype_whole(t, obj, new_values)
                 changed += [o.GlobalId for o in everyone]
             else:
                 target = _type_for(obj, new_values)

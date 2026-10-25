@@ -5,6 +5,7 @@ from the library."""
 import json
 
 import ifcopenshell
+import ifcopenshell.util.element
 import ifcopenshell.validate
 import pytest
 
@@ -173,3 +174,111 @@ def test_a_version_of_an_object_gone_from_the_library_still_works(project, tmp_p
     assert p["ok"] and p["type"] == v["type"]
     assert call("save_object_version", "office:block", "Tall", json.dumps({"height": 0.9}))["ok"]
     assert call("object_versions", "nosuchobject")["ok"] is False
+
+
+def test_a_stale_last_used_version_means_default(project):
+    v = call("save_object_version", "chair", "Dining", "")
+    assert call("set_last_used", "chair", json.dumps({"version": v["id"]}))["ok"]
+    assert call("delete_version", v["id"])["ok"]
+    assert call("object_versions", "chair")["last"] == {}       # gone from the project: Default
+    assert call("set_last_used", "chair", json.dumps({"values": {"width": 0.5}}))["ok"]
+    assert call("object_versions", "chair")["last"] == {"values": {"width": 0.5}}
+
+
+def test_modify_all_changes_every_placement_and_keeps_the_version(project):
+    v = call("save_object_version", "chair", "Dining", "")
+    a = call("place_object", project, "chair", "", 0, 0, 0, "", v["id"])["guid"]
+    c = call("place_object", project, "chair", "", 1, 0, 0, "", v["id"])["guid"]
+    s = call("object_settings_of", json.dumps([a]))
+    assert s["version"] == v["id"] and s["uses"] == 2 and s["shared"]
+    assert call("apply_object_settings", json.dumps([a]), json.dumps({"width": 0.55}), "auto")["shared"]
+    assert call("apply_object_settings", json.dumps([a]), json.dumps({"width": 0.55}), "all")["ok"]
+    for g in (a, c):
+        t = ifcopenshell.util.element.get_type(b._model.by_guid(g))
+        assert t.GlobalId == v["type"] and t.Name == "Dining"
+
+
+def test_modify_all_never_merges_named_types(project):
+    d = call("save_object_version", "chair", "Dining", json.dumps({"width": 0.5}))
+    k = call("save_object_version", "chair", "Kitchen", json.dumps({"width": 0.6}))
+    a = call("place_object", project, "chair", "", 0, 0, 0, "", k["id"])["guid"]
+    assert call("apply_object_settings", json.dumps([a]), json.dumps({"width": 0.5}), "all")["ok"]
+    assert ifcopenshell.util.element.get_type(b._model.by_guid(a)).GlobalId == k["type"]
+    assert b._model.by_guid(d["type"])
+
+
+def test_create_a_new_type_moves_only_the_selection(project):
+    v = call("save_object_version", "chair", "Dining", "")
+    a = call("place_object", project, "chair", "", 0, 0, 0, "", v["id"])["guid"]
+    c = call("place_object", project, "chair", "", 1, 0, 0, "", v["id"])["guid"]
+    r = call("apply_object_settings", json.dumps([a]), json.dumps({"arms": True}), "new", "Armchair")
+    assert r["ok"]
+    assert ifcopenshell.util.element.get_type(b._model.by_guid(a)).Name == "Armchair"
+    assert ifcopenshell.util.element.get_type(b._model.by_guid(c)).Name == "Dining"
+    assert call("undo")["ok"] and ifcopenshell.util.element.get_type(b._model.by_guid(a)).Name == "Dining"
+
+
+def test_an_unshared_type_applies_directly_and_a_mixed_selection_fails(project):
+    a = call("place_object", project, "chair", "", 0, 0, 0)["guid"]
+    assert call("apply_object_settings", json.dumps([a]), json.dumps({"legs": 3, "layout": "circle"}), "auto")["ok"]
+    t = call("place_object", project, "table", "", 2, 0, 0)["guid"]
+    assert call("object_settings_of", json.dumps([a, t]))["ok"] is False
+
+
+def test_assign_version(project):
+    v = call("save_object_version", "chair", "Dining", "")
+    a = call("place_object", project, "chair", "", 0, 0, 0)["guid"]
+    old = ifcopenshell.util.element.get_type(b._model.by_guid(a)).GlobalId
+    assert call("assign_version", json.dumps([a]), v["id"])["ok"]
+    assert ifcopenshell.util.element.get_type(b._model.by_guid(a)).GlobalId == v["type"]
+    with pytest.raises(RuntimeError):
+        b._model.by_guid(old)                       # the unnamed type left unused is gone
+
+
+def test_values_that_do_not_build_are_refused(project):        # Review Focus 5 (bridge)
+    a = call("place_object", project, "chair", "", 0, 0, 0)["guid"]
+    before = ifcopenshell.util.element.get_type(b._model.by_guid(a)).GlobalId
+    r = call("apply_object_settings", json.dumps([a]), json.dumps({"width": -1}), "all")
+    assert r["ok"] is False
+    assert ifcopenshell.util.element.get_type(b._model.by_guid(a)).GlobalId == before
+
+
+def test_settings_of_an_unnamed_type_and_the_edge_cases(project):
+    a = call("place_object", project, "chair", json.dumps({"width": 0.5}), 0, 0, 0)["guid"]
+    s = call("object_settings_of", json.dumps([a]))
+    assert s["ok"] and s["key"] == "chair" and s["version"] is None and s["values"]["width"] == 0.5
+    assert (s["selected"], s["uses"], s["shared"]) == (1, 1, False)
+    assert call("object_settings_of", "[]")["ok"] is False
+    v = call("save_object_version", "chair", "Dining", "")
+    clash = call("apply_object_settings", json.dumps([a]), "{}", "new", " dining ")
+    assert clash["ok"] is False and clash["exists"] == v["id"]
+    assert call("apply_object_settings", json.dumps([a]), "{}", "sideways")["ok"] is False
+    assert call("apply_object_settings", json.dumps([a]), json.dumps({"colour": "red"}), "all")["ok"] is False
+    assert call("apply_object_settings", json.dumps([a]), json.dumps({"width": "nan"}), "all")["ok"] is False
+    assert call("assign_version", json.dumps([a]), "nosuchid")["ok"] is False
+    t = call("place_object", project, "table", "", 2, 0, 0)["guid"]
+    assert call("assign_version", json.dumps([t]), v["id"])["ok"] is False   # a version of another object
+
+
+def test_modify_all_of_an_unnamed_type_joins_an_identical_unnamed_one(project):
+    a = call("place_object", project, "chair", "", 0, 0, 0)["guid"]
+    c = call("place_object", project, "chair", json.dumps({"width": 0.5}), 1, 0, 0)["guid"]
+    old = ifcopenshell.util.element.get_type(b._model.by_guid(a)).GlobalId
+    assert call("apply_object_settings", json.dumps([a]), json.dumps({"width": 0.5}), "all")["ok"]
+    ta = ifcopenshell.util.element.get_type(b._model.by_guid(a))
+    assert ta == ifcopenshell.util.element.get_type(b._model.by_guid(c))
+    with pytest.raises(RuntimeError):
+        b._model.by_guid(old)
+    assert call("undo")["ok"]
+    assert ifcopenshell.util.element.get_type(b._model.by_guid(a)).GlobalId == old
+
+
+def test_a_whole_type_parameter_edit_of_a_saved_version_regenerates_it(project):
+    d = call("save_object_version", "chair", "Dining", json.dumps({"width": 0.5}))
+    k = call("save_object_version", "chair", "Kitchen", json.dumps({"width": 0.6}))
+    a = call("place_object", project, "chair", "", 0, 0, 0, "", k["id"])["guid"]
+    loose = call("place_object", project, "chair", json.dumps({"width": 0.5}), 1, 0, 0)["type"]  # unnamed, same values
+    assert call("set_object_parameter", json.dumps([a]), "Width", "0.5", "type")["ok"]
+    assert b._model.by_guid(loose)
+    t = ifcopenshell.util.element.get_type(b._model.by_guid(a))
+    assert t.GlobalId == k["type"] and t.Name == "Kitchen" and b._model.by_guid(d["type"])

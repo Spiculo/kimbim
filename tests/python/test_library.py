@@ -113,29 +113,6 @@ def test_parameters_show_in_properties_and_regenerate(project):
     assert validate(b._model) == []
 
 
-def test_parameter_scope_can_change_every_placement_or_only_the_selection(project):
-    """D92: editing a shared object's parameter asks (in the app) whether to change its type or the
-    selection; the choice goes to set_object_parameter's `scope`."""
-    a = call("place_object", project, "sofa", "", 0, 0, 0)["guid"]
-    c = call("place_object", project, "sofa", "", 3, 0, 0)["guid"]
-    usage = call("object_parameter_usage", json.dumps([a]), "Width")
-    assert usage["elements"] == 2 and usage["selected"] == 1 and usage["shared"]
-    # Only the selection: the other keeps its type.
-    assert call("set_object_parameter", json.dumps([a]), "Width", "2.6", "selection")["ok"]
-    ta = ifcopenshell.util.element.get_type(b._model.by_guid(a))
-    tc = ifcopenshell.util.element.get_type(b._model.by_guid(c))
-    assert ta != tc and "2600" in ta.Name and "2000" in tc.Name
-    # Another sofa shares c's type; asking for the whole type changes both placements.
-    d = call("place_object", project, "sofa", "", 6, 0, 0)["guid"]
-    usage = call("object_parameter_usage", json.dumps([c]), "Seats")
-    assert usage["elements"] == 2 and usage["shared"]
-    assert call("set_object_parameter", json.dumps([c]), "Seats", "2", "type")["ok"]
-    tc = ifcopenshell.util.element.get_type(b._model.by_guid(c))
-    td = ifcopenshell.util.element.get_type(b._model.by_guid(d))
-    assert tc == td and "Seats 2" in tc.Name
-    assert ifcopenshell.util.element.get_type(b._model.by_guid(a)) != tc
-
-
 def test_an_object_can_have_its_own_origin(project, tmp_path):
     """D92: the library keeps the left front corner, but an object may set another insertion point."""
     box = {"format": "kimbim-object/1", "id": "origin_box", "name": "Origin box", "category": "furniture",

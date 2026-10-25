@@ -135,6 +135,8 @@ def object_versions(key: str) -> str:
     if obj is None:
         return A._fail(f"no library object {key}")
     last = settings.current().get("object_last_used", {}).get(key, {})
+    if "version" in last and find_version(last["version"]) is None:
+        last = {}  # a version no longer in the project: a plain click places the Default
     return B._dump({"ok": True, "default": obj.values(), "versions": project_versions(key), "last": last})
 
 
@@ -238,6 +240,149 @@ def delete_version(version_id: str) -> str:
     except Exception as ex:
         return A._fail(f"{type(ex).__name__}: {ex}")
     return B._dump({"ok": True})
+
+
+def _selection_type(guids_json: str):
+    """(elements, definition, values, type) of a selection of placements of one library type, or an error
+    text. The definition is the one stored on the type (D99)."""
+    from . import app_bridge as B
+
+    elements = B._elements(guids_json)
+    if not elements:
+        return "no library object selected"
+    found = [library._object_of(e) for e in elements]
+    if any(x is None for x in found):
+        return "the selection holds elements that are not library objects"
+    if len({x[2].id() for x in found}) > 1:
+        return "the selection holds objects of more than one type"
+    obj, values, t = found[0]
+    return elements, obj, values, t
+
+
+def object_settings_of(guids_json: str) -> str:
+    """What the dialog edits for these placements (D100): their object, the values and version of their
+    type, and whether the type is shared beyond the selection. Fails for no library object or more than one
+    type."""
+    import ifcopenshell.util.element
+
+    from . import app_bridge as B
+    from . import authoring as A
+
+    if B._model is None:
+        return A._fail("no model open")
+    found = _selection_type(guids_json)
+    if isinstance(found, str):
+        return A._fail(found)
+    elements, obj, values, t = found
+    uses = len(ifcopenshell.util.element.get_types(t))
+    return B._dump({"ok": True, "key": obj.ref, "values": values, "version": _pset(t).get(VERSION_ID) or None,
+                    "name": t.Name or "", "selected": len(elements), "uses": uses, "shared": uses > len(elements)})
+
+
+def apply_object_settings(guids_json: str, params_json: str, mode: str, name: str = "") -> str:
+    """Apply the dialog's values to these placements of one type (D100). One undo step. `mode`:
+    - "all": every placement of the type follows; the type regenerates in place, keeping its GlobalId, name
+      and VersionId, and never merges into another type (an unnamed type moves everyone to an unnamed type
+      with these values, if there is one: D99);
+    - "new": a saved version called `name` (a name the object has fails with {"exists": id}); only the
+      selection moves to it;
+    - "auto": "all" when nothing outside the selection uses the type, else fails with {"shared": true} so
+      the app asks."""
+    import ifcopenshell.api.type
+    import ifcopenshell.util.element
+
+    from . import app_bridge as B
+    from . import authoring as A
+
+    if B._model is None:
+        return A._fail("no model open")
+    if mode not in ("all", "new", "auto"):
+        return A._fail(f"unknown mode {mode}")
+    found = _selection_type(guids_json)
+    if isinstance(found, str):
+        return A._fail(found)
+    elements, obj, values, t = found
+    try:
+        given = json.loads(params_json) if params_json else {}
+    except ValueError as ex:
+        return A._fail(f"bad input: {ex}")
+    if not isinstance(given, dict):
+        return A._fail("the values are an object {parameter: value}")
+    try:
+        new_values = library._edited_values(obj, values, given)
+    except (ObjectError, ValueError) as ex:
+        return A._fail(str(ex))
+    everyone = list(ifcopenshell.util.element.get_types(t))
+    if mode == "auto":
+        if len(everyone) > len(elements):
+            return B._dump({"ok": False, "error": f"{len(everyone)} objects use this type", "shared": True,
+                            "uses": len(everyone), "selected": len(elements)})
+        mode = "all"
+    if mode == "new":
+        name, error = _clean_name(name)
+        if error:
+            return A._fail(error)
+        existing = _clash(obj.ref, name)
+        if existing is not None:
+            return B._dump({"ok": False, "error": f"{obj.name} already has a version called {existing['name']}",
+                            "exists": existing["id"]})
+    made = {}
+
+    def action():
+        if mode == "all":
+            library._retype_whole(t, obj, new_values)
+            changed = everyone
+        else:
+            target = library._make_type(obj, new_values)
+            made["id"] = uuid.uuid4().hex
+            _write_version(target, made["id"], name)
+            ifcopenshell.api.type.assign_type(B._model, related_objects=elements, relating_type=target)
+            library._remove_type_if_unused(t)
+            made["type"] = target.GlobalId
+            changed = elements
+        return len(changed), [e.GlobalId for e in changed], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return A._fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, **made})
+
+
+def assign_version(guids_json: str, version_id: str) -> str:
+    """Move these placements to a saved version's type (D100). An unnamed type left unused goes. One undo
+    step."""
+    import ifcopenshell.api.type
+    import ifcopenshell.util.element
+
+    from . import app_bridge as B
+    from . import authoring as A
+
+    if B._model is None:
+        return A._fail("no model open")
+    target = find_version(version_id)
+    if target is None:
+        return A._fail("unknown version")
+    ref = _pset(target).get("Object") or ""
+    elements = B._elements(guids_json)
+    if not elements:
+        return A._fail("no library object selected")
+    found = [library._object_of(e) for e in elements]
+    if any(x is None or x[0].ref != ref for x in found):
+        return A._fail(f"that version is not one of every selected object ({ref})")
+    old = {x[2].id(): x[2] for x in found if x[2] != target}
+
+    def action():
+        ifcopenshell.api.type.assign_type(B._model, related_objects=elements, relating_type=target)
+        for t in old.values():
+            library._remove_type_if_unused(t)
+        return len(elements), [e.GlobalId for e in elements], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return A._fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "type": target.GlobalId})
 
 
 def set_last_used(key: str, data_json: str) -> str:

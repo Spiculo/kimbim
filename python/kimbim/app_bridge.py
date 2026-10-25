@@ -1307,7 +1307,6 @@ _EXPORTS = {
         "library_objects",
         "library_updates",
         "object_form",
-        "object_parameter_usage",
         "object_symbol",
         "place_object",
         "set_library_paths",
@@ -1316,7 +1315,10 @@ _EXPORTS = {
         "update_from_library",
     ),
     "objversions": (
+        "apply_object_settings",
+        "assign_version",
         "delete_version",
+        "object_settings_of",
         "object_versions",
         "rename_version",
         "save_object_version",
