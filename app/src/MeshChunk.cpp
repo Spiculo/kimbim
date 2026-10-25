@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "MeshChunk.h"
 
+#include <QCoreApplication>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -122,6 +123,28 @@ bool fetchElementMeshes(PythonEngine& py, const QStringList& guids, MeshChunk* o
         return true;
     if (parts.size() != 3 && parts.size() != 4)
         return fail(error, QStringLiteral("mesh_elements returned %1 parts, expected 3 or 4").arg(parts.size()));
+    auto chunk = MeshChunk::parse(parts[0], parts[1], parts[2], error, parts.size() == 4 ? parts[3] : QByteArray());
+    if (!chunk)
+        return false;
+    *out = std::move(*chunk);
+    return true;
+}
+
+bool fetchObjectPreview(PythonEngine& py, const QString& key, const QJsonObject& params, MeshChunk* out,
+    QString* error, const QString& version)
+{
+    QList<QByteArray> parts;
+    bool none = false;
+    const QString values = QString::fromUtf8(QJsonDocument(params).toJson(QJsonDocument::Compact));
+    if (!py.callParts("object_preview", {key, values, version}, &parts, &none, error))
+        return false;
+    if (none) { // the values don't build: ask why
+        const QJsonObject why = py.callJson("object_preview_error", {key, values}).object();
+        const QString reason = why.value("error").toString();
+        return fail(error, reason.isEmpty() ? QCoreApplication::translate("kimbim::ObjectSettingsDialog", "The object could not be previewed") : reason);
+    }
+    if (parts.size() != 3 && parts.size() != 4)
+        return fail(error, QStringLiteral("object_preview returned %1 parts, expected 3 or 4").arg(parts.size()));
     auto chunk = MeshChunk::parse(parts[0], parts[1], parts[2], error, parts.size() == 4 ? parts[3] : QByteArray());
     if (!chunk)
         return false;

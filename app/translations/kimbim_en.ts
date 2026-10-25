@@ -4,27 +4,27 @@
 <context>
     <name>LibraryPanel</name>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="38"/>
+        <location filename="../src/LibraryPanel.cpp" line="31"/>
         <source>Furniture</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="38"/>
+        <location filename="../src/LibraryPanel.cpp" line="31"/>
         <source>Sanitary</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="39"/>
+        <location filename="../src/LibraryPanel.cpp" line="32"/>
         <source>Kitchen</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="39"/>
+        <location filename="../src/LibraryPanel.cpp" line="32"/>
         <source>People, trees and cars</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="40"/>
+        <location filename="../src/LibraryPanel.cpp" line="33"/>
         <source>Office library</source>
         <translation type="unfinished"></translation>
     </message>
@@ -2080,37 +2080,37 @@ Enter runs, Shift+Enter adds a line, Up/Down recall earlier input</source>
 <context>
     <name>kimbim::LibraryPanel</name>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="98"/>
+        <location filename="../src/LibraryPanel.cpp" line="91"/>
         <source>Search objects</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="115"/>
+        <location filename="../src/LibraryPanel.cpp" line="106"/>
         <source>Place</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="117"/>
+        <location filename="../src/LibraryPanel.cpp" line="108"/>
         <source>Click in the view to place the object; Tab turns it 90 degrees, a typed number sets its angle</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="120"/>
+        <location filename="../src/LibraryPanel.cpp" line="111"/>
         <source>Office library...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="122"/>
+        <location filename="../src/LibraryPanel.cpp" line="113"/>
         <source>Choose the office library folder: object files (.kimobj) and IFC type libraries (.ifc)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="123"/>
+        <location filename="../src/LibraryPanel.cpp" line="114"/>
         <source>Load IFC types...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/LibraryPanel.cpp" line="125"/>
+        <location filename="../src/LibraryPanel.cpp" line="116"/>
         <source>Add the types of an IFC file (e.g. IfcFurnitureType definitions) to the office library</source>
         <translation type="unfinished"></translation>
     </message>
@@ -7786,6 +7786,164 @@ Open it read-only?</source>
     <message>
         <location filename="../src/GraphicsDialogs.cpp" line="175"/>
         <source>Rename</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>kimbim::ObjectSettingsDialog</name>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="233"/>
+        <source>Place</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="233"/>
+        <source>Apply</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="234"/>
+        <source>Save as...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="242"/>
+        <source>%1 — settings</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="249"/>
+        <source>Saved</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="254"/>
+        <source>Save these values as a named version of the object in this project</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="268"/>
+        <source>3D</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="269"/>
+        <source>Plan</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="373"/>
+        <source>Default</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="375"/>
+        <source>The object as its definition ships</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="382"/>
+        <source>— Office —</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/ObjectSettingsDialog.cpp" line="391"/>
+        <source>%n placed object(s) use it</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="393"/>
+        <source>From the office library</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="504"/>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="518"/>
+        <source>Save as</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="505"/>
+        <source>There is already a version called %1. Replace it with these values?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="508"/>
+        <source>Could not save the version</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="518"/>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="577"/>
+        <source>Name of the version:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="525"/>
+        <source>Could not rename the version</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="538"/>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="542"/>
+        <source>Could not delete the version</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/ObjectSettingsDialog.cpp" line="539"/>
+        <source>%n placed object(s) use this version. Change them to another version first.</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="562"/>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="582"/>
+        <source>Move to library</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="563"/>
+        <source>The office library already has a version with this name. Replace it?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="566"/>
+        <source>Could not move the version to the office library</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="575"/>
+        <source>Rename...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="577"/>
+        <source>Rename version</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="581"/>
+        <source>Delete</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="586"/>
+        <source>Share this version with every project through the office library</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/ObjectSettingsDialog.cpp" line="587"/>
+        <source>Set the office library folder in the preferences first</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/MeshChunk.cpp" line="144"/>
+        <source>The object could not be previewed</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

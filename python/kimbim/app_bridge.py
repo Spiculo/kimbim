@@ -1307,6 +1307,8 @@ _EXPORTS = {
         "library_objects",
         "library_updates",
         "object_form",
+        "object_preview",
+        "object_preview_error",
         "object_symbol",
         "place_object",
         "set_library_paths",

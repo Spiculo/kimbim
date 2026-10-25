@@ -1,25 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "LibraryPanel.h"
 
-#include "PythonEngine.h"
+#include "ObjectSettingsDialog.h"
 #include "Translations.h"
 
-#include <QCheckBox>
-#include <QComboBox>
-
 #include <QCoreApplication>
-#include <QDoubleSpinBox>
-#include <QFormLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
-#include <QJsonDocument>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPixmap>
 #include <QPushButton>
-#include <QSpinBox>
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
@@ -108,10 +101,8 @@ LibraryPanel::LibraryPanel(QWidget* parent)
     bold.setBold(true);
     m_title->setFont(bold);
     layout->addWidget(m_title);
-    m_formHost = new QWidget(this);
-    m_form = new QFormLayout(m_formHost);
-    m_form->setContentsMargins(0, 0, 0, 0);
-    layout->addWidget(m_formHost);
+    m_form = new ParameterForm(this);
+    layout->addWidget(m_form);
     auto* place = new QPushButton(tr("Place"), this);
     place->setObjectName(QStringLiteral("libraryPlace"));
     place->setToolTip(tr("Click in the view to place the object; Tab turns it 90 degrees, a typed number sets its angle"));
@@ -128,6 +119,10 @@ LibraryPanel::LibraryPanel(QWidget* parent)
     layout->addLayout(row);
 
     connect(m_search, &QLineEdit::textChanged, this, &LibraryPanel::setFilter);
+    connect(m_form, &ParameterForm::changed, this, [this] {
+        m_params = m_form->values();
+        emit currentChanged();
+    });
     connect(m_tree, &QTreeWidget::currentItemChanged, this, [this](QTreeWidgetItem* item) {
         const QString id = item ? item->data(0, IdRole).toString() : QString();
         if (id.isEmpty() || id == m_current)
@@ -266,80 +261,10 @@ void LibraryPanel::setParam(const QString& key, const QJsonValue& value)
 
 void LibraryPanel::showParams()
 {
-    while (m_form->rowCount() > 0)
-        m_form->removeRow(0);
     const QJsonObject o = m_objects.value(m_current);
     m_title->setText(o.isEmpty() ? QString() : translated(o.value("name").toString(), o.value("name_es").toString()));
-    if (o.isEmpty())
-        return;
-    // D99: limits that are formulas and show_when depend on the current values, so Python makes the form.
-    const QJsonObject form = PythonEngine::instance()
-        .callJson("object_form", {m_current, QString::fromUtf8(QJsonDocument(m_params).toJson(QJsonDocument::Compact))})
-        .object();
-    for (const auto& v : form.value("params").toArray()) {
-        const QJsonObject p = v.toObject();
-        const QString key = p.value("key").toString(), kind = p.value("kind").toString();
-        const QJsonValue value = m_params.contains(key) ? m_params.value(key) : p.value("value");
-        QWidget* field = nullptr;
-        if (kind == QLatin1String("material")) { // D97: a part's building material
-            auto* combo = new QComboBox(m_formHost);
-            for (const auto& c : p.value("choices").toArray())
-                combo->addItem(c.toString());
-            combo->setCurrentText(value.toString());
-            connect(combo, &QComboBox::currentTextChanged, this, [this, key](const QString& name) {
-                m_params.insert(key, name);
-                emit currentChanged();
-            });
-            field = combo;
-        } else if (kind == QLatin1String("choice")) {
-            auto* combo = new QComboBox(m_formHost);
-            for (const auto& c : p.value("options").toArray()) {
-                const QJsonObject opt = c.toObject();
-                combo->addItem(translated(opt.value("label").toString(), opt.value("label_es").toString()), opt.value("id").toString());
-            }
-            combo->setCurrentIndex(std::max(0, combo->findData(value.toString())));
-            connect(combo, &QComboBox::currentIndexChanged, this, [this, combo, key](int i) {
-                m_params.insert(key, combo->itemData(i).toString());
-                QMetaObject::invokeMethod(this, &LibraryPanel::showParams, Qt::QueuedConnection); // show_when may change
-                emit currentChanged();
-            });
-            field = combo;
-        } else if (kind == QLatin1String("bool")) {
-            auto* check = new QCheckBox(m_formHost);
-            check->setChecked(value.toBool());
-            connect(check, &QCheckBox::toggled, this, [this, key](bool on) {
-                m_params.insert(key, on);
-                QMetaObject::invokeMethod(this, &LibraryPanel::showParams, Qt::QueuedConnection);
-                emit currentChanged();
-            });
-            field = check;
-        } else if (kind == QLatin1String("count")) {
-            auto* spin = new QSpinBox(m_formHost);
-            spin->setRange(p.value("min").toInt(1), p.value("max").toInt(20));
-            spin->setValue(int(std::lround(value.toDouble())));
-            connect(spin, &QSpinBox::valueChanged, this, [this, key](int n) { m_params.insert(key, n); emit currentChanged(); });
-            field = spin;
-        } else {
-            auto* spin = new QDoubleSpinBox(m_formHost);
-            if (kind == QLatin1String("angle")) {
-                spin->setDecimals(1);
-                spin->setSingleStep(1.0);
-                spin->setSuffix(QStringLiteral("°"));
-                spin->setRange(p.value("min").toDouble(-360), p.value("max").toDouble(360));
-            } else {
-                spin->setDecimals(3);
-                spin->setSingleStep(0.05);
-                spin->setRange(p.value("min").toDouble(0.01), p.value("max").toDouble(50.0));
-                spin->setSuffix(QStringLiteral(" m"));
-            }
-            spin->setValue(value.toDouble());
-            connect(spin, &QDoubleSpinBox::valueChanged, this, [this, key](double d) { m_params.insert(key, d); emit currentChanged(); });
-            field = spin;
-        }
-        field->setObjectName(QStringLiteral("param:%1").arg(key));
-        m_form->addRow(translated(p.value("label").toString(), p.value("label_es").toString()) + QLatin1Char(':'), field);
-        m_form->setRowVisible(field, p.value("visible").toBool(true));
-    }
+    m_form->setObject(o.isEmpty() ? QString() : m_current, m_params);
+    m_params = m_form->values();
 }
 
 } // namespace kimbim

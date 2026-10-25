@@ -5,8 +5,10 @@ from the library."""
 import json
 
 import ifcopenshell
+import ifcopenshell.api.owner.settings
 import ifcopenshell.util.element
 import ifcopenshell.validate
+import numpy
 import pytest
 
 from kimbim import app_bridge as b
@@ -499,3 +501,51 @@ def test_an_office_copy_follows_its_office_version(project, tmp_path):
     assert t.GlobalId == p["type"] and t.Name == "Café" and ps[objversions.VERSION_ID] == v["id"]
     assert json.loads(ps["Parameters"])["width"] == pytest.approx(0.6)
     assert call("library_updates", "") == {"ok": True, "outdated": 0, "versions": 0}
+
+
+# ---------------------------------------------------------------- the dialog's preview (Task 5)
+
+def _preview_meta(parts):
+    return json.loads(parts[0])
+
+
+@pytest.mark.parametrize("schema", ["IFC4", "IFC2X3"])
+def test_object_preview_builds_in_a_scratch_model(tmp_path, schema):
+    from kimbim import testing
+
+    try:
+        if schema == "IFC4":
+            assert call("new_project", "Preview")["ok"]
+        else:
+            f = testing.build_model("IFC2X3", walls=1)
+            f.write(str(tmp_path / "x3.ifc"))
+            assert call("open_model", str(tmp_path / "x3.ifc"))["ok"]
+            testing._reset_owner()  # the app's: no user set (the scratch model brings its own)
+        model, history, count = b._model, len(b._model.history), len(list(b._model))
+        get_user = ifcopenshell.api.owner.settings.get_user
+        parts = b.object_preview("chair", "")
+        assert parts is not None and len(parts) == 4
+        assert len(parts[1]) > 0 and len(parts[2]) > 0           # vertices and triangles
+        meta = _preview_meta(parts)
+        assert meta["guids"] == [library.PREVIEW_GUID] and meta["palette"]  # one element, coloured parts
+        assert b.object_preview("chair", '{"width": -1}') is None
+        assert b._model is model and len(b._model.history) == history and len(list(b._model)) == count
+        assert ifcopenshell.api.owner.settings.get_user is get_user
+    finally:
+        testing._reset_owner()
+
+
+def test_object_preview_reports_why_values_do_not_build(project):
+    assert call("object_preview_error", "chair", "") == {"ok": True}
+    bad = call("object_preview_error", "chair", json.dumps({"width": 0}))
+    assert bad["ok"] is False and "Width" in bad["error"]
+    assert call("object_preview_error", "nothing", "")["ok"] is False
+
+
+def test_object_preview_of_a_version_and_its_values(project):
+    v = call("save_object_version", "chair", "Wide", json.dumps({"width": 0.8}))
+    narrow = b.object_preview("chair", json.dumps({"width": 0.4}))
+    wide = b.object_preview("chair", "", v["id"])
+    span = lambda parts: max(numpy.frombuffer(parts[1], "<f4")[0::3]) - min(numpy.frombuffer(parts[1], "<f4")[0::3])  # noqa: E731
+    assert span(wide) == pytest.approx(0.8, abs=1e-3) and span(narrow) == pytest.approx(0.4, abs=1e-3)
+    assert b.object_preview("chair", "", "no-such-version") is None

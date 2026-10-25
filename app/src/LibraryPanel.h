@@ -7,13 +7,14 @@
 #include <QJsonObject>
 #include <QWidget>
 
-class QFormLayout;
 class QLabel;
 class QLineEdit;
 class QTreeWidget;
 class QTreeWidgetItem;
 
 namespace kimbim {
+
+class ParameterForm;
 
 // The object library (D86, Archicad's Library and Object settings): categories with the objects'
 // plan symbols as thumbnails, a search field, and the selected object's parameters. Place (or a
@@ -50,8 +51,7 @@ private:
     void showParams();
     QTreeWidget* m_tree;
     QLineEdit* m_search;
-    QFormLayout* m_form;
-    QWidget* m_formHost;
+    ParameterForm* m_form; // ObjectSettingsDialog.h
     QLabel* m_title;
     QHash<QString, QJsonObject> m_objects;
     QHash<QString, QIcon> m_icons;

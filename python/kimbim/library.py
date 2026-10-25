@@ -322,8 +322,9 @@ def _given(params_json: str) -> dict:
 def object_symbol(key: str, params_json: str = "") -> str:
     """The plan symbol and plan box of an object with these parameters (the panel's thumbnail)."""
     from . import app_bridge as B
+    from . import objversions
 
-    obj = get(key)
+    obj = objversions._definition(key)  # D100: also an object gone from the library (stored on a type)
     if not isinstance(obj, objects.ObjectDef):
         return B._dump({"symbol": [], "width": 1.0, "depth": 1.0})
     values = obj.values(_given(params_json))
@@ -336,14 +337,18 @@ def object_symbol(key: str, params_json: str = "") -> str:
 
 
 def object_form(key: str, params_json: str = "") -> str:
-    """The Library panel's parameter form for these values (D99): kinds, limits, which are shown."""
+    """The parameter form for these values (D99): kinds, limits, which are shown, and the object's name."""
     from . import app_bridge as B
+    from . import objversions
 
-    obj = get(key)
+    obj = objversions._definition(key)  # D100: also an object gone from the library (stored on a type)
     if not isinstance(obj, objects.ObjectDef):
-        return B._dump({"params": [], "visible": []})
+        entry = get(key)  # an office IFC type (fixed geometry): only its name
+        name = entry["name"] if isinstance(entry, dict) else key
+        return B._dump({"params": [], "visible": [], "name": name, "name_es": name})
     values = obj.values(_given(params_json))
-    return B._dump({"params": _param_listing(obj, values), "visible": obj.visible(values), "values": values})
+    return B._dump({"params": _param_listing(obj, values), "visible": obj.visible(values), "values": values,
+                    "name": obj.name, "name_es": obj.names["es"]})
 
 
 def set_library_paths(data: str) -> str:
@@ -789,6 +794,140 @@ def place_object(storey_guid: str, key: str, params_json: str, x, y, angle=0.0, 
     except Exception as ex:
         return A._fail(f"{type(ex).__name__}: {ex}")
     return B._dump({**r, "guid": made["element"].GlobalId, "type": made["type"].GlobalId})
+
+
+# ---------------------------------------------------------------- the settings dialog's preview (D100)
+
+PREVIEW_GUID = "0KimBimPreviewObject00"  # the preview's one element: each update replaces the last
+
+
+def _preview_definition(key: str, params_json: str, version: str = ""):
+    """(definition, values) the Object settings dialog previews: `version`'s (a saved or office version's
+    id) or the object's, with the dialog's values checked and applied like an edit (doc 16 §7). An office
+    IFC type gives (its entry, {}). ObjectError with the reason when the values don't build."""
+    from . import objversions
+
+    if version:
+        saved = objversions.find_version(version)
+        if saved is not None:
+            obj, info = definition_of_type(saved), _params_of_type(saved)
+            base = info[1] if info is not None else {}
+        elif version in _office_versions:
+            obj, base = office_definition(_office_versions[version]), _office_versions[version]["values"]
+        else:
+            raise ObjectError("unknown version")
+        if obj is None:
+            raise ObjectError("that version has no definition")
+    else:
+        entry = get(key)
+        if entry is not None and not isinstance(entry, objects.ObjectDef):
+            return entry, {}  # fixed geometry, no parameters
+        obj = objversions._definition(key)  # also an object gone from the library (stored on a type)
+        if obj is None:
+            raise ObjectError(f"no library object {key}")
+        base = {}
+    try:
+        given = json.loads(params_json) if params_json else {}
+    except ValueError as ex:
+        raise ObjectError(f"bad input: {ex}") from None
+    if not isinstance(given, dict):
+        raise ObjectError("the values are an object {parameter: value}")
+    return obj, _edited_values(obj, obj.values(base), given)
+
+
+def _copy_materials(model, f, obj, values: dict) -> None:
+    """The project's own building materials into the scratch model, so the preview shows their surfaces
+    as the project has them (edited or not in the catalogue); materials.ensure makes the rest."""
+    import ifcopenshell.api.project
+
+    from . import materials
+
+    if model is None:
+        return
+    names = {obj.material_of(values, part) for part in obj.materials} | {v for k, v in values.items() if k.startswith("mat_")}
+    for name in sorted(n for n in names if n):
+        m = materials._material_by_name(model, name)
+        if m is not None and materials._material_by_name(f, name) is None:
+            ifcopenshell.api.project.append_asset(f, library=model, element=m)
+
+
+def _preview_meshes(obj, values: dict):
+    """One placement of the object at the origin, built in a scratch in-memory model with the code real
+    types use (_make_type: the same representations and part styles), meshed in the mesh_elements format.
+    B._model is swapped in only while building and always restored: the project and its undo history are
+    never touched."""
+    import ifcopenshell.api.geometry
+    import ifcopenshell.api.owner.settings
+    import ifcopenshell.api.project
+    import ifcopenshell.api.root
+    import ifcopenshell.api.type
+    import ifcopenshell.api.unit
+    import ifcopenshell.geom
+
+    from . import app_bridge as B
+
+    model = B._model
+    schema = model.schema if model is not None else "IFC4"
+    f = ifcopenshell.api.project.create_file(version=schema)
+    owner = ifcopenshell.api.owner.settings
+    get_user, get_application = owner.get_user, owner.get_application
+    if schema == "IFC2X3":  # every root entity needs an owner history: the scratch model's own user
+        organization = f.createIfcOrganization(None, "KimBim")
+        user = f.createIfcPersonAndOrganization(f.createIfcPerson(None, None, "KimBim"), organization)
+        application = f.createIfcApplication(organization, "0", "KimBim", "KimBim")
+        owner.get_user = lambda ifc: user if ifc is f else get_user(ifc)
+        owner.get_application = lambda ifc: application if ifc is f else get_application(ifc)
+    B._model = f
+    try:
+        ifcopenshell.api.root.create_entity(f, ifc_class="IfcProject", name="Preview")
+        ifcopenshell.api.unit.assign_unit(f)
+        if isinstance(obj, objects.ObjectDef):
+            _copy_materials(model, f, obj, values)
+            t = _make_type(obj, values)
+        else:
+            t = _ifc_type(obj)  # copied from its IFC library file into the scratch model
+        element = ifcopenshell.api.root.create_entity(f, ifc_class=_occurrence_class(t.is_a(), schema))
+        element.GlobalId = PREVIEW_GUID
+        ifcopenshell.api.type.assign_type(f, related_objects=[element], relating_type=t)
+        ifcopenshell.api.geometry.edit_object_placement(f, product=element)
+        it = ifcopenshell.geom.iterator(B._mesh_settings(), f, 1, include=[element],
+                                        geometry_library="hybrid-cgal-simple-opencascade")
+        if not it.initialize():
+            return None
+        return B._collect_meshes(it)[0]
+    finally:
+        B._model = model
+        owner.get_user, owner.get_application = get_user, get_application
+
+
+def object_preview(key: str, params_json: str = "", version: str = ""):
+    """The Object settings dialog's 3D preview (D100): mesh parts in the mesh_elements format for one
+    placement of the object (or saved version `version`) with these values at the origin, or None when
+    the values don't build (object_preview_error says why)."""
+    try:
+        obj, values = _preview_definition(key, params_json, version)
+    except (ObjectError, ValueError):
+        return None
+    try:
+        return _preview_meshes(obj, values)
+    except Exception:  # whatever goes wrong, the dialog keeps its last preview
+        return None
+
+
+def object_preview_error(key: str, params_json: str = "") -> str:
+    """{"ok": true} when these values of an object build, else {"ok": false, "error": the reason}."""
+    from . import app_bridge as B
+    from . import authoring as A
+
+    try:
+        obj, values = _preview_definition(key, params_json)
+        if isinstance(obj, objects.ObjectDef):
+            obj.shape(values)
+    except (ObjectError, ValueError) as ex:
+        return A._fail(str(ex))
+    except Exception as ex:
+        return A._fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({"ok": True})
 
 
 def set_plan_display(guids_json: str, value: str) -> str:

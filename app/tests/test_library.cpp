@@ -104,19 +104,19 @@ private slots:
         action(w, "actionObjectLibrary")->trigger();
         kimbim::LibraryPanel* panel = w.libraryPanel();
         QVERIFY(panel->selectObject(QStringLiteral("chair")));
-        auto* layout = panel->findChild<QComboBox*>(QStringLiteral("param:layout"));
+        auto* layout = panel->findChild<QComboBox*>(QStringLiteral("param_layout"));
         QVERIFY(layout);
-        QVERIFY(panel->findChild<QWidget*>(QStringLiteral("param:radius"))->isHidden());
+        QVERIFY(panel->findChild<QWidget*>(QStringLiteral("param_radius"))->isHidden());
         layout->setCurrentIndex(layout->findData(QStringLiteral("circle")));
         QCOMPARE(panel->currentParams().value("layout").toString(), QStringLiteral("circle"));
         QCoreApplication::processEvents(); // the form is rebuilt queued
-        QVERIFY(!panel->findChild<QWidget*>(QStringLiteral("param:radius"))->isHidden());
-        auto* arms = panel->findChild<QCheckBox*>(QStringLiteral("param:arms"));
+        QVERIFY(!panel->findChild<QWidget*>(QStringLiteral("param_radius"))->isHidden());
+        auto* arms = panel->findChild<QCheckBox*>(QStringLiteral("param_arms"));
         QVERIFY(arms);
         arms->setChecked(true);
         QCOMPARE(panel->currentParams().value("arms").toBool(), true);
         QCoreApplication::processEvents();
-        auto* splay = panel->findChild<QDoubleSpinBox*>(QStringLiteral("param:splay"));
+        auto* splay = panel->findChild<QDoubleSpinBox*>(QStringLiteral("param_splay"));
         QVERIFY(splay && splay->suffix() == QStringLiteral("°"));
     }
 

@@ -62,6 +62,7 @@ class ViewHost;
 class DrawingsPanel;
 class FindSelectPanel;
 class LibraryPanel;
+class ObjectSettingsDialog;
 class ChecksPanel;
 class ConsolePanel;
 class SheetsPanel;
@@ -94,6 +95,7 @@ struct MeshChunk;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
+    friend class ObjectSettingsDialog; // D100: its edits go through bridge() and afterEdit()
 public:
     // quiet: report errors through signals only (no dialogs), for --self-test and automation.
     explicit MainWindow(QWidget* parent = nullptr, bool quiet = false, int chunkSize = 1000);

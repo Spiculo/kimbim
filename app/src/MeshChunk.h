@@ -2,6 +2,7 @@
 #pragma once
 
 #include <QByteArray>
+#include <QJsonObject>
 #include <QMetaType>
 #include <QString>
 #include <QStringList>
@@ -56,6 +57,11 @@ struct MeshChunk {
 bool fetchMeshChunk(PythonEngine& py, int maxElements, MeshChunk* out, bool* done, QString* error);
 // Meshes of specific elements after an edit (app_bridge.mesh_elements). *none: nothing to draw.
 bool fetchElementMeshes(PythonEngine& py, const QStringList& guids, MeshChunk* out, bool* none, QString* error);
+// D100: the Object settings dialog's preview, one placement of library object `key` with these values
+// (or saved version `version`'s) at the origin (library.object_preview). False with the reason in *error
+// when the values don't build.
+bool fetchObjectPreview(PythonEngine& py, const QString& key, const QJsonObject& params, MeshChunk* out,
+    QString* error, const QString& version = QString());
 
 } // namespace kimbim
 
