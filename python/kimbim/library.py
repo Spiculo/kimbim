@@ -183,16 +183,20 @@ def _open_library_ifc(path: str):
 
 
 def _load_ifc_types(path: str, category: str):
-    """An office IFC file's types: fixed `ifc:` entries, or office versions (D100) when they carry a
-    VersionId (kimbim-versions.ifc, written by objversions.move_version_to_library)."""
+    """An office IFC file's types: fixed `ifc:` entries. Office versions (D100) come only from
+    kimbim-versions.ifc (written by objversions.move_version_to_library): a type carrying a VersionId
+    in any other file (a project saved into the office folder) is skipped, so it cannot shadow them."""
     import ifcopenshell.util.element
 
     from . import objversions
 
     f = _open_library_ifc(path)
+    is_versions = os.path.basename(path).lower() == objversions.VERSIONS_FILE.lower()
     for t in f.by_type("IfcTypeProduct"):
         data = ifcopenshell.util.element.get_pset(t, PSET) or {}
         if data.get(objversions.VERSION_ID):
+            if not is_versions:
+                continue
             try:
                 values = json.loads(data.get("Parameters") or "{}")
             except ValueError:

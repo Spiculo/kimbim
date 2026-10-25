@@ -493,6 +493,23 @@ def test_a_selection_updates_only_its_types(project, tmp_path):
     assert _ps(x1["type"])["DefinitionHash"] != _ps(x2["type"])["DefinitionHash"]
 
 
+def test_versions_come_only_from_the_versions_file(project, tmp_path):
+    library.load_office(str(tmp_path))
+    v = call("save_object_version", "chair", "Café", "")
+    assert call("move_version_to_library", v["id"])["ok"]
+    moved = library._office_versions[v["id"]]["values"]["width"]
+    # a project saved into the office folder carries a copy of "Café" with width 0.6
+    assert call("new_project", "Old")["ok"]
+    storey = call("storeys")["storeys"][0]["guid"]
+    q = call("place_object", storey, "chair", "", 0, 0, 0, "", v["id"])
+    assert call("apply_object_settings", json.dumps([q["guid"]]), json.dumps({"width": 0.6}), "all")["ok"]
+    assert call("save", str(tmp_path / "old.ifc"))["ok"]
+    library.load_office(str(tmp_path))
+    assert library._office_versions[v["id"]]["values"]["width"] == pytest.approx(moved)
+    assert moved != pytest.approx(0.6)
+    assert len([e for e in library._office_versions.values() if e["name"] == "Café"]) == 1
+
+
 def test_an_office_copy_follows_its_office_version(project, tmp_path):
     library.load_office(str(tmp_path))
     v = call("save_object_version", "chair", "Café", "")
@@ -502,7 +519,8 @@ def test_an_office_copy_follows_its_office_version(project, tmp_path):
     storey = call("storeys")["storeys"][0]["guid"]
     p = call("place_object", storey, "chair", "", 0, 0, 0, "", v["id"])
     assert call("library_updates", "")["versions"] == 0
-    copying = tmp_path / "copying.ifc"
+    (tmp_path / "projects").mkdir()
+    copying = tmp_path / "projects" / "copying.ifc"
     assert call("save", str(copying))["ok"]
     # a third project's "Café" (the same id) gets width 0.6 and replaces the office version
     assert call("new_project", "Third")["ok"]
