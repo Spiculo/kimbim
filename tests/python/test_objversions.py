@@ -602,3 +602,105 @@ def test_form_and_symbol_of_a_version_use_its_own_definition(project, tmp_path):
     assert b.object_preview("office:block", json.dumps({"height": 0.6}), v["id"]) is not None
     assert call("object_preview_error", "office:block", json.dumps({"width": 0}), v["id"])["ok"] is False
     assert call("object_form", "office:block", "", "no-such-version")["params"] == []
+
+
+# ---------------------------------------------------------------- D100 final review
+
+def test_default_moves_the_selection_to_an_unnamed_type(project):
+    """Edit mode's Default (objversions.DEFAULT) moves the selection to the unnamed type of the object's
+    default values, found or made as placing finds it; the saved version stays untouched."""
+    v = call("save_object_version", "chair", "Dining", json.dumps({"width": 0.5}))
+    a = call("place_object", project, "chair", "", 0, 0, 0, "", v["id"])["guid"]
+    c = call("place_object", project, "chair", "", 1, 0, 0, "", v["id"])["guid"]
+    r = call("assign_version", json.dumps([a]), objversions.DEFAULT)
+    assert r["ok"], r
+    ta = ifcopenshell.util.element.get_type(b._model.by_guid(a))
+    assert not objversions.is_saved(ta) and r["type"] == ta.GlobalId
+    assert json.loads(_ps(ta.GlobalId)["Parameters"]) == library.get("chair").values()
+    tv = b._model.by_guid(v["type"])                                  # the saved version: untouched
+    assert json.loads(_ps(v["type"])["Parameters"])["width"] == 0.5 and tv.Name == "Dining"
+    assert ifcopenshell.util.element.get_type(b._model.by_guid(c)) == tv
+    d = call("place_object", project, "chair", "", 2, 0, 0)          # a plain Default placement: the same type
+    assert d["type"] == ta.GlobalId
+    assert call("assign_version", json.dumps([c]), objversions.DEFAULT)["type"] == ta.GlobalId
+    assert b._model.by_guid(v["type"])                                # unused, still a saved version
+    assert call("undo")["ok"] and ifcopenshell.util.element.get_type(b._model.by_guid(c)) == tv
+    t = call("place_object", project, "table", "", 4, 0, 0)["guid"]
+    assert call("assign_version", json.dumps([a, t]), objversions.DEFAULT)["ok"] is False  # two objects
+
+
+def test_settings_of_an_outdated_unnamed_placement_use_its_type(project, tmp_path):
+    """object_settings_of gives the type as the dialog's source ("type:<GlobalId>"): the form, symbol and
+    preview use the definition stored on the type, as apply_object_settings does."""
+    folder = tmp_path / "office"
+    folder.mkdir()
+    (folder / "block.kimobj").write_text(json.dumps(BLOCK), encoding="utf-8")
+    library.load_office(str(folder))
+    p = call("place_object", project, "office:block", json.dumps({"height": 0.3}), 0, 0, 0)
+    newer = {**BLOCK, "params": BLOCK["params"] + [{"key": "top", "kind": "length", "label": "Top", "default": 0.02}]}
+    (folder / "block.kimobj").write_text(json.dumps(newer), encoding="utf-8")
+    library.load_office(str(folder))                       # the office definition moved on: outdated
+    s = call("object_settings_of", json.dumps([p["guid"]]))
+    assert s["source"] == "type:" + p["type"]
+    form = call("object_form", "office:block", "", s["source"])
+    assert [x["key"] for x in form["params"]] == ["width", "depth", "height"] and form["values"]["height"] == 0.3
+    edited = {**form["values"], "height": 0.5}
+    assert call("object_preview_error", "office:block", json.dumps(edited), s["source"]) == {"ok": True}
+    assert b.object_preview("office:block", json.dumps(edited), s["source"]) is not None
+    assert call("object_symbol", "office:block", "", s["source"])["width"] == pytest.approx(0.4)
+    assert call("apply_object_settings", json.dumps([p["guid"]]), json.dumps(edited), "auto")["ok"]
+    assert call("object_form", "office:block", "", "type:nosuchguid")["params"] == []
+    assert call("object_preview_error", "office:block", "", "type:nosuchguid")["ok"] is False
+    v = call("save_object_version", "office:block", "Low", "")
+    q = call("place_object", project, "office:block", "", 1, 0, 0, "", v["id"])["guid"]
+    assert call("object_settings_of", json.dumps([q]))["source"] == "type:" + v["type"]
+
+
+def test_replacing_a_version_keeps_its_own_definition(project, tmp_path):
+    folder = tmp_path / "office"
+    folder.mkdir()
+    (folder / "block.kimobj").write_text(json.dumps(BLOCK), encoding="utf-8")
+    library.load_office(str(folder))
+    v = call("save_object_version", "office:block", "Low", json.dumps({"height": 0.3}))
+    old_hash = _ps(v["type"])["DefinitionHash"]
+    newer = {**BLOCK, "params": BLOCK["params"] + [{"key": "top", "kind": "length", "label": "Top", "default": 0.02}]}
+    (folder / "block.kimobj").write_text(json.dumps(newer), encoding="utf-8")
+    library.load_office(str(folder))
+    r = call("save_object_version", "office:block", "Low", json.dumps({"height": 0.35}), "1")
+    assert r["ok"] and r["id"] == v["id"]
+    ps = _ps(v["type"])
+    assert ps["DefinitionHash"] == old_hash
+    assert json.loads(ps["Parameters"]) == {"width": 0.4, "depth": 0.4, "height": 0.35}
+
+
+def test_a_local_edit_of_an_office_version_is_not_outdated(project, tmp_path):
+    """An office-linked project version keeps the office state it was copied or moved at (OfficeHash):
+    a local edit is not outdated; a change of the office version since is."""
+    folder = tmp_path / "office"  # projects are saved beside it: an IFC in the folder is office library
+    folder.mkdir()
+    library.load_office(str(folder))
+    v = call("save_object_version", "chair", "Café", "")
+    assert call("move_version_to_library", v["id"])["ok"]
+    a = call("place_object", project, "chair", "", 0, 0, 0, "", v["id"])["guid"]
+    assert call("apply_object_settings", json.dumps([a]), json.dumps({"width": 0.55}), "all")["ok"]  # local
+    assert call("library_updates", "")["versions"] == 0
+    mine = tmp_path / "mine.ifc"
+    assert call("save", str(mine))["ok"]
+    # another project copies the office version, changes it and replaces it in the office
+    assert call("new_project", "Other")["ok"]
+    storey = call("storeys")["storeys"][0]["guid"]
+    q = call("place_object", storey, "chair", "", 0, 0, 0, "", v["id"])["guid"]
+    assert call("library_updates", "")["versions"] == 0                     # a fresh copy
+    assert call("apply_object_settings", json.dumps([q]), json.dumps({"width": 0.6}), "all")["ok"]
+    assert call("library_updates", "")["versions"] == 0
+    assert call("move_version_to_library", v["id"], "1")["ok"]
+    assert call("library_updates", "")["versions"] == 0                     # it is the office state now
+    assert call("open_model", str(mine))["ok"]
+    assert call("library_updates", "")["versions"] == 1
+    assert call("update_from_library", "")["ok"]
+    t = ifcopenshell.util.element.get_type(b._model.by_guid(a))
+    assert json.loads(_ps(t.GlobalId)["Parameters"])["width"] == pytest.approx(0.6)
+    assert call("library_updates", "")["versions"] == 0                     # the baseline follows the update
+    office = ifcopenshell.open(str(folder / "kimbim-versions.ifc"))        # the office copy has no baseline
+    assert all("OfficeHash" not in (ifcopenshell.util.element.get_pset(o, library.PSET) or {})
+               for o in office.by_type("IfcTypeProduct"))

@@ -29,7 +29,13 @@ from .objbuild import ObjectError
 
 VERSION_ID = "VersionId"
 VERSION_NAME = "VersionName"
+# A project copy of an office version (copied in, or moved to the office) keeps the office version's state
+# it was made from: _office_state of its values and DefinitionHash. The copy is outdated only when the
+# office version has changed since, never for a local edit of the copy (D100).
+OFFICE_HASH = "OfficeHash"
 NAME_LIMIT = 255  # an IfcLabel
+DEFAULT = "#default"  # assign_version: the object's Default (an unnamed type of its default values)
+TYPE_SOURCE = "type:"  # "type:<GlobalId>": the dialog's source when it edits placements of a type
 
 
 def _pset(t) -> dict:
@@ -92,6 +98,39 @@ def find_version(version_id: str):
     return next((t for t in _saved_types() if _pset(t).get(VERSION_ID) == version_id), None)
 
 
+def type_of_source(source: str):
+    """The library type a "type:<GlobalId>" source names (object_settings_of), or None."""
+    from . import app_bridge as B
+
+    if B._model is None or not str(source).startswith(TYPE_SOURCE):
+        return None
+    try:
+        t = B._model.by_guid(source[len(TYPE_SOURCE):])
+    except RuntimeError:
+        return None
+    return t if library._params_of_type(t) is not None else None
+
+
+def _office_state(values: dict, digest: str) -> str:
+    """The OfficeHash of an office version with these values and DefinitionHash."""
+    return objects.digest(objects.canonical(values) + (digest or ""))
+
+
+def _write_office_state(t, values: dict, digest: str) -> None:
+    import ifcopenshell.api.pset
+
+    ifcopenshell.api.pset.edit_pset(t.file, pset=library._pset_of(t), properties={
+        OFFICE_HASH: t.file.createIfcIdentifier(_office_state(values, digest))})
+
+
+def refresh_office_state(t) -> None:
+    """A project copy of an office version takes the office version's current state as its baseline
+    (after Update from library). Nothing for any other type."""
+    entry = library._office_versions.get(_pset(t).get(VERSION_ID) or "")
+    if entry is not None:
+        _write_office_state(t, entry["values"], entry["hash"])
+
+
 def _definition(key: str):
     """The definition to build versions of `key`: the library's, else the one stored on a project type
     of that object (its object is gone from the library: the project still has it, D99), else an office
@@ -118,9 +157,11 @@ def _outdated_version(t):
     """(type, definition, values, current definition, new values) when saved version `t` is outdated
     (D100), else None:
     - a copy of an office version (its VersionId is in the office library) follows that office version:
-      outdated when the office version's values or definition (DefinitionHash) differ from the copy's; the
-      new values are the office version's. Only the office version, never the live definition too: the two
-      could disagree and the copy would never settle;
+      outdated when the office version's values or definition (DefinitionHash) changed since the copy was
+      made, moved to the office or last updated (its OfficeHash; a copy without one compares its own values
+      and hash); a local edit of the copy is not outdated. The new values are the office version's. Only
+      the office version, never the live definition too: the two could disagree and the copy would never
+      settle;
     - any other follows its object's live definition (bundled or office .kimobj): outdated when its
       DefinitionHash differs; values are kept as for unsaved placements (library._kept_values).
     The new values are not built: update_from_library checks they build."""
@@ -132,7 +173,8 @@ def _outdated_version(t):
     values = obj.values(info[1])
     entry = library._office_versions.get(data[VERSION_ID])
     if entry is not None and entry["object"] == info[0]:
-        if entry["values"] == info[1] and entry["hash"] == (data.get("DefinitionHash") or ""):
+        baseline = data.get(OFFICE_HASH) or _office_state(info[1], data.get("DefinitionHash") or "")
+        if _office_state(entry["values"], entry["hash"]) == baseline:
             return None
         current = library.office_definition(entry)
         if current is None:
@@ -198,7 +240,7 @@ def object_versions(key: str) -> str:
 def save_object_version(key: str, name: str, params_json: str, replace: str = "") -> str:
     """Save these values of an object as a named version: a new project type. A name the object already
     has fails with {"exists": id} unless `replace` ("1"), which regenerates that version with these values
-    (same id, type and name). One undo step."""
+    (same id, type and name) and the definition stored on it. One undo step."""
     from . import app_bridge as B
     from . import authoring as A
 
@@ -210,15 +252,17 @@ def save_object_version(key: str, name: str, params_json: str, replace: str = ""
     name, error = _clean_name(name)
     if error:
         return A._fail(error)
+    existing = _clash(obj.ref, name)
+    if existing is not None and str(replace) not in ("1", "true", "True"):
+        return B._dump({"ok": False, "error": f"{obj.name} already has a version called {existing['name']}",
+                        "exists": existing["id"]})
+    if existing is not None:  # replaced: regenerated with its own stored definition (D99), as editing does
+        obj = library.definition_of_type(find_version(existing["id"])) or obj
     try:
         values = obj.values(library._given(params_json))
         obj.shape(values)  # values the definition cannot build save nothing
     except (ObjectError, ValueError) as ex:
         return A._fail(str(ex))
-    existing = _clash(obj.ref, name)
-    if existing is not None and str(replace) not in ("1", "true", "True"):
-        return B._dump({"ok": False, "error": f"{obj.name} already has a version called {existing['name']}",
-                        "exists": existing["id"]})
     made = {}
 
     def action():
@@ -316,8 +360,9 @@ def _selection_type(guids_json: str):
 
 def object_settings_of(guids_json: str) -> str:
     """What the dialog edits for these placements (D100): their object, the values and version of their
-    type, and whether the type is shared beyond the selection. Fails for no library object or more than one
-    type."""
+    type, whether the type is shared beyond the selection, and the type as the dialog's "source"
+    ("type:<GlobalId>": its form and previews use the definition stored on the type, as
+    apply_object_settings does). Fails for no library object or more than one type."""
     import ifcopenshell.util.element
 
     from . import app_bridge as B
@@ -331,7 +376,8 @@ def object_settings_of(guids_json: str) -> str:
     elements, obj, values, t = found
     uses = len(ifcopenshell.util.element.get_types(t))
     return B._dump({"ok": True, "key": obj.ref, "values": values, "version": _pset(t).get(VERSION_ID) or None,
-                    "name": t.Name or "", "selected": len(elements), "uses": uses, "shared": uses > len(elements)})
+                    "name": t.Name or "", "selected": len(elements), "uses": uses, "shared": uses > len(elements),
+                    "source": TYPE_SOURCE + t.GlobalId})
 
 
 def apply_object_settings(guids_json: str, params_json: str, mode: str, name: str = "") -> str:
@@ -406,7 +452,10 @@ def apply_object_settings(guids_json: str, params_json: str, mode: str, name: st
 
 def assign_version(guids_json: str, version_id: str) -> str:
     """Move these placements to a saved version's type (D100). An office version the project has no copy
-    of is copied in first (as placing it does). An unnamed type left unused goes. One undo step."""
+    of is copied in first (as placing it does). `version_id` DEFAULT ("#default"): the object's Default,
+    the unnamed type of its default values found or made as placing it does (library._type_for, with the
+    definition the dialog shows for Default: _definition); the version left stays untouched. An unnamed
+    type left unused goes. One undo step."""
     import ifcopenshell.api.type
     import ifcopenshell.util.element
 
@@ -415,6 +464,8 @@ def assign_version(guids_json: str, version_id: str) -> str:
 
     if B._model is None:
         return A._fail("no model open")
+    if version_id == DEFAULT:
+        return _assign_default(guids_json)
     target = find_version(version_id)
     office = library._office_versions.get(version_id) if target is None and version_id else None
     if target is None and office is None:
@@ -447,6 +498,49 @@ def assign_version(guids_json: str, version_id: str) -> str:
     return B._dump({**r, "type": made[0].GlobalId})
 
 
+def _assign_default(guids_json: str) -> str:
+    """assign_version(guids, DEFAULT)."""
+    import ifcopenshell.api.type
+
+    from . import app_bridge as B
+    from . import authoring as A
+
+    elements = B._elements(guids_json)
+    if not elements:
+        return A._fail("no library object selected")
+    found = [library._object_of(e) for e in elements]
+    if any(x is None for x in found):
+        return A._fail("the selection holds elements that are not library objects")
+    refs = {x[0].ref for x in found}
+    if len(refs) > 1:
+        return A._fail("the selection holds more than one object")
+    obj = _definition(refs.pop())
+    if obj is None:
+        return A._fail("that object has no definition")
+    values = obj.values()
+    try:
+        obj.shape(values)
+    except (ObjectError, ValueError) as ex:
+        return A._fail(str(ex))
+    old = {x[2].id(): x[2] for x in found}
+    made = []
+
+    def action():
+        target = library._type_for(obj, values)
+        made.append(target)
+        ifcopenshell.api.type.assign_type(B._model, related_objects=elements, relating_type=target)
+        for t in old.values():
+            if t != target:
+                library._remove_type_if_unused(t)
+        return len(elements), [e.GlobalId for e in elements], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return A._fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "type": made[0].GlobalId})
+
+
 # ---------------------------------------------------------------- the office library
 
 VERSIONS_FILE = "kimbim-versions.ifc"  # in the office folder: the versions every project sees
@@ -464,9 +558,11 @@ def _office_copy_name(ref: str, name: str) -> str:
 def copy_office_version(entry: dict, obj, values: dict):
     """An office version copied into the project (library.place_object, inside its undo step): a project
     type built from the office type's stored definition and values, keeping the office VersionId, so later
-    placements find and reuse it and the project never depends on the office library."""
+    placements find and reuse it and the project never depends on the office library. Its OfficeHash is
+    the office version's state it was copied at."""
     t = library._make_type(obj, values)
     _write_version(t, entry["id"], _office_copy_name(obj.ref, entry["name"]))
+    _write_office_state(t, entry["values"], entry["hash"])  # the office state it was copied at
     return t
 
 
@@ -489,10 +585,13 @@ def move_version_to_library(version_id: str, replace: str = "") -> str:
     """Copy a project version into the office library's versions file (<office folder>/kimbim-versions.ifc,
     made in the project's schema if missing), keeping its VersionId. An office version with the same id,
     or the same object and name, fails with {"exists": id} unless `replace` ("1"), which replaces it. The
-    office library reloads after. Not an undo step: the project does not change."""
+    office library reloads after. The project version then records that office state as its baseline
+    (OfficeHash), one undo step; the office file is not undone."""
     import ifcopenshell
     import ifcopenshell.api.project
+    import ifcopenshell.api.pset
     import ifcopenshell.api.root
+    import ifcopenshell.util.element
 
     from . import app_bridge as B
     from . import authoring as A
@@ -529,6 +628,9 @@ def move_version_to_library(version_id: str, replace: str = "") -> str:
         for o in same:
             ifcopenshell.api.root.remove_product(office, product=o)
         copied = ifcopenshell.api.project.append_asset(office, library=B._model, element=t)  # the pset comes with it
+        data = ifcopenshell.util.element.get_pset(copied, library.PSET) or {}
+        if OFFICE_HASH in data:  # a project's baseline, not the office's
+            ifcopenshell.api.pset.edit_pset(office, pset=office.by_id(data["id"]), properties={OFFICE_HASH: None})
         for p in office.by_type("IfcProject"):
             if p.OwnerHistory is None and office.schema == "IFC2X3":  # required in IFC2X3
                 p.OwnerHistory = copied.OwnerHistory
@@ -543,7 +645,17 @@ def move_version_to_library(version_id: str, replace: str = "") -> str:
         return A._fail(f"cannot write {path}: {type(ex).__name__}: {ex}")
     library._ifc_cache.pop(path, None)
     library.load_office(folder, library._office_paths["files"])
-    return B._dump({"ok": True, "id": version_id, "path": path})
+    mine = _pset(t)
+
+    def action():
+        _write_office_state(t, json.loads(mine.get("Parameters") or "{}"), mine.get("DefinitionHash") or "")
+        return 0
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return A._fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "ok": True, "id": version_id, "path": path})
 
 
 def set_last_used(key: str, data_json: str) -> str:

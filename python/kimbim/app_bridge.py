@@ -875,7 +875,10 @@ def properties_multi(guids_json: str) -> str:
             label = row["label"]
             present = [next((r["value"] for r in rows if r["label"] == label), _MISSING) for rows in per_params]
             varies = any(v is _MISSING or v != present[0] for v in present)
-            group[label] = {"value": None if varies else present[0], "varies": varies,
+            row_name, n = label, 2
+            while row_name in group:  # a parameter labelled "Type" (or twice the same label): its own row
+                row_name, n = f"{label} ({n})", n + 1
+            group[row_name] = {"value": None if varies else present[0], "varies": varies,
                             "ifc_type": ifc_types[row["kind"]], "editable": False, "source": "parameter",
                             "type_value": None}
         psets = {**{k: v for k, v in psets.items() if k == authoring.DIMENSIONS}, library.PARAMETERS: group,

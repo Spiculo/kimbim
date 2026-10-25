@@ -322,10 +322,15 @@ def _given(params_json: str) -> dict:
 
 def _definition_for(key: str, version: str = ""):
     """(definition, the version's values) the dialog works on (D100): saved or office version `version`'s
-    own stored definition, else the object's (also one gone from the library, stored on a type). The
-    definition is None for an office IFC type or an unknown key or version."""
+    own stored definition, or a placed type's ("type:<GlobalId>", objversions.object_settings_of), else
+    the object's (also one gone from the library, stored on a type). The definition is None for an office
+    IFC type or an unknown key, version or type."""
     from . import objversions
 
+    if version.startswith(objversions.TYPE_SOURCE):
+        t = objversions.type_of_source(version)
+        info = _params_of_type(t) if t is not None else None
+        return (definition_of_type(t), info[1]) if info is not None else (None, {})
     if version:
         saved = objversions.find_version(version)
         if saved is not None:
@@ -827,7 +832,8 @@ def _preview_definition(key: str, params_json: str, version: str = ""):
     if version:
         from . import objversions
 
-        if objversions.find_version(version) is None and version not in _office_versions:
+        if objversions.find_version(version) is None and version not in _office_versions \
+                and objversions.type_of_source(version) is None:
             raise ObjectError("unknown version")
         obj, base = _definition_for(key, version)
         if obj is None:
@@ -1268,6 +1274,7 @@ def update_from_library(guids_json: str = "") -> str:
         changed = []
         for t, _, _, current, new_values in versions:
             _regenerate_type(t, current, new_values)  # keeps the name and the version fields
+            objversions.refresh_office_state(t)  # an office copy: the office state it now follows
             changed += [e.GlobalId for e in ifcopenshell.util.element.get_types(t)]
         for t, current, new_values, elements in groups.values():
             target = _type_for(current, new_values)

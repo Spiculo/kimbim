@@ -659,3 +659,23 @@ def test_a_tampered_stored_definition_is_not_an_object(project):
     assert library.definition_of_type(t) is None
     bad = call("set_object_parameter", json.dumps([r["guid"]]), "Width", "0.5", "")
     assert not bad["ok"] and "no selected object" in bad["error"]
+
+
+def test_a_parameter_labelled_type_keeps_the_summary_type_row(project, tmp_path):
+    """D100: the Parameters summary's Type row is the type's name; a parameter labelled "Type" shows too,
+    under another row name."""
+    block = {
+        "format": "kimbim-object/1", "id": "typed", "name": "Typed", "category": "furniture",
+        "ifc": {"IFC4": ["IfcFurnitureType", "NOTDEFINED", None]},
+        "params": [{"key": "width", "kind": "length", "label": "Width", "default": 0.4},
+                   {"key": "kind", "kind": "choice", "label": "Type", "default": "a",
+                    "options": [{"id": "a", "label": "Plain"}, {"id": "b", "label": "Fancy"}]}],
+        "parts": [{"id": "body", "box": {"dx": "width", "dy": 0.4, "dz": 0.4}}],
+    }
+    (tmp_path / "typed.kimobj").write_text(json.dumps(block), encoding="utf-8")
+    library.load_office(str(tmp_path))
+    assert library.get("office:typed") is not None, library._office_errors
+    p = call("place_object", project, "office:typed", "", 0, 0, 0)
+    group = call("properties_multi", json.dumps([p["guid"]]))["psets"]["Parameters"]
+    assert group["Type"]["value"] == b._model.by_guid(p["type"]).Name
+    assert [row["value"] for name, row in group.items() if name != "Type"] == [0.4, "Plain"]
