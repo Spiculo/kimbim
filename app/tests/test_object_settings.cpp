@@ -4,6 +4,7 @@
 // last preview, shows why and disables Place.
 #include <QComboBox>
 #include <QDoubleSpinBox>
+#include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QLabel>
@@ -11,11 +12,13 @@
 #include <QMenu>
 #include <QPushButton>
 #include <QStandardPaths>
+#include <QTemporaryDir>
 #include <QtTest>
 
 #include "MainWindow.h"
 #include "ObjectSettingsDialog.h"
 #include "PythonEngine.h"
+#include "Translations.h"
 #include "Viewport.h"
 
 namespace {
@@ -35,6 +38,40 @@ QStringList versionNames(const kimbim::ObjectSettingsDialog& d)
     auto* list = d.findChild<QListWidget*>(QStringLiteral("objectSettingsVersions"));
     for (int i = 0; i < list->count(); ++i)
         out << list->item(i)->text();
+    return out;
+}
+
+// An office object file (D99) in `dir`: a box, optionally with one more parameter or a group heading.
+void writeBlock(const QTemporaryDir& dir, const QString& id, const QJsonArray& extra = {}, const QJsonValue& group = {})
+{
+    QJsonArray params;
+    for (const char* key : {"width", "depth", "height"}) {
+        QJsonObject p{{"key", key}, {"kind", "length"}, {"label", key}, {"default", QString::fromLatin1(key) == "height" ? 0.45 : 0.4}};
+        if (!group.isNull())
+            p.insert("group", group);
+        params.append(p);
+    }
+    for (const auto& p : extra)
+        params.append(p);
+    const QJsonObject block{{"format", "kimbim-object/1"}, {"id", id}, {"name", "Block"}, {"category", "furniture"},
+        {"ifc", QJsonObject{{"IFC4", QJsonArray{"IfcFurnitureType", "NOTDEFINED", QJsonValue()}}}}, {"params", params},
+        {"parts", QJsonArray{QJsonObject{{"id", "body"}, {"box", QJsonObject{{"dx", "width"}, {"dy", "depth"}, {"dz", "height"}}}}}}};
+    QFile file(dir.filePath(id + QStringLiteral(".kimobj")));
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write(QJsonDocument(block).toJson());
+}
+
+void setOfficeFolder(const QString& folder)
+{
+    kimbim::PythonEngine::instance().callJson("set_library_paths",
+        {QString::fromUtf8(QJsonDocument(QJsonObject{{"folder", folder}}).toJson(QJsonDocument::Compact))});
+}
+
+QStringList headings(const kimbim::ObjectSettingsDialog& d)
+{
+    QStringList out;
+    for (const QLabel* l : d.findChildren<QLabel*>(QStringLiteral("paramGroup")))
+        out << l->text();
     return out;
 }
 
@@ -155,6 +192,42 @@ private slots:
         QCOMPARE(versionNames(d), QStringList{QStringLiteral("Default")});
     }
 
+    void formFollowsTheVersionsOwnDefinition()
+    {
+        QTemporaryDir dir;
+        writeBlock(dir, QStringLiteral("block"));
+        setOfficeFolder(dir.path());
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        const QString id = kimbim::PythonEngine::instance()
+            .callJson("save_object_version", {QStringLiteral("office:block"), QStringLiteral("Low"), QStringLiteral("{\"height\": 0.3}")})
+            .object().value("id").toString();
+        QVERIFY(!id.isEmpty());
+        // the library's definition moves on: a new parameter the version's stored definition doesn't have
+        writeBlock(dir, QStringLiteral("block"), {QJsonObject{{"key", "top"}, {"kind", "length"}, {"label", "Top"}, {"default", 0.02}}});
+        setOfficeFolder(dir.path());
+        {
+            kimbim::ObjectSettingsDialog d(&w, QStringLiteral("office:block"), kimbim::ObjectSettingsDialog::Mode::Place);
+            QVERIFY(d.findChild<QWidget*>(QStringLiteral("param_top"))); // Default: the library's definition
+            d.selectVersion(id);
+            QVERIFY(!d.findChild<QWidget*>(QStringLiteral("param_top")));
+            QCOMPARE(d.findChild<QDoubleSpinBox*>(QStringLiteral("param_height"))->value(), 0.3);
+            d.setValues({{"height", 0.5}}); // edited: still the version's definition
+            QVERIFY(d.versionId().isEmpty());
+            QVERIFY(!d.findChild<QWidget*>(QStringLiteral("param_top")));
+            QTRY_VERIFY(d.findChild<kimbim::Viewport*>(QStringLiteral("objectSettingsPreview"))->elementCount() > 0);
+            QVERIFY(d.valid());
+            QTRY_VERIFY(d.findChild<QWidget*>(QStringLiteral("objectSettingsPlan"))->property("symbolCurves").toInt() > 0);
+        }
+        setOfficeFolder(QString()); // gone from the library: the version still has its controls and preview
+        kimbim::ObjectSettingsDialog d(&w, QStringLiteral("office:block"), kimbim::ObjectSettingsDialog::Mode::Place);
+        d.selectVersion(id);
+        QCOMPARE(d.versionId(), id);
+        QCOMPARE(d.findChild<QDoubleSpinBox*>(QStringLiteral("param_height"))->value(), 0.3);
+        QTRY_VERIFY(d.findChild<kimbim::Viewport*>(QStringLiteral("objectSettingsPreview"))->elementCount() > 0);
+        QVERIFY(d.valid());
+    }
+
     void planToggleShowsTheSymbol()
     {
         kimbim::MainWindow w(nullptr, true);
@@ -169,6 +242,27 @@ private slots:
         QTRY_VERIFY(plan->property("symbolCurves").toInt() > 0);
         d.findChild<QPushButton*>(QStringLiteral("objectSettingsToggle3D"))->click();
         QVERIFY(!plan->isVisibleTo(&d) && preview->isVisibleTo(&d));
+    }
+
+    void groupHeadingsInSpanish() // last: the Spanish translator stays installed
+    {
+        QTemporaryDir dir;
+        writeBlock(dir, QStringLiteral("grouped"), {}, QJsonObject{{"en", "Size"}, {"es", "Tamaño"}});
+        setOfficeFolder(dir.path());
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        QVERIFY(kimbim::installTranslator(*qApp, QStringLiteral("es")));
+        {
+            kimbim::ObjectSettingsDialog chair(&w, QStringLiteral("chair"), kimbim::ObjectSettingsDialog::Mode::Place);
+            const QStringList h = headings(chair); // plain text in the bundled file: the app's translation
+            QVERIFY2(h.contains(QStringLiteral("Patas")) && h.contains(QStringLiteral("Respaldo"))
+                    && h.contains(QStringLiteral("Asiento")) && h.contains(QStringLiteral("Brazos")),
+                qPrintable(h.join(QLatin1Char(','))));
+        }
+        kimbim::ObjectSettingsDialog block(&w, QStringLiteral("office:grouped"), kimbim::ObjectSettingsDialog::Mode::Place);
+        QCOMPARE(headings(block), QStringList{QStringLiteral("Tamaño")}); // the object file's own Spanish
+        kimbim::installTranslator(*qApp, QStringLiteral("en"));
+        setOfficeFolder(QString());
     }
 };
 

@@ -1741,17 +1741,28 @@ ES = {
     "Set the office library folder in the preferences first": "Primero defina la carpeta de la biblioteca de la oficina en las preferencias",
 }
 
+# Words that mean something else in another context ("Back" is the view cube's "Posterior"): by
+# (context, source), tried before ES.
+ES_IN = {
+    # D100: the bundled objects' parameter group headings (plain text in their .kimobj files)
+    ("LibraryPanel", "Seat"): "Asiento",
+    ("LibraryPanel", "Legs"): "Patas",
+    ("LibraryPanel", "Back"): "Respaldo",
+    ("LibraryPanel", "Arms"): "Brazos",
+}
+
 
 def main():
     tree = ET.parse(TS)
     filled = missing = 0
-    for msg in tree.getroot().iter("message"):
+    messages = ((ctx.findtext("name"), msg) for ctx in tree.getroot().iter("context") for msg in ctx.iter("message"))
+    for context, msg in messages:
         src = msg.findtext("source")
         tr = msg.find("translation")
         if tr is None or tr.get("type") in ("obsolete", "vanished"):
             continue
-        if src in ES:
-            value = ES[src]
+        if (context, src) in ES_IN or src in ES:
+            value = ES_IN.get((context, src), ES.get(src))
             if msg.get("numerus") == "yes":
                 for child in list(tr):
                     tr.remove(child)

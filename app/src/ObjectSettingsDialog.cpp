@@ -55,9 +55,10 @@ ParameterForm::ParameterForm(QWidget* parent)
     m_form->setContentsMargins(0, 0, 0, 0);
 }
 
-void ParameterForm::setObject(const QString& key, const QJsonObject& values)
+void ParameterForm::setObject(const QString& key, const QJsonObject& values, const QString& version)
 {
     m_key = key;
+    m_version = version;
     m_values = values;
     build();
 }
@@ -96,7 +97,7 @@ void ParameterForm::build()
     if (m_key.isEmpty())
         return;
     // D99: limits that are formulas and show_when depend on the current values, so Python makes the form.
-    const QJsonObject form = PythonEngine::instance().callJson("object_form", {m_key, compact(m_values)}).object();
+    const QJsonObject form = PythonEngine::instance().callJson("object_form", {m_key, compact(m_values), m_version}).object();
     // the values as the definition reads them (every parameter; out-of-range ones clamped)
     const QJsonObject clean = form.value("values").toObject();
     for (auto it = clean.begin(); it != clean.end(); ++it)
@@ -119,7 +120,8 @@ void ParameterForm::build()
             heading = nullptr;
             headingShown = false;
             if (!group.isEmpty()) {
-                heading = new QLabel(LibraryPanel::translated(group), this);
+                heading = new QLabel(LibraryPanel::translated(group, p.value("group_es").toString()), this);
+                heading->setObjectName(QStringLiteral("paramGroup"));
                 QFont bold = heading->font();
                 bold.setBold(true);
                 heading->setFont(bold);
@@ -405,6 +407,7 @@ void ObjectSettingsDialog::selectVersion(const QString& id)
     if (!id.isEmpty() && version.isEmpty())
         return; // not one of this object's versions
     m_versionId = id;
+    m_source = id;
     m_lastEdited.clear();
     {
         const QSignalBlocker block(m_list);
@@ -412,7 +415,7 @@ void ObjectSettingsDialog::selectVersion(const QString& id)
             if ((m_list->item(i)->flags() & Qt::ItemIsSelectable) && m_list->item(i)->data(IdRole).toString() == id)
                 m_list->setCurrentItem(m_list->item(i));
     }
-    m_form->setObject(m_key, id.isEmpty() ? m_default : version.value("values").toObject());
+    m_form->setObject(m_key, id.isEmpty() ? m_default : version.value("values").toObject(), id);
     schedulePreview();
 }
 
@@ -441,7 +444,7 @@ void ObjectSettingsDialog::updatePreview()
     const QJsonObject values = m_fixed ? QJsonObject() : m_form->values();
     MeshChunk chunk;
     QString error;
-    if (fetchObjectPreview(py, m_key, values, &chunk, &error, m_versionId)) {
+    if (fetchObjectPreview(py, m_key, values, &chunk, &error, m_source)) {
         m_preview->replaceElements(chunk); // the preview element keeps its GlobalId: replaced, never added
         if (!m_hasPreview)
             m_preview->homeView(false);
@@ -451,7 +454,7 @@ void ObjectSettingsDialog::updatePreview()
         m_error->clear();
         m_form->markInvalid(QString(), QString());
         if (!m_fixed) {
-            const QJsonObject symbol = py.callJson("object_symbol", {m_key, compact(values)}).object();
+            const QJsonObject symbol = py.callJson("object_symbol", {m_key, compact(values), m_source}).object();
             m_plan->setSymbol(symbol.value("symbol").toArray(), symbol.value("width").toDouble(1.0), symbol.value("depth").toDouble(1.0));
         }
     } else { // the last good shape stays
@@ -542,6 +545,8 @@ bool ObjectSettingsDialog::deleteVersion(const QString& id)
     if (!editDone(r, tr("Could not delete the version")))
         return false;
     const bool current = m_versionId == id;
+    if (m_source == id) // its stored definition went with it: the object's from now on
+        m_source.clear();
     loadVersions(current ? QString() : m_versionId);
     if (current) { // its values stay in the controls, now unsaved
         m_versionId.clear();

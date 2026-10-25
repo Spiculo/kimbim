@@ -25,12 +25,15 @@ namespace {
 
 enum { IdRole = Qt::UserRole + 1 };
 
-// The category names (kimbim/library.py), so lupdate finds them; object and parameter names come
-// from the object files (D99).
+// The category names (kimbim/library.py) and group headings, so lupdate finds them; object and
+// parameter names come from the object files (D99).
 [[maybe_unused]] const char* const kNames[] = {
     QT_TRANSLATE_NOOP("LibraryPanel", "Furniture"), QT_TRANSLATE_NOOP("LibraryPanel", "Sanitary"),
     QT_TRANSLATE_NOOP("LibraryPanel", "Kitchen"), QT_TRANSLATE_NOOP("LibraryPanel", "People, trees and cars"),
     QT_TRANSLATE_NOOP("LibraryPanel", "Office library"),
+    // the bundled objects' parameter group headings (D100; an object file may give its own Spanish)
+    QT_TRANSLATE_NOOP("LibraryPanel", "Seat"), QT_TRANSLATE_NOOP("LibraryPanel", "Legs"),
+    QT_TRANSLATE_NOOP("LibraryPanel", "Back"), QT_TRANSLATE_NOOP("LibraryPanel", "Arms"),
 };
 
 } // namespace

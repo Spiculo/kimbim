@@ -29,8 +29,9 @@ class ParameterForm : public QWidget {
     Q_OBJECT
 public:
     explicit ParameterForm(QWidget* parent = nullptr);
-    // Show `key`'s parameters with these values (missing ones: the definition's defaults).
-    void setObject(const QString& key, const QJsonObject& values = {});
+    // Show `key`'s parameters with these values (missing ones: the definition's defaults). With
+    // `version` (D100), the parameters of that saved version's own stored definition.
+    void setObject(const QString& key, const QJsonObject& values = {}, const QString& version = {});
     void setValues(const QJsonObject& values); // merged into the current ones; rebuilds
     QJsonObject values() const { return m_values; }
     bool isEmpty() const { return m_rows == 0; } // no parameters (an office IFC type)
@@ -45,6 +46,7 @@ private:
     void edited(const QString& key, const QJsonValue& value, bool rebuild);
     QFormLayout* m_form;
     QString m_key;
+    QString m_version;
     QJsonObject m_values;
     int m_rows = 0;
 };
@@ -113,6 +115,9 @@ private:
     QJsonObject m_default;
     QJsonArray m_versions;
     QString m_versionId;
+    // The version whose stored definition the form and previews use: the one picked last, kept while
+    // its values are edited ("" for Default: the object's definition).
+    QString m_source;
     QString m_lastEdited; // the parameter the user changed last (marked when the values fail)
     bool m_valid = true;
     bool m_hasPreview = false;

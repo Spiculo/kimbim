@@ -139,7 +139,7 @@ bool fetchObjectPreview(PythonEngine& py, const QString& key, const QJsonObject&
     if (!py.callParts("object_preview", {key, values, version}, &parts, &none, error))
         return false;
     if (none) { // the values don't build: ask why
-        const QJsonObject why = py.callJson("object_preview_error", {key, values}).object();
+        const QJsonObject why = py.callJson("object_preview_error", {key, values, version}).object();
         const QString reason = why.value("error").toString();
         return fail(error, reason.isEmpty() ? QCoreApplication::translate("kimbim::ObjectSettingsDialog", "The object could not be previewed") : reason);
     }

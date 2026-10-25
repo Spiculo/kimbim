@@ -61,7 +61,11 @@ class ParamDef:
         if self.kind not in KINDS:
             raise ObjectError(f"{where}: unknown kind {self.kind!r} (one of {', '.join(KINDS)})")
         self.label = _label(data.get("label", key), f"{where}.label")
-        self.group, self.show_when = data.get("group"), data.get("show_when")
+        self.show_when = data.get("show_when")
+        # D100: a heading is text (translated by the app, if it knows it) or {"en": ..., "es": ...}
+        raw = data.get("group")
+        self.group = _label(raw, f"{where}.group")["en"] if raw is not None else None
+        self.group_es = str(raw.get("es") or "") if isinstance(raw, dict) else ""
         lo, hi = _LIMITS.get(self.kind, (None, None))
         self.lo, self.hi = data.get("min", lo), data.get("max", hi)
         self.options = []

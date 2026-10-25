@@ -85,7 +85,8 @@ Object Editor writes it, so nobody needs to type it by hand.
 - `show_when` hides a parameter whose condition is false (the backrest's settings when the back is *none*). Hidden
   parameters keep their values.
 - `group` (optional) puts parameters under a heading in Properties (*Legs*, *Back*). (Part A stores and lists
-  `group`; the panels show the headings with part B.)
+  `group`; the panels show the headings with part B.) Like a label it is text or `{"en": ..., "es": ...}`
+  (D100); plain text is translated by the app when it knows the word (the bundled objects' headings).
 - Parameter labels are unique within an object. An unreadable `choice` or `bool` value in an edit fails the edit;
   it never silently takes the default.
 - `width`, `depth` and `height` keep their meaning: the type name (`Chair 450x520x850`) and the placement preview

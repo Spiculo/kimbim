@@ -277,7 +277,8 @@ def _param_listing(obj, values) -> list:
     for p in obj.params:
         lo, hi = p.bounds(env)
         item = {"key": p.key, "label": p.label["en"], "label_es": p.label["es"], "value": values[p.key],
-                "kind": p.kind, "min": lo, "max": hi, "group": p.group, "visible": p.key in visible}
+                "kind": p.kind, "min": lo, "max": hi, "group": p.group, "group_es": p.group_es,
+                "visible": p.key in visible}
         if p.kind == "choice":
             item["options"] = [{"id": i, "label": label["en"], "label_es": label["es"]} for i, label in p.options]
         if p.kind == "material":
@@ -319,15 +320,33 @@ def _given(params_json: str) -> dict:
     return given if isinstance(given, dict) else {}
 
 
-def object_symbol(key: str, params_json: str = "") -> str:
-    """The plan symbol and plan box of an object with these parameters (the panel's thumbnail)."""
-    from . import app_bridge as B
+def _definition_for(key: str, version: str = ""):
+    """(definition, the version's values) the dialog works on (D100): saved or office version `version`'s
+    own stored definition, else the object's (also one gone from the library, stored on a type). The
+    definition is None for an office IFC type or an unknown key or version."""
     from . import objversions
 
-    obj = objversions._definition(key)  # D100: also an object gone from the library (stored on a type)
+    if version:
+        saved = objversions.find_version(version)
+        if saved is not None:
+            info = _params_of_type(saved)
+            return definition_of_type(saved), (info[1] if info is not None else {})
+        if version in _office_versions:
+            entry = _office_versions[version]
+            return office_definition(entry), dict(entry["values"])
+        return None, {}
+    return objversions._definition(key), {}
+
+
+def object_symbol(key: str, params_json: str = "", version: str = "") -> str:
+    """The plan symbol and plan box of an object with these parameters (the panel's thumbnail; with
+    `version`, from that saved version's own definition, D100)."""
+    from . import app_bridge as B
+
+    obj, base = _definition_for(key, version)
     if not isinstance(obj, objects.ObjectDef):
         return B._dump({"symbol": [], "width": 1.0, "depth": 1.0})
-    values = obj.values(_given(params_json))
+    values = obj.values({**base, **_given(params_json)})
     w, d = footprint(obj, values)
     try:
         symbol = obj.shape(values).polylines()
@@ -336,17 +355,17 @@ def object_symbol(key: str, params_json: str = "") -> str:
     return B._dump({"symbol": symbol, "width": w, "depth": d, "params": values})
 
 
-def object_form(key: str, params_json: str = "") -> str:
-    """The parameter form for these values (D99): kinds, limits, which are shown, and the object's name."""
+def object_form(key: str, params_json: str = "", version: str = "") -> str:
+    """The parameter form for these values (D99): kinds, limits, which are shown, and the object's name.
+    With `version` (D100), from that saved or office version's own stored definition, over its values."""
     from . import app_bridge as B
-    from . import objversions
 
-    obj = objversions._definition(key)  # D100: also an object gone from the library (stored on a type)
+    obj, base = _definition_for(key, version)
     if not isinstance(obj, objects.ObjectDef):
         entry = get(key)  # an office IFC type (fixed geometry): only its name
         name = entry["name"] if isinstance(entry, dict) else key
         return B._dump({"params": [], "visible": [], "name": name, "name_es": name})
-    values = obj.values(_given(params_json))
+    values = obj.values({**base, **_given(params_json)})
     return B._dump({"params": _param_listing(obj, values), "visible": obj.visible(values), "values": values,
                     "name": obj.name, "name_es": obj.names["es"]})
 
@@ -805,27 +824,21 @@ def _preview_definition(key: str, params_json: str, version: str = ""):
     """(definition, values) the Object settings dialog previews: `version`'s (a saved or office version's
     id) or the object's, with the dialog's values checked and applied like an edit (doc 16 §7). An office
     IFC type gives (its entry, {}). ObjectError with the reason when the values don't build."""
-    from . import objversions
-
     if version:
-        saved = objversions.find_version(version)
-        if saved is not None:
-            obj, info = definition_of_type(saved), _params_of_type(saved)
-            base = info[1] if info is not None else {}
-        elif version in _office_versions:
-            obj, base = office_definition(_office_versions[version]), _office_versions[version]["values"]
-        else:
+        from . import objversions
+
+        if objversions.find_version(version) is None and version not in _office_versions:
             raise ObjectError("unknown version")
+        obj, base = _definition_for(key, version)
         if obj is None:
             raise ObjectError("that version has no definition")
     else:
         entry = get(key)
         if entry is not None and not isinstance(entry, objects.ObjectDef):
             return entry, {}  # fixed geometry, no parameters
-        obj = objversions._definition(key)  # also an object gone from the library (stored on a type)
+        obj, base = _definition_for(key)
         if obj is None:
             raise ObjectError(f"no library object {key}")
-        base = {}
     try:
         given = json.loads(params_json) if params_json else {}
     except ValueError as ex:
@@ -914,13 +927,14 @@ def object_preview(key: str, params_json: str = "", version: str = ""):
         return None
 
 
-def object_preview_error(key: str, params_json: str = "") -> str:
-    """{"ok": true} when these values of an object build, else {"ok": false, "error": the reason}."""
+def object_preview_error(key: str, params_json: str = "", version: str = "") -> str:
+    """{"ok": true} when these values of an object (or of saved version `version`) build, else
+    {"ok": false, "error": the reason}."""
     from . import app_bridge as B
     from . import authoring as A
 
     try:
-        obj, values = _preview_definition(key, params_json)
+        obj, values = _preview_definition(key, params_json, version)
         if isinstance(obj, objects.ObjectDef):
             obj.shape(values)
     except (ObjectError, ValueError) as ex:

@@ -12,7 +12,7 @@ import numpy
 import pytest
 
 from kimbim import app_bridge as b
-from kimbim import library, objversions
+from kimbim import library, objects, objversions
 
 
 def call(fn, *args):
@@ -549,3 +549,38 @@ def test_object_preview_of_a_version_and_its_values(project):
     span = lambda parts: max(numpy.frombuffer(parts[1], "<f4")[0::3]) - min(numpy.frombuffer(parts[1], "<f4")[0::3])  # noqa: E731
     assert span(wide) == pytest.approx(0.8, abs=1e-3) and span(narrow) == pytest.approx(0.4, abs=1e-3)
     assert b.object_preview("chair", "", "no-such-version") is None
+
+
+def test_group_headings_have_a_spanish_form():
+    obj = objects.ObjectDef({**BLOCK, "id": "grouped", "params": [
+        {**BLOCK["params"][0], "group": {"en": "Size", "es": "Tamaño"}},
+        {**BLOCK["params"][1], "group": "Legs"}, BLOCK["params"][2]]}, "office")
+    listed = {p["key"]: p for p in library._param_listing(obj, obj.values())}
+    assert (listed["width"]["group"], listed["width"]["group_es"]) == ("Size", "Tamaño")
+    assert (listed["depth"]["group"], listed["depth"]["group_es"]) == ("Legs", "")   # the app translates it
+    assert (listed["height"]["group"], listed["height"]["group_es"]) == (None, "")
+    with pytest.raises(objects.ObjectError):
+        objects.ObjectDef({**BLOCK, "id": "bad", "params": [{**BLOCK["params"][0], "group": {"es": "Tamaño"}}]}, "office")
+
+
+def test_form_and_symbol_of_a_version_use_its_own_definition(project, tmp_path):
+    folder = tmp_path / "office"
+    folder.mkdir()
+    (folder / "block.kimobj").write_text(json.dumps(BLOCK), encoding="utf-8")
+    library.load_office(str(folder))
+    v = call("save_object_version", "office:block", "Low", json.dumps({"height": 0.3}))
+    newer = {**BLOCK, "params": BLOCK["params"] + [{"key": "top", "kind": "length", "label": "Top", "default": 0.02}]}
+    (folder / "block.kimobj").write_text(json.dumps(newer), encoding="utf-8")
+    library.load_office(str(folder))                          # the library's definition moved on
+    keys = lambda form: [p["key"] for p in form["params"]]  # noqa: E731
+    assert "top" in keys(call("object_form", "office:block", ""))
+    mine = call("object_form", "office:block", "", v["id"])
+    assert "top" not in keys(mine) and mine["values"]["height"] == 0.3
+    assert call("object_form", "office:block", json.dumps({"height": 0.5}), v["id"])["values"]["height"] == 0.5
+    library.load_office()                                     # gone from the library
+    gone = call("object_form", "office:block", "", v["id"])
+    assert keys(gone) == ["width", "depth", "height"] and gone["name"] == "Block"
+    assert call("object_symbol", "office:block", "", v["id"])["width"] == pytest.approx(0.4)
+    assert b.object_preview("office:block", json.dumps({"height": 0.6}), v["id"]) is not None
+    assert call("object_preview_error", "office:block", json.dumps({"width": 0}), v["id"])["ok"] is False
+    assert call("object_form", "office:block", "", "no-such-version")["params"] == []
