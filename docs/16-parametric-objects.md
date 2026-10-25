@@ -84,9 +84,8 @@ Object Editor writes it, so nobody needs to type it by hand.
   as `Param.clean` does today, `count` rounded first.
 - `show_when` hides a parameter whose condition is false (the backrest's settings when the back is *none*). Hidden
   parameters keep their values.
-- `group` (optional) puts parameters under a heading in Properties (*Legs*, *Back*). (Part A stores and lists
-  `group`; the panels show the headings with part B.) Like a label it is text or `{"en": ..., "es": ...}`
-  (D100); plain text is translated by the app when it knows the word (the bundled objects' headings).
+- `group` (optional) puts parameters under a heading in the Object settings dialog (*Legs*, *Back*, D100). Like a
+  label it is text or `{"en": ..., "es": ...}`; plain text is translated by the app when it knows the word (the bundled objects' headings).
 - Parameter labels are unique within an object. An unreadable `choice` or `bool` value in an edit fails the edit;
   it never silently takes the default.
 - `width`, `depth` and `height` keep their meaning: the type name (`Chair 450x520x850`) and the placement preview
@@ -249,11 +248,28 @@ Unchanged from D86 except the geometry:
 
 ## 6. Editing
 
+### Object settings dialog (D100)
+
+One modal dialog places and edits library objects: saved versions on the left, a live 3D preview (with a *Plan*
+toggle) in the middle, the controls on the right, grouped under the `group` headings and hidden by `show_when`.
+A value that breaks the object turns its field red, the preview keeps the last good shape, and *Place* / *Apply*
+stays disabled until it is fixed.
+
+- **Saved versions** are named types in the project that stay when unused, each with a stable id. *Save as...*
+  names the current values; right click a version for Rename, Delete (only when unused) and *Move to library*,
+  which copies it into `<office folder>/kimbim-versions.ifc`. Office versions appear in an *Office* section;
+  placing one copies it into the project once, and that copy follows only the office version for updates.
+  *Update from library* (§5) covers saved versions too.
+- **Placing**: a click in the Library panel or the viewport places the last version used (project setting
+  `object_last_used`; a stale entry means *Default*). In the Object tool a right click opens the quick switcher
+  (versions and *Settings...*), the tool options bar has a *Version* dropdown, and Esc ends the tool.
+- **Editing placed objects**: Properties shows a read-only summary of the *Parameters* group with **Edit...**.
+  Saving asks *modify all N objects of this type* (the type regenerates in place) or *create a new type*.
+
 ### In Properties (every placed object)
 
-The *Parameters* group (D86) shows the new kinds (degrees, check boxes, drop-downs), groups and `show_when`.
-A change works as today: the selected objects move to the type with the new values, or the type regenerates in
-place when the selection is all its placements (D92's scope setting). One undo step.
+The *Parameters* group is a summary (type and up to six parameters, read-only) with **Edit...**, which opens the
+dialog above. D92's edit-scope preference is gone; the save choice replaces it.
 
 ### Object Editor
 

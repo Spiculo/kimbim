@@ -175,6 +175,8 @@ release notes, so check before relying on a single cell.
 | Library browser (thumbnails, search, categories) | all | ✅ | P0 | D86: Library panel |
 | Bundled library: furniture, sanitary, kitchen, lighting, people, trees, cars | all | 🟡 | P0 | D86/D99: 21 objects as `.kimobj`, a material per part (D97); the chair fully customisable; no lighting yet |
 | Place a library object | all | ✅ | P0 | D86: Object tool (Shift+O), Tab turns |
+| Object settings dialog with live preview; place or edit a placed object | AC RV | ✅ | P0 | D100: Library panel right click, Properties *Edit...*; modify all or create a new type |
+| Saved object versions (project types, shared through the office library, quick switcher, last used) | RV | ✅ | P0 | D100: `kimbim-versions.ifc` in the office folder; a click places the last version, a right click in the Object tool switches |
 | Parametric object authoring | AC RV VW | 🟡 | new | D99: `.kimobj` definitions (parameters, formulas, parts, anchors, repeats, variants), stored on their types; Object Editor next. Archicad GDL, Revit Family Editor, Vectorworks plug-in objects. Design: [16](16-parametric-objects.md) |
 | Office libraries (shared folder or repo) | AC RV VW | 🟡 | P1 | D99: a folder of `.kimobj` files and IFC type files |
 | Online object catalogues (BIMobject and others) | AC RV VW | 🔮 | new | |

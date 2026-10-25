@@ -135,8 +135,8 @@ Not yet: checks chosen per project that run when a version is saved and warn or 
 ## After the MVP: full IFC4X3
 New IFC4X3 projects, schema upgrade command, IFC4X3 test suites become release-blocking ([02](02-data-model-and-format.md#ifc-schema-version)).
 
-## Next (2026-10-22)
-In order: finish **M6** (pre-commit checks, the exit above) → **parametric object authoring** ([16](16-parametric-objects.md); part A, the `.kimobj` engine, is done; part B, the Object Editor, is next) → **R4 reconciliation** (re-import with regenerated GlobalIds) → **R3** property-level diff and the speed benchmark → the M2 leftovers. [14](14-tool-inventory.md#largest-gaps) lists the largest remaining tool gaps (DWG, imperial units, curtain walls). The owner's M3 check in Bonsai and a commercial viewer is still open ([12](12-m3-exit.md)).
+## Next (2026-10-25)
+Done since: the Object settings dialog and saved object versions (D100). In order: finish **M6** (pre-commit checks, the exit above) → **parametric object authoring** ([16](16-parametric-objects.md); part A, the `.kimobj` engine, and the settings dialog with saved versions, D100, are done; part B, the Object Editor, is next) → **R4 reconciliation** (re-import with regenerated GlobalIds) → **R3** property-level diff and the speed benchmark → the M2 leftovers. [14](14-tool-inventory.md#largest-gaps) lists the largest remaining tool gaps (DWG, imperial units, curtain walls). The owner's M3 check in Bonsai and a commercial viewer is still open ([12](12-m3-exit.md)).
 
 ## Then
 See [08-future.md](08-future.md). Push/pull to Git remotes is the cheapest next step, because the storage is already Git.
