@@ -62,13 +62,19 @@ class _Syntax:
 
     def __init__(self):
         self.errors: list = []
+        self.names: set = set()  # what a formula in the scope being walked may name: its parameters, i, n, pi
+        self.part_ids: set = set()  # parts of the scope: `seat.top.z` names an anchor of part `seat`
 
     def formula(self, v, path):
         if isinstance(v, str):
             try:
-                compile_formula(v)
+                f = compile_formula(v)
             except FormulaError as ex:
                 self.errors.append({"path": path, "message": str(ex)})
+                return
+            for name in sorted(f.names):  # the loader's message for a name the scope does not have
+                if name not in self.names and not ("." in name and name.split(".")[0] in self.part_ids):
+                    self.errors.append({"path": path, "message": f"unknown name {name!r}"})
         elif isinstance(v, list | tuple):  # a list of numbers (at, step, a vector)
             for k, item in enumerate(v):
                 self.formula(item, f"{path}[{k}]")
@@ -145,15 +151,23 @@ class _Syntax:
                     for f, v in fields.items():
                         (self.points if f == "points" else self.formula)(v, f"{w}.{kind}.{f}")
 
+    def scope(self, params, parts, slots=()):
+        self.names = {"i", "n", "pi", *(f"mat_{k}" for k in slots)}
+        self.names |= {p["key"] for p in params or () if isinstance(p, dict) and isinstance(p.get("key"), str)}             if isinstance(params, list) else set()
+        self.part_ids = {p["id"] for p in parts or () if isinstance(p, dict) and isinstance(p.get("id"), str)}             if isinstance(parts, list) else set()
+
     def draft(self, data):
+        mats = data.get("materials")
+        self.scope(data.get("params"), data.get("parts"), mats if isinstance(mats, dict) else ())
         self.params(data.get("params"), "params")
         self.parts(data.get("parts"), "parts")
+        self.symbol(data.get("symbol"))
         if isinstance(data.get("components"), dict):
             for name, comp in data["components"].items():
                 if isinstance(comp, dict):
+                    self.scope(comp.get("params"), comp.get("parts"))  # a component sees its own parameters only
                     self.params(comp.get("params"), f"components.{name}.params")
                     self.parts(comp.get("parts"), f"components.{name}.parts")
-        self.symbol(data.get("symbol"))
 
 
 def _split(text: str) -> tuple[str, str]:
@@ -165,19 +179,21 @@ def _split(text: str) -> tuple[str, str]:
 def _load(draft_json: str):
     """(definition, errors): the draft loaded with the library's own checks as a project object, or None
     and every problem found (syntax first, then the loader's)."""
+    syntax = _Syntax()
     try:
         data = json.loads(draft_json)
+        if isinstance(data, dict):
+            syntax.draft(data)
     except ValueError as ex:
         return None, [{"path": "", "message": f"not JSON: {ex}"}]
-    syntax = _Syntax()
-    if isinstance(data, dict):
-        syntax.draft(data)
+    except Exception as ex:  # a hostile draft (nested past Python's recursion limit, say)
+        return None, [{"path": "", "message": f"cannot read the draft: {type(ex).__name__}"}]
     errors = syntax.errors
     try:
         return objects.load(data, "project", check=True), errors
     except Exception as ex:  # an ObjectError, or whatever a hand-made draft's odd shapes raise
         path, message = _split(str(ex) if isinstance(ex, ObjectError | ValueError) else f"{type(ex).__name__}: {ex}")
-        if message not in {e["message"] for e in errors}:  # a formula error found above is not said twice
+        if not any(message.startswith(e["message"]) for e in errors):  # a formula error found above is not said twice
             errors.append({"path": path, "message": message})
         return None, errors
 

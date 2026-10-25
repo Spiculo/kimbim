@@ -121,9 +121,7 @@ def test_a_project_object_opens_for_editing(project):
 
 def test_errors_name_their_fields(project):
     chair = _draft("chair")
-    # legs count the circle's legs: at the corners layout nothing evaluates it, so default to the circle
-    chair["params"] = [{**q, "key": "legz"} if q["key"] == "legs" else {**q, "default": "circle"} if q["key"] == "layout" else q
-                       for q in chair["params"]]
+    chair["params"] = [{**q, "key": "legz"} if q["key"] == "legs" else q for q in chair["params"]]
     r = call("check_draft", _text(chair))
     assert not r["ok"]
     assert any(e["path"].startswith("parts.leg") and "unknown name" in e["message"] for e in r["errors"]), r
@@ -182,3 +180,39 @@ def test_a_hostile_draft_fails_fast(project):
     r = call("check_draft", _text(d))
     assert time.time() - t0 < 5 and not r["ok"]
     assert "5000" in " ".join(e["message"] for e in r["errors"])
+
+
+def test_every_bundled_object_checks_ok(project):
+    for path in sorted(library.BUNDLED.glob("*.kimobj")):
+        r = call("check_draft", path.read_text(encoding="utf-8"))
+        assert r["ok"], (path.name, r["errors"])
+
+
+def test_unknown_names_in_branches_not_taken(project):
+    d = _draft("new")
+    d["parts"][0]["when"] = "nothing > 1"
+    d["params"].append({"key": "c", "kind": "bool", "label": "C", "default": False, "show_when": "gone"})
+    d["components"] = {"box2": {"params": [{"key": "s", "kind": "length", "label": "S", "default": 0.1}],
+                               "parts": [{"id": "p", "box": {"dx": "s", "dy": "width", "dz": "s"}}]}}
+    d["symbol"] = [{"rect": {"x": 0, "y": 0, "dx": "wdth", "dy": "depth"}}]
+    r = call("check_draft", _text(d))
+    got = {(e["path"], e["message"]) for e in r["errors"]}
+    assert ("parts.body.when", "unknown name 'nothing'") in got
+    assert ("params[3].show_when", "unknown name 'gone'") in got
+    assert ("components.box2.parts.p.box.dy", "unknown name 'width'") in got
+    assert ("symbol[0].rect.dx", "unknown name 'wdth'") in got
+    d = _draft("new")  # part anchors and material slots are names too
+    d["parts"].append({"id": "lid", "box": {"z": "body.top.z", "dx": "width", "dy": "depth", "dz": "i + n + pi"}})
+    assert call("check_draft", _text(d))["ok"]
+
+
+def test_a_hostile_draft_never_raises(project):
+    assert call("check_draft", "[" * 100000)["ok"] is False
+    d = _draft("new")
+    nested = 1
+    for _ in range(2000):
+        nested = [nested]
+    d["parts"][0]["box"]["dx"] = nested
+    r = call("check_draft", _text(d))
+    assert r["ok"] is False and r["errors"]
+    assert call("draft_form", "[" * 100000, "{}")["ok"] is False
