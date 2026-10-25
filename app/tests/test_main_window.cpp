@@ -367,7 +367,9 @@ private slots:
         QVERIFY(w.chooseObject(QStringLiteral("chair"), {}));
         QVERIFY(w.applyFavourite(QStringLiteral("Long table")));
         QCOMPARE(w.libraryPanel()->currentObject(), QStringLiteral("table"));
-        QCOMPARE(w.libraryPanel()->currentParams().value("width").toDouble(), 2.2);
+        QVERIFY(w.currentObjectVersion().isEmpty()); // D100: its Custom values, remembered as the last used
+        QCOMPARE(w.projectSettings().value("object_last_used").toObject().value("table").toObject()
+                     .value("values").toObject().value("width").toDouble(), 2.2);
         w.setTool(kimbim::MainWindow::Tool::None);
         QVERIFY(w.close());
     }

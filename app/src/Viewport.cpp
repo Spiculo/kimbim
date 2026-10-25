@@ -1965,7 +1965,10 @@ void Viewport::mousePressEvent(QMouseEvent* e)
     }
     if (m_drawingMode && (e->button() == Qt::LeftButton || e->button() == Qt::RightButton)) {
         if (e->button() == Qt::RightButton) {
-            emit drawingEnded();
+            if (m_rightClickMenu)
+                emit drawingContextRequested(e->globalPosition().toPoint());
+            else
+                emit drawingEnded();
             return;
         }
         QPointF p;

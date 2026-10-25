@@ -121,6 +121,10 @@ public:
     void setDrawingMode(bool on, double workPlaneZ = 0.0);
     void setWorkPlaneZ(double z) { m_workZ = z; }
     bool isDrawingMode() const { return m_drawingMode; }
+    // D100: while drawing, a right click asks for a context menu (drawingContextRequested) instead of
+    // ending (drawingEnded); Esc still ends. Off by default (the Object tool's quick switcher).
+    void setRightClickMenu(bool on) { m_rightClickMenu = on; }
+    bool rightClickMenu() const { return m_rightClickMenu; }
     // Rubber-band wall preview: a box along p1-p2 (plan metres); nullopt hides it.
     // `offset`: the body's centre to the left of the drawn line (D97: the reference line location).
     void setWallPreview(const std::optional<std::pair<QPointF, QPointF>>& axis, double thickness, double height,
@@ -366,6 +370,7 @@ signals:
     void workPointMoved(QPointF point, double tolerance, Qt::KeyboardModifiers modifiers);
     void workPointClicked(QPointF point, double tolerance, Qt::KeyboardModifiers modifiers);
     void drawingEnded();      // Esc or right click: cancel / stop
+    void drawingContextRequested(const QPoint& globalPos); // a right click with setRightClickMenu
     void drawingConfirmed();  // Enter or double click: finish the current shape
     void lengthKeyTyped(const QString& text);
     // The mouse rested on an element ("" when it left it): the app shows a hint.
@@ -428,6 +433,7 @@ private:
     QString guidOfId(int id) const; // empty if not a live element
     QSet<QString> selectedSet() const;
     bool m_drawingMode = false;
+    bool m_rightClickMenu = false;
     QTimer* m_hoverTimer = nullptr;
     bool m_dragCandidate = false;
     bool m_dragging = false;

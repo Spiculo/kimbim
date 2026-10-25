@@ -1739,6 +1739,13 @@ ES = {
     "Rename version": "Renombrar versión",
     "Share this version with every project through the office library": "Comparte esta versión con todos los proyectos a través de la biblioteca de la oficina",
     "Set the office library folder in the preferences first": "Primero defina la carpeta de la biblioteca de la oficina en las preferencias",
+    # D100: placing: the last version used, the quick switcher and the Version dropdown
+    "Click an object to place it; right-click for its settings and saved versions":
+        "Haga clic en un objeto para colocarlo; clic derecho para su configuración y versiones guardadas",
+    "Custom": "Personalizada",
+    "Settings...": "Configuración...",
+    "Version: what a click places (right-click in the view to switch it while placing)":
+        "Versión: lo que coloca un clic (clic derecho en la vista para cambiarla mientras coloca)",
 }
 
 # Words that mean something else in another context ("Back" is the view cube's "Posterior"): by

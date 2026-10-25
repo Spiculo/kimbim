@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "LibraryPanel.h"
 
-#include "ObjectSettingsDialog.h"
 #include "Translations.h"
 
 #include <QCoreApplication>
 #include <QHBoxLayout>
 #include <QHeaderView>
-#include <QLabel>
 #include <QLineEdit>
 #include <QPainter>
 #include <QPainterPath>
@@ -97,19 +95,9 @@ LibraryPanel::LibraryPanel(QWidget* parent)
     m_tree->setObjectName(QStringLiteral("libraryTree"));
     m_tree->setHeaderHidden(true);
     m_tree->setIconSize(QSize(36, 36));
-    layout->addWidget(m_tree, 3);
-    m_title = new QLabel(this);
-    m_title->setObjectName(QStringLiteral("libraryTitle"));
-    QFont bold = m_title->font();
-    bold.setBold(true);
-    m_title->setFont(bold);
-    layout->addWidget(m_title);
-    m_form = new ParameterForm(this);
-    layout->addWidget(m_form);
-    auto* place = new QPushButton(tr("Place"), this);
-    place->setObjectName(QStringLiteral("libraryPlace"));
-    place->setToolTip(tr("Click in the view to place the object; Tab turns it 90 degrees, a typed number sets its angle"));
-    layout->addWidget(place);
+    m_tree->setContextMenuPolicy(Qt::CustomContextMenu);
+    m_tree->setToolTip(tr("Click an object to place it; right-click for its settings and saved versions"));
+    layout->addWidget(m_tree, 1);
     auto* row = new QHBoxLayout;
     auto* office = new QPushButton(tr("Office library..."), this);
     office->setObjectName(QStringLiteral("libraryOffice"));
@@ -122,28 +110,28 @@ LibraryPanel::LibraryPanel(QWidget* parent)
     layout->addLayout(row);
 
     connect(m_search, &QLineEdit::textChanged, this, &LibraryPanel::setFilter);
-    connect(m_form, &ParameterForm::changed, this, [this] {
-        m_params = m_form->values();
-        emit currentChanged();
-    });
     connect(m_tree, &QTreeWidget::currentItemChanged, this, [this](QTreeWidgetItem* item) {
         const QString id = item ? item->data(0, IdRole).toString() : QString();
         if (id.isEmpty() || id == m_current)
             return;
         m_current = id;
-        m_params = QJsonObject();
-        for (const auto& p : m_objects.value(id).value("params").toArray())
-            m_params.insert(p.toObject().value("key").toString(), p.toObject().value("value"));
-        showParams();
         emit currentChanged();
     });
-    connect(m_tree, &QTreeWidget::itemDoubleClicked, this, [this](QTreeWidgetItem* item) {
-        if (!item->data(0, IdRole).toString().isEmpty())
-            emit placeRequested();
-    });
-    connect(place, &QPushButton::clicked, this, [this] {
-        if (!m_current.isEmpty())
-            emit placeRequested();
+    const auto place = [this](QTreeWidgetItem* item) {
+        if (!item || item->data(0, IdRole).toString().isEmpty())
+            return;
+        m_tree->setCurrentItem(item);
+        emit placeRequested();
+    };
+    connect(m_tree, &QTreeWidget::itemClicked, this, place);
+    connect(m_tree, &QTreeWidget::itemActivated, this, place); // Enter
+    connect(m_tree, &QTreeWidget::customContextMenuRequested, this, [this](const QPoint& pos) {
+        QTreeWidgetItem* item = m_tree->itemAt(pos);
+        const QString id = item ? item->data(0, IdRole).toString() : QString();
+        if (id.isEmpty())
+            return;
+        m_tree->setCurrentItem(item);
+        emit settingsRequested(id);
     });
     connect(office, &QPushButton::clicked, this, &LibraryPanel::officeLibraryRequested);
     connect(ifc, &QPushButton::clicked, this, &LibraryPanel::ifcLibraryRequested);
@@ -170,7 +158,7 @@ void LibraryPanel::setListing(const QJsonObject& listing)
             parent = categories.value(QStringLiteral("office"));
         if (!parent)
             continue;
-        auto* item = new QTreeWidgetItem(parent, {translated(o.value("name").toString(), o.value("name_es").toString())});
+        auto* item = new QTreeWidgetItem(parent, {entryText(id)});
         item->setData(0, IdRole, id);
         item->setToolTip(0, o.value("ifc_class").toString());
         if (!m_icons.contains(id)) // drawn once per object (default sizes), not on every refresh
@@ -183,13 +171,47 @@ void LibraryPanel::setListing(const QJsonObject& listing)
     }
     setFilter(m_search->text());
     if (!keep.isEmpty() && m_objects.contains(keep)) {
-        const QJsonObject params = m_params;
+        const QSignalBlocker block(this); // the same object: no change
         m_current.clear();
         selectObject(keep);
-        for (auto it = params.begin(); it != params.end(); ++it)
-            m_params.insert(it.key(), it.value());
-        showParams();
+    } else if (!keep.isEmpty()) {
+        m_current.clear(); // gone from the library
+        emit currentChanged();
     }
+}
+
+QStringList LibraryPanel::objectIds() const
+{
+    return m_objects.keys();
+}
+
+QTreeWidgetItem* LibraryPanel::itemOf(const QString& id) const
+{
+    for (int i = 0; i < m_tree->topLevelItemCount(); ++i) {
+        QTreeWidgetItem* category = m_tree->topLevelItem(i);
+        for (int j = 0; j < category->childCount(); ++j)
+            if (category->child(j)->data(0, IdRole).toString() == id)
+                return category->child(j);
+    }
+    return nullptr;
+}
+
+QString LibraryPanel::entryText(const QString& id) const
+{
+    const QJsonObject o = m_objects.value(id);
+    const QString name = translated(o.value("name").toString(), o.value("name_es").toString());
+    const QString label = m_labels.value(id);
+    return label.isEmpty() ? name : name + QStringLiteral(" · ") + label;
+}
+
+void LibraryPanel::setVersionLabel(const QString& id, const QString& label)
+{
+    if (label.isEmpty())
+        m_labels.remove(id);
+    else
+        m_labels.insert(id, label);
+    if (QTreeWidgetItem* item = itemOf(id))
+        item->setText(0, entryText(id));
 }
 
 void LibraryPanel::setFilter(const QString& text)
@@ -223,15 +245,11 @@ int LibraryPanel::visibleObjectCount() const
 
 bool LibraryPanel::selectObject(const QString& id)
 {
-    for (int i = 0; i < m_tree->topLevelItemCount(); ++i) {
-        QTreeWidgetItem* category = m_tree->topLevelItem(i);
-        for (int j = 0; j < category->childCount(); ++j)
-            if (category->child(j)->data(0, IdRole).toString() == id) {
-                m_tree->setCurrentItem(category->child(j));
-                return true;
-            }
-    }
-    return false;
+    QTreeWidgetItem* item = itemOf(id);
+    if (!item)
+        return false;
+    m_tree->setCurrentItem(item);
+    return true;
 }
 
 QString LibraryPanel::currentName() const
@@ -240,34 +258,15 @@ QString LibraryPanel::currentName() const
     return translated(o.value("name").toString(), o.value("name_es").toString());
 }
 
-QJsonObject LibraryPanel::currentParams() const
-{
-    return m_params;
-}
-
-QJsonObject LibraryPanel::currentInfo() const
+QJsonObject LibraryPanel::currentInfo(const QJsonObject& values) const
 {
     QJsonObject info = m_objects.value(m_current);
     for (const char* key : {"width", "depth", "height"})
-        if (m_params.contains(QLatin1String(key)))
-            info.insert(QLatin1String(key), m_params.value(QLatin1String(key)));
-    if (!m_params.contains(QStringLiteral("depth")) && m_params.contains(QStringLiteral("width")))
-        info.insert(QStringLiteral("depth"), m_params.value(QStringLiteral("width"))); // round (a tree's crown)
+        if (values.contains(QLatin1String(key)))
+            info.insert(QLatin1String(key), values.value(QLatin1String(key)));
+    if (!values.contains(QStringLiteral("depth")) && values.contains(QStringLiteral("width")))
+        info.insert(QStringLiteral("depth"), values.value(QStringLiteral("width"))); // round (a tree's crown)
     return info;
-}
-
-void LibraryPanel::setParam(const QString& key, const QJsonValue& value)
-{
-    m_params.insert(key, value);
-    showParams();
-}
-
-void LibraryPanel::showParams()
-{
-    const QJsonObject o = m_objects.value(m_current);
-    m_title->setText(o.isEmpty() ? QString() : translated(o.value("name").toString(), o.value("name_es").toString()));
-    m_form->setObject(o.isEmpty() ? QString() : m_current, m_params);
-    m_params = m_form->values();
 }
 
 } // namespace kimbim

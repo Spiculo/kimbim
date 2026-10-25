@@ -2394,6 +2394,17 @@ void MainWindow::buildModelingToolbar()
     m_objectFit->setToolTip(tr("Near a wall, the object turns its back to the wall and stands against it"));
     m_objectFit->setChecked(true);
     bar->addField(m_objectFit);
+    // D100: the version a click places (the same list as the quick switcher, a right click while placing).
+    m_objectVersionCombo = new QComboBox(bar);
+    m_objectVersionCombo->setObjectName(QStringLiteral("objectVersionCombo"));
+    m_objectVersionCombo->setToolTip(tr("Version: what a click places (right-click in the view to switch it while placing)"));
+    m_objectVersionCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    connect(m_objectVersionCombo, &QComboBox::currentIndexChanged, this, [this](int i) {
+        const QString id = m_objectVersionCombo->itemData(i).toString();
+        if (m_library && !m_library->currentObject().isEmpty() && id != QLatin1String("#custom"))
+            setObjectVersion(m_library->currentObject(), id);
+    });
+    bar->addField(m_objectVersionCombo);
     m_roofKind = new QComboBox(bar);
     m_roofKind->setObjectName(QStringLiteral("roofKind"));
     m_roofKind->addItem(tr("Flat"), QStringLiteral("flat"));
@@ -2708,6 +2719,21 @@ void MainWindow::buildModelingToolbar()
         case Tool::None:
             break;
         }
+    }); });
+    // D100: while placing an object, a right click opens the quick switcher (its versions, Settings...).
+    onEachView([this](Viewport* v) { connect(v, &Viewport::drawingContextRequested, this, [this](const QPoint& at) {
+        if (m_tool != Tool::Object)
+            return;
+        auto* menu = new QMenu(this);
+        menu->setObjectName(QStringLiteral("objectVersionMenu"));
+        menu->setAttribute(Qt::WA_DeleteOnClose);
+        fillObjectVersionMenu(menu);
+        if (menu->isEmpty()) { // no object picked yet
+            delete menu;
+            setTool(Tool::None);
+            return;
+        }
+        menu->popup(at);
     }); });
     onEachView([this](Viewport* v) { connect(v, &Viewport::drawingEnded, this, [this] {
         // Esc / right click: stop the current shape, or leave the tool when nothing is in progress.
@@ -3052,6 +3078,8 @@ void MainWindow::setTool(Tool tool)
     m_objectHover.reset();
     m_annotationPoints.clear();
     m_tool = tool;
+    if (m_viewport)
+        m_viewport->setRightClickMenu(tool == Tool::Object); // D100: the quick switcher, not the end
     m_measureCopy->setVisible(tool == Tool::Measure);
     startModifyTool(tool); // D80: its mode list in the options bar
     startDraftTool(tool);  // D84: line type, arc mode, fill pattern
@@ -3067,6 +3095,7 @@ void MainWindow::setTool(Tool tool)
     m_wallGeometry->setVisible(tool == Tool::Wall);
     m_objectGravity->setVisible(tool == Tool::Object);
     m_objectFit->setVisible(tool == Tool::Object);
+    m_objectVersionCombo->setVisible(tool == Tool::Object);
     m_favourites->setVisible(!favouriteTool(tool).isEmpty());
     if (tool == Tool::Wall) {
         const int i = m_wallReference->findData(m_settings.value("wall_reference_line").toString(QStringLiteral("Outside face")));
@@ -3157,6 +3186,7 @@ void MainWindow::setTool(Tool tool)
         break;
     case Tool::Object:
         refreshLibrary();
+        showObjectVersion();
         m_status->showMessage(tr("Object: click where it goes (Tab: turn 90 degrees, type an angle + Enter; Shift: turned for this click)"));
         break;
     case Tool::Stair:
@@ -6206,8 +6236,9 @@ QJsonObject MainWindow::captureToolSettings() const
     QJsonObject fields;
     for (QWidget* w : m_toolOptions->findChildren<QWidget*>()) {
         const QString name = w->objectName();
-        if (name.isEmpty() || name == QLatin1String("favouritesButton") || !w->isVisibleTo(m_toolOptions))
-            continue;
+        if (name.isEmpty() || name == QLatin1String("favouritesButton") || name == QLatin1String("objectVersionCombo")
+            || !w->isVisibleTo(m_toolOptions))
+            continue; // (the object's version goes with the object, below)
         if (auto* combo = qobject_cast<QComboBox*>(w)) {
             // types by name (their ids are the project's); other choices by their key, else their text
             const QVariant data = combo->currentData();
@@ -6222,8 +6253,9 @@ QJsonObject MainWindow::captureToolSettings() const
         }
     }
     QJsonObject out{{"tool", favouriteTool(m_tool)}, {"fields", fields}};
-    if (m_tool == Tool::Object && m_library && !m_library->currentObject().isEmpty())
-        out.insert("object", QJsonObject{{"id", m_library->currentObject()}, {"params", m_library->currentParams()}});
+    if (m_tool == Tool::Object && m_library && !m_library->currentObject().isEmpty()) // D100: its version, or Custom
+        out.insert("object", QJsonObject{{"id", m_library->currentObject()}, {"version", currentObjectVersion()},
+            {"params", m_objectCustom ? m_objectValues : QJsonObject()}});
     return out;
 }
 
@@ -6239,11 +6271,10 @@ bool MainWindow::applyToolSettings(const QJsonObject& favourite)
         return false;
     if (tool == Tool::Object) { // the object first: choosing it starts the tool
         const QJsonObject o = favourite.value("object").toObject();
-        if (!chooseObject(o.value("id").toString(), {}))
+        if (!chooseObject(o.value("id").toString(), o.value("params").toObject()))
             return false;
-        const QJsonObject params = o.value("params").toObject();
-        for (auto it = params.begin(); it != params.end(); ++it)
-            m_library->setParam(it.key(), it.value());
+        if (!o.value("version").toString().isEmpty())
+            setObjectVersion(o.value("id").toString(), o.value("version").toString());
     } else if (m_tool != tool) {
         setTool(tool);
     }
@@ -6793,6 +6824,10 @@ void MainWindow::loadProjectSettings()
     m_cutHeight->setValue(m_settings.value("plan_cut_height").toDouble(1.2));
     m_cutLabel->setText(formatLength(m_cutHeight->value()));
     applySun(); // D96: the project's sun
+    if (m_library) { // D100: this project's last used versions
+        refreshObjectLabels();
+        loadObjectVersion();
+    }
     if (m_draftTool) { // D92: typed lengths (and a rectangle's width;height) in the project unit
         const QString unit = m_settings.value("length_unit").toString(QStringLiteral("m"));
         const double intoMetres = unit == QLatin1String("mm") ? 0.001 : unit == QLatin1String("cm") ? 0.01 : 1.0;

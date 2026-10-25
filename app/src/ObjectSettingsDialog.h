@@ -24,7 +24,7 @@ class Viewport;
 // One control per parameter of a library object (D99): lengths, angles, counts, on/off, choices and
 // building materials, under the definition's group headings, each named `param_<key>`. Python makes
 // the form (object_form): limits that are formulas and show_when depend on the current values, so a
-// choice or an on/off rebuilds it (queued). Used by the Object settings dialog and the Library panel.
+// choice or an on/off rebuilds it (queued). Used by the Object settings dialog.
 class ParameterForm : public QWidget {
     Q_OBJECT
 public:

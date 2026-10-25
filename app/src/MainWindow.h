@@ -434,12 +434,25 @@ public:
     bool deleteSelectionSet(const QString& name);
     FindSelectPanel* findSelectPanel(); // created and docked on first use
     // D86: the object library (LibraryTools.cpp). The Library panel (docked on first use) picks the
-    // object and its parameters; the Object tool places it on the active level where you click,
-    // turned by the object angle (Tab: +90 degrees, a typed number: that angle; Shift+click: +90
-    // for that click). One undo step per object; the status for new elements and the active layer.
+    // object; the Object tool places it on the active level where you click, turned by the object
+    // angle (Tab: +90 degrees, a typed number: that angle; Shift+click: +90 for that click). One undo
+    // step per object; the status for new elements and the active layer.
     LibraryPanel* libraryPanel();
-    bool chooseObject(const QString& id, const QJsonObject& params = {}); // and start the Object tool
+    // The object with these unsaved values (D100: "Custom"; none: its Default), and start the tool.
+    bool chooseObject(const QString& id, const QJsonObject& params = {});
     bool placeObjectAt(QPointF p, bool turned = false);
+    // D100: what a click places: each object's current version, the last one used in this project
+    // (object_versions' "last"), shown in the Library panel, the Version dropdown of the tool options
+    // and the quick switcher (a right click while placing). currentObjectVersion: the current
+    // object's saved (or office) version id, "" for its Default or Custom values. setObjectVersion
+    // makes `key` the current object with that version (or, with `customValues`, Custom) and
+    // remembers it as the last used; it does not start the tool.
+    QString currentObjectVersion() const { return m_objectCustom ? QString() : m_objectVersion; }
+    void setObjectVersion(const QString& key, const QString& versionId, const QJsonObject& customValues = {});
+    void fillObjectVersionMenu(QMenu* menu); // Default, Custom, the project's, the office's, Settings...
+    // The Object settings dialog for placing `key` (its current version selected); Place starts the
+    // Object tool with what the dialog shows. False if cancelled.
+    bool objectSettingsDialog(const QString& key);
     struct ObjectFit {
         QPointF origin; // the object's left front corner
         double angle = 0.0; // degrees
@@ -637,6 +650,18 @@ private:
     QAction* m_objectTurn = nullptr; // Tab while the Object tool is active
     double m_objectAngle = 0.0;
     std::optional<QPointF> m_objectHover;
+    // D100: the current object's version: its id (or "" for the Default), or Custom values; the values
+    // (sizes for the preview) and object_versions' reply for the current object.
+    QString m_objectVersion;
+    bool m_objectCustom = false;
+    QJsonObject m_objectValues;
+    QJsonObject m_objectVersions;
+    QComboBox* m_objectVersionCombo = nullptr; // D100: the Object tool's Version dropdown
+    void loadObjectVersion();   // the current object's last used (object_versions)
+    void showObjectVersion();   // into the panel label and the Version dropdown
+    void refreshObjectLabels(); // every listed object's current version in the panel
+    QString objectVersionName(const QJsonObject& last, const QJsonArray& versions) const;
+    QJsonObject versionEntry(const QString& id) const; // of the current object (an office copy too)
     bool m_libraryPathsSent = false;
     void refreshChecks(); // D81
     ChecksPanel* m_checks = nullptr;
