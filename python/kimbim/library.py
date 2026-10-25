@@ -1013,15 +1013,32 @@ def set_object_parameter(guids_json: str, name: str, value, scope: str = "") -> 
     return B._dump(r)
 
 
+def _kept_values(obj, values: dict, current) -> dict:
+    """`values` (of definition `obj`) for definition `current`: every value whose key and kind still exist
+    is kept, the rest take `current`'s defaults. Not built: the caller checks they build."""
+    kinds = {p.key: p.kind for p in current.params}
+    kept = {k: v for k, v in values.items() if k in kinds and obj.param(k) is not None and kinds[k] == obj.param(k).kind}
+    return current.values(kept)
+
+
 def _outdated(elements) -> list:
     """[(element, project definition, values, type, library definition)] whose library has another version
-    (its text or the text of an object it uses differs: the DefinitionHash)."""
-    out = []
+    (its text or the text of an object it uses differs: the DefinitionHash). A placement of a saved version
+    (D100) is outdated when its type is (objversions.outdated_versions)."""
+    from . import objversions
+
+    out, saved = [], {}
     for e in elements:
         found = _object_of(e)
         if found is None:
             continue
         obj, values, t = found
+        if objversions.is_saved(t):
+            if t.id() not in saved:
+                saved[t.id()] = objversions._outdated_version(t)
+            if saved[t.id()] is not None:
+                out.append((e, obj, values, t, saved[t.id()][3]))
+            continue
         current = get(obj.ref)
         if isinstance(current, objects.ObjectDef) and _hash_of(current) != _hash_of(obj):
             out.append((e, obj, values, t, current))
@@ -1036,35 +1053,59 @@ def _targets(guids_json: str):
     return B._elements(guids_json)
 
 
+def _outdated_versions_of(guids_json: str) -> list:
+    """objversions.outdated_versions of every saved version (given "", used or not), or of the types of
+    these elements."""
+    import ifcopenshell.util.element
+
+    from . import app_bridge as B
+    from . import objversions
+
+    if guids_json in ("", "[]"):
+        return objversions.outdated_versions()
+    types = {t.id(): t for e in B._elements(guids_json) if (t := ifcopenshell.util.element.get_type(e)) is not None}
+    return objversions.outdated_versions(list(types.values()))
+
+
 def library_updates(guids_json: str = "") -> str:
-    """How many of these placed objects (all, given "") have a newer definition in the library (D99)."""
+    """How many of these placed objects (all, given "") have a newer definition in the library (D99), and
+    how many saved versions (D100: every one, used or not, given ""; else the selection's) are outdated."""
     from . import app_bridge as B
     from . import authoring as A
 
     if B._model is None:
         return A._fail("no model open")
-    return B._dump({"ok": True, "outdated": len(_outdated(_targets(guids_json)))})
+    return B._dump({"ok": True, "outdated": len(_outdated(_targets(guids_json))),
+                    "versions": len(_outdated_versions_of(guids_json))})
 
 
 def update_from_library(guids_json: str = "") -> str:
     """Regenerate these placed objects (all, given "") from the library's definition, keeping every
-    parameter value whose key and kind still exist. One undo step."""
+    parameter value whose key and kind still exist. Outdated saved versions (D100: every one given "", else
+    the selection's) regenerate in place, keeping their GlobalId, name and VersionId; every placement
+    follows. One undo step."""
     import ifcopenshell.api.type
+    import ifcopenshell.util.element
 
     from . import app_bridge as B
     from . import authoring as A
+    from . import objversions
 
     if B._model is None:
         return A._fail("no model open")
-    todo = _outdated(_targets(guids_json))
-    if not todo:
+    versions = _outdated_versions_of(guids_json)
+    todo = [x for x in _outdated(_targets(guids_json)) if not objversions.is_saved(x[3])]
+    if not todo and not versions:
         return A._fail("these objects already match the library")
+    for t, _, _, current, new_values in versions:
+        try:
+            current.shape(new_values)
+        except (ObjectError, ValueError) as ex:
+            return A._fail(f"{t.Name}: {ex}")
     groups: dict = {}
     for e, obj, values, t, current in todo:
-        kinds = {p.key: p.kind for p in current.params}
-        kept = {k: v for k, v in values.items() if k in kinds and obj.param(k) is not None and kinds[k] == obj.param(k).kind}
         try:
-            new_values = current.values(kept)
+            new_values = _kept_values(obj, values, current)
             current.shape(new_values)
         except (ObjectError, ValueError) as ex:
             return A._fail(f"{current.name}: {ex}")
@@ -1073,6 +1114,9 @@ def update_from_library(guids_json: str = "") -> str:
 
     def action():
         changed = []
+        for t, _, _, current, new_values in versions:
+            _regenerate_type(t, current, new_values)  # keeps the name and the version fields
+            changed += [e.GlobalId for e in ifcopenshell.util.element.get_types(t)]
         for t, current, new_values, elements in groups.values():
             target = _type_for(current, new_values)
             ifcopenshell.api.type.assign_type(B._model, related_objects=elements, relating_type=target)

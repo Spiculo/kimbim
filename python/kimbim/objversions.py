@@ -114,6 +114,43 @@ def _definition(key: str):
     return None
 
 
+def _outdated_version(t):
+    """(type, definition, values, current definition, new values) when saved version `t` is outdated
+    (D100), else None:
+    - a copy of an office version (its VersionId is in the office library) follows that office version:
+      outdated when the office version's values or definition (DefinitionHash) differ from the copy's; the
+      new values are the office version's. Only the office version, never the live definition too: the two
+      could disagree and the copy would never settle;
+    - any other follows its object's live definition (bundled or office .kimobj): outdated when its
+      DefinitionHash differs; values are kept as for unsaved placements (library._kept_values).
+    The new values are not built: update_from_library checks they build."""
+    data = _pset(t)
+    obj = library.definition_of_type(t)
+    info = library._params_of_type(t)
+    if obj is None or info is None or not data.get(VERSION_ID):
+        return None
+    values = obj.values(info[1])
+    entry = library._office_versions.get(data[VERSION_ID])
+    if entry is not None and entry["object"] == info[0]:
+        if entry["values"] == info[1] and entry["hash"] == (data.get("DefinitionHash") or ""):
+            return None
+        current = library.office_definition(entry)
+        if current is None:
+            return None  # the office file went or changed since it loaded: nothing to follow
+        return t, obj, values, current, current.values(entry["values"])
+    current = library.get(info[0])
+    if not isinstance(current, objects.ObjectDef) or library._hash_of(current) == library._hash_of(obj):
+        return None
+    return t, obj, values, current, library._kept_values(obj, values, current)
+
+
+def outdated_versions(types=None) -> list:
+    """[(type, definition, values, current definition, new values)] of the project's outdated saved versions
+    (_outdated_version), used or not; only those among `types` when given."""
+    candidates = _saved_types() if types is None else [t for t in types if is_saved(t)]
+    return [x for t in sorted(candidates, key=lambda t: t.id()) if (x := _outdated_version(t)) is not None]
+
+
 def _clean_name(name) -> tuple[str, str | None]:
     """(stripped name, error or None)."""
     text = str(name or "").strip()

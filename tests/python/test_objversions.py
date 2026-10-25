@@ -412,3 +412,90 @@ def test_move_to_library_when_the_file_cannot_be_written(project, tmp_path):  # 
     assert r["ok"] is False and "cannot write" in r["error"]
     assert not (tmp_path / "kimbim-versions.ifc.tmp").exists() and not library._office_versions
     assert call("object_versions", "chair")["versions"][0]["source"] == "project"
+
+
+# ---------------------------------------------------------------- Update from library (Task 4)
+
+def _ps(guid):
+    return ifcopenshell.util.element.get_pset(b._model.by_guid(guid), library.PSET)
+
+
+def test_an_outdated_saved_version_updates_in_place(project, tmp_path):
+    folder = tmp_path / "office"
+    folder.mkdir()
+    (folder / "block.kimobj").write_text(json.dumps(BLOCK), encoding="utf-8")
+    library.load_office(str(folder))
+    x1 = call("save_object_version", "office:block", "X1", json.dumps({"width": 0.5}))           # unused
+    x2 = call("save_object_version", "office:block", "X2", json.dumps({"height": 0.7}))          # placed
+    loose = call("place_object", project, "office:block", "", 2, 0, 0)                            # unsaved
+    p = call("place_object", project, "office:block", "", 0, 0, 0, "", x2["id"])
+    assert call("library_updates", "") == {"ok": True, "outdated": 0, "versions": 0}
+    v2 = json.loads(json.dumps(BLOCK))
+    v2["params"][0]["default"] = 0.6                     # the office edits its block
+    (folder / "block.kimobj").write_text(json.dumps(v2), encoding="utf-8")
+    library.load_office(str(folder))
+    u = call("library_updates", "")
+    assert u["ok"] and u["versions"] == 2 and u["outdated"] == 2   # both placements count, as today
+    assert call("library_updates", json.dumps([p["guid"]]))["versions"] == 1   # only the selection's types
+    r = call("update_from_library", "")
+    assert r["ok"], r
+    assert set(r["geometry"]["changed"]) >= {p["guid"], loose["guid"]}
+    new_hash = library._hash_of(library.get("office:block"))
+    for v, name, values in ((x1, "X1", {"width": 0.5}), (x2, "X2", {"height": 0.7})):
+        t = b._model.by_guid(v["type"])                  # same GlobalId
+        ps = _ps(v["type"])
+        assert t.Name == name and ps[objversions.VERSION_ID] == v["id"] and ps[objversions.VERSION_NAME] == name
+        assert ps["DefinitionHash"] == new_hash
+        assert all(json.loads(ps["Parameters"])[k] == pytest.approx(x) for k, x in values.items())
+    assert ifcopenshell.util.element.get_type(b._model.by_guid(p["guid"])).GlobalId == x2["type"]
+    assert _ps(ifcopenshell.util.element.get_type(b._model.by_guid(loose["guid"])).GlobalId)["DefinitionHash"] == new_hash
+    assert call("library_updates", "") == {"ok": True, "outdated": 0, "versions": 0}
+    assert not call("update_from_library", "")["ok"]
+    assert call("undo")["ok"]                            # one step
+    assert call("library_updates", "") == {"ok": True, "outdated": 2, "versions": 2}
+    assert not validate(b._model)
+
+
+def test_a_selection_updates_only_its_types(project, tmp_path):
+    folder = tmp_path / "office"
+    folder.mkdir()
+    (folder / "block.kimobj").write_text(json.dumps(BLOCK), encoding="utf-8")
+    library.load_office(str(folder))
+    x1 = call("save_object_version", "office:block", "X1", "")
+    x2 = call("save_object_version", "office:block", "X2", json.dumps({"height": 0.7}))
+    p = call("place_object", project, "office:block", "", 0, 0, 0, "", x2["id"])
+    v2 = json.loads(json.dumps(BLOCK))
+    v2["params"][0]["default"] = 0.6
+    (folder / "block.kimobj").write_text(json.dumps(v2), encoding="utf-8")
+    library.load_office(str(folder))
+    assert call("update_from_library", json.dumps([p["guid"]]))["ok"]
+    assert call("library_updates", "")["versions"] == 1          # X1 is still outdated
+    assert _ps(x1["type"])["DefinitionHash"] != _ps(x2["type"])["DefinitionHash"]
+
+
+def test_an_office_copy_follows_its_office_version(project, tmp_path):
+    library.load_office(str(tmp_path))
+    v = call("save_object_version", "chair", "Café", "")
+    assert call("move_version_to_library", v["id"])["ok"]
+    assert call("library_updates", "")["versions"] == 0          # the original matches the office
+    assert call("new_project", "Copying")["ok"]
+    storey = call("storeys")["storeys"][0]["guid"]
+    p = call("place_object", storey, "chair", "", 0, 0, 0, "", v["id"])
+    assert call("library_updates", "")["versions"] == 0
+    copying = tmp_path / "copying.ifc"
+    assert call("save", str(copying))["ok"]
+    # a third project's "Café" (the same id) gets width 0.6 and replaces the office version
+    assert call("new_project", "Third")["ok"]
+    storey = call("storeys")["storeys"][0]["guid"]
+    q = call("place_object", storey, "chair", "", 0, 0, 0, "", v["id"])
+    assert call("apply_object_settings", json.dumps([q["guid"]]), json.dumps({"width": 0.6}), "all")["ok"]
+    assert call("move_version_to_library", v["id"], "1")["ok"]
+    assert call("open_model", str(copying))["ok"]
+    u = call("library_updates", "")
+    assert u["versions"] == 1 and u["outdated"] == 1
+    assert call("update_from_library", "")["ok"]
+    t = ifcopenshell.util.element.get_type(b._model.by_guid(p["guid"]))
+    ps = _ps(t.GlobalId)
+    assert t.GlobalId == p["type"] and t.Name == "Café" and ps[objversions.VERSION_ID] == v["id"]
+    assert json.loads(ps["Parameters"])["width"] == pytest.approx(0.6)
+    assert call("library_updates", "") == {"ok": True, "outdated": 0, "versions": 0}
