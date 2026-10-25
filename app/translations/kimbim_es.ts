@@ -8139,64 +8139,331 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
     </message>
   </context>
   <context>
-    <name>kimbim::ObjectSettingsDialog</name>
+    <name>kimbim::ObjectEditorDialog</name>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="235" />
-      <source>Place</source>
-      <translation>Colocar</translation>
+      <location filename="../src/MeshChunk.cpp" line="166" />
+      <source>The object could not be previewed</source>
+      <translation>No se pudo previsualizar el objeto</translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="235" />
-      <source>Apply</source>
-      <translation>Aplicar</translation>
+      <location filename="../src/ObjectEditorDialog.cpp" line="178" />
+      <source>Save to project</source>
+      <translation>Guardar en el proyecto</translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="236" />
-      <source>Save as...</source>
-      <translation>Guardar como...</translation>
+      <location filename="../src/ObjectEditorDialog.cpp" line="179" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="710" />
+      <source>Save to office library</source>
+      <translation>Guardar en la biblioteca de la oficina</translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="244" />
-      <source>%1 — settings</source>
-      <translation>%1 — configuración</translation>
+      <location filename="../src/ObjectEditorDialog.cpp" line="199" />
+      <source>Furniture</source>
+      <translation>Mobiliario</translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="251" />
-      <source>Saved</source>
-      <translation>Guardadas</translation>
+      <location filename="../src/ObjectEditorDialog.cpp" line="200" />
+      <source>Sanitary</source>
+      <translation>Sanitarios</translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="256" />
-      <source>Save these values as a named version of the object in this project</source>
-      <translation>Guarda estos valores como una versión con nombre del objeto en este proyecto</translation>
+      <location filename="../src/ObjectEditorDialog.cpp" line="201" />
+      <source>Kitchen</source>
+      <translation>Cocina</translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="270" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="202" />
+      <source>Site</source>
+      <translation>Exterior</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="206" />
+      <source>Id:</source>
+      <translation>Id:</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="207" />
+      <source>Name:</source>
+      <translation>Nombre:</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="208" />
+      <source>Name (ES):</source>
+      <translation>Nombre (ES):</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="209" />
+      <source>Category:</source>
+      <translation>Categoría:</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="210" />
+      <source>IFC class:</source>
+      <translation>Clase IFC:</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="211" />
+      <source>Predefined type:</source>
+      <translation>Tipo predefinido:</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="212" />
+      <source>The id names the object's file and its reference: lower-case letters, digits and _.</source>
+      <translation>El id da nombre al archivo del objeto y a su referencia: minúsculas, dígitos y _.</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="215" />
+      <source>Object</source>
+      <translation>Objeto</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="221" />
+      <source>Key</source>
+      <translation>Clave</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="221" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="243" />
+      <source>Label</source>
+      <translation>Etiqueta</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="221" />
+      <source>Label (ES)</source>
+      <translation>Etiqueta (ES)</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="221" />
+      <source>Kind</source>
+      <translation>Tipo</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="221" />
+      <source>Default</source>
+      <translation>Predeterminado</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="221" />
+      <source>Min</source>
+      <translation>Mín</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="222" />
+      <source>Max</source>
+      <translation>Máx</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="222" />
+      <source>Group</source>
+      <translation>Grupo</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="222" />
+      <source>Show when</source>
+      <translation>Mostrar si</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="222" />
+      <source>Options</source>
+      <translation>Opciones</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="223" />
+      <source>A choice's options: id: Label, id2: Label 2</source>
+      <translation>Las opciones de una elección: id: Etiqueta, id2: Etiqueta 2</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="224" />
+      <source>A formula: the parameter shows while it is true</source>
+      <translation>Una fórmula: el parámetro se muestra mientras es verdadera</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="229" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="249" />
+      <source>Add</source>
+      <translation>Añadir</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="230" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="250" />
+      <source>Remove</source>
+      <translation>Quitar</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="231" />
+      <source>Up</source>
+      <translation>Subir</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="232" />
+      <source>Down</source>
+      <translation>Bajar</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="237" />
+      <source>Parameters</source>
+      <translation>Parámetros</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="243" />
+      <source>Slot</source>
+      <translation>Ranura</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="243" />
+      <source>Default material</source>
+      <translation>Material predeterminado</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="255" />
+      <source>Materials</source>
+      <translation>Materiales</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="267" />
       <source>3D</source>
       <translation>3D</translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="271" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="268" />
       <source>Plan</source>
       <translation>Planta</translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="378" />
+      <location filename="../src/ObjectEditorDialog.cpp" line="284" />
+      <source>Try values</source>
+      <translation>Probar valores</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="285" />
+      <source>Values to preview the object with; they don't change the defaults</source>
+      <translation>Valores con los que previsualizar el objeto; no cambian los predeterminados</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="305" />
+      <source>Keep the object in this project: its placed objects follow</source>
+      <translation>Guarda el objeto en este proyecto: sus objetos colocados lo siguen</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="316" />
+      <source>Write the object's file to the office library, for every project</source>
+      <translation>Escribe el archivo del objeto en la biblioteca de la oficina, para todos los proyectos</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="317" />
+      <source>Set an office library folder in Preferences › Office library</source>
+      <translation>Indica una carpeta de biblioteca de la oficina en Preferencias › Biblioteca de la oficina</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="328" />
+      <source>Object editor — %1</source>
+      <translation>Editor de objetos — %1</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="361" />
+      <source>The object could not be opened</source>
+      <translation>No se pudo abrir el objeto</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="517" />
+      <source>Parameter</source>
+      <translation>Parámetro</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="547" />
+      <source>Material</source>
+      <translation>Material</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="577" />
+      <source>The object could not be checked</source>
+      <translation>No se pudo comprobar el objeto</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="624" />
+      <source>Try values: %1</source>
+      <translation>Probar valores: %1</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="711" />
+      <source>The office library already has an object %1. Replace it?</source>
+      <translation>La biblioteca de la oficina ya tiene un objeto %1. ¿Reemplazarlo?</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="721" />
+      <source>Could not save the object</source>
+      <translation>No se pudo guardar el objeto</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="735" />
+      <source>Object editor</source>
+      <translation>Editor de objetos</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectEditorDialog.cpp" line="735" />
+      <source>Discard the changes to this object?</source>
+      <translation>¿Descartar los cambios de este objeto?</translation>
+    </message>
+  </context>
+  <context>
+    <name>kimbim::ObjectSettingsDialog</name>
+    <message>
+      <location filename="../src/ObjectSettingsDialog.cpp" line="247" />
+      <source>Place</source>
+      <translation>Colocar</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectSettingsDialog.cpp" line="247" />
+      <source>Apply</source>
+      <translation>Aplicar</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectSettingsDialog.cpp" line="248" />
+      <source>Save as...</source>
+      <translation>Guardar como...</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectSettingsDialog.cpp" line="256" />
+      <source>%1 — settings</source>
+      <translation>%1 — configuración</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectSettingsDialog.cpp" line="263" />
+      <source>Saved</source>
+      <translation>Guardadas</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectSettingsDialog.cpp" line="268" />
+      <source>Save these values as a named version of the object in this project</source>
+      <translation>Guarda estos valores como una versión con nombre del objeto en este proyecto</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectSettingsDialog.cpp" line="282" />
+      <source>3D</source>
+      <translation>3D</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectSettingsDialog.cpp" line="283" />
+      <source>Plan</source>
+      <translation>Planta</translation>
+    </message>
+    <message>
+      <location filename="../src/ObjectSettingsDialog.cpp" line="390" />
       <source>Default</source>
       <translation>Predeterminada</translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="380" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="392" />
       <source>The object as its definition ships</source>
       <translation>El objeto tal como viene en su definición</translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="387" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="399" />
       <source>— Office —</source>
       <translation>— Oficina —</translation>
     </message>
     <message numerus="yes">
-      <location filename="../src/ObjectSettingsDialog.cpp" line="396" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="408" />
       <source>%n placed object(s) use it</source>
       <translation>
         <numerusform>%n objeto colocado la usa</numerusform>
@@ -8204,51 +8471,51 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       </translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="398" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="410" />
       <source>A copy of a version of the office library</source>
       <translation>Una copia de una versión de la biblioteca de la oficina</translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="401" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="413" />
       <source>From the office library</source>
       <translation>De la biblioteca de la oficina</translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="529" />
-      <location filename="../src/ObjectSettingsDialog.cpp" line="543" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="541" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="555" />
       <source>Save as</source>
       <translation>Guardar como</translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="530" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="542" />
       <source>There is already a version called %1. Replace it with these values?</source>
       <translation>Ya existe una versión llamada %1. ¿Reemplazarla con estos valores?</translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="533" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="545" />
       <source>Could not save the version</source>
       <translation>No se pudo guardar la versión</translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="543" />
-      <location filename="../src/ObjectSettingsDialog.cpp" line="604" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="555" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="616" />
       <source>Name of the version:</source>
       <translation>Nombre de la versión:</translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="550" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="562" />
       <source>Could not rename the version</source>
       <translation>No se pudo renombrar la versión</translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="563" />
-      <location filename="../src/ObjectSettingsDialog.cpp" line="567" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="575" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="579" />
       <source>Could not delete the version</source>
       <translation>No se pudo eliminar la versión</translation>
     </message>
     <message numerus="yes">
-      <location filename="../src/ObjectSettingsDialog.cpp" line="564" />
-      <location filename="../src/ObjectSettingsDialog.cpp" line="612" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="576" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="624" />
       <source>%n placed object(s) use this version. Change them to another version first.</source>
       <translation>
         <numerusform>%n objeto colocado usa esta versión. Cámbielo primero a otra versión.</numerusform>
@@ -8256,43 +8523,43 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       </translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="589" />
-      <location filename="../src/ObjectSettingsDialog.cpp" line="613" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="601" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="625" />
       <source>Move to library</source>
       <translation>Mover a la biblioteca</translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="590" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="602" />
       <source>The office library already has a version with this name. Replace it?</source>
       <translation>La biblioteca de la oficina ya tiene una versión con este nombre. ¿Reemplazarla?</translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="593" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="605" />
       <source>Could not move the version to the office library</source>
       <translation>No se pudo mover la versión a la biblioteca de la oficina</translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="602" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="614" />
       <source>Rename...</source>
       <translation>Renombrar...</translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="604" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="616" />
       <source>Rename version</source>
       <translation>Renombrar versión</translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="608" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="620" />
       <source>Delete</source>
       <translation>Eliminar</translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="617" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="629" />
       <source>Share this version with every project through the office library</source>
       <translation>Comparte esta versión con todos los proyectos a través de la biblioteca de la oficina</translation>
     </message>
     <message>
-      <location filename="../src/ObjectSettingsDialog.cpp" line="618" />
+      <location filename="../src/ObjectSettingsDialog.cpp" line="630" />
       <source>Set the office library folder in the preferences first</source>
       <translation>Primero defina la carpeta de la biblioteca de la oficina en las preferencias</translation>
     </message>

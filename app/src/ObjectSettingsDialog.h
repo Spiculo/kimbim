@@ -24,7 +24,7 @@ class Viewport;
 // One control per parameter of a library object (D99): lengths, angles, counts, on/off, choices and
 // building materials, under the definition's group headings, each named `param_<key>`. Python makes
 // the form (object_form): limits that are formulas and show_when depend on the current values, so a
-// choice or an on/off rebuilds it (queued). Used by the Object settings dialog.
+// choice or an on/off rebuilds it (queued). Used by the Object settings dialog and the Object Editor.
 class ParameterForm : public QWidget {
     Q_OBJECT
 public:
@@ -32,6 +32,8 @@ public:
     // Show `key`'s parameters with these values (missing ones: the definition's defaults). With
     // `version` (D100), the parameters of that saved version's own stored definition.
     void setObject(const QString& key, const QJsonObject& values = {}, const QString& version = {});
+    // D101: the parameters of an Object Editor draft (draft_form) instead of a library object's.
+    void setDraft(const QJsonObject& draft, const QJsonObject& values = {});
     void setValues(const QJsonObject& values); // merged into the current ones; rebuilds
     QJsonObject values() const { return m_values; }
     bool isEmpty() const { return m_rows == 0; } // no parameters (an office IFC type)
@@ -47,6 +49,7 @@ private:
     QFormLayout* m_form;
     QString m_key;
     QString m_version;
+    QString m_draft; // a draft's JSON (setDraft), else empty
     QJsonObject m_values;
     int m_rows = 0;
 };

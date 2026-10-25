@@ -96,6 +96,7 @@ struct MeshChunk;
 class MainWindow : public QMainWindow {
     Q_OBJECT
     friend class ObjectSettingsDialog; // D100: its edits go through bridge() and afterEdit()
+    friend class ObjectEditorDialog; // D101: so does saving a draft to the project
 public:
     // quiet: report errors through signals only (no dialogs), for --self-test and automation.
     explicit MainWindow(QWidget* parent = nullptr, bool quiet = false, int chunkSize = 1000);

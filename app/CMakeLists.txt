@@ -60,6 +60,7 @@ qt_add_library(kimbim_core STATIC
     src/UnderlayDialogs.cpp src/UnderlayDialogs.h src/Underlays.cpp
     src/LibraryPanel.cpp src/LibraryPanel.h src/LibraryTools.cpp
     src/ObjectSettingsDialog.cpp src/ObjectSettingsDialog.h
+    src/ObjectEditorDialog.cpp src/ObjectEditorDialog.h
     src/MaterialsDialog.cpp src/MaterialsDialog.h
 )
 target_include_directories(kimbim_core PUBLIC src)
@@ -128,6 +129,7 @@ kimbim_test(test_dxf_export)
 kimbim_test(test_underlays)
 kimbim_test(test_materials_dialog)
 kimbim_test(test_object_settings)
+kimbim_test(test_object_editor)
 
 # GUI self-tests: need a real OpenGL window (GPU, or Mesa on the Linux CI runner). Label "gui".
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/broken.ifc "ISO-10303-21;

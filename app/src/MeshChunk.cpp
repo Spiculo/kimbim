@@ -152,6 +152,28 @@ bool fetchObjectPreview(PythonEngine& py, const QString& key, const QJsonObject&
     return true;
 }
 
+bool fetchDraftPreview(PythonEngine& py, const QJsonObject& draft, const QJsonObject& values, MeshChunk* out, QString* error)
+{
+    QList<QByteArray> parts;
+    bool none = false;
+    const QString text = QString::fromUtf8(QJsonDocument(draft).toJson(QJsonDocument::Compact));
+    const QString given = QString::fromUtf8(QJsonDocument(values).toJson(QJsonDocument::Compact));
+    if (!py.callParts("draft_preview", {text, given}, &parts, &none, error))
+        return false;
+    if (none) { // the draft or the values don't build: ask why
+        const QJsonObject why = py.callJson("draft_preview_error", {text, given}).object();
+        const QString reason = why.value("error").toString();
+        return fail(error, reason.isEmpty() ? QCoreApplication::translate("kimbim::ObjectEditorDialog", "The object could not be previewed") : reason);
+    }
+    if (parts.size() != 3 && parts.size() != 4)
+        return fail(error, QStringLiteral("draft_preview returned %1 parts, expected 3 or 4").arg(parts.size()));
+    auto chunk = MeshChunk::parse(parts[0], parts[1], parts[2], error, parts.size() == 4 ? parts[3] : QByteArray());
+    if (!chunk)
+        return false;
+    *out = std::move(*chunk);
+    return true;
+}
+
 bool fetchMeshChunk(PythonEngine& py, int maxElements, MeshChunk* out, bool* done, QString* error)
 {
     *done = false;

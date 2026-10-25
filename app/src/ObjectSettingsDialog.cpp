@@ -59,6 +59,16 @@ void ParameterForm::setObject(const QString& key, const QJsonObject& values, con
 {
     m_key = key;
     m_version = version;
+    m_draft.clear();
+    m_values = values;
+    build();
+}
+
+void ParameterForm::setDraft(const QJsonObject& draft, const QJsonObject& values)
+{
+    m_key.clear();
+    m_version.clear();
+    m_draft = compact(draft);
     m_values = values;
     build();
 }
@@ -94,10 +104,12 @@ void ParameterForm::build()
     while (m_form->rowCount() > 0)
         m_form->removeRow(0);
     m_rows = 0;
-    if (m_key.isEmpty())
+    if (m_key.isEmpty() && m_draft.isEmpty())
         return;
     // D99: limits that are formulas and show_when depend on the current values, so Python makes the form.
-    const QJsonObject form = PythonEngine::instance().callJson("object_form", {m_key, compact(m_values), m_version}).object();
+    const QJsonObject form = m_draft.isEmpty()
+        ? PythonEngine::instance().callJson("object_form", {m_key, compact(m_values), m_version}).object()
+        : PythonEngine::instance().callJson("draft_form", {m_draft, compact(m_values)}).object();
     // the values as the definition reads them (every parameter; out-of-range ones clamped)
     const QJsonObject clean = form.value("values").toObject();
     for (auto it = clean.begin(); it != clean.end(); ++it)

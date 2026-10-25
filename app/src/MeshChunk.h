@@ -62,6 +62,9 @@ bool fetchElementMeshes(PythonEngine& py, const QStringList& guids, MeshChunk* o
 // when the values don't build.
 bool fetchObjectPreview(PythonEngine& py, const QString& key, const QJsonObject& params, MeshChunk* out,
     QString* error, const QString& version = QString());
+// D101: the Object Editor's preview, its draft (a .kimobj JSON) at these trial values (objedit.draft_preview).
+// False with the reason in *error when the draft or the values don't build.
+bool fetchDraftPreview(PythonEngine& py, const QJsonObject& draft, const QJsonObject& values, MeshChunk* out, QString* error);
 
 } // namespace kimbim
 
