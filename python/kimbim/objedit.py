@@ -11,15 +11,20 @@ library.OBJECTS, library._office or the open model (the preview builds in a scra
   real loader says (structure, names, limits, a build at the defaults).
 - `draft_form`, `draft_symbol`, `draft_preview`, `draft_preview_error`: the Library's object_form,
   object_symbol, object_preview and object_preview_error for the draft, at the dialog's trial values.
-- `object_part_template(shape)`: a part to add that builds as it is.
+- `object_part_template(shape)`, `object_symbol_template(kind)`: a part or a plan symbol item to add that
+  builds as it is.
 - `save_draft(draft, target, replace)`: the draft kept in the office library (a `.kimobj` file; with the
-  count and GUIDs of this object's placements it left outdated) or in the project (its types, one undo step)."""
+  count and GUIDs of this object's placements it left outdated) or in the project (its types, one undo step,
+  with the geometry of their placements). An object the target has is replaced only when `replace` is its
+  id; otherwise the answer is {"ok": false, "exists": id}."""
 from __future__ import annotations
 
 import copy
 import json
 import os
 import uuid
+
+import ifcopenshell.util.element
 
 from . import library, objbuild, objects
 from .objbuild import ObjectError
@@ -43,6 +48,19 @@ _TEMPLATE_POINTS = {  # the point lists of the shapes that need them, as small v
     "revolve": [[0.05, 0], [0.1, 0], [0.1, 0.1]],
     "sweep": [[0, 0, 0], [0, 0, 0.1]],
 }
+_SYMBOL_TEMPLATES = {  # a plan symbol item of each kind, small and drawable as it is
+    "line": {"points": [[0, 0], [0.1, 0]]},
+    "polygon": {"points": [[0, 0], [0.1, 0], [0.1, 0.1]]},
+    "rect": {"x": 0, "y": 0, "dx": 0.1, "dy": 0.1},
+    "circle": {"cx": 0.05, "cy": 0.05, "r": 0.05},
+    "ellipse": {"cx": 0.05, "cy": 0.05, "rx": 0.05, "ry": 0.03},
+    "arc": {"cx": 0, "cy": 0, "r": 0.1, "a0": 0, "a1": 90},
+}
+# A saved file's key order: the definition's fields as doc 16 lists them (objects._FIELDS is a set), then
+# any other; a part's id first, a parameter's key, kind and label first.
+_FILE_ORDER = ("format", "id", "name", "category", "ifc", "origin", "params", "materials", "parts", "components",
+               "symbol")
+_PARAM_ORDER = ("key", "kind", "label")
 
 
 def _fail(message: str) -> str:
@@ -157,8 +175,11 @@ class _Syntax:
 
     def scope(self, params, parts, slots=()):
         self.names = {"i", "n", "pi", *(f"mat_{k}" for k in slots)}
-        self.names |= {p["key"] for p in params or () if isinstance(p, dict) and isinstance(p.get("key"), str)}             if isinstance(params, list) else set()
-        self.part_ids = {p["id"] for p in parts or () if isinstance(p, dict) and isinstance(p.get("id"), str)}             if isinstance(parts, list) else set()
+        if isinstance(params, list):
+            self.names |= {p["key"] for p in params if isinstance(p, dict) and isinstance(p.get("key"), str)}
+        self.part_ids = set()
+        if isinstance(parts, list):
+            self.part_ids = {p["id"] for p in parts if isinstance(p, dict) and isinstance(p.get("id"), str)}
 
     def draft(self, data):
         mats = data.get("materials")
@@ -281,13 +302,18 @@ def _taken_ids() -> set:
     return taken
 
 
-def _copy_of(data: dict, base_id: str) -> dict:
-    """A copy to edit: a free id `<id>_copy`, `<id>_copy2`, ..., and the name marked as a copy."""
-    taken, k = _taken_ids(), 1
-    new_id = f"{base_id}_copy"
+def _free_id(first: str) -> str:
+    """`first`, else `first2`, `first3`, ...: the first id no object uses."""
+    taken, k, new_id = _taken_ids(), 1, first
     while new_id in taken:
         k += 1
-        new_id = f"{base_id}_copy{k}"
+        new_id = f"{first}{k}"
+    return new_id
+
+
+def _copy_of(data: dict, base_id: str) -> dict:
+    """A copy to edit: a free id `<id>_copy`, `<id>_copy2`, ..., and the name marked as a copy."""
+    new_id = _free_id(f"{base_id}_copy")
     name = data.get("name", base_id)
     en = name if isinstance(name, str) else name.get("en", base_id)
     es = name if isinstance(name, str) else name.get("es") or en
@@ -311,7 +337,8 @@ def object_draft(source: str) -> str:
 
     try:
         if source == "new":
-            return _dump({"ok": True, "draft": copy.deepcopy(_NEW), "target": "", "copy": False})
+            return _dump({"ok": True, "draft": {**copy.deepcopy(_NEW), "id": _free_id(_NEW["id"])}, "target": "",
+                          "copy": False})
         if source.startswith(objversions.TYPE_SOURCE):
             t = objversions.type_of_source(source)
             obj = library.definition_of_type(t) if t is not None else None
@@ -348,7 +375,49 @@ def object_part_template(shape: str) -> str:
     return _dump({"ok": True, "part": {"id": "part", shape: fields}})
 
 
+def object_symbol_template(kind: str) -> str:
+    if kind not in _SYMBOL_TEMPLATES:
+        return _fail(f"unknown symbol kind {kind!r}")
+    return _dump({"ok": True, "item": {kind: copy.deepcopy(_SYMBOL_TEMPLATES[kind])}})
+
+
 # ---------------------------------------------------------------- saving a draft
+
+def _ordered(data: dict, order) -> dict:
+    """`data` with the keys of `order` first, in that order, then the others as they were."""
+    return {**{k: data[k] for k in order if k in data}, **{k: v for k, v in data.items() if k not in order}}
+
+
+def _file_order(data: dict) -> dict:
+    """The definition as its file writes it: keys in the definition's order (the dialog's JSON comes back
+    sorted), each part's id and each parameter's key, kind and label first."""
+
+    def each(items, order):
+        return [_ordered(p, order) if isinstance(p, dict) else p for p in items] if isinstance(items, list) else items
+
+    def parts(items):
+        return each(items, ("id",))
+
+    def params(items):
+        return each(items, _PARAM_ORDER)
+
+    def component(c):
+        if not isinstance(c, dict):
+            return c
+        c = _ordered(c, ("params", "parts"))
+        for key, fix in (("params", params), ("parts", parts)):
+            if key in c:
+                c[key] = fix(c[key])
+        return c
+
+    out = _ordered(data, _FILE_ORDER)
+    for key, fix in (("params", params), ("parts", parts)):
+        if key in out:
+            out[key] = fix(out[key])
+    if isinstance(out.get("components"), dict):
+        out["components"] = {name: component(c) for name, c in out["components"].items()}
+    return out
+
 
 def _save_office(obj, draft_json: str, replace: str) -> str:
     folder = library._office_paths["folder"]
@@ -361,13 +430,21 @@ def _save_office(obj, draft_json: str, replace: str) -> str:
         path = known.library
     if (os.path.exists(path) or known is not None) and replace != obj.key:
         return _dump({"ok": False, "exists": obj.key})
-    text = json.dumps(json.loads(draft_json), indent=2, ensure_ascii=False) + "\n"
-    try:
-        with open(path, "w", encoding="utf-8", newline="\n") as fh:
+    text = json.dumps(_file_order(json.loads(draft_json)), indent=2, ensure_ascii=False) + "\n"
+    try:  # written whole or not at all: a failed write leaves the old file as it was
+        with open(path + ".tmp", "w", encoding="utf-8", newline="\n") as fh:
             fh.write(text)
+        os.replace(path + ".tmp", path)
     except OSError as ex:
+        try:
+            os.remove(path + ".tmp")
+        except OSError:
+            pass
         return _fail(f"cannot write {path}: {ex}")
     library.load_office(folder, library._office_paths["files"])
+    if ref not in library._office:  # it checks as a project object, yet the office library leaves it out
+        why = next((e["error"] for e in library._office_errors if e["file"] == path), "it did not load")
+        return _fail(f"the office library could not load the object: {why} (the file was written: {path})")
     from . import app_bridge as B
 
     placed = [e for e in B._model.by_type("IfcElement")
@@ -377,7 +454,7 @@ def _save_office(obj, draft_json: str, replace: str) -> str:
                   "guids": [e.GlobalId for e, *_ in outdated]})
 
 
-def _save_project(obj) -> str:
+def _save_project(obj, replace: str) -> str:
     from . import app_bridge as B
     from . import objversions
 
@@ -385,6 +462,8 @@ def _save_project(obj) -> str:
         return _fail("no model open")
     types = [t for t in library._library_types(B._model)
              if (info := library._params_of_type(t)) is not None and info[0] == obj.ref]
+    if types and replace != obj.key:  # another object of this id: replaced only when the dialog says so
+        return _dump({"ok": False, "exists": obj.key})
     plans = []
     for t in types:  # every type must build before any changes
         old = library.definition_of_type(t) or obj
@@ -398,15 +477,17 @@ def _save_project(obj) -> str:
     def action():
         if not plans:  # kept in the project by a saved version named after the object
             objversions._write_version(library._make_type(obj, obj.values()), uuid.uuid4().hex, obj.name)
+        changed = []
         for t, values in plans:
             library._regenerate_type(t, obj, values)
-        return max(len(plans), 1), [], []
+            changed += [e.GlobalId for e in ifcopenshell.util.element.get_types(t)]  # they redraw (undo too)
+        return max(len(plans), 1), changed, []
 
     try:
-        B._run(action)
+        r = B._run(action)
     except Exception as ex:
         return _fail(f"{type(ex).__name__}: {ex}")
-    return _dump({"ok": True, "ref": obj.ref, "types": max(len(plans), 1)})
+    return _dump({**r, "ref": obj.ref, "types": max(len(plans), 1)})
 
 
 def save_draft(draft_json: str, target: str, replace: str = "") -> str:
@@ -418,6 +499,6 @@ def save_draft(draft_json: str, target: str, replace: str = "") -> str:
             return _fail(f"unknown target {target!r}")
         if obj.key in library.OBJECTS:
             return _fail(f"{obj.key} is a bundled object: give the copy another id")
-        return _save_office(obj, draft_json, replace) if target == "office" else _save_project(obj)
+        return _save_office(obj, draft_json, replace) if target == "office" else _save_project(obj, replace)
     except Exception as ex:
         return _fail(f"{type(ex).__name__}: {ex}")

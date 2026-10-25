@@ -275,12 +275,13 @@ def test_save_with_errors_is_refused(project, tmp_path):
 def test_save_to_project_keeps_the_object_and_undoes(project):
     d = _text(_draft("new"))
     r = call("save_draft", d, "project")
-    assert r == {"ok": True, "ref": "project:new_object", "types": 1}, r
+    assert r["ok"] and r["ref"] == "project:new_object" and r["types"] == 1, r
+    assert r["geometry"] == {"changed": [], "removed": []}  # nothing placed yet
 
     def listed():
         return [o["id"] for o in call("library_objects")["objects"]]
     assert "project:new_object" in listed()
-    assert call("save_draft", d, "project")["types"] == 1  # saving again regenerates, it adds no type
+    assert call("save_draft", d, "project", "new_object")["types"] == 1  # saving again regenerates, it adds no type
     assert call("undo")["ok"] and "project:new_object" in listed()
     assert call("undo")["ok"] and "project:new_object" not in listed()
     assert call("redo")["ok"] and "project:new_object" in listed()
@@ -299,7 +300,7 @@ def test_saving_a_project_object_regenerates_its_types(project):
     t = b._model.by_guid(p1["type"])
     assert _height(t, library._params_of_type(t)[1]) == pytest.approx(0.75)
     d["parts"][0]["box"]["dz"] = "height / 2"
-    r = call("save_draft", _text(d), "project")
+    r = call("save_draft", _text(d), "project", "new_object")
     assert r["ok"] and r["types"] == 2, r  # the saved version anchor and the placed type
     t = b._model.by_guid(p1["type"])
     assert b._model.by_guid(p2["type"]) == t
@@ -314,7 +315,7 @@ def test_a_failing_type_changes_nothing(project):
     t = b._model.by_guid(p["type"])
     before = ifcopenshell.util.element.get_pset(t, library.PSET, "Definition")
     d["parts"][0]["box"]["dz"] = "1 / (width - 0.7)"  # builds at the defaults, not at width 0.7
-    r = call("save_draft", _text(d), "project")
+    r = call("save_draft", _text(d), "project", "new_object")
     assert r["ok"] is False and t.Name in r["error"], r
     assert ifcopenshell.util.element.get_pset(t, library.PSET, "Definition") == before
 
@@ -355,3 +356,91 @@ def test_an_office_save_names_its_outdated_placements(project, tmp_path):
     assert call("library_updates", "")["outdated"] == 2
     assert call("update_from_library", json.dumps(r["guids"]))["ok"]
     assert call("library_updates", "")["outdated"] == 1  # the stool is still outdated
+
+
+# ---------------------------------------------------------------- D101 final review
+
+
+def test_saving_a_project_object_again_redraws_its_placements(project):
+    """Final review 1: the save's geometry names every placement of the regenerated types, and so does
+    the undo straight after (the app redraws them in 3D)."""
+    d = _draft("new")
+    assert call("save_draft", _text(d), "project")["ok"]
+    p1 = call("place_object", project, "project:new_object", '{"width": 0.7}', 0, 0)
+    p2 = call("place_object", project, "project:new_object", '{"width": 0.7}', 2, 0)
+    assert p1["ok"] and p2["ok"]
+    d["parts"][0]["box"]["dz"] = "height / 2"
+    r = call("save_draft", _text(d), "project", "new_object")
+    assert r["ok"] and r["ref"] == "project:new_object" and r["types"] == 2, r
+    assert {p1["guid"], p2["guid"]} <= set(r["geometry"]["changed"]), r
+    u = call("undo")
+    assert u["ok"] and {p1["guid"], p2["guid"]} <= set(u["geometry"]["changed"]), u
+    assert {p1["guid"], p2["guid"]} <= set(call("redo")["geometry"]["changed"])
+
+
+def test_new_objects_get_free_ids_and_the_project_asks(project):
+    """Final review 2: a second new object does not silently replace the first."""
+    d = _draft("new")
+    assert d["id"] == "new_object"
+    assert call("save_draft", _text(d), "project")["ok"]
+    second = _draft("new")
+    assert second["id"] == "new_object2"
+    assert call("save_draft", _text(second), "project")["ok"]
+    assert _draft("new")["id"] == "new_object3"
+    n = len(b._model.by_type("IfcTypeProduct"))
+    assert call("save_draft", _text(d), "project") == {"ok": False, "exists": "new_object"}
+    assert len(b._model.by_type("IfcTypeProduct")) == n
+    assert call("save_draft", _text(d), "project", "other")["exists"] == "new_object"
+    assert call("save_draft", _text(d), "project", "new_object")["ok"]
+    listed = [o["id"] for o in call("library_objects")["objects"]]
+    assert "project:new_object" in listed and "project:new_object2" in listed
+
+
+def test_symbol_templates_check_ok(project):
+    for kind in ("line", "polygon", "rect", "circle", "ellipse", "arc"):
+        r = call("object_symbol_template", kind)
+        assert r["ok"] and list(r["item"]) == [kind], (kind, r)
+        d = _draft("new")
+        d["symbol"] = [r["item"]]
+        assert call("check_draft", _text(d))["ok"], (kind, call("check_draft", _text(d)))
+        assert call("draft_symbol", _text(d), "{}")["symbol"], kind
+    assert call("object_symbol_template", "blob")["ok"] is False
+
+
+def test_an_office_file_keeps_the_definition_order(project, tmp_path):
+    """Final review 5: keys in the definition's order (format, id, name, ...), a part's id first, a
+    parameter's key, kind, label first."""
+    library.load_office(str(tmp_path))
+    d = _draft("new")
+    shuffled = {k: d[k] for k in sorted(d)}
+    shuffled["parts"] = [{"box": d["parts"][0]["box"], "material": "body", "id": "body"}]
+    shuffled["params"] = [{"default": q["default"], "label": q["label"], "kind": q["kind"], "key": q["key"]}
+                          for q in d["params"]]
+    shuffled["components"] = {"c": {"parts": [{"box": {"dx": 0.1, "dy": 0.1, "dz": 0.1}, "id": "p"}],
+                                    "params": [{"default": 0.1, "label": "P", "kind": "length", "key": "p"}]}}
+    r = call("save_draft", _text(shuffled), "office")
+    assert r["ok"], r
+    saved = json.loads((tmp_path / "new_object.kimobj").read_text(encoding="utf-8"))
+    assert list(saved) == ["format", "id", "name", "category", "ifc", "params", "materials", "parts",
+                           "components"]
+    assert list(saved["parts"][0])[0] == "id"
+    assert [list(q)[:3] for q in saved["params"]] == [["key", "kind", "label"]] * 3
+    assert list(saved["components"]["c"]["parts"][0])[0] == "id"
+    assert list(saved["components"]["c"]["params"][0])[:3] == ["key", "kind", "label"]
+    assert not list(tmp_path.glob("*.tmp"))
+
+
+def test_an_office_save_that_does_not_load_says_so(project, tmp_path):
+    """Final review 7b: a draft that checks as a project object but not in the office library (here it
+    uses the office object of its own id: the old one in the project check, itself once saved) fails, and
+    the file it wrote stays."""
+    library.load_office(str(tmp_path))
+    d = _draft("new")
+    assert call("save_draft", _text(d), "office")["ok"]
+    d["parts"].append({"id": "again", "use": "new_object"})
+    assert call("check_draft", _text(d))["ok"]
+    r = call("save_draft", _text(d), "office", "new_object")
+    assert r["ok"] is False and "use cycle" in r["error"], r
+    assert str(tmp_path / "new_object.kimobj") in r["error"]
+    assert "office:new_object" not in library._office
+    assert json.loads((tmp_path / "new_object.kimobj").read_text(encoding="utf-8"))["parts"][1]["id"] == "again"
