@@ -23,6 +23,7 @@ class Session:
         self.source = source
         self.client = client
         self.tasks = None  # the project's agent tasks (agent.tasks.Tasks), set by open()
+        self.renderer = None  # the snapshot renderer (agent.render.Renderer), started by the first snapshot
         self._saved_user = ""
         self._closed = False
 
@@ -85,6 +86,8 @@ class Session:
             return
         self._closed = True
         try:
+            if self.renderer is not None:
+                self.renderer.close()  # the windowless helper goes with the session
             D.close_document()
         finally:
             K.display_user = self._saved_user

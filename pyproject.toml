@@ -25,5 +25,6 @@ pythonpath = ["python", "tests/python"]
 markers = [
   "golden: needs the downloaded corpus (pixi run fetch-corpus)",
   "slow: large models, minutes (run with -m \"golden and slow\")",
+  "app: needs the built app binary (build/app/kimbim-app or KIMBIM_APP); skipped without it",
 ]
 addopts = "-m 'not golden and not slow'"

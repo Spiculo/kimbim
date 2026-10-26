@@ -544,12 +544,12 @@ def _drafted(svg: str, drawing) -> str:
     return tags.add_to_drawing(drafting.add_to_drawing(svg, drawing), drawing)  # D87: tags, symbols, stamps
 
 
-def generate_drawing(guid: str, include_json: str = "") -> str:
+def generate_drawing(guid: str, include_json: str = "", purpose: str = "") -> str:
     """{ok, svg, cached, timing}: the drawing's SVG for the current model state, styled by the current
-    purpose (D73: pens, line types, overrides; hidden elements left out)."""
+    purpose (D73: pens, line types, overrides; hidden elements left out), or by `purpose` (D102 snapshots)."""
     from . import graphics
 
-    resolved = graphics.resolve()
+    resolved = graphics.resolve(purpose or None)
     r = raw_drawing(guid, include_json, resolved["hidden"])
     if r.get("ok"):
         r["svg"] = graphics.style_svg(r["svg"], resolved, 1.0)

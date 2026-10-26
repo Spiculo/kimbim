@@ -44,6 +44,14 @@ MESSAGES = {
     "hint_form": {"en": "{field} does not have an accepted form.", "es": "{field} no tiene una forma aceptada."},
     "hint_not_versioned": {"en": "Turn on versioning for the project, or start a task with mode \"direct\".",
                            "es": "Activa el historial de versiones del proyecto o inicia una tarea con mode \"direct\"."},
+    "hint_no_app": {"en": "The KimBim app binary was not found: build it with `pixi run app-build`, or set "
+                           "KIMBIM_APP to its path. SVG needs no binary.",
+                    "es": "No se encontró el ejecutable de KimBim: compílalo con `pixi run app-build` o indica su "
+                          "ruta en KIMBIM_APP. SVG no necesita el ejecutable."},
+    "hint_render": {"en": "The renderer said: {error}. Its log: {log}",
+                    "es": "El renderizador respondió: {error}. Su registro: {log}"},
+    "warn_snapshot_ignored": {"en": "{fields} only apply to 3D snapshots; ignored.",
+                              "es": "{fields} solo se aplican a las capturas 3D; se ignoraron."},
     "warn_no_dimension": {"en": "{label} has no {name} to change; skipped.",
                           "es": "{label} no tiene {name} que cambiar; se omitió."},
     "hint_bad_angle": {"en": "{value} is not an angle; use degrees (90, \"90deg\") or \"1.57rad\".",

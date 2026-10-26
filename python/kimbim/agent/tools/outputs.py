@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import json
 import math
-import os
 import pathlib
 import subprocess
 import tempfile
@@ -17,7 +16,9 @@ from ... import documents as D
 from ... import drawings as DR
 from ... import schedules as SC
 from ... import sheets as SH
+from .. import messages
 from ..catalogue import AgentError, bridge, tool
+from ..render import app_binary
 from .common import level_guid, point
 
 _OUT = {"type": "string", "description": "Path of the file to write."}
@@ -140,18 +141,10 @@ def sheets_place_drawing(session, sheet, drawing, at=None, scale=100):
     return {"sheet": number}
 
 
-def _app_binary() -> pathlib.Path | None:
-    env = os.environ.get("KIMBIM_APP")
-    candidates = [pathlib.Path(env)] if env else [
-        pathlib.Path(__file__).resolve().parents[4] / "build" / "app" / name for name in ("kimbim-app.exe", "kimbim-app")]
-    return next((c for c in candidates if c.is_file()), None)
-
-
 def _pdf(number: str, out: str) -> None:
-    app = _app_binary()
+    app = app_binary()
     if app is None:
-        raise AgentError("render_failed", hint="The KimBim app binary was not found (build it with `pixi run "
-                         "app-build`, or set KIMBIM_APP to its path). SVG and DXF need no binary.")
+        raise AgentError("render_failed", hint=messages.text("hint_no_app"))
     with tempfile.TemporaryDirectory() as tmp:
         ifc = str(pathlib.Path(tmp) / "model.ifc")
         bridge(D.export_ifc, ifc)
