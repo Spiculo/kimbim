@@ -24,6 +24,8 @@ from typing import Callable
 
 from .records import Schema, agg_info, canon, h
 
+# Byte patterns over records as records.canon writes them (sorted keys, no whitespace): a reference is
+# exactly {"@n":"<id>"} or {"@a":"<GlobalId>/<Attr>"}; an inline entity starts {"a":.
 _REF = re.compile(rb'(?<!"OwnerHistory":)\{"@([na])":"([^"]*)"\}')
 
 
@@ -31,6 +33,11 @@ def references(data: bytes) -> list[tuple[str, str]]:
     """The node ("n", id) and anchor ("a", "<GlobalId>/<Attr>") references in a record's bytes, but
     for its OwnerHistory (left out of content, see above)."""
     return [(k.decode(), v.decode()) for k, v in _REF.findall(data)]
+
+
+def inline_owner_history(data: bytes) -> bool:
+    """Whether a record holds its owner history inline (whose references are not content)."""
+    return b'"OwnerHistory":{"a"' in data
 
 
 def without_owner_history(v: dict) -> dict:
@@ -73,6 +80,7 @@ class Contents:
         """The expanded value a node or anchor reference stands for."""
         k = (kind, ident)
         if k not in self._refs:
+            self._refs[k] = {"cycle": ident}  # never recurse forever through anchors (IFC values are acyclic)
             b = self.get(ref_key(kind, ident))
             if b is None:
                 out = {"missing": ident}
@@ -81,12 +89,12 @@ class Contents:
             else:
                 gid, attr = ident.split("/", 1)
                 v = json.loads(b)
-                out = self.value(v.get("a", {}).get(attr), self._attr_types(v["t"]).get(attr))
+                out = self.value(v.get("a", {}).get(attr), self.attr_types(v["t"]).get(attr))
             self._refs[k] = out
         return self._refs[k]
 
     def entity(self, v) -> dict:
-        types = self._attr_types(v["t"])
+        types = self.attr_types(v["t"])
         a = {}
         for name, x in v.get("a", {}).items():
             if name != "OwnerHistory":
@@ -116,7 +124,8 @@ class Contents:
             return items
         return v
 
-    def _attr_types(self, ifc_type: str) -> dict:
+    def attr_types(self, ifc_type: str) -> dict:
+        """{attribute name: its schema type} of an entity type."""
         if ifc_type not in self._types:
             try:
                 self._types[ifc_type] = {name: t for name, _i, t in self.schema.attrs(ifc_type)}
@@ -130,6 +139,43 @@ class Contents:
             return d.declared_type() if d else None
         except Exception:
             return None
+
+
+class Changed:
+    """Which references stand for different content in two record sets (`a` before, `b` after),
+    memoised. Records with identical bytes differ only through what they refer to, which is walked
+    cheaply (no digests) where the bytes say enough."""
+
+    def __init__(self, a: Contents, b: Contents):
+        self.a, self.b = a, b
+        self._memo: dict[tuple[str, str], bool] = {}
+
+    def ref(self, kind: str, ident: str) -> bool:
+        k = (kind, ident)
+        if k not in self._memo:
+            self._memo[k] = False  # never recurse forever through anchors (IFC values are acyclic)
+            key = ref_key(kind, ident)
+            da, db = self.a.get(key), self.b.get(key)
+            if da is None or db is None:
+                out = da is not db
+            elif da == db and (kind == "n" or not references(da)):
+                out = self.uses(da)  # same bytes: different exactly when a value it refers to is
+            elif da == db and not self.uses(da):
+                out = False  # an anchor in a record whose references are all unchanged
+            else:
+                out = self.a.ref(kind, ident) != self.b.ref(kind, ident)
+            self._memo[k] = out
+        return self._memo[k]
+
+    def uses(self, data: bytes) -> bool:
+        """Whether a value referred to from these bytes differs."""
+        return any(self.ref(*r) for r in references(data))
+
+    def record(self, key: str, data: bytes) -> bool:
+        """Whether a record with the same bytes `data` in both sets has different content."""
+        if not self.uses(data):
+            return False
+        return not inline_owner_history(data) or self.a.record(key) != self.b.record(key)
 
 
 def schema_of(meta: bytes | None) -> Schema:

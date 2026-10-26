@@ -24,7 +24,7 @@ import json
 import re
 from dataclasses import asdict, dataclass, field
 
-from .content import Contents
+from .content import Changed, Contents
 from .records import Schema, agg_info, canon
 
 OURS, THEIRS = "ours", "theirs"
@@ -91,10 +91,12 @@ class _Merger:
                 schema = json.loads(side["meta"]).get("schema", schema)
                 break
         self.schema = Schema(schema)
-        # Content digests per side (kimbim.content): a record or value only re-encoded (a value it shares
-        # became a node) is unchanged, so it never conflicts with a real change on the other side.
+        # Changes are decided on content (kimbim.content, Task 11b): a record or value only re-encoded (a
+        # value it shares became a node, or stopped being one) is unchanged, and one with the same bytes
+        # whose shared value was edited in place is changed.
         self.contents = {side: Contents(records.get, self.schema, owner_history=True)
                          for side, records in (("base", base), (OURS, ours), (THEIRS, theirs))}
+        self.changes = {side: Changed(self.contents["base"], self.contents[side]) for side in (OURS, THEIRS)}
         self.conflicts: list[Conflict] = []
         self.out: dict[str, bytes] = {}
         self._set_attrs: dict[str, set] = {}
@@ -121,13 +123,27 @@ class _Merger:
         """Records with the same content on two sides."""
         return self.contents[x].record(key) == self.contents[y].record(key)
 
+    def changed(self, key, side, b, v) -> bool:
+        """Whether a side changed a record's content since the base (`b`, `v`: its bytes)."""
+        if b is None or v is None:
+            return b is not v
+        if b == v:
+            return self.changes[side].record(key, v)
+        return not self.same(key, "base", side)
+
     def same_value(self, ifc_type, attr, x, vx, y, vy) -> bool:
         """An attribute with the same content on two sides."""
         t = self.attr_types(ifc_type).get(attr)
         return canon(self.contents[x].value(vx, t)) == canon(self.contents[y].value(vy, t))
 
+    def value_changed(self, ifc_type, attr, side, b, v) -> bool:
+        """Whether a side changed an attribute's content since the base."""
+        if b == v:  # the same value, unless a shared value it refers to was edited in place
+            return attr != "OwnerHistory" and b is not None and self.changes[side].uses(canon(b))
+        return not self.same_value(ifc_type, attr, "base", b, side, v)
+
     def attr_types(self, ifc_type: str) -> dict:
-        return self.contents["base"]._attr_types(ifc_type)
+        return self.contents["base"].attr_types(ifc_type)
 
     def node(self, side, ref):
         """The entity behind a node reference on a side (for property names), or the value itself."""
@@ -144,19 +160,33 @@ class _Merger:
             b, o, t = self.base.get(key), self.ours.get(key), self.theirs.get(key)
             if o == t:
                 merged = o
-            elif o == b:
+            elif key.startswith("n/"):
+                merged = self.merge_node(key, b, o, t)
+            elif not self.changed(key, OURS, b, o):  # ours left its content alone (maybe re-encoded it)
                 merged = t
-            elif t == b:
-                merged = o
-            elif self.same(key, "base", OURS):  # ours only re-encoded it
-                merged = t
-            elif self.same(key, "base", THEIRS) or self.same(key, OURS, THEIRS):
+            elif not self.changed(key, THEIRS, b, t) or self.same(key, OURS, THEIRS):
                 merged = o
             else:
                 merged = self.both_changed(key, b, o, t)
             if merged is not None:
                 self.out[key] = merged
         return self.out
+
+    def merge_node(self, key, b, o, t):
+        """A shared value (n/) has no identity: the records using it carry its changes (above). Whether it
+        is a node at all depends on its referrers, so a side that stopped sharing it (deleted it) never
+        overrides an edit made in place on the other; values nothing uses are collected later."""
+        if o == b:
+            return t
+        if t == b:
+            return o
+        if o is None or t is None:
+            return o if t is None else t
+        if self.same(key, "base", OURS):
+            return t
+        if self.same(key, "base", THEIRS) or self.same(key, OURS, THEIRS):
+            return o
+        return self.both_changed(key, b, o, t)
 
     def both_changed(self, key, b, o, t):
         vb, vo, vt = _load(b), _load(o), _load(t)
@@ -199,13 +229,10 @@ class _Merger:
             b, o, t = ab.get(attr), ao.get(attr), at.get(attr)
             if o == t:
                 value = o
-            elif o == b:
+            elif not self.value_changed(ifc_type, attr, OURS, b, o):  # maybe re-encoded, not changed
                 value = t
-            elif t == b:
-                value = o
-            elif self.same_value(ifc_type, attr, "base", b, OURS, o):  # ours only re-encoded it
-                value = t
-            elif self.same_value(ifc_type, attr, "base", b, THEIRS, t) or self.same_value(ifc_type, attr, OURS, o, THEIRS, t):
+            elif not self.value_changed(ifc_type, attr, THEIRS, b, t) or \
+                    self.same_value(ifc_type, attr, OURS, o, THEIRS, t):
                 value = o
             elif attr == "OwnerHistory":  # edit bookkeeping (IFC2X3): this option's, never a question
                 value = o

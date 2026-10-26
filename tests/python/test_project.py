@@ -154,3 +154,27 @@ def test_owner_history_is_bookkeeping_not_content(project, tmp_path):
     shared.LastModifiedDate = 1790000500  # edited in place: keeps its node id
     status = project.status(write(f, tmp_path / "c.ifc"))
     assert status and not [c for c in status.items if c.key.startswith("o/")]
+
+
+def test_changes_survive_cyclic_anchor_references():
+    """Content comparison follows anchors from record to record; a cycle (never written by KimBim, but
+    records come from files) must end, not recurse forever."""
+    from kimbim.layout import blob_oid, key_to_path
+    from kimbim.project import _by_content
+    from kimbim.records import canon
+
+    def wall(gid, **attrs):
+        return canon({"a": {"GlobalId": gid, **attrs}, "t": "IfcWall"})
+
+    old = {"meta": canon({"k": "kimbim/1", "schema": "IFC4"}),
+           "o/A": wall("A", Description="x", ObjectPlacement={
+               "a": {"PlacementRelTo": {"@a": "B/ObjectPlacement"}}, "t": "IfcLocalPlacement"}),
+           "o/B": wall("B", ObjectPlacement={"a": {}, "t": "IfcLocalPlacement"}, Representation={
+               "a": {"Description": {"@a": "A/ObjectPlacement"}, "Representations": []},
+               "t": "IfcProductDefinitionShape"})}
+    new = {**old, "o/C": wall("C", Name="new")}
+    entries = {key_to_path(k): blob_oid(v) for k, v in old.items()}
+    paths = {key_to_path(k): v for k, v in new.items()}
+    oids = {p: blob_oid(v) for p, v in paths.items()}
+    added, modified, removed = _by_content(entries, {}, lambda oids: [], paths, oids, [key_to_path("o/C")], [], [])
+    assert added == [key_to_path("o/C")] and modified == [] and removed == []

@@ -10,7 +10,7 @@ import ifcopenshell
 import pytest
 
 from kimbim.layout import blob_oid, key_to_path
-from kimbim.merge import merge_records
+from kimbim.merge import OURS, THEIRS, merge_records
 from kimbim.nodeids import decompose_against_head
 from kimbim.records import compose, decompose
 
@@ -353,3 +353,35 @@ def test_a_set_member_reencoded_on_one_side_is_kept_once():
     assert r.clean, r.conflicts
     items = json.loads(r.records["n/r"])["a"]["Items"]
     assert sorted(i["a"]["Depth"] for i in items) == [1.0, 2.0, 3.0, 4.0]
+
+
+def _shared_point_sides():
+    """Base: walls A and B share the point node p. Ours deletes B, so p is stored inline in A again (a
+    re-encoding); theirs moves p in place (same node id, so A's and B's bytes don't change)."""
+    base = {"meta": META, "o/A": _wall("A", {"@n": "p"}), "o/B": _wall("B", {"@n": "p"}), "n/p": _rec(_point(0.0))}
+    ours = {"meta": META, "o/A": _wall("A", _point(0.0))}
+    theirs = {"meta": META, "o/A": _wall("A", {"@n": "p"}), "o/B": _wall("B", {"@n": "p"}), "n/p": _rec(_point(5.0))}
+    return base, ours, theirs
+
+
+def _location(records, key):
+    from kimbim.records import compose
+
+    wall = [w for w in compose(records).by_type("IfcWall") if w.GlobalId == key[2:]][0]
+    return wall.ObjectPlacement.RelativePlacement.Location.Coordinates
+
+
+def test_a_shared_value_edited_in_place_beats_a_reencoding():
+    """The move made in place (theirs) reaches A, whose bytes only ours changed (by re-encoding it); B,
+    deleted by ours and moved by theirs, is a delete/modify conflict, not a silent delete."""
+    base, ours, theirs = _shared_point_sides()
+    r = merge_records(base, ours, theirs)
+    assert [(c.kind, c.key) for c in r.conflicts] == [("delete_modify", "o/B")]
+    assert _location(r.records, "o/A") == (5.0, 0.0, 0.0)
+    kept = merge_records(base, ours, theirs, {"o/B": THEIRS}).records
+    assert _location(kept, "o/A") == _location(kept, "o/B") == (5.0, 0.0, 0.0)
+    gone = merge_records(base, ours, theirs, {"o/B": OURS}).records
+    assert "o/B" not in gone and _location(gone, "o/A") == (5.0, 0.0, 0.0)
+    # The same with the sides swapped.
+    r = merge_records(base, theirs, ours, {"o/B": OURS})
+    assert r.clean and _location(r.records, "o/A") == _location(r.records, "o/B") == (5.0, 0.0, 0.0)

@@ -14,7 +14,7 @@ import ifcopenshell
 import ifcopenshell.validate
 
 from . import _core
-from .content import Contents, ref_key, references, schema_of, without_owner_history
+from .content import Changed, Contents, schema_of, without_owner_history
 from .layout import (META_PATH, SETTINGS_PATH, WORK_FILES_DIR, blob_oid, is_file_path, is_record_path, key_to_path,
                      path_to_key, referenced_files)
 from .nodeids import decompose_against_head
@@ -149,45 +149,22 @@ def _by_content(old_entries: dict[str, str], old_blobs: dict[str, bytes], read_b
 
     schema = schema_of(new_get("meta") or old_get("meta"))
     old_c, new_c = Contents(old_get, schema), Contents(new_get, schema)
-    changed: dict[tuple[str, str], bool] = {}
-
-    def ref_changed(kind: str, ident: str) -> bool:
-        k = (kind, ident)
-        if k not in changed:
-            p = key_to_path(ref_key(kind, ident))
-            data, oid = new_paths.get(p), old_entries.get(p)
-            if data is None or oid is None:
-                changed[k] = True
-            elif oid == new_oids[p] and (kind == "n" or not references(data)):
-                # same bytes: changed exactly when a value it refers to changed (no digest needed)
-                changed[k] = any(ref_changed(*r) for r in references(data))
-            elif oid == new_oids[p] and not any(ref_changed(*r) for r in references(data)):
-                changed[k] = False  # an anchor in an unchanged record
-            else:
-                changed[k] = old_c.ref(kind, ident) != new_c.ref(kind, ident)
-        return changed[k]
+    changed = Changed(old_c, new_c)
 
     def content(p: str) -> bool:
         return p.startswith(("objects/", "nodes/", "loose/"))
 
-    def uses_changed(p: str) -> bool:
-        """For a record with the same structure and references on both sides: whether a value it refers
-        to changed (an inline owner history's references are bookkeeping: the digests decide)."""
-        data = new_paths[p]
-        if not any(ref_changed(*r) for r in references(data)):
-            return False
-        return b'"OwnerHistory":{"a"' not in data or old_c.record(path_to_key(p)) != new_c.record(path_to_key(p))
-
     def same(p: str) -> bool:
         key = path_to_key(p)
         if without_owner_history(json.loads(old_get(key))) == without_owner_history(json.loads(new_paths[p])):
-            return not uses_changed(p)  # a common case: only its owner history re-encoded
+            return not changed.record(key, new_paths[p])  # a common case: only its owner history re-encoded
         return old_c.record(key) == new_c.record(key)
 
     kept = [p for p in modified if not content(p) or not same(p)]
     touched = set(modified)
     for p in new_paths:  # same bytes, but a shared value it uses changed
-        if p.startswith(("objects/", "loose/")) and p not in touched and p in old_entries and uses_changed(p):
+        if p.startswith(("objects/", "loose/")) and p not in touched and p in old_entries and \
+                changed.record(path_to_key(p), new_paths[p]):
             kept.append(p)
     gone: dict[str, list[str]] = {}
     for p in removed:
