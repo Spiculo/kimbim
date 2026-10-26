@@ -6,7 +6,7 @@ import pytest
 
 from kimbim import app_bridge as B
 from kimbim.agent import catalogue
-from kimbim.agent.catalogue import AgentError, bridge, call_tool, tool, validate
+from kimbim.agent.catalogue import AgentError, ToolResult, bridge, call_tool, tool, validate
 
 
 class _Tasks:
@@ -116,6 +116,7 @@ def test_write_is_one_undo_step(opened, tools):
     assert sorted(g["guid"] for g in r["changes"]["modified"]) == sorted(opened[:2])
     assert r["changes"]["modified"][0]["label"] == "Wall Agent"
     assert r["changes"]["counts"] == {"added": 0, "modified": 2, "removed": 0}
+    assert set(r) == {"ok", "result", "changes"} and "dry_run" not in r["changes"]
     assert session.tasks.calls and session.tasks.calls[0][0] == "cli"
     assert len(B._ids) == 1 and B._current_id() != start
     assert json.loads(B.undo())["ok"]
@@ -127,7 +128,7 @@ def test_dry_run_rolls_back(opened, tools):
     before = _names(opened)
     start = B._current_id()
     r = call_tool(session, "test.rename", {"guids": opened[:2], "name": "Agent", "dry_run": True})
-    assert r["ok"] and r["dry_run"], r
+    assert r["ok"] and r["changes"]["dry_run"] is True and set(r) == {"ok", "result", "changes"}, r
     assert r["changes"]["counts"]["modified"] == 2
     assert _names(opened) == before
     assert B._current_id() == start and not B._ids and not B._future_ids and not B._model.future
@@ -220,12 +221,76 @@ def test_write_tool_schema_has_dry_run(tools):
     assert "dry_run" not in catalogue.TOOLS["test.count"].params["properties"]
 
 
-def test_inside_an_open_step_joins_it(opened, tools):
+def test_write_tool_refused_inside_an_open_step(opened, tools):
     from kimbim import console
 
+    session = _Session()
+    before = _names(opened)
     with console.edit():
-        r = call_tool(_Session(), "test.rename", {"guids": opened[:1], "name": "Joined"})
-        assert r["ok"] and r["changes"]["counts"]["modified"] == 1
-        assert call_tool(_Session(), "test.rename", {"guids": opened[:1], "name": "X", "dry_run": True}
-                         )["error"]["code"] == "bad_input"
-    assert len(B._ids) == 1 and _names(opened[:1]) == ["Joined"]
+        for args in ({"guids": opened[:1], "name": "Joined"}, {"guids": opened[:1], "name": "X", "dry_run": True}):
+            r = call_tool(session, "test.rename", args)
+            assert r["error"]["code"] == "bad_input" and r["error"]["hint"], r
+        assert call_tool(session, "test.count", {"ifc_class": "IfcWall"})["ok"]  # reads still work
+    assert _names(opened) == before and not B._ids and session.tasks.calls == []
+
+
+def test_warnings_only_when_there_are_some(opened, tools):
+    @tool("test.warn", {"type": "object", "properties": {"n": {"type": "integer"}}})
+    def warn(session, n=0):
+        """Return warnings."""
+        return ToolResult({"n": n}, warnings=[f"w{i}" for i in range(n)])
+
+    try:
+        assert call_tool(_Session(), "test.warn", {"n": 2}) == {"ok": True, "result": {"n": 2},
+                                                                "warnings": ["w0", "w1"]}
+        assert call_tool(_Session(), "test.warn", {}) == {"ok": True, "result": {"n": 0}}
+    finally:
+        catalogue.TOOLS.pop("test.warn")
+
+
+@pytest.fixture
+def profile_tool(tmp_path):
+    """A project with a closed polyline, and a write tool saving it as a wall profile: configure.save_wall_profile
+    is a `_run_settings` bridge call that changes the project settings only."""
+    from kimbim import configure
+
+    assert json.loads(B.new_project("Settings"))["ok"]
+    level = json.loads(B.storeys())["storeys"][0]["guid"]
+    pts = [[0, 0], [0.3, 0], [0.3, 3], [0, 3]]
+    d = json.loads(B.add_drafting(level, "polyline", json.dumps(pts), json.dumps({"closed": True})))
+    assert d["ok"], d
+
+    @tool("test.profile", {"type": "object", "properties": {"fail": {"type": "boolean"}}}, writes=True)
+    def profile(session, fail=False):
+        """Save the polyline as a wall profile."""
+        bridge(configure.save_wall_profile, d["guid"], "Agent")
+        if fail:
+            raise AgentError("no_match")
+        return {}
+
+    yield configure.profiles
+    catalogue.TOOLS.pop("test.profile")
+
+
+def test_dry_run_restores_settings(profile_tool):
+    start = B._current_id()
+    r = call_tool(_Session(), "test.profile", {"dry_run": True})
+    assert r["ok"] and r["changes"]["dry_run"], r
+    assert "Agent" not in profile_tool() and B._current_id() == start and not B._future_ids
+
+
+def test_undo_restores_settings(profile_tool):
+    start = B._current_id()
+    r = call_tool(_Session(), "test.profile", {})
+    assert r["ok"], r
+    assert "Agent" in profile_tool() and B._current_id() != start  # a settings-only change is a step
+    assert json.loads(B.undo())["ok"]
+    assert "Agent" not in profile_tool() and B._current_id() == start
+    assert json.loads(B.redo())["ok"]
+    assert "Agent" in profile_tool()
+
+
+def test_failure_restores_settings(profile_tool):
+    start = B._current_id()
+    assert call_tool(_Session(), "test.profile", {"fail": True})["error"]["code"] == "no_match"
+    assert "Agent" not in profile_tool() and B._current_id() == start

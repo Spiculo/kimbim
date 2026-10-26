@@ -2,8 +2,12 @@
 """The agent tool catalogue (D102): tools register with @tool, `call_tool` validates the input, runs a write
 tool as one undo step (or a dry run) inside the task gate, and wraps everything in the JSON envelope
 
-    {"ok": true, "result": ..., "changes"?: {...}, "dry_run"?: true}
+    {"ok": true, "result": ..., "changes"?: {..., "dry_run"?: true}, "warnings"?: [...]}
     {"ok": false, "error": {"code", "message", "hint"?, "details"?}}
+
+`changes` comes with every write tool (`dry_run: true` in it when the call was rolled back). A tool returns
+its result, or `ToolResult(result, warnings=[...])` to add warnings (in the envelope only when there are any).
+Write tools are refused while another undo step is open (a console run or edit() block).
 
 The CLI and the MCP server both call `call_tool`; tools never re-implement modelling, they call the bridge
 through `bridge(fn, *args)`.
@@ -13,7 +17,7 @@ from __future__ import annotations
 import inspect
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable
 
 from . import messages, steps
@@ -53,6 +57,18 @@ class Tool:
 
 
 TOOLS: dict[str, Tool] = {}
+
+
+@dataclass
+class ToolResult:
+    """What a tool returns when it has warnings for the agent (EN/ES text, e.g. from `messages.text`)."""
+    result: object = None
+    warnings: list[str] = field(default_factory=list)
+
+
+def _unwrap(out) -> tuple:
+    return (out.result, list(out.warnings)) if isinstance(out, ToolResult) else (out, [])
+
 
 _DRY_RUN = {"type": "boolean", "description": "Report what would change, then roll it back."}
 
@@ -179,6 +195,15 @@ def _title(name: str, args: dict) -> str:
     return " ".join([name, *words])[:80]
 
 
+def _ok(result, changes, warnings) -> dict:
+    envelope = {"ok": True, "result": result}
+    if changes is not None:
+        envelope["changes"] = changes
+    if warnings:
+        envelope["warnings"] = warnings
+    return envelope
+
+
 def call_tool(session, name: str, args: dict, *, client: str = "cli", task_id: str = "") -> dict:
     """Run tool `name` with `args` and return its envelope. Never raises."""
     try:
@@ -190,15 +215,18 @@ def call_tool(session, name: str, args: dict, *, client: str = "cli", task_id: s
         args = dict(args)
         dry_run = bool(args.pop("dry_run", False)) if t.writes else False
         if not t.writes:
-            return {"ok": True, "result": t.fn(session, **args)}
+            result, warnings = _unwrap(t.fn(session, **args))
+            return _ok(result, None, warnings)
+        if B._step is not None:  # inside a console run or edit() block: refused before any task starts
+            raise AgentError("bad_input", hint=messages.text("hint_open_step"))
         if t.needs_task and not dry_run:  # a dry run changes nothing, so it starts no task
             session.tasks.for_write(client, task_id, title=_title(name, args))
         with steps.step(dry_run) as changes:
-            result = t.fn(session, **args)
-        envelope = {"ok": True, "result": result, "changes": changes.to_dict(getattr(session, "label", None))}
+            result, warnings = _unwrap(t.fn(session, **args))
+        summary = changes.to_dict(getattr(session, "label", None))
         if dry_run:
-            envelope["dry_run"] = True
-        return envelope
+            summary["dry_run"] = True
+        return _ok(result, summary, warnings)
     except AgentError as ex:
         return ex.envelope()
     except Exception as ex:  # noqa: BLE001  (an agent sees an error, the process carries on)

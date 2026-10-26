@@ -130,36 +130,43 @@ def _drop_last_undo(saved_future) -> None:
 def step(dry_run: bool = False):
     """`with step(dry_run) as changes:` the block's edits are one undo step; on exit `changes` says what was
     added, modified and removed. A dry run then undoes the step and leaves no trace in the history. On an
-    exception the step is rolled back and the exception re-raised, so a failing call leaves nothing."""
+    exception the step is rolled back and the exception re-raised, so a failing call leaves nothing.
+    Project settings changed in the step (`_run_settings` bridge calls, D92) are undone with it."""
+    from .. import settings as S
+    from . import messages
     from .catalogue import AgentError
 
     if B._model is None:
         raise AgentError("no_model")
+    if B._step is not None:  # a console run or edit() block: its rollback can't be told apart from ours
+        raise AgentError("bad_input", hint=messages.text("hint_open_step"))
     changes = Changes()
-    if B._step is not None:  # already inside an open step (a console run): join it
-        if dry_run:
-            from . import messages
-
-            raise AgentError("bad_input", hint=messages.text("hint_nested_dry_run"))
-        tx = B._model.transaction
-        start = len(tx.operations) if tx else 0
-        marks = (len(B._step[0]), len(B._step[1]))
-        yield changes
-        found = _summarise(B._model, tx.operations[start:] if tx else None,
-                           B._step[0][marks[0]:], B._step[1][marks[1]:])
-        changes.__dict__.update(found.__dict__)
-        return
     saved_future = (list(B._model.future), list(B._future_ids), list(B._future_deltas),
                     list(B._future_drawing_ids), list(B._future_settings_before))
+    settings_before = S.current()
     B._begin()
     B._step = ([], [])
     try:
         yield changes
         reported = B._step
-        kept = console._finish_step()  # runs the follow-ups (rooms re-fitted, ...) inside the step
+        if S.current() != settings_before:
+            # a joined `_run_settings` clears its snapshot before the step closes: the step carries ours
+            B._pending_settings = settings_before
+            tx = B._model.transaction
+            if not (tx and tx.operations) and not reported[0] and not reported[1]:
+                B._step = None  # a settings-only step is still a step (console._finish_step would drop it)
+                B._commit(0, [], [])
+                kept = True
+            else:
+                kept = console._finish_step()
+        else:
+            kept = console._finish_step()  # runs the follow-ups (rooms re-fitted, ...) inside the step
     except BaseException as failure:
         B._step = None
-        B._abort(failure)
+        try:
+            B._abort(failure)
+        finally:
+            S.restore(settings_before)
         raise
     if kept:
         operations = B._model.history[-1].operations if B._model.history else None

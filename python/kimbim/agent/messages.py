@@ -36,8 +36,9 @@ MESSAGES = {
     "hint_type": {"en": "{field} must be {type}.", "es": "{field} debe ser {type}."},
     "hint_enum": {"en": "{field} must be one of: {values}.", "es": "{field} debe ser uno de: {values}."},
     "hint_form": {"en": "{field} does not have an accepted form.", "es": "{field} no tiene una forma aceptada."},
-    "hint_nested_dry_run": {"en": "dry_run is not available inside another undo step.",
-                            "es": "dry_run no está disponible dentro de otro paso de deshacer."},
+    "hint_open_step": {"en": "Write tools can't run inside another undo step (a console run or edit() block).",
+                       "es": "Las herramientas de escritura no pueden ejecutarse dentro de otro paso de deshacer "
+                             "(una ejecución de la consola o un bloque edit())."},
 }
 
 _ORG = _APP = "KimBim"  # app/src/main.cpp
