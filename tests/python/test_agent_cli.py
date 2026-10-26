@@ -81,7 +81,7 @@ def test_widen_windows_cli(house, capsys):
     assert code == 0 and env["ok"], (env, err)
     windows = [m for m in env["changes"]["modified"] if m["label"].startswith("Window")]
     assert len(windows) == 4
-    assert env["task"]["status"] == "ready"  # the write's own task was finished: nothing is left open
+    assert env["changes"]["task"]["status"] == "ready"  # the write's own task was finished: nothing is left open
     code, env, _ = envelope(capsys, house, "task", "status")
     assert code == 0 and env["result"]["task"] is None
     code, out, _ = run(capsys, house, "elements", "set-dimensions", "--elements", '{"kind":"door"}',
@@ -130,7 +130,7 @@ def test_task_env(house, capsys, monkeypatch):
     monkeypatch.setenv("KIMBIM_TASK", task_id)
     code, env, err = envelope(capsys, house, "elements", "rename", "--elements", '{"kind":"wall"}', "--name", "X",
                               "--client", "t")
-    assert code == 0 and "task" not in env, (env, err)  # an explicit task is not finished by the write
+    assert code == 0 and "task" not in env["changes"], (env, err)  # an explicit task is not finished by the write
     code, env, _ = envelope(capsys, house, "task", "status", "--client", "t")
     assert env["result"]["task"]["id"] == task_id and env["result"]["changes"]["modified"]
     monkeypatch.setenv("KIMBIM_TASK", "nope")
@@ -294,7 +294,7 @@ def test_no_changes_reads_naturally():
     assert cli.summarize("levels.add", {"ok": True, "result": {}, "changes": {}}, {}) == "No changes"
 
 
-def test_finish_failure_is_reported_with_the_write(house, capsys, monkeypatch):
+def _failing_finish(monkeypatch):
     from kimbim.agent import catalogue
 
     real = catalogue.call_tool
@@ -305,5 +305,29 @@ def test_finish_failure_is_reported_with_the_write(house, capsys, monkeypatch):
         return real(session, name, args, **kw)
 
     monkeypatch.setattr(cli, "call_tool", failing)
-    code, out, err = run(capsys, house, "elements", "rename", "--elements", '{"kind":"door"}', "--name", "P")
+
+
+ARGV = ["elements", "rename", "--elements", '{"kind":"door"}', "--name", "P"]
+
+
+def test_finish_failure_is_reported_with_the_write(house, capsys, monkeypatch):
+    _failing_finish(monkeypatch)
+    code, out, err = run(capsys, house, *ARGV)
     assert code == 1 and "Renamed" in out and "disk full" in err
+
+
+def test_finish_failure_json_is_an_error_envelope(house, capsys, monkeypatch):
+    _failing_finish(monkeypatch)
+    code, env, _ = envelope(capsys, house, *ARGV)
+    assert code == 1 and env["ok"] is False and set(env) == {"ok", "error"}
+    assert env["error"]["code"] == "bridge_error" and env["error"]["hint"] == "disk full"
+    write = env["error"]["details"]["write"]
+    assert write["result"]["elements"] == 2 and write["changes"]["modified"]
+
+
+def test_json_envelope_keeps_its_shape(house, capsys):
+    code, env, _ = envelope(capsys, house, "elements", "rename", "--elements", '{"kind":"door"}', "--name", "Q")
+    assert code == 0 and set(env) <= {"ok", "result", "changes", "warnings"}
+    assert env["changes"]["task"]["status"] == "ready"
+    code, env, _ = envelope(capsys, house, "elements", "find", "--elements", '{"kind":"window","name":"Nope"}')
+    assert code == 1 and set(env) == {"ok", "error"}

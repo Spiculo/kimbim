@@ -235,9 +235,12 @@ def _run_in_process(project: str, name: str, args: dict, client: str, task: str)
             done = call_tool(session, "task.finish", {"summary": f"kimbim {name.replace('.', ' ')}"},
                              client=client, task_id=implicit)
             if done.get("ok"):
-                envelope["task"] = done["result"]["task"]
-            else:  # the write is made; the report says both
-                envelope["finish_error"] = done["error"]
+                envelope.setdefault("changes", {})["task"] = done["result"]["task"]
+            else:  # the write is made: the error says so, with the write's result
+                error = dict(done["error"])
+                error["details"] = {**error.get("details", {}), "write": {
+                    k: envelope[k] for k in ("result", "changes") if k in envelope}}
+                return {"ok": False, "error": error}
         return envelope
     finally:
         _stop(session)
@@ -334,7 +337,7 @@ def summarize(name: str, envelope: dict, args: dict | None = None) -> str:
             return _t("sum_no_changes")
         what = ", ".join(counts)
         line = _t("sum_would", what=what) if changes.get("dry_run") else _t("sum_changed", what=what)
-        task = envelope.get("task")
+        task = changes.get("task")
         return line + (_t("sum_task", id=task["id"], status=task["status"]) if task else "")
     if isinstance(result, dict) and result:
         return ", ".join(f"{k}: {_brief(v)}" for k, v in result.items())
@@ -350,19 +353,19 @@ def _error_lines(error: dict) -> None:
 
 
 def _report(name: str, envelope: dict, as_json: bool, args: dict | None = None) -> int:
-    failed = not envelope.get("ok") or "finish_error" in envelope
     if as_json:
         print(json.dumps(envelope, ensure_ascii=False, indent=1, default=str))
-        return 1 if failed else 0
+        return 0 if envelope.get("ok") else 1
     if not envelope.get("ok"):
-        _error_lines(envelope.get("error") or {})
+        error = envelope.get("error") or {}
+        write = (error.get("details") or {}).get("write")
+        if write:  # the write is made but its task did not finish: say what it did, then the error
+            print(summarize(name, {"ok": True, **write}, args))
+        _error_lines(error)
         return 1
     print(summarize(name, envelope, args))
     for w in envelope.get("warnings", ()):
         print(_t("cli_warning", message=w), file=sys.stderr)
-    if "finish_error" in envelope:
-        _error_lines(envelope["finish_error"])
-        return 1
     return 0
 
 
