@@ -45,4 +45,4 @@ def settings(session, keys=None):
 @tool("levels.list", {})
 def levels_list(session):
     """List the levels from the lowest: GlobalId, name, elevation, height to the next level and element count."""
-    return json.loads(L.levels_table())["levels"]
+    return {"levels": json.loads(L.levels_table())["levels"], "unit": "m"}  # metres, like every tool number

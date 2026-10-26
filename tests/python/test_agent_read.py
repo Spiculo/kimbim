@@ -57,7 +57,9 @@ def test_settings_and_levels(s):
     r = run(s, "project.settings", keys=["length_unit"])
     assert r["result"] == {"length_unit": "m"}
     assert "length_unit" in run(s, "project.settings")["result"]
-    rows = run(s, "levels.list")["result"]
+    levels = run(s, "levels.list")["result"]
+    assert levels["unit"] == "m"
+    rows = levels["levels"]
     assert [x["name"] for x in rows][:2] == ["Level 1", "Level 2"]
 
 
@@ -71,7 +73,9 @@ def test_find_windows_level(s):
 
 def test_find_no_match(s):
     assert run(s, "elements.find", elements={"kind": "window", "level": "Level 9"})["error"]["code"] == "not_found"
-    assert run(s, "elements.find", elements={"kind": "furniture"})  # the house has a roof, no furniture["error"]["code"] == "no_match"
+    # the house has no HVAC
+    assert run(s, "elements.find", elements={"kind": "hvac"})["error"]["code"] == "no_match"
+    assert run(s, "elements.find", elements=[])["error"]["code"] == "no_match"
     assert run(s, "elements.find", elements="selection")["error"]["code"] == "needs_app"
     assert run(s, "elements.find", elements=["nope"])["error"]["code"] == "not_found"
 
@@ -91,8 +95,6 @@ def test_get_dimensions(s):
     assert item["dimensions"]["values"]["Width"] == pytest.approx(1.2)
     assert item["dimensions"]["unit"] == "m" and item["class"] == "IfcWindow"
     assert item["host"] and item["level"] == "Level 1"
-    wall = run(s, "elements.get", elements={"kind": "wall", "level": "Level 1", "name": item.get("x", "")}) \
-        if False else None
     wall = run(s, "elements.get", elements=[item["host"]])["result"]["items"][0]
     assert g in wall["openings"]
 
@@ -108,3 +110,9 @@ def test_paging(s):
             break
     assert len(seen) == 8 and len(set(seen)) == 8
     assert run(s, "elements.find", elements={"kind": "wall"}, cursor="x")["error"]["code"] == "bad_input"
+
+
+def test_limit_bounds(s):
+    for bad in (0, 1001, -5):
+        assert run(s, "elements.find", elements={"kind": "wall"}, limit=bad)["error"]["code"] == "bad_input"
+    assert run(s, "elements.get", elements={"kind": "wall"}, limit=0)["error"]["code"] == "bad_input"

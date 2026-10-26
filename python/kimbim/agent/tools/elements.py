@@ -30,12 +30,12 @@ def _level_name(e) -> str:
 
 @tool("elements.find", {"required": ["elements"], "properties": {
     "elements": SELECTOR,
-    "limit": {"type": "integer", "description": "Page size (default 200)."},
+    "limit": {"type": "integer", "minimum": 1, "maximum": 1000, "description": "Page size (default 200)."},
     "cursor": {"type": "string", "description": "next_cursor from the previous page."}}})
 def find(session, elements, limit=200, cursor=""):
     """Find elements and list them: GlobalId, label, kind and level, a page at a time."""
     guids = session.resolve(elements)
-    start, limit = _offset(cursor), max(1, int(limit))
+    start, limit = _offset(cursor), int(limit)
     items = []
     for g in guids[start:start + limit]:
         e = B._model.by_guid(g)
@@ -58,11 +58,11 @@ def _related(e) -> dict:
 
 
 @tool("elements.get", {"required": ["elements"], "properties": {
-    "elements": SELECTOR, "limit": {"type": "integer", "description": "Most elements to describe (default 50)."}}})
+    "elements": SELECTOR, "limit": {"type": "integer", "minimum": 1, "maximum": 1000, "description": "Most elements to describe (default 50)."}}})
 def get(session, elements, limit=50):
     """Describe elements in full: class, type, level, dimensions (metres), property sets, host and openings."""
     guids = session.resolve(elements)
-    limit = max(1, int(limit))
+    limit = int(limit)
     out = []
     for g in guids[:limit]:
         e = B._model.by_guid(g)

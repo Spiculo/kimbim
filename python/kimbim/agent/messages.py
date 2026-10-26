@@ -35,6 +35,8 @@ MESSAGES = {
     "hint_unknown_field": {"en": "Unknown field {field}.", "es": "Campo desconocido {field}."},
     "hint_type": {"en": "{field} must be {type}.", "es": "{field} debe ser {type}."},
     "hint_enum": {"en": "{field} must be one of: {values}.", "es": "{field} debe ser uno de: {values}."},
+    "hint_range": {"en": "{field} must be between {minimum} and {maximum}.",
+                   "es": "{field} debe estar entre {minimum} y {maximum}."},
     "hint_form": {"en": "{field} does not have an accepted form.", "es": "{field} no tiene una forma aceptada."},
     "hint_open_step": {"en": "Write tools can't run inside another undo step (a console run or edit() block).",
                        "es": "Las herramientas de escritura no pueden ejecutarse dentro de otro paso de deshacer "

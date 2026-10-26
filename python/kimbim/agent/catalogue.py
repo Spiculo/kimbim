@@ -148,7 +148,7 @@ def _bad(code: str, **fmt):
 
 def validate(schema: dict, value, path: str = "input") -> None:
     """Check `value` against `schema`: type (one or a list), required, properties, additionalProperties,
-    enum, items and oneOf. Raises AgentError("bad_input") with a hint naming the field."""
+    enum, minimum/maximum, items and oneOf. Raises AgentError("bad_input") with a hint naming the field."""
     if "oneOf" in schema:
         matches = 0
         for option in schema["oneOf"]:
@@ -167,6 +167,11 @@ def validate(schema: dict, value, path: str = "input") -> None:
     if "enum" in schema and value not in schema["enum"]:
         raise _bad("hint_enum", field=path, values=", ".join(json.dumps(v, ensure_ascii=False)
                                                              for v in schema["enum"]))
+    if _is_type(value, "number") and not isinstance(value, bool):
+        for bound, ok in (("minimum", lambda v, b: v >= b), ("maximum", lambda v, b: v <= b)):
+            if bound in schema and not ok(value, schema[bound]):
+                raise _bad("hint_range", field=path, minimum=schema.get("minimum", "-inf"),
+                           maximum=schema.get("maximum", "inf"))
     if isinstance(value, dict):
         props = schema.get("properties") or {}
         for key in schema.get("required") or ():
