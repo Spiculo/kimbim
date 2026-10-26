@@ -2,6 +2,7 @@
 """Agent sessions open .kim, folders and IFC the way the app does (D102)."""
 import json
 
+import ifcopenshell
 import pytest
 
 from kimbim import app_bridge as B
@@ -50,7 +51,12 @@ def test_open_plain_ifc(model, tmp_path, monkeypatch):
     s = Session.open(str(ifc))
     assert s.kind == "ifc" and s.work == ""
     assert len(s.resolve(_walls())) == 2
+    assert K.display_user == "KimBim agent"
+    assert json.loads(B.set_name(json.dumps(_walls()[:1]), "Saved"))["ok"]
+    s.save()
     s.close()
+    assert K.display_user == ""
+    assert "Saved" in [w.Name for w in ifcopenshell.open(str(ifc)).by_type("IfcWall")]
 
 
 def test_open_folder(kim, tmp_path):
@@ -71,6 +77,15 @@ def test_locked_kim(kim):
     assert ex.value.code == "project_locked"
     assert ex.value.extra["holder"]["user"] == "Ana"
     assert K.display_user == ""
+
+
+def test_open_model_failure_cleans_up(kim, monkeypatch):
+    monkeypatch.setattr(B, "open_model", lambda path: json.dumps({"ok": False, "error": "x"}))
+    with pytest.raises(AgentError):
+        Session.open(str(kim))
+    assert not K.lock_path(kim).exists()
+    assert K.display_user == ""
+    assert D._pending is None
 
 
 def test_resolve_unknown(kim):

@@ -190,6 +190,20 @@ def _prepare(project_dir: pathlib.Path, files_dir: pathlib.Path, doc: dict, atta
     return working
 
 
+def discard_pending() -> None:
+    """Undo an open_kim/open_folder/import_ifc whose model never opened: release its lock and drop the note
+    (and the working folder of a .kim; a project folder is the user's own and stays)."""
+    global _pending
+    p, _pending = _pending, None
+    if p is None:
+        return
+    doc = p["doc"]
+    if doc["lock"]:
+        K.release(doc["lock"])
+    if doc["mode"] in ("kim", "template") and doc["work"]:
+        K.remove_tree(doc["work"])
+
+
 def open_kim(path: str, read_only: str = "") -> str:
     kim = pathlib.Path(path)
     try:

@@ -62,6 +62,8 @@ class Session:
                 raise AgentError("project_locked", holder=out["locked"])
             if out.get("ok"):
                 out = json.loads(B.open_model(out["path"]))
+                if not out.get("ok"):
+                    D.discard_pending()
         if not out.get("ok"):
             raise AgentError("bridge_error", hint=str(out.get("error") or ""))
 
@@ -70,15 +72,17 @@ class Session:
             out = json.loads(B.save())
         else:
             out = json.loads(D.save_document())
-        if not out.get("ok", True):
+        if not out.get("ok"):
             raise AgentError("bridge_error", hint=str(out.get("error") or ""))
 
     def close(self) -> None:
         if self._closed:
             return
         self._closed = True
-        D.close_document()
-        K.display_user = self._saved_user
+        try:
+            D.close_document()
+        finally:
+            K.display_user = self._saved_user
 
     def resolve(self, selector) -> list[str]:
         """GlobalIds for a selector. Task 4 adds query selectors and "selection"."""
