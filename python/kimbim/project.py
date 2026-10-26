@@ -14,6 +14,7 @@ import ifcopenshell
 import ifcopenshell.validate
 
 from . import _core
+from .content import Contents, ref_key, references, schema_of, without_owner_history
 from .layout import (META_PATH, SETTINGS_PATH, WORK_FILES_DIR, blob_oid, is_file_path, is_record_path, key_to_path,
                      path_to_key, referenced_files)
 from .nodeids import decompose_against_head
@@ -124,6 +125,83 @@ def _git_config(key: str) -> str | None:
     return out.stdout.strip() or None
 
 
+def _by_content(old_entries: dict[str, str], old_blobs: dict[str, bytes], read_blobs, new_paths: dict[str, bytes],
+                new_oids: dict[str, str], added: list[str], modified: list[str], removed: list[str]):
+    """The record changes by content (kimbim.content, Task 11b): a record only re-encoded (a value it
+    shares became a node, so its reference changed) is not modified; an element or loose value whose
+    shared value was edited in place (same bytes, same node id) is. Loose values re-keyed by a
+    re-encoding cancel out. Owner histories are bookkeeping, not content. Shared values (n/) keep their
+    own entries when their bytes change: they are storage, reported as such. Returns (added, modified,
+    removed) paths."""
+    def old_get(key):
+        p = key_to_path(key)
+        oid = old_entries.get(p)
+        if oid is None:
+            return None
+        if new_oids.get(p) == oid:
+            return new_paths[p]
+        if p not in old_blobs:
+            old_blobs[p] = read_blobs([oid])[0]
+        return old_blobs[p]
+
+    def new_get(key):
+        return new_paths.get(key_to_path(key))
+
+    schema = schema_of(new_get("meta") or old_get("meta"))
+    old_c, new_c = Contents(old_get, schema), Contents(new_get, schema)
+    changed: dict[tuple[str, str], bool] = {}
+
+    def ref_changed(kind: str, ident: str) -> bool:
+        k = (kind, ident)
+        if k not in changed:
+            p = key_to_path(ref_key(kind, ident))
+            data, oid = new_paths.get(p), old_entries.get(p)
+            if data is None or oid is None:
+                changed[k] = True
+            elif oid == new_oids[p] and (kind == "n" or not references(data)):
+                # same bytes: changed exactly when a value it refers to changed (no digest needed)
+                changed[k] = any(ref_changed(*r) for r in references(data))
+            elif oid == new_oids[p] and not any(ref_changed(*r) for r in references(data)):
+                changed[k] = False  # an anchor in an unchanged record
+            else:
+                changed[k] = old_c.ref(kind, ident) != new_c.ref(kind, ident)
+        return changed[k]
+
+    def content(p: str) -> bool:
+        return p.startswith(("objects/", "nodes/", "loose/"))
+
+    def uses_changed(p: str) -> bool:
+        """For a record with the same structure and references on both sides: whether a value it refers
+        to changed (an inline owner history's references are bookkeeping: the digests decide)."""
+        data = new_paths[p]
+        if not any(ref_changed(*r) for r in references(data)):
+            return False
+        return b'"OwnerHistory":{"a"' not in data or old_c.record(path_to_key(p)) != new_c.record(path_to_key(p))
+
+    def same(p: str) -> bool:
+        key = path_to_key(p)
+        if without_owner_history(json.loads(old_get(key))) == without_owner_history(json.loads(new_paths[p])):
+            return not uses_changed(p)  # a common case: only its owner history re-encoded
+        return old_c.record(key) == new_c.record(key)
+
+    kept = [p for p in modified if not content(p) or not same(p)]
+    touched = set(modified)
+    for p in new_paths:  # same bytes, but a shared value it uses changed
+        if p.startswith(("objects/", "loose/")) and p not in touched and p in old_entries and uses_changed(p):
+            kept.append(p)
+    gone: dict[str, list[str]] = {}
+    for p in removed:
+        if p.startswith("loose/"):
+            gone.setdefault(old_c.record(path_to_key(p)), []).append(p)
+    still_added, rekeyed = [], set()
+    for p in added:
+        if p.startswith("loose/") and gone.get(d := new_c.record(path_to_key(p))):
+            rekeyed.add(gone[d].pop())
+        else:
+            still_added.append(p)
+    return still_added, kept, [p for p in removed if p not in rekeyed]
+
+
 _AUTHOR: tuple[str, str] | None = None  # set by the app from its preferences (documents.set_author)
 
 
@@ -198,6 +276,7 @@ class Project:
         old_files = {p: o for p, o in old_entries.items() if is_file_path(p)}
         old_entries = {p: o for p, o in old_entries.items() if is_record_path(p)}
         new_paths = {key_to_path(k): v for k, v in new.items()}
+        new_oids = {p: blob_oid(data) for p, data in new_paths.items()}
         writes: dict[str, bytes | None] = {}
         added, modified, removed = [], [], []
         for p, data in new_paths.items():
@@ -205,14 +284,17 @@ class Project:
             if old is None:
                 added.append(p)
                 writes[p] = data
-            elif old != blob_oid(data):
+            elif old != new_oids[p]:
                 modified.append(p)
                 writes[p] = data
         for p in old_entries:
             if p not in new_paths:
                 removed.append(p)
                 writes[p] = None
-        old_blobs = dict(zip(removed, self.repo.read_blobs([old_entries[p] for p in removed]))) if removed else {}
+        read = removed + modified
+        old_blobs = dict(zip(read, self.repo.read_blobs([old_entries[p] for p in read]))) if read else {}
+        added, modified, removed = _by_content(old_entries, old_blobs, self.repo.read_blobs, new_paths, new_oids,
+                                               added, modified, removed)
         items = []
         for kind, paths in (("added", added), ("modified", modified), ("removed", removed)):
             for p in sorted(paths):
@@ -283,7 +365,7 @@ class Project:
         is recorded even when the result equals the current version)."""
         records = self._decompose_file(ifc_path)
         changes, writes = self._changes(self._head_entries(), records, settings)
-        if not changes and not merged:
+        if not changes and not merged and not any(is_record_path(p) for p in writes):
             raise NothingToCommit("nothing to commit: the file matches the current version")
         name, email = author or _author()
         when = int(time if time is not None else _time.time())

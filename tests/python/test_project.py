@@ -115,3 +115,42 @@ def test_malformed_globalids_are_reported_not_crashed(project, tmp_path):
         project.commit(write(f, tmp_path / "bad.ifc"), "x", author=AUTHOR)
     assert any("bad/../id" in m for m in e.value.messages)
     assert project.log() == []
+
+
+def _shared_owner_history(f):
+    """Like a Revit export: every rooted entity shares ONE IfcOwnerHistory."""
+    shared = f.by_type("IfcOwnerHistory")[0]
+    for r in f.by_type("IfcRoot"):
+        r.OwnerHistory = shared
+    for oh in f.by_type("IfcOwnerHistory"):
+        if oh != shared:
+            f.remove(oh)
+    shared.LastModifyingUser = shared.LastModifyingApplication = None  # its user and application: inline
+    return shared
+
+
+def test_owner_history_is_bookkeeping_not_content(project, tmp_path):
+    """Editing a wall gives it its own owner history (IFC2X3), which re-encodes the shared one and so
+    every rooted record (the Clinic: 41,068 records); an in-place timestamp is no change of elements
+    either. The edited wall is the one change reported."""
+    from kimbim.testing import _reset_owner
+
+    f = build_model(schema="IFC2X3", walls=3)
+    _reset_owner()  # the IFC2X3 owner callbacks are global: don't leak them into later tests
+    shared = _shared_owner_history(f)
+    project.commit(write(f, tmp_path / "a.ifc"), "first", author=AUTHOR, time=1)
+    walls = f.by_type("IfcWall")[:2]
+    edited = f.createIfcOwnerHistory(shared.OwningUser, shared.OwningApplication, None, "MODIFIED",
+                                     1790000000, shared.OwningUser, shared.OwningApplication, 0)
+    for i, wall in enumerate(walls):
+        wall.OwnerHistory = edited  # one edit, two walls
+        wall.Name = f"Edited {i}"
+    status = project.status(write(f, tmp_path / "b.ifc"))
+    assert len([c for c in status.items if c.key.startswith("n/")]) >= 4  # the records changed: new ids
+    expected = sorted(f"o/{w.GlobalId}" for w in walls)
+    assert sorted(c.key for c in status.items if c.key.startswith("o/")) == expected
+    project.commit(tmp_path / "b.ifc", "edit", author=AUTHOR, time=2)
+    assert sorted(c.key for c in project.diff().items if c.key.startswith("o/")) == expected
+    shared.LastModifiedDate = 1790000500  # edited in place: keeps its node id
+    status = project.status(write(f, tmp_path / "c.ifc"))
+    assert status and not [c for c in status.items if c.key.startswith("o/")]

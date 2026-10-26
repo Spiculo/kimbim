@@ -168,3 +168,56 @@ def test_switching_options_keeps_the_project_settings(tmp_path):
     assert call("open_model", r["path"])["ok"]  # what the app's loader does
     assert S.current()["wall_reference_line"] == "Core centre"
     assert call("project_state")["unversioned"] is False
+
+
+def _house(tmp_path):
+    """The sample two-storey house, versioned; its windows by level name."""
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
+    import make_house
+
+    ifc = tmp_path / "house.ifc"
+    make_house.build(str(ifc))
+    assert call("open_model", str(ifc))["ok"]
+    assert call("enable_versioning", str(tmp_path / "project"), "Initial import")["ok"]
+    windows = {}
+    for w in b._model.by_type("IfcWindow"):
+        level = w.ContainedInStructure[0].RelatingStructure.Name
+        windows.setdefault(level, []).append(w.GlobalId)
+    return windows
+
+
+def test_compare_ignores_reencoded_untouched_elements(tmp_path):
+    """Widening the Level 1 windows makes their shared placement a node in the records, which re-encodes
+    the untouched Level 2 windows: compare reports elements whose content changed, not re-encodings."""
+    from kimbim import authoring as A
+    from kimbim import versioning as V
+
+    windows = _house(tmp_path)
+    l1, l2 = sorted(windows["Level 1"]), windows["Level 2"]
+    assert len(l1) == 4 and len(l2) == 4
+    assert json.loads(A.set_dimension(g(*l1), "Width", 1.7))["ok"]
+    first = call("history", 1)["versions"][0]["id"]
+    c = call("compare", first, "WORKING")
+    assert sorted(x["guid"] for x in c["modified"] if x["type"] == "IfcWindow") == l1
+    summary = call("version_changes")
+    assert sorted(x["guid"] for x in summary["items"] if x["type"] == "IfcWindow" and x["kind"] == "modified") == l1
+    assert call("save_version", "Wider windows")["ok"]
+    head = call("history", 1)["versions"][0]["id"]
+    d = V._project.diff(first, head)
+    assert sorted(x.key[2:] for x in d.modified if x.ifc_type == "IfcWindow") == l1
+    assert sorted(x["guid"] for x in call("compare", first, head)["modified"] if x["type"] == "IfcWindow") == l1
+
+
+def test_compare_reports_every_element_using_an_edited_shared_value(tmp_path):
+    """A value shared by several elements (a record node) edited in place changes all of them."""
+    windows = _house(tmp_path)
+    first = call("history", 1)["versions"][0]["id"]
+    ctx = [c for c in b._model.by_type("IfcGeometricRepresentationContext")
+           if not c.is_a("IfcGeometricRepresentationSubContext")][0]
+    ctx.Precision = 0.0001  # every representation refers to it
+    c = call("compare", first, "WORKING")
+    modified = {x["guid"] for x in c["modified"]}
+    assert set(windows["Level 1"]) | set(windows["Level 2"]) <= modified

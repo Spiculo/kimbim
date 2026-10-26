@@ -24,6 +24,7 @@ import json
 import re
 from dataclasses import asdict, dataclass, field
 
+from .content import Contents
 from .records import Schema, agg_info, canon
 
 OURS, THEIRS = "ours", "theirs"
@@ -90,6 +91,10 @@ class _Merger:
                 schema = json.loads(side["meta"]).get("schema", schema)
                 break
         self.schema = Schema(schema)
+        # Content digests per side (kimbim.content): a record or value only re-encoded (a value it shares
+        # became a node) is unchanged, so it never conflicts with a real change on the other side.
+        self.contents = {side: Contents(records.get, self.schema, owner_history=True)
+                         for side, records in (("base", base), (OURS, ours), (THEIRS, theirs))}
         self.conflicts: list[Conflict] = []
         self.out: dict[str, bytes] = {}
         self._set_attrs: dict[str, set] = {}
@@ -112,6 +117,18 @@ class _Merger:
             self._set_attrs[ifc_type] = names
         return self._set_attrs[ifc_type]
 
+    def same(self, key, x, y) -> bool:
+        """Records with the same content on two sides."""
+        return self.contents[x].record(key) == self.contents[y].record(key)
+
+    def same_value(self, ifc_type, attr, x, vx, y, vy) -> bool:
+        """An attribute with the same content on two sides."""
+        t = self.attr_types(ifc_type).get(attr)
+        return canon(self.contents[x].value(vx, t)) == canon(self.contents[y].value(vy, t))
+
+    def attr_types(self, ifc_type: str) -> dict:
+        return self.contents["base"]._attr_types(ifc_type)
+
     def node(self, side, ref):
         """The entity behind a node reference on a side (for property names), or the value itself."""
         if isinstance(ref, dict) and "@n" in ref:
@@ -130,6 +147,10 @@ class _Merger:
             elif o == b:
                 merged = t
             elif t == b:
+                merged = o
+            elif self.same(key, "base", OURS):  # ours only re-encoded it
+                merged = t
+            elif self.same(key, "base", THEIRS) or self.same(key, OURS, THEIRS):
                 merged = o
             else:
                 merged = self.both_changed(key, b, o, t)
@@ -182,12 +203,16 @@ class _Merger:
                 value = t
             elif t == b:
                 value = o
+            elif self.same_value(ifc_type, attr, "base", b, OURS, o):  # ours only re-encoded it
+                value = t
+            elif self.same_value(ifc_type, attr, "base", b, THEIRS, t) or self.same_value(ifc_type, attr, OURS, o, THEIRS, t):
+                value = o
             elif attr == "OwnerHistory":  # edit bookkeeping (IFC2X3): this option's, never a question
                 value = o
             elif (ifc_type, attr) in _PROPERTY_LISTS and all(isinstance(x, list) for x in (b, o, t)):
                 value = self.merge_properties(key, ifc_type, name, attr, b, o, t)
             elif attr in sets and all(isinstance(x, list) for x in (b or [], o or [], t or [])):
-                value = self.merge_set(b or [], o or [], t or [])
+                value = self.merge_set(ifc_type, attr, b or [], o or [], t or [])
             else:
                 pick = self.conflict(Conflict(f"{key}#{attr}", "attribute", key, ifc_type, name, attribute=attr,
                                               base=b, ours=o, theirs=t))
@@ -196,15 +221,18 @@ class _Merger:
                 merged[attr] = value
         return {"a": merged, "t": ifc_type}
 
-    @staticmethod
-    def merge_set(b, o, t):
-        """base + what either side added - what either side removed (members compared canonically)."""
-        cb = {canon(x): x for x in b}
-        co = {canon(x): x for x in o}
-        ct = {canon(x): x for x in t}
+    def merge_set(self, ifc_type, attr, b, o, t):
+        """base + what either side added - what either side removed (members compared by content, so a
+        member only re-encoded on one side is neither removed nor added)."""
+        el = agg_info(self.attr_types(ifc_type).get(attr))[1]
+
+        def members(side, items):
+            return {canon(self.contents[side].value(x, el)): x for x in items}
+
+        cb, co, ct = members("base", b), members(OURS, o), members(THEIRS, t)
         keep = (set(cb) - (set(cb) - set(co)) - (set(cb) - set(ct))) | (set(co) - set(cb)) | (set(ct) - set(cb))
-        members = {**cb, **co, **ct}
-        return [members[k] for k in sorted(keep)]
+        chosen = {**cb, **co, **ct}
+        return sorted({canon(chosen[k]): chosen[k] for k in keep}.values(), key=canon)
 
     def merge_properties(self, key, ifc_type, name, attr, b, o, t):
         """Property sets merge per property name (docs/03)."""

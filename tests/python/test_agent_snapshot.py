@@ -138,8 +138,6 @@ def test_snapshot_changes_task(s):
     assert run(s, "task.status")["result"]["task"]["status"] == "open"
 
 
-@pytest.mark.xfail(strict=True, reason="versioning compare re-encodes untouched elements "
-                                       "(records.py inline/node reclassification)")
 def test_compare_reports_only_the_widened_windows(s):
     """What a changes snapshot colours is versioning.compare's list: it should be the 4 Level 1 windows."""
     assert run(s, "task.start", title="Widen windows")["ok"]

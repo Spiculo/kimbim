@@ -296,3 +296,60 @@ def test_an_owner_history_edited_on_both_sides_is_not_a_conflict():
     assert json.loads(r.records["n/H"])["a"]["LastModifiedDate"] == 300
     r = merge_records(base, theirs, ours)
     assert r.conflicts == [] and json.loads(r.records["n/H"])["a"]["LastModifiedDate"] == 300
+
+
+# ---- re-encoding is not a change (Task 11b): whether a value is inline or a node depends on its referrers
+
+def _rec(v):
+    from kimbim.records import canon
+    return canon(v)
+
+
+def _point(x):
+    return {"a": {"Coordinates": [x, 0.0, 0.0]}, "t": "IfcCartesianPoint"}
+
+
+def _placement(location):
+    return {"a": {"RelativePlacement": {"a": {"Location": location}, "t": "IfcAxis2Placement3D"}},
+            "t": "IfcLocalPlacement"}
+
+
+def _wall(name, location):
+    return _rec({"a": {"GlobalId": name, "Name": name, "ObjectPlacement": _placement(location)}, "t": "IfcWall"})
+
+
+META = _rec({"k": "kimbim/1", "schema": "IFC4"})
+
+
+def test_a_reencoded_record_does_not_conflict_with_a_real_change():
+    """Ours adds a wall at the same point, so the point becomes a node and wall A is re-encoded; theirs
+    moves wall A. The move is taken, without a conflict."""
+    base = {"meta": META, "o/A": _wall("A", _point(0.0))}
+    ours = {"meta": META, "o/A": _wall("A", {"@n": "p0"}), "o/B": _wall("B", {"@n": "p0"}),
+            "n/p0": _rec(_point(0.0))}
+    theirs = {"meta": META, "o/A": _wall("A", _point(1.0))}
+    r = merge_records(base, ours, theirs)
+    assert r.clean, r.conflicts
+    assert r.records["o/A"] == theirs["o/A"] and r.records["o/B"] == ours["o/B"] and "n/p0" in r.records
+
+
+def test_a_set_member_reencoded_on_one_side_is_kept_once():
+    def solid(depth, position):
+        return {"a": {"Depth": depth, "Position": position}, "t": "IfcExtrudedAreaSolid"}
+
+    def rep(*items):
+        from kimbim.records import canon
+        return _rec({"a": {"Items": sorted(items, key=canon), "RepresentationIdentifier": "Body"},
+                     "t": "IfcShapeRepresentation"})
+
+    origin = {"a": {"Location": _point(0.0)}, "t": "IfcAxis2Placement3D"}
+    wall = _rec({"a": {"GlobalId": "A", "Representation": {
+        "a": {"Representations": [{"@n": "r"}]}, "t": "IfcProductDefinitionShape"}}, "t": "IfcWall"})
+    base = {"meta": META, "o/A": wall, "n/r": rep(solid(1.0, origin), solid(2.0, origin))}
+    ours = {"meta": META, "o/A": wall, "n/r": rep(solid(1.0, {"@n": "o"}), solid(2.0, origin), solid(4.0, origin)),
+            "n/o": _rec(origin)}
+    theirs = {"meta": META, "o/A": wall, "n/r": rep(solid(1.0, origin), solid(2.0, origin), solid(3.0, origin))}
+    r = merge_records(base, ours, theirs)
+    assert r.clean, r.conflicts
+    items = json.loads(r.records["n/r"])["a"]["Items"]
+    assert sorted(i["a"]["Depth"] for i in items) == [1.0, 2.0, 3.0, 4.0]
