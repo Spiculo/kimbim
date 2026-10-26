@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from kimbim import app_bridge as B
+from kimbim import checks as C
 from kimbim import documents as D
 from kimbim import kimfile as K
 from kimbim import settings as S
@@ -59,13 +60,35 @@ def test_plan_and_sheet_export_svg(s, tmp_path):
     assert "<svg" in svg.read_text(encoding="utf-8")
 
 
+def _digest(tmp_path, name):
+    """The model as an IFC file's text, without the header (it carries a timestamp)."""
+    path = tmp_path / name
+    assert json.loads(D.export_ifc(str(path)))["ok"]
+    lines = path.read_text(encoding="utf-8").splitlines()
+    return "\n".join(line for line in lines if not line.startswith("FILE_NAME"))
+
+
 def test_section_and_exports_change_nothing(s, tmp_path):
     r = run(s, "drawings.create", kind="section", line=[[0, 2], [8, 2]])
     assert r["ok"] and r["result"]["guid"], r
-    before = len(B._ids)
-    out = tmp_path / "s.csv"
-    assert run(s, "schedules.export", schedule="doors", out=str(out))["ok"]
-    assert out.exists() and len(B._ids) == before
+    plan = run(s, "drawings.create", kind="plan", level="Level 1")["result"]["guid"]
+    number = run(s, "sheets.create", title="S")["result"]["number"]
+    assert run(s, "sheets.place_drawing", sheet=number, drawing=plan)["ok"]
+    before, steps, current = _digest(tmp_path, "before.ifc"), len(B._ids), B._current_id()
+    calls = [("drawings.export", dict(drawing=plan, format="svg", out=str(tmp_path / "d.svg"))),
+             ("drawings.export", dict(drawing=plan, format="dxf", out=str(tmp_path / "d.dxf"))),
+             ("sheets.export", dict(sheet=number, format="svg", out=str(tmp_path / "s.svg"))),
+             ("sheets.export", dict(sheet=number, format="dxf", out=str(tmp_path / "s.dxf"))),
+             ("schedules.export", dict(schedule="doors", out=str(tmp_path / "s.csv"))),
+             ("checks.run", dict(checks=["model"])),
+             ("versions.export", dict(out=str(tmp_path / "v.ifc"))),
+             ("versions.diff", {"from": "HEAD", "to": "WORKING"})]
+    for name, args in calls:
+        assert run(s, name, **args)["ok"], name
+    for f in ("d.svg", "d.dxf", "s.svg", "s.dxf", "s.csv", "v.ifc"):
+        assert (tmp_path / f).stat().st_size > 0, f
+    assert len(B._ids) == steps and B._current_id() == current
+    assert _digest(tmp_path, "after.ifc") == before
 
 
 def test_pdf_without_the_binary_is_render_failed(s, tmp_path, monkeypatch):
@@ -90,9 +113,44 @@ def test_checks_model(s):
     assert r["result"]["checks"][0]["check"] == "model" and "counts" in r["result"]["checks"][0]
 
 
-def test_ids_report(s, tmp_path):
+IDS = """<?xml version="1.0" encoding="UTF-8"?>
+<ids xmlns="http://standards.buildingsmart.org/IDS" xmlns:xs="http://www.w3.org/2001/XMLSchema"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://standards.buildingsmart.org/IDS http://standards.buildingsmart.org/IDS/1.0/ids.xsd">
+  <info><title>Rules</title></info>
+  <specifications>
+    <specification name="Walls have a name" ifcVersion="IFC2X3 IFC4">
+      <applicability minOccurs="0" maxOccurs="unbounded"><entity><name><simpleValue>IFCWALL</simpleValue></name></entity></applicability>
+      <requirements><attribute><name><simpleValue>Name</simpleValue></name></attribute></requirements>
+    </specification>
+  </specifications>
+</ids>
+"""
+
+
+def test_ids_report_before_any_run(s, tmp_path, monkeypatch):
+    monkeypatch.setattr(C, "_last_ids", {})
     r = run(s, "checks.ids_report", out=str(tmp_path / "ids.html"))
-    assert r["ok"] or r["error"]["code"] == "bridge_error"
+    assert not r["ok"] and r["error"]["code"] == "bridge_error" and "run the IDS check first" in r["error"]["hint"]
+    assert not (tmp_path / "ids.html").exists()
+
+
+def test_ids_report_after_a_run(s, tmp_path):
+    assert json.loads(S.set_project_settings(json.dumps({"ids_files": {"rules.ids": IDS}})))["ok"]
+    assert run(s, "checks.run", checks=["ids"])["ok"]
+    out = tmp_path / "ids.html"
+    r = run(s, "checks.ids_report", out=str(out))
+    assert r["ok"], r
+    assert "<html" in out.read_text(encoding="utf-8").lower()
+
+
+def test_elevations_and_hand_placed_elevation(s):
+    r = run(s, "drawings.create", kind="elevation")
+    assert r["ok"] and r["result"]["drawings"], r
+    r = run(s, "drawings.create", kind="elevation", line=[[0, -1], [8, -1]], direction="right")
+    assert r["ok"] and r["result"]["guid"], r
+    assert r["result"]["guid"] in {d["guid"] for d in run(s, "drawings.list")["result"]["drawings"]
+                                   if d["kind"] == "elevation"}
 
 
 def test_versions_log_after_task(s):
@@ -115,6 +173,13 @@ def test_versions_export(s, tmp_path):
     r = run(s, "versions.export", out=str(out))
     assert r["ok"], r
     assert out.stat().st_size > 0
+    first = run(s, "versions.log")["result"]["versions"][-1]["id"]
+    older = tmp_path / "older.ifc"
+    assert run(s, "versions.export", version=first, out=str(older))["ok"] and older.stat().st_size > 0
+    bad = run(s, "versions.export", version="no-such-version", out=str(tmp_path / "x.ifc"))
+    assert bad["error"]["code"] == "not_found"
+    blocked = run(s, "versions.export", out=str(tmp_path))  # a directory
+    assert blocked["error"]["code"] == "bridge_error"
 
 
 def test_selection_needs_app(s):

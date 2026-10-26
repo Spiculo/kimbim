@@ -100,9 +100,13 @@ def export(session, out, version="HEAD"):
     else:
         _versioned()
         try:
-            V._model_at(version).write(out)
-        except Exception as ex:  # noqa: BLE001  (an unknown revision, an unwritable path)
+            model = V._model_at(version)
+        except Exception as ex:  # noqa: BLE001  (an unknown revision)
             raise AgentError("not_found", hint=str(ex), what=version) from None
+        try:
+            model.write(out)
+        except Exception as ex:  # noqa: BLE001  (an unwritable path)
+            raise AgentError("bridge_error", hint=str(ex)) from None
     return {"path": out, "version": version}
 
 
