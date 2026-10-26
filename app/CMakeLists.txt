@@ -37,6 +37,7 @@ qt_add_library(kimbim_core STATIC
     src/DrawingsPanel.cpp src/DrawingsPanel.h
     src/DrawingView.cpp src/DrawingView.h
     src/SheetExport.cpp src/SheetExport.h
+    src/SnapshotServer.cpp src/SnapshotServer.h
     src/SheetsPanel.cpp src/SheetsPanel.h
     src/SchedulesDialog.cpp src/SchedulesDialog.h
     src/DockLayout.cpp src/DockLayout.h
@@ -174,3 +175,13 @@ kimbim_gui_test(app_selftest_view_front "\"view_animated\":true,\"view_ok\":true
 # behind the tall one from the south, in front of it from the north).
 kimbim_gui_test(app_selftest_drawing_visible_south "\"drawing_shown\":true,\"drawing_visible\":1," :occlusion: --frames 1 --open-drawing "South Elevation")
 kimbim_gui_test(app_selftest_drawing_visible_north "\"drawing_shown\":true,\"drawing_visible\":2," :occlusion: --frames 1 --open-drawing "North Elevation")
+# D102: the windowless snapshot server for agent tools, driven over stdin/stdout like the worker does
+# (the sample house from `pixi run house`). Needs a real OpenGL context; no window is shown.
+qt_add_executable(test_snapshot_server tests/test_snapshot_server.cpp)
+target_link_libraries(test_snapshot_server PRIVATE Qt6::Gui Qt6::Test)
+add_dependencies(test_snapshot_server kimbim-app)
+add_test(NAME app_snapshot_server COMMAND test_snapshot_server)
+set_tests_properties(app_snapshot_server PROPERTIES
+    LABELS gui
+    TIMEOUT 600
+    ENVIRONMENT "KIMBIM_PYTHON_PATH=${PROJECT_SOURCE_DIR}/python;KIMBIM_APP=$<TARGET_FILE:kimbim-app>;KIMBIM_HOUSE=${PROJECT_SOURCE_DIR}/build/house.ifc")

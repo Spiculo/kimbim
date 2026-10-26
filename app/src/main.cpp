@@ -7,6 +7,7 @@
 #include "Preferences.h"
 #include "SelfTest.h"
 #include "SheetExport.h"
+#include "SnapshotServer.h"
 #include "Translations.h"
 
 int main(int argc, char* argv[])
@@ -138,6 +139,10 @@ int main(int argc, char* argv[])
         QStringLiteral("Export sheet <number> of the IFC file to <out.pdf|out.svg|out.dxf> and exit (no window)."),
         QStringLiteral("number"));
     parser.addOption(exportSheet);
+    QCommandLineOption snapshotServer(QStringLiteral("snapshot-server"),
+        QStringLiteral("Agent tools (D102): render snapshots for JSON requests read from stdin, one per line, "
+                       "without showing a window; exits at the end of input."));
+    parser.addOption(snapshotServer);
     parser.addPositionalArgument(QStringLiteral("file"), QStringLiteral("IFC file to open."), QStringLiteral("[file.ifc]"));
     parser.process(app);
 
@@ -159,6 +164,9 @@ int main(int argc, char* argv[])
         }
         return kimbim::exportSheetCommand(args.at(0), parser.value(exportSheet), args.at(1));
     }
+
+    if (parser.isSet(snapshotServer))
+        return kimbim::snapshotServerCommand();
 
     if (parser.isSet(selfTest)) {
         kimbim::SelfTestOptions options;

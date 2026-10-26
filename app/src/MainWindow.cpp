@@ -6834,6 +6834,13 @@ void MainWindow::loadProjectSettings()
     }
 }
 
+void MainWindow::reloadProjectSettings()
+{
+    loadProjectSettings();
+    refreshLayers(); // the layers' states, then the purpose's graphics
+    refreshAnnotations();
+}
+
 bool MainWindow::setProjectSettings(const QJsonObject& changes)
 {
     const QJsonObject r = bridge("set_project_settings",

@@ -40,6 +40,7 @@
 
 #include <QElapsedTimer>
 #include <QGuiApplication>
+#include <QImage>
 #include <QKeyEvent>
 #include <QThread>
 #include <QTimer>
@@ -2804,6 +2805,50 @@ bool Viewport::dumpImage(const QString& path)
         return false;
     m_view->Redraw();
     return m_view->Dump(path.toUtf8().constData());
+}
+
+QImage Viewport::renderImage(int width, int height)
+{
+    if (width <= 0 || height <= 0 || !ensureWindow())
+        return {};
+    // The cube and its home button are the view's controls, not the model: left out of the picture
+    // (they come back on the next paint). No hover highlight either.
+    eraseViewCube();
+    m_context->ClearDetected(false);
+    Image_PixMap pixmap;
+    V3d_ImageDumpOptions options;
+    options.Width = width;
+    options.Height = height;
+    options.BufferType = Graphic3d_BT_RGB;
+    options.ToAdjustAspect = true; // the camera keeps its framing at the image's proportions
+    bool ok = false;
+    try {
+        ok = m_view->ToPixMap(pixmap, options);
+    } catch (const Standard_Failure& e) {
+        qWarning("KimBim: offscreen render failed: %s", e.what());
+    }
+    update();
+    if (!ok || int(pixmap.SizeX()) != width || int(pixmap.SizeY()) != height)
+        return {};
+    QImage image(width, height, QImage::Format_RGB32);
+    const Image_Format format = pixmap.Format();
+    const bool bgr = format == Image_Format_BGR || format == Image_Format_BGR32 || format == Image_Format_BGRA;
+    const bool known = bgr || format == Image_Format_RGB || format == Image_Format_RGB32 || format == Image_Format_RGBA;
+    for (int y = 0; y < height; ++y) {
+        QRgb* row = reinterpret_cast<QRgb*>(image.scanLine(y));
+        for (int x = 0; x < width; ++x) {
+            if (!known) { // any other buffer format: OCCT converts the pixel
+                const Quantity_ColorRGBA c = pixmap.PixelColor(x, y);
+                row[x] = qRgb(int(std::lround(c.GetRGB().Red() * 255)), int(std::lround(c.GetRGB().Green() * 255)),
+                    int(std::lround(c.GetRGB().Blue() * 255)));
+                continue;
+            }
+            // RawValue counts rows from the top whatever the memory order (see IdImage::at).
+            const uint8_t* p = pixmap.RawValue(size_t(y), size_t(x));
+            row[x] = bgr ? qRgb(p[2], p[1], p[0]) : qRgb(p[0], p[1], p[2]);
+        }
+    }
+    return image;
 }
 
 QString Viewport::pickAt(int x, int y)

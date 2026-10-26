@@ -1160,6 +1160,7 @@ _EXPORTS = {
         "roof_info",
     ),
     "settings": (
+        "load_settings_file",
         "project_settings",
         "set_project_settings",
     ),

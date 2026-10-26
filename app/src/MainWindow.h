@@ -249,6 +249,9 @@ public:
     bool addGridSystem(QPointF corner, double angleDegrees, const QJsonArray& across, const QJsonArray& along,
         double extension);
     bool setProjectSettings(const QJsonObject& changes); // false (and nothing changes) if refused
+    // D102: the engine's settings were replaced (the snapshot server loads a project's settings file):
+    // read them again and apply them as an open does (purpose, pens, layers, annotations, sun).
+    void reloadProjectSettings();
     // D73: the purpose (pen set, visibility, overrides, layer combination) and the graphics tables.
     bool setPurpose(const QString& name);
     bool setGraphics(const QString& changesJson); // the editors' tables; false (nothing changes) if refused

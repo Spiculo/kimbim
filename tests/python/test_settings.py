@@ -113,3 +113,16 @@ def test_favourites_are_kept_with_the_project():
     assert json.loads(b.project_settings())["settings"]["favourites"] == fav
     assert not json.loads(b.set_project_settings(json.dumps({"favourites": {"x": {"fields": {}}}})))["ok"]
     assert not json.loads(b.set_project_settings(json.dumps({"favourites": []})))["ok"]
+
+
+def test_a_settings_file_is_put_in_place_for_the_open_model(tmp_path):
+    # D102: the snapshot server renders with the project's settings file
+    assert call("new_project", "x")["ok"]
+    path = tmp_path / "settings.json"
+    path.write_bytes(S.to_bytes({"length_unit": "mm", "future_key": 3}))
+    r = call("load_settings_file", str(path))
+    assert r["ok"] and r["settings"]["length_unit"] == "mm" and r["settings"]["future_key"] == 3
+    assert call("project_settings")["settings"]["plan_cut_height"] == 1.2  # defaults filled in
+    assert call("state")["dirty"] is False
+    bad = call("load_settings_file", str(tmp_path / "missing.json"))
+    assert bad["ok"] is False and "missing.json" in bad["error"]

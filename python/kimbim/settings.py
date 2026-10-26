@@ -349,3 +349,15 @@ def set_project_settings(changes_json: str) -> str:
 
         stairs.refresh_plan_settings()
     return B._dump({"ok": True, "settings": current(), "dirty": B._dirty()})
+
+
+def load_settings_file(path: str) -> str:
+    """D102: a project's settings.json put in place for the open model, as opening its project does
+    (the snapshot server renders with the project's purposes, pens and materials)."""
+    try:
+        with open(path, "rb") as f:
+            data = f.read()
+    except OSError as ex:
+        return B._dump({"ok": False, "error": f"cannot read {path}: {ex}"})
+    load(from_bytes(data))
+    return B._dump({"ok": True, "settings": current()})

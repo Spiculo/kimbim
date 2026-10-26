@@ -42,6 +42,7 @@
 #include "Scene.h"
 #include "Underlay.h"
 
+class QImage;
 class QTimer;
 class QWheelEvent;
 
@@ -306,6 +307,9 @@ public:
     QString pickAt(int x, int y);
     // Renders the view into an image file through OCCT (independent of screen composition).
     bool dumpImage(const QString& path);
+    // D102: the current camera rendered offscreen at exactly width x height pixels (the camera's
+    // aspect follows the image), without the view cube. A null image without a window or on failure.
+    QImage renderImage(int width, int height);
     bool projectCenterOf(const QString& guid, int* x, int* y) const;
 
     const Handle(AIS_InteractiveContext)& context() const { return m_context; }
