@@ -6,7 +6,9 @@ import json
 import os
 import shutil
 import signal
+import subprocess
 import sys
+import threading
 import time
 from multiprocessing import AuthenticationError
 from multiprocessing.connection import Client
@@ -18,7 +20,7 @@ from kimbim import app_bridge as B
 from kimbim import documents as D
 from kimbim import kimfile as K
 from kimbim import versioning as V
-from kimbim.agent import client
+from kimbim.agent import client, worker
 from kimbim.agent.session import Session
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -168,6 +170,7 @@ def test_locked_project(house):
     assert len(client.spawned) == 1
     assert _wait(lambda: not K.pid_alive(client.spawned[0]), 10)
     assert not _discovery(house).exists()
+    assert list(_discovery(house).parent.glob("*.error.json")) == []  # the client read and removed it
 
 
 def test_wrong_authkey_rejected(house):
@@ -178,3 +181,74 @@ def test_wrong_authkey_rejected(house):
         Client(found["address"], authkey=b"not the key")
     again = client.request(str(house), "_ping", {})
     assert again["ok"] and again["result"]["pid"] == pid
+
+
+def test_stale_entry_with_live_unrelated_pid(house):
+    """A dead worker's pid reused by another process: the entry looks alive but nobody listens."""
+    path = _discovery(house)
+    path.parent.mkdir(parents=True)
+    me = os.getpid()
+    stale = {"address": rf"\\.\pipe\kimbim-gone-{me}" if os.name == "nt" else f"/tmp/kimbim-gone-{me}.sock",
+             "authkey": os.urandom(32).hex(), "pid": me, "started": worker.process_started(me),
+             "project": str(house), "kind": "worker"}
+    path.write_text(json.dumps(stale), encoding="utf-8")
+    out = client.request(str(house), "_ping", {})
+    assert out["ok"], out
+    assert out["result"]["pid"] != me and len(client.spawned) == 1
+    # another process's start time: recognised as stale without connecting
+    found = json.loads(path.read_text(encoding="utf-8"))
+    path.write_text(json.dumps({**found, "started": "1"}), encoding="utf-8")
+    assert client._entry(str(house)) is None and not path.exists()
+
+
+def test_concurrent_start_makes_one_worker(house):
+    barrier = threading.Barrier(2)
+    results = []
+
+    def go():
+        barrier.wait()
+        results.append(client.request(str(house), "_ping", {}))
+
+    threads = [threading.Thread(target=go) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(120)
+    assert len(results) == 2 and all(r["ok"] for r in results), results
+    assert results[0]["result"]["pid"] == results[1]["result"]["pid"]
+    assert _wait(lambda: sum(K.pid_alive(p) for p in client.spawned) == 1, 15)
+    assert client.request(str(house), "_ping", {})["result"]["pid"] == results[0]["result"]["pid"]
+
+
+def test_signal_handler_raises_system_exit():
+    with pytest.raises(SystemExit):
+        worker._on_signal(signal.SIGTERM, None)
+
+
+def test_signal_parks_saves_and_releases(house):
+    """SIGTERM (POSIX) or Ctrl+Break (Windows: the worker shares our console in its own process group)."""
+    if os.name == "nt":
+        proc = subprocess.Popen([sys.executable, "-m", "kimbim", "serve", str(house)], env=client._env(),
+                                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+        client.spawned.append(proc.pid)
+        assert _wait(lambda: _discovery(house).exists(), 60)
+        pid = proc.pid
+    else:
+        pid = client.request(str(house), "_ping", {})["result"]["pid"]
+    started = client.request(str(house), "task.start", {"title": "Signal"}, client="test")
+    assert started["ok"], started
+    assert client.request(str(house), "elements.rename", {"elements": {"kind": "wall"}, "name": "Z"},
+                          client="test")["ok"]
+    os.kill(pid, signal.CTRL_BREAK_EVENT if os.name == "nt" else signal.SIGTERM)
+    assert _wait(lambda: not K.pid_alive(pid), 30)
+    assert not K.lock_path(house).exists() and not _discovery(house).exists()
+    s = Session.open(str(house))
+    try:
+        task = s.tasks.get(started["result"]["id"])
+        assert task.status == "parked"
+        assert all(w.Name != "Z" for w in B._model.by_type("IfcWall"))
+        assert json.loads(V.switch_option(task.option))["ok"]
+        assert {w.Name for w in B._model.by_type("IfcWall")} == {"Z"}
+    finally:
+        s.close()

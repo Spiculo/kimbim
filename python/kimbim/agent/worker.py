@@ -3,20 +3,25 @@
 "KimBim agent") and keeps it open between CLI/MCP commands, so a big model is opened once, not per command.
 
 It listens on a local pipe (named pipe on Windows, Unix socket elsewhere) with a random authkey and announces
-itself in a discovery file, `<data dir>/agent/sessions/<path hash>.json`, that only this user can read. One
-request at a time: `{"tool", "args", "client", "task"}` -> the tool's envelope (catalogue.call_tool), plus
-`_ping` and `_shutdown`. After `idle` seconds without a request (KIMBIM_AGENT_IDLE, default 600) it parks an open
-task, saves, releases the lock and exits. A worker that can't open the project writes `{"error": envelope}` to
-the discovery path, for the client that started it, and exits.
+itself in a discovery file, `<data dir>/agent/sessions/<path hash>.json`, that only this user can read:
+`{address, authkey, pid, started, project, kind, ...}`. `started` is the process's creation time, so a file left
+behind by a dead worker whose pid was reused is still recognised as stale. One request at a time:
+`{"tool", "args", "client", "task"}` -> the tool's envelope (catalogue.call_tool), plus `_ping` and `_shutdown`.
+After `idle` seconds without a request (KIMBIM_AGENT_IDLE, default 600), on SIGTERM or on Ctrl+Break it marks
+its entry `stopping`, parks an open task, saves, releases the lock and exits. A worker that can't open the
+project writes `{"error": envelope}` to its own `<hash>.<pid>.error.json`, for the client that started it.
 
-All model work stays on the main thread (the bridge is not thread-safe); the idle watchdog thread only wakes
-the listener up by connecting to it.
+All model work stays on the main thread (the bridge is not thread-safe); the watchdog thread only wakes the
+listener up by connecting to it (when idle, or when a signal arrives while accept() blocks).
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import select
+import signal
+import socket
 import sys
 import tempfile
 import threading
@@ -31,8 +36,9 @@ from .. import kimfile as K
 from .catalogue import AgentError, call_tool
 
 IDLE_DEFAULT = 600.0
+RECV_WAIT = 30.0  # seconds a connected client gets to send its request
 FAMILY = "AF_PIPE" if os.name == "nt" else "AF_UNIX"
-_IDLE = "_idle"  # the watchdog's wake-up request (not a tool)
+_WAKE = "_wake"  # the watchdog's wake-up request (not a tool)
 
 
 def _log(message: str) -> None:
@@ -46,8 +52,41 @@ def idle_seconds() -> float:
         return IDLE_DEFAULT
 
 
+# ---------------------------------------------------------------- discovery file
+
 def discovery_path(project) -> Path:
     return D.data_dir() / "agent" / "sessions" / f"{K.path_hash(project)}.json"
+
+
+def error_path(project, pid: int) -> Path:
+    """Where worker `pid` leaves its start error for the client that spawned it."""
+    return D.data_dir() / "agent" / "sessions" / f"{K.path_hash(project)}.{pid}.error.json"
+
+
+def process_started(pid: int) -> str:
+    """The process's creation time as an opaque token ("" when unknown): a reused pid gives another token."""
+    if pid <= 0:
+        return ""
+    try:
+        if os.name == "nt":
+            import ctypes
+            from ctypes import wintypes
+
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+            if not handle:
+                return ""
+            try:
+                times = [wintypes.FILETIME() for _ in range(4)]
+                if not kernel32.GetProcessTimes(handle, *(ctypes.byref(t) for t in times)):
+                    return ""
+                return str((times[0].dwHighDateTime << 32) | times[0].dwLowDateTime)
+            finally:
+                kernel32.CloseHandle(handle)
+        stat = Path(f"/proc/{pid}/stat").read_text()
+        return stat.rsplit(")", 1)[1].split()[19]  # field 22, starttime
+    except (OSError, IndexError, ValueError, AttributeError):
+        return ""
 
 
 def read_discovery(path: Path) -> dict | None:
@@ -58,21 +97,35 @@ def read_discovery(path: Path) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
-def _write_discovery(path: Path, data: dict) -> None:
+def entry_alive(data: dict | None) -> bool:
+    """A worker entry whose process is still the one that wrote it (it may be `stopping`)."""
+    if not data or not data.get("address") or not data.get("authkey"):
+        return False
+    pid = int(data.get("pid", 0) or 0)
+    if not K.pid_alive(pid):
+        return False
+    then, now = str(data.get("started") or ""), process_started(pid)
+    return not (then and now and then != now)
+
+
+def same_entry(a: dict | None, b: dict | None) -> bool:
+    return bool(a) and bool(b) and a.get("pid") == b.get("pid") and a.get("started") == b.get("started")
+
+
+def unlink_if(path: Path, seen: dict) -> None:
+    """Remove the file only if it still holds the entry `seen` (another worker may have replaced it)."""
+    if same_entry(read_discovery(path), seen):
+        path.unlink(missing_ok=True)
+
+
+def write_json(path: Path, data: dict) -> None:
     """Atomically, readable only by this user (the authkey is in it)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         json.dump(data, f)
     os.replace(tmp, path)
-
-
-def _remove_discovery(path: Path) -> None:
-    """Only our own file: a newer worker's stays."""
-    data = read_discovery(path)
-    if data is not None and data.get("pid") == os.getpid():
-        path.unlink(missing_ok=True)
 
 
 def _address(project) -> str:
@@ -82,12 +135,38 @@ def _address(project) -> str:
     return str(Path(tempfile.gettempdir()) / f"{name}.sock")  # short: AF_UNIX paths are limited to ~100 bytes
 
 
-class _Watchdog(threading.Thread):
-    """Wakes the main loop's accept() once `idle` seconds pass without a request."""
+# ---------------------------------------------------------------- signals and the watchdog
 
-    def __init__(self, address: str, authkey: bytes, idle: float):
+def _on_signal(signum, _frame):
+    """SIGTERM / SIGBREAK: leave through serve()'s finally (park, save, release the lock)."""
+    raise SystemExit(128 + int(signum))
+
+
+_wakeup_pair: list[socket.socket] = []
+
+
+def _install_signals() -> socket.socket | None:
+    """Handlers that raise SystemExit, and a wakeup socket the watchdog watches: a signal arriving while the main
+    thread blocks in accept() wakes it, so the handler runs."""
+    for name in ("SIGTERM", "SIGBREAK"):
+        if hasattr(signal, name):
+            signal.signal(getattr(signal, name), _on_signal)
+    try:
+        reader, writer = socket.socketpair()
+        writer.setblocking(False)
+        signal.set_wakeup_fd(writer.fileno(), warn_on_full_buffer=False)
+        _wakeup_pair[:] = [reader, writer]  # the write end must stay open
+        return reader
+    except (OSError, ValueError):
+        return None
+
+
+class _Watchdog(threading.Thread):
+    """Wakes the main loop's accept() once `idle` seconds pass without a request, or when a signal arrives."""
+
+    def __init__(self, address: str, authkey: bytes, idle: float, wakeup: socket.socket | None):
         super().__init__(daemon=True)
-        self.address, self.authkey, self.idle = address, authkey, idle
+        self.address, self.authkey, self.idle, self.wakeup = address, authkey, idle, wakeup
         self.last = time.monotonic()
         self.busy = False
         self.poked = False
@@ -100,19 +179,37 @@ class _Watchdog(threading.Thread):
     def idle_now(self) -> bool:
         return not self.busy and time.monotonic() - self.last >= self.idle
 
+    def _poke(self) -> None:
+        try:
+            conn = Client(self.address, family=FAMILY, authkey=self.authkey)
+            conn.send({"tool": _WAKE})
+            conn.close()
+        except (OSError, EOFError, AuthenticationError):
+            self.poked = False
+
     def run(self) -> None:
         tick = max(0.05, min(1.0, self.idle / 4))
-        while not self.stopped.wait(tick):
-            if self.poked or not self.idle_now():
-                continue
-            self.poked = True
-            try:
-                conn = Client(self.address, family=FAMILY, authkey=self.authkey)
-                conn.send({"tool": _IDLE})
-                conn.close()
-            except (OSError, EOFError, AuthenticationError):
-                self.poked = False
+        while not self.stopped.is_set():
+            signalled = False
+            if self.wakeup is not None:
+                try:
+                    signalled = bool(select.select([self.wakeup], [], [], tick)[0])
+                    if signalled:
+                        self.wakeup.recv(64)
+                except OSError:
+                    self.wakeup = None
+            else:
+                self.stopped.wait(tick)
+            if self.stopped.is_set():
+                return
+            if signalled and not self.busy:
+                self._poke()  # the handler runs (and raises) once accept() returns
+            elif not self.poked and self.idle_now():
+                self.poked = True
+                self._poke()
 
+
+# ---------------------------------------------------------------- serving
 
 def _stop(session) -> list[str]:
     """Park an open task, save and close (releasing the lock). Returns the problems, which are logged."""
@@ -148,49 +245,55 @@ def _handle(session, request) -> dict:
                      task_id=str(request.get("task") or ""))
 
 
+def _fail_start(project: str, envelope: dict) -> int:
+    write_json(error_path(project, os.getpid()), {"error": envelope, "pid": os.getpid(), "project": project})
+    return 1
+
+
 def serve(project: str, idle: float) -> int:
-    """Open `project` and serve requests until idle for `idle` seconds or told to shut down."""
+    """Open `project` and serve requests until idle for `idle` seconds, told to shut down or signalled."""
     from .session import Session
 
     project = os.path.abspath(project)
     found = discovery_path(project)
     other = read_discovery(found)
-    if other and other.get("address") and other.get("pid") != os.getpid() and K.pid_alive(int(other.get("pid", 0))):
+    if entry_alive(other) and not other.get("stopping"):
         _log(f"a worker for {project} is already running (pid {other['pid']})")
         return 0
+    wakeup = _install_signals()
     _log(f"opening {project}")
     try:
         session = Session.open(project, "cli")
     except AgentError as ex:
         _log(f"cannot open {project}: {ex.code} {ex}")
-        _write_discovery(found, {"error": ex.envelope(), "pid": os.getpid(), "project": project})
-        return 1
+        return _fail_start(project, ex.envelope())
     except Exception as ex:  # noqa: BLE001
         _log(f"cannot open {project}: {ex}")
-        _write_discovery(found, {"error": AgentError("bridge_error", hint=str(ex)).envelope(), "pid": os.getpid(),
-                                 "project": project})
-        return 1
-    try:
-        session.tasks.resume("")  # a parked task's option is current again (call_tool's resume is then a no-op)
-    except Exception as ex:  # noqa: BLE001  (the next command reports it)
-        _log(f"unpark: {ex}")
+        return _fail_start(project, AgentError("bridge_error", hint=str(ex)).envelope())
     authkey = os.urandom(32)
     address = _address(project)
-    try:
-        listener = Listener(address, family=FAMILY, authkey=authkey)
-    except OSError as ex:
-        _log(f"cannot listen on {address}: {ex}")
-        _stop(session)
-        _write_discovery(found, {"error": AgentError("worker_failed", hint=str(ex)).envelope(), "pid": os.getpid(),
-                                 "project": project})
-        return 1
-    _write_discovery(found, {"address": address, "authkey": authkey.hex(), "pid": os.getpid(), "project": project,
-                             "kind": "worker", "started": datetime.now().isoformat(timespec="seconds")})
-    _log(f"serving {project} on {address} (idle exit after {idle:g} s)")
-    watchdog = _Watchdog(address, authkey, idle)
-    watchdog.start()
+    entry = {"address": address, "authkey": authkey.hex(), "pid": os.getpid(),
+             "started": process_started(os.getpid()), "project": project, "kind": "worker",
+             "since": datetime.now().isoformat(timespec="seconds")}
+    listener = None
+    watchdog = None
     stopped = False
     try:
+        try:
+            session.tasks.resume("")  # a parked task's option is current again (call_tool's resume is then a no-op)
+        except Exception as ex:  # noqa: BLE001  (the next command reports it)
+            _log(f"unpark: {ex}")
+        try:
+            listener = Listener(address, family=FAMILY, authkey=authkey)
+        except OSError as ex:
+            _log(f"cannot listen on {address}: {ex}")
+            _stop(session)
+            stopped = True
+            return _fail_start(project, AgentError("worker_failed", hint=str(ex)).envelope())
+        write_json(found, entry)  # we hold the project lock: no other live worker owns this entry
+        _log(f"serving {project} on {address} (idle exit after {idle:g} s)")
+        watchdog = _Watchdog(address, authkey, idle, wakeup)
+        watchdog.start()
         while True:
             try:
                 conn = listener.accept()
@@ -202,10 +305,13 @@ def serve(project: str, idle: float) -> int:
                 continue
             try:
                 try:
+                    if not conn.poll(RECV_WAIT):
+                        _log("a client connected but sent nothing")
+                        continue
                     request = conn.recv()
                 except (OSError, EOFError):
                     continue
-                if isinstance(request, dict) and request.get("tool") == _IDLE:
+                if isinstance(request, dict) and request.get("tool") == _WAKE:
                     if watchdog.idle_now():
                         _log("idle: exiting")
                         break
@@ -215,6 +321,7 @@ def serve(project: str, idle: float) -> int:
                 try:
                     if isinstance(request, dict) and request.get("tool") == "_shutdown":
                         _log("shutdown requested")
+                        write_json(found, {**entry, "stopping": True})
                         problems = _stop(session)
                         stopped = True
                         reply = {"ok": True, "result": {"stopped": True, "pid": os.getpid()}}
@@ -235,12 +342,21 @@ def serve(project: str, idle: float) -> int:
                     watchdog.touch()
             finally:
                 conn.close()
+    except SystemExit as ex:
+        _log(f"signal: exiting ({ex.code})")
     finally:
-        watchdog.stopped.set()
-        listener.close()  # new clients fail to connect and wait for this process to end
+        for name in ("SIGTERM", "SIGBREAK"):  # a second signal must not cut the park and save short
+            if hasattr(signal, name):
+                signal.signal(getattr(signal, name), signal.SIG_IGN)
+        if watchdog is not None:
+            watchdog.stopped.set()
+        if listener is not None:
+            if same_entry(read_discovery(found), entry):
+                write_json(found, {**entry, "stopping": True})  # clients wait for this process to end
+            listener.close()
         if not stopped:
             _stop(session)
-        _remove_discovery(found)
+        unlink_if(found, entry)
         _log("stopped")
     return 0
 

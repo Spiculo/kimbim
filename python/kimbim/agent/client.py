@@ -1,9 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """The client side of the agent worker (D102, spec §4.2): find the project's worker through its discovery file,
 or start one (`python -m kimbim serve PROJECT`, detached, logging to `<data dir>/agent/logs/<path hash>.log`),
-and send it one request. Every outcome is an envelope; nothing raises."""
+and send it one request. Every outcome is an envelope; nothing raises.
+
+Starting is serialised per project by a `<hash>.starting` file made with O_EXCL, so concurrent clients (threads
+or processes) start one worker and the others wait for its discovery entry."""
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -15,14 +19,20 @@ from pathlib import Path
 from .. import documents as D
 from .. import kimfile as K
 from .catalogue import AgentError
-from .worker import FAMILY, discovery_path, read_discovery
+from .worker import FAMILY, discovery_path, entry_alive, error_path, read_discovery, same_entry, unlink_if
 
-START_WAIT = 60.0  # seconds to wait for a new worker's discovery file
-EXIT_WAIT = 30.0  # seconds to wait for a worker that is shutting down
-AGENT_USER = "KimBim agent"
+START_WAIT_DEFAULT = 120.0  # seconds to wait for a new worker's entry (KIMBIM_AGENT_START_WAIT): big projects open slowly
+ATTEMPTS = 4
 
 spawned: list[int] = []  # pids of the workers this process started (tests kill them in teardown)
 _procs: list[subprocess.Popen] = []  # kept so a running worker's Popen isn't collected (ResourceWarning)
+
+
+def start_wait() -> float:
+    try:
+        return float(os.environ.get("KIMBIM_AGENT_START_WAIT", "") or START_WAIT_DEFAULT)
+    except ValueError:
+        return START_WAIT_DEFAULT
 
 
 def _wait(cond, timeout: float) -> bool:
@@ -34,18 +44,15 @@ def _wait(cond, timeout: float) -> bool:
     return cond()
 
 
-def _live(project: str) -> dict | None:
-    """The project's running worker, from its discovery file. A file left by a dead worker, or an error left
-    for another client, is removed."""
+def _entry(project: str) -> dict | None:
+    """The project's worker entry if its process is alive (it may be `stopping`); a stale one is removed."""
     path = discovery_path(project)
     data = read_discovery(path)
     if data is None:
         return None
-    pid = int(data.get("pid", 0) or 0)
-    if data.get("address") and data.get("authkey") and K.pid_alive(pid):
+    if entry_alive(data):
         return data
-    if "error" in data or not K.pid_alive(pid):
-        path.unlink(missing_ok=True)
+    unlink_if(path, data)
     return None
 
 
@@ -80,33 +87,73 @@ def _spawn(project: str) -> subprocess.Popen:
     return proc
 
 
+def _guard_stale(guard: Path) -> bool:
+    try:
+        held = json.loads(guard.read_text(encoding="utf-8"))
+        age = time.time() - guard.stat().st_mtime
+    except (OSError, ValueError):
+        return False  # being written or just removed: look again
+    return not K.pid_alive(int(held.get("pid", 0) or 0)) or age > 2 * start_wait() + 10
+
+
 def _start(project: str) -> dict:
-    """Start a worker and wait for its discovery file: the worker's entry, or {"error": envelope}."""
-    proc = _spawn(project)
+    """Start a worker (or wait for the one another client is starting): its entry, or {"error": envelope}."""
     path = discovery_path(project)
-    locked = None
-    end = time.monotonic() + START_WAIT
+    guard = path.with_name(path.stem + ".starting")
+    guard.parent.mkdir(parents=True, exist_ok=True)
+    end = time.monotonic() + start_wait()
+    while True:
+        live = _entry(project)
+        if live is not None and not live.get("stopping"):
+            return live
+        try:
+            fd = os.open(guard, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError:
+            if _guard_stale(guard):
+                guard.unlink(missing_ok=True)
+            elif time.monotonic() > end:
+                return {"error": AgentError("worker_failed", hint=f"no worker after {start_wait():g} s").envelope()}
+            time.sleep(0.05)
+            continue
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump({"pid": os.getpid()}, f)
+        break
+    try:
+        live = _entry(project)  # one may have started between our look and taking the guard
+        if live is not None and not live.get("stopping"):
+            return live
+        if live is not None:  # the old worker is still saving: it holds the lock until it ends
+            _wait(lambda: not entry_alive(read_discovery(path)), start_wait())
+        return _spawn_and_wait(project)
+    finally:
+        guard.unlink(missing_ok=True)
+
+
+def _spawn_and_wait(project: str) -> dict:
+    proc = _spawn(project)
+    failed = error_path(project, proc.pid)
+    end = time.monotonic() + start_wait()
     while time.monotonic() < end:
-        data = read_discovery(path)
-        if data is not None:
-            pid = int(data.get("pid", 0) or 0)
-            if data.get("address") and K.pid_alive(pid):
-                return data  # ours, or another client's worker that won the race
-            if "error" in data and pid == proc.pid:
-                path.unlink(missing_ok=True)
-                error = data["error"]
-                holder = ((error.get("error") or {}).get("details") or {}).get("holder") or {}
-                if holder.get("user") == AGENT_USER and K.pid_alive(int(holder.get("pid", 0) or 0)):
-                    locked = error  # another client's worker holds it: wait for its discovery file
-                    continue
-                return {"error": error}
-        if locked is None and proc.poll() is not None and read_discovery(path) is None:
+        live = _entry(project)
+        if live is not None and not live.get("stopping"):
+            return live  # ours, or one that won a race we couldn't see
+        error = read_discovery(failed)
+        if error is not None and "error" in error:
+            failed.unlink(missing_ok=True)
+            return {"error": error["error"]}
+        if proc.poll() is not None:  # gone without an entry or an error: one last look at both
+            time.sleep(0.1)
+            live = _entry(project)
+            if live is not None and not live.get("stopping"):
+                return live
+            error = read_discovery(failed)
+            failed.unlink(missing_ok=True)
+            if error is not None and "error" in error:
+                return {"error": error["error"]}
             hint = f"the worker exited with code {proc.returncode}; see {_log_path(project)}"
             return {"error": AgentError("worker_failed", hint=hint).envelope()}
         time.sleep(0.05)
-    if locked is not None:
-        return {"error": locked}
-    return {"error": AgentError("worker_failed", hint=f"no answer in {START_WAIT:g} s; see {_log_path(project)}")
+    return {"error": AgentError("worker_failed", hint=f"no answer in {start_wait():g} s; see {_log_path(project)}")
             .envelope()}
 
 
@@ -114,10 +161,14 @@ def request(project: str, tool: str, args: dict | None = None, *, client: str = 
             start: bool = True, timeout: float = 120) -> dict:
     """Run `tool` with `args` in the project's worker (started if needed and `start`) and return the envelope."""
     project = os.path.abspath(str(project))
+    path = discovery_path(project)
     message = {"tool": tool, "args": args or {}, "client": client, "task": task}
     problem = ""
-    for _attempt in range(3):
-        info = _live(project)
+    for _attempt in range(ATTEMPTS):
+        info = _entry(project)
+        if info is not None and info.get("stopping"):  # shutting down: it holds the lock until it ends
+            _wait(lambda: not same_entry(read_discovery(path), info) or not entry_alive(info), start_wait())
+            continue
         if info is None:
             if not start:
                 return AgentError("no_session").envelope()
@@ -126,10 +177,20 @@ def request(project: str, tool: str, args: dict | None = None, *, client: str = 
                 return info["error"]
         try:
             conn = Client(info["address"], family=FAMILY, authkey=bytes.fromhex(info["authkey"]))
-        except (OSError, EOFError, AuthenticationError, ValueError) as ex:
-            # the worker is exiting (idle or shut down): nothing ran, so wait for it to end and try again
+        except (FileNotFoundError, ConnectionRefusedError) as ex:
+            # nobody listens there. A stopping worker marks its entry first, so an unmarked entry is stale
+            # (a dead worker's pid reused by another process): remove it, unless it changed meanwhile
             problem = str(ex)
-            _wait(lambda: not K.pid_alive(int(info.get("pid", 0) or 0)), EXIT_WAIT)
+            current = read_discovery(path)
+            if same_entry(current, info) and not current.get("stopping"):
+                unlink_if(path, info)
+            continue
+        except (OSError, EOFError, AuthenticationError, ValueError) as ex:
+            # accepted and then dropped (the worker began to exit): nothing ran; once it is marked stopping
+            # (or gone) the next attempt waits for it to end
+            problem = str(ex)
+            _wait(lambda: not same_entry(current := read_discovery(path), info) or current.get("stopping")
+                  or not entry_alive(info), 5.0)
             continue
         try:
             conn.send(message)
