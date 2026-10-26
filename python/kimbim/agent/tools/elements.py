@@ -15,6 +15,7 @@ from ... import layers as Ly
 from ... import renovation as R
 from .. import messages, units
 from ..catalogue import SELECTOR, AgentError, ToolResult, bridge, tool
+from .common import lengths, level_guid
 
 
 def _offset(cursor: str) -> int:
@@ -168,22 +169,12 @@ def rename(session, elements, name):
     return {"elements": len(guids)}
 
 
-def _lengths(session, *values) -> list[float]:
-    out = []
-    for v in values:
-        try:
-            out.append(units.parse_length(v, session.unit))
-        except ValueError:
-            raise AgentError("bad_length", value=v) from None
-    return out
-
-
 @tool("elements.move", {"required": ["elements"], "properties": {
     "elements": SELECTOR, "dx": _NUMBER, "dy": _NUMBER, "dz": _NUMBER}}, writes=True)
 def move(session, elements, dx=0, dy=0, dz=0):
     """Move elements by dx, dy, dz. Joined walls follow and hosted doors/windows move with their wall."""
     guids = session.resolve(elements)
-    x, y, z = _lengths(session, dx, dy, dz)
+    x, y, z = lengths(session, dx, dy, dz)
     bridge(A.move_elements, _guids(guids), x, y, z)
     return {"elements": len(guids)}
 
@@ -213,17 +204,9 @@ def rotate(session, elements, angle, center=None):
         raise AgentError("bad_input", hint=messages.text("hint_bad_angle", value=angle)) from None
     if center is not None and len(center) != 2:
         raise AgentError("bad_input", hint="center must be [x, y]")
-    cx, cy = _lengths(session, *center) if center is not None else _centre(guids)
+    cx, cy = lengths(session, *center) if center is not None else _centre(guids)
     bridge(A.rotate_elements, _guids(guids), cx, cy, math.radians(degrees))
     return {"elements": len(guids), "center_m": [round(cx, 6), round(cy, 6)]}
-
-
-def _level_guid(level: str) -> str:
-    want = str(level).strip().lower()
-    for s in json.loads(A.storeys())["storeys"]:
-        if s["guid"] == level or s["name"].strip().lower() == want:
-            return s["guid"]
-    raise AgentError("not_found", what=level)
 
 
 @tool("elements.copy", {"required": ["elements"], "properties": {
@@ -233,8 +216,8 @@ def _level_guid(level: str) -> str:
 def copy(session, elements, dx=0, dy=0, dz=0, level=""):
     """Copy elements, shifted by dx, dy, dz, optionally onto another level."""
     guids = session.resolve(elements)
-    x, y, z = _lengths(session, dx, dy, dz)
-    storey = _level_guid(level) if level else ""
+    x, y, z = lengths(session, dx, dy, dz)
+    storey = level_guid(level) if level else ""
     bridge(E.copy_elements, _guids(guids), x, y, z, storey)
     return {"elements": len(guids)}
 
@@ -250,7 +233,7 @@ def mirror(session, elements, line, copy=False):
     guids = session.resolve(elements)
     if len(line) != 2 or any(len(p) != 2 for p in line):
         raise AgentError("bad_input", hint="line must be [[x1, y1], [x2, y2]]")
-    x1, y1, x2, y2 = _lengths(session, line[0][0], line[0][1], line[1][0], line[1][1])
+    x1, y1, x2, y2 = lengths(session, line[0][0], line[0][1], line[1][0], line[1][1])
     bridge(E.mirror_elements, _guids(guids), x1, y1, x2, y2, bool(copy))
     return {"elements": len(guids)}
 
@@ -260,7 +243,7 @@ def mirror(session, elements, line, copy=False):
 def copy_to_level(session, elements, level):
     """Copy elements to another level at the same plan position (walls bring their doors and windows)."""
     guids = session.resolve(elements)
-    bridge(A.copy_to_storey, _guids(guids), _level_guid(level))
+    bridge(A.copy_to_storey, _guids(guids), level_guid(level))
     return {"elements": len(guids)}
 
 

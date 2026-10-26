@@ -11,6 +11,7 @@ from ... import levels as L
 from ... import settings as S
 from ... import versioning as V
 from ..catalogue import AgentError, bridge, tool
+from .common import lengths, level_guid
 
 
 @tool("project.info", {})
@@ -68,3 +69,45 @@ def set_settings(session, changes):
 def levels_list(session):
     """List the levels from the lowest: GlobalId, name, elevation, height to the next level and element count."""
     return {"levels": json.loads(L.levels_table())["levels"], "unit": "m"}  # metres, like every tool number
+
+
+@tool("levels.add", {"required": ["name", "elevation"], "properties": {
+    "name": {"type": "string"},
+    "elevation": {"type": ["number", "string"], "description": "Project units or a string with units (\"3m\")."}}},
+    writes=True)
+def levels_add(session, name, elevation):
+    """Add a level at an elevation."""
+    r = bridge(A.add_storey, name, lengths(session, elevation)[0])
+    return {"guid": r["guid"], "name": name}
+
+
+@tool("levels.edit", {"required": ["level"], "properties": {
+    "level": {"type": "string", "description": "Level name or GlobalId."}, "name": {"type": "string"},
+    "elevation": {"type": ["number", "string"], "description": "New elevation; the level's elements move with it."},
+    "move_above": {"type": "boolean", "description": "Move the levels above by the same amount (default false)."}}},
+    writes=True)
+def levels_edit(session, level, name=None, elevation=None, move_above=False):
+    """Rename a level or move it to a new elevation."""
+    if name is None and elevation is None:
+        raise AgentError("bad_input", hint="give a name or an elevation")
+    guid = level_guid(level)
+    target = lengths(session, elevation)[0] if elevation is not None else None
+    if name is not None:
+        bridge(L.rename_storey, guid, name)
+    if target is not None:
+        bridge(L.set_storey_elevation, guid, target, bool(move_above))
+    return {"guid": guid}
+
+
+@tool("levels.delete", {"required": ["level"], "properties": {
+    "level": {"type": "string", "description": "Level name or GlobalId."},
+    "elements": {"type": "string", "enum": ["refuse", "delete", "move"], "description":
+                 "What to do with the level's elements: refuse (default), delete them, or move them to move_to."},
+    "move_to": {"type": "string", "description": "Level that receives the elements when elements is move."}}},
+    writes=True)
+def levels_delete(session, level, elements="refuse", move_to=""):
+    """Delete a level."""
+    if elements == "move" and not move_to:
+        raise AgentError("bad_input", hint="elements \"move\" needs move_to")
+    bridge(L.delete_storey, level_guid(level), elements, level_guid(move_to) if move_to else "")
+    return {"deleted": level}
