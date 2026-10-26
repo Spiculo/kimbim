@@ -2,7 +2,11 @@
 """Task tools (D102, spec §4.3): start, finish, abandon and status of the task an agent's changes go in."""
 from __future__ import annotations
 
-from ..catalogue import tool
+from ... import console
+from ... import documents as D
+from ... import settings as S
+from ... import versioning as V
+from ..catalogue import AgentError, bridge, tool
 
 _TASK = {"type": "string", "description": "The task id task.start printed (default: your open task)."}
 
@@ -37,3 +41,99 @@ def abandon(session, task="", client="cli", task_id=""):
 def status(session, task="", client="cli", task_id=""):
     """Show the open task (or the named one) with what it changed so far, and every task of the project."""
     return session.tasks.status(task or task_id, client=client)
+
+
+# ---------------------------------------------------------------- versions (D102)
+
+def _versioned() -> None:
+    if V._project is None:
+        raise AgentError("not_versioned")
+
+
+@tool("versions.log", {"properties": {"limit": {"type": "integer", "minimum": 1, "description": "Default 50."}}})
+def log(session, limit=50):
+    """List the saved versions of the current option, newest first: id, message, author, time, milestones."""
+    return bridge(V.history, limit)
+
+
+@tool("versions.diff", {"required": ["from"], "properties": {
+    "from": {"type": "string", "description": "A version id, milestone or option name."},
+    "to": {"type": "string", "description": "A version id, milestone, option name, or WORKING (default)."}}})
+def diff(session, **kw):
+    """Compare two versions: the elements added, modified and removed from one to the other (WORKING is the open
+    model with its unsaved changes)."""
+    _versioned()
+    r = bridge(V.compare, kw["from"], kw.get("to") or "WORKING")
+    r.pop("ok", None)
+    return r
+
+
+@tool("versions.options", {})
+def options(session):
+    """List the design options of the project and the current one."""
+    return bridge(V.options)
+
+
+@tool("versions.milestones", {})
+def milestones(session):
+    """List the milestones (named versions such as Concept or Schematic design)."""
+    return bridge(V.milestones)
+
+
+@tool("versions.element_history", {"required": ["element"], "properties": {
+    "element": {"type": "string", "description": "GlobalId."}}})
+def element_history(session, element):
+    """List the saved versions that changed an element, newest first."""
+    _versioned()
+    r = bridge(V.element_history, element)
+    r.pop("ok", None)
+    return r
+
+
+@tool("versions.export", {"required": ["out"], "properties": {
+    "version": {"type": "string", "description": "A version id, milestone, option name, HEAD or WORKING."},
+    "out": {"type": "string", "description": "Path of the IFC file to write."}}})
+def export(session, out, version="HEAD"):
+    """Write a version of the model as an IFC file (HEAD, the latest saved one, by default)."""
+    if version == "WORKING":
+        bridge(D.export_ifc, out)
+    else:
+        _versioned()
+        try:
+            V._model_at(version).write(out)
+        except Exception as ex:  # noqa: BLE001  (an unknown revision, an unwritable path)
+            raise AgentError("not_found", hint=str(ex), what=version) from None
+    return {"path": out, "version": version}
+
+
+# ---------------------------------------------------------------- selection and scripts
+
+@tool("selection.get", {})
+def selection_get(session):
+    """Read the app's current selection. Needs the KimBim app to be running."""
+    raise AgentError("needs_app")
+
+
+@tool("selection.set", {"required": ["elements"], "properties": {
+    "elements": {"type": "array", "items": {"type": "string"}, "description": "GlobalIds to select."}}})
+def selection_set(session, elements):
+    """Select elements in the app's window. Needs the KimBim app to be running."""
+    raise AgentError("needs_app")
+
+
+def _scripts_on(session, code):
+    if not S.current().get("agent_scripts"):
+        raise AgentError("scripts_off", hint="The architect turns scripts on in the project settings (agent_scripts).")
+
+
+@tool("script.run", {"required": ["code"], "properties": {
+    "code": {"type": "string", "description": "Python, as in the console: `ifc` is the model, `bridge` the KimBim "
+                                              "commands, edit() groups edits."}}}, writes=True, check=_scripts_on)
+def run(session, code):
+    """Run a Python script in the project's console (the model is `ifc`, KimBim commands are in `bridge`). It is one
+    undo step with the rest of the call; a script that raises is rolled back. Only when the architect allows
+    scripts."""
+    out = bridge(console.console_run, code, "[]")
+    if out.get("error"):
+        raise AgentError("bridge_error", hint=out.get("traceback") or "the script failed")
+    return {"output": out.get("output", "")}
