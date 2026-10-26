@@ -19,6 +19,8 @@ KimBim is GPL-3.0-or-later. These are the components it uses, how each is linked
 | Flask | BSD-3-Clause | IfcTester's web app (installed as its dependency, never started) | Dynamic |
 | ezdxf (and pyparsing, fonttools) | MIT | Drawings and sheets exported to DXF (D83) | Dynamic |
 | pypdfium2 (and PDFium) | Apache-2.0 / BSD-3-Clause (PDFium: BSD-3-Clause, Apache-2.0) | PDF underlay pages rendered to images (D85) | Dynamic |
+| MCP Python SDK (`mcp`, `mcp-types`) 2.3 | MIT | `kimbim mcp`: the agent tools as an MCP server for AI clients (D102) | Dynamic (Python module) |
+| anyio, httpx, pydantic, starlette, sse-starlette, uvicorn, jsonschema, PyJWT, rich, typer, opentelemetry-api, cryptography, pywin32 (and their dependencies) | MIT / BSD-3-Clause / Apache-2.0 / PSF-2.0 | Dependencies of the MCP SDK (only its stdio server is used) | Dynamic |
 | Git | GPL-2.0-only (program) | `git fast-import`, repack, branch | Separate program |
 | gix (gitoxide) | MIT OR Apache-2.0 | Reading the Git object database | Static (Rust) |
 | rayon | MIT OR Apache-2.0 | Parallel reads | Static (Rust) |

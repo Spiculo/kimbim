@@ -213,10 +213,8 @@ def test_script_run_on_the_project(house, tmp_path, capsys):
     assert code == 1 and "script" in err.lower()  # agent_scripts is off: the architect turns it on
 
 
-def test_mcp_and_setup_are_not_available_yet(capsys):
-    assert main(["mcp"]) == 1 and "not available yet" in capsys.readouterr().err
-    assert main(["setup", "claude-code"]) == 1 and "not available yet" in capsys.readouterr().err
-    assert main(["setup", "nope"]) == 2
+def test_setup_unknown_client_is_a_usage_error(capsys):
+    assert main(["setup", "nope"]) == 2  # mcp and setup themselves: test_agent_mcp.py, test_agent_setup.py
 
 
 def test_through_the_worker(house, capsys):

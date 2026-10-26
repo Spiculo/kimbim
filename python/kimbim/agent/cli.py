@@ -441,9 +441,17 @@ def _people(group, top) -> None:
     sp.add_argument("project")
     sp.add_argument("--idle", type=float, default=None, help="seconds without a request before exiting")
     sp.set_defaults(handler=_serve)
-    top.add_parser("mcp", help=GROUP_HELP["mcp"], description=GROUP_HELP["mcp"]).set_defaults(handler=_mcp)
-    st = top.add_parser("setup", help=GROUP_HELP["setup"], description=GROUP_HELP["setup"])
+    only_project = frozenset({"json", "no-worker", "task", "client"})
+    mp = top.add_parser("mcp", help=GROUP_HELP["mcp"], description=GROUP_HELP["mcp"] + " (stdio). Without --project, "
+                        "every tool call names its project.")
+    _add_globals(mp, False, only_project)
+    mp.set_defaults(handler=_mcp)
+    st = top.add_parser("setup", help=GROUP_HELP["setup"],
+                        description="Write the AI client's configuration for `kimbim mcp` (merged into its file).")
     st.add_argument("client", choices=("claude-desktop", "claude-code", "opencode"))
+    st.add_argument("--print", dest="print_only", action="store_true",
+                    help="print the configuration (for claude-code, the `claude mcp add` line) instead of writing it")
+    _add_globals(st, False, only_project)
     st.set_defaults(handler=_setup)
 
 
@@ -630,15 +638,27 @@ def _serve(ns) -> int:
     return serve_main([ns.project] + ([] if ns.idle is None else ["--idle", str(ns.idle)]))
 
 
-# `kimbim mcp` and `kimbim setup` are filled by the MCP task (D102): replace these two functions.
 def _mcp(ns) -> int:
-    print(_t("cli_error", message=_t("cli_not_available", what="mcp")), file=sys.stderr)
-    return 1
+    from .mcp_server import serve
+
+    return serve(ns.g_project)
 
 
 def _setup(ns) -> int:
-    print(_t("cli_error", message=_t("cli_not_available", what="setup")), file=sys.stderr)
-    return 1
+    from . import clients
+
+    try:
+        text, written = clients.setup(ns.client, ns.g_project, ns.print_only)
+    except (clients.SetupError, OSError) as e:
+        print(_t("cli_error", message=e), file=sys.stderr)
+        return 1
+    if text:
+        print(text)
+    for path in written:
+        print(_t("setup_wrote", path=path))
+    if written:
+        print(_t("setup_restart", client=ns.client))
+    return 0
 
 
 # ---------------------------------------------------------------- main
