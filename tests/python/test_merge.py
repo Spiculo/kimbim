@@ -261,10 +261,10 @@ def test_project_merge_with_conflicts(tmp_path, capsys):
         p.merge("b", "Combine b")
     (c,) = info.value.result.conflicts
     assert p.log("HEAD", 1)[0].message.strip() == "ours"  # nothing committed
-    code = cli(["-C", str(tmp_path / "p"), "merge", "b", "-m", "Combine b"])
+    code = cli(["--project", str(tmp_path / "p"), "versions", "merge", "b", "-m", "Combine b"])
     out = capsys.readouterr()
     assert code == 1 and c.id in out.out and "Window" in out.out
-    code = cli(["-C", str(tmp_path / "p"), "merge", "b", "-m", "Combine b", "--resolve", f"{c.id}=theirs"])
+    code = cli(["--project", str(tmp_path / "p"), "versions", "merge", "b", "-m", "Combine b", "--resolve", f"{c.id}=theirs"])
     assert code == 0, capsys.readouterr()
     assert len(p.log("HEAD", 1)[0].parents) == 2
     name = json.loads(p._records("HEAD")[c.key])["a"]["Name"]

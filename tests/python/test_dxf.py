@@ -312,17 +312,17 @@ def test_cli_exports_a_version_to_dxf(house_file, tmp_path, capsys):
     from kimbim.cli import main
 
     proj = tmp_path / "proj"
-    assert main(["init", str(proj)]) == 0
-    assert main(["-C", str(proj), "commit", house_file, "-m", "house"]) == 0
+    assert main(["project", "init", str(proj)]) == 0
+    assert main(["--project", str(proj), "versions", "save", house_file, "-m", "house"]) == 0
     capsys.readouterr()
     one = tmp_path / "plan.dxf"
-    assert main(["-C", str(proj), "export", str(one), "--drawing", "Level 1 Floor Plan", "--layers", "kind"]) == 0
+    assert main(["--project", str(proj), "versions", "export-dxf", str(one), "--drawing", "Level 1 Floor Plan", "--layers", "kind"]) == 0
     assert "A-WALL" in {layer.dxf.name for layer in read(str(one)).layers}
-    assert main(["-C", str(proj), "export", str(one), "--drawing", "Level 1 Floor Plan"]) == 1
+    assert main(["--project", str(proj), "versions", "export-dxf", str(one), "--drawing", "Level 1 Floor Plan"]) == 1
     assert "--force" in capsys.readouterr().err
     folder = tmp_path / "set"
-    assert main(["-C", str(proj), "export", str(folder), "--format", "dxf", "--sheet", "A01",
+    assert main(["--project", str(proj), "versions", "export-dxf", str(folder), "--sheet", "A01",
                  "--drawing", "Section 1"]) == 0
     assert sorted(p.name for p in folder.iterdir()) == ["A01 Plan, section and elevation.dxf", "Section 1.dxf"]
-    assert main(["-C", str(proj), "export", str(folder), "--format", "dxf", "--sheet", "Z9"]) == 1
+    assert main(["--project", str(proj), "versions", "export-dxf", str(folder), "--sheet", "Z9"]) == 1
     assert "Z9" in capsys.readouterr().err
