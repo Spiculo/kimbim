@@ -91,7 +91,7 @@ def _is(e, classes) -> bool:
     return any(e.is_a(c) for c in classes)
 
 
-def _touched(f, operations) -> tuple[list[str], list[str]] | None:
+def touched(f, operations) -> tuple[list[str], list[str]] | None:
     """The elements whose shape a transaction may have changed (still there) and the ones it removed, from
     the entities it created, edited or deleted. None when it can't tell (redraw everything)."""
     removed, seeds = [], set()
@@ -141,7 +141,7 @@ def _finish_step() -> bool:
     """Close the open step as one undo step, or drop it when it changed nothing (D92). Returns whether a
     step was kept."""
     operations = B._model.transaction.operations if B._model.transaction else None
-    found = _touched(B._model, operations) if operations is not None else None
+    found = touched(B._model, operations) if operations is not None else None
     if found is None:
         _run["refresh"] = True
         found = ([], [])

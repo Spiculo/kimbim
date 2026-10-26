@@ -30,6 +30,14 @@ MESSAGES = {
     "render_failed": {"en": "The view could not be rendered.", "es": "No se pudo generar la vista."},
     "unknown_tool": {"en": "Unknown tool: {tool}", "es": "Herramienta desconocida: {tool}"},
     "not_found": {"en": "Not found: {what}", "es": "No se encontró: {what}"},
+    # hints for bad_input (catalogue.validate)
+    "hint_required": {"en": "Missing {field}.", "es": "Falta {field}."},
+    "hint_unknown_field": {"en": "Unknown field {field}.", "es": "Campo desconocido {field}."},
+    "hint_type": {"en": "{field} must be {type}.", "es": "{field} debe ser {type}."},
+    "hint_enum": {"en": "{field} must be one of: {values}.", "es": "{field} debe ser uno de: {values}."},
+    "hint_form": {"en": "{field} does not have an accepted form.", "es": "{field} no tiene una forma aceptada."},
+    "hint_nested_dry_run": {"en": "dry_run is not available inside another undo step.",
+                            "es": "dry_run no está disponible dentro de otro paso de deshacer."},
 }
 
 _ORG = _APP = "KimBim"  # app/src/main.cpp
