@@ -40,6 +40,11 @@ MESSAGES = {
     "hint_form": {"en": "{field} does not have an accepted form.", "es": "{field} no tiene una forma aceptada."},
     "hint_not_versioned": {"en": "Turn on versioning for the project, or start a task with mode \"direct\".",
                            "es": "Activa el historial de versiones del proyecto o inicia una tarea con mode \"direct\"."},
+    "warn_no_dimension": {"en": "{label} has no {name} to change; skipped.",
+                          "es": "{label} no tiene {name} que cambiar; se omitió."},
+    "hint_bad_angle": {"en": "{value} is not an angle; use degrees (90, \"90deg\") or \"1.57rad\".",
+                       "es": "{value} no es un ángulo; usa grados (90, \"90deg\") o \"1.57rad\"."},
+    "hint_bad_property": {"en": "{key} must be \"Pset.Property\".", "es": "{key} debe ser \"Pset.Propiedad\"."},
     "hint_open_step": {"en": "Write tools can't run inside another undo step (a console run or edit() block).",
                        "es": "Las herramientas de escritura no pueden ejecutarse dentro de otro paso de deshacer "
                              "(una ejecución de la consola o un bloque edit())."},
