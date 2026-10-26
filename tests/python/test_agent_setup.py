@@ -94,6 +94,20 @@ def test_setup_merges_existing_claude_code(home, project):
     _env_ok(entry["env"])
 
 
+def test_setup_claude_code_adds_the_claude_md_section(home, project):
+    claude_md = project.parent / "CLAUDE.md"
+    claude_md.write_text("# House\n\nOur own notes.\n", encoding="utf-8")
+    assert main(["setup", "claude-code", "--project", str(project)]) == 0
+    text = claude_md.read_text(encoding="utf-8")
+    assert text.startswith("# House\n\nOur own notes.\n")
+    assert text.count(clients.AGENTS_START) == 1 and text.count(clients.AGENTS_END) == 1
+    assert "`kimbim`" in text and "never accept your own option" in text
+    assert not (project.parent / "AGENTS.md").exists()  # opencode's file is not Claude Code's
+    # idempotent: a second run replaces its own section
+    assert main(["setup", "claude-code", "--project", str(project)]) == 0
+    assert claude_md.read_text(encoding="utf-8") == text
+
+
 def test_setup_claude_code_print(home, project, capsys):
     assert main(["setup", "claude-code", "--project", str(project), "--print"]) == 0
     out = capsys.readouterr().out

@@ -10,7 +10,8 @@ folders are put on PATH by `kimbim/__main__.py`, so the env's python runs withou
 - Claude Desktop: `claude_desktop_config.json` in `%APPDATA%/Claude` (Windows), `~/Library/Application
   Support/Claude` (macOS) or `$XDG_CONFIG_HOME/Claude` (`~/.config/Claude`), key `mcpServers.kimbim`.
 - Claude Code: `.mcp.json` in the project's folder (the current folder without --project), `mcpServers.kimbim`;
-  `--print` prints the `claude mcp add` line instead.
+  `--print` prints the `claude mcp add` line instead. With --project, the same marked section as opencode's goes
+  in the folder's CLAUDE.md.
 - opencode: `opencode.json` in the project's folder (`$XDG_CONFIG_HOME/opencode/opencode.json` without --project),
   `mcp.kimbim` = `{"type": "local", "command": [...]}`; with --project, a marked section in the folder's AGENTS.md
   tells the agent the `kimbim` command line exists (replaced, not repeated, on the next run)."""
@@ -28,6 +29,7 @@ CLIENTS = ("claude-desktop", "claude-code", "opencode")
 SERVER = "kimbim"
 AGENTS_START = "<!-- kimbim:start -->"
 AGENTS_END = "<!-- kimbim:end -->"
+INSTRUCTIONS = {"opencode": "AGENTS.md", "claude-code": "CLAUDE.md"}  # the file each client reads its instructions from
 
 
 class SetupError(Exception):
@@ -140,7 +142,7 @@ def _write(path: pathlib.Path, text: str) -> None:
     os.replace(tmp, path)
 
 
-# ---------------------------------------------------------------- Claude Code's command, opencode's AGENTS.md
+# ---------------------------------------------------------------- Claude Code's command, the instructions section
 
 def _join(args: list[str]) -> str:
     return subprocess.list2cmdline(args) if sys.platform == "win32" else shlex.join(args)
@@ -183,8 +185,9 @@ def merge_agents(text: str, section: str) -> str:
 # ---------------------------------------------------------------- setup
 
 def setup(client: str, project: str | None, print_only: bool = False) -> tuple[str, list[pathlib.Path]]:
-    """Write the client's configuration (and opencode's AGENTS.md section with a project). Returns the text to
-    print (with --print, the configuration; nothing is written) and the files written."""
+    """Write the client's configuration (and, with a project, the instructions section in opencode's AGENTS.md or
+    Claude Code's CLAUDE.md). Returns the text to print (with --print, the configuration; nothing is written) and
+    the files written."""
     if client not in CLIENTS:
         raise SetupError(f"unknown client {client}")
     part = snippet(client, project)
@@ -196,8 +199,8 @@ def setup(client: str, project: str | None, print_only: bool = False) -> tuple[s
     data = merged(path, part)
     written = [path]
     agents = None
-    if client == "opencode" and project:
-        agents = project_folder(project) / "AGENTS.md"
+    if project and client in INSTRUCTIONS:
+        agents = project_folder(project) / INSTRUCTIONS[client]
         try:
             old = agents.read_text(encoding="utf-8") if agents.exists() else ""
         except (OSError, ValueError) as ex:
