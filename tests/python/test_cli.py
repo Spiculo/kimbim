@@ -39,14 +39,29 @@ def test_full_cli_flow(tmp_path, capsys):
     assert "* main" in out and "option-b" in out
 
 
-def test_save_the_working_model_without_a_file(tmp_path, capsys):
+def test_save_the_working_model_without_a_file(tmp_path, capsys, monkeypatch):
+    from kimbim import app_bridge as B
+    from kimbim import documents as D
+    from kimbim import kimfile as K
+    from kimbim.agent.session import Session
+
+    monkeypatch.setattr(D, "_data_dir", tmp_path / "data")
+    monkeypatch.setattr(K, "display_user", "")
     proj = tmp_path / "p"
     a = tmp_path / "a.ifc"
-    build_model().write(str(a))
+    f = build_model()
+    f.write(str(a))
     run(capsys, "project", "init", str(proj))
-    run(capsys, "--project", str(proj), "versions", "save", str(a), "-m", "first")
-    code, out, err = run(capsys, "--project", str(proj), "versions", "save", "-m", "nothing new")
-    assert code in (0, 1) and "Traceback" not in err
+    base = ["--project", str(proj)]
+    run(capsys, *base, "versions", "save", str(a), "-m", "first")
+    s = Session.open(str(proj))
+    B.set_name(json.dumps([f.by_type("IfcWall")[0].GlobalId]), "Edited")
+    s.save()
+    s.close()
+    code, out, err = run(capsys, *base, "versions", "save", "-m", "from the working model")
+    assert code == 0, err
+    code, out, _ = run(capsys, *base, "--no-worker", "versions", "log")
+    assert code == 0 and "from the working model" in out and "first" in out
 
 
 def test_empty_project_messages(tmp_path, capsys):

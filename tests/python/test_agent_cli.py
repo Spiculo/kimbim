@@ -229,3 +229,81 @@ def test_through_the_worker(house, capsys):
     assert len(client.spawned) == 1  # the same worker
     capsys.readouterr()
     assert client.request(str(house), "_shutdown", {})["ok"]
+
+
+# ---------------------------------------------------------------- fix round 1
+
+@pytest.mark.parametrize("value", ["-10%", "-50cm"])
+def test_negative_relative_values_are_values(value):
+    argv = ["elements", "set-dimensions", "--elements", "selection", "--width", value]
+    ns = cli.build_parser().parse_args(cli.fix_negative_values(argv, cli.build_parser()))
+    assert cli.tool_args(ns) == {"elements": "selection", "width": value}
+
+
+def test_negative_width_end_to_end(house, capsys):
+    from kimbim import app_bridge as B
+    from kimbim import authoring as A
+    from kimbim.agent.session import Session
+
+    from kimbim import settings as S
+
+    s = Session.open(str(house))
+    assert json.loads(S.set_project_settings(json.dumps({"agent_changes": "direct"})))["ok"]
+    s.save()
+    s.close()
+    code, env, err = envelope(capsys, house, "elements", "set-dimensions", "--elements",
+                              '{"kind":"window","level":"Level 1"}', "--width", "-10cm")
+    assert code == 0 and env["ok"], (env, err)
+    s = Session.open(str(house))
+    try:
+        widths = [round(dict((n, v) for n, v, _ in A.element_dimensions(w))["Width"], 6)
+                  for w in B._model.by_type("IfcWindow")]
+    finally:
+        s.close()
+    assert widths.count(1.1) == 4  # the four Level 1 windows were 1.2 m wide
+
+
+def test_human_text_in_spanish(house, capsys, monkeypatch):
+    monkeypatch.setenv("KIMBIM_LANG", "es")
+    code, out, _ = run(capsys, house, "elements", "rename", "--elements", '{"kind":"door"}', "--name", "P",
+                       "--dry-run")
+    assert code == 0 and "Renombraría" in out
+    code, _, err = run(capsys, house, "elements", "find", "--elements", '{"kind":"window","name":"Nope"}')
+    assert code == 1 and err.startswith("kimbim: error: No hay coincidencias")
+    monkeypatch.chdir(house.parent / "..")
+    assert main(["project", "info"]) == 2
+    assert "No hay ningún proyecto" in capsys.readouterr().err
+
+
+def test_summaries_per_tool(house, capsys):
+    code, out, err = run(capsys, house, "elements", "set-dimensions", "--elements",
+                         '{"kind":"window","level":"Level 1"}', "--width", "+50cm")
+    assert code == 0 and out.startswith("Changed 4 windows: width +50cm"), (out, err)
+    code, out, _ = run(capsys, house, "elements", "rename", "--elements", '{"kind":"door"}', "--name", "P")
+    assert code == 0 and out.startswith("Renamed ") and " to P" in out
+    code, out, _ = run(capsys, house, "task", "start", "--title", "Mi tarea", "--mode", "direct")
+    assert code == 0 and out.startswith("Task started") and "Mi tarea" in out
+    code, out, _ = run(capsys, house, "elements", "rename", "--elements", '{"kind":"door"}', "--name", "P",
+                       "--dry-run")
+    assert out.startswith("Would rename")
+    code, out, _ = run(capsys, house, "elements", "delete", "--elements", '{"kind":"door"}', "--dry-run")
+    assert code == 0 and out.startswith("Would delete")
+
+
+def test_no_changes_reads_naturally():
+    assert cli.summarize("levels.add", {"ok": True, "result": {}, "changes": {}}, {}) == "No changes"
+
+
+def test_finish_failure_is_reported_with_the_write(house, capsys, monkeypatch):
+    from kimbim.agent import catalogue
+
+    real = catalogue.call_tool
+
+    def failing(session, name, args, **kw):
+        if name == "task.finish":
+            return catalogue.AgentError("bridge_error", hint="disk full").envelope()
+        return real(session, name, args, **kw)
+
+    monkeypatch.setattr(cli, "call_tool", failing)
+    code, out, err = run(capsys, house, "elements", "rename", "--elements", '{"kind":"door"}', "--name", "P")
+    assert code == 1 and "Renamed" in out and "disk full" in err

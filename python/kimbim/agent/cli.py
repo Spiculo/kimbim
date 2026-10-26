@@ -18,6 +18,7 @@ import sys
 from .. import _core
 from ..project import Changes, KimbimError, MergeConflicts, Project
 from . import client as _client
+from . import messages
 from .catalogue import TOOLS, AgentError, call_tool
 from .session import Session
 
@@ -107,6 +108,37 @@ def _add_globals(p: argparse.ArgumentParser, top: bool, skip: frozenset = frozen
             p.add_argument("--" + flag, **kw)
 
 
+def fix_negative_values(argv: list[str], parser: argparse.ArgumentParser) -> list[str]:
+    """argparse takes `--width -10%` for a flag; a value after an option that takes one is joined to it
+    (`--width=-10%`) unless it is itself one of the CLI's options."""
+    takes: dict[str, bool] = {}
+    known: set[str] = set()
+
+    def walk(p: argparse.ArgumentParser) -> None:
+        for a in p._actions:
+            if isinstance(a, argparse._SubParsersAction):
+                for sub in a.choices.values():
+                    walk(sub)
+            for o in a.option_strings:
+                known.add(o)
+                value = a.nargs is None and not isinstance(a, argparse._StoreTrueAction)
+                takes[o] = takes.get(o, False) or value
+
+    walk(parser)
+    out, i = [], 0
+    while i < len(argv):
+        tok = argv[i]
+        nxt = argv[i + 1] if i + 1 < len(argv) else ""
+        if takes.get(tok) and tok.startswith("--") and nxt.startswith("-") and len(nxt) > 1 and nxt not in known \
+                and not nxt.startswith("--"):
+            out.append(f"{tok}={nxt}")
+            i += 2
+            continue
+        out.append(tok)
+        i += 1
+    return out
+
+
 def build_parser() -> argparse.ArgumentParser:
     from .. import agent  # noqa: F401  (importing the package fills the catalogue)
 
@@ -169,7 +201,7 @@ def discover(project: str | None) -> str:
     kims = sorted(here.glob("*.kim"))
     if len(kims) == 1:
         return str(kims[0])
-    raise UsageError("no project here (no .kimbim folder, and not exactly one .kim file): give --project")
+    raise UsageError(messages.text("cli_no_project"))
 
 
 def _tool_command(ns) -> int:
@@ -183,7 +215,7 @@ def _call(ns, name: str, args: dict) -> int:
         envelope = _run_in_process(project, name, args, ns.g_client, task)
     else:
         envelope = _client.request(project, name, args, client=ns.g_client, task=task)
-    return _report(name, envelope, ns.g_json)
+    return _report(name, envelope, ns.g_json, args)
 
 
 def _run_in_process(project: str, name: str, args: dict, client: str, task: str) -> dict:
@@ -198,13 +230,14 @@ def _run_in_process(project: str, name: str, args: dict, client: str, task: str)
     try:
         session.tasks.resume(client, task)
         envelope = call_tool(session, name, args, client=client, task_id=task)
-        implicit = session.tasks._implicit
+        implicit = session.tasks.implicit_task()
         if envelope.get("ok") and implicit:  # a write that started its own task: finish it so it is saved
             done = call_tool(session, "task.finish", {"summary": f"kimbim {name.replace('.', ' ')}"},
                              client=client, task_id=implicit)
-            if not done.get("ok"):
-                return done
-            envelope["task"] = done["result"]["task"]
+            if done.get("ok"):
+                envelope["task"] = done["result"]["task"]
+            else:  # the write is made; the report says both
+                envelope["finish_error"] = done["error"]
         return envelope
     finally:
         _stop(session)
@@ -212,50 +245,124 @@ def _run_in_process(project: str, name: str, args: dict, client: str, task: str)
 
 # ---------------------------------------------------------------- output
 
-def _plural(n: int, word: str) -> str:
-    return f"{n} {word}" if n == 1 else f"{n} {word}s"
+def _t(code: str, **fmt) -> str:
+    return messages.text(code, **fmt)
 
 
 def _brief(v) -> str:
     if isinstance(v, list):
-        return _plural(len(v), "item")
+        return _t("sum_items", n=len(v))
     if isinstance(v, dict):
         return "{" + ", ".join(list(v)[:6]) + (", ..." if len(v) > 6 else "") + "}"
     return str(v)
 
 
-def summarize(name: str, envelope: dict) -> str:
-    """One line for a person: the counts in `changes` for a write, else the result's top-level keys."""
+def _kind_of(envelope: dict, n: int) -> str:
+    """"windows" when n of the modified elements are labelled Window..."""
+    words: dict[str, int] = {}
+    for m in (envelope.get("changes") or {}).get("modified", ()):
+        word = (m.get("label") or "").split(" ", 1)[0].lower()
+        if word:
+            words[word] = words.get(word, 0) + 1
+    hit = next((w for w, c in words.items() if c == n), None)
+    return hit + ("" if hit.endswith("s") else "s") if hit else "elements"
+
+
+def _dry(envelope: dict) -> bool:
+    return bool((envelope.get("changes") or {}).get("dry_run"))
+
+
+def _sum_dimensions(envelope, args):
+    n = envelope["result"]["changed"]
+    what = ", ".join(f"{k} {args[k]}" for k in ("width", "height", "sill", "length") if k in args)
+    return _t("sum_dims_would" if _dry(envelope) else "sum_dims", n=n, kind=_kind_of(envelope, n), what=what)
+
+
+def _sum_count(code: str, key: str = "elements"):
+    def summary(envelope, args):
+        return _t(code + ("_would" if _dry(envelope) else ""), n=envelope["result"][key],
+                  name=args.get("name", ""))
+    return summary
+
+
+def _sum_create(kind: str):
+    def summary(envelope, args):
+        if _dry(envelope):
+            return _t("sum_created_would", kind=kind)
+        return _t("sum_created", kind=kind, guid=envelope["result"]["guids"][0])
+    return summary
+
+
+def _sum_task_start(envelope, args):
+    r = envelope["result"]
+    return _t("sum_task_started", title=r["title"], id=r["id"], mode=r["mode"])
+
+
+def _sum_task_finish(envelope, args):
+    r = envelope["result"]["task"]
+    return _t("sum_task_finished", title=r["title"], id=r["id"], status=r["status"])
+
+
+# A one-line summary for the main tools: fn(envelope, args) -> text. Others use the generic line.
+SUMMARIES = {
+    "elements.set_dimensions": _sum_dimensions,
+    "elements.rename": _sum_count("sum_renamed"),
+    "elements.move": _sum_count("sum_moved"),
+    "elements.delete": _sum_count("sum_deleted", "requested"),
+    "task.start": _sum_task_start,
+    "task.finish": _sum_task_finish,
+    "snapshot.take": lambda envelope, args: _t("sum_snapshot", path=envelope["result"]["path"]),
+    **{"create." + k: _sum_create(k) for k in ("wall", "slab", "column", "beam", "opening", "room")},
+}
+
+
+def summarize(name: str, envelope: dict, args: dict | None = None) -> str:
+    """One line for a person: the tool's own summary, else the counts in `changes`, else the result's keys."""
+    args = args or {}
     result, changes = envelope.get("result"), envelope.get("changes")
     if name == "versions.log" and isinstance(result, dict):
         return "\n".join(f"{v['short']}  {v['author']}  {(v['message'].strip().splitlines() or [''])[0]}"
-                         for v in result["versions"]) or "no versions yet"
+                         for v in result["versions"]) or _t("cli_no_versions")
+    if name in SUMMARIES:
+        try:
+            return SUMMARIES[name](envelope, args)
+        except (KeyError, TypeError, IndexError):
+            pass  # an unexpected result shape: the generic line
     if changes is not None:
-        counts = [f"{len(changes[k])} {k}" for k in ("added", "modified", "removed") if changes.get(k)]
-        what = ", ".join(counts) or "no changes"
-        line = f"Would change ({what}); dry run, nothing changed" if changes.get("dry_run") else f"Changed {what}"
+        counts = [_t("sum_" + k, n=len(changes[k])) for k in ("added", "modified", "removed") if changes.get(k)]
+        if not counts:
+            return _t("sum_no_changes")
+        what = ", ".join(counts)
+        line = _t("sum_would", what=what) if changes.get("dry_run") else _t("sum_changed", what=what)
         task = envelope.get("task")
-        return line + (f" (task {task['id']}: {task['status']})" if task else "")
+        return line + (_t("sum_task", id=task["id"], status=task["status"]) if task else "")
     if isinstance(result, dict) and result:
         return ", ".join(f"{k}: {_brief(v)}" for k, v in result.items())
     if isinstance(result, list):
-        return _plural(len(result), "item")
-    return "ok" if result in (None, "", {}) else str(result)
+        return _t("sum_items", n=len(result))
+    return _t("sum_ok") if result in (None, "", {}) else str(result)
 
 
-def _report(name: str, envelope: dict, as_json: bool) -> int:
+def _error_lines(error: dict) -> None:
+    print(_t("cli_error", message=error.get("message", "failed")), file=sys.stderr)
+    if error.get("hint"):
+        print(f"  {error['hint']}", file=sys.stderr)
+
+
+def _report(name: str, envelope: dict, as_json: bool, args: dict | None = None) -> int:
+    failed = not envelope.get("ok") or "finish_error" in envelope
     if as_json:
         print(json.dumps(envelope, ensure_ascii=False, indent=1, default=str))
-        return 0 if envelope.get("ok") else 1
+        return 1 if failed else 0
     if not envelope.get("ok"):
-        error = envelope.get("error") or {}
-        print(f"kimbim: error: {error.get('message', 'failed')}", file=sys.stderr)
-        if error.get("hint"):
-            print(f"  {error['hint']}", file=sys.stderr)
+        _error_lines(envelope.get("error") or {})
         return 1
-    print(summarize(name, envelope))
+    print(summarize(name, envelope, args))
     for w in envelope.get("warnings", ()):
-        print(f"kimbim: warning: {w}", file=sys.stderr)
+        print(_t("cli_warning", message=w), file=sys.stderr)
+    if "finish_error" in envelope:
+        _error_lines(envelope["finish_error"])
+        return 1
     return 0
 
 
@@ -337,12 +444,8 @@ def _people(group, top) -> None:
     st.set_defaults(handler=_setup)
 
 
-def _project_path(ns) -> str:
-    return ns.g_project or "."
-
-
 def _init(ns) -> int:
-    target = pathlib.Path(ns.dir or _project_path(ns))
+    target = pathlib.Path(ns.dir or ns.g_project or ".")
     Project.init(target)
     print(f"Initialized KimBim project in {target.resolve()}")
     return 0
@@ -350,7 +453,7 @@ def _init(ns) -> int:
 
 def _save(ns) -> int:
     if ns.file:
-        proj = Project.open(_project_path(ns))
+        proj = Project.open(discover(ns.g_project))
         cid, changes = proj.commit(ns.file, ns.message)
         print(f"[{proj.current_branch()} {cid[:10]}] {ns.message}")
         _print_changes(changes)
@@ -370,18 +473,18 @@ def _save(ns) -> int:
 
 
 def _status(ns) -> int:
-    changes = Project.open(_project_path(ns)).status(ns.file)
+    changes = Project.open(discover(ns.g_project)).status(ns.file)
     _print_changes(changes) if changes else print("no changes")
     return 0
 
 
 def _show(ns) -> int:
-    print(json.dumps(Project.open(_project_path(ns)).show(ns.key, ns.rev), ensure_ascii=False, indent=1, sort_keys=True))
+    print(json.dumps(Project.open(discover(ns.g_project)).show(ns.key, ns.rev), ensure_ascii=False, indent=1, sort_keys=True))
     return 0
 
 
 def _branch(ns) -> int:
-    proj = Project.open(_project_path(ns))
+    proj = Project.open(discover(ns.g_project))
     if ns.name:
         proj.create_branch(ns.name, ns.rev)
         print(f"created design option {ns.name}")
@@ -393,13 +496,13 @@ def _branch(ns) -> int:
 
 
 def _switch(ns) -> int:
-    Project.open(_project_path(ns)).switch(ns.name)
+    Project.open(discover(ns.g_project)).switch(ns.name)
     print(f"switched to {ns.name}")
     return 0
 
 
 def _tag(ns) -> int:
-    proj = Project.open(_project_path(ns))
+    proj = Project.open(discover(ns.g_project))
     if ns.name and ns.delete:
         proj.delete_tag(ns.name)
         print(f"deleted milestone {ns.name}")
@@ -414,7 +517,7 @@ def _tag(ns) -> int:
 
 
 def _merge(ns) -> int:
-    proj = Project.open(_project_path(ns))
+    proj = Project.open(discover(ns.g_project))
     resolutions = dict(r.rsplit("=", 1) for r in ns.resolve if "=" in r)
     message = ns.message or f"Combine {ns.option} into {proj.current_branch()}"
     try:
@@ -478,7 +581,7 @@ def _export_dxf(ns) -> int:
 
     from .. import app_bridge, dxf
 
-    proj = Project.open(_project_path(ns))
+    proj = Project.open(discover(ns.g_project))
     with tempfile.TemporaryDirectory(prefix="kimbim-dxf-") as tmp:
         ifc = proj.export(pathlib.Path(tmp) / "version.ifc", ns.rev, overwrite=True, one_owner=True)
         opened = json.loads(app_bridge.open_model(str(ifc)))
@@ -514,7 +617,7 @@ def _export_dxf(ns) -> int:
     for f in files:
         print(f"wrote {f}")
     for e in errors:
-        print(f"kimbim: error: {e['item']}: {e['error']}", file=sys.stderr)
+        print(_t("cli_error", message=f"{e['item']}: {e['error']}"), file=sys.stderr)
     return 1 if errors else 0
 
 
@@ -526,12 +629,12 @@ def _serve(ns) -> int:
 
 # `kimbim mcp` and `kimbim setup` are filled by the MCP task (D102): replace these two functions.
 def _mcp(ns) -> int:
-    print("kimbim: mcp is not available yet", file=sys.stderr)
+    print(_t("cli_error", message=_t("cli_not_available", what="mcp")), file=sys.stderr)
     return 1
 
 
 def _setup(ns) -> int:
-    print("kimbim: setup is not available yet", file=sys.stderr)
+    print(_t("cli_error", message=_t("cli_not_available", what="setup")), file=sys.stderr)
     return 1
 
 
@@ -547,22 +650,23 @@ def _utf8_streams():
 def main(argv: list[str] | None = None) -> int:
     _utf8_streams()
     try:
-        ns = build_parser().parse_args(argv)
+        parser = build_parser()
+        ns = parser.parse_args(fix_negative_values(list(sys.argv[1:] if argv is None else argv), parser))
     except SystemExit as e:  # --help is 0, a usage error 2
         return e.code if isinstance(e.code, int) else 2
     try:
         return ns.handler(ns)
     except UsageError as e:
-        print(f"kimbim: error: {e}", file=sys.stderr)
+        print(_t("cli_error", message=e), file=sys.stderr)
         return 2
     except AgentError as e:
-        print(f"kimbim: error: {e}", file=sys.stderr)
+        print(_t("cli_error", message=e), file=sys.stderr)
         return 1
     except KimbimError as e:
-        print(f"kimbim: error: {e}", file=sys.stderr)
+        print(_t("cli_error", message=e), file=sys.stderr)
         for m in getattr(e, "messages", [])[:20]:
             print(f"  {m}", file=sys.stderr)
         return 1
     except (OSError, _core.RepoError) as e:
-        print(f"kimbim: error: {e}", file=sys.stderr)
+        print(_t("cli_error", message=e), file=sys.stderr)
         return 1

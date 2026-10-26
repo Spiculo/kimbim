@@ -238,6 +238,10 @@ class Tasks:
         self._enter(task)
         return task
 
+    def implicit_task(self) -> str:
+        """The id of the implicit task the last write started (empty when it ran in an existing task)."""
+        return self._implicit
+
     def write_failed(self) -> None:
         """The write call that started an implicit task failed: the task goes, with its option (a "Before
         agent" version already saved stays: it only holds the architect's work)."""
