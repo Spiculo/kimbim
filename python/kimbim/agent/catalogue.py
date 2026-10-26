@@ -50,6 +50,7 @@ class Tool:
     writes: bool
     fn: Callable
     needs_task: bool | None = None
+    check: Callable | None = None  # check(session, **args): refuses a call before it starts a task
 
     def __post_init__(self):
         if self.needs_task is None:
@@ -73,10 +74,14 @@ def _unwrap(out) -> tuple:
 _DRY_RUN = {"type": "boolean", "description": "Report what would change, then roll it back."}
 
 
-def tool(name: str, params: dict, writes: bool = False, needs_task: bool | None = None):
+RESERVED_ARGS = ("client", "task_id")  # passed by call_tool to a tool function that takes them, never by agents
+
+
+def tool(name: str, params: dict, writes: bool = False, needs_task: bool | None = None, check: Callable | None = None):
     """Register `fn(session, **args)` as tool `name`. Its docstring is the description agents read, so it is
     required. Write tools get a `dry_run` parameter. Unknown arguments are refused unless `params` says
-    otherwise (`additionalProperties`)."""
+    otherwise (`additionalProperties`). `check(session, **args)` raises AgentError to refuse a write before it
+    starts a task."""
     def register(fn):
         description = inspect.cleandoc(fn.__doc__ or "")
         if not re.search(r"\w.*[.!?](\s|$)", description):
@@ -85,10 +90,12 @@ def tool(name: str, params: dict, writes: bool = False, needs_task: bool | None 
             raise ValueError(f"tool {name} is already registered")
         schema = {"type": "object", **params}
         schema["properties"] = dict(schema.get("properties") or {})
+        if set(schema["properties"]) & set(RESERVED_ARGS):
+            raise ValueError(f"tool {name}: {', '.join(RESERVED_ARGS)} are reserved argument names")
         schema.setdefault("additionalProperties", False)
         if writes:
             schema["properties"]["dry_run"] = _DRY_RUN
-        t = Tool(name, description, schema, writes, fn, needs_task)
+        t = Tool(name, description, schema, writes, fn, needs_task, check)
         TOOLS[name] = t
         return t
     return register
@@ -247,16 +254,28 @@ def call_tool(session, name: str, args: dict, *, client: str = "cli", task_id: s
         validate(t.params, args)  # refuses a non-object too
         args = dict(args)
         dry_run = bool(args.pop("dry_run", False)) if t.writes else False
-        args.update(_caller(t, client, task_id))
+        caller = _caller(t, client, task_id)
         if not t.writes:
-            result, warnings = _unwrap(t.fn(session, **args))
+            session.tasks.resume(client, task_id)  # any command unparks: a read sees the task's option
+            result, warnings = _unwrap(t.fn(session, **args, **caller))
             return _ok(result, None, warnings)
         if B._step is not None:  # inside a console run or edit() block: refused before any task starts
             raise AgentError("bad_input", hint=messages.text("hint_open_step"))
+        if t.check is not None:
+            t.check(session, **args)
+        session.tasks.resume(client, task_id)
         if t.needs_task and not dry_run:  # a dry run changes nothing, so it starts no task
             session.tasks.for_write(client, task_id, title=_title(name, args))
-        with steps.step(dry_run) as changes:
-            result, warnings = _unwrap(t.fn(session, **args))
+        try:
+            with steps.step(dry_run) as changes:
+                result, warnings = _unwrap(t.fn(session, **args, **caller))
+        except BaseException:
+            if t.needs_task and not dry_run:
+                try:
+                    session.tasks.write_failed()  # an implicit task this call started goes again
+                except Exception:  # noqa: BLE001  (the call's own error is the one to report)
+                    pass
+            raise
         if t.needs_task and not dry_run:
             session.tasks.record(changes)  # task.status reports what the task changed so far
         summary = changes.to_dict(getattr(session, "label", None))

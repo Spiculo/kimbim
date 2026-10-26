@@ -45,16 +45,23 @@ def settings(session, keys=None):
 RESERVED = ("agent_changes", "agent_scripts")  # the review rules: only the architect changes them (spec §4.3)
 
 
-@tool("project.set_settings", {"required": ["changes"], "properties": {
-    "changes": {"type": "object", "description": "Settings to change, {key: value} (keys as project.settings)."}}},
-    writes=True)
-def set_settings(session, changes):
-    """Change project settings (units, decimals, display options...) as one undo step."""
+def _check_settings(session, changes):
+    """Refused before a task starts: the review rules, and values settings.py would refuse."""
     reserved = sorted(set(changes) & set(RESERVED))
     if reserved:
         raise AgentError("setting_reserved", key=reserved[0])
+    for k, v in changes.items():
+        if (err := S._error(k, v)) is not None:
+            raise AgentError("bad_input", hint=err)
+
+
+@tool("project.set_settings", {"required": ["changes"], "properties": {
+    "changes": {"type": "object", "description": "Settings to change, {key: value} (keys as project.settings)."}}},
+    writes=True, check=_check_settings)
+def set_settings(session, changes):
+    """Change project settings (units, decimals, display options...) as one undo step."""
     current = bridge(S.set_project_settings, json.dumps(changes))["settings"]
-    return {k: current[k] for k in changes}
+    return {k: current.get(k) for k in changes}
 
 
 @tool("levels.list", {})

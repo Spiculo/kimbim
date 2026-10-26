@@ -4,8 +4,8 @@
 Option mode (default): the agent's edits go into a design option `agent/<slug>` made from the architect's
 latest version (unsaved work is first saved as "Before agent: <title>"); `finish` saves a version on it, by
 "<client> (agent)", and goes back to the base option, ready for the architect to review, combine or reject.
-Direct mode: the edits are saved in place on `finish`, with a way back (a version first, or for a plain IFC
-the recovery copy and `<stem>.before-agent.ifc`).
+Direct mode: the edits are saved in place on `finish`, with a way back made at start (the architect's
+unsaved work as a version, or for a plain IFC `<stem>.before-agent.ifc`).
 
 Project setting `agent_changes`: option, direct, or agent_decides (the task's mode, default option). Task
 state is a JSON file per task in `<work>/.kimbim/agent/tasks/` (it travels in the .kim), or for a plain IFC in
@@ -80,6 +80,7 @@ class Tasks:
         self.session = session
         self._current = ""  # the task the write being run belongs to (for_write -> record)
         self._start_steps: dict[str, int] = {}  # direct tasks started in this process: the undo id at start
+        self._implicit = ""  # an implicit task the running write started (write_failed removes it)
 
     # ------------------------------------------------------------ storage
 
@@ -182,7 +183,9 @@ class Tasks:
 
     # ------------------------------------------------------------ lifecycle
 
-    def start(self, title: str, mode: str = "", client: str = "") -> Task:
+    def start(self, title: str, mode: str = "", client: str = "", implicit: bool = False) -> Task:
+        """`mode`: the agent's choice (used when the project lets it decide). An explicit "direct" is also
+        honoured on an unversioned project, where option mode can't work; an implicit task there fails."""
         self._no_step()
         client = client or getattr(self.session, "client", "cli")
         title = " ".join((title or "").split())
@@ -191,13 +194,16 @@ class Tasks:
         busy = next((t for t in self.all() if t.status in ACTIVE), None)
         if busy is not None:  # phase 1: one open task per project
             raise AgentError("task_busy", task=busy.id, title=busy.title)
-        task = Task(uuid.uuid4().hex[:8], title, self.mode_for(mode), client,
-                    created=datetime.now(timezone.utc).isoformat(timespec="seconds"))
-        if task.mode == "option":
-            if V._project is None:
+        chosen = self.mode_for(mode)
+        if chosen == "option" and V._project is None:
+            if mode != "direct" or implicit:
                 raise AgentError("not_versioned", hint=messages.text("hint_not_versioned"))
-            self._save_version(f"Before agent: {title}")  # the architect's work, so the architect's version
+            chosen = "direct"
+        task = Task(uuid.uuid4().hex[:8], title, chosen, client,
+                    created=datetime.now(timezone.utc).isoformat(timespec="seconds"))
         if V._project is not None:
+            # the architect's unsaved work becomes the architect's version, so the agent's starts clean
+            self._save_version(f"Before agent: {title}")
             state = json.loads(V.project_state())
             task.base_option, task.base_version = state["option"], state["head"] or ""
         if task.mode == "option":
@@ -206,22 +212,62 @@ class Tasks:
             try:
                 bridge(V.create_option, task.option)
             except AgentError:
-                (self._dir() / f"{task.id}.json").unlink(missing_ok=True)
+                self._remove(task)
                 raise
         else:
+            if self.session.kind == "ifc":  # the way back for a plain IFC: the file as it was
+                source = pathlib.Path(self.session.source)
+                if source.exists():
+                    shutil.copyfile(source, source.with_name(source.stem + ".before-agent.ifc"))
             self._write(task)
             self._start_steps[task.id] = B._current_id()
         self._current = task.id
+        self._implicit = task.id if implicit else ""
         return task
+
+    def _remove(self, task: Task) -> None:
+        (self._dir() / f"{task.id}.json").unlink(missing_ok=True)
 
     def for_write(self, client: str, task_id: str = "", title: str = "") -> Task:
         """The task a write tool's call belongs to: the open one (unparked), or a new implicit one titled
         `title`, so nothing bypasses review."""
+        self._implicit = ""
         task = self.open_task(client, task_id)
         if task is None:
-            return self.start(title or "agent edit", client=client)
+            return self.start(title or "agent edit", client=client, implicit=True)
         self._enter(task)
         return task
+
+    def write_failed(self) -> None:
+        """The write call that started an implicit task failed: the task goes, with its option (a "Before
+        agent" version already saved stays: it only holds the architect's work)."""
+        task_id, self._implicit = self._implicit, ""
+        if not task_id:
+            return
+        try:
+            task = self.get(task_id)
+        except AgentError:
+            return
+        if task.changes:
+            return
+        self._remove(task)
+        self._current = ""
+        self._start_steps.pop(task.id, None)
+        if task.mode == "option":
+            if _option() == task.option:
+                bridge(V.discard_changes)
+                bridge(V.switch_option, task.base_option)
+            bridge(V.delete_option, task.option)  # packs the .kim without the task file
+
+    def resume(self, client: str, task_id: str = "") -> None:
+        """Before any command (catalogue.call_tool): a parked task, or one whose option isn't current (the
+        worker restarted), is entered again so reads and writes see its option."""
+        try:
+            task = self.open_task(client, task_id)
+        except AgentError:
+            return  # unknown or ambiguous: the command itself reports it if it matters
+        if task is not None:
+            self._enter(task)
 
     def record(self, changes: Changes) -> None:
         """Add one write call's changes to the task it ran in (catalogue.call_tool)."""
@@ -266,15 +312,19 @@ class Tasks:
         version = ""
         if task.mode == "option":
             self._enter(task)
+            head = json.loads(V.project_state()).get("head") or ""
+            if not V._unversioned() and head == task.base_version:  # nothing to review: no empty proposal
+                bridge(V.switch_option, task.base_option)
+                bridge(V.delete_option, task.option)
+                task.status, task.summary = "abandoned", summary
+                self._write(task)
+                D.history_changed()
+                self._current = ""
+                return {"task": task.to_dict(), "changes": self.changes(task), "version": "", "no_changes": True}
             version = self._save_version(f"{task.title}\n\n{summary}" if summary else task.title, task.client)
             bridge(V.switch_option, task.base_option)
         elif V._project is not None:
             version = self._save_version(f"{task.title} (agent)", task.client)
-        elif self.session.kind == "ifc":
-            bridge(D.write_recovery)
-            source = pathlib.Path(self.session.source)
-            if source.exists():
-                shutil.copyfile(source, source.with_name(source.stem + ".before-agent.ifc"))
         task.status, task.summary = "ready", summary
         self._write(task)  # before saving: a .kim packs it
         self._save_document()
@@ -291,38 +341,39 @@ class Tasks:
             if _option() == task.option:
                 bridge(V.discard_changes)
                 bridge(V.switch_option, task.base_option)
-            task.status = "abandoned"
-            self._write(task)
-            bridge(V.delete_option, task.option)  # packs the .kim, task file included
+            bridge(V.delete_option, task.option)
         else:
             start = self._start_steps.pop(task.id, None)
             if start is not None and (start == B._base_id or start in B._ids):
                 while B._current_id() != start and B._ids:  # undo the task's steps
                     B.undo()
-            task.status = "abandoned"
-            self._write(task)
-            D.history_changed()
+        task.status = "abandoned"  # only once its option is gone
+        self._write(task)
+        D.history_changed()  # a .kim packs the task's new state
         self._current = ""
         return task
 
     def park(self) -> None:
-        """The worker exits with a task open: keep its work as a version on its option and go back to the base
-        (a direct task keeps its unsaved work in the recovery copy)."""
+        """The worker exits with tasks open: an option task's work becomes a version on its option and the
+        project goes back to the base; a direct task's work is saved (its way back was made at start). Every
+        task is tried; the ones that failed are reported together in one AgentError."""
+        failed = []
         for task in self.all():
             if task.status != "open":
                 continue
-            if task.mode == "option":
-                if _option() == task.option:
+            try:
+                if task.mode == "option" and _option() == task.option:
                     self._save_version(f"Work in progress: {task.title}", task.client)
                     bridge(V.switch_option, task.base_option)
                 task.status = "parked"
                 self._write(task)
                 self._save_document()
-            else:
-                bridge(D.write_recovery)
-                task.status = "parked"
-                self._write(task)
+            except Exception as ex:  # noqa: BLE001  (keep parking the others)
+                failed.append({"task": task.id, "error": getattr(ex, "hint", "") or str(ex)})
         self._current = ""
+        if failed:
+            raise AgentError("bridge_error", hint="; ".join(f"{f['task']}: {f['error']}" for f in failed),
+                             tasks=[f["task"] for f in failed])
 
     def unpark(self, task_id: str = "", client: str = "") -> Task | None:
         """The next command after a park: back on the task's option."""

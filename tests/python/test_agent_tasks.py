@@ -178,6 +178,7 @@ def test_direct_plain_ifc_backup(tmp_path, monkeypatch):
         assert json.loads(S.set_project_settings(json.dumps({"agent_changes": "direct"})))["ok"]  # the architect
         task = run(s, "task.start", title="Direct")["result"]
         assert task["mode"] == "direct" and task["option"] == ""
+        assert (tmp_path / "plain.before-agent.ifc").read_bytes() == original  # the way back, made at start
         g = walls()[0].GlobalId
         assert run(s, "test.rename", guids=[g], name="Direct edit")["ok"]
         r = run(s, "task.finish", summary="one wall")
@@ -198,7 +199,8 @@ def test_not_versioned(tmp_path, monkeypatch):
     s = Session.open(str(ifc))
     try:
         r = run(s, "task.start", title="Option")
-        assert r["error"]["code"] == "not_versioned" and r["error"]["hint"]
+        assert r["error"]["code"] == "not_versioned" and "direct" in r["error"]["hint"]
+        assert run(s, "task.start", title="Option", mode="option")["error"]["code"] == "not_versioned"
         # a write outside a task can't start one either: nothing bypasses review
         assert run(s, "test.rename", guids=[walls()[0].GlobalId], name="X")["error"]["code"] == "not_versioned"
         assert s.tasks.all() == []
@@ -227,11 +229,13 @@ def test_reserved_settings(house):
     for key, value in (("agent_changes", "direct"), ("agent_scripts", True)):
         r = run(s, "project.set_settings", changes={key: value})
         assert r["error"]["code"] == "setting_reserved", r
+    assert s.tasks.all() == [] and option() == "main"  # refused before any task started
+    assert run(s, "project.set_settings", changes={"length_decimals": 9})["error"]["code"] == "bad_input"
+    assert s.tasks.all() == []
     assert S.current()["agent_changes"] == "option" and S.current()["agent_scripts"] is False
     r = run(s, "project.set_settings", changes={"length_decimals": 3})
     assert r["ok"], r
     assert S.current()["length_decimals"] == 3
-    assert run(s, "project.set_settings", changes={"length_decimals": 9})["error"]["code"] == "bridge_error"
     assert not json.loads(S.set_project_settings(json.dumps({"agent_changes": "sometimes"})))["ok"]
     assert not json.loads(S.set_project_settings(json.dumps({"agent_scripts": "yes"})))["ok"]
 
@@ -315,3 +319,102 @@ def test_record_merges(house):
     c = s.tasks.status()["changes"]
     assert [x["guid"] for x in c["added"]] == [] and [x["guid"] for x in c["modified"]] == ["m"]
     assert c["removed"] == [{"guid": "r", "label": "Wall R"}]
+
+
+def test_direct_explicit_on_plain_ifc(tmp_path, monkeypatch):
+    monkeypatch.setattr(D, "_data_dir", tmp_path / "data")
+    ifc = tmp_path / "plain.ifc"
+    make_house.build(str(ifc))
+    original = ifc.read_bytes()
+    s = Session.open(str(ifc))
+    try:
+        assert S.current()["agent_changes"] == "option"  # the default: an explicit direct is still honoured
+        task = run(s, "task.start", title="Plain", mode="direct")["result"]
+        assert task["mode"] == "direct"
+        g = walls()[0].GlobalId
+        assert run(s, "test.rename", guids=[g], name="Plain edit")["ok"]
+        assert run(s, "task.finish", summary="done")["ok"]
+        assert (tmp_path / "plain.before-agent.ifc").read_bytes() == original
+        import ifcopenshell
+        assert ifcopenshell.open(str(ifc)).by_guid(g).Name == "Plain edit"
+    finally:
+        s.close()
+
+
+def test_failed_implicit_write_rolls_back(house):
+    s = house()
+
+    @tool("test.fail", {"required": ["guids"], "properties": {"guids": {"type": "array", "items": {"type": "string"}}}},
+          writes=True)
+    def fail(session, guids):
+        """Rename, then fail."""
+        bridge(B.set_name, json.dumps(guids), "Half")
+        raise catalogue.AgentError("no_match")
+
+    try:
+        before = names()
+        r = run(s, "test.fail", guids=[walls()[0].GlobalId])
+        assert r["error"]["code"] == "no_match"
+        assert s.tasks.all() == [] and option() == "main" and names() == before
+        assert not [o for o in json.loads(V.options())["options"] if o.startswith("agent/")]
+        assert run(s, "test.rename", guids=[walls()[0].GlobalId], name="Fine")["ok"]  # a later write still works
+        assert len(s.tasks.all()) == 1
+    finally:
+        catalogue.TOOLS.pop("test.fail", None)
+
+
+def test_read_after_restart_resumes(house, tmp_path):
+    s = house()
+    task = run(s, "task.start", title="Overnight")["result"]
+    assert run(s, "test.rename", guids=[walls()[0].GlobalId], name="Night")["ok"]
+    s.tasks.park()
+    s.close()
+    s2 = house(tmp_path / "house.kim")
+    assert option() == "main"
+    info = run(s2, "project.info")["result"]  # any command unparks, a read too
+    assert info["option"] == task["option"]
+    assert s2.tasks.get(task["id"]).status == "open"
+    assert "Night" in names().values()
+
+
+def test_direct_versioned_keeps_architect_work(house):
+    s = house()
+    assert json.loads(S.set_project_settings(json.dumps({"agent_changes": "direct"})))["ok"]
+    g, h = walls()[0].GlobalId, walls()[1].GlobalId
+    assert json.loads(B.set_name(json.dumps([g]), "Architect"))["ok"]
+    run(s, "task.start", title="Agent fix")
+    assert run(s, "test.rename", guids=[h], name="Agent")["ok"]
+    assert run(s, "task.finish", summary="x")["ok"]
+    log = V._project.log(V._encode("main"), 3)
+    assert log[0].message == "Agent fix (agent)" and log[0].author_name == "test (agent)"
+    assert log[1].message == "Before agent: Agent fix" and log[1].author_name != "test (agent)"
+
+
+def test_finish_without_edits(house):
+    s = house()
+    task = run(s, "task.start", title="Idle")["result"]
+    r = run(s, "task.finish", summary="nothing to do")["result"]
+    assert r["no_changes"] is True and r["version"] == "" and r["task"]["status"] == "abandoned"
+    assert option() == "main" and task["option"] not in json.loads(V.options())["options"]
+
+
+def test_abandon_parked_with_wip(house):
+    s = house()
+    task = run(s, "task.start", title="Parked")["result"]
+    before = names()
+    assert run(s, "test.rename", guids=[walls()[0].GlobalId], name="WIP")["ok"]
+    s.tasks.park()
+    assert s.tasks.abandon(task["id"]).status == "abandoned"  # straight away, no write in between
+    assert option() == "main" and names() == before
+    assert task["option"] not in json.loads(V.options())["options"]
+
+
+def test_park_reports_failures(house, monkeypatch):
+    s = house()
+    task = run(s, "task.start", title="Stuck")["result"]
+    assert run(s, "test.rename", guids=[walls()[0].GlobalId], name="S")["ok"]
+    monkeypatch.setattr(V, "switch_option", lambda name: json.dumps({"ok": False, "error": "disk full"}))
+    with pytest.raises(catalogue.AgentError) as ex:
+        s.tasks.park()
+    assert ex.value.extra["tasks"] == [task["id"]] and "disk full" in ex.value.hint
+    assert s.tasks.get(task["id"]).status == "open"

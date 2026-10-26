@@ -20,6 +20,12 @@ class _Tasks:
     def record(self, changes):
         pass
 
+    def resume(self, client, task_id):
+        pass
+
+    def write_failed(self):
+        pass
+
 
 class _Session:
     def __init__(self):
@@ -297,3 +303,13 @@ def test_failure_restores_settings(profile_tool):
     start = B._current_id()
     assert call_tool(_Session(), "test.profile", {"fail": True})["error"]["code"] == "no_match"
     assert "Agent" not in profile_tool() and B._current_id() == start
+
+
+def test_reserved_argument_names():
+    def fn(session, **kw):
+        """A tool."""
+
+    for reserved in ("client", "task_id"):
+        with pytest.raises(ValueError, match="reserved"):
+            tool(f"test.reserved_{reserved}", {"properties": {reserved: {"type": "string"}}})(fn)
+        assert f"test.reserved_{reserved}" not in catalogue.TOOLS

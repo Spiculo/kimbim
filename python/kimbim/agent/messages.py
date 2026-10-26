@@ -38,8 +38,8 @@ MESSAGES = {
     "hint_range": {"en": "{field} must be between {minimum} and {maximum}.",
                    "es": "{field} debe estar entre {minimum} y {maximum}."},
     "hint_form": {"en": "{field} does not have an accepted form.", "es": "{field} no tiene una forma aceptada."},
-    "hint_not_versioned": {"en": "Turn on versioning for the project, or use direct mode.",
-                           "es": "Activa el historial de versiones del proyecto o usa el modo directo."},
+    "hint_not_versioned": {"en": "Turn on versioning for the project, or start a task with mode \"direct\".",
+                           "es": "Activa el historial de versiones del proyecto o inicia una tarea con mode \"direct\"."},
     "hint_open_step": {"en": "Write tools can't run inside another undo step (a console run or edit() block).",
                        "es": "Las herramientas de escritura no pueden ejecutarse dentro de otro paso de deshacer "
                              "(una ejecución de la consola o un bloque edit())."},
