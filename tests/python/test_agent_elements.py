@@ -59,7 +59,12 @@ def test_widen_windows_relative(s):
     assert r["ok"], r
     guids = [i["guid"] for i in run(s, "elements.find", elements=L1_WINDOWS)["result"]["items"]]
     assert len(guids) == 4 and widths(guids) == [1.7] * 4
-    assert {m["guid"] for m in r["changes"]["modified"]} >= set(guids)
+    modified = {m["guid"] for m in r["changes"]["modified"]}
+    hosts = {B._model.by_guid(g).FillsVoids[0].RelatingOpeningElement.VoidsElements[0].RelatingBuildingElement.GlobalId
+             for g in guids}
+    assert modified == set(guids) | hosts  # the windows and their walls; no IfcOpeningElement (D102)
+    assert not any(B._model.by_guid(g).is_a("IfcFeatureElementSubtraction") for g in modified)
+    assert not r["changes"]["added"] and not r["changes"]["removed"]
 
 
 def test_mixed_widths_grouped(s):

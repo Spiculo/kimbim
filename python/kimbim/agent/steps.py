@@ -61,6 +61,19 @@ def _is_product(ifc_class: str) -> bool:
     return False
 
 
+def _is_opening_element(ifc_class: str) -> bool:
+    """IfcOpeningElement and its kin: voids the model keeps, which architects never see (D102)."""
+    try:
+        decl = B._schema().declaration_by_name(ifc_class)
+    except Exception:  # noqa: BLE001
+        return False
+    while decl is not None:
+        if decl.name() == "IfcFeatureElementSubtraction":
+            return True
+        decl = decl.supertype()
+    return False
+
+
 def _summarise(f, operations, step_changed, step_removed) -> Changes:
     """Changes from the step's transaction operations plus the geometry its bridge calls reported."""
     created, deleted = [], {}
@@ -78,7 +91,7 @@ def _summarise(f, operations, step_changed, step_removed) -> Changes:
             e = f.by_id(i)
         except RuntimeError:
             continue  # created and deleted again in the same step
-        if e.is_a("IfcProduct"):
+        if e.is_a("IfcProduct") and not e.is_a("IfcFeatureElementSubtraction"):
             changes.added.append(e.GlobalId)
     added = set(changes.added)
     created_guids = {(op.get("value") or {}).get("GlobalId") for op in operations or ()
@@ -87,8 +100,8 @@ def _summarise(f, operations, step_changed, step_removed) -> Changes:
         if g in created_guids:
             continue
         value = deleted.get(g)
-        if value is not None and not _is_product(value.get("type", "")):
-            continue  # a property set, relationship, ... has a GlobalId too
+        if value is not None and (not _is_product(value.get("type", "")) or _is_opening_element(value.get("type", ""))):
+            continue  # a property set, relationship, ... has a GlobalId too; so has an opening element
         try:
             f.by_guid(g)
             continue  # still there
@@ -102,7 +115,8 @@ def _summarise(f, operations, step_changed, step_removed) -> Changes:
         if g in added or g in gone:
             continue
         try:
-            f.by_guid(g)
+            if f.by_guid(g).is_a("IfcFeatureElementSubtraction"):
+                continue
         except RuntimeError:
             continue
         changes.modified.append(g)
