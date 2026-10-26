@@ -14,6 +14,7 @@ from .. import documents as D
 from .. import kimfile as K
 from .. import settings as S
 from .catalogue import AgentError
+from .tasks import Tasks
 
 
 class Session:
@@ -21,7 +22,7 @@ class Session:
         self.kind = kind
         self.source = source
         self.client = client
-        self.tasks = None  # filled by the task manager (Task 5)
+        self.tasks = None  # the project's agent tasks (agent.tasks.Tasks), set by open()
         self._saved_user = ""
         self._closed = False
 
@@ -51,6 +52,7 @@ class Session:
         K.display_user = "KimBim agent"
         try:
             session._open(p)
+            session.tasks = Tasks(session)
         except BaseException:
             K.display_user = session._saved_user
             raise

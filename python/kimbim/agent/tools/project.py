@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Read tools about the project: info, settings, levels (D102)."""
+"""Tools about the project: info, settings, set_settings, levels (D102)."""
 from __future__ import annotations
 
 import json
@@ -10,7 +10,7 @@ from ... import graphics as G
 from ... import levels as L
 from ... import settings as S
 from ... import versioning as V
-from ..catalogue import tool
+from ..catalogue import AgentError, bridge, tool
 
 
 @tool("project.info", {})
@@ -40,6 +40,21 @@ def settings(session, keys=None):
     if keys is not None:
         current = {k: current[k] for k in keys if k in current}
     return current
+
+
+RESERVED = ("agent_changes", "agent_scripts")  # the review rules: only the architect changes them (spec §4.3)
+
+
+@tool("project.set_settings", {"required": ["changes"], "properties": {
+    "changes": {"type": "object", "description": "Settings to change, {key: value} (keys as project.settings)."}}},
+    writes=True)
+def set_settings(session, changes):
+    """Change project settings (units, decimals, display options...) as one undo step."""
+    reserved = sorted(set(changes) & set(RESERVED))
+    if reserved:
+        raise AgentError("setting_reserved", key=reserved[0])
+    current = bridge(S.set_project_settings, json.dumps(changes))["settings"]
+    return {k: current[k] for k in changes}
 
 
 @tool("levels.list", {})

@@ -77,6 +77,8 @@ DEFAULTS = {
     "member_material_scope": "element",  # D97: a column's or beam's material: its own (Archicad) or its type's (Revit)
     "wall_profiles": {},
     "favourites": {},
+    "agent_changes": "option",  # D102: agent edits go to a design option, "direct", or "agent_decides"
+    "agent_scripts": False,  # D102: agents may run Python scripts (script.run); only the architect sets it
     "sun": {},  # D96: the sun for 3D light and shadows (sun.DEFAULT fills it in)  # D97: Archicad's Favourites, by name: {tool, fields {object name: value}, object?}  # D97: complex wall sections by name: [[across, up], ...] metres from the base line  # D96: walls and slabs show each layer on their ends and tops in 3D  # D97: where a new wall's clicked line is (Archicad default)
 }
 UNITS = {"m": 1.0, "cm": 100.0, "mm": 1000.0}
@@ -194,6 +196,10 @@ def _error(key: str, value) -> str | None:
         return "the sea level must be between -10000 and 10000 m"
     if key in ("angle_decimals", "radius_decimals") and not (isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 4):
         return f"{key} must be between 0 and 4"
+    if key == "agent_changes" and value not in ("option", "direct", "agent_decides"):
+        return f"unknown agent changes choice {value}"
+    if key == "agent_scripts" and not isinstance(value, bool):
+        return "agent_scripts must be true or false"
     if key == "orphan_tags" and value not in ("delete", "keep"):
         return f"unknown orphan tag choice {value}"
     if key == "length_decimals" and not (isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 4):

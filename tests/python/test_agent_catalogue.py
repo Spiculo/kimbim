@@ -17,6 +17,9 @@ class _Tasks:
         self.calls.append((client, task_id, title))
         return None
 
+    def record(self, changes):
+        pass
+
 
 class _Session:
     def __init__(self):

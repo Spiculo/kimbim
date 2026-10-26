@@ -230,15 +230,23 @@ def version_changes() -> str:
                     "removed": len(s["removed"]), "other": s["other"], "items": items, "settings": keys})
 
 
-def save_version(message: str) -> str:
+def save_version(message: str, author_json: str = "") -> str:
+    """`author_json`: {"name", "email"} for a version someone else makes (an agent, D102); default: the user."""
     if _project is None:
         return _fail("this model isn't versioned: enable versioning first")
     if not (message or "").strip():
         return _fail("a version needs a message")
+    author = None
+    if author_json:
+        try:
+            a = json.loads(author_json)
+            author = (str(a["name"]), str(a.get("email") or "user@localhost"))
+        except (ValueError, KeyError, TypeError):
+            return _fail("bad author: expected {\"name\", \"email\"}")
     working = _write_working()
     try:
         merged = [_combining["theirs"]] if _combining else None
-        cid, changes = _project.commit(working, message.strip(), merged=merged, settings=S.to_bytes())
+        cid, changes = _project.commit(working, message.strip(), author=author, merged=merged, settings=S.to_bytes())
         _end_combining()
     except NothingToCommit:
         _mark_saved(working)

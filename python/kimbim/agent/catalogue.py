@@ -10,7 +10,7 @@ its result, or `ToolResult(result, warnings=[...])` to add warnings (in the enve
 Write tools are refused while another undo step is open (a console run or edit() block).
 
 The CLI and the MCP server both call `call_tool`; tools never re-implement modelling, they call the bridge
-through `bridge(fn, *args)`.
+through `bridge(fn, *args)`. A tool function that takes `client` or `task_id` is passed the caller's.
 """
 from __future__ import annotations
 
@@ -222,6 +222,12 @@ def _title(name: str, args: dict) -> str:
     return " ".join([name, *words])[:80]
 
 
+def _caller(t: Tool, client: str, task_id: str) -> dict:
+    """Who is calling, for a tool whose function takes `client` / `task_id` (the task tools)."""
+    params = inspect.signature(t.fn).parameters
+    return {k: v for k, v in (("client", client), ("task_id", task_id)) if k in params}
+
+
 def _ok(result, changes, warnings) -> dict:
     envelope = {"ok": True, "result": result}
     if changes is not None:
@@ -241,6 +247,7 @@ def call_tool(session, name: str, args: dict, *, client: str = "cli", task_id: s
         validate(t.params, args)  # refuses a non-object too
         args = dict(args)
         dry_run = bool(args.pop("dry_run", False)) if t.writes else False
+        args.update(_caller(t, client, task_id))
         if not t.writes:
             result, warnings = _unwrap(t.fn(session, **args))
             return _ok(result, None, warnings)
@@ -250,6 +257,8 @@ def call_tool(session, name: str, args: dict, *, client: str = "cli", task_id: s
             session.tasks.for_write(client, task_id, title=_title(name, args))
         with steps.step(dry_run) as changes:
             result, warnings = _unwrap(t.fn(session, **args))
+        if t.needs_task and not dry_run:
+            session.tasks.record(changes)  # task.status reports what the task changed so far
         summary = changes.to_dict(getattr(session, "label", None))
         if dry_run:
             summary["dry_run"] = True
