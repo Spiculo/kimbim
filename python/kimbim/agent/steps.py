@@ -49,29 +49,25 @@ def _label(ifc_class: str, name) -> str:
     return f"{_short(ifc_class)} {name}" if name else _short(ifc_class)
 
 
-def _is_product(ifc_class: str) -> bool:
+def _derives_from(ifc_class: str, base: str) -> bool:
     try:
         decl = B._schema().declaration_by_name(ifc_class)
     except Exception:  # noqa: BLE001
         return False
     while decl is not None:
-        if decl.name() == "IfcProduct":
+        if decl.name() == base:
             return True
         decl = decl.supertype()
     return False
+
+
+def _is_product(ifc_class: str) -> bool:
+    return _derives_from(ifc_class, "IfcProduct")
 
 
 def _is_opening_element(ifc_class: str) -> bool:
     """IfcOpeningElement and its kin: voids the model keeps, which architects never see (D102)."""
-    try:
-        decl = B._schema().declaration_by_name(ifc_class)
-    except Exception:  # noqa: BLE001
-        return False
-    while decl is not None:
-        if decl.name() == "IfcFeatureElementSubtraction":
-            return True
-        decl = decl.supertype()
-    return False
+    return _derives_from(ifc_class, "IfcFeatureElementSubtraction")
 
 
 def _summarise(f, operations, step_changed, step_removed) -> Changes:
@@ -100,7 +96,8 @@ def _summarise(f, operations, step_changed, step_removed) -> Changes:
         if g in created_guids:
             continue
         value = deleted.get(g)
-        if value is not None and (not _is_product(value.get("type", "")) or _is_opening_element(value.get("type", ""))):
+        kind = value.get("type", "") if value is not None else ""
+        if value is not None and (not _is_product(kind) or _is_opening_element(kind)):
             continue  # a property set, relationship, ... has a GlobalId too; so has an opening element
         try:
             f.by_guid(g)

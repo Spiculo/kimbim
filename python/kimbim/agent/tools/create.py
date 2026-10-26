@@ -6,8 +6,6 @@ from __future__ import annotations
 import json
 import math
 
-import ifcopenshell.util.element
-
 from ... import app_bridge as B
 from ... import authoring as A
 from ... import levels as L
@@ -17,16 +15,18 @@ from ..catalogue import SELECTOR, AgentError, bridge, tool
 from .common import lengths, level_guid, pick_type, point
 
 KINDS = ("wall", "slab", "column", "beam", "door", "window")
-_LISTERS = {"wall": A.wall_types, "slab": A.slab_types, "column": A.column_types, "beam": A.beam_types,
-            "door": lambda: A.opening_types("door"), "window": lambda: A.opening_types("window")}
+_LISTERS = {"wall": A.wall_types, "slab": A.slab_types, "column": A.column_types, "beam": A.beam_types}
 _LENGTH = {"type": ["number", "string"], "description": "Project units or a string with units (\"50cm\")."}
 _POINT = {"type": "array", "items": _LENGTH, "description": "[x, y] in project units or strings with units."}
 _TYPE = {"type": "string", "description": "Type name or GlobalId (create.types lists them); default the first."}
 _LEVEL = {"type": "string", "description": "Level name or GlobalId."}
 
 
-def _types(kind: str) -> list[dict]:
-    return bridge(_LISTERS[kind])["types"]
+def _types(kind: str, create_defaults: bool = True) -> list[dict]:
+    """The types of a kind. Creating the defaults of a model that has none is a model change: only write tools do."""
+    if kind in ("door", "window"):
+        return bridge(A.opening_types, kind, create_defaults)["types"]
+    return bridge(_LISTERS[kind], create_defaults)["types"]
 
 
 def _type(kind: str, ref) -> str:
@@ -46,26 +46,11 @@ def _level_height(info: dict) -> float:
     "kind": {"type": "string", "enum": list(KINDS)}}})
 def types(session, kind):
     """List the types you can create of a kind: GlobalId, name and size (wall thickness, default door/window sizes)."""
-    return {"kind": kind, "types": _types(kind)}
-
-
-def _join_target(storey: str, p) -> str:
-    """A wall of the level with an end (or else its axis) at `p`, within 1 cm: the wall a new one joins."""
-    middle = ""
-    for e in B._model.by_type("IfcWall"):
-        container = ifcopenshell.util.element.get_container(e)
-        axis = A._axis_world(e)
-        if not axis or container is None or container.GlobalId != storey:
-            continue
-        a, b = axis
-        if min(math.dist(p, a), math.dist(p, b)) <= 0.01:
-            return e.GlobalId
-        dx, dy = b[0] - a[0], b[1] - a[1]
-        n = dx * dx + dy * dy
-        t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / n if n else -1
-        if 0 < t < 1 and math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy)) <= 0.01 and not middle:
-            middle = e.GlobalId
-    return middle
+    found = _types(kind, create_defaults=False)  # a read tool changes nothing
+    out = {"kind": kind, "types": found}
+    if not found:
+        out["hint"] = f"The project has no {kind} types yet; a create tool makes the defaults when no type is given."
+    return out
 
 
 @tool("create.wall", {"required": ["level", "start", "end"], "properties": {
@@ -79,8 +64,8 @@ def wall(session, level, start, end, height=None, type="", join=True):
     x2, y2 = point(session, end, "end")
     h = lengths(session, height)[0] if height is not None else _level_height(_level_info(level))
     wall_type = _type("wall", type)
-    js = _join_target(storey, (x1, y1)) if join else ""
-    je = _join_target(storey, (x2, y2)) if join else ""
+    js = bridge(A.wall_join_at, storey, x1, y1)["guid"] if join else ""
+    je = bridge(A.wall_join_at, storey, x2, y2)["guid"] if join else ""
     r = bridge(A.create_wall, storey, wall_type, x1, y1, x2, y2, h, js, je)
     return {"guids": [r["guid"]], "length_m": round(math.dist((x1, y1), (x2, y2)), 6), "height_m": round(h, 6)}
 

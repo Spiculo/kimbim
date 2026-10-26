@@ -209,10 +209,11 @@ def _create_layered_types(ifc_class: str, defaults):
         ifcopenshell.api.material.assign_material(f, products=[wall_type], material=layer_set)
 
 
-def wall_types() -> str:
+def wall_types(create_defaults: bool = True) -> str:
+    """Wall types; `create_defaults=False` (D102: read tools) lists what exists and creates nothing."""
     if B._model is None:
         return B._dump({"types": []})
-    if not _layered_wall_types():
+    if create_defaults and not _layered_wall_types():
         _create_default_wall_types()
     from . import configure
 
@@ -530,10 +531,10 @@ def snap_data(storey_guid: str, mesh_vertices: str = "") -> str:
 
 # ---------------------------------------------------------------- slabs (Slice 5)
 
-def slab_types() -> str:
+def slab_types(create_defaults: bool = True) -> str:
     if B._model is None:
         return B._dump({"types": []})
-    if not _layered_types("IfcSlabType"):
+    if create_defaults and not _layered_types("IfcSlabType"):
         _create_layered_types("IfcSlabType", DEFAULT_SLAB_TYPES)
     return B._dump({"types": [{"guid": t.GlobalId, "name": t.Name or "", "thickness": round(_thickness(_layer_set(t)), 6)}
                               for t in _layered_types("IfcSlabType")]})
@@ -673,6 +674,36 @@ def slab_outline_from_walls(walls_json: str) -> str:
     return B._dump({"ok": True, "points": [[round(float(x), 6), round(float(y), 6)] for x, y in points]})
 
 
+def wall_join_at(storey_guid: str, x, y) -> str:
+    """{"ok": true, "guid": ...} the wall on a level that a new wall starting or ending at (x, y) metres joins
+    (D102): one with an axis end within 1 cm of the point, else one whose axis passes within 1 cm of it
+    (a T join); "" when none."""
+    if B._model is None:
+        return _fail("no model open")
+    storey = _by_guid(storey_guid)
+    if storey is None or not storey.is_a("IfcBuildingStorey"):
+        return _fail("unknown level")
+    try:
+        p = (float(x), float(y))
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    middle = ""
+    for wall in B._model.by_type("IfcWall"):
+        container = ifcopenshell.util.element.get_container(wall)
+        axis = _axis_world(wall)
+        if not axis or container is None or container.GlobalId != storey.GlobalId:
+            continue
+        a, b = axis
+        if min(math.dist(p, a), math.dist(p, b)) <= 0.01:
+            return B._dump({"ok": True, "guid": wall.GlobalId})
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        n = dx * dx + dy * dy
+        t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / n if n else -1
+        if not middle and 0 < t < 1 and math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy)) <= 0.01:
+            middle = wall.GlobalId
+    return B._dump({"ok": True, "guid": middle})
+
+
 # ---------------------------------------------------------------- doors and windows (Slice 5)
 
 def _opening_defaults(t) -> tuple[float, float, float]:
@@ -682,12 +713,12 @@ def _opening_defaults(t) -> tuple[float, float, float]:
     return (float(d.get("Width", 0.9 / s)) * s, float(d.get("Height", 2.1 / s)) * s, float(d.get("SillHeight", 0.0)) * s)
 
 
-def opening_types(kind: str) -> str:
+def opening_types(kind: str, create_defaults: bool = True) -> str:
     if B._model is None or kind not in OPENING_CLASSES:
         return B._dump({"types": []})
     _, type_class = OPENING_CLASSES[kind]
     f = B._model
-    if not f.by_type(type_class):
+    if create_defaults and not f.by_type(type_class):
         import ifcopenshell.api.pset
         for name, width, height, sill, operation in DEFAULT_OPENING_TYPES[kind]:
             t = ifcopenshell.api.root.create_entity(f, ifc_class=type_class, name=name,
@@ -935,9 +966,9 @@ def _profile_size(profile) -> tuple[float, float]:
     return 0.0, 0.0
 
 
-def _profile_types(ifc_class: str, defaults) -> list:
+def _profile_types(ifc_class: str, defaults, create_defaults: bool = True) -> list:
     f = B._model
-    if not [t for t in f.by_type(ifc_class) if _profile(t) is not None]:
+    if create_defaults and not [t for t in f.by_type(ifc_class) if _profile(t) is not None]:
         s = _scale()
         for name, profile_class, width, depth in defaults:
             t = ifcopenshell.api.root.create_entity(f, ifc_class=ifc_class, name=name)
@@ -963,12 +994,12 @@ def _profile_types(ifc_class: str, defaults) -> list:
     return out
 
 
-def column_types() -> str:
-    return B._dump({"types": _profile_types("IfcColumnType", DEFAULT_COLUMN_TYPES) if B._model is not None else []})
+def column_types(create_defaults: bool = True) -> str:
+    return B._dump({"types": _profile_types("IfcColumnType", DEFAULT_COLUMN_TYPES, create_defaults) if B._model is not None else []})
 
 
-def beam_types() -> str:
-    return B._dump({"types": _profile_types("IfcBeamType", DEFAULT_BEAM_TYPES) if B._model is not None else []})
+def beam_types(create_defaults: bool = True) -> str:
+    return B._dump({"types": _profile_types("IfcBeamType", DEFAULT_BEAM_TYPES, create_defaults) if B._model is not None else []})
 
 
 def _profile_element(storey_guid, type_guid, type_class):
