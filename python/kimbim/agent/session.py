@@ -7,6 +7,9 @@ import json
 import pathlib
 
 from .. import app_bridge as B
+from .. import authoring as A
+from .. import graphics as G
+from .. import queries as Q
 from .. import documents as D
 from .. import kimfile as K
 from .. import settings as S
@@ -85,15 +88,48 @@ class Session:
             K.display_user = self._saved_user
 
     def resolve(self, selector) -> list[str]:
-        """GlobalIds for a selector. Task 4 adds query selectors and "selection"."""
-        if isinstance(selector, (list, tuple)) and all(isinstance(g, str) for g in selector):
+        """GlobalIds for a selector: a GlobalId list, "selection" (needs the app) or a find object. Raises
+        not_found for an unknown GlobalId or level and no_match when nothing matches."""
+        if selector == "selection":
+            raise AgentError("needs_app")
+        if isinstance(selector, (list, tuple)):
             for g in selector:
                 try:
                     B._model.by_guid(g)
                 except RuntimeError:
                     raise AgentError("not_found", what=g) from None
+            if not selector:
+                raise AgentError("no_match")
             return list(selector)
-        raise AgentError("bridge_error", hint="unsupported selector")
+        if not isinstance(selector, dict):
+            raise AgentError("bad_input", hint="unsupported selector")
+        shortcuts = []
+        if selector.get("kind") is not None:
+            kind = str(selector["kind"]).strip().lower()
+            kind = kind if kind in G.KINDS else kind + "s"
+            if kind not in G.KINDS:
+                raise AgentError("bad_input", hint=f"unknown kind {selector['kind']}")
+            shortcuts.append({"field": "kind", "op": "equals", "value": kind})
+        if selector.get("level") is not None:
+            want = str(selector["level"])
+            hit = next((s for s in json.loads(A.storeys())["storeys"]
+                        if s["guid"] == want or s["name"].strip().lower() == want.strip().lower()), None)
+            if hit is None:
+                raise AgentError("not_found", what=want)
+            shortcuts.append({"field": "level", "op": "equals", "value": hit["guid"]})
+        for key in ("ifc_class", "name", "type", "layer", "status"):
+            if selector.get(key) is not None:
+                shortcuts.append({"field": key, "op": "equals", "value": selector[key]})
+        where = list(selector.get("where") or ())
+        match = selector.get("match", "all")
+        if match == "any" and shortcuts:
+            raise AgentError("bad_input", hint="match any can't mix with the shortcut fields; put them in where")
+        out = json.loads(Q.find_elements(json.dumps({"rows": shortcuts + where, "match": match})))
+        if not out.get("ok"):
+            raise AgentError("bad_input", hint=str(out.get("error") or ""))
+        if not out["guids"]:
+            raise AgentError("no_match")
+        return out["guids"]
 
     def label(self, guid: str) -> str:
         e = B._model.by_guid(guid)

@@ -94,6 +94,28 @@ def tool(name: str, params: dict, writes: bool = False, needs_task: bool | None 
     return register
 
 
+# ---------------------------------------------------------------- the shared element selector
+
+_ROW = {"type": "object", "required": ["field"], "properties": {
+    "field": {"type": "string", "enum": ["kind", "ifc_class", "type", "name", "property", "layer", "level",
+                                         "status", "material"]},
+    "op": {"type": "string"}, "value": {"type": ["string", "number"]}, "property": {"type": "string"}},
+    "additionalProperties": False}
+
+SELECTOR = {"description": "Which elements: a list of GlobalIds, the string \"selection\" (the app's current "
+                           "selection), or a find object.",
+            "oneOf": [
+                {"type": "array", "items": {"type": "string"}},
+                {"type": "string", "enum": ["selection"]},
+                {"type": "object", "properties": {
+                    "kind": {"type": "string", "description": "walls, windows, doors, slabs... (singular works)"},
+                    "ifc_class": {"type": "string"}, "level": {"type": "string", "description": "name or GlobalId"},
+                    "name": {"type": "string"}, "type": {"type": "string"}, "layer": {"type": "string"},
+                    "status": {"type": "string"},
+                    "where": {"type": "array", "items": _ROW}, "match": {"type": "string", "enum": ["all", "any"]}},
+                 "additionalProperties": False}]}
+
+
 # ---------------------------------------------------------------- validation (a small JSON Schema subset)
 
 _TYPE_NAMES = {"object": "an object", "string": "a string", "number": "a number", "integer": "an integer",
