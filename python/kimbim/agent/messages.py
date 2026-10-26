@@ -30,6 +30,10 @@ MESSAGES = {
     "render_failed": {"en": "The view could not be rendered.", "es": "No se pudo generar la vista."},
     "unknown_tool": {"en": "Unknown tool: {tool}", "es": "Herramienta desconocida: {tool}"},
     "not_found": {"en": "Not found: {what}", "es": "No se encontró: {what}"},
+    "no_session": {"en": "No agent session is running for this project.",
+                   "es": "No hay ninguna sesión de agente en ejecución para este proyecto."},
+    "worker_failed": {"en": "The background session for the project failed.",
+                      "es": "Falló la sesión en segundo plano del proyecto."},
     # hints for bad_input (catalogue.validate)
     "hint_required": {"en": "Missing {field}.", "es": "Falta {field}."},
     "hint_unknown_field": {"en": "Unknown field {field}.", "es": "Campo desconocido {field}."},
