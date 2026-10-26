@@ -250,13 +250,14 @@ class Tasks:
             return
         if task.changes:
             return
+        if task.mode == "option" and _option() == task.option:
+            # off the agent option first: if this fails the task file stays (open), so resume/abandon recover it
+            bridge(V.discard_changes)
+            bridge(V.switch_option, task.base_option)
         self._remove(task)
         self._current = ""
         self._start_steps.pop(task.id, None)
         if task.mode == "option":
-            if _option() == task.option:
-                bridge(V.discard_changes)
-                bridge(V.switch_option, task.base_option)
             bridge(V.delete_option, task.option)  # packs the .kim without the task file
 
     def resume(self, client: str, task_id: str = "") -> None:

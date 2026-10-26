@@ -418,3 +418,23 @@ def test_park_reports_failures(house, monkeypatch):
         s.tasks.park()
     assert ex.value.extra["tasks"] == [task["id"]] and "disk full" in ex.value.hint
     assert s.tasks.get(task["id"]).status == "open"
+
+
+def test_failed_rollback_keeps_task(house, monkeypatch):
+    s = house()
+
+    @tool("test.fail2", {"required": ["guids"], "properties": {"guids": {"type": "array", "items": {"type": "string"}}}},
+          writes=True)
+    def fail(session, guids):
+        """Fail."""
+        raise catalogue.AgentError("no_match")
+
+    try:
+        monkeypatch.setattr(V, "switch_option", lambda name: json.dumps({"ok": False, "error": "disk full"}))
+        assert run(s, "test.fail2", guids=[walls()[0].GlobalId])["error"]["code"] == "no_match"
+        left = s.tasks.all()
+        assert len(left) == 1 and left[0].status == "open" and left[0].option.startswith("agent/test-fail2")
+        assert (s.tasks._dir() / f"{left[0].id}.json").exists()
+        assert option() == left[0].option  # still on it, and still tracked
+    finally:
+        catalogue.TOOLS.pop("test.fail2", None)
