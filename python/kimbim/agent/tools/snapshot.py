@@ -126,7 +126,9 @@ def _drawing_for(view, args) -> str:
     """The GlobalId of the drawing a 2D view shows."""
     if args["drawing"]:
         guid = _drawing_guid(args["drawing"])
-        kind = next(d["kind"] for d in bridge(DR.drawings)["drawings"] if d["guid"] == guid)
+        kind = next((d["kind"] for d in bridge(DR.drawings)["drawings"] if d["guid"] == guid), None)
+        if kind is None:
+            raise AgentError("not_found", what=args["drawing"])
         if view != "drawing" and kind != view:
             raise AgentError("bad_input", hint=f"{args['drawing']} is a {kind}, not a {view}")
         return guid
@@ -164,7 +166,10 @@ def _take_2d(session, view, args) -> dict:
                 "view": view}
     renderer = _renderer(session)
     source = renderer.folder() / f"view-{datetime.now().strftime('%Y%m%d-%H%M%S-%f')}.svg"
-    source.write_text(svg, encoding="utf-8")
+    try:
+        source.write_text(svg, encoding="utf-8")
+    except OSError as ex:
+        raise AgentError("bridge_error", hint=str(ex)) from None
     try:
         reply = renderer.svg2png(str(source), _out_path(args["out"], "png"), args["size"])
     finally:

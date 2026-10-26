@@ -13,6 +13,7 @@ import json
 import os
 import pathlib
 import queue
+import shutil
 import subprocess
 import sys
 import threading
@@ -21,6 +22,7 @@ from .. import app_bridge as B
 from .. import documents as D
 from .. import kimfile as K
 from .. import settings as S
+from .. import underlays
 from . import messages
 from .catalogue import AgentError
 
@@ -64,6 +66,32 @@ class Renderer:
         path.mkdir(parents=True, exist_ok=True)
         return path
 
+    @classmethod
+    def data(cls) -> pathlib.Path:
+        """The helper's KIMBIM_DATA_DIR."""
+        path = cls.folder() / "data"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    @classmethod
+    def _stage_files(cls, settings: dict) -> None:
+        """The underlay, texture and sheet-picture files the settings name (by content hash), copied to the
+        helper's per-computer store, where it looks for them: it opens a plain IFC copy, so the project's
+        working folder isn't its own. Missing files are skipped (the app would lack them too)."""
+        store = cls.data() / "underlays"
+        for name in underlays.referenced(settings):
+            target = store / name
+            if target.is_file():
+                continue  # named by content: an existing copy is the same file
+            source = underlays.file_path(name)
+            if source is None:
+                continue
+            store.mkdir(parents=True, exist_ok=True)
+            try:
+                shutil.copyfile(source, target)
+            except OSError:
+                continue
+
     @property
     def log_path(self) -> pathlib.Path:
         return self.folder() / "helper.log"
@@ -79,7 +107,9 @@ class Renderer:
         env = dict(os.environ)
         env.pop("QT_QPA_PLATFORM", None)  # the helper needs a real platform plugin; it shows no window anyway
         env.setdefault("KIMBIM_PYTHON_PATH", str(pathlib.Path(__file__).resolve().parents[2]))  # this code
-        env["KIMBIM_DATA_DIR"] = str(D.data_dir())
+        # Its own data folder: whatever opening a model writes (recovery copies, open/tmp folders, caches)
+        # stays out of the user's, and the files the settings use are staged there (_stage_files).
+        env["KIMBIM_DATA_DIR"] = str(self.data())
         self._log = open(self.log_path, "ab")
         flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
         try:
@@ -166,6 +196,7 @@ class Renderer:
             settings_path.write_bytes(settings)
         except (OSError, RuntimeError) as ex:
             raise self._failed(str(ex)) from None
+        self._stage_files(S.current())
         self._loaded = None
         self._request({"op": "load", "model": str(model), "settings": str(settings_path)}, LOAD_TIMEOUT)
         self.loads += 1

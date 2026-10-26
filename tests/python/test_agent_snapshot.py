@@ -138,6 +138,43 @@ def test_snapshot_changes_task(s):
     assert run(s, "task.status")["result"]["task"]["status"] == "open"
 
 
+@pytest.mark.xfail(strict=True, reason="versioning compare re-encodes untouched elements "
+                                       "(records.py inline/node reclassification)")
+def test_compare_reports_only_the_widened_windows(s):
+    """What a changes snapshot colours is versioning.compare's list: it should be the 4 Level 1 windows."""
+    assert run(s, "task.start", title="Widen windows")["ok"]
+    windows = s.resolve({"kind": "window", "level": "Level 1"})
+    assert run(s, "elements.set_dimensions", elements=windows, width="+50cm")["ok"]
+    diff = json.loads(V.compare(s.tasks.open_task("test").base_version, "WORKING"))
+    assert sorted(e["guid"] for e in diff["modified"] if e["type"] == "IfcWindow") == sorted(windows)
+
+
+def test_renderer_stages_the_files_settings_use(s, tmp_path):
+    """Textures and underlays named in the settings are copied where the helper (a plain IFC copy, its own
+    data folder) looks for them."""
+    from kimbim import underlays
+
+    name = "ab" * 20 + ".png"
+    store = underlays.store_dir()
+    store.mkdir(parents=True, exist_ok=True)
+    (store / name).write_bytes(b"picture")
+    render.Renderer._stage_files({"texture_files": [name, "cd" * 20 + ".png"]})  # the second is missing
+    staged = render.Renderer.data() / "underlays"
+    assert (staged / name).read_bytes() == b"picture"
+    assert not (staged / ("cd" * 20 + ".png")).exists()
+    assert render.Renderer.data() != D.data_dir()
+
+
+@app
+@needs_app
+def test_helper_keeps_out_of_the_data_folder(s):
+    before = {p.name for p in D.data_dir().iterdir()}
+    assert run(s, "snapshot.take", size=[200, 150])["ok"]
+    assert {p.name for p in D.data_dir().iterdir()} - before <= {"agent"}
+    assert not (D.data_dir() / "recovery").exists()
+    assert (D.data_dir() / "agent" / "render" / "data").is_dir()
+
+
 def test_snapshot_changes_without_task(s):
     r = run(s, "snapshot.take", changes="task")
     assert not r["ok"] and r["error"]["code"] == "no_task"
