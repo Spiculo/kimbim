@@ -62,6 +62,9 @@ drawings = { cmd = "python tools/check_drawings.py build/house.ifc build/drawing
 # M5 exit test: two design options of the house are created, edited separately, compared and combined
 # with one conflict resolved (the UI path is test_main_window's m5ExitCombineOptions).
 m5 = { cmd = "python tools/check_m5.py build/m5", depends-on = ["build"] }
+# Agent tools exit test (D102 phase 1): through MCP only, an agent widens the house's Level 1 windows in a task;
+# the option holds exactly those windows at 1.7 m, main is unchanged, and the task's snapshot is a real picture.
+agent = { cmd = "python tools/check_agent.py build/house.ifc build/agent", depends-on = ["house", "app-build", "build"] }
 # Renovation exit test (D74): the house with an existing, a demolished and a new wall; one sheet per
 # purpose (Existing, Demolition, New construction) with a legend, each showing the right walls.
 renovation = { cmd = "python tools/check_renovation.py build/house.ifc build/renovation", depends-on = ["house", "build"] }

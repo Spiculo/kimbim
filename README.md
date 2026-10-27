@@ -53,15 +53,19 @@ Requires [pixi](https://pixi.sh). Works on Windows and Linux.
 pixi install                      # environment from conda-forge (IfcOpenShell, Rust, Git, ...)
 pixi run build                    # build the Rust engine (kimbim._core)
 
-pixi run kimbim init my-house                       # create a project
-pixi run kimbim -C my-house commit model.ifc -m "Import from Revit"
-pixi run kimbim -C my-house status edited.ifc       # what would change
-pixi run kimbim -C my-house commit edited.ifc -m "Fire ratings"
-pixi run kimbim -C my-house log
-pixi run kimbim -C my-house diff                    # last version vs its parent
-pixi run kimbim -C my-house export v1.ifc --rev HEAD~1
-pixi run kimbim -C my-house branch option-b         # a design option
+pixi run kimbim project init my-house                                 # create a project
+pixi run kimbim --project my-house versions save model.ifc -m "Import from Revit"
+pixi run kimbim --project my-house versions status edited.ifc         # what would change
+pixi run kimbim --project my-house versions save edited.ifc -m "Fire ratings"
+pixi run kimbim --project my-house versions log
+pixi run kimbim --project my-house versions diff --from HEAD~1 --to HEAD
+pixi run kimbim --project my-house versions export --out v1.ifc --version HEAD~1
+pixi run kimbim --project my-house versions branch option-b           # a design option
 ```
+
+The same `kimbim` command gives AI agents (Claude, opencode...) tools to read, picture and change a project, with
+every change going into a design option you review: `pixi run kimbim setup claude-desktop`, and see
+[docs/17](docs/17-agent-tools.md).
 
 Each version stores the model as canonical, object-level records in a standard Git repository (`my-house/.git`). A one-property edit on a 10,000-object Revit model is stored as **one changed record**. Exports are lossless and byte-identical on Windows and Linux. See [docs/11](docs/11-spike-results.md) for how that was validated.
 

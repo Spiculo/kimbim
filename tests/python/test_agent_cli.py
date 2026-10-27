@@ -101,6 +101,25 @@ def test_help_lists_groups(capsys):
     assert "--width" in out and "--dry-run" in out and "Change dimensions" in out
 
 
+def test_mcp_help_says_the_project_is_named_per_call(capsys):
+    assert main(["mcp", "--help"]) == 0
+    assert "every tool call names it" in capsys.readouterr().out
+
+
+def test_help_markdown_is_the_tool_table(capsys):
+    """`kimbim help --markdown` prints the table docs/17-agent-tools.md pastes: one row per public tool."""
+    assert main(["help", "--markdown"]) == 0
+    rows = capsys.readouterr().out.strip().splitlines()
+    assert rows[0].startswith("| Tool (MCP) | Command line |") and rows[1].startswith("|---")
+    public = [n for n in TOOLS if not n.startswith("_")]
+    assert len(rows) == 2 + len(public)
+    dims = next(r for r in rows if r.startswith("| `elements_set_dimensions` "))
+    assert "`kimbim elements set-dimensions`" in dims and dims.endswith("| yes |")
+    assert "wall... tables" in next(r for r in rows if r.startswith("| `schedules_list` "))  # "..." isn't a full stop
+    doc = (ROOT / "docs" / "17-agent-tools.md").read_text(encoding="utf-8")
+    assert "\n".join(rows) in doc  # the guide's table is the current catalogue's
+
+
 def test_exit_codes(house, capsys):
     assert run(capsys, house, "elements", "find", "--bogus", "1")[0] == 2
     assert run(capsys, house, "elements", "find")[0] == 2  # --elements is required

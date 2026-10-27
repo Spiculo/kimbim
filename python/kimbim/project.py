@@ -215,7 +215,7 @@ class Project:
     # ---- helpers ----
     def _rev(self, rev: str) -> str:
         if self.repo.head() is None:
-            raise NoVersions("this project has no versions yet (use `kimbim commit <file.ifc>`)")
+            raise NoVersions("this project has no versions yet (use `kimbim versions save FILE.ifc -m MESSAGE`)")
         try:
             return self.repo.resolve(rev)
         except _core.RepoError:

@@ -12,7 +12,8 @@ pixi run build          # build the Rust extension (kimbim._core)
 pixi run test           # SPDX check + Rust tests + Python tests
 pixi run fetch-corpus   # download the IFC test corpus (~95 MB, not committed)
 pixi run golden         # golden-hash tests against the corpus
-pixi run kimbim --help  # the CLI
+pixi run kimbim --help  # the CLI (agent tools and versions, docs/17)
+pixi run agent          # agent tools exit check (MCP, on the sample house)
 ```
 
 ## Rules

@@ -64,5 +64,6 @@ select([w for w in ifc.by_type("IfcWall") if "Exterior" in (w.Name or "")])
 
 ## Not yet
 
-Code completion, plugins that add commands and panels (doc 04 §11, P2), and running scripts from the command line
-without the window. `kimbim` on the command line covers versioning (`kimbim --help`).
+Code completion and plugins that add commands and panels (doc 04 §11, P2). Scripts run from the command line
+without the window with `kimbim script run FILE [MODEL.ifc]`, and AI agents can run them on a project when you allow
+it (`agent_scripts`, see [17](17-agent-tools.md)). `kimbim --help` lists the other commands.

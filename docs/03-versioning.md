@@ -109,6 +109,8 @@ Diff categories (spec §16), all derived from record changes:
 
 In the UI, Compare colors the viewport (added / modified / removed) and shows a per-object before/after panel (spec §8.5).
 
+**Changes are judged on content (2026-10-26).** A record stores a shared value inline, anchored or as its own node depending on how many places use it, so editing one element can re-encode others that did not change (widening the Level 1 windows turned their shared placement into a node, and the untouched Level 2 windows were listed as modified; on the Clinic a new IFC2X3 owner history re-encoded all 41,068 rooted records). Compare now works on content digests (`kimbim.content`): node and anchor references are expanded, SET members are re-sorted by digest, and the owner history is left out as bookkeeping. A re-encoded record is not *modified*; a record whose shared value was edited in place is. Combine uses the same digests, so a re-encoding never conflicts with a real change, and a value edited in place on one side wins over the other side's mere re-encoding. The stored records and the golden hashes are unchanged. This is what lets an agent's proposal show exactly the elements it changed ([17](17-agent-tools.md)).
+
 ## Merge ("Combine options")
 
 **Decided (owner answer 2):** in Git-style collaboration, conflicts are resolved **at merge time** by the user. Real-time auto-merge is a separate, future mode (see [08](08-future.md#collaboration-modes)).
@@ -167,20 +169,24 @@ For any object or property, walk the commits that changed its record. Each step 
 
 ## CLI
 
-The engine is fully usable without the GUI:
+The engine is fully usable without the GUI. Since D102 the versioning commands are under `versions`, next to the
+agent tools ([17](17-agent-tools.md)); every command takes `--project P` (a folder, `.kim` or `.ifc`):
 
 ```bash
-kimbim init [--from model.ifc]
-kimbim import model.ifc          # with reconciliation report
-kimbim export -o model.ifc [rev]
-kimbim status
-kimbim commit -m "message"
-kimbim log [--object <id>]
-kimbim diff [rev] [rev]
-kimbim branch / switch / tag
-kimbim merge <branch>
-kimbim blame <id> [property]
-kimbim show <id> [rev]           # canonical JSON
-kimbim export-tree <dir>
-kimbim push / pull               # thin wrappers over git remotes
+kimbim project init [DIR]                       # make a folder a project
+kimbim versions save [FILE.ifc] -m "message"    # a version of that IFC file, or of the working model
+kimbim versions status FILE.ifc                 # what saving that file would change
+kimbim versions log                             # the current option's versions
+kimbim versions diff --from REV [--to REV]      # Compare (--to defaults to WORKING)
+kimbim versions export --out model.ifc [--version REV]
+kimbim versions export-dxf OUT [--rev REV]      # drawings and sheets as DXF
+kimbim versions options                         # design options
+kimbim versions branch [NAME] / switch NAME     # list or create an option, switch to one
+kimbim versions tag [NAME] [-m NOTE]            # milestones
+kimbim versions merge OPTION [--resolve ID=CHOICE]
+kimbim versions element-history --element GLOBALID   # object history ("blame")
+kimbim versions show KEY [--rev REV]            # canonical JSON
 ```
+
+Not yet: `import` with a reconciliation report, `export-tree`, and `push` / `pull` (thin wrappers over git remotes).
+The old top-level commands (`kimbim commit`, `kimbim log`...) are gone.

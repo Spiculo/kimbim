@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """The `kimbim` command line (D102, spec §7): one subcommand per agent tool, generated from the tool catalogue
 (`kimbim <group> <verb> --param value ...`), plus the commands people use that agents never get (`project init`,
-`versions save|show|merge|export-dxf|status|branch|switch|tag`, `script run FILE [MODEL]`, `serve`, `mcp`, `setup`).
+`versions save|show|merge|export-dxf|status|branch|switch|tag`, `script run FILE [MODEL]`, `serve`, `mcp`, `setup`)
+and `help [--markdown]` (docs/17-agent-tools.md's tool table is its Markdown output).
 
 A tool command goes to the project's background worker (started if needed) or, with `--no-worker`, runs in this
 process: the project is opened, the tool runs, the task it started on its own is finished and the project is saved
@@ -31,7 +32,7 @@ GROUP_HELP = {
     "sheets": "sheets", "schedules": "schedules", "checks": "model checks", "levels": "levels",
     "selection": "the app's selection", "script": "run Python scripts", "snapshot": "pictures of the model",
     "serve": "keep a project open for agent commands", "mcp": "MCP server for AI agents",
-    "setup": "configure an AI client",
+    "setup": "configure an AI client", "help": "this help, or the agent tools as a Markdown table",
 }
 
 _JSONISH = re.compile(r"^\s*([\[{]|-?\d+(\.\d+)?([eE][-+]?\d+)?\s*$|true\s*$|false\s*$|null\s*$)")
@@ -81,7 +82,7 @@ def _option(name: str) -> str:
 
 
 def _first_sentence(text: str) -> str:
-    m = re.match(r"(.+?[.!?])(\s|$)", " ".join(text.split()))
+    m = re.match(r"(.+?(?<!\.\.)[.!?])(\s|$)", " ".join(text.split()))  # "wall... tables" goes on
     return m.group(1) if m else " ".join(text.split())
 
 
@@ -89,7 +90,8 @@ def _h(text: str) -> str:
     return text.replace("%", "%%")
 
 
-def _add_globals(p: argparse.ArgumentParser, top: bool, skip: frozenset = frozenset()) -> None:
+def _add_globals(p: argparse.ArgumentParser, top: bool, skip: frozenset = frozenset(),
+                 project_help: str = "") -> None:
     """The options every command takes: before the group on the top parser, and again after the verb (there
     they set a value only when given, so they never undo one given earlier)."""
     def d(v):
@@ -97,7 +99,8 @@ def _add_globals(p: argparse.ArgumentParser, top: bool, skip: frozenset = frozen
 
     for flag, kw in (
             ("project", dict(dest="g_project", default=d(None), metavar="P",
-                             help="the project: a folder, .kim or .ifc (default: the current folder)")),
+                             help=project_help or
+                             "the project: a folder, .kim or .ifc (default: the current folder)")),
             ("json", dict(dest="g_json", action="store_true", default=d(False), help="print the result as JSON")),
             ("no-worker", dict(dest="g_no_worker", action="store_true", default=d(False),
                                help="run in this process instead of the project's background worker")),
@@ -444,7 +447,8 @@ def _people(group, top) -> None:
     only_project = frozenset({"json", "no-worker", "task", "client"})
     mp = top.add_parser("mcp", help=GROUP_HELP["mcp"], description=GROUP_HELP["mcp"] + " (stdio). Without --project, "
                         "every tool call names its project.")
-    _add_globals(mp, False, only_project)
+    _add_globals(mp, False, only_project,
+                 project_help="the project: a folder, .kim or .ifc (default: none; every tool call names it)")
     mp.set_defaults(handler=_mcp)
     st = top.add_parser("setup", help=GROUP_HELP["setup"],
                         description="Write the AI client's configuration for `kimbim mcp` (merged into its file).")
@@ -453,6 +457,9 @@ def _people(group, top) -> None:
                     help="print the configuration (for claude-code, the `claude mcp add` line) instead of writing it")
     _add_globals(st, False, only_project)
     st.set_defaults(handler=_setup)
+    hp = top.add_parser("help", help=GROUP_HELP["help"], description=GROUP_HELP["help"] + ".")
+    hp.add_argument("--markdown", action="store_true", help="print the agent tools as a Markdown table")
+    hp.set_defaults(handler=_help)
 
 
 def _init(ns) -> int:
@@ -658,6 +665,31 @@ def _setup(ns) -> int:
         print(_t("setup_wrote", path=path))
     if written:
         print(_t("setup_restart", client=ns.client))
+    return 0
+
+
+def tools_markdown() -> str:
+    """The agent tools as a Markdown table, in the groups' order: the MCP name, the command line, what it does and
+    whether it changes the model (docs/17-agent-tools.md pastes it)."""
+    from .. import agent  # noqa: F401  (importing the package fills the catalogue)
+
+    order = list(GROUP_HELP)
+    names = sorted((n for n in TOOLS if not n.startswith("_")),
+                   key=lambda n: (order.index(n.split(".")[0]) if n.split(".")[0] in order else len(order), n))
+    lines = ["| Tool (MCP) | Command line | What it does | Changes the model |", "|---|---|---|---|"]
+    for name in names:
+        group, verb = name.split(".", 1)
+        what = _first_sentence(TOOLS[name].description).replace("|", "\\|")
+        lines.append(f"| `{name.replace('.', '_')}` | `kimbim {group} {verb.replace('_', '-')}` | {what} | "
+                     f"{'yes' if TOOLS[name].writes else ''} |")
+    return "\n".join(lines)
+
+
+def _help(ns) -> int:
+    if ns.markdown:
+        print(tools_markdown())
+    else:
+        build_parser().print_help()
     return 0
 
 
