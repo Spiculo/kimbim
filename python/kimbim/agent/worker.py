@@ -22,6 +22,7 @@ import os
 import select
 import signal
 import socket
+import subprocess
 import sys
 import tempfile
 import threading
@@ -83,9 +84,12 @@ def process_started(pid: int) -> str:
                 return str((times[0].dwHighDateTime << 32) | times[0].dwLowDateTime)
             finally:
                 kernel32.CloseHandle(handle)
+        if sys.platform == "darwin":  # macOS has no /proc; ps lstart is the same token for both calls
+            out = subprocess.run(["ps", "-p", str(pid), "-o", "lstart="], capture_output=True, text=True, timeout=5)
+            return out.stdout.strip() if out.returncode == 0 else ""
         stat = Path(f"/proc/{pid}/stat").read_text()
         return stat.rsplit(")", 1)[1].split()[19]  # field 22, starttime
-    except (OSError, IndexError, ValueError, AttributeError):
+    except (OSError, IndexError, ValueError, AttributeError, subprocess.SubprocessError):
         return ""
 
 
@@ -264,6 +268,9 @@ def serve(project: str, idle: float) -> int:
     _log(f"opening {project}")
     try:
         session = Session.open(project, "cli")
+    except SystemExit as ex:  # a signal before there is a session: tell the client instead of vanishing
+        _log(f"signal while opening {project}: {ex.code}")
+        return _fail_start(project, AgentError("worker_failed", hint=f"signal {ex.code} while opening").envelope())
     except AgentError as ex:
         _log(f"cannot open {project}: {ex.code} {ex}")
         return _fail_start(project, ex.envelope())
@@ -322,8 +329,8 @@ def serve(project: str, idle: float) -> int:
                     if isinstance(request, dict) and request.get("tool") == "_shutdown":
                         _log("shutdown requested")
                         write_json(found, {**entry, "stopping": True})
+                        stopped = True  # set first: a signal during park/save must not run _stop twice
                         problems = _stop(session)
-                        stopped = True
                         reply = {"ok": True, "result": {"stopped": True, "pid": os.getpid()}}
                         if problems:
                             reply["warnings"] = problems

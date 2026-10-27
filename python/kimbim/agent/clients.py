@@ -92,7 +92,11 @@ def config_path(client: str, project: str | None) -> pathlib.Path:
     if client == "claude-code":
         return project_folder(project) / ".mcp.json"
     if client == "opencode":
-        return project_folder(project) / "opencode.json" if project else _config_home() / "opencode" / "opencode.json"
+        base = project_folder(project) if project else _config_home() / "opencode"
+        for name in ("opencode.json", "opencode.jsonc"):  # an existing .jsonc is the config opencode reads
+            if (base / name).exists():
+                return base / name
+        return base / "opencode.json"
     raise SetupError(f"unknown client {client}")
 
 
@@ -112,7 +116,7 @@ def snippet(client: str, project: str | None) -> dict:
     return {"mcpServers": {SERVER: entry}}
 
 
-def merged(path: pathlib.Path, part: dict) -> dict:
+def merged(path: pathlib.Path, part: dict, client: str = "") -> dict:
     """The file at `path` with `part`'s server entries put in (other keys and servers kept)."""
     data: dict = {}
     if path.exists():
@@ -120,7 +124,12 @@ def merged(path: pathlib.Path, part: dict) -> dict:
             text = path.read_text(encoding="utf-8-sig")
             data = json.loads(text) if text.strip() else {}
         except (OSError, ValueError) as ex:
-            raise SetupError(f"{path} is not valid JSON ({ex}); fix or move it, then run setup again") from None
+            hint = ""
+            if client == "opencode":  # opencode also reads JSONC; this writer keeps plain JSON only
+                hint = ("\nopencode accepts comments (JSONC); kimbim setup does not edit a commented file. "
+                        "Add this to its \"mcp\" object by hand:\n"
+                        + json.dumps(part.get("mcp", {}), indent=2, ensure_ascii=False))
+            raise SetupError(f"{path} is not valid JSON ({ex}); fix or move it, then run setup again{hint}") from None
         if not isinstance(data, dict):
             raise SetupError(f"{path} does not hold a JSON object; fix or move it, then run setup again")
     elif "mcp" in part:
@@ -136,10 +145,14 @@ def merged(path: pathlib.Path, part: dict) -> dict:
 
 
 def _write(path: pathlib.Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".kimbim-tmp")
-    tmp.write_text(text, encoding="utf-8")
-    os.replace(tmp, path)
+    target = pathlib.Path(os.path.realpath(path))  # keep a symlinked config a symlink, update what it points at
+    target.parent.mkdir(parents=True, exist_ok=True)
+    tmp = target.with_name(target.name + ".kimbim-tmp")
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, target)
+    finally:
+        tmp.unlink(missing_ok=True)  # only there when the replace failed
 
 
 # ---------------------------------------------------------------- Claude Code's command, the instructions section
@@ -176,7 +189,8 @@ def merge_agents(text: str, section: str) -> str:
     start, end = text.find(AGENTS_START), text.find(AGENTS_END)
     if start >= 0 and end > start:
         tail = text[end + len(AGENTS_END):]
-        return text[:start] + section + tail.lstrip("\r\n")
+        rest = tail.lstrip("\r\n")
+        return text[:start] + section + (("\n" if rest else "") + rest)  # keep one blank line before what follows
     if text and not text.endswith("\n"):
         text += "\n"
     return text + ("\n" if text else "") + section
@@ -196,7 +210,7 @@ def setup(client: str, project: str | None, print_only: bool = False) -> tuple[s
             return claude_add_line(project), []
         return json.dumps(part, indent=2, ensure_ascii=False), []
     path = config_path(client, project)
-    data = merged(path, part)
+    data = merged(path, part, client)
     written = [path]
     agents = None
     if project and client in INSTRUCTIONS:

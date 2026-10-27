@@ -252,3 +252,16 @@ def test_signal_parks_saves_and_releases(house):
         assert {w.Name for w in B._model.by_type("IfcWall")} == {"Z"}
     finally:
         s.close()
+
+
+def test_empty_or_half_written_starting_guard_goes_stale(tmp_path):
+    """A client killed between O_EXCL and its write must not block starts until the 120 s wait."""
+    guard = tmp_path / "project.starting"
+    guard.write_text("", encoding="utf-8")
+    assert client._guard_stale(guard) is False  # the writer may be about to write it
+    old = time.time() - client.GUARD_GRACE - 5
+    os.utime(guard, (old, old))
+    assert client._guard_stale(guard) is True
+    guard.write_text("{ not json", encoding="utf-8")
+    os.utime(guard, (old, old))
+    assert client._guard_stale(guard) is True

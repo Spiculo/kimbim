@@ -171,7 +171,9 @@ def build_server(project: str | None = None, request=None) -> Server:
         return types.ReadResourceResult(contents=[types.TextResourceContents(
             uri=RESOURCE, mime_type="application/json", text=json.dumps(body, ensure_ascii=False, default=str))])
 
-    server = Server(NAME, version=_version(), instructions=INSTRUCTIONS, on_list_tools=list_tools,
+    instructions = INSTRUCTIONS if core.project else INSTRUCTIONS.replace(
+        " (also the resource kimbim://project/info)", "")  # no resource without a project
+    server = Server(NAME, version=_version(), instructions=instructions, on_list_tools=list_tools,
                     on_call_tool=call_tool, on_list_resources=list_resources, on_read_resource=read_resource)
     server.core = core
     return server

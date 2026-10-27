@@ -36,7 +36,7 @@ def project(tmp_path):
 
 
 def _command_ok(command: list[str], kim: Path | None):
-    assert command[0] == sys.executable and Path(command[0]).is_absolute()
+    assert command[0] == str(Path(sys.executable).resolve()) and Path(command[0]).is_absolute()
     assert command[1:4] == ["-m", "kimbim", "mcp"]
     if kim is not None:
         assert command[4:] == ["--project", str(kim.resolve())]
@@ -162,3 +162,23 @@ def test_setup_refuses_a_broken_file(home, project, capsys):
     assert main(["setup", "claude-code", "--project", str(project)]) == 1
     assert path.read_text(encoding="utf-8") == "{ not json"  # left as it was
     assert "kimbim: error" in capsys.readouterr().err
+
+
+def test_setup_opencode_uses_existing_jsonc_and_explains_comments(home, project, capsys):
+    """opencode's JSONC is not silently ignored (no second config), and a commented file gets the snippet."""
+    path = project.parent / "opencode.jsonc"
+    original = '{\n  // our settings\n  "model": "x/y"\n}\n'
+    path.write_text(original, encoding="utf-8")
+    assert main(["setup", "opencode", "--project", str(project)]) == 1
+    assert path.read_text(encoding="utf-8") == original
+    assert not (project.parent / "opencode.json").exists()
+    err = capsys.readouterr().err
+    assert "opencode.jsonc" in err and "JSONC" in err and '"kimbim"' in err
+
+
+def test_merge_agents_keeps_a_blank_line_before_what_follows():
+    section = f"{clients.AGENTS_START}\nKimBim\n{clients.AGENTS_END}\n"
+    text = f"# House\n\n{section}\nOur own notes.\n"
+    once = clients.merge_agents(text, section)
+    assert f"{clients.AGENTS_END}\n\nOur own notes." in once
+    assert clients.merge_agents(once, section) == once  # idempotent

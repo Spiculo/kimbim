@@ -23,6 +23,7 @@ from .worker import FAMILY, discovery_path, entry_alive, error_path, read_discov
 
 START_WAIT_DEFAULT = 120.0  # seconds to wait for a new worker's entry (KIMBIM_AGENT_START_WAIT): big projects open slowly
 ATTEMPTS = 4
+GUARD_GRACE = 10.0  # seconds before an empty or half-written .starting file counts as stale
 
 spawned: list[int] = []  # pids of the workers this process started (tests kill them in teardown)
 _procs: list[subprocess.Popen] = []  # kept so a running worker's Popen isn't collected (ResourceWarning)
@@ -89,11 +90,25 @@ def _spawn(project: str) -> subprocess.Popen:
 
 def _guard_stale(guard: Path) -> bool:
     try:
-        held = json.loads(guard.read_text(encoding="utf-8"))
         age = time.time() - guard.stat().st_mtime
+    except OSError:
+        return False  # just removed: look again
+    try:
+        held = json.loads(guard.read_text(encoding="utf-8"))
+        pid = int(held.get("pid", 0) or 0)
     except (OSError, ValueError):
-        return False  # being written or just removed: look again
-    return not K.pid_alive(int(held.get("pid", 0) or 0)) or age > 2 * start_wait() + 10
+        return age > GUARD_GRACE  # the writer died between O_EXCL and its write
+    return not K.pid_alive(pid) or age > 2 * start_wait() + 10
+
+
+def _unlink_guard(guard: Path, seen: os.stat_result) -> None:
+    """Remove `guard` only if it is still the file we judged stale (another client may have taken it)."""
+    try:
+        now = guard.stat()
+    except OSError:
+        return
+    if (now.st_mtime_ns, now.st_size, now.st_ino) == (seen.st_mtime_ns, seen.st_size, seen.st_ino):
+        guard.unlink(missing_ok=True)
 
 
 def _start(project: str) -> dict:
@@ -109,8 +124,12 @@ def _start(project: str) -> dict:
         try:
             fd = os.open(guard, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         except FileExistsError:
-            if _guard_stale(guard):
-                guard.unlink(missing_ok=True)
+            try:
+                seen = guard.stat()
+            except OSError:
+                seen = None
+            if seen is not None and _guard_stale(guard):
+                _unlink_guard(guard, seen)
             elif time.monotonic() > end:
                 return {"error": AgentError("worker_failed", hint=f"no worker after {start_wait():g} s").envelope()}
             time.sleep(0.05)
