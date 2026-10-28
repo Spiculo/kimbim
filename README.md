@@ -64,8 +64,9 @@ pixi run kimbim --project my-house versions branch option-b           # a design
 ```
 
 The same `kimbim` command gives AI agents (Claude, opencode...) tools to read, picture and change a project, with
-every change going into a design option you review: `pixi run kimbim setup claude-desktop`, and see
-[docs/17](docs/17-agent-tools.md).
+every change going into a design option you review, live while the app is open or offline with the app closed.
+The in-app **Assistant** panel uses your own provider and key. Connect a client with
+`pixi run kimbim setup claude-desktop`; see [docs/17](docs/17-agent-tools.md).
 
 Each version stores the model as canonical, object-level records in a standard Git repository (`my-house/.git`). A one-property edit on a 10,000-object Revit model is stored as **one changed record**. Exports are lossless and byte-identical on Windows and Linux. See [docs/11](docs/11-spike-results.md) for how that was validated.
 

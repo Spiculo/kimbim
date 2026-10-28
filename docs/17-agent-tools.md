@@ -6,14 +6,16 @@ you. You ask *"make every window on the first floor 50 cm wider"*, the agent doe
 result in KimBim before anything reaches your model (decision D102,
 [spec](superpowers/specs/2026-10-25-agent-tools-design.md)).
 
-The same set of tools is available in two ways:
+The same set of tools is available three ways:
 
 - **`kimbim mcp`**, an MCP server. Claude Desktop, Claude Code and opencode connect to it and see the tools.
 - **`kimbim`**, a command line, for agents that run shell commands and for you. `kimbim elements find --elements
   '{"kind": "window"}'` is the same call as the MCP tool `elements_find`.
+- **The Assistant panel** inside the app (View › Panels › Assistant), using your own model provider and API key.
 
-This is **phase 1**: agents work on projects that are closed in the app (offline). Working on the project you have
-open, and the in-app review bar, come in phase 2. An Assistant panel inside the app comes in phase 3.
+Agents work **live**, while the project is open in KimBim, or **offline**, with the app closed. In live mode the
+app hosts a local session: each write is one undo step, the views redraw, and a review bar lists finished agent
+proposals. In offline mode a background worker keeps the project open between commands.
 
 ## What an agent can do
 
@@ -46,6 +48,11 @@ other servers and settings. In development, run it as `pixi run kimbim ...`.
   tasks. It sits between `<!-- kimbim:start -->` and `<!-- kimbim:end -->`, and running setup again replaces it
   instead of adding a second copy. Your own text in the file is kept.
 - Restart the agent (or reload its MCP servers) after running setup.
+- In the app, *Help › Connect an AI agent...* shows the same configuration with a Copy button.
+
+The app starts its live server when a project finishes loading. While it runs, the status bar shows
+*Agent: live* with a *Disconnect* button; disconnecting stops accepting commands for that window. The server is
+not started for the windowless snapshot helper.
 
 ## Tasks and review
 
@@ -60,16 +67,18 @@ Every change an agent makes belongs to a **task**, such as *"Widen first-floor w
 
 A write tool called without a task starts one on its own, so nothing skips review.
 
-**Reviewing (phase 1).** Open the project in KimBim:
+**Reviewing.** The app lists finished proposals in a bar above the views: *"Agent proposal: Widen first-floor
+windows (4 changed)"* with **Review**, **Accept** and **Reject**.
 
 | To | Do this |
 |----|---------|
-| See the proposal | *Versions › Design options* and switch to `agent/...`. In *History and compare*, compare it with your option: Compare colours what changed (added, modified, removed) |
-| Accept it | Go back to your option and use *Versions › Combine options...* with the `agent/...` option, then *Save version* |
-| Reject it | *Versions › Delete option...* and pick the `agent/...` option |
+| See the proposal | **Review** switches to the `agent/...` option and compares it with the version the task started from; Compare colours what changed (added, modified, removed) |
+| Accept it | **Accept** combines the option into its base option, saves the combined version and deletes the agent option. If both sides changed the same property, the existing Combine dialog asks which value to keep |
+| Reject it | **Reject** deletes the agent option and leaves your model unchanged |
 
-Agents cannot accept, combine or delete options, and they cannot change the review rules below. Phase 2 adds a
-review bar in the app (*Review*, *Accept*, *Reject*) and lists proposals as soon as you open the project.
+The same review works offline: open the project and the proposal appears. You can also use *Versions › Design
+options*, *Combine options...* and *Delete option...* by hand. Agents cannot accept, combine or delete options, and
+they cannot change the review rules below.
 
 Compare reports only the elements whose content changed (since the fix of 2026-10-26, see
 [03](03-versioning.md#diff-compare)). Widening four windows shows those four windows and their wall openings, not
@@ -85,7 +94,7 @@ to change them.
 | `agent_changes` | `option`: changes go into a design option for review. `direct`: changes go straight into your model, and finishing the task saves them as a version *"<title> (agent)"*, so the version before it is your way back. `agent_decides`: the agent picks per task, option unless it asks for direct | `option` |
 | `agent_scripts` | `true` lets agents run Python scripts in the project (`script_run`), like the [console](15-scripting.md) | `false` |
 
-Phase 1 has no dialog for them yet. Set them in the Python console, then save the project (Ctrl+S):
+There is no dialog for them yet. Set them in the Python console, then save the project (Ctrl+S):
 
 ```python
 import kimbim.settings
@@ -111,6 +120,17 @@ answer, so the agent sees it right away. Every field is optional:
 come from the same drawing generator as the *Drawings* tab. The first 3D picture of a session takes a few seconds
 longer while the renderer starts. An SVG snapshot is returned as text, not as an image, because many MCP clients do
 not display `image/svg+xml`.
+
+## The Assistant panel
+
+*View › Panels › Assistant* docks a chat with the model. It uses the same tools and the same live session as an
+external agent, so its changes are undo steps and its tasks appear in the review bar.
+
+Set the provider in *Edit › Preferences › Assistant*: **Anthropic**, or **OpenAI-compatible** (a base URL and a
+model name, which covers OpenRouter, DeepSeek, Ollama and similar). The API key is stored in the operating system's
+credential store, never in `preferences.json` or the project. The panel sends the current selection and view as
+context; tool calls appear as compact lines and snapshots inline. *Clear* forgets the conversation; history is per
+window and is not saved in the project.
 
 ## The tools
 
@@ -213,10 +233,16 @@ folder when it is a project or holds exactly one `.kim`.
 
 ## How it runs
 
-The first command on a project starts a **background worker** (`kimbim serve`). It opens the project once and keeps
-it open, so later commands are fast even on large models. While it runs it holds the project's lock as
-*KimBim agent*, so the app opens the project read-only. The worker saves and lets go of the project 10 minutes after
-the last command (`KIMBIM_AGENT_IDLE` sets other seconds), and it saves when a task finishes.
+When the project is open in KimBim, the app hosts the **live** session: it writes its discovery file next to the
+project (`.kim` files get `<name>.kim.agent-live.json`; folders get `.kimbim/agent-live.json`) and runs each call
+on its own thread. The CLI and MCP server find it there first, so the same commands work with no worker. The
+status bar shows *Agent: live* and a *Disconnect* button.
+
+When no app has the project open, the first command starts a **background worker** (`kimbim serve`). It opens the
+project once and keeps it open, so later commands are fast even on large models. While it runs it holds the
+project's lock as *KimBim agent*, so the app opens the project read-only. The worker saves and lets go of the
+project 10 minutes after the last command (`KIMBIM_AGENT_IDLE` sets other seconds), and it saves when a task
+finishes.
 
 Timings on Windows, 2026-10-26. The sample house is the exit check below (`tools/check_agent.py`, each step one
 MCP call including the round trip to the worker). The Clinic (13 MB, IFC 2x3, 41,068 elements) was timed with the
@@ -246,14 +272,17 @@ What these show:
   compare on the Clinic takes about 200 s. `task_finish` and a snapshot with `changes` both compare, so they take
   minutes there. This is the next thing to speed up.
 
-## Limits of phase 1
+## Limits
 
-- **Offline only.** Close the project in the app before an agent works on it. An agent can't reach a project you
-  have open (it is told the project is locked). `selection_get` and `selection_set` need the app and answer
-  `needs_app` for now.
-- **One open task per project.** A second `task_start` while a task is open answers `task_busy`. Finish or abandon
-  the first one. Several agents at once on one project come with phase 2.
-- **Review in the app is manual** (above). The review bar comes with phase 2.
+- **Live needs the app open.** The app hosts the session when a project finishes loading; close it and later
+  commands use an offline worker instead. `selection_get` and `selection_set` work live and answer `needs_app`
+  offline.
+- **One open task per client.** A second `task_start` from the same client answers `task_busy`; another client may
+  have its own task and option. Live tasks share the app's one working model: each call switches to its task's
+  option, so the architect's view follows the agent at work. Separate working copies per client (undisturbed views)
+  are not built yet.
+- **Review is a bar, not a dialog.** A proposal with conflicting property edits opens the existing Combine dialog;
+  otherwise Accept combines and saves in one step.
 - **Long calls on large models.** The command line and the MCP server wait 120 s for an answer. On the Clinic,
   `task_finish` and a snapshot with `changes` take longer (above), so the agent is told `worker_failed`. The
   worker still completes the call, so the task does finish.
@@ -270,3 +299,7 @@ changes and finishes the task. It then reads the project's history and checks th
 `agent/widen-first-floor-windows` holds one new version, and its difference from `main` is exactly the 4 windows at
 1.7 m wide (their wall openings may also appear). `main` has not moved. The snapshot is a real picture (a PNG with
 at least 100 colours). It prints one JSON line with the timings.
+
+`test_agent_live` (part of `pixi run app-test`) runs the same request against the app's **live** session: it opens
+the sample house, calls the CLI through the live discovery file, finishes a task, finds it in the proposal bar and
+clicks **Accept**. It then checks that the combined model holds the change.

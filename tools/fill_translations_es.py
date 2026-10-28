@@ -1814,6 +1814,47 @@ ES = {
     "%n placed object(s) use an older version of this object. Update them now?":
         ("%n objeto colocado usa una versión anterior de este objeto. ¿Actualizarlo ahora?",
          "%n objetos colocados usan una versión anterior de este objeto. ¿Actualizarlos ahora?"),
+    # D102 phase 3: the Assistant panel and the agent review bar.
+    "Ask the assistant to read or change the model...": "Pida al asistente que lea o cambie el modelo...",
+    "Send": "Enviar",
+    "Changes go in a task the architect reviews. Set the provider and API key in Preferences › Assistant.":
+        "Los cambios van en una tarea que revisa el arquitecto. Configure el proveedor y la clave de API en "
+        "Preferencias › Asistente.",
+    "Conversation cleared.": "Conversación borrada.",
+    "You": "Usted",
+    "Thinking...": "Pensando...",
+    "Assistant": "Asistente",
+    "Could not ask the model: %1": "No se pudo consultar el modelo: %1",
+    "Agent proposals": "Propuestas del agente",
+    "Connect an AI &agent...": "Conectar un &agente de IA...",
+    "Agent: live": "Agente: en vivo",
+    "Could not accept the proposal": "No se pudo aceptar la propuesta",
+    "Accepted the agent's proposal": "Propuesta del agente aceptada",
+    "Could not reject the proposal": "No se pudo rechazar la propuesta",
+    "Rejected the agent's proposal": "Propuesta del agente rechazada",
+    "Connect an AI agent": "Conectar un agente de IA",
+    "Choose your AI client, then copy this configuration. Restart the client or reload its MCP servers afterwards.":
+        "Elija su cliente de IA y copie esta configuración. Reinicie el cliente o recargue sus servidores MCP "
+        "después.",
+    "OpenAI-compatible": "Compatible con OpenAI",
+    "Provider:": "Proveedor:",
+    "Model name": "Nombre del modelo",
+    "Default endpoint when empty (OpenAI-compatible: base URL ending in /v1)":
+        "Dirección por defecto cuando está vacía (compatible con OpenAI: URL base terminada en /v1)",
+    "Base URL:": "URL base:",
+    "Leave empty to keep the stored key": "Dejar vacío para conservar la clave guardada",
+    "API key:": "Clave de API:",
+    "Keys are stored in the operating system's credential store.":
+        "Las claves se guardan en el almacén de credenciales del sistema operativo.",
+    "Agent proposal:": "Propuesta del agente:",
+    "Review": "Revisar",
+    "Accept": "Aceptar",
+    "Reject": "Rechazar",
+    "%1 (%2 changed)%3": "%1 (%2 cambios)%3",
+    " — %1": " — %1",
+    "A local AI agent is connected to the open project": "Un agente de IA local está conectado al proyecto abierto",
+    "Disconnect": "Desconectar",
+    "Stop accepting agent commands for this open project": "Dejar de aceptar comandos del agente en este proyecto",
 }
 
 # Words that mean something else in another context ("Back" is the view cube's "Posterior"): by
