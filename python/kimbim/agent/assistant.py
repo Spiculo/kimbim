@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
+from urllib.parse import urlsplit, urlunsplit
 
 from . import catalogue, live
 from .credentials import KeyStoreError, get_key, has_key
@@ -105,11 +106,13 @@ def _summary(public: str, envelope: dict) -> str:
 
 
 def _endpoint(base: str, suffix: str, default: str) -> str:
-    """The full endpoint for a base URL that may be a host, a `/v1` root or the endpoint itself."""
-    base = (base or default).rstrip("/")
-    if base.endswith(suffix):
-        return base
-    return base + (suffix if base.endswith("/v1") else "/v1" + suffix)
+    """The full endpoint for a configured URL: a host, a `/v1` root, or the endpoint itself (with an
+    optional query such as Azure's `?api-version=`). Never appends the path twice."""
+    parts = urlsplit((base or default).strip())
+    path = parts.path.rstrip("/")
+    if not path.endswith(suffix):
+        path += suffix if path.endswith("/v1") else "/v1" + suffix
+    return urlunsplit((parts.scheme, parts.netloc, path, parts.query, parts.fragment))
 
 
 def _call_anthropic(config: dict, messages: list[dict], system: str, schemas: list[dict], back: dict) -> dict:

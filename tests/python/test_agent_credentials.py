@@ -106,3 +106,19 @@ def test_anthropic_endpoint_is_not_duplicated(monkeypatch, base, want):
                                     json.dumps({"provider": "anthropic", "model": "m", "base_url": base})))
     assert out["ok"], out
     assert seen == [want]
+
+@pytest.mark.parametrize("base,want", [
+    ("https://provider.example/v1/chat/completions?api-version=2024-10-21",
+     "https://provider.example/v1/chat/completions?api-version=2024-10-21"),
+    ("https://provider.example/v1/?api-version=2024-10-21",
+     "https://provider.example/v1/chat/completions?api-version=2024-10-21"),
+])
+def test_openai_endpoint_keeps_a_query(monkeypatch, base, want):
+    _fake_live(monkeypatch)
+    seen = []
+    monkeypatch.setattr(assistant, "_http", lambda url, headers, body: (
+        seen.append(url), {"choices": [{"message": {"role": "assistant", "content": "ok"}}]})[1])
+    out = json.loads(assistant.chat('[{"role":"user","content":"hi"}]',
+                                    json.dumps({"provider": "openai", "model": "m", "base_url": base})))
+    assert out["ok"], out
+    assert seen == [want]
