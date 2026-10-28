@@ -10,6 +10,8 @@
 #include "LibraryPanel.h"
 #include "ToolOptionsBar.h"
 #include "ToolPalette.h"
+#include "ProposalBar.h"
+#include "AssistantPanel.h"
 #include "ViewCube.h"
 #include "TitleBar.h"
 #include "ViewHost.h"
@@ -61,6 +63,8 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QLineEdit>
+#include <QPlainTextEdit>
+#include <QClipboard>
 #include <QRegularExpression>
 #include <QLineF>
 #include <QTreeWidgetItem>
@@ -200,6 +204,17 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
         m_gridSnap->setIconText(tr("Grid snap"));
         m_status->addToggle(m_gridSnap);
     }
+    // D102 phase 2: the agent's proposal bar and the live session's queue.
+    m_proposalBar = new ProposalBar(this);
+    // bottom->addWidget(m_proposalBar); // D75 keeps the title bar the only top row
+    connect(m_proposalBar, &ProposalBar::reviewRequested, this, &MainWindow::reviewProposal);
+    connect(m_proposalBar, &ProposalBar::acceptRequested, this, &MainWindow::acceptProposal);
+    connect(m_proposalBar, &ProposalBar::rejectRequested, this, &MainWindow::rejectProposal);
+    connect(m_status, &StatusStrip::agentDisconnectRequested, this, &MainWindow::stopAgentLive);
+    m_agentPoll = new QTimer(this);
+    m_agentPoll->setInterval(150);
+    connect(m_agentPoll, &QTimer::timeout, this, &MainWindow::pollAgentLive);
+    m_agentPoll->start();
     setWindowTitle(QStringLiteral("KimBim"));
     resize(1280, 800);
     // The plan-cut height slider at the right edge of the active model view (owner feedback).
@@ -220,6 +235,8 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     // D71: the 3D view is the first center tab; plans, drawings and sheets open next to it, and any
     // tab can be dragged out to its own window.
     m_dock = new DockLayout(this);
+    m_proposalBar->setParent(m_dock->manager()); // an overlay on the views: no effect on the window minimum
+    m_proposalBar->raise();
     auto* host = new ViewHost(m_viewport);
     m_hosts.insert(QStringLiteral("3d"), host);
     host->adoptChrome(nullptr, m_cutColumn);
@@ -392,10 +409,12 @@ void MainWindow::resizeEvent(QResizeEvent* event)
             m_dock->setSideWidths(small ? 168 : 216, small ? 220 : 280);
         }
     }
+    positionProposalBar();
 }
 
 MainWindow::~MainWindow()
 {
+    stopAgentLive(); // the live discovery entry must go with the window
     for (QThread* t : std::as_const(m_drawingThreads))
         t->wait(); // a drawing being generated: its result is dropped
     stopLoading();
@@ -882,6 +901,10 @@ void MainWindow::buildMenus()
     m_graphicsMenu = graphics;
     QMenu* help = m_menuBar->addMenu(tr("&Help"));
     m_helpMenu = help;
+    QAction* connectAgent = help->addAction(tr("Connect an AI &agent..."));
+    connectAgent->setObjectName(QStringLiteral("actionConnectAgent"));
+    connect(connectAgent, &QAction::triggered, this, &MainWindow::connectAgentDialog);
+    help->addSeparator();
     QAction* about = help->addAction(tr("&About KimBim"));
     connect(about, &QAction::triggered, this, &MainWindow::showAbout);
 }
@@ -894,6 +917,8 @@ void MainWindow::buildDocks()
     m_cutPlanesPanel = new CutPlanesPanel(this);
     m_drawingsPanel = new DrawingsPanel(this);
     m_sheetsPanel = new SheetsPanel(this);
+    m_assistant = new AssistantPanel(this);
+    m_assistant->setConfigProvider([this] { return assistantConfig(); });
     m_dock->addPanel(QStringLiteral("tree"), tr("Model"), m_tree);
     m_dock->addPanel(QStringLiteral("properties"), tr("Properties"), m_properties);
     m_dock->addPanel(QStringLiteral("layers"), tr("Layers"), m_layersPanel);
@@ -913,6 +938,7 @@ void MainWindow::buildDocks()
     });
     m_dock->addPanel(QStringLiteral("drawings"), tr("Drawings"), m_drawingsPanel);
     m_dock->addPanel(QStringLiteral("sheets"), tr("Sheets"), m_sheetsPanel);
+    m_dock->addPanel(QStringLiteral("assistant"), tr("Assistant"), m_assistant);
     connect(m_history, &HistoryPanel::compareRequested, this, [this](const QString& a, const QString& b) { compareWith(a, b); });
     connect(m_history, &HistoryPanel::endCompareRequested, this, &MainWindow::endCompare);
     connect(m_history, &HistoryPanel::beforeAfterRequested, this, [this](const QString& guid) {
@@ -1509,6 +1535,7 @@ void MainWindow::closeEvent(QCloseEvent* event)
         event->ignore();
         return;
     }
+    stopAgentLive();
     stopLoading();
     bridge("close_document"); // the lock and the working folder go
     if (!m_quiet) {
@@ -1747,6 +1774,7 @@ bool MainWindow::newProject()
 
 void MainWindow::resetForNewModel()
 {
+    stopAgentLive();
     closePlanTabs(); // the old model's levels
     m_viewport->clear();
     m_properties->clear();
@@ -3589,7 +3617,8 @@ void MainWindow::buildPalette()
     m_viewMenu->addSeparator();
     QMenu* panels = m_viewMenu->addMenu(tr("&Panels"));
     panels->setObjectName(QStringLiteral("panelsMenu"));
-    for (const char* key : {"tools", "tree", "properties", "layers", "cutplanes", "history", "drawings", "sheets"})
+    for (const char* key : {"tools", "tree", "properties", "layers", "cutplanes", "history", "drawings", "sheets",
+                            "assistant"})
         if (ads::CDockWidget* d = m_dock->manager()->findDockWidget(QLatin1String(key))) {
             const QString k = QLatin1String(key);
             const bool pinned = m_prefs.pinnedPanels().contains(k);
@@ -3710,6 +3739,7 @@ bool MainWindow::prepareToOpen()
 {
     if (!maybeSave())
         return false;
+    stopAgentLive();
     stopLoading();
     bridge("clear_recovery");
     return true;
@@ -3719,6 +3749,7 @@ bool MainWindow::closeDocument()
 {
     if (!maybeSave())
         return false;
+    stopAgentLive();
     stopLoading();
     bridge("close_document");
     return true;
@@ -6544,6 +6575,213 @@ void MainWindow::afterEdit(const QJsonObject& result)
         m_traceTimer->start();
 }
 
+// ---------------------------------------------------------------- D102 phase 2: live agents and review
+
+void MainWindow::startAgentLive()
+{
+    if (m_agentLive || qEnvironmentVariableIsSet("KIMBIM_NO_LIVE_AGENT"))
+        return;
+    const QJsonObject r = bridge("agent_live_start");
+    m_agentLive = r.value("ok").toBool();
+    if (m_agentLive)
+        m_status->setAgentStatus(tr("Agent: live"), true);
+    else
+        m_status->setAgentStatus(QString(), false);
+}
+
+void MainWindow::stopAgentLive()
+{
+    if (m_agentLive) {
+        bridge("agent_live_stop");
+        m_agentLive = false;
+        m_status->setAgentStatus(QString(), false);
+        m_proposalBar->setProposals(QJsonArray());
+    }
+}
+
+void MainWindow::pollAgentLive()
+{
+    if (!m_agentLive || m_loading)
+        return;
+    const QJsonObject pending = bridge("agent_live_pending");
+    const QJsonObject request = pending.value("request").toObject();
+    if (!request.isEmpty()) {
+        const QJsonObject run = bridge("agent_live_run", {request.value("id").toString()});
+        if (!run.value("busy").toBool())
+            applyAgentResult(run);
+    }
+    if (++m_agentPollTicks % 8 == 0) { // twice a second is enough for the review bar
+        const QJsonObject listed = bridge("agent_proposals");
+        const QJsonArray proposals = listed.value("proposals").toArray();
+        m_proposalBar->setProposals(proposals);
+        if (!proposals.isEmpty())
+            positionProposalBar();
+    }
+}
+
+void MainWindow::positionProposalBar()
+{
+    if (m_proposalBar->isHidden() || !m_dock || !m_dock->manager())
+        return;
+    const int width = qMin(m_proposalBar->sizeHint().width(), qMax(320, m_dock->manager()->width() - 24));
+    m_proposalBar->setGeometry(12, 8, width, m_proposalBar->sizeHint().height());
+    m_proposalBar->raise();
+}
+
+void MainWindow::applyAgentResult(const QJsonObject& result)
+{
+    const QJsonObject ui = result.value("ui").toObject();
+    if (ui.contains("reload") && !ui.value("reload").toString().isEmpty()) {
+        openFile(ui.value("reload").toString()); // a task switched option: load the model it now shows
+        return;
+    }
+    if (ui.contains("geometry")) {
+        QJsonObject edit;
+        edit.insert(QStringLiteral("geometry"), ui.value("geometry"));
+        afterEdit(edit);
+    }
+    if (ui.value("select").isArray()) {
+        QStringList guids;
+        for (const QJsonValue& g : ui.value("select").toArray())
+            guids << g.toString();
+        applySelection(guids, QStringLiteral("replace"));
+    }
+    if (ui.value("refresh").toBool())
+        refreshProject();
+}
+
+void MainWindow::reviewProposal(const QString& task)
+{
+    const QJsonObject r = bridge("agent_proposal", {task});
+    const QJsonObject p = r.value("proposal").toObject();
+    if (!r.value("ok").toBool() || p.isEmpty()) {
+        m_status->showMessage(r.value("error").toString());
+        return;
+    }
+    const QString base = p.value(QStringLiteral("base_version")).toString();
+    auto connection = std::make_shared<QMetaObject::Connection>();
+    *connection = connect(this, &MainWindow::loadFinished, this,
+        [this, base, connection](int, bool stopped) {
+            disconnect(*connection);
+            if (!stopped && !base.isEmpty())
+                compareWith(base);
+        });
+    if (!switchOption(p.value(QStringLiteral("option")).toString()))
+        disconnect(*connection);
+}
+
+void MainWindow::acceptProposal(const QString& task)
+{
+    const QJsonObject r = bridge("agent_proposal", {task});
+    const QJsonObject p = r.value("proposal").toObject();
+    if (!r.value("ok").toBool() || p.isEmpty()) {
+        showError(tr("Could not accept the proposal"), r.value("error").toString());
+        return;
+    }
+    const QString base = p.value(QStringLiteral("base_option")).toString();
+    if (!base.isEmpty() && base != m_currentOption) {
+        auto connection = std::make_shared<QMetaObject::Connection>();
+        *connection = connect(this, &MainWindow::loadFinished, this,
+            [this, task, connection](int, bool stopped) {
+                disconnect(*connection);
+                if (!stopped)
+                    acceptProposal(task); // now on the base option
+            });
+        if (!switchOption(base))
+            disconnect(*connection);
+        return;
+    }
+    const QString option = p.value(QStringLiteral("option")).toString();
+    const QJsonObject preview = bridge("combine_preview", {option});
+    QJsonObject resolutions;
+    if (!preview.value("unresolved").toArray().isEmpty()) {
+        CombineDialog dialog([this](const char* fn, const QStringList& args) { return bridge(fn, args); },
+                             {option}, this);
+        if (dialog.exec() != QDialog::Accepted)
+            return;
+        resolutions = dialog.resolutions();
+    }
+    const QJsonObject accepted = bridge("agent_accept",
+        {task, QString::fromUtf8(QJsonDocument(resolutions).toJson(QJsonDocument::Compact))});
+    if (!accepted.value("ok").toBool()) {
+        showError(tr("Could not accept the proposal"), accepted.value("error").toString());
+        return;
+    }
+    m_proposalBar->setProposals(QJsonArray());
+    const QString path = accepted.value("path").toString();
+    if (!path.isEmpty())
+        openFile(path);
+    refreshProject();
+    m_status->showMessage(tr("Accepted the agent's proposal"));
+}
+
+void MainWindow::rejectProposal(const QString& task)
+{
+    const QJsonObject rejected = bridge("agent_reject", {task});
+    if (!rejected.value("ok").toBool()) {
+        showError(tr("Could not reject the proposal"), rejected.value("error").toString());
+        return;
+    }
+    const QString path = rejected.value("path").toString();
+    if (!path.isEmpty())
+        openFile(path);
+    refreshProject();
+    m_status->showMessage(tr("Rejected the agent's proposal"));
+}
+
+QJsonObject MainWindow::assistantConfig()
+{
+    QJsonArray selection;
+    for (const QString& guid : m_selection)
+        selection.append(guid);
+    return {{QStringLiteral("provider"), m_prefs.value(QStringLiteral("assistant_provider")).toString()},
+            {QStringLiteral("model"), m_prefs.value(QStringLiteral("assistant_model")).toString()},
+            {QStringLiteral("base_url"), m_prefs.value(QStringLiteral("assistant_base_url")).toString()},
+            {QStringLiteral("selection"), selection},
+            {QStringLiteral("view"), currentViewKey()}};
+}
+
+void MainWindow::connectAgentDialog()
+{
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Connect an AI agent"));
+    dialog.resize(680, 440);
+    auto* layout = new QVBoxLayout(&dialog);
+    auto* intro = new QLabel(tr("Choose your AI client, then copy this configuration. Restart the client or "
+                                "reload its MCP servers afterwards."), &dialog);
+    intro->setWordWrap(true);
+    layout->addWidget(intro);
+    auto* client = new QComboBox(&dialog);
+    client->addItem(QStringLiteral("Claude Desktop"), QStringLiteral("claude-desktop"));
+    client->addItem(QStringLiteral("Claude Code"), QStringLiteral("claude-code"));
+    client->addItem(QStringLiteral("opencode"), QStringLiteral("opencode"));
+    layout->addWidget(client);
+    auto* text = new QPlainTextEdit(&dialog);
+    text->setReadOnly(true);
+    text->setLineWrapMode(QPlainTextEdit::NoWrap);
+    layout->addWidget(text, 1);
+    auto* row = new QHBoxLayout;
+    auto* copy = new QPushButton(tr("Copy"), &dialog);
+    auto* close = new QPushButton(tr("Close"), &dialog);
+    row->addWidget(copy);
+    row->addStretch(1);
+    row->addWidget(close);
+    layout->addLayout(row);
+    connect(close, &QPushButton::clicked, &dialog, &QDialog::accept);
+    const QString project = documentState().value(QStringLiteral("path")).toString();
+    const auto refresh = [this, client, text, project] {
+        const QJsonObject r = bridge("agent_connect_info", {client->currentData().toString(), project});
+        text->setPlainText(r.value("ok").toBool() ? r.value(QStringLiteral("text")).toString()
+                                                  : r.value(QStringLiteral("error")).toString());
+    };
+    connect(client, &QComboBox::currentIndexChanged, &dialog, refresh);
+    connect(copy, &QPushButton::clicked, &dialog, [text] {
+        QApplication::clipboard()->setText(text->toPlainText());
+    });
+    refresh();
+    dialog.exec();
+}
+
 bool MainWindow::nativeEvent(const QByteArray& eventType, void* message, qintptr* result)
 {
     if (TitleBar::nativeEvent(this, m_titleBar, eventType, message, result)) // D75: the custom title bar
@@ -7045,6 +7283,7 @@ void MainWindow::onFinished(int elements, bool stopped)
         m_viewport->fitAll();
         m_status->showMessage(tr("%n element(s) loaded in %1 s", nullptr, elements)
                                      .arg(double(m_loadTimer.elapsed()) / 1000.0, 0, 'f', 1));
+        startAgentLive(); // D102 phase 2: the project is open and ready for live commands
     }
     emit loadFinished(elements, stopped);
     if (std::exchange(m_askImportStatus, false) && !stopped) // D74: after the other load-finished work
@@ -7054,6 +7293,7 @@ void MainWindow::onFinished(int elements, bool stopped)
 void MainWindow::onFailed(const QString& error)
 {
     m_loading = false;
+    stopAgentLive();
     showError(tr("Could not open the model"), error);
     emit loadFailed(error);
 }

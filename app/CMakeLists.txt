@@ -46,6 +46,8 @@ qt_add_library(kimbim_core STATIC
     src/ToolPalette.cpp src/ToolPalette.h
     src/ToolOptionsBar.cpp src/ToolOptionsBar.h
     src/StatusStrip.cpp src/StatusStrip.h
+    src/ProposalBar.cpp src/ProposalBar.h
+    src/AssistantPanel.cpp src/AssistantPanel.h
     src/TitleBar.cpp src/TitleBar.h
     src/Graphics.cpp src/Graphics.h
     src/PenGrid.cpp src/PenGrid.h
@@ -97,6 +99,7 @@ kimbim_test(test_element_batch)
 kimbim_test(test_model_tree)
 kimbim_test(test_visibility)
 kimbim_test(test_main_window)
+kimbim_test(test_agent_live)
 kimbim_test(test_cuts)
 kimbim_test(test_cut_planes)
 kimbim_test(test_model_loader)

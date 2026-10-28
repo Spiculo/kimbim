@@ -1004,7 +1004,6 @@ from . import configure as _configure  # noqa: E402
 from . import curved_walls as _curved_walls  # noqa: E402
 from . import sun as _sun  # noqa: E402
 from . import worksheets as _worksheets  # noqa: E402
-
 _EXPORTS = {
     "authoring": (
         "add_grid_axis",
@@ -1350,6 +1349,82 @@ _EXPORTS = {
         "set_last_used",
     ),
 }
+# D102 phase 2: the live session and the review bar (named apart from the catalogue's bare verbs).
+def agent_live_start() -> str:
+    from .agent import live; return live.start()
+
+
+def agent_live_stop() -> str:
+    from .agent import live; return live.stop()
+
+
+def agent_live_status() -> str:
+    from .agent import live; return live.status()
+
+
+def agent_live_pending() -> str:
+    from .agent import live; return live.pending()
+
+
+def agent_live_run(request_id: str = "") -> str:
+    from .agent import live; return live.run(request_id)
+
+
+def agent_live_set_selection(guids_json: str = "[]") -> str:
+    from .agent import live; return live.set_selection(guids_json)
+
+
+def agent_proposals() -> str:
+    from .agent import live; return live.proposals()
+
+
+def agent_proposal(task_id: str) -> str:
+    from .agent import live; return live.proposal(task_id)
+
+
+def agent_accept(task_id: str, resolutions_json: str = "{}") -> str:
+    from .agent import live; return live.accept(task_id, resolutions_json)
+
+
+def agent_reject(task_id: str) -> str:
+    from .agent import live; return live.reject(task_id)
+
+
+def assistant_chat(messages_json: str, config_json: str) -> str:
+    from .agent import assistant
+
+    return assistant.chat(messages_json, config_json)
+
+
+def assistant_set_key(provider: str, key: str) -> str:
+    from .agent import assistant
+
+    return assistant.set_key(provider, key)
+
+
+def assistant_clear_key(provider: str) -> str:
+    from .agent import assistant
+
+    return assistant.clear_key(provider)
+
+
+def assistant_key_set(provider: str) -> str:
+    from .agent import assistant
+
+    return assistant.key_set(provider)
+
+
+def agent_connect_info(client: str, project: str = "") -> str:
+    """The configuration or command for `kimbim setup <client> --print` (Help › Connect an AI agent)."""
+    from .agent import clients
+
+    try:
+        text, _ = clients.setup(client, project or None, True)
+    except (clients.SetupError, OSError) as ex:
+        return _dump({"ok": False, "error": str(ex)})
+    return _dump({"ok": True, "text": text})
+
+
 _EXPORTED = {name: module for module, names in _EXPORTS.items() for name in names}
 del annotations  # `from __future__ import annotations` bound it; the bridge function resolves lazily
 

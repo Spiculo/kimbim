@@ -59,6 +59,16 @@ def discovery_path(project) -> Path:
     return D.data_dir() / "agent" / "sessions" / f"{K.path_hash(project)}.json"
 
 
+def live_discovery_path(project) -> Path:
+    """The live app's entry, in the project itself (D102 phase 2), so the app and the CLI agree on it even when
+    they use different data folders. Next to the lock: `<file>.kim.agent-live.json` or
+    `<folder>/.kimbim/agent-live.json`."""
+    p = Path(project)
+    if p.is_dir():
+        return p / ".kimbim" / "agent-live.json"
+    return p.with_name(p.name + ".agent-live.json")
+
+
 def error_path(project, pid: int) -> Path:
     """Where worker `pid` leaves its start error for the client that spawned it."""
     return D.data_dir() / "agent" / "sessions" / f"{K.path_hash(project)}.{pid}.error.json"
@@ -261,8 +271,9 @@ def serve(project: str, idle: float) -> int:
     project = os.path.abspath(project)
     found = discovery_path(project)
     other = read_discovery(found)
-    if entry_alive(other) and not other.get("stopping"):
-        _log(f"a worker for {project} is already running (pid {other['pid']})")
+    live = read_discovery(live_discovery_path(project))
+    if (entry_alive(other) and not other.get("stopping")) or (entry_alive(live) and not live.get("stopping")):
+        _log(f"a session for {project} is already running (pid {(other or live)['pid']})")
         return 0
     wakeup = _install_signals()
     _log(f"opening {project}")

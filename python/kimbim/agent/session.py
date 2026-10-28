@@ -26,6 +26,9 @@ class Session:
         self.renderer = None  # the snapshot renderer (agent.render.Renderer), started by the first snapshot
         self._saved_user = ""
         self._closed = False
+        self.live = False  # attached to the project the app already has open (D102 phase 2)
+        self._selection_get = None  # live: () -> [GlobalId]; the app pushes its selection
+        self._selection_set = None  # live: ([GlobalId]) -> None; the app selects them on its next poll
 
     @property
     def work(self) -> str:
@@ -34,6 +37,15 @@ class Session:
     @property
     def unit(self) -> str:
         return S.current().get("length_unit", "m")
+
+    @classmethod
+    def attach(cls, source: str, kind: str, client: str = "assistant") -> "Session":
+        """A session over the document the app already has open: no opening, locking or creating of tasks'
+        storage. The app owns the document and the lock; it drives calls on its own thread."""
+        session = cls(kind, source, client)
+        session.tasks = Tasks(session)
+        session.live = True
+        return session
 
     @classmethod
     def open(cls, path: str, client: str = "cli") -> "Session":
@@ -88,15 +100,22 @@ class Session:
         try:
             if self.renderer is not None:
                 self.renderer.close()  # the windowless helper goes with the session
-            D.close_document()
+            if not self.live:  # the app owns its open document: closing the session must not close it
+                D.close_document()
         finally:
-            K.display_user = self._saved_user
+            if not self.live:
+                K.display_user = self._saved_user
 
     def resolve(self, selector) -> list[str]:
         """GlobalIds for a selector: a GlobalId list, "selection" (needs the app) or a find object. Raises
         not_found for an unknown GlobalId or level and no_match when nothing matches."""
         if selector == "selection":
-            raise AgentError("needs_app")
+            if self._selection_get is None:
+                raise AgentError("needs_app")
+            guids = list(self._selection_get())
+            if not guids:
+                raise AgentError("no_match")
+            return guids
         if isinstance(selector, (list, tuple)):
             for g in selector:
                 try:

@@ -65,6 +65,8 @@ class LibraryPanel;
 class ObjectSettingsDialog;
 class ChecksPanel;
 class ConsolePanel;
+class AssistantPanel;
+class ProposalBar;
 class SheetsPanel;
 class SchedulesDialog;
 class DrawingView;
@@ -706,6 +708,23 @@ private:
     void runScriptDialog();
     QJsonObject runConsoleCall(const char* fn, const QString& arg);
     ConsolePanel* m_console = nullptr;
+    QJsonObject assistantConfig(); // D102 phase 3: provider and context for the Assistant panel
+    AssistantPanel* m_assistant = nullptr;
+
+    // D102 phase 2: the live agent session, the status indicator and the proposal review bar.
+    void startAgentLive();
+    void stopAgentLive();
+    void pollAgentLive();
+    void applyAgentResult(const QJsonObject& result);
+    void positionProposalBar();
+    void reviewProposal(const QString& task);
+    void acceptProposal(const QString& task);
+    void rejectProposal(const QString& task);
+    void connectAgentDialog();
+    ProposalBar* m_proposalBar = nullptr;
+    QTimer* m_agentPoll = nullptr;
+    bool m_agentLive = false;
+    int m_agentPollTicks = 0;
 
     void onOpened(const QJsonObject& info);
     void onChunk(const MeshChunk& chunk);

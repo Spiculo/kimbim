@@ -414,6 +414,7 @@ private:
 
 int snapshotServerCommand()
 {
+    qputenv("KIMBIM_NO_LIVE_AGENT", "1"); // the helper opens a private copy, never the user's project
     redirectStdout();
     QString e;
     if (!PythonEngine::instance().start(&e)) {

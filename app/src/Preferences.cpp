@@ -76,6 +76,9 @@ QJsonObject Preferences::defaults()
         {"box_selection", "direction"},
         {"split_join", true},
         {"merge_props", "keep"},
+        {"assistant_provider", "anthropic"},
+        {"assistant_model", "claude-sonnet-4-5"},
+        {"assistant_base_url", ""},
         {"recent", QJsonArray()},
     };
 }

@@ -115,14 +115,19 @@ def export(session, out, version="HEAD"):
 @tool("selection.get", {})
 def selection_get(session):
     """Read the app's current selection. Needs the KimBim app to be running."""
-    raise AgentError("needs_app")
+    if session._selection_get is None:
+        raise AgentError("needs_app")
+    return {"elements": [{"guid": g, "label": session.label(g)} for g in session._selection_get()]}
 
 
 @tool("selection.set", {"required": ["elements"], "properties": {
     "elements": {"type": "array", "items": {"type": "string"}, "description": "GlobalIds to select."}}})
 def selection_set(session, elements):
     """Select elements in the app's window. Needs the KimBim app to be running."""
-    raise AgentError("needs_app")
+    if session._selection_set is None:
+        raise AgentError("needs_app")
+    session._selection_set(list(elements))
+    return {"selected": len(elements)}
 
 
 def _scripts_on(session, code):

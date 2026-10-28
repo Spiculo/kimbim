@@ -11,7 +11,7 @@ Project setting `agent_changes`: option, direct, or agent_decides (the task's mo
 state is a JSON file per task in `<work>/.kimbim/agent/tasks/` (it travels in the .kim), or for a plain IFC in
 `<data dir>/agent/tasks/<path hash>/`, so it survives the worker's exit.
 
-Phase 1 narrowing: one open task per project (`task_busy` on a second start); state stays per client.
+Each client has at most one open task; different clients may have tasks open on the same project (D102 phase 2).
 """
 from __future__ import annotations
 
@@ -166,6 +166,10 @@ class Tasks:
     def _enter(self, task: Task) -> None:
         """Make `task` the open one: an option task works on its option (unparking it)."""
         if task.mode == "option" and _option() != task.option:
+            if V._unversioned():  # another task's edits: keep them as its work in progress before switching
+                current = next((t for t in self.all() if t.status in ACTIVE and t.option == _option()), None)
+                self._save_version(f"Work in progress: {current.title if current else task.title}",
+                                   current.client if current else "")
             bridge(V.switch_option, task.option)
         if task.status != "open":
             task.status = "open"
@@ -191,8 +195,9 @@ class Tasks:
         title = " ".join((title or "").split())
         if not title:
             raise AgentError("bad_input", hint=messages.text("hint_required", field="title"))
-        busy = next((t for t in self.all() if t.status in ACTIVE), None)
-        if busy is not None:  # phase 1: one open task per project
+        active = [t for t in self.all() if t.status in ACTIVE]
+        busy = next((t for t in active if t.client == client), None)
+        if busy is not None:  # one open task per client; other clients may have theirs
             raise AgentError("task_busy", task=busy.id, title=busy.title)
         chosen = self.mode_for(mode)
         if chosen == "option" and V._project is None:
@@ -202,6 +207,14 @@ class Tasks:
         task = Task(uuid.uuid4().hex[:8], title, chosen, client,
                     created=datetime.now(timezone.utc).isoformat(timespec="seconds"))
         if V._project is not None:
+            # start from the architect's option even when another agent's option is current: save that task's
+            # work in progress first, then go back to its base
+            if active:
+                base = next((t.base_option for t in active if t.base_option), "")
+                if base and _option() != base:
+                    if V._unversioned():
+                        self._save_version(f"Work in progress: {active[0].title}")
+                    bridge(V.switch_option, base)
             # the architect's unsaved work becomes the architect's version, so the agent's starts clean
             self._save_version(f"Before agent: {title}")
             state = json.loads(V.project_state())

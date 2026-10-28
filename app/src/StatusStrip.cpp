@@ -77,6 +77,19 @@ StatusStrip::StatusStrip(QWidget* parent)
     m_selection = new QLabel(this);
     m_selection->setObjectName(QStringLiteral("selectionLabel"));
     row->addWidget(m_selection);
+    m_agent = new QLabel(this);
+    m_agent->setObjectName(QStringLiteral("agentStatus"));
+    m_agent->setToolTip(tr("A local AI agent is connected to the open project"));
+    row->addWidget(m_agent);
+    m_agentOff = new QToolButton(this);
+    m_agentOff->setObjectName(QStringLiteral("agentDisconnect"));
+    m_agentOff->setText(tr("Disconnect"));
+    m_agentOff->setAutoRaise(true);
+    m_agentOff->setToolTip(tr("Stop accepting agent commands for this open project"));
+    connect(m_agentOff, &QToolButton::clicked, this, &StatusStrip::agentDisconnectRequested);
+    row->addWidget(m_agentOff);
+    m_agent->hide();
+    m_agentOff->hide();
     m_message = new QLabel(this);
     m_message->setObjectName(QStringLiteral("statusMessage"));
     m_message->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
@@ -165,6 +178,13 @@ QString StatusStrip::message() const
 QString StatusStrip::selectionText() const
 {
     return m_selection->text();
+}
+
+void StatusStrip::setAgentStatus(const QString& text, bool connected)
+{
+    m_agent->setText(text);
+    m_agent->setVisible(!text.isEmpty());
+    m_agentOff->setVisible(connected);
 }
 
 void StatusStrip::setPen(int number, const QColor& color, double weight)

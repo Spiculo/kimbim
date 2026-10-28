@@ -19,7 +19,8 @@ from pathlib import Path
 from .. import documents as D
 from .. import kimfile as K
 from .catalogue import AgentError
-from .worker import FAMILY, discovery_path, entry_alive, error_path, read_discovery, same_entry, unlink_if
+from .worker import (FAMILY, discovery_path, entry_alive, error_path, live_discovery_path, read_discovery,
+                     same_entry, unlink_if)
 
 START_WAIT_DEFAULT = 120.0  # seconds to wait for a new worker's entry (KIMBIM_AGENT_START_WAIT): big projects open slowly
 ATTEMPTS = 4
@@ -45,16 +46,29 @@ def _wait(cond, timeout: float) -> bool:
     return cond()
 
 
+def _paths(project: str) -> tuple[Path, Path]:
+    """The live app's entry (in the project) first, then an offline worker's (in the data folder)."""
+    return live_discovery_path(project), discovery_path(project)
+
+
 def _entry(project: str) -> dict | None:
-    """The project's worker entry if its process is alive (it may be `stopping`); a stale one is removed."""
-    path = discovery_path(project)
-    data = read_discovery(path)
-    if data is None:
-        return None
-    if entry_alive(data):
-        return data
-    unlink_if(path, data)
+    """The project's live or worker entry if its process is alive (it may be `stopping`); stale ones are removed."""
+    for path in _paths(project):
+        data = read_discovery(path)
+        if data is None:
+            continue
+        if entry_alive(data):
+            return data
+        unlink_if(path, data)
     return None
+
+
+def _path_for(project: str, info: dict) -> Path:
+    """The discovery file that holds `info` (live first)."""
+    for path in _paths(project):
+        if same_entry(read_discovery(path), info):
+            return path
+    return discovery_path(project)
 
 
 def _log_path(project: str) -> Path:
@@ -180,13 +194,13 @@ def request(project: str, tool: str, args: dict | None = None, *, client: str = 
             start: bool = True, timeout: float = 120) -> dict:
     """Run `tool` with `args` in the project's worker (started if needed and `start`) and return the envelope."""
     project = os.path.abspath(str(project))
-    path = discovery_path(project)
     message = {"tool": tool, "args": args or {}, "client": client, "task": task}
     problem = ""
     for _attempt in range(ATTEMPTS):
         info = _entry(project)
         if info is not None and info.get("stopping"):  # shutting down: it holds the lock until it ends
-            _wait(lambda: not same_entry(read_discovery(path), info) or not entry_alive(info), start_wait())
+            _wait(lambda: not same_entry(read_discovery(_path_for(project, info)), info) or not entry_alive(info),
+                  start_wait())
             continue
         if info is None:
             if not start:
@@ -194,6 +208,7 @@ def request(project: str, tool: str, args: dict | None = None, *, client: str = 
             info = _start(project)
             if "error" in info:
                 return info["error"]
+        path = _path_for(project, info)
         try:
             conn = Client(info["address"], family=FAMILY, authkey=bytes.fromhex(info["authkey"]))
         except (FileNotFoundError, ConnectionRefusedError) as ex:

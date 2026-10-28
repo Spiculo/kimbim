@@ -155,6 +155,28 @@ def test_task_busy(house):
     assert len(s.tasks.all()) == 1
 
 
+def test_two_clients_can_have_tasks(house):
+    """D102 phase 2: one task per client, several clients at once, each on its own option from the same base."""
+    s = house()
+    a = call_tool(s, "task.start", {"title": "A"}, client="a")["result"]
+    b = call_tool(s, "task.start", {"title": "B"}, client="b")
+    assert b["ok"], b
+    b = b["result"]
+    assert a["option"] != b["option"] and a["base_option"] == b["base_option"] == "main"
+    again = call_tool(s, "task.start", {"title": "A2"}, client="a")
+    assert again["error"]["code"] == "task_busy" and again["error"]["details"]["task"] == a["id"]
+    assert {t.id for t in s.tasks.all() if t.status in tasks.ACTIVE} == {a["id"], b["id"]}
+    # each client's next write goes to its own option
+    ga = walls()[0].GlobalId
+    gb = walls()[1].GlobalId
+    assert call_tool(s, "test.rename", {"guids": [ga], "name": "A wall"}, client="a")["ok"]
+    rb = call_tool(s, "test.rename", {"guids": [gb], "name": "B wall"}, client="b")
+    assert rb["ok"], rb
+    assert call_tool(s, "task.finish", {"summary": "A"}, client="a")["ok"]
+    assert call_tool(s, "task.finish", {"summary": "B"}, client="b")["ok"]
+    assert {t.status for t in s.tasks.all()} == {"ready"}
+
+
 def test_abandon_deletes_option(house):
     s = house()
     before = names()

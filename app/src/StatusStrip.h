@@ -37,8 +37,11 @@ public:
     void setStatusForNew(const QString& status);
     // D98: buttons for window actions (grid snap): toggles beside the zoom.
     void addToggle(QAction* action);
+    // D102 phase 2: the live agent session ("" hides it); connected shows the Disconnect button.
+    void setAgentStatus(const QString& text, bool connected);
 
 signals:
+    void agentDisconnectRequested();
     void activeLayerRequested(const QString& layer);
     void layerVisibilityToggled(const QString& layer, bool visible);
     void penRequested(); // the pen button: pick a pen
@@ -55,6 +58,8 @@ private:
     QHBoxLayout* m_toggles;
     QLabel* m_zoom;
     QLabel* m_selection;
+    QLabel* m_agent = nullptr;
+    QToolButton* m_agentOff = nullptr;
     QLabel* m_message;
     QTimer* m_timer;
     QString m_zoomText, m_layersText;

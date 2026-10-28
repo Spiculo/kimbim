@@ -14,6 +14,7 @@
 #include <QVBoxLayout>
 
 #include "Preferences.h"
+#include "PythonEngine.h"
 
 namespace kimbim {
 
@@ -246,6 +247,31 @@ PreferencesDialog::PreferencesDialog(Preferences& prefs, QWidget* parent)
     m_underlayLayerPerFile->setChecked(prefs.underlayLayerPerFile());
     form->addRow(QString(), m_underlayLayerPerFile);
 
+    // D102 phase 3: the Assistant's provider. The key is kept in the OS credential store, never here.
+    auto* assistantTitle = new QLabel(QStringLiteral("<b>%1</b>").arg(tr("Assistant")), this);
+    assistantTitle->setObjectName(QStringLiteral("assistantTitle"));
+    form->addRow(assistantTitle);
+    m_assistantProvider = choice(this, "assistantProvider",
+                                 {{QStringLiteral("Anthropic"), "anthropic"}, {tr("OpenAI-compatible"), "openai"}},
+                                 prefs.value(QStringLiteral("assistant_provider")).toString());
+    form->addRow(tr("Provider:"), m_assistantProvider);
+    m_assistantModel = new QLineEdit(prefs.value(QStringLiteral("assistant_model")).toString(), this);
+    m_assistantModel->setObjectName(QStringLiteral("assistantModel"));
+    m_assistantModel->setPlaceholderText(tr("Model name"));
+    form->addRow(tr("Model:"), m_assistantModel);
+    m_assistantBaseUrl = new QLineEdit(prefs.value(QStringLiteral("assistant_base_url")).toString(), this);
+    m_assistantBaseUrl->setObjectName(QStringLiteral("assistantBaseUrl"));
+    m_assistantBaseUrl->setPlaceholderText(tr("Default endpoint when empty (OpenAI-compatible: base URL ending in /v1)"));
+    form->addRow(tr("Base URL:"), m_assistantBaseUrl);
+    m_assistantKey = new QLineEdit(this);
+    m_assistantKey->setObjectName(QStringLiteral("assistantKey"));
+    m_assistantKey->setEchoMode(QLineEdit::Password);
+    m_assistantKey->setPlaceholderText(tr("Leave empty to keep the stored key"));
+    form->addRow(tr("API key:"), m_assistantKey);
+    m_assistantKeyNote = new QLabel(tr("Keys are stored in the operating system's credential store."), this);
+    m_assistantKeyNote->setWordWrap(true);
+    form->addRow(QString(), m_assistantKeyNote);
+
     layout->addLayout(form);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
@@ -289,6 +315,15 @@ void PreferencesDialog::apply()
     m_prefs.setValue(QStringLiteral("underlay_greyscale"), m_underlayGrey->isChecked());
     m_prefs.setValue(QStringLiteral("underlay_tint"), m_underlayTint->text().trimmed());
     m_prefs.setValue(QStringLiteral("underlay_layer_per_file"), m_underlayLayerPerFile->isChecked());
+    const QString assistantProvider = m_assistantProvider->currentData().toString();
+    m_prefs.setValue(QStringLiteral("assistant_provider"), assistantProvider);
+    m_prefs.setValue(QStringLiteral("assistant_model"), m_assistantModel->text().trimmed());
+    m_prefs.setValue(QStringLiteral("assistant_base_url"), m_assistantBaseUrl->text().trimmed());
+    if (!m_assistantKey->text().trimmed().isEmpty()) {
+        PythonEngine::instance().callJson("assistant_set_key",
+            {assistantProvider, m_assistantKey->text().trimmed()});
+        m_assistantKey->clear();
+    }
 }
 
 void PreferencesDialog::accept()

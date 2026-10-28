@@ -30,7 +30,7 @@ def info(session):
                        for s in json.loads(A.storeys())["storeys"]],
             "counts": counts, "option": state.get("option", ""), "options": state.get("options", []),
             "versioned": state.get("versioned", False), "unsaved": bool(state.get("dirty", False)),
-            "mode": "offline"}
+            "mode": "live" if session.live else "offline"}
 
 
 @tool("project.settings", {"properties": {"keys": {"type": "array", "items": {"type": "string"},

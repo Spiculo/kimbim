@@ -58,6 +58,12 @@ private:
     QCheckBox* m_underlayGrey;
     QLineEdit* m_underlayTint;
     QCheckBox* m_underlayLayerPerFile;
+    // D102 phase 3: the Assistant's provider (the key itself lives in the OS credential store).
+    QComboBox* m_assistantProvider;
+    QLineEdit* m_assistantModel;
+    QLineEdit* m_assistantBaseUrl;
+    QLineEdit* m_assistantKey;
+    QLabel* m_assistantKeyNote;
 };
 
 } // namespace kimbim
