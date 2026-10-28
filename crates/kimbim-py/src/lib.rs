@@ -65,6 +65,15 @@ impl Repo {
         self.inner.tree_entries(rev).map_err(err)
     }
 
+    fn diff_entries(&self, a_rev: &str, b_rev: &str) -> PyResult<Vec<(String, Option<String>, Option<String>)>> {
+        self.inner.diff_entries(a_rev, b_rev).map_err(err)
+    }
+
+    fn read_blob_at<'py>(&self, py: Python<'py>, rev: &str, path: &str) -> PyResult<Option<Bound<'py, PyBytes>>> {
+        let data = self.inner.read_blob_at(rev, path).map_err(err)?;
+        Ok(data.map(|b| PyBytes::new(py, &b)))
+    }
+
     fn read_blobs<'py>(&self, py: Python<'py>, oids: Vec<String>) -> PyResult<Vec<Bound<'py, PyBytes>>> {
         let blobs = py.detach(|| self.inner.read_blobs(&oids)).map_err(err)?;
         Ok(blobs.iter().map(|b| PyBytes::new(py, b)).collect())

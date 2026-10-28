@@ -5,6 +5,7 @@
 #include <QFile>
 #include <QGuiApplication>
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QJsonObject>
 #include <QMenu>
 #include <QPushButton>
@@ -13,6 +14,8 @@
 #include <QTemporaryDir>
 #include <QTreeWidget>
 #include <QtTest>
+
+#include <functional>
 
 #include "ChecksPanel.h"
 #include "DockLayout.h"
@@ -112,6 +115,52 @@ private slots:
         QVERIFY(panel->idsFiles().isEmpty());
         QVERIFY(w.deleteClashSet(QStringLiteral("Walls × slabs")));
         QVERIFY(panel->clashSetNames().isEmpty());
+    }
+
+    void precommitChecksBlockAndRecord()
+    {
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
+        w.resize(1300, 800);
+        w.show();
+        QSignalSpy done(&w, &kimbim::MainWindow::loadFinished);
+        w.openFile(m_house);
+        QVERIFY(done.wait(60000));
+
+        QTemporaryDir folder;
+        QVERIFY(folder.isValid());
+        QVERIFY(w.enableVersioning(folder.path()));
+        QVERIFY(w.saveClashSet(QStringLiteral("Walls A- slabs"),
+            {{"a", QJsonObject{{"classes", QJsonArray{"IfcWall"}}}},
+                {"b", QJsonObject{{"classes", QJsonArray{"IfcSlab"}}}}, {"mode", "hard"}, {"tolerance", 0.002}}));
+        const QJsonObject block{{"check", "clash"}, {"mode", "block"}};
+        QVERIFY(w.setProjectSettings({{"precommit_checks", QJsonArray{block}}}));
+        QVERIFY(!w.saveVersion(QStringLiteral("Blocked by the clash check"))); // the house's slabs overlap its walls
+
+        // A warning check lets the save through, and its result is recorded with the version.
+        const QJsonObject warn{{"check", "clash"}, {"mode", "warn"}};
+        QVERIFY(w.setProjectSettings({{"precommit_checks", QJsonArray{warn}}}));
+        QString error;
+        const QJsonObject tree = kimbim::PythonEngine::instance().callJson("spatial_tree", {}, &error).object();
+        QString guid;
+        std::function<void(const QJsonObject&)> findWall = [&](const QJsonObject& node) {
+            if (guid.isEmpty() && node.value("type").toString() == QLatin1String("IfcWall"))
+                guid = node.value("guid").toString();
+            for (const auto& child : node.value("children").toArray())
+                findWall(child.toObject());
+        };
+        findWall(tree);
+        QVERIFY2(!guid.isEmpty(), qPrintable(error));
+        kimbim::PythonEngine::instance().callJson("set_name",
+            {QString::fromUtf8(QJsonDocument(QJsonArray{guid}).toJson(QJsonDocument::Compact)), QStringLiteral("Renamed")},
+            &error);
+        QVERIFY(w.saveVersion(QStringLiteral("Checks recorded")));
+        const QJsonObject recorded = kimbim::PythonEngine::instance().callJson("version_checks", {}, &error).object();
+        QVERIFY2(recorded.value("ok").toBool(), qPrintable(recorded.value("error").toString()));
+        const QJsonArray checks = recorded.value("checks").toArray();
+        QCOMPARE(checks.size(), 1);
+        QCOMPARE(checks[0].toObject().value("mode").toString(), QStringLiteral("warn"));
+        QVERIFY(checks[0].toObject().value("failed").toBool());
+        QVERIFY(checks[0].toObject().value("total").toInt() > 0);
     }
 
     void clashSetSides()

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import time
 import urllib.parse
 
 from . import app_bridge as B
@@ -54,6 +55,29 @@ def _working(project: Project | None = None) -> pathlib.Path:
     return (project or _project).path / ".kimbim" / "working.ifc"
 
 
+# The decomposed working model, kept between Compare, version_changes and Save version: decomposing a
+# large model is minutes (D102's slow compare), and those three used to do it separately.
+_working_cache: dict = {"key": None, "records": None}
+
+
+def _working_key():
+    return (str(_project.path.resolve()), _project.current_branch(), B._current_id(), S.to_bytes())
+
+
+def _working_records() -> dict[str, bytes]:
+    if _project is None:
+        return {}
+    key = _working_key()
+    if _working_cache["key"] != key or _working_cache["records"] is None:
+        _working_cache["key"] = key
+        _working_cache["records"] = _project._decompose_file(_write_working())
+    return _working_cache["records"]
+
+
+def _forget_working() -> None:
+    _working_cache["key"], _working_cache["records"] = None, None
+
+
 def forget(path: str = "") -> None:
     """Called when a model is opened or created: leave versioned mode unless it's our working copy."""
     global _project
@@ -63,6 +87,7 @@ def forget(path: str = "") -> None:
         return
     _project = None
     _end_combining()
+    _forget_working()
 
 
 def _encode(option: str) -> str:
@@ -116,6 +141,7 @@ def _open_head(project: Project) -> str:
     working.parent.mkdir(parents=True, exist_ok=True)
     project.export(working, overwrite=True, one_owner=True)
     _project = project
+    _forget_working()
     info = json.loads(B.open_model(str(working)))  # keeps _project: it's our working copy
     _project = project
     S.load(S.from_bytes(project.settings_at("HEAD")))
@@ -221,13 +247,24 @@ def version_changes() -> str:
     if _project is None:
         return _fail("this model isn't versioned")
     try:
-        s = _summary(_project.status(_write_working(), S.to_bytes()))
+        changes, _ = _project._changes(_project._head_entries(), _working_records(), S.to_bytes())
+        s = _summary(changes)
         keys = S.changed_keys(S.from_bytes(_project.settings_at("HEAD")), S.current())
     except KimbimError as ex:
         return _fail(str(ex))
     items = (s["added"] + s["modified"] + s["removed"])[:500]
     return B._dump({"ok": True, "added": len(s["added"]), "modified": len(s["modified"]),
                     "removed": len(s["removed"]), "other": s["other"], "items": items, "settings": keys})
+
+
+def _checks_record(report: dict) -> bytes:
+    return json.dumps({"format": "kimbim-checks/1", "time": int(time.time()), "checks": report["checks"]},
+                      ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+
+def _checks_summary(report: dict | None) -> list[dict]:
+    return [{"check": r["check"], "title": r.get("title", r["check"]), "mode": r["mode"],
+             "failed": r["failed"], "total": r["total"]} for r in (report or {}).get("checks", [])]
 
 
 def save_version(message: str, author_json: str = "") -> str:
@@ -243,10 +280,22 @@ def save_version(message: str, author_json: str = "") -> str:
             author = (str(a["name"]), str(a.get("email") or "user@localhost"))
         except (ValueError, KeyError, TypeError):
             return _fail("bad author: expected {\"name\", \"email\"}")
-    working = _write_working()
+    # M6: the project's chosen checks run before anything is committed. A blocking check that
+    # reports issues stops the save; a warning check's results are recorded with the version.
+    from . import checks as C
+
+    report = C.run_precommit(B._model) if C.precommit_entries() else None
+    if report and report["blocked"]:
+        failed = [r for r in report["checks"] if r["failed"] and r["mode"] == "block"]
+        text = ", ".join(f"{r.get('title', r['check'])} ({r['total']})" for r in failed)
+        return B._dump({"ok": False, "blocked": True, "error": f"a blocking check did not pass: {text}",
+                        "checks": report["checks"]})
+    records = _working_records()
+    working = _working()
     try:
         merged = [_combining["theirs"]] if _combining else None
-        cid, changes = _project.commit(working, message.strip(), author=author, merged=merged, settings=S.to_bytes())
+        cid, changes = _project.commit(working, message.strip(), author=author, merged=merged, settings=S.to_bytes(),
+                                       checks=_checks_record(report) if report else None, records=records)
         _end_combining()
     except NothingToCommit:
         _mark_saved(working)
@@ -261,7 +310,25 @@ def save_version(message: str, author_json: str = "") -> str:
     _history_changed()
     s = _summary(changes)
     return B._dump({"ok": True, "id": cid, "added": len(s["added"]), "modified": len(s["modified"]),
-                    "removed": len(s["removed"]), "other": s["other"]})
+                    "removed": len(s["removed"]), "other": s["other"], "checks": _checks_summary(report)})
+
+
+def version_checks(rev: str = "HEAD") -> str:
+    """The pre-commit check results recorded with a version (M6)."""
+    if _project is None:
+        return _fail("this model isn't versioned")
+    try:
+        data = _project.checks_at(rev)
+    except KimbimError as ex:
+        return _fail(str(ex))
+    if not data:
+        return B._dump({"ok": True, "rev": rev, "checks": [], "time": None})
+    try:
+        record = json.loads(data)
+    except ValueError as ex:
+        return _fail(f"bad checks record: {ex}")
+    return B._dump({"ok": True, "rev": rev, "time": record.get("time"),
+                    "checks": record.get("checks", [])})
 
 
 def history(limit=100) -> str:
@@ -283,7 +350,7 @@ def compare(rev_a: str, rev_b: str = "WORKING") -> str:
         rev_a = _revision(rev_a)
         before = S.from_bytes(_project.settings_at(rev_a))
         if rev_b == "WORKING":
-            changes, _ = _project._changes(_project._entries(rev_a), _project._decompose_file(_write_working()), S.to_bytes())
+            changes, _ = _project._changes(_project._entries(rev_a), _working_records(), S.to_bytes())
             keys = S.changed_keys(before, S.current())
         else:
             rev_b = _revision(rev_b)
@@ -292,6 +359,68 @@ def compare(rev_a: str, rev_b: str = "WORKING") -> str:
     except KimbimError as ex:
         return _fail(str(ex))
     return B._dump({"ok": True, **_summary(changes), "settings": keys})
+
+
+def remotes() -> str:
+    if _project is None:
+        return _fail("this model isn't versioned")
+    try:
+        return B._dump({"ok": True, "remotes": _project.remotes()})
+    except KimbimError as ex:
+        return _fail(str(ex))
+
+
+def add_remote(name: str, url: str) -> str:
+    if _project is None:
+        return _fail("this model isn't versioned")
+    try:
+        _project.add_remote(name, url)
+        return B._dump({"ok": True, "remotes": _project.remotes()})
+    except KimbimError as ex:
+        return _fail(str(ex))
+
+
+def remove_remote(name: str) -> str:
+    if _project is None:
+        return _fail("this model isn't versioned")
+    try:
+        _project.remove_remote(name)
+        return B._dump({"ok": True, "remotes": _project.remotes()})
+    except KimbimError as ex:
+        return _fail(str(ex))
+
+
+def push(remote: str = "origin", branch: str = "") -> str:
+    if _project is None:
+        return _fail("this model isn't versioned")
+    try:
+        return B._dump({"ok": True, **_project.push(remote or "origin", branch)})
+    except KimbimError as ex:
+        return _fail(str(ex))
+
+
+def pull(remote: str = "origin", branch: str = "") -> str:
+    if _project is None:
+        return _fail("this model isn't versioned")
+    try:
+        out = _project.pull(remote or "origin", branch)
+        _forget_working()
+        _history_changed()
+        return B._dump({"ok": True, **out})
+    except KimbimError as ex:
+        return _fail(str(ex))
+
+
+def diff_details(rev_a: str, rev_b: str = "HEAD") -> str:
+    """Compare two versions with property-level detail, categories and the level tree (R3)."""
+    if _project is None:
+        return _fail("this model isn't versioned")
+    try:
+        if rev_b == "WORKING":
+            return B._dump({"ok": True, **_project.diff_details(rev_a, working_records=_working_records())})
+        return B._dump({"ok": True, **_project.diff_details(rev_a, rev_b)})
+    except KimbimError as ex:
+        return _fail(str(ex))
 
 
 def options() -> str:

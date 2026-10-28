@@ -77,6 +77,78 @@ fn oid(hex: &str) -> Result<gix::ObjectId> {
     gix::ObjectId::from_hex(hex.as_bytes()).map_err(|_| Error::InvalidOid(hex.to_string()))
 }
 
+fn tree_entries(repo: &gix::Repository, id: gix::ObjectId) -> Result<Vec<gix::objs::tree::Entry>> {
+    let tree = repo.find_tree(id).map_err(git_err)?;
+    let mut out = Vec::new();
+    for entry in tree.iter() {
+        let entry = entry.map_err(git_err)?;
+        out.push(gix::objs::tree::Entry {
+            mode: entry.mode(),
+            filename: entry.filename().to_owned(),
+            oid: entry.oid().to_owned(),
+        });
+    }
+    Ok(out)
+}
+
+fn collect_tree(repo: &gix::Repository, id: gix::ObjectId, prefix: &str, old: bool,
+                out: &mut Vec<(String, Option<String>, Option<String>)>) -> Result<()> {
+    for entry in tree_entries(repo, id)? {
+        let path = format!("{prefix}{}", entry.filename);
+        if entry.mode.is_tree() {
+            collect_tree(repo, entry.oid, &format!("{path}/"), old, out)?;
+        } else {
+            let oid = Some(entry.oid.to_string());
+            out.push(if old { (path, oid, None) } else { (path, None, oid) });
+        }
+    }
+    Ok(())
+}
+
+fn walk_diff(repo: &gix::Repository, a: gix::ObjectId, b: gix::ObjectId, prefix: &str,
+             out: &mut Vec<(String, Option<String>, Option<String>)>) -> Result<()> {
+    if a == b {
+        return Ok(());
+    }
+    let mut ae = tree_entries(repo, a)?.into_iter().peekable();
+    let mut be = tree_entries(repo, b)?.into_iter().peekable();
+    let push_only = |entry: gix::objs::tree::Entry, old: bool, out: &mut Vec<_>| -> Result<()> {
+        let path = format!("{prefix}{}", entry.filename);
+        if entry.mode.is_tree() {
+            collect_tree(repo, entry.oid, &format!("{path}/"), old, out)
+        } else {
+            let oid = Some(entry.oid.to_string());
+            out.push(if old { (path, oid, None) } else { (path, None, oid) });
+            Ok(())
+        }
+    };
+    loop {
+        let (next_a, next_b) = (ae.peek(), be.peek());
+        match (next_a, next_b) {
+            (None, None) => break,
+            (Some(_), None) => push_only(ae.next().unwrap(), true, out)?,
+            (None, Some(_)) => push_only(be.next().unwrap(), false, out)?,
+            (Some(x), Some(y)) => {
+                let (name_a, name_b) = (&x.filename, &y.filename);
+                match name_a.cmp(name_b) {
+                    std::cmp::Ordering::Less => push_only(ae.next().unwrap(), true, out)?,
+                    std::cmp::Ordering::Greater => push_only(be.next().unwrap(), false, out)?,
+                    std::cmp::Ordering::Equal => {
+                        let (x, y) = (ae.next().unwrap(), be.next().unwrap());
+                        let path = format!("{prefix}{}", x.filename);
+                        if x.mode.is_tree() && y.mode.is_tree() {
+                            walk_diff(repo, x.oid, y.oid, &format!("{path}/"), out)?;
+                        } else if x.oid != y.oid || x.mode != y.mode {
+                            out.push((path, Some(x.oid.to_string()), Some(y.oid.to_string())));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 impl Repo {
     pub fn init(project: &Path) -> Result<Repo> {
         let git_dir = project.join(".git");
@@ -144,6 +216,43 @@ impl Repo {
             .filter(|e| e.mode.is_blob())
             .map(|e| (e.filepath.to_string(), e.oid.to_string()))
             .collect())
+    }
+
+    /// The paths whose blobs differ between two revisions, as (path, old oid, new oid). Identical
+    /// subtrees are skipped by their tree id, so the cost follows the change, not the tree size.
+    pub fn diff_entries(&self, a_rev: &str, b_rev: &str) -> Result<Vec<(String, Option<String>, Option<String>)>> {
+        let repo = self.gix()?;
+        let a = repo.find_commit(oid(&self.resolve(a_rev)?)?).map_err(git_err)?.tree().map_err(git_err)?.id;
+        let b = repo.find_commit(oid(&self.resolve(b_rev)?)?).map_err(git_err)?.tree().map_err(git_err)?.id;
+        let mut out = Vec::new();
+        walk_diff(&repo, a, b, "", &mut out)?;
+        out.sort_by(|x, y| x.0.cmp(&y.0));
+        Ok(out)
+    }
+
+    /// One blob by its path in a revision's tree, without listing the whole tree (settings, meta).
+    pub fn read_blob_at(&self, rev: &str, path: &str) -> Result<Option<Vec<u8>>> {
+        let repo = self.gix()?;
+        let mut id = repo.find_commit(oid(&self.resolve(rev)?)?).map_err(git_err)?
+            .tree().map_err(git_err)?.id;
+        let parts: Vec<&str> = path.split('/').collect();
+        for (i, part) in parts.iter().enumerate() {
+            let entry = tree_entries(&repo, id)?.into_iter()
+                .find(|e| e.filename.to_string() == *part);
+            let Some(entry) = entry else { return Ok(None) };
+            if i + 1 == parts.len() {
+                if !entry.mode.is_blob() {
+                    return Ok(None);
+                }
+                let object = repo.find_object(entry.oid).map_err(git_err)?;
+                return Ok(Some(object.data.clone()));
+            }
+            if !entry.mode.is_tree() {
+                return Ok(None);
+            }
+            id = entry.oid;
+        }
+        Ok(None)
     }
 
     pub fn read_blobs(&self, oids: &[String]) -> Result<Vec<Vec<u8>>> {

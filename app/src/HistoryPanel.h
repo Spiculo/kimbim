@@ -32,6 +32,7 @@ signals:
     void endCompareRequested();
     void elementActivated(const QString& guid);
     void beforeAfterRequested(const QString& guid); // the selected change, between the compared versions
+    void versionChecksRequested(const QString& rev); // M6: the checks recorded with the selected version
 
 private:
     void updateButtons();
@@ -42,6 +43,7 @@ private:
     QPushButton* m_compareTwo;
     QPushButton* m_end;
     QPushButton* m_beforeAfter;
+    QPushButton* m_versionChecks;
     QLabel* m_legend;
     int m_changeCount = 0;
 };

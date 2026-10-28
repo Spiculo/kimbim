@@ -25,6 +25,7 @@ HistoryPanel::HistoryPanel(QWidget* parent)
     , m_compareTwo(new QPushButton(tr("Compare the two selected"), this))
     , m_end(new QPushButton(tr("End compare"), this))
     , m_beforeAfter(new QPushButton(tr("Before/after..."), this))
+    , m_versionChecks(new QPushButton(tr("Checks..."), this))
     , m_legend(new QLabel(this))
 {
     m_versions->setObjectName(QStringLiteral("versionList"));
@@ -47,7 +48,12 @@ HistoryPanel::HistoryPanel(QWidget* parent)
     layout->addWidget(m_changes, 3);
     m_beforeAfter->setObjectName(QStringLiteral("beforeAfterButton"));
     m_beforeAfter->setToolTip(tr("The selected element in the two compared versions, field by field"));
-    layout->addWidget(m_beforeAfter);
+    m_versionChecks->setObjectName(QStringLiteral("versionChecksButton"));
+    m_versionChecks->setToolTip(tr("The checks recorded with the selected version when it was saved"));
+    auto* versionButtons = new QHBoxLayout;
+    versionButtons->addWidget(m_beforeAfter);
+    versionButtons->addWidget(m_versionChecks);
+    layout->addLayout(versionButtons);
     connect(m_changes, &QTreeWidget::itemSelectionChanged, this, [this] {
         const auto items = m_changes->selectedItems();
         m_beforeAfter->setEnabled(items.size() == 1 && !items.first()->data(0, GuidRole).toString().isEmpty());
@@ -56,6 +62,11 @@ HistoryPanel::HistoryPanel(QWidget* parent)
         const auto items = m_changes->selectedItems();
         if (items.size() == 1 && !items.first()->data(0, GuidRole).toString().isEmpty())
             emit beforeAfterRequested(items.first()->data(0, GuidRole).toString());
+    });
+    connect(m_versionChecks, &QPushButton::clicked, this, [this] {
+        const auto items = m_versions->selectedItems();
+        if (items.size() == 1)
+            emit versionChecksRequested(items.first()->data(IdRole).toString());
     });
 
     connect(m_versions, &QListWidget::itemSelectionChanged, this, &HistoryPanel::updateButtons);
@@ -148,6 +159,7 @@ void HistoryPanel::updateButtons()
     const int selected = int(m_versions->selectedItems().size());
     m_compareCurrent->setEnabled(selected == 1);
     m_compareTwo->setEnabled(selected == 2);
+    m_versionChecks->setEnabled(selected == 1);
 }
 
 } // namespace kimbim

@@ -56,6 +56,24 @@ fn commit_read_modify_delete_log() {
 }
 
 #[test]
+fn diff_entries_skips_unchanged_subtrees() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = Repo::init(dir.path()).unwrap();
+    repo.commit(&changes(&[("objects/ab/W1.json", Some("{\"a\":1}")),
+                           ("objects/cd/W2.json", Some("{\"b\":1}")),
+                           ("kimbim.json", Some("{}"))]), "first", &sig(1)).unwrap();
+    let first = repo.tree_entries("HEAD").unwrap();
+    repo.commit(&changes(&[("objects/ab/W1.json", Some("{\"a\":2}"))]), "second", &sig(2)).unwrap();
+    let second = repo.tree_entries("HEAD").unwrap();
+    let rows = repo.diff_entries("HEAD~1", "HEAD").unwrap();
+    assert_eq!(rows, vec![("objects/ab/W1.json".to_string(),
+                           Some(first["objects/ab/W1.json"].clone()),
+                           Some(second["objects/ab/W1.json"].clone()))]);
+    assert_eq!(repo.read_blob_at("HEAD", "objects/cd/W2.json").unwrap().unwrap(), b"{\"b\":1}");
+    assert!(repo.read_blob_at("HEAD", "objects/zz/none.json").unwrap().is_none());
+}
+
+#[test]
 fn branches_and_switch() {
     let dir = tempfile::tempdir().unwrap();
     let repo = Repo::init(dir.path()).unwrap();

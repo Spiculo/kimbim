@@ -12,6 +12,7 @@ import blake3
 
 META_PATH = "kimbim.json"
 SETTINGS_PATH = "settings.json"  # project settings (step 2, D72); not a record, never composed into IFC
+CHECKS_PATH = "checks.json"  # M6: the pre-commit check results recorded with a version
 # Files kept with a version (D85: underlays), named by their blob id "<sha1>.<ext>", so a file is
 # stored once however many versions use it. Not records, never composed into IFC. In the working folder
 # they live in WORK_FILES_DIR.
@@ -52,7 +53,7 @@ def is_file_path(path: str) -> bool:
 
 
 def is_record_path(path: str) -> bool:
-    return path != SETTINGS_PATH and not is_file_path(path)
+    return path not in (SETTINGS_PATH, CHECKS_PATH) and not is_file_path(path)
 
 
 def referenced_files(settings: bytes | None) -> set[str]:

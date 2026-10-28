@@ -63,6 +63,28 @@ def test_save_version_summarises_and_clears_dirty(versioned):
     assert call("undo")["ok"]
 
 
+def test_compare_and_save_reuse_one_decomposition(versioned, monkeypatch):
+    """R3: version_changes, Compare with WORKING and Save version share the decomposed working model."""
+    from kimbim import versioning as V
+    from kimbim.project import Project
+
+    V._forget_working()
+    calls = []
+    original = Project._decompose_file
+
+    def counting(self, path):
+        calls.append(str(path))
+        return original(self, path)
+
+    monkeypatch.setattr(Project, "_decompose_file", counting)
+    call("set_name", g(versioned["walls"][0]), "Una vez")
+    call("version_changes")
+    call("compare", call("history", 1)["versions"][0]["id"], "WORKING")
+    assert len(calls) == 1, calls
+    assert call("save_version", "One decomposition")["ok"]
+    assert len(calls) == 1, calls
+
+
 def test_compare_working_and_two_versions(versioned):
     w1, w2 = versioned["walls"]
     first = call("history", 1)["versions"][0]["id"]

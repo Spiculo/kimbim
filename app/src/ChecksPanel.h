@@ -2,6 +2,7 @@
 #pragma once
 
 #include <QDialog>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QList>
 #include <QStringList>
@@ -34,6 +35,10 @@ public:
     QJsonObject options() const; // {"express_rules": bool}
     void run();                  // the Run button
 
+    // M6: the checks that run when a version is saved ([] = none), each "warn" or "block".
+    QJsonArray precommit() const; // [{"check", "mode", "options"}] in run order
+    void setPrecommit(const QJsonArray& entries);
+
     // The project's IDS files (names) and clash sets ({name: set}).
     void setIdsFiles(const QStringList& names);
     QStringList idsFiles() const;
@@ -63,12 +68,14 @@ signals:
     void deleteClashSetRequested(const QString& name);
     void issueActivated(const QStringList& guids);
     void refreshRequested(); // shown: the IDS files, clash sets and choices may be stale
+    void precommitChanged(const QJsonArray& entries); // M6: the user picked what runs on Save version
 
 protected:
     void showEvent(QShowEvent* event) override;
 
 private:
     void editClashSet(const QString& name);
+    void emitPrecommit();
     QList<QTreeWidgetItem*> issueItems() const;
 
     QCheckBox* m_schema;
@@ -76,6 +83,10 @@ private:
     QCheckBox* m_ids;
     QCheckBox* m_clash;
     QCheckBox* m_model;
+    QComboBox* m_saveSchema;
+    QComboBox* m_saveIds;
+    QComboBox* m_saveClash;
+    QComboBox* m_saveModel;
     QListWidget* m_idsList;
     QListWidget* m_clashList;
     QTreeWidget* m_results;

@@ -945,6 +945,7 @@ void MainWindow::buildDocks()
         if (!m_compareA.isEmpty())
             beforeAfterDialog(guid, m_compareA, m_compareB);
     });
+    connect(m_history, &HistoryPanel::versionChecksRequested, this, &MainWindow::showVersionChecks);
     connect(m_history, &HistoryPanel::elementActivated, this, [this](const QString& guid) {
         m_viewport->selectGuids({guid});
         m_tree->selectGuids({guid});
@@ -3480,6 +3481,15 @@ void MainWindow::buildVersions()
     connect(combineAction, &QAction::triggered, this, &MainWindow::combineDialog);
     m_projectActions << menu->addSeparator();
     // Save version stays visible: in an unversioned project its shortcut says to enable versioning.
+    QAction* pushAction = menu->addAction(tr("Push to remote...")); // R4 follow-up: Git remotes
+    pushAction->setObjectName(QStringLiteral("actionPushRemote"));
+    m_projectActions << pushAction;
+    connect(pushAction, &QAction::triggered, this, &MainWindow::pushRemote);
+    QAction* pullAction = menu->addAction(tr("Pull from remote..."));
+    pullAction->setObjectName(QStringLiteral("actionPullRemote"));
+    m_projectActions << pullAction;
+    connect(pullAction, &QAction::triggered, this, &MainWindow::pullRemote);
+    menu->addSeparator();
     QAction* saveVersionAction = menu->addAction(tr("Save &version..."));
     saveVersionAction->setObjectName(QStringLiteral("actionSaveVersion"));
     saveVersionAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_S));
@@ -3914,6 +3924,39 @@ bool MainWindow::commitVersion(const QString& message)
     const QJsonObject r = bridge("save_version", {message});
     if (!r.value("ok").toBool()) {
         m_status->showMessage(tr("No version saved: %1").arg(r.value("error").toString()));
+        if (r.value("blocked").toBool()) {
+            // M6: a blocking pre-commit check lists the elements that failed, so the save can be fixed.
+            QStringList details;
+            for (const auto& value : r.value("checks").toArray()) {
+                const QJsonObject check = value.toObject();
+                if (!check.value("failed").toBool())
+                    continue;
+                details << QStringLiteral("%1 (%2)").arg(check.value("title").toString(), check.value("mode").toString());
+                for (const auto& issueValue : check.value("issues").toArray()) {
+                    const QJsonObject issue = issueValue.toObject();
+                    QStringList elements;
+                    const QJsonArray labels = issue.value("labels").toArray();
+                    const QJsonArray guids = issue.value("guids").toArray();
+                    for (int i = 0; i < guids.size(); ++i)
+                        elements << QStringLiteral("%1 [%2]").arg(i < labels.size() ? labels[i].toString() : QString(),
+                            guids[i].toString());
+                    details << QStringLiteral("  %1%2").arg(issue.value("message").toString(),
+                        elements.isEmpty() ? QString() : QStringLiteral(" â€” %1").arg(elements.join(QStringLiteral(", "))));
+                }
+                if (check.value("total").toInt() > check.value("issues").toArray().size())
+                    details << tr("  ... and %n more issue(s)", nullptr,
+                        check.value("total").toInt() - int(check.value("issues").toArray().size()));
+            }
+            if (!m_quiet) {
+                QMessageBox box(this);
+                box.setIcon(QMessageBox::Warning);
+                box.setWindowTitle(tr("Version not saved"));
+                box.setText(tr("A blocking check did not pass. Fix these elements or change the check in the Checks panel."));
+                box.setInformativeText(r.value("error").toString());
+                box.setDetailedText(details.join(QLatin1Char('\n')));
+                box.exec();
+            }
+        }
         refreshProject();
         return false;
     }
@@ -3921,9 +3964,69 @@ bool MainWindow::commitVersion(const QString& message)
     m_sinceVersion.restart();
     afterEdit();
     refreshProject();
-    m_status->showMessage(tr("Version saved: %1 added, %2 modified, %3 removed")
-                                 .arg(r.value("added").toInt()).arg(r.value("modified").toInt()).arg(r.value("removed").toInt()));
+    QString text = tr("Version saved: %1 added, %2 modified, %3 removed")
+                       .arg(r.value("added").toInt()).arg(r.value("modified").toInt()).arg(r.value("removed").toInt());
+    int warnings = 0;
+    for (const auto& value : r.value("checks").toArray()) {
+        const QJsonObject check = value.toObject();
+        if (check.value("failed").toBool() && check.value("mode").toString() == QLatin1String("warn"))
+            ++warnings;
+    }
+    if (warnings > 0)
+        text += QStringLiteral(" ") + tr("(checks recorded %n warning(s))", nullptr, warnings); // M6
+    m_status->showMessage(text);
     return true;
+}
+
+void MainWindow::pushRemote()
+{
+    const QJsonArray remotes = bridge("remotes").value("remotes").toArray();
+    QString remote;
+    if (remotes.size() == 1) {
+        remote = remotes[0].toObject().value("name").toString();
+    } else if (!remotes.isEmpty()) {
+        QStringList names;
+        for (const auto& value : remotes)
+            names << value.toObject().value("name").toString();
+        bool ok = false;
+        remote = QInputDialog::getItem(this, tr("Push to remote"), tr("Remote:"), names, 0, false, &ok);
+        if (!ok)
+            return;
+    } else {
+        m_status->showMessage(tr("No Git remote: add one with `kimbim versions remotes --add origin=URL`"));
+        return;
+    }
+    const QJsonObject r = bridge("push", {remote});
+    m_status->showMessage(r.value("ok").toBool()
+                              ? tr("Pushed %1 to %2").arg(r.value("branch").toString(), remote)
+                              : tr("Push failed: %1").arg(r.value("error").toString()));
+}
+
+void MainWindow::pullRemote()
+{
+    const QJsonArray remotes = bridge("remotes").value("remotes").toArray();
+    QString remote;
+    if (remotes.size() == 1) {
+        remote = remotes[0].toObject().value("name").toString();
+    } else if (!remotes.isEmpty()) {
+        QStringList names;
+        for (const auto& value : remotes)
+            names << value.toObject().value("name").toString();
+        bool ok = false;
+        remote = QInputDialog::getItem(this, tr("Pull from remote"), tr("Remote:"), names, 0, false, &ok);
+        if (!ok)
+            return;
+    } else {
+        m_status->showMessage(tr("No Git remote: add one with `kimbim versions remotes --add origin=URL`"));
+        return;
+    }
+    const QJsonObject r = bridge("pull", {remote});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(tr("Pull failed: %1").arg(r.value("error").toString()));
+        return;
+    }
+    m_status->showMessage(tr("Pulled %1 from %2").arg(r.value("branch").toString(), remote));
+    switchOption(m_currentOption); // reopen the pulled state
 }
 
 void MainWindow::saveVersionDialog()

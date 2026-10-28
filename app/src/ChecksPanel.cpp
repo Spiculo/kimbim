@@ -9,6 +9,7 @@
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QHash>
 #include <QHeaderView>
 #include <QJsonArray>
 #include <QLabel>
@@ -21,6 +22,8 @@
 #include <QToolButton>
 #include <QTreeWidget>
 #include <QVBoxLayout>
+
+#include <utility>
 
 namespace kimbim {
 
@@ -58,6 +61,10 @@ ChecksPanel::ChecksPanel(QWidget* parent)
     , m_ids(new QCheckBox(tr("IDS"), this))
     , m_clash(new QCheckBox(tr("Clash detection"), this))
     , m_model(new QCheckBox(tr("Model checks"), this))
+    , m_saveSchema(new QComboBox(this))
+    , m_saveIds(new QComboBox(this))
+    , m_saveClash(new QComboBox(this))
+    , m_saveModel(new QComboBox(this))
     , m_idsList(new QListWidget(this))
     , m_clashList(new QListWidget(this))
     , m_results(new QTreeWidget(this))
@@ -105,6 +112,28 @@ ChecksPanel::ChecksPanel(QWidget* parent)
     otherRow->addStretch(1);
     whichLayout->addLayout(otherRow);
     whichLayout->addWidget(run);
+
+    // M6: the checks that run on Save version, each off, a warning or a block.
+    auto saveCombo = [this](const char* name) {
+        auto* combo = new QComboBox(this);
+        combo->setObjectName(QLatin1String(name));
+        combo->addItem(tr("Off"), QString());
+        combo->addItem(tr("Warn and save"), QStringLiteral("warn"));
+        combo->addItem(tr("Block the save"), QStringLiteral("block"));
+        connect(combo, &QComboBox::currentIndexChanged, this, &ChecksPanel::emitPrecommit);
+        return combo;
+    };
+    m_saveSchema = saveCombo("precommitSchema");
+    m_saveIds = saveCombo("precommitIds");
+    m_saveClash = saveCombo("precommitClash");
+    m_saveModel = saveCombo("precommitModel");
+    connect(m_rules, &QCheckBox::toggled, this, &ChecksPanel::emitPrecommit);
+    auto* saving = new QGroupBox(tr("Before saving a version"), this);
+    auto* savingForm = new QFormLayout(saving);
+    savingForm->addRow(tr("Schema validation:"), m_saveSchema);
+    savingForm->addRow(tr("IDS:"), m_saveIds);
+    savingForm->addRow(tr("Clash detection:"), m_saveClash);
+    savingForm->addRow(tr("Model checks:"), m_saveModel);
 
     // IDS files: kept in the project settings (their XML, so they are versioned).
     m_idsList->setObjectName(QStringLiteral("idsFiles"));
@@ -181,6 +210,7 @@ ChecksPanel::ChecksPanel(QWidget* parent)
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(4, 4, 4, 4);
     layout->addWidget(which);
+    layout->addWidget(saving);
     layout->addWidget(ids);
     layout->addWidget(clash);
     layout->addWidget(m_summary);
@@ -216,6 +246,51 @@ void ChecksPanel::setChecked(const QString& check, bool on)
 QJsonObject ChecksPanel::options() const
 {
     return {{"express_rules", m_rules->isChecked()}};
+}
+
+QJsonArray ChecksPanel::precommit() const
+{
+    QJsonArray out;
+    auto add = [&out](QComboBox* combo, const char* check, const QJsonObject& options) {
+        const QString mode = combo->currentData().toString();
+        if (mode.isEmpty())
+            return;
+        QJsonObject entry{{"check", QLatin1String(check)}, {"mode", mode}};
+        if (!options.isEmpty())
+            entry.insert("options", options);
+        out.append(entry);
+    };
+    add(m_saveSchema, "schema", {{"express_rules", m_rules->isChecked()}});
+    add(m_saveIds, "ids", {});
+    add(m_saveClash, "clash", {});
+    add(m_saveModel, "model", {});
+    return out;
+}
+
+void ChecksPanel::setPrecommit(const QJsonArray& entries)
+{
+    QHash<QString, QComboBox*> combos{{QStringLiteral("schema"), m_saveSchema},
+        {QStringLiteral("ids"), m_saveIds}, {QStringLiteral("clash"), m_saveClash},
+        {QStringLiteral("model"), m_saveModel}};
+    for (QComboBox* combo : std::as_const(combos))
+        combo->blockSignals(true);
+    for (QComboBox* combo : std::as_const(combos))
+        combo->setCurrentIndex(0);
+    for (const auto& value : entries) {
+        const QJsonObject entry = value.toObject();
+        if (QComboBox* combo = combos.value(entry.value("check").toString())) {
+            const int index = combo->findData(entry.value("mode").toString());
+            if (index > 0)
+                combo->setCurrentIndex(index);
+        }
+    }
+    for (QComboBox* combo : std::as_const(combos))
+        combo->blockSignals(false);
+}
+
+void ChecksPanel::emitPrecommit()
+{
+    emit precommitChanged(precommit());
 }
 
 void ChecksPanel::run()

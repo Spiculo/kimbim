@@ -281,6 +281,9 @@ public:
     bool recoverFrom(const QString& id);
     void offerRecovery(); // asks about each copy (not in quiet mode)
     bool saveVersion(const QString& message);
+    // R4 follow-up: push the current option to a Git remote, or fast-forward it from one.
+    void pushRemote();
+    void pullRemote();
     QJsonArray history();
     bool compareWith(const QString& revA, const QString& revB = QStringLiteral("WORKING"));
     void endCompare();
@@ -508,6 +511,11 @@ public:
     bool saveClashSet(const QString& name, const QJsonObject& set, const QString& replaces = QString());
     bool deleteClashSet(const QString& name);
     void showIssue(const QStringList& guids);
+    // M6: the pre-commit check results recorded with a version, in a dialog.
+    void showVersionChecks(const QString& rev);
+    // M2: the type manager and the classifications dialog (these edit the open model).
+    void openTypeManager();
+    void openClassifications();
     // D82: the Python console (ConsoleTools.cpp). Runs code / a .py file in kimbim.console's namespace on a
     // worker thread (Stop interrupts it), shows the output in the panel, then applies its edits (afterEdit)
     // and selection. Returns console_run's result: {ok, output, error, traceback, geometry, edited, select}.

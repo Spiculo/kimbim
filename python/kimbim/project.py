@@ -7,6 +7,7 @@ import os
 import re
 import pathlib
 import subprocess
+import tempfile
 import time as _time
 from dataclasses import dataclass, field
 
@@ -14,9 +15,9 @@ import ifcopenshell
 import ifcopenshell.validate
 
 from . import _core
-from .content import Changed, Contents, schema_of, without_owner_history
-from .layout import (META_PATH, SETTINGS_PATH, WORK_FILES_DIR, blob_oid, is_file_path, is_record_path, key_to_path,
-                     path_to_key, referenced_files)
+from .content import Changed, Contents, references, schema_of, without_owner_history
+from .layout import (CHECKS_PATH, META_PATH, SETTINGS_PATH, WORK_FILES_DIR, blob_oid, is_file_path, is_record_path,
+                     key_to_path, path_to_key, referenced_files)
 from .nodeids import decompose_against_head
 from .records import compose, unshare
 
@@ -160,6 +161,15 @@ def _by_content(old_entries: dict[str, str], old_blobs: dict[str, bytes], read_b
             return not changed.record(key, new_paths[p])  # a common case: only its owner history re-encoded
         return old_c.record(key) == new_c.record(key)
 
+    # Fast path (R3): when the change touches only object records and none of them carries an anchor
+    # value another record can refer to, no unchanged record can have changed through it. Property and
+    # name edits take this path, so their diff does not walk the whole model.
+    if not any(p.startswith(("nodes/", "loose/")) for p in added + modified + removed) and \
+            not any(p.startswith("objects/") and (b'"@a"' in old_blobs.get(p, b"") or b'"@a"' in new_paths[p])
+                    for p in modified):
+        kept = [p for p in modified if not content(p) or not same(p)]
+        return added, kept, removed
+
     kept = [p for p in modified if not content(p) or not same(p)]
     touched = set(modified)
     for p in new_paths:  # same bytes, but a shared value it uses changed
@@ -235,6 +245,13 @@ class Project:
         if self.repo.head() is None:
             return None
         oid = self._entries(rev).get(SETTINGS_PATH)
+        return self.repo.read_blobs([oid])[0] if oid else None
+
+    def checks_at(self, rev: str = "HEAD") -> bytes | None:
+        """The pre-commit check results stored with a version (None when no check ran)."""
+        if self.repo.head() is None:
+            return None
+        oid = self._entries(rev).get(CHECKS_PATH)
         return self.repo.read_blobs([oid])[0] if oid else None
 
     def _head_entries(self) -> dict[str, str]:
@@ -337,13 +354,22 @@ class Project:
         return changes
 
     def commit(self, ifc_path, message: str, *, author: tuple[str, str] | None = None, time: int | None = None,
-               merged: list[str] | None = None, settings: bytes | None = None):
+               merged: list[str] | None = None, settings: bytes | None = None, checks: bytes | None = None,
+               records: dict[str, bytes] | None = None):
         """A new version from an IFC file; `merged`: other versions it combines (a merge commit, which
-        is recorded even when the result equals the current version)."""
-        records = self._decompose_file(ifc_path)
-        changes, writes = self._changes(self._head_entries(), records, settings)
+        is recorded even when the result equals the current version). `checks`: the pre-commit check
+        results to record with the version (M6); None leaves no checks.json in the tree. `records`: an
+        already decomposed working model (the app caches it between Compare and Save version)."""
+        head = self._head_entries()
+        if records is None:
+            records = self._decompose_file(ifc_path)
+        changes, writes = self._changes(head, records, settings)
         if not changes and not merged and not any(is_record_path(p) for p in writes):
             raise NothingToCommit("nothing to commit: the file matches the current version")
+        if checks is not None:
+            writes[CHECKS_PATH] = checks
+        elif CHECKS_PATH in head:
+            writes[CHECKS_PATH] = None
         name, email = author or _author()
         when = int(time if time is not None else _time.time())
         if merged:
@@ -357,6 +383,47 @@ class Project:
             self.repo.repack_no_delta()
         return cid, changes
 
+    def import_ifc(self, ifc_path, message: str, *, accept_heuristic: bool = False, dry_run: bool = False,
+                   author: tuple[str, str] | None = None) -> dict:
+        """Re-import an IFC, reconciling its products with the current version's before committing.
+
+        `dry_run` returns the report without writing anything. Otherwise matched imported objects take
+        the existing GlobalIds (Tag and, if accepted, heuristic matches) and the result is one ordinary
+        commit, so their history and Compare keep working.
+        """
+        from .reconcile import reconcile
+
+        if self.repo.head() is None:
+            raise NoVersions("this project has no versions yet")
+        new = ifcopenshell.open(str(ifc_path))
+        current = self.schema()
+        if current and new.schema_identifier != current:
+            raise SchemaMismatch(
+                f"{ifc_path} is {new.schema_identifier} but this project is {current}; "
+                "KimBim never converts schemas silently (docs/02, D30)"
+            )
+        old = compose(self._records("HEAD"))
+        report = reconcile(old, new, accept_heuristic)
+        applied = report.pop("applied", {})
+        if dry_run:
+            return report
+        entities = {guid: new.by_guid(guid) for guid in applied}
+        for guid, entity in entities.items():
+            entity.GlobalId = applied[guid]
+        fd, path = tempfile.mkstemp(suffix=".ifc", prefix="kimbim-import-")
+        os.close(fd)
+        try:
+            new.write(path)
+            cid, changes = self.commit(path, message, author=author)
+        finally:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+        report.update({"id": cid, "added": len(changes.added), "modified": len(changes.modified),
+                       "removed": len(changes.removed)})
+        return report
+
     def log(self, rev: str = "HEAD", limit: int = 50):
         if self.repo.head() is None:
             return []
@@ -366,11 +433,103 @@ class Project:
         b = self._rev(rev_b)
         if rev_a is None:
             parents = self.repo.log(b, 1)[0].parents
-            old = self.repo.tree_entries(parents[0]) if parents else {}
+            a = parents[0] if parents else b
         else:
-            old = self._entries(rev_a)
-        changes, _ = self._changes(old, self._records(b), self.settings_at(b))
-        return changes
+            a = self._rev(rev_a)
+        return self._diff_entries(a, b)
+
+    def _diff_entries(self, rev_a: str, rev_b: str) -> Changes:
+        """A diff that reads only the changed records when nothing shared could have changed (R3).
+
+        The tree diff skips identical subtrees. A property or name edit touches object records only,
+        and those records carry no anchor value another record can refer to, so no unchanged record
+        can differ. Node/loose changes or anchors fall back to the full content pass in `_changes`.
+        """
+        rows = [r for r in self.repo.diff_entries(rev_a, rev_b) if is_record_path(r[0])]
+        added = [p for p, old, _new in rows if old is None]
+        removed = [p for p, _old, new in rows if new is None]
+        modified = [(p, old, new) for p, old, new in rows if old is not None and new is not None]
+        changed = added + [p for p, _, _ in modified] + removed
+        if not changed:
+            settings = self.repo.read_blob_at(rev_b, SETTINGS_PATH)
+            old_settings = self.repo.read_blob_at(rev_a, SETTINGS_PATH)
+            items = []
+            if settings is not None and settings != old_settings:
+                items.append(Change("added" if old_settings is None else "modified", "settings",
+                                    "(project settings)", None))
+            return Changes(items)
+        if any(p.startswith(("nodes/", "loose/")) for p in changed):
+            return self._changes(self._entries(rev_a), self._records(rev_b), self.settings_at(rev_b))[0]
+
+        old_paths = [p for p, old, _new in rows if old]
+        new_paths = [p for p, _old, new in rows if new]
+        old_data = dict(zip(old_paths, self.repo.read_blobs([old for _p, old, _n in rows if old]))) if old_paths else {}
+        new_data = dict(zip(new_paths, self.repo.read_blobs([new for _p, _o, new in rows if new]))) if new_paths else {}
+        if any(references(old_data[p]) != references(new_data[p]) for p, _, _ in modified):
+            return self._changes(self._entries(rev_a), self._records(rev_b), self.settings_at(rev_b))[0]
+
+        # Content digests only for the modified records; nodes they reference are read on demand.
+        meta = self.repo.read_blob_at(rev_b, META_PATH) or self.repo.read_blob_at(rev_a, META_PATH)
+        schema = schema_of(meta)
+
+        def getter(rev, cache):
+            def get(key):
+                path = key_to_path(key)
+                if path in cache:
+                    return cache[path]
+                data = self.repo.read_blob_at(rev, path)
+                cache[path] = data
+                return data
+            return get
+
+        old_c = Contents(getter(rev_a, {}), schema)
+        new_c = Contents(getter(rev_b, {}), schema)
+        kept = []
+        for p, _old, _new in modified:
+            key = path_to_key(p)
+            before, after = json.loads(old_data[p]), json.loads(new_data[p])
+            if without_owner_history(before) == without_owner_history(after) and old_c.record(key) == new_c.record(key):
+                continue
+            kept.append(p)
+        items = []
+        for kind, paths in (("added", added), ("modified", kept), ("removed", removed)):
+            for p in sorted(paths):
+                key = path_to_key(p)
+                ifc_type, name = _describe(key, old_data[p] if kind == "removed" else new_data[p])
+                items.append(Change(kind, key, ifc_type, name))
+        settings = self.repo.read_blob_at(rev_b, SETTINGS_PATH)
+        old_settings = self.repo.read_blob_at(rev_a, SETTINGS_PATH)
+        if settings is not None and settings != old_settings:
+            items.append(Change("added" if old_settings is None else "modified", "settings",
+                                "(project settings)", None))
+        return Changes(items)
+
+    def diff_details(self, rev_a: str | None = None, rev_b: str = "HEAD", *,
+                     working_records: dict[str, bytes] | None = None) -> dict:
+        """`diff()` plus the property-level explanation, categories and the level tree (R3)."""
+        from .diff import changes_by_element
+
+        if working_records is not None:
+            a = self._rev(rev_a) if rev_a else self._rev("HEAD")
+            b = "WORKING"
+            changes, _ = self._changes(self._entries(a), working_records, None)
+            out = changes_by_element(self, a, b, changes, new_records=working_records)
+        else:
+            changes = self.diff(rev_a, rev_b)
+            b = self._rev(rev_b)
+            if rev_a is None:
+                parents = self.repo.log(b, 1)[0].parents
+                a = parents[0] if parents else b
+            else:
+                a = self._rev(rev_a)
+            out = changes_by_element(self, a, b, changes)
+
+        products = out.pop("elements")
+        detail_keys = {f"o/{item['guid']}" for kind in products for item in products[kind]}
+        out.update({"from": a, "to": b, "changes": products,
+                    "other": sum(1 for c in changes.items if c.key not in detail_keys and c.key != "settings"),
+                    "settings": [c.key for c in changes.items if c.key == "settings"]})
+        return out
 
     def export(self, out_path, rev: str = "HEAD", overwrite: bool = False, one_owner: bool = False) -> pathlib.Path:
         """Write a version as IFC. `one_owner`: give each owner its own copy of values IFC wants owned
@@ -392,6 +551,65 @@ class Project:
         if p not in entries:
             raise KimbimError(f"no record {key} in {rev}")
         return json.loads(self.repo.read_blobs([entries[p]])[0])
+
+    # ---- remotes (R4 follow-up: push/pull over Git) ----
+    def _git(self, *args: str) -> subprocess.CompletedProcess:
+        env = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "LC_ALL": "C"}
+        result = subprocess.run(["git", f"--git-dir={self.path / '.git'}", *args],
+                                capture_output=True, text=True, env=env)
+        if result.returncode != 0:
+            message = (result.stderr or result.stdout or "git failed").strip().splitlines()[-1]
+            raise KimbimError(f"git {args[0]}: {message}")
+        return result
+
+    def remotes(self) -> list[dict]:
+        """Configured remotes: [{"name", "url"}]."""
+        out = self._git("remote", "-v").stdout.splitlines()
+        seen = {}
+        for line in out:
+            parts = line.split()
+            if len(parts) >= 2 and parts[0] not in seen:
+                seen[parts[0]] = parts[1]
+        return [{"name": name, "url": url} for name, url in seen.items()]
+
+    def add_remote(self, name: str, url: str) -> None:
+        name, url = (name or "").strip(), (url or "").strip()
+        if not name or not url or any(c in name for c in " ~^:?*[\\"):
+            raise KimbimError("a remote needs a simple name and a URL")
+        self._git("remote", "add", name, url)
+
+    def remove_remote(self, name: str) -> None:
+        self._git("remote", "remove", name)
+
+    def push(self, remote: str = "origin", branch: str = "") -> dict:
+        """Push a branch (the current option by default) to a remote."""
+        branch = branch or self.current_branch()
+        self._git("push", "--porcelain", remote, f"refs/heads/{branch}:refs/heads/{branch}")
+        return {"remote": remote, "branch": branch, "url": next(
+            (r["url"] for r in self.remotes() if r["name"] == remote), "")}
+
+    def pull(self, remote: str = "origin", branch: str = "") -> dict:
+        """Fetch a remote branch and fast-forward the current one (a diverged branch is refused)."""
+        branch = branch or self.current_branch()
+        ref = f"refs/remotes/{remote}/{branch}"
+        self._git("fetch", "--prune", remote, f"+refs/heads/{branch}:{ref}")
+        head = self.head_commit()
+        if head is None:
+            self._git("update-ref", f"refs/heads/{branch}", ref)
+            result = "fast_forward"
+        else:
+            try:
+                self._git("merge-base", "--is-ancestor", head, ref)
+            except KimbimError:
+                raise KimbimError(
+                    f"{branch} has diverged from {remote}/{branch}; push your versions or combine them in an option"
+                ) from None
+            self._git("update-ref", f"refs/heads/{branch}", ref)
+            result = "fast_forward"
+        return {"remote": remote, "branch": branch, "status": result, "head": self.head_commit()}
+
+    def head_commit(self) -> str | None:
+        return self.repo.head()
 
     def branches(self) -> list[str]:
         return self.repo.branches()

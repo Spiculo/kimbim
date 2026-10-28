@@ -12,14 +12,20 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QElapsedTimer>
 #include <QEventLoop>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QJsonDocument>
+#include <QLabel>
 #include <QMenu>
 #include <QPointer>
 #include <QProgressDialog>
+#include <QStyle>
+#include <QTreeWidget>
+#include <QVBoxLayout>
 
 #include <DockManager.h>
 #include <DockWidget.h>
@@ -95,6 +101,8 @@ ChecksPanel* MainWindow::checksPanel()
     });
     connect(m_checks, &ChecksPanel::saveClashSetRequested, this, &MainWindow::saveClashSet);
     connect(m_checks, &ChecksPanel::deleteClashSetRequested, this, &MainWindow::deleteClashSet);
+    connect(m_checks, &ChecksPanel::precommitChanged, this,
+        [this](const QJsonArray& entries) { setProjectSettings({{"precommit_checks", entries}}); }); // M6
     refreshChecks();
     m_dock->raisePanel(QStringLiteral("checks"));
     return m_checks;
@@ -106,6 +114,7 @@ void MainWindow::refreshChecks()
         return;
     m_checks->setIdsFiles(m_settings.value("ids_files").toObject().keys());
     m_checks->setClashSets(m_settings.value("clash_sets").toObject());
+    m_checks->setPrecommit(m_settings.value("precommit_checks").toArray());
     const QJsonObject choices = bridge("query_choices");
     m_checks->setChoices(strings(choices.value("classes")), m_settings.value("selection_criteria").toObject().keys(),
         m_settings.value("selection_sets").toObject().keys());
@@ -175,6 +184,59 @@ bool MainWindow::runChecks(const QStringList& checks, const QJsonObject& options
     panel->setSummary(summary);
     m_status->showMessage(tr("Checks: %1").arg(summary));
     return !cancelled && ran == checks.size();
+}
+
+void MainWindow::showVersionChecks(const QString& rev)
+{
+    const QJsonObject r = bridge("version_checks", {rev});
+    if (!r.value("ok").toBool()) {
+        m_status->showMessage(tr("Could not read the version's checks: %1").arg(r.value("error").toString()));
+        return;
+    }
+    QDialog dialog(this);
+    dialog.setObjectName(QStringLiteral("versionChecksDialog"));
+    dialog.setWindowTitle(tr("Checks recorded with the version"));
+    auto* layout = new QVBoxLayout(&dialog);
+    const QJsonArray checks = r.value("checks").toArray();
+    if (checks.isEmpty()) {
+        layout->addWidget(new QLabel(tr("No checks were recorded with this version."), &dialog));
+    } else {
+        auto* tree = new QTreeWidget(&dialog);
+        tree->setObjectName(QStringLiteral("versionCheckResults"));
+        tree->setColumnCount(2);
+        tree->setHeaderLabels({tr("Check"), tr("Result")});
+        for (const auto& value : checks) {
+            const QJsonObject check = value.toObject();
+            const QString mode = check.value("mode").toString();
+            const bool failed = check.value("failed").toBool();
+            const QString result = !check.value("ok").toBool()
+                ? tr("Could not run: %1").arg(check.value("error").toString())
+                : tr("%1 — %n issue(s)", nullptr, check.value("total").toInt())
+                      .arg(mode == QLatin1String("block") ? tr("Blocking") : tr("Warning"));
+            auto* item = new QTreeWidgetItem(tree, {check.value("title").toString(), result});
+            if (!failed)
+                item->setIcon(0, dialog.style()->standardIcon(QStyle::SP_DialogApplyButton));
+            else
+                item->setIcon(0, dialog.style()->standardIcon(QStyle::SP_MessageBoxWarning));
+            for (const auto& issueValue : check.value("issues").toArray()) {
+                const QJsonObject issue = issueValue.toObject();
+                QStringList elements;
+                const QJsonArray labels = issue.value("labels").toArray();
+                const QJsonArray guids = issue.value("guids").toArray();
+                for (int i = 0; i < guids.size(); ++i)
+                    elements << QStringLiteral("%1 [%2]").arg(i < labels.size() ? labels[i].toString() : QString(),
+                        guids[i].toString());
+                new QTreeWidgetItem(item, {issue.value("message").toString(), elements.join(QStringLiteral(", "))});
+            }
+            item->setExpanded(failed);
+        }
+        layout->addWidget(tree, 1);
+    }
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dialog);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    layout->addWidget(buttons);
+    dialog.resize(560, 360);
+    dialog.exec();
 }
 
 void MainWindow::showIssue(const QStringList& guids)

@@ -40,6 +40,8 @@ from . import app_bridge as B
 CHECKS = ("schema", "ids", "clash", "model")
 MODEL_CHECKS = ("duplicates", "rooms", "zero_walls", "not_on_level", "no_host")
 CLASH_MODES = ("hard", "clearance")
+PRECOMMIT_MODES = ("warn", "block")
+PRECOMMIT_RECORDED_ISSUES = 200  # per check in checks.json: enough to list, small enough for every version
 MAX_ISSUES = 5000  # per check: beyond this the list says it was cut
 # Never clash or count as elements: voids, virtual elements, rooms (they are volumes, not things)
 NOT_PHYSICAL = ("IfcFeatureElement", "IfcVirtualElement", "IfcSpatialElement", "IfcSpatialStructureElement")
@@ -62,6 +64,24 @@ def _poll():
 # ---------------------------------------------------------------- settings tables
 
 def validate(key: str, value) -> str | None:
+    if key == "precommit_checks":
+        if not isinstance(value, list):
+            return "precommit_checks must be a list"
+        seen = set()
+        for entry in value:
+            if not isinstance(entry, dict):
+                return "each pre-commit check must be an object"
+            name = entry.get("check")
+            if name not in RUNNERS:
+                return f"unknown pre-commit check {name} ({', '.join(CHECKS)})"
+            if name in seen:
+                return f"pre-commit check {name} is listed twice"
+            seen.add(name)
+            if entry.get("mode") not in PRECOMMIT_MODES:
+                return f"pre-commit check {name}: mode must be warn or block"
+            if "options" in entry and not isinstance(entry["options"], dict):
+                return f"pre-commit check {name}: options must be an object"
+        return None
     if not isinstance(value, dict) or any(not isinstance(k, str) or not k.strip() for k in value):
         return f"{key} must map names to entries"
     if key == "ids_files":
@@ -774,6 +794,45 @@ def run(model, name: str, options: dict | None = None) -> dict:
     return {"ok": True, "check": name, "title": TITLES[name], "issues": issues[:MAX_ISSUES], "truncated": cut,
             "total": len(issues), "groups": out.get("groups", []), "counts": counts, "detail": out.get("detail", ""),
             "timings": out.get("timings", {}), "empty": out.get("empty", ""), "seconds": round(time.perf_counter() - t0, 3)}
+
+
+# ---------------------------------------------------------------- pre-commit (M6)
+
+def precommit_entries() -> list[dict]:
+    """The project's chosen checks for Save version, in the order they run."""
+    from . import settings
+
+    return [e for e in settings.current().get("precommit_checks", [])
+            if isinstance(e, dict) and e.get("check") in RUNNERS]
+
+
+def run_precommit(model=None) -> dict:
+    """Run the project's pre-commit checks on `model` (default: the open one).
+
+    A check fails when it reports any issue. "block" checks stop the save; "warn" checks let it
+    through and their results are recorded with the version. Returns the per-check results in the
+    shape checks.json keeps: counts and groups, with at most PRECOMMIT_RECORDED_ISSUES issues each.
+    """
+    entries = precommit_entries()
+    model = B._model if model is None else model
+    results, blocked = [], False
+    for entry in entries:
+        name, mode = entry["check"], entry["mode"]
+        options = entry.get("options") if isinstance(entry.get("options"), dict) else {}
+        try:
+            out = run(model, name, options)
+            result = {"check": name, "title": out["title"], "mode": mode, "ok": True,
+                      "total": out["total"], "counts": out["counts"], "groups": out["groups"],
+                      "issues": out["issues"][:PRECOMMIT_RECORDED_ISSUES], "truncated": out["total"] > PRECOMMIT_RECORDED_ISSUES,
+                      "seconds": out["seconds"], "failed": out["total"] > 0}
+        except Exception as ex:  # a broken checker never lets a save through unnoticed
+            result = {"check": name, "title": TITLES[name], "mode": mode, "ok": False,
+                      "error": f"{type(ex).__name__}: {ex}", "total": 1, "counts": {"error": 1, "warning": 0, "info": 0},
+                      "groups": [], "issues": [], "truncated": False, "seconds": 0.0, "failed": True}
+        blocked = blocked or (result["failed"] and mode == "block")
+        results.append(result)
+    return {"ok": True, "checks": results, "blocked": blocked,
+            "failed": any(r["failed"] for r in results)}
 
 
 # ---------------------------------------------------------------- bridge
