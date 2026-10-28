@@ -20,7 +20,7 @@ Each feature notes **what we reuse**. Priorities: **P0** is needed for first usa
 | User preferences | P0 | Done (D72): Edit › Preferences (language, templates folder, your name, new views as tabs or windows, IFC opening, the size above which opening an IFC asks first, automatic versions, recovery) |
 | Project settings | P0 | Done (D72): File › Project settings (plan cut height, drawing scale, sheet paper, length units); layer states kept; versioned |
 | Office templates | P0 | Done (D72): File › New project lists the templates folder; File › Save as template |
-| Units: metric and imperial | P0 | IfcOpenShell unit utils |
+| Units: metric and imperial | P0 | ✅ D108: m/cm/mm/ft/in and matching areas in Project settings, fields and formatting (`IfcOpenShell` unit utils for IFC) |
 | Georeferencing | P2 | `ifcopenshell.api.georeference` |
 
 ## 2. Viewport and navigation
@@ -75,9 +75,9 @@ Display (Slice 4b): every element has border lines (outline and creases); View �
 | Property panel: attributes, property sets, quantities | P0 | `ifcopenshell.util.element` |
 | Edit properties, add/remove property sets, custom psets | P0 | `ifcopenshell.api.pset` |
 | Standard pset templates (Pset_WallCommon…) with validation of types/enums | P0 | IfcOpenShell bundled pset templates |
-| Classifications (Uniclass, OmniClass, local systems) | P1 | `ifcopenshell.api.classification`; bSDD lookup in P2 |
+| Classifications (Uniclass, OmniClass, local systems) | P1 | ✅ D106: Model › Classifications... (systems and codes, assign/unassign to the selection); Properties lists them; `ifcopenshell.api.classification`; bSDD lookup in P2 |
 | Materials: single, layer sets, profile sets, constituents | P0 | `ifcopenshell.api.material` |
-| Type / instance: assign type, edit type to update all instances | P0 | `ifcopenshell.api.type` |
+| Type / instance: assign type, edit type to update all instances | P0 | ✅ D106: Model › Type manager... (list, make from selection, assign, edit, update all); D50 per-property type edits |
 | Quantity take-off (auto-calculated quantities) | P1 | IfcOpenShell `ifc5d` / qto utilities |
 | **Bulk edit**: set a property on a selection | P0 | |
 | **Type vs. element values** (D50): values inherited from the element's type are dimmed; editing writes the element's own value (an override); *Edit type value…* changes the type for every element of it, after a confirmation with the count; *Reset to type value* drops the override | P0 | `ifcopenshell.util.element.get_type` |
@@ -93,14 +93,14 @@ All modeling goes through commands, with undo/redo ([01](01-architecture.md#engi
 |---------|-----|---------------|
 | Levels (storeys) and grids | P0 | `ifcopenshell.api.spatial`, `grid` — levels ✅ (Slice 4), grids ✅ (Slice 6) |
 | Walls: layered (by type), draw by axis, join at corners/T, flip | P0 | ✅ Slice 4 (flip: later). `geometry.create_2pt_wall`, `connect_wall`, `regenerate_wall_representation` — Bonsai's wall logic, already in ifcopenshell 0.9, no port needed |
-| Slabs / floors from outline or from walls | P0 | ✅ Slice 5 (top of slab at the level; from walls = outer faces of a closed loop); slab openings ✅ Slice 7 |
+| Slabs / floors from outline or from walls | P0 | ✅ Slice 5 (top of slab at the level; from walls = outer faces of a closed loop); slab openings ✅ Slice 7; ✅ D109 sloped slabs (`elements.set_slab_slope`) and slab edges (`create.slab_edge`), agent/CLI |
 | Copy to another level | P0 | ✅ Slice 7 (walls with their openings, doors/windows and joins; slabs, columns, beams) |
 | Openings + doors + windows hosted in walls (parametric types) | P0 | ✅ Slice 5: `geometry.add_door/window_representation` + `feature.add_feature/add_filling`; moving/resizing placed doors: Slice 6 |
 | Columns and beams from profile types | P0 | ✅ Slice 6 (`geometry.add_profile_representation`, material profile sets) |
 | Roofs (flat; pitched later) | P1 | |
 | Spaces / rooms (auto from boundaries), area | P1 | |
 | Stairs and railings (basic parametric) | P1 | Straight-flight stair ✅ Slice 7 (own generator: ifcopenshell has none outside Bonsai); landings, other shapes and railings: later |
-| Curtain walls | P2 | |
+| Curtain walls | P2 | 🟡 D109: `create.curtain_wall` (IfcCurtainWall panel with height/spacing metadata); Curtain wall tool in the 3D palette (panel, mullions and rails) |
 | Generic object (extrusion, mesh import) | P1 | |
 | Snapping (endpoint, midpoint, perpendicular, grid, axis) and work planes | P0 | ✅ Slice 4 (on wall, 15° angles, ortho with Shift; work plane = active level) |
 | Precise input (typed distances/angles) | P0 | Typed lengths ✅ Slice 4; typed angles: later |
@@ -148,12 +148,12 @@ Clones get **new KimBim IDs and GlobalIds**. They never share identity with the 
 |---------|-----|-------|
 | "Save version" dialog: message, changed-objects summary | P0 | ✅ Slice 8 (Ctrl+Alt+S; Ctrl+S in a versioned project) |
 | History timeline (versions, milestones, design options) | P0 | ✅ Slice 8: History dock per option; ✅ Slice 20: milestones shown in bold with ◆ |
-| Compare any two versions: viewport coloring + change list + before/after | P0 | ✅ Slice 8: version vs current or two versions, added green / modified orange, change list (click selects); ✅ Slice 20: before/after per element (field by field) |
+| Compare any two versions: viewport coloring + change list + before/after | P0 | ✅ Slice 8: version vs current or two versions, added green / modified orange, change list (click selects); ✅ Slice 20: before/after per element (field by field); ✅ D105: property-level attributes and property values, categories and the level tree (CLI/agent `versions diff`, JSON or text) |
 | Design options: create, switch, delete | P0 | Branches. ✅ Slice 8: create, switch (with an unsaved-changes guard); delete: Slice 20 |
 | Combine options with conflict resolution UI | P1 | ✅ Slice 22 (M5 exit): dialog, combined model as preview, two-parent version ([03](03-versioning.md#merge-combine-options)) |
 | Milestones | P0 | ✅ Slice 20: annotated tags (D67) |
-| Re-import from external tool with reconciliation report | P1 | [03](03-versioning.md#import-reconciliation) |
-| Remotes: push/pull to a Git host | P2 | [08](08-future.md) |
+| Re-import from external tool with reconciliation report | P1 | ✅ D104: `kimbim versions import` (GlobalId → Tag → heuristic review, dry run and JSON report); no app dialog yet ([03](03-versioning.md#import-reconciliation)) |
+| Remotes: push/pull to a Git host | P2 | ✅ D107: `kimbim versions remotes/push/pull` and Versions › Push/Pull (fast-forward pull; a diverged branch is refused). Merge-aware pull is next ([08](08-future.md)) |
 
 ## 10. Checking (local)
 
@@ -162,7 +162,7 @@ Clones get **new KimBim IDs and GlobalIds**. They never share identity with the 
 | IFC schema validation | P1 | `ifcopenshell.validate` |
 | IDS check (local, on demand) | P1 | IfcTester (IfcOpenShell, LGPL) |
 | Clash detection between selections | P2 | `ifcclash` / `IfcGeom::tree` |
-| Local pre-commit checks (configurable rules that block or warn on "Save version") | P2 | Owner answer 5 |
+| Local pre-commit checks (configurable rules that block or warn on "Save version") | P2 | ✅ M6 (D103): chosen checks in the Checks panel; blocking stops the save with its elements, warnings are recorded in `checks.json` with the version |
 
 ## 11. Scripting and extensibility
 

@@ -52,7 +52,7 @@ Measured (`kimbim-app --self-test`, integrated GPU): Duplex at 60 fps (vsync); a
 
 Not yet: colour by property, walk mode, measure, saved views, a "show spaces" toggle, section-box handles (the box is around the selection), and a fix for vsync double-waits in a bare top-level viewport.
 
-### M2 — Object data editor 🟡 (classifications and a type manager left)
+### M2 — Object data editor ✅
 Command/undo framework, property and pset editing, materials, types, classifications, bulk edit, schedules, save IFC (Plain mode).
 **Exit:** edit → save → reopen preserves everything; round-trip tests pass on the saved file.
 
@@ -64,8 +64,7 @@ Done in Slice 3 ([plan](superpowers/plans/2026-10-05-slice3-navigation-and-data-
 - Save / Save As with an unsaved-changes guard; the saved file round-trips;
 - Revit/ArchiCAD navigation; multi-select by Ctrl/Shift-click, box and tree.
 
-Done since: building materials, surfaces and composites (D96), schedules and quantities with CSV/XLSX (D77), object types from the library (D86).
-Not yet: classifications (Uniclass, OmniClass), a type manager (assign, edit, update all).
+Done since: building materials, surfaces and composites (D96), schedules and quantities with CSV/XLSX (D77), object types from the library (D86), and the M2 leftovers in D106: **classifications** (Uniclass 2015, OmniClass and local systems; `IfcClassification`/`IfcClassificationReference`, assign and unassign) and a **type manager** (list types, make one from the selection, assign, edit name/description/tag and properties, *update all* removes occurrence overrides). Both have Model menu dialogs and CLI/agent tools; the Properties panel lists the selection's classifications. Tests: `test_classifications.py`, `test_types.py` and the app's `test_types`.
 
 ### M3 — Modeler ✅ (automatic exit checks pass; the owner's check in Bonsai + a commercial viewer is pending — [12](12-m3-exit.md))
 Levels and grids, walls (layered, joins), slabs, openings, doors/windows, columns/beams, snapping, precise input, move/rotate/stretch.
@@ -104,17 +103,16 @@ Done in Slice 1: `init / commit / status / log / show / export / branch / switch
 `kimbim init / import / commit / log / show / export / branch / switch / tag` on the gitoxide-backed store; local cache.
 **Exit:** import 100k-object model, change one property, commit; the new commit adds only a handful of objects.
 
-### R3 — Diff 🟡
-Record-level diff (added/modified/removed per object) done in Slice 1. Property-level detail and speed work remain.
+### R3 — Diff ✅
+Record-level diff (added/modified/removed per object) was done in Slice 1. D105 adds the rest: `Project.diff_details` explains every modified element (attributes, including **Placement** and **Geometry** by name, and every property set's properties with old/new values), groups the change by IFC class and by level (the tree), and the CLI/agent `versions diff` prints it as text or JSON (`--detail`). The tree diff now works from Git tree ids, skips identical subtrees and reads only the changed records; the app also keeps the decomposed working model shared by `version_changes`, Compare with WORKING and Save version, so it is decomposed once instead of three times.
 
-Tree diff, per-category classification, property-level changes, JSON and human output.
-**Exit:** diff time depends on the size of the change, not the size of the model (benchmark).
+**Exit:** met. On one renamed wall (`Project.diff`), 50 walls took 0.053 s and 8,000 walls 0.074 s (not proportional to the model); property detail took 0.15 s and 1.5 s respectively (it indexes the object records for the property sets). `tests/python/test_diff.py` checks the detail, the CLI and a 20× model with a one-element diff; `test_versioning_app.py::test_compare_and_save_reuse_one_decomposition` checks the single decomposition. The D102 Clinic compare cost was the repeated full decomposition; it is now done once per working state (the remaining first decomposition is the R1/Python-decomposer limit).
 
-### R4 — Merge and reconciliation 🟡 (merge ✅ Slice 21; reconciliation to do)
-Slice 21 ([plan](superpowers/plans/2026-10-07-slice21-merge-engine.md)): three-way record merge with the conflict model, integrity pass and IFC validation, `kimbim merge`, and ifcmerge's cases ported (fixtures in `tests/fixtures/ifcmerge`).
+### R4 — Merge and reconciliation ✅
+Slice 21 ([plan](superpowers/plans/2026-10-07-slice21-merge-engine.md)): three-way record merge with the conflict model, integrity pass and IFC validation, `kimbim merge`, and ifcmerge's cases ported (fixtures in `tests/fixtures/ifcmerge`). D104 adds the reconciliation half: `kimbim versions import FILE -m MESSAGE [--accept-heuristic] [--dry-run]` matches the imported products by GlobalId, then class + Tag, then a heuristic (class, name, type, storey, nearby placement), gives matched objects the existing GlobalIds and commits the result as an ordinary version. `--dry-run` prints the report, `--accept-heuristic` applies the review matches, and `--report OUT` writes the JSON.
 
 Three-way merge with conflict model, integrity pass, conflict serialization for the UI; GlobalId/Tag/heuristic reconciliation with report.
-**Exit:** merge test suite (including ported `ifcmerge` cases) passes; re-importing a Revit-exported file with regenerated GlobalIds keeps more than 95% of identities on the corpus pair.
+**Exit:** met: the merge suite (including the ported `ifcmerge` cases) passes; on the Duplex corpus pair with every GlobalId regenerated, reconciliation keeps **99.66%** of product identities (232 by Tag, 62 by heuristic, 1 new and 1 missing of 295 products), and `tests/python/test_reconcile.py::test_the_duplex_reimport_keeps_most_identities` checks it (`pytest -m slow`).
 
 ## M5 — Versioned projects in the app ✅ (exit test automated: `pixi run m5` + app test `m5ExitCombineOptions`)
 Slices: **8 ✅ enable/open, Save version, History, Compare (colours + list), design options** → **20 ✅ milestones (tags), object history, before/after, delete option** ([plan](superpowers/plans/2026-10-07-slice20-milestones-history.md)) → **21 ✅ R4 merge engine** (repository side; [plan](superpowers/plans/2026-10-07-slice21-merge-engine.md)) → **22 ✅ Combine options** (conflict UI: this option or the other per element and property, the combined model as a 3D preview, commit with two parents; [plan](superpowers/plans/2026-10-07-slice22-combine-options.md)) = M5 exit. (These were called 9 and 10 before the architect-feedback track took Slices 9–13.)
@@ -125,18 +123,18 @@ Enable/disable versioning, Save version, history timeline, Compare (viewport col
 ## Archicad parity track ✅ (D74–D98, 2026-10-09 to 2026-10-22)
 After M5 the owner asked for Archicad feature parity before checking. Done: renovation status (D74), one-row window chrome and the Versions menu (D75), view cube, preset views and perspective (D76), schedules (D77), selection tools (D78), measure and the levels table (D79), split/trim/join (D80), checks (D81), the Python console (D82), DXF export (D83), 2D drafting (D84), underlays (D85), the object library (D86), tags and more dimensions (D87), stairs, ramps and railings (D88), input aids and touchpad (D89), the compact palette (D90), the owner's answers and configurable behaviour (D91–D93), the rename to KimBim (D94), 3D cut planes (D95), materials (D96), wall and object configuration, curved walls (D97) and tooling (D98). Status per tool: [14](14-tool-inventory.md).
 
-## M6 — Checking 🟡 (in-app checks done, D81; pre-commit checks left)
+## M6 — Checking ✅ (D81 in-app checks; D103 pre-commit checks)
 Schema validation, IDS checks with IfcTester, clash between selections, configurable local pre-commit checks.
 
 Done in D81: the Checks panel runs schema validation (EXPRESS rules included), IDS files kept in the project, hard and clearance clashes between classes or Find & Select criteria, and model checks (duplicates, rooms, zero-length walls, elements not on a level, hostless openings), with HTML/JSON reports.
-Not yet: checks chosen per project that run when a version is saved and warn or block it; BCF export of the results.
-**Exit:** a project's chosen checks run on Save version; a failing blocking check stops the save with a list of the elements, and a warning check saves and records the result with the version.
+Done in D103 (M6 exit): *Before saving a version* in the Checks panel picks each check as Off, **Warn and save** or **Block the save** (project setting `precommit_checks`). A blocking check with any issue stops the save and lists the elements (in the app's dialog and in the bridge reply); a warning check saves and its result is recorded as `checks.json` in the version's tree and shown from History › Checks...
+**Exit:** met by `tests/python/test_precommit.py` and the app test `test_checks`'s `precommitChecksBlockAndRecord`.
 
 ## After the MVP: full IFC4X3
 New IFC4X3 projects, schema upgrade command, IFC4X3 test suites become release-blocking ([02](02-data-model-and-format.md#ifc-schema-version)).
 
-## Next (2026-10-25)
-Done since: the Object settings dialog and saved object versions (D100), and the Object Editor (D101), which completes **parametric object authoring** ([16](16-parametric-objects.md)). In order: finish **M6** (pre-commit checks, the exit above) → **R4 reconciliation** (re-import with regenerated GlobalIds) → **R3** property-level diff and the speed benchmark → the M2 leftovers. [14](14-tool-inventory.md#largest-gaps) lists the largest remaining tool gaps (DWG, imperial units, curtain walls). The owner's M3 check in Bonsai and a commercial viewer is still open ([12](12-m3-exit.md)).
+## Next (2026-10-28)
+Done since: the Object settings dialog and saved object versions (D100), the Object Editor (D101, parametric object authoring), agent tools (D102), **M6 pre-commit checks** (D103), **R4 reconciliation** (D104, re-import with regenerated GlobalIds; 99.66% identities kept on the Duplex pair), **R3 property-level diff and a change-sized diff** (D105) and the **M2 leftovers** (D106, classifications and the type manager). Git remote push/pull (D107), imperial units (D108) and the owner's four gaps (D109: DWG in/out through LibreDWG, curtain walls, sloped slabs and slab edges) are in. The remaining [14](14-tool-inventory.md#largest-gaps) items are detail views/markers, title block templates, schedules on sheets, terrain and BCF; curtain walls have a palette tool; slopes and edges are Model menu actions. The owner's M3 check in Bonsai and a commercial viewer is still open ([12](12-m3-exit.md)); [14](14-tool-inventory.md#largest-gaps) asks the owner to confirm or reorder the list.
 
 ## Then
-See [08-future.md](08-future.md). Push/pull to Git remotes is the cheapest next step, because the storage is already Git.
+See [08-future.md](08-future.md). Git remote push/pull is in (D107); a merge-aware pull and the remotes UI are the next remote steps. The owner reorders the remaining tool gaps in [14](14-tool-inventory.md#largest-gaps).

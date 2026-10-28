@@ -70,6 +70,7 @@ geometry/<aa>/<hash>.json                # heavy geometry records
 
 **Since D72:** every `.kim` is versioned. Ctrl+S saves the file (the working copy and the project settings) without making a version; *Save version* adds one. Opening an `.ifc` makes a `.kim` beside it with a first version "Imported from …" (a preference keeps the old Plain mode). Building that first version with the Python decomposer takes minutes on large files (the Clinic, 13 MB: about 6 min), so an IFC over the `large_ifc_mb` preference (default 5 MB) asks first, offering to edit the IFC directly instead; the conversion runs on a worker thread behind a progress window. Project settings are `settings.json` in each version's tree. A `.kim` or project folder is locked (`<file>.kim.lock`, or `.kimbim/lock`) while someone edits it; others open it read-only.
 
+- **Pre-commit checks (M6, D103):** the project setting `precommit_checks` picks the schema, IDS, clash or model checks that run on *Save version*, each `warn` or `block`. A `block` check with any issue stops the save and lists its elements; a `warn` check lets the save through and its result is stored as `checks.json` in that version's tree (never in the model, never part of a diff).
 - **Enable versioning:** creates the repository from the current model. The first commit is "Initial import".
 - **Working copy (Slice 8):** the open model is the working state. *Save version* writes it to `<project>/.kimbim/working.ifc` (local, never committed) and commits it. Opening a project or switching option exports that option's latest version to the same file. Unsaved work is guarded on close, open and option switches (save a version / discard / cancel).
 - **Disable versioning:** exports the current state to `.ifc` and reverts to Plain mode. History stays in the folder unless the user deletes it.
@@ -95,6 +96,8 @@ user command ──► transaction ──► IFC model updated ──► change 
 ## Diff ("Compare")
 
 A diff compares two root trees. Unchanged subtrees are skipped by hash, so the cost depends on the size of the change, not the size of the model.
+
+**Property-level detail (R3, D105).** `Project.diff_details` (the CLI's `kimbim versions diff --from REV [--to REV]`, and the agent tool `versions.diff` with `detail: true`) adds, for each modified element, the attributes that changed (an `ObjectPlacement` is shown as **Placement**, a `Representation` as **Geometry**) and every property set's properties with their old and new values; added and removed elements are listed too. It groups the change by IFC class and by level (the tree) and returns JSON or prints it as text. A changed property set is attributed to the elements that use it. The tree walk follows Git tree ids and stops at identical subtrees; a property or name edit reads only the changed records, while a change to a shared node or an anchor value falls back to the full content pass. The app keeps the decomposed working model across `version_changes`, Compare with WORKING and Save version, so a large model is decomposed once per state instead of once per operation.
 
 Diff categories (spec §16), all derived from record changes:
 
@@ -151,6 +154,14 @@ Matching cascade, from strongest to weakest:
 2. **Authoring-tool ID**, for example `IfcElement.Tag` (Revit element ID) or an application-specific property, together with the same IFC class.
 3. **Heuristic:** same class and type, same storey, similar name, nearby placement or centroid. The match gets a confidence score.
 
+Since D104 the engine does this in `kimbim.reconcile` and on the command line:
+
+```bash
+kimbim versions import revised.ifc -m "Re-import the consultant's model" [--accept-heuristic] [--dry-run] [--report report.json]
+```
+
+The report counts the matches by **GlobalId**, by **Tag** and by **heuristic** (score in the JSON report) and lists the unmatched (new) and missing (deleted) products. Matched imported objects are given the existing GlobalIds before the normal commit, so their records, Compare and history stay; heuristic matches are only applied with `--accept-heuristic` (the CLI shows them for review first). If a target GlobalId still belongs to an unmatched imported object, that match is skipped and reported.
+
 The result is a **reconciliation report** that the user reviews before committing:
 
 ```text
@@ -184,9 +195,15 @@ kimbim versions options                         # design options
 kimbim versions branch [NAME] / switch NAME     # list or create an option, switch to one
 kimbim versions tag [NAME] [-m NOTE]            # milestones
 kimbim versions merge OPTION [--resolve ID=CHOICE]
+kimbim versions import FILE.ifc -m MESSAGE [--accept-heuristic] [--dry-run]
 kimbim versions element-history --element GLOBALID   # object history ("blame")
 kimbim versions show KEY [--rev REV]            # canonical JSON
+kimbim versions remotes [--add NAME=URL] [--remove NAME]
+kimbim versions push [REMOTE] [--branch NAME]   # the current option by default
+kimbim versions pull [REMOTE] [--branch NAME]   # fetch + fast-forward; a diverged branch is refused
 ```
 
-Not yet: `import` with a reconciliation report, `export-tree`, and `push` / `pull` (thin wrappers over git remotes).
+`push` and `pull` are thin wrappers over git with `GIT_TERMINAL_PROMPT=0`, so credentials must be configured for the host (SSH agent, credential helper). `pull` is **fast-forward only**: a diverged option is refused and asks you to push your versions or combine them in a design option, never to run Git's text merge over IFC records. The app's Versions menu has *Push to remote...* and *Pull from remote...*.
+
+Not yet: `export-tree`, and a merge-aware remote pull.
 The old top-level commands (`kimbim commit`, `kimbim log`...) are gone.

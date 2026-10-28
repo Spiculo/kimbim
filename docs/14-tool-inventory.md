@@ -37,7 +37,7 @@ release notes, so check before relying on a single cell.
 | Project templates (units, levels, types, views, title blocks) | AC RV VW | ✅ | P0 | D72: office templates (File › New from template, Save as template) |
 | Autosave, crash recovery | AC RV VW | ✅ | P0 | D72: recovery copies on a timer, offered again after a crash; no oplog yet ([03](03-versioning.md)) |
 | Recent projects | all | ✅ | P0 | File › Recent files |
-| Imperial units, unit preferences | all | ⬜ | P0 | Metric only today |
+| Imperial units, unit preferences | all | ✅ | P0 | D108: project length units m/cm/mm/**ft/in** and areas m²/cm²/mm²/**ft²/in²**, in Project settings, every length/area field and format; the model stays in metres |
 | Project info (address, client, number) used in title blocks | AC RV VW | ✅ | new | Slice 16: *File › Project info…*, in IFC fields (D63) |
 | Survey point, project base point, georeferencing | AC RV VW BB | ⬜ | P2 | `ifcopenshell.api.georeference` |
 | Story settings (levels table: edit heights, insert/delete) | AC RV | ✅ | P0 | D79: Model › Levels..., one undo step; elements follow |
@@ -134,7 +134,7 @@ release notes, so check before relying on a single cell.
 | Wall attached to a slab or roof above | AC RV | 🟡 | new | D97: top linked to the level above (Properties › Geometry › Top link); Model › Trim walls to roof |
 | Slabs by outline or from walls | all | ✅ | P0 | |
 | Slab openings | all | ✅ | P0 | |
-| Sloped slabs, slab edges | AC RV VW | ⬜ | new | |
+| Sloped slabs, slab edges | AC RV VW | 🟡 | new | D109: `elements.set_slab_slope` tilts a slab about its local X/Y (rise over run; 0 returns flat, base kept in `KIMBIM_Slab`) and `create.slab_edge` adds `IfcMember` edges around a slab. CLI/agent only; no tool-palette fields yet |
 | Doors and windows in walls (parametric) | all | ✅ | P0 | Basic types |
 | Door/window variety: sliding, double, corner window, skylight, storefront | all | 🟡 | new | D97: double, sliding, double sliding doors; two- and three-panel windows; no corner windows, skylights or storefronts |
 | Door swing and window symbols in plan | all | ✅ | new | Door leaves and swing arcs in plan drawings (drawgen.door_swings) |
@@ -149,7 +149,7 @@ release notes, so check before relying on a single cell.
 | Roofs: flat | all | ✅ | P1 | Slice 19 (D66) |
 | Roofs: pitched, hip, gable, multi-plane, by footprint | all | ✅ | P1 | Slice 19 (D66): shed, gable, hip, a slope per edge; walls trimmed to the roof |
 | Shell / free-form roof | AC RV | ⬜ | new | |
-| Curtain walls (grids, mullions, panels) | AC RV VW | ⬜ | P2 | |
+| Curtain walls (grids, mullions, panels) | AC RV VW | 🟡 | P2 | D109: `create.curtain_wall` makes an `IfcCurtainWall` panel (`IfcCurtainWallType`, `KIMBIM_CurtainWall` height/spacing/panel thickness) with vertical mullions and top/bottom rails as aggregated IfcMembers; the Curtain wall tool is in the 3D palette |
 | Ceilings | RV VW | ⬜ | new | Archicad uses slabs |
 | Zones / rooms / spaces (auto from walls, area, name, number) | all | ✅ | P1 | Slice 18 (D65): Room tool (Z), stamps, room schedule |
 | Area plans (gross, rentable) | RV VW | ⬜ | new | |
@@ -189,8 +189,8 @@ release notes, so check before relying on a single cell.
 | Layers (shown, locked, active) | AC VW | ✅ | — | D57 |
 | Layer combinations / view templates | AC RV VW | 🟡 | new | D73: layer combinations in purposes; saved views store layer states; no view templates |
 | Graphic overrides / view filters (rules by property) | AC RV VW | ✅ | new | D73: override rules by property, class, kind, layer, material, chosen per purpose |
-| Classifications (Uniclass, OmniClass, local) | AC RV VW BB | ⬜ | P1 | |
-| Element types: assign, edit type, update all | all | 🟡 | P0 | Type values and overrides ✅ (D50); no type manager |
+| Classifications (Uniclass, OmniClass, local) | AC RV VW BB | ✅ | P1 | D106: Model › Classifications..., `IfcClassificationReference` assignment, `classifications.*` bridge/CLI tools; shipped system metadata (Uniclass 2015, OmniClass, Local), codes typed by the office |
+| Element types: assign, edit type, update all | all | ✅ | P0 | D50 type values and overrides; D106 type manager (Model › Type manager...): list, create from selection, assign, edit name/description/tag and properties, update all removes overrides |
 | Property editing, psets, bulk edit | all | ✅ | P0 | |
 | Dimensions group (length, height… edits the shape) | AC RV | ✅ | — | |
 | Expression / calculated properties | AC RV VW | ⬜ | new | Archicad expression-based properties, Revit formulas |
@@ -290,7 +290,7 @@ release notes, so check before relying on a single cell.
 
 | Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
-| Save version, History, Compare (colours and list) | — | ✅ | P0 | KimBim's own feature (Slice 8). Competitors have backups and Revit compare add-ins at most |
+| Save version, History, Compare (colours and list) | — | ✅ | P0 | KimBim's own feature (Slice 8). Competitors have backups and Revit compare add-ins at most. D105: property-level attributes and properties, categories and the level tree in `versions diff --detail` (JSON or text) |
 | Milestones, object history, before/after | — | ✅ | P0 | Slice 20 (M5) |
 | Combine options with conflict UI | — | ✅ | P1 | Slice 22 (D69), M5 exit |
 | Several people on one project (Teamwork, Worksharing, Project Sharing) | AC RV VW | 🔮 | P2 | Git remotes first ([08](08-future.md)) |
@@ -306,7 +306,7 @@ release notes, so check before relying on a single cell.
 |------|-----|--------|-----|-------|
 | IFC export, valid against the schema | all | ✅ | P0 | Checked in CI |
 | IFC export settings (what to export, property mapping) | AC RV VW | ⬜ | new | |
-| Re-import with reconciliation report | — | ⬜ | P1 | |
+| Re-import with reconciliation report | — | ✅ | P1 | D104: `kimbim versions import` matches by GlobalId, Tag, then a reviewed heuristic; dry run and JSON report |
 | DWG/DXF import (underlay and convert) | all | 🟡 | new | D85: DXF as an underlay (units, exploded blocks, snapping to ends, midpoints, crossings). No DWG yet, no convert to 2D elements. Architects receive most survey and consultant data as DWG |
 | PDF import | AC RV VW | 🟡 | new | D85: a PDF page as an underlay (an image); no vectors |
 | SketchUp, Rhino, OBJ, FBX import | AC RV VW | ⬜ | new | |
@@ -345,15 +345,15 @@ object library, 2D drafting and fills, pen sets and cut fills, the navigation ba
 
 What now most often stops an architect from finishing a real project, roughly in the order it would come up:
 
-1. **DWG in and out** (§14, §18). DXF works both ways (D83, D85); most surveys and consultants send DWG.
+1. ✅ **DWG in and out** (§14, §18): D109 converts DWG underlays through LibreDWG (`dwg2dxf`) and exports drawings/sheets with `dxf2dwg` (`versions export-dwg`). The converter lives in its own `dwg` pixi environment because conda-forge's libredwg cannot share IfcOpenShell's msys2 epoch; `KIMBIM_DWG_BIN` points at another install. The app's DXF export dialog has a DWG format.
 2. ✅ **Parametric object authoring** (§8): make and customise objects without writing code. Done: the `.kimobj` engine (D99), the settings dialog with saved versions (D100) and the Object Editor (D101). Design: [16](16-parametric-objects.md).
-3. **Imperial units** (§1). Metric only; blocks every US office.
-4. **Curtain walls** (§6) and **sloped slabs / slab edges** (§6).
+3. ✅ **Imperial units** (§1): D108 (m/cm/mm/ft/in, matching areas; feet-and-inches text and imperial paper still to do).
+4. 🟡 **Curtain walls** (§6) and **sloped slabs / slab edges** (§6): D109 adds the data/model APIs (`create.curtain_wall`, `set_slab_slope`, `create.slab_edge`) and tests; the curtain wall now has a palette tool; slopes and edges are Model menu actions.
 5. **Detail views and markers** linked to the model (§11, §13), and **title block templates** (§14).
 6. **Schedules on sheets** and **drawing/sheet lists** (§14, §15).
-7. **Re-import with reconciliation** (§18): the R4 half of the roadmap still to do.
-8. **Classifications and a type manager** (§9): the M2 leftovers.
+7. ✅ **Re-import with reconciliation** (§18): D104.
+8. ✅ **Classifications and a type manager** (§9): D106.
 9. **Terrain** (§7).
 10. **BCF issues** (§17), for working with consultants.
 
-Next step: the owner confirms or reorders this list. 04 is then updated to match.
+Next step: the owner confirms or reorders the remaining list. 04 is then updated to match. The DWG pipeline is in; curtain walls and sloped slabs have their model APIs but not their tool-palette UI/geometry.

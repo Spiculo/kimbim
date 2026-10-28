@@ -6,7 +6,7 @@
 
 **Cheapest path:** the repository is already Git ([03](03-versioning.md)), so sync is `git fetch` / `git push` to any Git remote: a self-hosted Forgejo/Gitea, GitLab, GitHub, or a bare repo on a shared drive or LAN machine.
 
-- `kimbim pull` = fetch + KimBim merge (never Git's text merge).
+- `kimbim pull` today = fetch + **fast-forward** (a diverged option is refused; combine it in a design option). A merge-aware pull that runs KimBim's record merge (never Git's text merge) is the next step.
 - Partial clone / sparse fetch (Git `--filter=blob:none`) lets clients download geometry blobs lazily.
 
 **Constraint on current work:** keep everything in standard Git objects and refs, and keep no state outside the repo that collaborators need.

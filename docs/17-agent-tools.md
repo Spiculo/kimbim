@@ -144,7 +144,7 @@ would change and changes nothing. This table is the output of `kimbim help --mar
 | `project_info` | `kimbim project info` | Describe the open project: name, schema, levels, element counts per kind, the current option and whether there are unsaved changes. |  |
 | `project_set_settings` | `kimbim project set-settings` | Change project settings (units, decimals, display options...) as one undo step. | yes |
 | `project_settings` | `kimbim project settings` | Read the project settings (units, decimals, display options...), all or just the named keys. |  |
-| `versions_diff` | `kimbim versions diff` | Compare two versions: the elements added, modified and removed from one to the other (WORKING is the open model with its unsaved changes). |  |
+| `versions_diff` | `kimbim versions diff` | Compare two versions: the elements added, modified and removed from one to the other (WORKING is the open model with its unsaved changes); with detail, each modified element's attributes and properties. |  |
 | `versions_element_history` | `kimbim versions element-history` | List the saved versions that changed an element, newest first. |  |
 | `versions_export` | `kimbim versions export` | Write a version of the model as an IFC file (HEAD, the latest saved one, by default). |  |
 | `versions_log` | `kimbim versions log` | List the saved versions of the current option, newest first: id, message, author, time, milestones. |  |
@@ -159,6 +159,7 @@ would change and changes nothing. This table is the output of `kimbim help --mar
 | `elements_delete` | `kimbim elements delete` | Delete elements (and the doors/windows they host). | yes |
 | `elements_find` | `kimbim elements find` | Find elements and list them: GlobalId, label, kind and level, a page at a time. |  |
 | `elements_get` | `kimbim elements get` | Describe elements in full: class, type, level, dimensions (metres), property sets, host and openings. |  |
+| `elements_get_slab_slope` | `kimbim elements get-slab-slope` | A slab's slope (rise over run). |  |
 | `elements_mirror` | `kimbim elements mirror` | Mirror elements across a line on the plan. | yes |
 | `elements_move` | `kimbim elements move` | Move elements by dx, dy, dz. | yes |
 | `elements_remove_properties` | `kimbim elements remove-properties` | Remove properties from elements. | yes |
@@ -167,12 +168,15 @@ would change and changes nothing. This table is the output of `kimbim help --mar
 | `elements_set_dimensions` | `kimbim elements set-dimensions` | Change dimensions of elements: width, height and sill of doors/windows, height or length of walls, columns and beams. | yes |
 | `elements_set_layer` | `kimbim elements set-layer` | Move elements to a layer. | yes |
 | `elements_set_properties` | `kimbim elements set-properties` | Set property values on elements, creating the property set when needed. | yes |
+| `elements_set_slab_slope` | `kimbim elements set-slab-slope` | Tilt slabs: 0, 0 returns them to horizontal. | yes |
 | `elements_set_status` | `kimbim elements set-status` | Set the renovation status of elements: existing, demolish, new, temporary or auxiliary. | yes |
 | `create_beam` | `kimbim create beam` | Create a beam between two points on a level. | yes |
 | `create_column` | `kimbim create column` | Create a column standing on a level. | yes |
+| `create_curtain_wall` | `kimbim create curtain-wall` | Create an IfcCurtainWall on a level, with its glazed panel and mullion spacing. | yes |
 | `create_opening` | `kimbim create opening` | Put a door or window in a wall. | yes |
 | `create_room` | `kimbim create room` | Create a room filling the walled-in space around a point. | yes |
 | `create_slab` | `kimbim create slab` | Create a slab on a level from an outline or from a closed loop of walls (the outline follows their outer faces). | yes |
+| `create_slab_edge` | `kimbim create slab-edge` | Add a raised edge around a slab, one IfcMember per side. | yes |
 | `create_types` | `kimbim create types` | List the types you can create of a kind: GlobalId, name and size (wall thickness, default door/window sizes). |  |
 | `create_wall` | `kimbim create wall` | Create a straight wall on a level. | yes |
 | `objects_assign_version` | `kimbim objects assign-version` | Move placed library objects to a saved version. | yes |
