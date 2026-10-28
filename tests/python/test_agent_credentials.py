@@ -122,3 +122,26 @@ def test_openai_endpoint_keeps_a_query(monkeypatch, base, want):
                                     json.dumps({"provider": "openai", "model": "m", "base_url": base})))
     assert out["ok"], out
     assert seen == [want]
+
+def test_openai_falls_back_to_responses_for_reasoning_models(monkeypatch):
+    calls = _fake_live(monkeypatch)
+    urls = []
+
+    def http(url, headers, body):
+        urls.append(url)
+        if "/chat/completions" in url:
+            raise assistant.AssistantError(
+                "provider_error", "Function tools with reasoning_effort are not supported; use /v1/responses")
+        if len(urls) == 2:
+            return {"output": [{"type": "function_call", "call_id": "c1", "name": "project_info", "arguments": "{}"}]}
+        return {"output": [{"type": "message", "content": [{"type": "output_text", "text": "done"}]}]}
+
+    monkeypatch.setattr(assistant, "_http", http)
+    out = json.loads(assistant.chat('[{"role":"user","content":"hi"}]',
+                                    json.dumps({"provider": "openai", "model": "gpt-6-luna",
+                                                "base_url": "https://provider.example/v1/chat/completions?api-version=1"})))
+    assert out["ok"], out
+    assert out["result"]["text"] == "done"
+    assert urls[0] == "https://provider.example/v1/chat/completions?api-version=1"
+    assert urls[1] == "https://provider.example/v1/responses?api-version=1"
+    assert calls == [("project.info", {})]

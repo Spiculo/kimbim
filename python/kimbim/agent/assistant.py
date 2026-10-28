@@ -142,8 +142,21 @@ def _call_anthropic(config: dict, messages: list[dict], system: str, schemas: li
     raise AssistantError("too_many_steps", "The model kept calling tools; stop and ask again.")
 
 
-def _call_openai(config: dict, messages: list[dict], system: str, schemas: list[dict], back: dict) -> dict:
-    key = _key(config.get("provider") or "openai")
+def _responses_url(base: str) -> str:
+    """The `/responses` sibling of the configured Chat Completions URL (keeping a query string)."""
+    parts = urlsplit((base or OPENAI_DEFAULT).strip())
+    path = parts.path.rstrip("/")
+    for suffix in ("/chat/completions", "/responses"):
+        if path.endswith(suffix):
+            path = path[:-len(suffix)]
+            break
+    if not path.endswith("/v1"):
+        path += "/v1"
+    return urlunsplit((parts.scheme, parts.netloc, path + "/responses", parts.query, parts.fragment))
+
+
+def _openai_chat(key: str, config: dict, messages: list[dict], system: str, schemas: list[dict],
+                 back: dict) -> dict:
     url = _endpoint(config.get("base_url") or OPENAI_DEFAULT, "/chat/completions", OPENAI_DEFAULT)
     headers = {"Authorization": f"Bearer {key}", "content-type": "application/json"}
     model = config.get("model") or "gpt-4o-mini"
@@ -175,6 +188,51 @@ def _call_openai(config: dict, messages: list[dict], system: str, schemas: list[
             thread.append({"role": "tool", "tool_call_id": call.get("id", ""),
                            "content": json.dumps(envelope, ensure_ascii=False)})
     raise AssistantError("too_many_steps", "The model kept calling tools; stop and ask again.")
+
+
+def _openai_responses(key: str, config: dict, messages: list[dict], system: str, schemas: list[dict],
+                      back: dict) -> dict:
+    """The OpenAI Responses API, whose tools work with reasoning models that reject Chat Completions tools."""
+    url = _responses_url(config.get("base_url") or OPENAI_DEFAULT)
+    headers = {"Authorization": f"Bearer {key}", "content-type": "application/json"}
+    model = config.get("model") or "gpt-4o-mini"
+    tools = [{"type": "function", "name": s["name"], "description": s["description"],
+              "parameters": s["input_schema"]} for s in schemas]
+    items = [{"role": "system", "content": system}, *messages]
+    used: list[dict] = []
+    for _ in range(MAX_STEPS):
+        data = _http(url, headers, {"model": model, "input": items, "tools": tools})
+        output = data.get("output") or []
+        text = "".join(part.get("text", "") for item in output if item.get("type") == "message"
+                       for part in (item.get("content") or []) if part.get("type") == "output_text").strip()
+        calls = [item for item in output if item.get("type") == "function_call"]
+        if not calls:
+            return {"text": text, "tool_calls": used}
+        items.extend(output)
+        for call in calls:
+            try:
+                args = json.loads(call.get("arguments") or "{}")
+            except ValueError:
+                args = {}
+            envelope = _tool(call.get("name", ""), args, back)
+            used.append({"name": call.get("name", ""), "summary": _summary(call.get("name", ""), envelope),
+                         "snapshot": (envelope.get("result") or {}).get("path", "")
+                         if call.get("name") == "snapshot_take" else ""})
+            items.append({"type": "function_call_output", "call_id": call.get("call_id", ""),
+                          "output": json.dumps(envelope, ensure_ascii=False)})
+    raise AssistantError("too_many_steps", "The model kept calling tools; stop and ask again.")
+
+
+def _call_openai(config: dict, messages: list[dict], system: str, schemas: list[dict], back: dict) -> dict:
+    key = _key(config.get("provider") or "openai")
+    try:
+        return _openai_chat(key, config, messages, system, schemas, back)
+    except AssistantError as ex:
+        # Some reasoning models refuse tools on Chat Completions and name the Responses API in the error.
+        text = ex.message.lower()
+        if ex.code == "provider_error" and ("/v1/responses" in text or "reasoning_effort" in text):
+            return _openai_responses(key, config, messages, system, schemas, back)
+        raise
 
 
 def _dump(data: dict) -> str:
