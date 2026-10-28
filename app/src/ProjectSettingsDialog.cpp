@@ -6,8 +6,10 @@
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
+#include <QFrame>
 #include <QJsonArray>
 #include <QLabel>
+#include <QScrollArea>
 #include <QSpinBox>
 #include <QVBoxLayout>
 
@@ -20,8 +22,15 @@ ProjectSettingsDialog::ProjectSettingsDialog(const QJsonObject& settings, bool k
     , m_settings(settings)
 {
     setWindowTitle(tr("Project settings"));
+    resize(640, 720);
+    setMinimumSize(520, 400);
     auto* layout = new QVBoxLayout(this);
-    auto* form = new QFormLayout;
+    auto* scroll = new QScrollArea(this);
+    scroll->setObjectName(QStringLiteral("projectSettingsScroll"));
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    auto* page = new QWidget(scroll);
+    auto* form = new QFormLayout(page);
     m_cut = new QDoubleSpinBox(this);
     m_cut->setObjectName(QStringLiteral("cutHeight"));
     m_cut->setRange(0.01, 20.0);
@@ -200,7 +209,8 @@ ProjectSettingsDialog::ProjectSettingsDialog(const QJsonObject& settings, bool k
     m_planSymbols->setObjectName(QStringLiteral("planSymbols"));
     m_planSymbols->setChecked(settings.value("plan_symbols").toBool(true));
     form->addRow(QString(), m_planSymbols);
-    layout->addLayout(form);
+    scroll->setWidget(page);
+    layout->addWidget(scroll, 1);
     auto* note = new QLabel(tr("These settings aren't kept with a plain IFC file. Save as .kim to keep them."), this);
     note->setObjectName(QStringLiteral("notKeptNote"));
     note->setWordWrap(true);

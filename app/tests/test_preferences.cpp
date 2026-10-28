@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include <QApplication>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -7,6 +8,8 @@
 #include <QCheckBox>
 #include <QLabel>
 #include <QLineEdit>
+#include <QScrollArea>
+#include <QScrollBar>
 #include <QSpinBox>
 #include <QtTest>
 
@@ -168,6 +171,18 @@ private slots:
         QVERIFY(!p.splitJoin());
         QCOMPARE(p.authorName(), QString("Felipe"));
         QCOMPARE(p.templatesFolder(), QString("Z:/Plantillas"));
+    }
+
+    void preferencesScrollWhenTheWindowIsShort()
+    {
+        kimbim::Preferences p; // in memory
+        kimbim::PreferencesDialog d(p, nullptr);
+        d.resize(560, 420); // smaller than the form: the fields must stay reachable
+        d.show();
+        QApplication::processEvents();
+        auto* scroll = d.findChild<QScrollArea*>(QStringLiteral("preferencesScroll"));
+        QVERIFY(scroll && scroll->widgetResizable());
+        QVERIFY(scroll->verticalScrollBar()->maximum() > 0);
     }
 };
 

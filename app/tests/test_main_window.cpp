@@ -2757,6 +2757,8 @@ private slots:
                                          {"scales", QJsonArray{500, 100, 50, 20}},
                                          {"ifc_status_default", "existing"}}, /*kept=*/false, nullptr);
         QVERIFY(d.findChild<QLabel*>("notKeptNote")->isVisibleTo(&d));
+        auto* settingsScroll = d.findChild<QScrollArea*>(QStringLiteral("projectSettingsScroll"));
+        QVERIFY(settingsScroll && settingsScroll->widgetResizable());
         auto* reference = d.findChild<QComboBox*>("levelReference"); // D92
         auto* sea = d.findChild<QDoubleSpinBox*>("seaLevel");
         QVERIFY(reference && sea);

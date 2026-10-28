@@ -6,10 +6,12 @@
 #include <QDialogButtonBox>
 #include <QFileDialog>
 #include <QFormLayout>
+#include <QFrame>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QSpinBox>
 #include <QVBoxLayout>
 
@@ -35,8 +37,15 @@ PreferencesDialog::PreferencesDialog(Preferences& prefs, QWidget* parent)
     , m_prefs(prefs)
 {
     setWindowTitle(tr("Preferences"));
+    resize(760, 700);
+    setMinimumSize(560, 420);
     auto* layout = new QVBoxLayout(this);
-    auto* form = new QFormLayout;
+    auto* scroll = new QScrollArea(this);
+    scroll->setObjectName(QStringLiteral("preferencesScroll"));
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    auto* page = new QWidget(scroll);
+    auto* form = new QFormLayout(page);
 
     m_language = choice(this, "language", {{tr("Automatic (system)"), "auto"}, {QStringLiteral("English"), "en"},
                                               {QStringLiteral("Español"), "es"}}, prefs.language());
@@ -272,7 +281,8 @@ PreferencesDialog::PreferencesDialog(Preferences& prefs, QWidget* parent)
     m_assistantKeyNote->setWordWrap(true);
     form->addRow(QString(), m_assistantKeyNote);
 
-    layout->addLayout(form);
+    scroll->setWidget(page);
+    layout->addWidget(scroll, 1);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
