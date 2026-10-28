@@ -74,3 +74,35 @@ def test_assistant_without_a_key(monkeypatch):
     monkeypatch.setattr(assistant, "get_key", lambda provider: "")
     out = json.loads(assistant.chat('[{"role":"user","content":"hi"}]', '{"provider":"anthropic"}'))
     assert not out["ok"] and out["error"]["code"] == "no_key"
+
+@pytest.mark.parametrize("base,want", [
+    ("https://api.openai.com/v1", "https://api.openai.com/v1/chat/completions"),
+    ("https://api.openai.com/v1/chat/completions", "https://api.openai.com/v1/chat/completions"),
+    ("https://api.deepseek.com", "https://api.deepseek.com/v1/chat/completions"),
+    ("https://openrouter.ai/api/v1/", "https://openrouter.ai/api/v1/chat/completions"),
+])
+def test_openai_endpoint_is_not_duplicated(monkeypatch, base, want):
+    _fake_live(monkeypatch)
+    seen = []
+    monkeypatch.setattr(assistant, "_http", lambda url, headers, body: (
+        seen.append(url), {"choices": [{"message": {"role": "assistant", "content": "ok"}}]})[1])
+    out = json.loads(assistant.chat('[{"role":"user","content":"hi"}]',
+                                    json.dumps({"provider": "openai", "model": "m", "base_url": base})))
+    assert out["ok"], out
+    assert seen == [want]
+
+
+@pytest.mark.parametrize("base,want", [
+    ("https://api.anthropic.com", "https://api.anthropic.com/v1/messages"),
+    ("https://api.anthropic.com/v1", "https://api.anthropic.com/v1/messages"),
+    ("https://api.anthropic.com/v1/messages", "https://api.anthropic.com/v1/messages"),
+])
+def test_anthropic_endpoint_is_not_duplicated(monkeypatch, base, want):
+    _fake_live(monkeypatch)
+    seen = []
+    monkeypatch.setattr(assistant, "_http", lambda url, headers, body: (
+        seen.append(url), {"content": [{"type": "text", "text": "ok"}]})[1])
+    out = json.loads(assistant.chat('[{"role":"user","content":"hi"}]',
+                                    json.dumps({"provider": "anthropic", "model": "m", "base_url": base})))
+    assert out["ok"], out
+    assert seen == [want]

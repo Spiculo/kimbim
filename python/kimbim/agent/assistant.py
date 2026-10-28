@@ -104,10 +104,17 @@ def _summary(public: str, envelope: dict) -> str:
     return public
 
 
+def _endpoint(base: str, suffix: str, default: str) -> str:
+    """The full endpoint for a base URL that may be a host, a `/v1` root or the endpoint itself."""
+    base = (base or default).rstrip("/")
+    if base.endswith(suffix):
+        return base
+    return base + (suffix if base.endswith("/v1") else "/v1" + suffix)
+
+
 def _call_anthropic(config: dict, messages: list[dict], system: str, schemas: list[dict], back: dict) -> dict:
     key = _key("anthropic")
-    base = (config.get("base_url") or ANTHROPIC_DEFAULT).rstrip("/")
-    url = base + ("/messages" if base.endswith("/v1") else "/v1/messages")
+    url = _endpoint(config.get("base_url") or ANTHROPIC_DEFAULT, "/messages", ANTHROPIC_DEFAULT)
     headers = {"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
     model = config.get("model") or "claude-sonnet-4-5"
     used: list[dict] = []
@@ -134,8 +141,7 @@ def _call_anthropic(config: dict, messages: list[dict], system: str, schemas: li
 
 def _call_openai(config: dict, messages: list[dict], system: str, schemas: list[dict], back: dict) -> dict:
     key = _key(config.get("provider") or "openai")
-    base = (config.get("base_url") or OPENAI_DEFAULT).rstrip("/")
-    url = base + ("/chat/completions" if base.endswith("/v1") else "/v1/chat/completions")
+    url = _endpoint(config.get("base_url") or OPENAI_DEFAULT, "/chat/completions", OPENAI_DEFAULT)
     headers = {"Authorization": f"Bearer {key}", "content-type": "application/json"}
     model = config.get("model") or "gpt-4o-mini"
     tools = [{"type": "function", "function": {"name": s["name"], "description": s["description"],
