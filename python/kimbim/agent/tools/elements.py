@@ -255,6 +255,24 @@ def delete(session, elements):
     return {"requested": len(guids)}
 
 
+@tool("elements.set_slab_slope", {"required": ["elements"], "properties": {
+    "elements": SELECTOR,
+    "slope_x": {"type": "number", "description": "Rise over run along the slab's local +X (0 = flat)."},
+    "slope_y": {"type": "number", "description": "Rise over run along the slab's local +Y."}}}, writes=True)
+def set_slab_slope(session, elements, slope_x=0, slope_y=0):
+    """Tilt slabs: 0, 0 returns them to horizontal."""
+    guids = session.resolve(elements)
+    r = bridge(A.set_slab_slope, _guids(guids), slope_x, slope_y)
+    return {"elements": len(r.get("slabs", [])), "slope_x": slope_x, "slope_y": slope_y}
+
+
+@tool("elements.get_slab_slope", {"required": ["element"], "properties": {
+    "element": {"type": "string", "description": "GlobalId of a slab."}}})
+def get_slab_slope(session, element):
+    """A slab's slope (rise over run)."""
+    return bridge(A.slab_slope, element)
+
+
 @tool("elements.set_layer", {"required": ["elements", "layer"], "properties": {
     "elements": SELECTOR, "layer": {"type": "string", "description": "An existing layer's name."}}}, writes=True)
 def set_layer(session, elements, layer):

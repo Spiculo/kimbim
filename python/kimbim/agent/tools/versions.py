@@ -58,12 +58,17 @@ def log(session, limit=50):
 
 @tool("versions.diff", {"required": ["from"], "properties": {
     "from": {"type": "string", "description": "A version id, milestone or option name."},
-    "to": {"type": "string", "description": "A version id, milestone, option name, or WORKING (default)."}}})
+    "to": {"type": "string", "description": "A version id, milestone, option name, or WORKING (default)."},
+    "detail": {"type": "boolean", "description": "Also the changed attributes and properties of each element, "
+                                                 "grouped by category and level."}}})
 def diff(session, **kw):
     """Compare two versions: the elements added, modified and removed from one to the other (WORKING is the open
-    model with its unsaved changes)."""
+    model with its unsaved changes); with detail, each modified element's attributes and properties."""
     _versioned()
-    r = bridge(V.compare, kw["from"], kw.get("to") or "WORKING")
+    if kw.get("detail"):
+        r = bridge(V.diff_details, kw["from"], kw.get("to") or "WORKING")
+    else:
+        r = bridge(V.compare, kw["from"], kw.get("to") or "WORKING")
     r.pop("ok", None)
     return r
 

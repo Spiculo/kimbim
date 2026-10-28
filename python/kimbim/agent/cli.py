@@ -309,8 +309,35 @@ def _sum_task_finish(envelope, args):
     return _t("sum_task_finished", title=r["title"], id=r["id"], status=r["status"])
 
 
+def _sum_diff(envelope, args):
+    r = envelope.get("result") or {}
+    changes = r.get("changes") or {k: r.get(k) or [] for k in ("added", "modified", "removed")}
+    lines = [f"{len(changes.get('added', ()))} added, {len(changes.get('modified', ()))} modified, "
+             f"{len(changes.get('removed', ()))} removed"]
+    if r.get("settings"):
+        lines.append("project settings changed")
+    if r.get("other"):
+        lines.append(f"{r['other']} other record(s) (relationships, types, styles)")
+    for cls, counts in (r.get("categories") or {}).items():
+        lines.append(f"  {cls}: {counts.get('added', 0)} added, {counts.get('modified', 0)} modified, "
+                     f"{counts.get('removed', 0)} removed")
+    by_guid = {d["guid"]: d for d in r.get("details", ())}
+    for kind, symbol in (("added", "+"), ("modified", "~"), ("removed", "-")):
+        for item in (changes.get(kind) or [])[:MAX_LINES]:
+            detail = by_guid.get(item.get("guid"), {})
+            name = f" {item['name']!r}" if item.get("name") else ""
+            level = f"  ({detail['level']})" if detail.get("level") else ""
+            lines.append(f"  {symbol} {item['type']}{name}  [{item['guid']}]{level}")
+            for attr in detail.get("attributes", ()):
+                lines.append(f"      {attr['name']}: {attr['old']!r} -> {attr['new']!r}")
+            for prop in detail.get("properties", ()):
+                lines.append(f"      {prop['pset']}.{prop['property']}: {prop['old']!r} -> {prop['new']!r}")
+    return "\n".join(lines)
+
+
 # A one-line summary for the main tools: fn(envelope, args) -> text. Others use the generic line.
 SUMMARIES = {
+    "versions.diff": _sum_diff,
     "elements.set_dimensions": _sum_dimensions,
     "elements.rename": _sum_count("sum_renamed"),
     "elements.move": _sum_count("sum_moved"),
@@ -403,6 +430,25 @@ def _people(group, top) -> None:
     s.add_argument("-m", "--message", required=True)
     s = leaf("versions", "status", _status, help="show what saving an IFC file would change")
     s.add_argument("file")
+    s = leaf("versions", "import", _reconciled, help="re-import an IFC, matching its objects to the project (people only)",
+             description="Re-import an IFC whose GlobalIds may have changed: match its objects to the project's by "
+                         "GlobalId, Tag and (with --accept-heuristic) similarity, then save the result as an "
+                         "ordinary version. --dry-run only prints the reconciliation report.")
+    s.add_argument("file")
+    s.add_argument("-m", "--message", required=True)
+    s.add_argument("--accept-heuristic", action="store_true",
+                   help="apply the heuristic matches too (review them in the report first)")
+    s.add_argument("--dry-run", action="store_true", help="print the report and save nothing")
+    s.add_argument("--report", metavar="OUT", help="also write the report as JSON")
+    s = leaf("versions", "remotes", _remotes, help="list, add or remove Git remotes (people only)")
+    s.add_argument("--add", metavar="NAME=URL", help="add or update a remote")
+    s.add_argument("--remove", metavar="NAME", help="remove a remote")
+    s = leaf("versions", "push", _push, help="push the current option to a Git remote (people only)")
+    s.add_argument("remote", nargs="?", default="origin")
+    s.add_argument("--branch", default="", help="the branch (default: the current option)")
+    s = leaf("versions", "pull", _pull, help="fast-forward the current option from a Git remote (people only)")
+    s.add_argument("remote", nargs="?", default="origin")
+    s.add_argument("--branch", default="", help="the branch (default: the current option)")
     s = leaf("versions", "show", _show, help="print one canonical record")
     s.add_argument("key")
     s.add_argument("--rev", default="HEAD")
@@ -430,6 +476,16 @@ def _people(group, top) -> None:
     s.add_argument("--sheet", action="append", default=[], metavar="NUMBER", help="a sheet to export, by number (repeatable)")
     s.add_argument("--layers", choices=("layer", "kind"), default="layer", help="layers by KimBim layer (default) or by element kind")
     s.add_argument("--purpose", default="", help="the purpose (pens, visibility) to draw with")
+    s = leaf("versions", "export-dwg", _export_dwg, help="write a version's drawings and sheets as DWG (people only)",
+             description="Like export-dxf, then LibreDWG's dxf2dwg (or KIMBIM_DXF2DWG). Needs the `dwg` pixi "
+                         "environment or a converter on PATH.")
+    s.add_argument("out", help="a folder, or a .dwg file for one drawing or sheet")
+    s.add_argument("--rev", default="HEAD")
+    s.add_argument("--force", action="store_true")
+    s.add_argument("--drawing", action="append", default=[], metavar="NAME")
+    s.add_argument("--sheet", action="append", default=[], metavar="NUMBER")
+    s.add_argument("--layers", choices=("layer", "kind"), default="layer")
+    s.add_argument("--purpose", default="")
     s = leaf("script", "run", _script_run, help="run a Python script on the project, or on an IFC model offline (D92)",
              description="With MODEL: a batch job on that IFC file, offline: the script runs in the console's namespace "
                          "(ifc, selection(), bridge...) and the changed model is written back. Without MODEL: the "
@@ -496,6 +552,63 @@ def _status(ns) -> int:
     return 0
 
 
+def _reconciled(ns) -> int:
+    proj = Project.open(discover(ns.g_project))
+    report = proj.import_ifc(ns.file, ns.message, accept_heuristic=ns.accept_heuristic, dry_run=ns.dry_run)
+    if ns.report:
+        pathlib.Path(ns.report).write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
+    if ns.g_json:
+        print(json.dumps(report, ensure_ascii=False, indent=1))
+        return 0
+    counts = report["counts"]
+    print(f"Matched by GlobalId   {counts['globalid']}")
+    print(f"Matched by Tag        {counts['tag']}")
+    if counts["heuristic_review"]:
+        print(f"Heuristic (review)    {counts['heuristic_review']}  (pass --accept-heuristic to apply them)")
+    elif counts["heuristic"]:
+        print(f"Heuristic (applied)   {counts['heuristic']}")
+    print(f"Unmatched -> new      {counts['new']}")
+    print(f"Missing -> deleted    {counts['deleted']}")
+    if counts["skipped"]:
+        print(f"Moved GlobalIds       {counts['changed']}  ({counts['skipped']} kept: the id is still used)")
+    else:
+        print(f"Moved GlobalIds       {counts['changed']}")
+    print(f"Identity kept         {report['identity_rate'] * 100:.1f}%")
+    if ns.dry_run:
+        print("(dry run: nothing was saved)")
+    else:
+        print(f"[{proj.current_branch()} {report['id'][:10]}] {ns.message}")
+    return 0
+
+
+def _remotes(ns) -> int:
+    proj = Project.open(discover(ns.g_project))
+    if ns.add:
+        name, _, url = ns.add.partition("=")
+        if not url:
+            raise UsageError("--add takes NAME=URL")
+        proj.add_remote(name, url)
+    if ns.remove:
+        proj.remove_remote(ns.remove)
+    for remote in proj.remotes():
+        print(f"{remote['name']}  {remote['url']}")
+    return 0
+
+
+def _push(ns) -> int:
+    proj = Project.open(discover(ns.g_project))
+    result = proj.push(ns.remote, ns.branch)
+    print(f"pushed {result['branch']} to {result['remote']} ({result['url']})")
+    return 0
+
+
+def _pull(ns) -> int:
+    proj = Project.open(discover(ns.g_project))
+    result = proj.pull(ns.remote, ns.branch)
+    print(f"pulled {result['branch']} from {result['remote']} ({result['status']}, {result['head'][:10]})")
+    return 0
+
+
 def _show(ns) -> int:
     print(json.dumps(Project.open(discover(ns.g_project)).show(ns.key, ns.rev), ensure_ascii=False, indent=1, sort_keys=True))
     return 0
@@ -556,6 +669,60 @@ def _merge(ns) -> int:
                           f"  theirs {json.dumps(c['theirs'], default=str)[:80]}")
         return 1
     print(f"[{proj.current_branch()} {cid[:10]}] {message}")
+    return 0
+
+
+def _export_dwg(ns) -> int:
+    """Drawings and sheets of a version as DWG files: DXF first, then LibreDWG's dxf2dwg."""
+    import tempfile
+
+    from .. import app_bridge, dwg, dxf
+
+    if not dwg.available() or dwg.from_dxf_tool() is None:
+        raise KimbimError(dwg.error())
+    proj = Project.open(discover(ns.g_project))
+    with tempfile.TemporaryDirectory(prefix="kimbim-dwg-") as tmp:
+        ifc = proj.export(pathlib.Path(tmp) / "version.ifc", ns.rev, overwrite=True, one_owner=True)
+        opened = json.loads(app_bridge.open_model(str(ifc)))
+    if not opened.get("ok"):
+        raise KimbimError(opened.get("error", "could not open the version"))
+    targets = json.loads(dxf.dxf_targets())
+    by_name = {d["name"]: d["guid"] for d in targets["drawings"]}
+    numbers = {s["number"] for s in targets["sheets"]}
+    missing = [n for n in ns.drawing if n not in by_name] + [n for n in ns.sheet if n not in numbers]
+    if missing:
+        raise KimbimError(f"no drawing or sheet called {', '.join(missing)} in {ns.rev}")
+    items = [{"drawing": by_name[n]} for n in ns.drawing] + [{"sheet": n} for n in ns.sheet]
+    if not items:
+        items = [{"drawing": d["guid"]} for d in targets["drawings"]] + [{"sheet": s["number"]} for s in targets["sheets"]]
+    if not items:
+        raise KimbimError(f"{ns.rev} has no drawings or sheets")
+    options = json.dumps({"layers": ns.layers, "purpose": ns.purpose or None})
+    out = pathlib.Path(ns.out)
+    with tempfile.TemporaryDirectory(prefix="kimbim-dwg-out-") as tmp:
+        folder = out if out.suffix.lower() != ".dwg" else pathlib.Path(tmp)
+        folder.mkdir(parents=True, exist_ok=True)
+        files = []
+        for item in items:
+            key = item.get("drawing") or item.get("sheet")
+            made = pathlib.Path(tmp) / "one.dxf"
+            r = json.loads(dxf.export_drawing_dxf(key, str(made), options) if "drawing" in item
+                           else dxf.export_sheet_dxf(key, str(made), options))
+            if not r.get("ok"):
+                raise KimbimError(r.get("error", "the DXF step failed"))
+            name = (dxf.file_name(key) + ".dwg") if "sheet" in item else (dxf.file_name(item["drawing"]) + ".dwg")
+            target = pathlib.Path(folder) / name
+            dwg.dxf_to_dwg(made, target)
+            files.append(str(target))
+        if out.suffix.lower() == ".dwg":
+            if len(files) != 1:
+                raise KimbimError("a .dwg file holds one drawing or sheet; give a folder for more")
+            if out.exists() and not ns.force:
+                raise KimbimError(f"{out} already exists (use --force to overwrite)")
+            pathlib.Path(files[0]).replace(out)
+            files = [str(out)]
+    for f in files:
+        print(f"wrote {f}")
     return 0
 
 

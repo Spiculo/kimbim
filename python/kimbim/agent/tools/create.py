@@ -88,6 +88,31 @@ def slab(session, level, points=None, from_walls=None, type="", offset=0):
     return {"guids": [r["guid"]], "points_m": outline}
 
 
+@tool("create.curtain_wall", {"required": ["level", "start", "end"], "properties": {
+    "level": _LEVEL, "start": _POINT, "end": _POINT, "height": _LENGTH,
+    "spacing": {**_LENGTH, "description": "Mullion spacing (default 1.5 m)."},
+    "panel_thickness": {**_LENGTH, "description": "Glass panel thickness (default 4 cm)."}}}, writes=True)
+def curtain_wall(session, level, start, end, height=None, spacing="1.5m", panel_thickness="4cm"):
+    """Create an IfcCurtainWall on a level, with its glazed panel and mullion spacing."""
+    storey = level_guid(level)
+    x1, y1 = point(session, start, "start")
+    x2, y2 = point(session, end, "end")
+    h = lengths(session, height)[0] if height is not None else _level_height(_level_info(level))
+    r = bridge(A.create_curtain_wall, storey, x1, y1, x2, y2, h,
+               lengths(session, spacing)[0], lengths(session, panel_thickness)[0])
+    return {"guids": [r["guid"]], "length_m": round(math.dist((x1, y1), (x2, y2)), 6), "height_m": round(h, 6)}
+
+
+@tool("create.slab_edge", {"required": ["slab"], "properties": {
+    "slab": {"type": "string", "description": "GlobalId of the slab."},
+    "width": _LENGTH, "depth": _LENGTH}},
+    writes=True)
+def slab_edge(session, slab, width="2cm", depth="20cm"):
+    """Add a raised edge around a slab, one IfcMember per side."""
+    r = bridge(A.add_slab_edge, slab, lengths(session, width)[0], lengths(session, depth)[0])
+    return {"guids": r["edges"]}
+
+
 @tool("create.column", {"required": ["level", "at"], "properties": {
     "level": _LEVEL, "at": _POINT, "height": _LENGTH, "type": _TYPE,
     "rotation": {"type": ["number", "string"], "description": "Degrees (90, \"90deg\") or \"1.57rad\"."}}}, writes=True)
