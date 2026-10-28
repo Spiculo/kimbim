@@ -55,3 +55,11 @@ desktop.ini
 
 # interop check (npm)
 node_modules/
+
+# Ad-hoc corpus dumps and local scratch (the corpus is fetched into tests/corpus/files/)
+/tests/corpus/ENTREGA-GOES - Centro Educativo.ifc
+/tests/corpus/ENTREGA-GOES - Centro Educativo.kim
+/tests/corpus/PARQUE BATLLE APTOS09-09_.ifc
+*.stackdump
+*.prof
+/~/
