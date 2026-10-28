@@ -613,6 +613,220 @@ def create_slab(storey_guid: str, type_guid: str, points_json: str, offset=0.0) 
     return B._dump({**r, "guid": made["slab"].GlobalId})
 
 
+def set_slab_slope(guids_json: str, slope_x=0.0, slope_y=0.0) -> str:
+    """Tilt slabs: `slope_x`/`slope_y` are rise over run along the slab's local +X/+Y (0 = flat).
+
+    The slab's base placement is kept in its `KIMBIM_Slab` pset, so editing the slope again tilts
+    from the horizontal slab rather than compounding; `0, 0` returns it to flat.
+    """
+    if B._model is None:
+        return _fail("no model open")
+    try:
+        sx, sy = float(slope_x or 0.0), float(slope_y or 0.0)
+        slabs = [e for e in B._elements(guids_json) if e.is_a("IfcSlab")]
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    if not slabs:
+        return _fail("select at least one slab")
+    if abs(sx) > 5 or abs(sy) > 5:
+        return _fail("a slope over 5:1 is not a slab")
+
+    def rotation(sx: float, sy: float):
+        rx, ry = math.atan(sy), -math.atan(sx)
+        cx, sx_, cy, sy_ = math.cos(rx), math.sin(rx), math.cos(ry), math.sin(ry)
+        mx = np.array([[1, 0, 0, 0], [0, cx, -sx_, 0], [0, sx_, cx, 0], [0, 0, 0, 1]], dtype=float)
+        my = np.array([[cy, 0, sy_, 0], [0, 1, 0, 0], [-sy_, 0, cy, 0], [0, 0, 0, 1]], dtype=float)
+        return mx @ my
+
+    def action():
+        changed = []
+        for slab in slabs:
+            ps = next((d for d in getattr(slab, "IsDefinedBy", ()) or ()
+                       if d.is_a("IfcRelDefinesByProperties") and d.RelatingPropertyDefinition.is_a("IfcPropertySet")
+                       and d.RelatingPropertyDefinition.Name == "KIMBIM_Slab"), None)
+            pset = ps.RelatingPropertyDefinition if ps is not None else ifcopenshell.api.pset.add_pset(
+                B._model, product=slab, name="KIMBIM_Slab")
+            values = ifcopenshell.util.element.get_pset(slab, "KIMBIM_Slab") or {}
+            base = values.get("BaseMatrix")
+            if isinstance(base, str) and base.startswith("m:") and len(base[2:].split(",")) == 16:
+                matrix = np.array([float(v) for v in base[2:].split(",")], dtype=float).reshape(4, 4)
+            else:
+                matrix = ifcopenshell.util.placement.get_local_placement(slab.ObjectPlacement)
+                base = "m:" + ",".join(f"{float(v):.9g}" for v in matrix.flatten())
+            ifcopenshell.api.pset.edit_pset(B._model, pset=pset, properties={
+                "SlopeX": sx, "SlopeY": sy, "BaseMatrix": base})
+            ifcopenshell.api.geometry.edit_object_placement(
+                B._model, product=slab, matrix=matrix @ rotation(sx, sy), is_si=False)
+            changed.append(slab.GlobalId)
+        return len(changed), changed, []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "slabs": [{"guid": s.GlobalId, "slope_x": sx, "slope_y": sy} for s in slabs]})
+
+
+def slab_slope(guid: str) -> str:
+    """A slab's slope (rise over run), or zeros."""
+    slab = _by_guid(guid)
+    if slab is None or not slab.is_a("IfcSlab"):
+        return _fail("unknown slab")
+    values = ifcopenshell.util.element.get_pset(slab, "KIMBIM_Slab") or {}
+    return B._dump({"ok": True, "guid": guid, "slope_x": float(values.get("SlopeX", 0.0) or 0.0),
+                    "slope_y": float(values.get("SlopeY", 0.0) or 0.0)})
+
+
+def add_slab_edge(slab_guid: str, width=0.02, depth=0.2) -> str:
+    """A 0.02 x 0.2 m edge member around a slab (one IfcMember per edge, aggregated to the slab)."""
+    slab = _by_guid(slab_guid)
+    if slab is None or not slab.is_a("IfcSlab"):
+        return _fail("unknown slab")
+    try:
+        width, depth = float(width), float(depth)
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    if not (0.001 <= width <= 1 and 0.001 <= depth <= 2):
+        return _fail("the slab edge width or depth is out of range")
+    rep = ifcopenshell.util.representation.get_representation(slab, "Model", "Body", "MODEL_VIEW")
+    points = []
+    for item in getattr(rep, "Items", ()) or ():
+        profile = getattr(item, "SweptArea", None)
+        curve = getattr(profile, "OuterCurve", None) if profile is not None else None
+        points = getattr(curve, "Points", None)
+        if points is not None and getattr(points, "CoordList", None):
+            points = [(float(x), float(y)) for x, y in points.CoordList]
+            break
+    if len(points) < 4:
+        return _fail("the slab has no outline to put an edge on")
+    storey = ifcopenshell.util.element.get_container(slab)
+    if storey is None:
+        return _fail("the slab is not on a level")
+    matrix = ifcopenshell.util.placement.get_local_placement(slab.ObjectPlacement)
+    top = float(matrix[2][3]) + _thickness(_layer_set(slab)) if _layer_set(slab) else float(matrix[2][3])
+    made = []
+
+    def action():
+        f = B._model
+        for i in range(len(points)):
+            (x1, y1), (x2, y2) = points[i], points[(i + 1) % len(points)]
+            length = math.dist((x1, y1), (x2, y2))
+            if length < 0.01:
+                continue
+            member = ifcopenshell.api.root.create_entity(f, ifc_class="IfcMember", name="Slab edge")
+            representation = ifcopenshell.api.geometry.add_wall_representation(
+                f, context=_body_context(), length=length, height=depth, thickness=width)
+            ifcopenshell.api.geometry.assign_representation(f, product=member, representation=representation)
+            dx, dy = (x2 - x1) / length, (y2 - y1) / length
+            m = np.array([[dx, -dy, 0, x1], [dy, dx, 0, y1], [0, 0, 1, top - depth], [0, 0, 0, 1]],
+                         dtype=float)
+            ifcopenshell.api.geometry.edit_object_placement(f, product=member, matrix=m, is_si=True)
+            ifcopenshell.api.spatial.assign_container(f, products=[member], relating_structure=storey)
+            try:
+                ifcopenshell.api.aggregate.assign_object(f, products=[member], relating_object=slab)
+            except Exception:
+                pass
+            ps = ifcopenshell.api.pset.add_pset(f, product=member, name="KIMBIM_SlabEdge")
+            ifcopenshell.api.pset.edit_pset(f, pset=ps, properties={
+                "Slab": slab.GlobalId, "Width": width, "Depth": depth})
+            layers.assign_active(member)
+            renovation.stamp_new(member)
+            made.append(member.GlobalId)
+        return len(made), made, []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "edges": made})
+
+
+def create_curtain_wall(storey_guid: str, x1, y1, x2, y2, height, spacing=1.5,
+                        panel_thickness=0.04) -> str:
+    """An IfcCurtainWall from (x1, y1) to (x2, y2) with a glazed panel of `panel_thickness`; the
+    mullion spacing is kept in `KIMBIM_CurtainWall` (the IFC body is the panel)."""
+    if B._model is None:
+        return _fail("no model open")
+    try:
+        p1, p2 = (float(x1), float(y1)), (float(x2), float(y2))
+        height, spacing, panel_thickness = float(height), float(spacing), float(panel_thickness)
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    storey = _by_guid(storey_guid)
+    if storey is None or not storey.is_a("IfcBuildingStorey"):
+        return _fail("unknown level")
+    if math.dist(p1, p2) < MIN_WALL_LENGTH or height <= 0:
+        return _fail("the curtain wall needs a length and a positive height")
+    if spacing <= 0.1 or not 0.005 <= panel_thickness <= 0.5:
+        return _fail("the mullion spacing and panel thickness are out of range")
+    made = {}
+
+    def action():
+        f = B._model
+        cw_type = next((t for t in f.by_type("IfcCurtainWallType") if (t.Name or "") == "Curtain Wall"), None)
+        if cw_type is None:
+            cw_type = ifcopenshell.api.root.create_entity(f, ifc_class="IfcCurtainWallType",
+                                                          name="Curtain Wall")
+        wall = ifcopenshell.api.root.create_entity(f, ifc_class="IfcCurtainWall", name="Curtain Wall",
+                                                   predefined_type="USERDEFINED")
+        ifcopenshell.api.type.assign_type(f, related_objects=[wall], relating_type=cw_type)
+        representation = ifcopenshell.api.geometry.create_2pt_wall(
+            f, element=wall, context=_body_context(), p1=tuple(p1), p2=tuple(p2),
+            elevation=_elevation(storey), height=height, thickness=panel_thickness, is_si=True)
+        ifcopenshell.api.geometry.assign_representation(f, product=wall, representation=representation)
+        ifcopenshell.api.spatial.assign_container(f, products=[wall], relating_structure=storey)
+        ps = ifcopenshell.api.pset.add_pset(f, product=wall, name="KIMBIM_CurtainWall")
+        ifcopenshell.api.pset.edit_pset(f, pset=ps, properties={
+            "Height": height, "MullionSpacing": spacing, "PanelThickness": panel_thickness})
+        # Mullions (vertical, every spacing) and top/bottom rails as IfcMembers aggregated to the wall.
+        base = _elevation(storey)
+        length = math.dist(p1, p2)
+        dx, dy = (p2[0] - p1[0]) / length, (p2[1] - p1[1]) / length
+        parts = []
+
+        def member(name, along, z, length_, height_, thickness_):
+            m = ifcopenshell.api.root.create_entity(f, ifc_class="IfcMember", name=name)
+            rep = ifcopenshell.api.geometry.add_wall_representation(
+                f, context=_body_context(), length=length_, height=height_, thickness=thickness_)
+            ifcopenshell.api.geometry.assign_representation(f, product=m, representation=rep)
+            matrix = np.array([[dx, -dy, 0, p1[0] + dx * along],
+                               [dy, dx, 0, p1[1] + dy * along],
+                               [0, 0, 1, z], [0, 0, 0, 1]], dtype=float)
+            ifcopenshell.api.geometry.edit_object_placement(f, product=m, matrix=matrix, is_si=True)
+            ifcopenshell.api.aggregate.assign_object(f, products=[m], relating_object=wall)
+            layers.assign_active(m)
+            renovation.stamp_new(m)
+            parts.append(m.GlobalId)
+
+        step, t = max(spacing, 0.3), 0.0
+        while t < length - 0.01:
+            member("Curtain wall mullion", t, base, 0.05, height, 0.05)
+            t += step
+        member("Curtain wall mullion", max(length - 0.05, 0.0), base, 0.05, height, 0.05)
+        member("Curtain wall bottom rail", 0.0, base, length, 0.05, 0.05)
+        member("Curtain wall top rail", 0.0, base + height - 0.05, length, 0.05, 0.05)
+        layers.assign_active(wall)
+        renovation.stamp_new(wall)
+        made["wall"] = wall
+        made["parts"] = parts
+        return 1 + len(parts), [wall.GlobalId, *parts], []
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "guid": made["wall"].GlobalId, "parts": made.get("parts", [])})
+
+
+def curtain_wall_info(guid: str) -> str:
+    wall = _by_guid(guid)
+    if wall is None or not wall.is_a("IfcCurtainWall"):
+        return _fail("unknown curtain wall")
+    values = ifcopenshell.util.element.get_pset(wall, "KIMBIM_CurtainWall") or {}
+    return B._dump({"ok": True, "guid": guid, "height": values.get("Height"),
+                    "spacing": values.get("MullionSpacing"), "panel_thickness": values.get("PanelThickness")})
+
+
 def slab_outline_from_walls(walls_json: str) -> str:
     """Outline at the outer faces of walls that form one closed loop (metres)."""
     if B._model is None:

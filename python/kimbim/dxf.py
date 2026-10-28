@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import tempfile
 import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -1015,6 +1016,63 @@ def dxf_targets() -> str:
                                   "file": file_name(d["name"]) + ".dxf"} for d in ds],
                     "sheets": [{"number": s["number"], "title": s["title"],
                                 "file": file_name(f'{s["number"]} {s["title"]}') + ".dxf"} for s in sh]})
+
+
+def export_drawing_dwg(guid: str, path: str, options_json: str = "") -> str:
+    from . import dwg
+
+    if dwg.from_dxf_tool() is None:
+        return A._fail(dwg.error())
+    with tempfile.TemporaryDirectory(prefix="kimbim-dwg-") as tmp:
+        dxf_path = Path(tmp) / "drawing.dxf"
+        made = json.loads(export_drawing_dxf(guid, str(dxf_path), options_json))
+        if not made.get("ok"):
+            return A._fail(made.get("error", "the DXF step failed"))
+        try:
+            dwg.dxf_to_dwg(dxf_path, path)
+        except Exception as ex:
+            return A._fail(str(ex))
+    return B._dump({"ok": True, "path": path})
+
+
+def export_sheet_dwg(number: str, path: str, options_json: str = "") -> str:
+    from . import dwg
+
+    if dwg.from_dxf_tool() is None:
+        return A._fail(dwg.error())
+    with tempfile.TemporaryDirectory(prefix="kimbim-dwg-") as tmp:
+        dxf_path = Path(tmp) / "sheet.dxf"
+        made = json.loads(export_sheet_dxf(number, str(dxf_path), options_json))
+        if not made.get("ok"):
+            return A._fail(made.get("error", "the DXF step failed"))
+        try:
+            dwg.dxf_to_dwg(dxf_path, path)
+        except Exception as ex:
+            return A._fail(str(ex))
+    return B._dump({"ok": True, "path": path})
+
+
+def export_dwg(items_json: str, folder: str, options_json: str = "") -> str:
+    """Batch as DXF, then each file to DWG with LibreDWG (`dxf2dwg`). Same items as export_dxf."""
+    from . import dwg
+
+    if dwg.from_dxf_tool() is None:
+        return A._fail(dwg.error())
+    with tempfile.TemporaryDirectory(prefix="kimbim-dwg-") as tmp:
+        made = json.loads(export_dxf(items_json, tmp, options_json))
+        if not made.get("ok") and not made.get("files"):
+            return A._fail(made.get("error", "the DXF step failed"))
+        files, errors = [], list(made.get("errors", []))
+        out_dir = Path(folder)
+        for source in made.get("files", []):
+            target = out_dir / (Path(source).stem + ".dwg")
+            try:
+                dwg.dxf_to_dwg(source, target)
+                files.append(str(target))
+            except Exception as ex:
+                errors.append({"item": Path(source).name, "error": str(ex)})
+        return B._dump({"ok": not errors, "files": files, "errors": errors,
+                        **({"error": errors[0]["error"]} if errors else {})})
 
 
 def export_dxf(items_json: str, folder: str, options_json: str = "") -> str:

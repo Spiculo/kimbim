@@ -67,12 +67,14 @@ ProjectSettingsDialog::ProjectSettingsDialog(const QJsonObject& settings, bool k
     form->addRow(tr("New sheets:"), m_paper);
     m_unit = new QComboBox(this);
     m_unit->setObjectName(QStringLiteral("lengthUnit"));
-    m_unit->addItems({QStringLiteral("m"), QStringLiteral("cm"), QStringLiteral("mm")});
+    m_unit->addItems({QStringLiteral("m"), QStringLiteral("cm"), QStringLiteral("mm"),
+                      QStringLiteral("ft"), QStringLiteral("in")});
     m_unit->setCurrentText(settings.value("length_unit").toString(QStringLiteral("m")));
     form->addRow(tr("Lengths in:"), m_unit);
     m_areaUnit = new QComboBox(this); // D92
     m_areaUnit->setObjectName(QStringLiteral("areaUnit"));
-    m_areaUnit->addItems({QStringLiteral("m²"), QStringLiteral("cm²"), QStringLiteral("mm²")});
+    m_areaUnit->addItems({QStringLiteral("m²"), QStringLiteral("cm²"), QStringLiteral("mm²"),
+                          QStringLiteral("ft²"), QStringLiteral("in²")});
     m_areaUnit->setCurrentText(settings.value("area_unit").toString(QStringLiteral("m²")));
     form->addRow(tr("Areas in:"), m_areaUnit);
     m_levelReference = new QComboBox(this); // D92

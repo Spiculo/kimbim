@@ -30,10 +30,10 @@ def test_changing_a_setting_marks_the_model_unsaved_and_unknown_keys_are_kept():
 
 def test_bad_values_are_refused_and_change_nothing():
     assert call("new_project", "x")["ok"]
-    for bad in ({"plan_cut_height": -1}, {"drawing_scale": 0}, {"sheet_paper": "B5"}, {"length_unit": "ft"},
+    for bad in ({"plan_cut_height": -1}, {"drawing_scale": 0}, {"sheet_paper": "B5"}, {"length_unit": "yard"},
                 {"length_decimals": 9}, {"hidden_layers": "A-WALL"}, {"ifc_status_default": "maybe"},
                 {"legend_mode": "sometimes"}, {"plan_cut_levels": {"lvl": -1}}, {"plan_symbols": "yes"},
-                {"view_depth": -1}, {"view_depth_levels": {"lvl": -1}}, {"area_unit": "ft²"},
+                {"view_depth": -1}, {"view_depth_levels": {"lvl": -1}}, {"area_unit": "yard²"},
                 {"angle_decimals": 9}, {"orphan_tags": "x"}, {"level_reference": "datum"},
                 {"sea_level": "high"}, {"north_arrow_style": "star"}, {"scale_bar_style": "zigzag"}):
         r = call("set_project_settings", json.dumps(bad))
@@ -86,6 +86,12 @@ def test_lengths_follow_the_unit_and_decimals():
     assert S.format_length(3.5) == "3500 mm" and S.format_length(3.5, unit=False) == "3500"
     S.load({"length_unit": "cm", "length_decimals": 1})
     assert S.format_length(3.5) == "350.0 cm"
+    S.load({"length_unit": "ft", "length_decimals": 2})  # imperial
+    assert S.format_length(1.0) == "3.28 ft"
+    S.load({"length_unit": "in", "length_decimals": 1})
+    assert S.format_length(1.0) == "39.4 in"
+    S.load({"area_unit": "ft²", "length_decimals": 1})
+    assert S.format_area(1.0) == "10.8 ft²"
     S.load(None)
     assert S.format_length(3.5) == "3.50 m"
 

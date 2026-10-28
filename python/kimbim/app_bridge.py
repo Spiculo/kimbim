@@ -897,6 +897,7 @@ def properties_multi(guids_json: str) -> str:
         "name": {"value": names[0] if same_name else None, "varies": not same_name},
         "status": status,
         "material": _materials.merged(elements),  # D96: the Material row (None: not shown)
+        "classifications": _classifications.summary_for(elements),
         "psets": _with_settings(psets, elements),
     }
     if outdated:
@@ -1004,6 +1005,8 @@ from . import configure as _configure  # noqa: E402
 from . import curved_walls as _curved_walls  # noqa: E402
 from . import sun as _sun  # noqa: E402
 from . import worksheets as _worksheets  # noqa: E402
+from . import classifications as _classifications  # noqa: E402
+from . import typemanager as _typemanager  # noqa: E402
 _EXPORTS = {
     "authoring": (
         "add_grid_axis",
@@ -1022,6 +1025,11 @@ _EXPORTS = {
         "update_model_instances",
         "create_beam",
         "create_column",
+        "create_curtain_wall",
+        "curtain_wall_info",
+        "add_slab_edge",
+        "set_slab_slope",
+        "slab_slope",
         "create_slab",
         "create_wall",
         "delete_elements",
@@ -1294,6 +1302,24 @@ _EXPORTS = {
         "underlay_raster",
         "underlays",
     ),
+    "classifications": (
+        "add_reference",
+        "assign_classification",
+        "create_system",
+        "of_element",
+        "remove_reference",
+        "systems",
+        "unassign_classification",
+    ),
+    "typemanager": (
+        "assign_type",
+        "create_type",
+        "edit_type",
+        "list_types",
+        "type_details",
+        "type_of",
+        "update_type_all",
+    ),
     "worksheets": (
         "create_worksheet",
         "delete_worksheet",
@@ -1472,3 +1498,28 @@ def export_dxf(items_json: str, folder: str, options_json: str = "") -> str:
     from . import dxf
 
     return dxf.export_dxf(items_json, folder, options_json)
+
+
+def export_drawing_dwg(guid: str, path: str, options_json: str = "") -> str:
+    from . import dxf
+
+    return dxf.export_drawing_dwg(guid, path, options_json)
+
+
+def export_sheet_dwg(number: str, path: str, options_json: str = "") -> str:
+    from . import dxf
+
+    return dxf.export_sheet_dwg(number, path, options_json)
+
+
+def export_dwg(items_json: str, folder: str, options_json: str = "") -> str:
+    from . import dxf
+
+    return dxf.export_dwg(items_json, folder, options_json)
+
+
+def dwg_available() -> str:
+    from . import dwg
+
+    return _dump({"ok": True, "available": dwg.available(), "to_dxf": dwg.to_dxf_tool() or "",
+                  "from_dxf": dwg.from_dxf_tool() or "", "error": "" if dwg.available() else dwg.error()})

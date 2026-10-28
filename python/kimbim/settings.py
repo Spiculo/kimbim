@@ -56,6 +56,7 @@ DEFAULTS = {
     "selection_sets": {},
     "ids_files": {},  # IDS files by name: their XML, kept in the project so it is versioned (D81)
     "clash_sets": {},  # clash detection sets by name (D81)
+    "precommit_checks": [],  # M6: [{"check", "mode" ("warn"|"block"), "options"}] run on Save version
     "underlays": [],  # DXF, PDF and image underlays on levels: file, placement, display (D85)
     "sheet_files": [],  # D98: the picture files placed on sheets (so versions and .kim files keep them)
     "texture_files": [],  # D96: the surfaces' texture pictures (likewise)
@@ -81,8 +82,9 @@ DEFAULTS = {
     "agent_scripts": False,  # D102: agents may run Python scripts (script.run); only the architect sets it
     "sun": {},  # D96: the sun for 3D light and shadows (sun.DEFAULT fills it in)  # D97: Archicad's Favourites, by name: {tool, fields {object name: value}, object?}  # D97: complex wall sections by name: [[across, up], ...] metres from the base line  # D96: walls and slabs show each layer on their ends and tops in 3D  # D97: where a new wall's clicked line is (Archicad default)
 }
-UNITS = {"m": 1.0, "cm": 100.0, "mm": 1000.0}
-AREA_UNITS = {"m²": 1.0, "cm²": 10000.0, "mm²": 1000000.0}
+UNITS = {"m": 1.0, "cm": 100.0, "mm": 1000.0, "ft": 1 / 0.3048, "in": 1 / 0.0254}
+AREA_UNITS = {"m²": 1.0, "cm²": 10000.0, "mm²": 1000000.0,
+              "ft²": 1 / 0.3048 ** 2, "in²": 1 / 0.0254 ** 2}
 
 _current: dict = copy.deepcopy(DEFAULTS)
 _saved: dict = copy.deepcopy(DEFAULTS)
@@ -298,7 +300,7 @@ def _error(key: str, value) -> str | None:
 
         if value not in configure.REFERENCES:
             return f"unknown wall reference line {value}"
-    if key in ("ids_files", "clash_sets"):
+    if key in ("ids_files", "clash_sets", "precommit_checks"):
         from . import checks
 
         return checks.validate(key, value)

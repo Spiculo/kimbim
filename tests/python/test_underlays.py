@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 
 from kimbim import app_bridge as b
-from kimbim import underlays as U
+from kimbim import dwg, underlays as U
 
 
 def call(fn, *args):
@@ -380,3 +380,19 @@ def test_trace_shows_the_level_below():
     assert np.abs(xs - 6.0).min() < 0.02 and np.abs(xs).min() < 0.02  # the wall's ends, real size, in place
     assert len(colours) == 3 * meta["count"]
     assert not json.loads(U.trace_lines(l1["guid"], "below")[0])["ok"]  # nothing below the lowest level
+
+
+@pytest.mark.skipif(not dwg.available(), reason="no DWG converter (pixi install -e dwg)")
+def test_a_dwg_underlay_is_converted_to_dxf(tmp_path):
+    dxf = survey_dxf(tmp_path / "survey.dxf")
+    source = dwg.dxf_to_dwg(dxf, tmp_path / "survey.dwg")
+    probe = call("underlay_probe", str(source))
+    assert probe["ok"], probe
+    assert call("new_project", "DWG")["ok"]
+    r = call("add_underlay", str(source), json.dumps({"units": 0.001}))
+    assert r["ok"], r
+    underlay = r["underlay"]
+    assert underlay["kind"] == "dxf"
+    meta, coords, _colours = U.underlay_lines(underlay["id"])
+    assert json.loads(meta)["ok"] and len(coords) > 0
+    assert call("remove_underlay", underlay["id"])["ok"]

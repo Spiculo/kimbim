@@ -46,6 +46,9 @@ private slots:
         QCOMPARE(dialog.tree()->topLevelItem(0)->childCount(), 2);
         QCOMPARE(dialog.tree()->topLevelItem(1)->childCount(), 1);
         QCOMPARE(dialog.tree()->topLevelItem(0)->child(0)->text(1), QString("Level 1 Floor Plan.dxf"));
+        QCOMPARE(dialog.format(), QString("dxf"));
+        dialog.setFormat("dwg");
+        QCOMPARE(dialog.format(), QString("dwg"));
         const QJsonArray all = dialog.checkedItems();
         QCOMPARE(all.size(), 3);
         QCOMPARE(all.at(0).toObject().value("drawing").toString(), QString("G1"));

@@ -45,6 +45,7 @@ flask = "*"
 typing_extensions = "*"
 # MCP server for AI agents (D102): the official Python SDK, MIT (pulls anyio, httpx, pydantic, starlette...)
 mcp = ">=2.3,<3"
+isodate = ">=0.7.2,<0.8"
 
 [pypi-dependencies]
 ifctester = "==0.9.0"
@@ -96,5 +97,12 @@ pythonocc-core = { version = "8.0.1.*", build = "novtk*" }
 pyside6 = "*"
 psutil = "*"
 
+# DWG in and out needs LibreDWG's command-line tools. It cannot share the default environment:
+# conda-forge's libredwg wants the old msys2 epoch that IfcOpenShell 0.9's mpfr conflicts with, so it
+# lives in this separate environment and the app calls its `dwg2dxf` / `dwgwrite` by path or PATH.
+[feature.dwg.dependencies]
+libredwg = ">=0.11"
+
 [environments]
 s2 = { features = ["s2"], solve-group = "default" }
+dwg = { features = ["dwg"], solve-group = "dwg", no-default-feature = true }

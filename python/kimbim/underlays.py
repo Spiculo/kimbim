@@ -37,8 +37,8 @@ import uuid
 
 import numpy as np
 
-KINDS = {".dxf": "dxf", ".pdf": "pdf", ".png": "image", ".jpg": "image", ".jpeg": "image"}
-FILE_NAME = re.compile(r"[0-9a-f]{40}\.(dxf|pdf|png|jpg|jpeg)")
+KINDS = {".dxf": "dxf", ".dwg": "dwg", ".pdf": "pdf", ".png": "image", ".jpg": "image", ".jpeg": "image"}
+FILE_NAME = re.compile(r"[0-9a-f]{40}\.(dxf|dwg|pdf|png|jpg|jpeg)")
 DEFAULT_LAYER = "Underlays"
 TESSELLATION = 0.002  # metres on site: arcs and curves become chords this close to the curve
 PDF_DPI = 150
@@ -314,6 +314,10 @@ def _segments(name: str, source: pathlib.Path | None = None):
         p = source or file_path(name)
         if p is None:
             raise FileNotFoundError(f"the underlay file {name} is missing")
+        if p.suffix.lower() == ".dwg":
+            from . import dwg
+
+            p = dwg.cached_dxf(p, _cache_dir())
         d = read_dxf(p)
         info = {"origin": list(d["origin"]), "units": d["units"], "extents": d["extents"], "skipped": d["skipped"]}
         hit = (d["coords"], d["colours"], d["origin"], info)
@@ -509,9 +513,9 @@ def underlay_probe(path: str) -> str:
     p = pathlib.Path(path)
     kind = KINDS.get(p.suffix.lower())
     if kind is None:
-        return _fail("choose a DXF, PDF, PNG or JPEG file")
+        return _fail("choose a DXF, DWG, PDF, PNG or JPEG file")
     try:
-        if kind == "dxf":
+        if kind in ("dxf", "dwg"):
             coords, _colours, _origin, d = _segments(blob_name(p.read_bytes(), p.suffix), p)  # placing reuses it
             units = d["units"]
             ext = d["extents"]
@@ -543,7 +547,7 @@ def add_underlay(path: str, options_json: str = "{}") -> str:
     p = pathlib.Path(path)
     kind = KINDS.get(p.suffix.lower())
     if kind is None:
-        return _fail("choose a DXF, PDF, PNG or JPEG file")
+        return _fail("choose a DXF, DWG, PDF, PNG or JPEG file")
     try:
         options = json.loads(options_json or "{}")
         data = p.read_bytes()
@@ -559,11 +563,12 @@ def add_underlay(path: str, options_json: str = "{}") -> str:
             tmp.replace(target)
     except OSError as ex:
         return _fail(f"could not copy the file into the project: {ex}")
-    entry = {"id": uuid.uuid4().hex[:12], "name": p.name, "file": name, "kind": kind,
+    entry = {"id": uuid.uuid4().hex[:12], "name": p.name, "file": name,
+             "kind": "dxf" if kind == "dwg" else kind,
              "storey": str(options.get("storey", "")), "x": 0.0, "y": 0.0, "rotation": 0.0,
-             "opacity": 0.5 if kind == "dxf" else 0.6, "layer": DEFAULT_LAYER, "visible": True, "locked": False}
+             "opacity": 1.0 if kind in ("dxf", "dwg") else 0.6, "layer": DEFAULT_LAYER, "visible": True, "locked": False}
     try:
-        if kind == "dxf":
+        if kind in ("dxf", "dwg"):
             _c, _col, _o, info = _segments(name)
             units = info["units"] or options.get("units")
             if not units:
@@ -592,7 +597,7 @@ def add_underlay(path: str, options_json: str = "{}") -> str:
         # (the drawing's own origin kept, e.g. map/georeferenced drawings).
         placement = str(options.get("placement", ""))
         if placement == "centred":
-            if kind == "dxf":
+            if kind in ("dxf", "dwg"):
                 ext = info["extents"]
                 entry["base"] = [(ext[0] + ext[2]) / 2, (ext[1] + ext[3]) / 2]
             else:

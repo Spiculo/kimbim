@@ -198,6 +198,18 @@ void PropertiesPanel::showMulti(const QJsonObject& merged)
         });
         m_tree->setItemWidget(item, 1, m_material);
     }
+    // M2: the classification references assigned to the selection.
+    const QJsonArray classifications = merged.value("classifications").toArray();
+    if (!classifications.isEmpty()) {
+        auto* group = new QTreeWidgetItem(element, {tr("Classifications"), QString()});
+        group->setData(0, SourceRole, QStringLiteral("classification"));
+        for (const auto& value : classifications) {
+            const QJsonObject c = value.toObject();
+            new QTreeWidgetItem(group, {c.value("system").toString(),
+                QStringLiteral("%1  %2").arg(c.value("identification").toString(), c.value("name").toString())});
+        }
+        group->setExpanded(true);
+    }
     element->setExpanded(true);
 
     const QJsonObject psets = merged.value("psets").toObject();

@@ -36,6 +36,8 @@ public:
 
     QString folder() const;
     void setFolder(const QString& folder);
+    QString format() const; // "dxf" or "dwg"
+    void setFormat(const QString& format);
     QString layerMode() const; // "layer", "kind", "iso" or "pen"
     void setLayerMode(const QString& mode);
     // [{"drawing": guid} | {"sheet": number}, ...] in list order.
@@ -74,6 +76,7 @@ private:
     QTreeWidgetItem* m_sheets;
     QLineEdit* m_folder;
     QPushButton* m_browse;
+    QComboBox* m_format;
     QComboBox* m_layers;
     QComboBox* m_colour;   // D92: exact / ACI / lineweight
     QCheckBox* m_poche;    // D92: fills on the element layer instead of -PATT

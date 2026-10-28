@@ -128,6 +128,30 @@ namespace kimbim {
 
 namespace {
 
+// Imperial and metric project units: the model is in metres; these convert for display and input.
+double unitFactor(const QString& unit)
+{
+    if (unit == QLatin1String("mm")) return 1000.0;
+    if (unit == QLatin1String("cm")) return 100.0;
+    if (unit == QLatin1String("ft")) return 1.0 / 0.3048;
+    if (unit == QLatin1String("in")) return 1.0 / 0.0254;
+    return 1.0;
+}
+
+double unitToMetres(const QString& unit)
+{
+    return 1.0 / unitFactor(unit);
+}
+
+double areaFactor(const QString& unit)
+{
+    if (unit == QLatin1String("mm²")) return 1000000.0;
+    if (unit == QLatin1String("cm²")) return 10000.0;
+    if (unit == QLatin1String("ft²")) return 1.0 / (0.3048 * 0.3048);
+    if (unit == QLatin1String("in²")) return 1.0 / (0.0254 * 0.0254);
+    return 1.0;
+}
+
 // D97: the tools whose settings can be favourites, by a name kept in the project.
 QString favouriteTool(MainWindow::Tool tool)
 {
@@ -1863,7 +1887,7 @@ void MainWindow::levelsDialog()
     // D79 (Archicad's Story Settings): edited in the dialog, applied on OK as one undo step.
     const QJsonObject table = bridge("levels_table");
     const QString unit = m_settings.value("length_unit").toString(QStringLiteral("m"));
-    const double factor = unit == QLatin1String("mm") ? 1000.0 : unit == QLatin1String("cm") ? 100.0 : 1.0;
+    const double factor = unitFactor(unit);
     LevelsDialog dialog(table.value("levels").toArray(), unit, factor, m_settings.value("length_decimals").toInt(2), this);
     if (dialog.exec() != QDialog::Accepted || !dialog.table().modified())
         return;
@@ -2137,6 +2161,8 @@ void MainWindow::buildModelingToolbar()
             tr("Place columns: click a point (snaps to grid crossings); Shift turns it 90 degrees")},
         {Tool::Beam, "actionBeamTool", tr("&Beam"), Qt::Key_J,
             tr("Draw a beam: click its two ends; its top is at the level plus the height field")},
+        {Tool::CurtainWall, "actionCurtainWallTool", tr("Curtain &wall"), QKeyCombination::fromCombined(0),
+            tr("Draw a curtain wall: click its two ends; height from the field, mullions every 1.5 m")},
         {Tool::Grid, "actionGridTool", tr("&Grid line"), Qt::Key_G,
             tr("Draw a grid line: click its two ends (tags A, B... and 1, 2... are automatic)")},
         {Tool::Move, "actionMoveTool", tr("&Move"), Qt::Key_M,
@@ -2299,6 +2325,22 @@ void MainWindow::buildModelingToolbar()
     checkAction->setObjectName(QStringLiteral("actionCheckModel"));
     checkAction->setToolTip(tr("Schema validation, IDS, clash detection and model checks"));
     connect(checkAction, &QAction::triggered, this, [this] { checksPanel(); });
+    QAction* typesAction = model->addAction(tr("&Type manager...")); // M2
+    typesAction->setObjectName(QStringLiteral("actionTypeManager"));
+    typesAction->setToolTip(tr("List the model's types, make one from the selection, assign, edit and update all"));
+    connect(typesAction, &QAction::triggered, this, &MainWindow::openTypeManager);
+    QAction* classAction = model->addAction(tr("&Classifications...")); // M2
+    classAction->setObjectName(QStringLiteral("actionClassifications"));
+    classAction->setToolTip(tr("Uniclass, OmniClass and local classification systems and their codes"));
+    connect(classAction, &QAction::triggered, this, &MainWindow::openClassifications);
+    QAction* slabEdgeAction = model->addAction(tr("Add slab &edge")); // D109
+    slabEdgeAction->setObjectName(QStringLiteral("actionAddSlabEdge"));
+    slabEdgeAction->setToolTip(tr("Add a raised 2 cm x 20 cm edge (IfcMember) around the selected slabs"));
+    connect(slabEdgeAction, &QAction::triggered, this, [this] { addSlabEdges(); });
+    QAction* slopeAction = model->addAction(tr("Slab slo&pe...")); // D109
+    slopeAction->setObjectName(QStringLiteral("actionSlabSlope"));
+    slopeAction->setToolTip(tr("Tilt the selected slabs by a rise over run along X and Y (0 returns them flat)"));
+    connect(slopeAction, &QAction::triggered, this, &MainWindow::slabSlopeDialog);
     QAction* sizeAction = model->addAction(tr("Door/window si&ze..."));
     sizeAction->setObjectName(QStringLiteral("actionOpeningSize"));
     connect(sizeAction, &QAction::triggered, this, &MainWindow::openingSizeDialog);
@@ -2475,7 +2517,7 @@ void MainWindow::buildModelingToolbar()
             return;
         }
         const QString unit = m_settings.value("length_unit").toString(QStringLiteral("m"));
-        const double intoMetres = unit == QLatin1String("mm") ? 0.001 : unit == QLatin1String("cm") ? 0.01 : 1.0;
+        const double intoMetres = unitToMetres(unit);
         const double metres = m_prefs.typedLengthUnit() == QLatin1String("project")
             ? value * intoMetres  // D92: the field takes the project's unit
             : value;
@@ -2524,6 +2566,7 @@ void MainWindow::buildModelingToolbar()
                 break;
             [[fallthrough]];
         case Tool::Beam:
+        case Tool::CurtainWall:
         case Tool::Grid:
             m_twoPointTool->setTolerance(tolerance);
             m_twoPointTool->setOrtho(ortho);
@@ -2640,6 +2683,7 @@ void MainWindow::buildModelingToolbar()
                 break;
             [[fallthrough]];
         case Tool::Beam:
+        case Tool::CurtainWall:
         case Tool::Grid:
             m_twoPointTool->setTolerance(tolerance);
             m_twoPointTool->setOrtho(ortho);
@@ -2763,7 +2807,7 @@ void MainWindow::buildModelingToolbar()
             m_wallTool->finish();
         else if ((m_tool == Tool::Slab || m_tool == Tool::SlabOpening || m_tool == Tool::Roof) && m_polygonTool->isDrawing())
             m_polygonTool->cancel();
-        else if ((m_tool == Tool::Beam || m_tool == Tool::Grid || m_tool == Tool::Move || m_tool == Tool::Stair)
+        else if ((m_tool == Tool::Beam || m_tool == Tool::CurtainWall || m_tool == Tool::Grid || m_tool == Tool::Move || m_tool == Tool::Stair)
             && m_twoPointTool->isDrawing())
             m_twoPointTool->cancel();
         else if (isDraftTool(m_tool) && m_draftTool->isDrawing())
@@ -3108,7 +3152,7 @@ void MainWindow::setTool(Tool tool)
         const QSignalBlocker block(it.value());
         it.value()->setChecked(it.key() == int(tool));
     }
-    m_wallHeight->setVisible(tool == Tool::Wall || tool == Tool::Column || tool == Tool::Beam || tool == Tool::Roof);
+    m_wallHeight->setVisible(tool == Tool::Wall || tool == Tool::Column || tool == Tool::Beam || tool == Tool::Roof || tool == Tool::CurtainWall);
     m_wallReference->setVisible(tool == Tool::Wall);
     m_wallGeometry->setVisible(tool == Tool::Wall);
     m_objectGravity->setVisible(tool == Tool::Object);
@@ -3588,7 +3632,7 @@ void MainWindow::buildPalette()
     auto tool = [this](Tool t) { return m_toolActions.value(int(t)); };
     m_palette = new ToolPalette(this);
     m_palette->addGroup(QStringLiteral("3d"), tr("3D"), {tool(Tool::Wall), tool(Tool::Slab), tool(Tool::Column),
-        tool(Tool::Beam), tool(Tool::Door), tool(Tool::Window), tool(Tool::Stair), tool(Tool::Railing), tool(Tool::Roof), tool(Tool::Room),
+        tool(Tool::Beam), tool(Tool::CurtainWall), tool(Tool::Door), tool(Tool::Window), tool(Tool::Stair), tool(Tool::Railing), tool(Tool::Roof), tool(Tool::Room),
         tool(Tool::SlabOpening), tool(Tool::PlaceModel), tool(Tool::Object)});
     m_palette->addGroup(QStringLiteral("plane"), tr("Plane"), {tool(Tool::Text), tool(Tool::Dimension),
         tool(Tool::Leader), tool(Tool::Mark), tool(Tool::Grid), tool(Tool::Line), tool(Tool::Polyline),
@@ -3941,7 +3985,7 @@ bool MainWindow::commitVersion(const QString& message)
                         elements << QStringLiteral("%1 [%2]").arg(i < labels.size() ? labels[i].toString() : QString(),
                             guids[i].toString());
                     details << QStringLiteral("  %1%2").arg(issue.value("message").toString(),
-                        elements.isEmpty() ? QString() : QStringLiteral(" â€” %1").arg(elements.join(QStringLiteral(", "))));
+                        elements.isEmpty() ? QString() : QStringLiteral(" — %1").arg(elements.join(QStringLiteral(", "))));
                 }
                 if (check.value("total").toInt() > check.value("issues").toArray().size())
                     details << tr("  ... and %n more issue(s)", nullptr,
@@ -6231,7 +6275,10 @@ bool MainWindow::createSegment(QPointF p1, QPointF p2)
 {
     auto num = [](double v) { return QString::number(v, 'g', 17); };
     QJsonObject r;
-    if (m_tool == Tool::Grid) {
+    if (m_tool == Tool::CurtainWall) {
+        r = bridge("create_curtain_wall", {m_levels->activeStorey(), num(p1.x()), num(p1.y()), num(p2.x()),
+            num(p2.y()), num(m_wallHeight->value()), QStringLiteral("1.5"), QStringLiteral("0.04")});
+    } else if (m_tool == Tool::Grid) {
         r = bridge("add_grid_axis", {m_levels->activeStorey(), num(p1.x()), num(p1.y()), num(p2.x()), num(p2.y()), QString()});
     } else {
         QJsonObject type = m_tool == Tool::Beam ? currentType() : QJsonObject();
@@ -7170,7 +7217,7 @@ void MainWindow::loadProjectSettings()
     }
     if (m_draftTool) { // D92: typed lengths (and a rectangle's width;height) in the project unit
         const QString unit = m_settings.value("length_unit").toString(QStringLiteral("m"));
-        const double intoMetres = unit == QLatin1String("mm") ? 0.001 : unit == QLatin1String("cm") ? 0.01 : 1.0;
+        const double intoMetres = unitToMetres(unit);
         m_draftTool->setLengthFactor(m_prefs.typedLengthUnit() == QLatin1String("project") ? intoMetres : 1.0);
     }
 }
@@ -7279,8 +7326,7 @@ bool MainWindow::setSun(const QJsonObject& sun)
 QString MainWindow::formatLength(double metres) const
 {
     const QString unit = m_settings.value("length_unit").toString(QStringLiteral("m"));
-    const double factor = unit == QLatin1String("mm") ? 1000.0 : unit == QLatin1String("cm") ? 100.0 : 1.0;
-    return QLocale().toString(metres * factor, 'f', m_settings.value("length_decimals").toInt(2))
+    return QLocale().toString(metres * unitFactor(unit), 'f', m_settings.value("length_decimals").toInt(2))
         + QLatin1Char(' ') + unit;
 }
 
@@ -7288,8 +7334,7 @@ QString MainWindow::formatArea(double squareMetres) const
 {
     // D92: the project's area unit (m²/cm²/mm²).
     const QString unit = m_settings.value("area_unit").toString(QStringLiteral("m²"));
-    const double factor = unit == QLatin1String("mm²") ? 1000000.0 : unit == QLatin1String("cm²") ? 10000.0 : 1.0;
-    return QLocale().toString(squareMetres * factor, 'f', m_settings.value("length_decimals").toInt(2))
+    return QLocale().toString(squareMetres * areaFactor(unit), 'f', m_settings.value("length_decimals").toInt(2))
         + QLatin1Char(' ') + unit;
 }
 

@@ -70,7 +70,7 @@ void MainWindow::addUnderlayActions(QMenu* file)
     m_underlayPicker = std::make_shared<UnderlayPicker>();
     QAction* place = file->addAction(tr("Place &underlay..."));
     place->setObjectName(QStringLiteral("actionPlaceUnderlay"));
-    place->setToolTip(tr("A DXF survey, a PDF page or a scanned image on the active level, to trace over"));
+    place->setToolTip(tr("A DXF/DWG survey, a PDF page or a scanned image on the active level, to trace over"));
     connect(place, &QAction::triggered, this, [this] { placeUnderlayDialog(); });
     // D98: Archicad's Figure tool: a picture at a typed width, opaque (on a worksheet it prints).
     QAction* figure = file->addAction(tr("Place &picture..."));
@@ -151,7 +151,7 @@ void MainWindow::placeUnderlayDialog(const QString& given)
     }
     const QString path = !given.isEmpty() ? given
         : QFileDialog::getOpenFileName(this, tr("Place underlay"), QString(),
-            tr("Underlays (*.dxf *.pdf *.png *.jpg *.jpeg);;DXF drawings (*.dxf);;PDF files (*.pdf);;Images (*.png *.jpg *.jpeg)"));
+            tr("Underlays (*.dxf *.dwg *.pdf *.png *.jpg *.jpeg);;CAD drawings (*.dxf *.dwg);;DXF drawings (*.dxf);;DWG drawings (*.dwg);;PDF files (*.pdf);;Images (*.png *.jpg *.jpeg)"));
     if (path.isEmpty())
         return;
     // Reading a large DXF takes seconds (ezdxf): off the window's thread, behind a progress dialog.

@@ -748,7 +748,7 @@ private slots:
         kimbim::ToolPalette* p = w.toolPalette();
         QCOMPARE(p->groups(), QStringList({"3d", "plane", "view", "edit"}));
         const QHash<QString, QStringList> expected = {
-            {"3d", {"actionWallTool", "actionSlabTool", "actionColumnTool", "actionBeamTool", "actionDoorTool",
+            {"3d", {"actionWallTool", "actionSlabTool", "actionColumnTool", "actionBeamTool", "actionCurtainWallTool", "actionDoorTool",
                        "actionWindowTool", "actionStairTool", "actionRailingTool", "actionRoofTool", "actionRoomTool",
                        "actionSlabOpeningTool", "actionPlaceModelTool", "actionObjectTool"}},
             {"plane", {"actionTextTool", "actionDimensionTool", "actionLeaderTool", "actionMarkTool", "actionGridTool",

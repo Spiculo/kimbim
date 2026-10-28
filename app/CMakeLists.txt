@@ -65,6 +65,8 @@ qt_add_library(kimbim_core STATIC
     src/ObjectSettingsDialog.cpp src/ObjectSettingsDialog.h
     src/ObjectEditorDialog.cpp src/ObjectEditorDialog.h src/JsonTreeEditor.cpp src/JsonTreeEditor.h
     src/MaterialsDialog.cpp src/MaterialsDialog.h
+    src/TypeManagerDialog.cpp src/TypeManagerDialog.h
+    src/ClassificationsDialog.cpp src/ClassificationsDialog.h src/Types.cpp
 )
 target_include_directories(kimbim_core PUBLIC src)
 # Element icons (owner feedback: objects need an icon and a hint on hover).
@@ -133,6 +135,7 @@ kimbim_test(test_dxf_export)
 kimbim_test(test_underlays)
 kimbim_test(test_materials_dialog)
 kimbim_test(test_object_settings)
+kimbim_test(test_types)
 kimbim_test(test_object_editor)
 
 # GUI self-tests: need a real OpenGL window (GPU, or Mesa on the Linux CI runner). Label "gui".

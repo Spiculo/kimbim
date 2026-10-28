@@ -174,7 +174,7 @@ public:
         Line, Polyline, ArcCircle, Rectangle, Fill, // 2D drafting (D84, DraftTools.cpp)
         Tag, NorthArrow, ScaleBar, Cloud, AngleDimension, RadialDimension, LevelDimension, // D87, MarkupTools.cpp
         Object, // D86: a library object (LibraryTools.cpp)
-        Railing }; // D88, StairTools.cpp
+        Railing, CurtainWall }; // D88, StairTools.cpp; D109 curtain wall
     void setTool(Tool tool);
     Tool tool() const { return m_tool; }
     WallTool* wallTool() const { return m_wallTool; }
@@ -423,6 +423,9 @@ public:
     bool createWall(const WallSegment& segment);
     bool createSlab(const QVector<QPointF>& outline);
     bool slabFromWalls(const QStringList& walls);
+    // D109: slab edges (IfcMember) and a slope (rise over run) on the selected slabs.
+    bool addSlabEdges();
+    void slabSlopeDialog();
     bool insertOpening(const Host& host);
     bool treeHasGuid(const QString& guid) const;
     // Re-mesh changed elements and drop removed ones after an edit/undo/redo ({changed, removed}).

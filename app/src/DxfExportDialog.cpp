@@ -34,6 +34,7 @@ DxfExportDialog::DxfExportDialog(const QJsonObject& targets, Bridge run, QWidget
     , m_tree(new QTreeWidget(this))
     , m_folder(new QLineEdit(this))
     , m_browse(new QPushButton(tr("Browse..."), this))
+    , m_format(new QComboBox(this))
     , m_layers(new QComboBox(this))
     , m_colour(new QComboBox(this))
     , m_poche(new QCheckBox(tr("Fills on the element's layer (no -PATT layer)"), this))
@@ -42,7 +43,7 @@ DxfExportDialog::DxfExportDialog(const QJsonObject& targets, Bridge run, QWidget
     , m_status(new QLabel(this))
 {
     setObjectName(QStringLiteral("dxfExportDialog"));
-    setWindowTitle(tr("Export DXF"));
+    setWindowTitle(tr("Export DXF or DWG"));
     m_tree->setObjectName(QStringLiteral("dxfItems"));
     m_tree->setColumnCount(2);
     m_tree->setHeaderLabels({tr("Drawing or sheet"), tr("File")});
@@ -80,6 +81,9 @@ DxfExportDialog::DxfExportDialog(const QJsonObject& targets, Bridge run, QWidget
     }
     m_folder->setObjectName(QStringLiteral("dxfFolder"));
     m_folder->setPlaceholderText(tr("Folder for the DXF files"));
+    m_format->setObjectName(QStringLiteral("dxfFormat"));
+    m_format->addItem(tr("DXF"), QStringLiteral("dxf"));
+    m_format->addItem(tr("DWG"), QStringLiteral("dwg"));
     m_layers->setObjectName(QStringLiteral("dxfLayers"));
     m_layers->addItem(tr("By KimBim layer"), QStringLiteral("layer"));
     m_layers->addItem(tr("By element kind (A-WALL, A-DOOR...)"), QStringLiteral("kind"));
@@ -109,6 +113,7 @@ DxfExportDialog::DxfExportDialog(const QJsonObject& targets, Bridge run, QWidget
     folderRow->addWidget(m_browse);
     auto* form = new QFormLayout;
     form->addRow(tr("Folder:"), folderRow);
+    form->addRow(tr("Format:"), m_format);
     form->addRow(tr("Layers:"), m_layers);
     form->addRow(tr("Colours:"), m_colour);
     form->addRow(QString(), m_poche);
@@ -153,6 +158,18 @@ QString DxfExportDialog::folder() const
 void DxfExportDialog::setFolder(const QString& folder)
 {
     m_folder->setText(folder);
+}
+
+QString DxfExportDialog::format() const
+{
+    return m_format->currentData().toString();
+}
+
+void DxfExportDialog::setFormat(const QString& format)
+{
+    const int i = m_format->findData(format);
+    if (i >= 0)
+        m_format->setCurrentIndex(i);
 }
 
 QString DxfExportDialog::layerMode() const
