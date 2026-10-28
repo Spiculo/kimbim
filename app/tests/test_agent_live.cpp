@@ -133,6 +133,12 @@ private slots:
         kimbim::ProposalBar* bar = w.findChild<kimbim::ProposalBar*>();
         QVERIFY(bar);
         QTRY_VERIFY(bar->isVisible());
+        QPushButton* review = w.findChild<QPushButton*>(QStringLiteral("proposalReview"));
+        QVERIFY(review);
+        QSignalSpy reviewed(&w, &kimbim::MainWindow::loadFinished);
+        review->click();
+        QVERIFY(reviewed.wait(120000));
+        QTRY_VERIFY(w.compareChangeCount() > 0); // Review switched to the option and compared with the base
         QPushButton* accept = w.findChild<QPushButton*>(QStringLiteral("proposalAccept"));
         QVERIFY(accept);
         QSignalSpy reloaded(&w, &kimbim::MainWindow::loadFinished);
@@ -141,8 +147,8 @@ private slots:
         QTRY_VERIFY(!bar->isVisible());
         QTRY_VERIFY(kimbim::PythonEngine::instance().callJson("agent_proposals", {})
                         .object().value("proposals").toArray().isEmpty());
-        const QJsonObject props = kimbim::PythonEngine::instance().callJson("properties", {wall}).object();
-        QCOMPARE(props.value("name").toString(), QStringLiteral("Live wall"));
+        QTRY_VERIFY(kimbim::PythonEngine::instance().callJson("properties", {wall})
+                        .object().value("name").toString() == QLatin1String("Live wall"));
     }
 
 private:
