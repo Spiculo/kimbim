@@ -48,6 +48,7 @@ class Task:
     base_option: str = ""
     base_version: str = ""
     option: str = ""
+    session: str = ""  # the stored session it belongs to (D111), also for a .kim served by a shared worker
     created: str = ""
     summary: str = ""
     changes: dict = field(default_factory=dict)  # accumulated: {"added", "modified", "removed", "labels"}
@@ -87,7 +88,8 @@ class Tasks:
     def _dir(self) -> pathlib.Path:
         if self.session.kind == "ifc":
             return D.data_dir() / "agent" / "tasks" / K.path_hash(self.session.source)
-        return pathlib.Path(self.session.work) / ".kimbim" / "agent" / "tasks"
+        # D111: a session's task file stays in the project, not in its worktree, so the app sees the proposal
+        return pathlib.Path(self.session.project_path) / ".kimbim" / "agent" / "tasks"
 
     def _write(self, task: Task) -> None:
         folder = self._dir()
@@ -114,6 +116,14 @@ class Tasks:
 
     # ------------------------------------------------------------ which task
 
+    def _owned(self, task: Task) -> bool:
+        """Whether `task` belongs to this session (D111): a stored session only sees its own tasks, so two
+        sessions on one project never adopt each other's proposal. A plain CLI/MCP session sees all."""
+        record = getattr(self.session, "stored", None)
+        if record is None:
+            return True
+        return task.id in (record.tasks or ()) or bool(task.option and task.option == record.branch)
+
     def open_task(self, client: str, task_id: str = "") -> Task | None:
         """`task_id` -> that task; else the client's open task; else the only open task on the project;
         several -> ambiguous_task. Parked tasks count as open."""
@@ -122,7 +132,7 @@ class Tasks:
             if t.status not in ACTIVE:
                 raise AgentError("no_task", task=task_id)
             return t
-        active = [t for t in self.all() if t.status in ACTIVE]
+        active = [t for t in self.all() if t.status in ACTIVE and self._owned(t)]
         mine = [t for t in active if t.client == client]
         for group in (mine, active):
             if len(group) == 1:
@@ -163,11 +173,17 @@ class Tasks:
             name, n = f"agent/{base}-{n}", n + 1
         return name
 
+    def _session_branch(self, base: str) -> str:
+        """The stored session's branch (D111): one per conversation, reused by its tasks and its worktree."""
+        hint = getattr(self.session, "branch_hint", lambda: "")()
+        return hint or self._free_option(base)
+
     def _enter(self, task: Task) -> None:
         """Make `task` the open one: an option task works on its option (unparking it)."""
         if task.mode == "option" and _option() != task.option:
             if V._unversioned():  # another task's edits: keep them as its work in progress before switching
-                current = next((t for t in self.all() if t.status in ACTIVE and t.option == _option()), None)
+                current = next((t for t in self.all()
+                                if t.status in ACTIVE and t.option == _option() and self._owned(t)), None)
                 self._save_version(f"Work in progress: {current.title if current else task.title}",
                                    current.client if current else "")
             bridge(V.switch_option, task.option)
@@ -191,11 +207,13 @@ class Tasks:
         """`mode`: the agent's choice (used when the project lets it decide). An explicit "direct" is also
         honoured on an unversioned project, where option mode can't work; an implicit task there fails."""
         self._no_step()
+        if hasattr(self.session, "sync_worktree"):
+            self.session.sync_worktree()  # a session branches from its worktree's latest version
         client = client or getattr(self.session, "client", "cli")
         title = " ".join((title or "").split())
         if not title:
             raise AgentError("bad_input", hint=messages.text("hint_required", field="title"))
-        active = [t for t in self.all() if t.status in ACTIVE]
+        active = [t for t in self.all() if t.status in ACTIVE and self._owned(t)]
         busy = next((t for t in active if t.client == client), None)
         if busy is not None:  # one open task per client; other clients may have theirs
             raise AgentError("task_busy", task=busy.id, title=busy.title)
@@ -205,6 +223,7 @@ class Tasks:
                 raise AgentError("not_versioned", hint=messages.text("hint_not_versioned"))
             chosen = "direct"
         task = Task(uuid.uuid4().hex[:8], title, chosen, client,
+                    session=getattr(self.session, "stored_id", "") or "",
                     created=datetime.now(timezone.utc).isoformat(timespec="seconds"))
         if V._project is not None:
             # start from the architect's option even when another agent's option is current: save that task's
@@ -220,10 +239,13 @@ class Tasks:
             state = json.loads(V.project_state())
             task.base_option, task.base_version = state["option"], state["head"] or ""
         if task.mode == "option":
-            task.option = self._free_option(slug(title))
+            task.option = self._session_branch(slug(title))
             self._write(task)  # before the option: creating it packs the .kim, task file included
             try:
-                bridge(V.create_option, task.option)
+                if task.option in json.loads(V.options())["options"]:
+                    bridge(V.switch_option, task.option)  # a stored session resumes its own branch
+                else:
+                    bridge(V.create_option, task.option)
             except AgentError:
                 self._remove(task)
                 raise
@@ -236,6 +258,8 @@ class Tasks:
             self._start_steps[task.id] = B._current_id()
         self._current = task.id
         self._implicit = task.id if implicit else ""
+        if hasattr(self.session, "bind_task"):
+            self.session.bind_task(task)
         return task
 
     def _remove(self, task: Task) -> None:
@@ -336,6 +360,8 @@ class Tasks:
                 bridge(V.delete_option, task.option)
                 task.status, task.summary = "abandoned", summary
                 self._write(task)
+                if hasattr(self.session, "task_status"):
+                    self.session.task_status(task, "open")
                 D.history_changed()
                 self._current = ""
                 return {"task": task.to_dict(), "changes": self.changes(task), "version": "", "no_changes": True}
@@ -346,6 +372,8 @@ class Tasks:
         task.status, task.summary = "ready", summary
         self._write(task)  # before saving: a .kim packs it
         self._save_document()
+        if hasattr(self.session, "task_status"):
+            self.session.task_status(task, "ready")
         self._current = ""
         self._start_steps.pop(task.id, None)
         return {"task": task.to_dict(), "changes": self.changes(task), "version": version}
@@ -367,6 +395,8 @@ class Tasks:
                     B.undo()
         task.status = "abandoned"  # only once its option is gone
         self._write(task)
+        if hasattr(self.session, "task_status"):
+            self.session.task_status(task, "open")
         D.history_changed()  # a .kim packs the task's new state
         self._current = ""
         return task
@@ -377,7 +407,7 @@ class Tasks:
         task is tried; the ones that failed are reported together in one AgentError."""
         failed = []
         for task in self.all():
-            if task.status != "open":
+            if task.status != "open" or not self._owned(task):
                 continue
             try:
                 if task.mode == "option" and _option() == task.option:
@@ -385,6 +415,8 @@ class Tasks:
                     bridge(V.switch_option, task.base_option)
                 task.status = "parked"
                 self._write(task)
+                if hasattr(self.session, "task_status"):
+                    self.session.task_status(task, "parked")
                 self._save_document()
             except Exception as ex:  # noqa: BLE001  (keep parking the others)
                 failed.append({"task": task.id, "error": getattr(ex, "hint", "") or str(ex)})

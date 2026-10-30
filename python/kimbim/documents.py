@@ -21,6 +21,7 @@ import uuid
 import ifcopenshell
 import ifcopenshell.guid
 
+from . import _core
 from . import app_bridge as B
 from . import kimfile as K
 from . import project as P
@@ -190,6 +191,59 @@ def _prepare(project_dir: pathlib.Path, files_dir: pathlib.Path, doc: dict, atta
     return working
 
 
+def _prepare_worktree(project: Project, work: pathlib.Path, doc: dict) -> pathlib.Path:
+    """Make `work` a session's checkout of `project` (D111): the branch its own `.kimbim/HEAD` names is
+    exported to `work/.kimbim/working.ifc`. The repository's HEAD (the app's working copy) is untouched."""
+    global _pending
+    working = work / ".kimbim" / "working.ifc"
+    working.parent.mkdir(parents=True, exist_ok=True)
+    head = project.repo.head()
+    if head is None:
+        raise KimbimError("the project has no versions yet")
+    try:
+        state = json.loads(_read(work / ".kimbim" / "working.json") or b"{}")
+    except ValueError:
+        state = {}
+    if not working.exists() or state.get("head") != head:
+        project.export(working, overwrite=True, one_owner=True)
+        settings, unversioned = S.from_bytes(project.settings_at("HEAD")), False
+    else:
+        settings = S.from_bytes(_read(work / ".kimbim" / "settings.json"))
+        unversioned = bool(state.get("unversioned"))
+    _pending = {"path": str(working), "doc": doc, "project": project, "settings": settings,
+                "unversioned": unversioned}
+    return working
+
+
+def open_worktree(project_path: str, work: str, branch: str = "") -> str:
+    """Open a session's worktree (D111): `project_path` holds the history, `work` the working folder. The
+    project's own lock is not taken (the app may have it open); the worktree gets its own lock, so two
+    sessions and the app never write the same working folder."""
+    project_dir, work_dir = pathlib.Path(project_path), pathlib.Path(work)
+    try:
+        project = Project.open_worktree(project_dir, work_dir)
+    except (NotAProject, KimbimError) as ex:
+        return _fail(f"not a KimBim project: {ex}")
+    try:
+        if branch:
+            project.switch(branch)
+    except (KimbimError, _core.RepoError) as ex:
+        return _fail(str(ex))
+    if project.repo.head() is None:
+        return _fail("the project has no versions yet")
+    lock = work_dir / ".kimbim" / "lock"
+    if (holder := K.acquire(lock)) is not None:
+        return _locked(work_dir.name, holder)
+    doc = {"mode": "worktree", "source": str(project_dir), "work": str(work_dir), "lock": str(lock),
+           "read_only": False, "template": ""}
+    try:
+        working = _prepare_worktree(project, work_dir, doc)
+    except (KimbimError, OSError) as ex:
+        K.release(lock)
+        return _fail(str(ex))
+    return B._dump({"ok": True, "path": str(working), "option": project.current_branch()})
+
+
 def discard_pending() -> None:
     """Undo an open_kim/open_folder/import_ifc whose model never opened: release its lock and drop the note
     (and the working folder of a .kim; a project folder is the user's own and stays)."""
@@ -336,6 +390,8 @@ def save_document() -> str:
     except (K.KimError, OSError) as ex:
         return _fail(str(ex))
     _saved()
+    if d["mode"] == "worktree":  # a session's checkout: the version is committed, there is no file to pack
+        return B._dump({"ok": True, "path": str(work / ".kimbim" / "working.ifc")})
     return B._dump({"ok": True, "path": d["source"]})
 
 

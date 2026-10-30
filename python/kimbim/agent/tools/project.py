@@ -30,6 +30,7 @@ def info(session):
                        for s in json.loads(A.storeys())["storeys"]],
             "counts": counts, "option": state.get("option", ""), "options": state.get("options", []),
             "versioned": state.get("versioned", False), "unsaved": bool(state.get("dirty", False)),
+            "session": session.stored_id, "worktree": session.work if session.work != session.project_path else "",
             "mode": "live" if session.live else "offline"}
 
 
@@ -41,6 +42,18 @@ def settings(session, keys=None):
     if keys is not None:
         current = {k: current[k] for k in keys if k in current}
     return current
+
+
+@tool("_owner_save", {"properties": {"message": {"type": "string", "description": "The version's message."}}})
+def owner_save(session, message=""):
+    """Internal: save the architect's unsaved work before a session branches away from it (D111). The
+    Assistant calls it on the live host, never on its own worktree."""
+    if V._project is None or not V._unversioned():
+        return {"saved": ""}
+    out = json.loads(V.save_version(message or "Before agent"))
+    if not out.get("ok"):
+        raise AgentError("bridge_error", hint=str(out.get("error") or ""))
+    return {"saved": out.get("id", "")}
 
 
 RESERVED = ("agent_changes", "agent_scripts")  # the review rules: only the architect changes them (spec §4.3)

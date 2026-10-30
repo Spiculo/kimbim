@@ -201,8 +201,9 @@ def _author() -> tuple[str, str]:
 
 
 class Project:
-    def __init__(self, path: pathlib.Path, repo):
-        self.path = path
+    def __init__(self, path: pathlib.Path, repo, work=None):
+        self.path = path  # the repository (`.git` and the project settings live here)
+        self.work = pathlib.Path(work) if work else path  # the working folder (a session's worktree, D111)
         self.repo = repo
 
     @classmethod
@@ -219,6 +220,16 @@ class Project:
         path = pathlib.Path(path)
         try:
             return cls(path, _core.Repo.open(str(path)))
+        except _core.RepoError as e:
+            raise NotAProject(str(e)) from None
+
+    @classmethod
+    def open_worktree(cls, path, work) -> Project:
+        """A project whose working folder is `work` (a session's worktree) but whose history is `path` (D111).
+        The worktree names its own branch; two of them may sit on different branches of the same store."""
+        path, work = pathlib.Path(path), pathlib.Path(work)
+        try:
+            return cls(path, _core.Repo.open_worktree(str(path), str(work)), work=work)
         except _core.RepoError as e:
             raise NotAProject(str(e)) from None
 
@@ -309,7 +320,7 @@ class Project:
         writes: dict[str, bytes | None] = {p: None for p in old_files if p not in wanted}
         for p in sorted(wanted - set(old_files)):
             name = p.split("/", 1)[1]
-            local = self.path / WORK_FILES_DIR / name
+            local = self.work / WORK_FILES_DIR / name
             data = None
             if local.is_file():
                 data = local.read_bytes()

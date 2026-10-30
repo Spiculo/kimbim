@@ -49,6 +49,12 @@ impl Repo {
         Ok(Repo { inner: kimbim_repo::Repo::open(&path).map_err(err)? })
     }
 
+    /// A second working copy (D111): the object store of `project`, its branch in `<worktree>/.kimbim/HEAD`.
+    #[staticmethod]
+    fn open_worktree(project: PathBuf, worktree: PathBuf) -> PyResult<Self> {
+        Ok(Repo { inner: kimbim_repo::Repo::open_worktree(&project, &worktree).map_err(err)? })
+    }
+
     fn head(&self) -> PyResult<Option<String>> {
         self.inner.head().map_err(err)
     }

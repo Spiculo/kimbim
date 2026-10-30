@@ -52,7 +52,7 @@ def _fail(message: str) -> str:
 
 
 def _working(project: Project | None = None) -> pathlib.Path:
-    return (project or _project).path / ".kimbim" / "working.ifc"
+    return (project or _project).work / ".kimbim" / "working.ifc"
 
 
 # The decomposed working model, kept between Compare, version_changes and Save version: decomposing a
@@ -61,7 +61,7 @@ _working_cache: dict = {"key": None, "records": None}
 
 
 def _working_key():
-    return (str(_project.path.resolve()), _project.current_branch(), B._current_id(), S.to_bytes())
+    return (str(_project.work.resolve()), _project.current_branch(), B._current_id(), S.to_bytes())
 
 
 def _working_records() -> dict[str, bytes]:
@@ -109,7 +109,8 @@ def project_state() -> str:
     if _project is None:
         return B._dump({"versioned": False, "dirty": _dirty() if B._model is not None else False, "unversioned": False, "document": doc})
     head = _project.repo.head()
-    return B._dump({"versioned": True, "folder": str(_project.path), "option": _decode(_project.current_branch()),
+    return B._dump({"versioned": True, "folder": str(_project.path), "work": str(_project.work),
+                    "option": _decode(_project.current_branch()),
                     "options": sorted(_decode(b) for b in _project.branches()), "head": head, "dirty": _dirty(),
                     "unversioned": _unversioned(), "combining": _combining["option"] if _combining else "", "document": doc})
 
@@ -120,7 +121,7 @@ def _write_working() -> pathlib.Path:
     B._model.write(str(working))
     from . import underlays
 
-    underlays.write_files(_project.path)  # D85: a version keeps the underlay files its settings use
+    underlays.write_files(_project.work)  # D85: a version keeps the underlay files its settings use
     return working
 
 

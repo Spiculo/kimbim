@@ -67,6 +67,10 @@ pub struct TagInfo {
 
 pub struct Repo {
     git_dir: PathBuf,
+    /// The file that names the current branch. Normally `<git_dir>/HEAD`; a worktree
+    /// (`Repo::open_worktree`) keeps its own `<worktree>/.kimbim/HEAD`, so two working copies can sit on
+    /// different branches of the same object store at the same time (D111).
+    head_file: PathBuf,
 }
 
 fn git_err(e: impl std::fmt::Display) -> Error {
@@ -156,16 +160,33 @@ impl Repo {
             return Err(Error::AlreadyExists(git_dir));
         }
         gix::init_bare(&git_dir).map_err(git_err)?;
-        std::fs::write(git_dir.join("HEAD"), "ref: refs/heads/main\n")?;
-        Ok(Repo { git_dir })
+        let head_file = git_dir.join("HEAD");
+        std::fs::write(&head_file, "ref: refs/heads/main\n")?;
+        Ok(Repo { git_dir, head_file })
     }
 
     pub fn open(project: &Path) -> Result<Repo> {
         let git_dir = project.join(".git");
+        let head_file = git_dir.join("HEAD");
+        if !head_file.is_file() {
+            return Err(Error::NotARepo(project.to_path_buf()));
+        }
+        Ok(Repo { git_dir, head_file })
+    }
+
+    /// A second working copy of the same project (D111): the object store is `project/.git`, the branch is
+    /// named by `<worktree>/.kimbim/HEAD`. The worktree starts on `main` when its HEAD file does not exist yet.
+    pub fn open_worktree(project: &Path, worktree: &Path) -> Result<Repo> {
+        let git_dir = project.join(".git");
         if !git_dir.join("HEAD").is_file() {
             return Err(Error::NotARepo(project.to_path_buf()));
         }
-        Ok(Repo { git_dir })
+        let head_file = worktree.join(".kimbim").join("HEAD");
+        if !head_file.is_file() {
+            std::fs::create_dir_all(head_file.parent().expect("HEAD has a parent"))?;
+            std::fs::write(&head_file, "ref: refs/heads/main\n")?;
+        }
+        Ok(Repo { git_dir, head_file })
     }
 
     fn gix(&self) -> Result<gix::Repository> {
@@ -181,7 +202,7 @@ impl Repo {
     }
 
     pub fn current_branch(&self) -> Result<String> {
-        let head = std::fs::read_to_string(self.git_dir.join("HEAD"))?;
+        let head = std::fs::read_to_string(&self.head_file)?;
         head.trim()
             .strip_prefix("ref: refs/heads/")
             .map(str::to_string)
@@ -378,7 +399,7 @@ impl Repo {
         if !self.branches()?.iter().any(|b| b == name) {
             return Err(Error::UnknownBranch(name.to_string()));
         }
-        std::fs::write(self.git_dir.join("HEAD"), format!("ref: refs/heads/{name}\n"))?;
+        std::fs::write(&self.head_file, format!("ref: refs/heads/{name}\n"))?;
         Ok(())
     }
 

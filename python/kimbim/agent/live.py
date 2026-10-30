@@ -151,7 +151,9 @@ class LiveHost:
                 except queue.Empty:
                     return None
             rid, request = self._current
-        return {"id": rid, "tool": str(request.get("tool") or ""),
+        tool = str(request.get("tool") or "")
+        spec = catalogue.TOOLS.get(tool)
+        return {"id": rid, "tool": tool, "writes": bool(spec is not None and spec.writes),
                 "args": request.get("args") or {}, "client": str(request.get("client") or "live"),
                 "task": str(request.get("task") or "")}
 
@@ -169,9 +171,18 @@ class LiveHost:
             before_option = json.loads(V.project_state()).get("option", "")
             before_path = B._path
             before_id = B._current_id()
-            envelope = catalogue.call_tool(
-                self.session, str(request.get("tool") or ""), request.get("args") or {},
-                client=str(request.get("client") or "live"), task_id=str(request.get("task") or ""))
+            sid = str(request.get("session") or "")
+            rebound = bool(sid and self.session.stored_id != sid)
+            before_stored = (self.session.store, self.session.stored, self.session.stored_id)
+            if rebound:
+                self.session.bind_stored(sid)
+            try:
+                envelope = catalogue.call_tool(
+                    self.session, str(request.get("tool") or ""), request.get("args") or {},
+                    client=str(request.get("client") or "live"), task_id=str(request.get("task") or ""))
+            finally:
+                if rebound:
+                    self.session.store, self.session.stored, self.session.stored_id = before_stored
             ui: dict = {"state": json.loads(B.state())}
             if envelope.get("ok") and before_option != json.loads(V.project_state()).get("option", ""):
                 ui["reload"] = B._path
@@ -199,7 +210,7 @@ class LiveHost:
             self._current = None
         return {"ok": True, "reply": envelope, "ui": ui}
 
-    def call_tool_sync(self, tool: str, args: dict, client: str = "assistant") -> dict:
+    def call_tool_sync(self, tool: str, args: dict, client: str = "assistant", session: str = "") -> dict:
         """Run a tool through the app's queue (used by the Assistant's own thread): the app's poll runs it
         on its thread and applies the undo step, while this thread waits for the envelope."""
         if self._closed:
@@ -207,7 +218,7 @@ class LiveHost:
         rid = uuid.uuid4().hex
         with self._reply_lock:
             self._replies[rid] = None
-        self._requests.put((rid, {"tool": tool, "args": args, "client": client, "task": ""}))
+        self._requests.put((rid, {"tool": tool, "args": args, "client": client, "task": "", "session": session}))
         with self._reply_lock:
             self._reply_lock.wait_for(lambda: self._replies.get(rid) is not None, timeout=REQUEST_WAIT)
             return self._replies.pop(rid, None) or AgentError("worker_failed", hint="the app did not answer").envelope()
@@ -249,10 +260,10 @@ def stop() -> str:
     return B._dump({"ok": True})
 
 
-def call_tool_sync(tool: str, args: dict, client: str = "assistant") -> dict:
+def call_tool_sync(tool: str, args: dict, client: str = "assistant", session: str = "") -> dict:
     if _host is None:
         raise AgentError("needs_app")
-    return _host.call_tool_sync(tool, args, client)
+    return _host.call_tool_sync(tool, args, client, session)
 
 
 def status() -> str:
@@ -290,18 +301,55 @@ def _counts(task) -> dict:
 
 
 def proposals() -> str:
-    """Ready option tasks whose design option still exists: what the review bar lists."""
-    if _host is None:
-        return B._dump({"ok": True, "proposals": []})
-    options = set(json.loads(V.options()).get("options", []))
+    """Ready option tasks whose design option still exists: what the review bar lists. When the live host
+    is not running (a read-only or failed session) the task files of the open project are read directly,
+    so the bar still appears and says what is waiting for review."""
     out = []
-    for task in _host.session.tasks.all():
-        if task.status != "ready" or task.mode != "option" or not task.option or task.option not in options:
-            continue
-        out.append({"id": task.id, "title": task.title, "client": task.client, "summary": task.summary,
-                    "option": task.option, "base_option": task.base_option, "base_version": task.base_version,
-                    "created": task.created, "counts": _counts(task)})
+    if _host is not None and V._project is not None:
+        options = set(json.loads(V.options()).get("options", []))
+        for task in _host.session.tasks.all():
+            if task.status != "ready" or task.mode != "option" or not task.option or task.option not in options:
+                continue
+            out.append({"id": task.id, "title": task.title, "client": task.client, "summary": task.summary,
+                        "option": task.option, "base_option": task.base_option, "base_version": task.base_version,
+                        "created": task.created, "counts": _counts(task)})
+    if not out:  # no live host, a read-only session, or a host that lost the task list: read the project files
+        out = _offline_proposals()
     return B._dump({"ok": True, "proposals": out})
+
+
+def _offline_proposals() -> list:
+    """The open document's ready task files without a live host (the app's working folder has them)."""
+    import pathlib
+
+    work = (D._doc or {}).get("work") if hasattr(D, "_doc") else None
+    if not work:
+        return []
+    folder = pathlib.Path(work) / ".kimbim" / "agent" / "tasks"
+    if not folder.is_dir():
+        return []
+    try:
+        options = set(json.loads(V.options()).get("options", [])) if V._project is not None else set()
+    except Exception:  # noqa: BLE001  (a broken project state must not hide the bar)
+        options = set()
+    out = []
+    for path in sorted(folder.glob("*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if data.get("status") != "ready" or data.get("mode") != "option":
+                continue
+            option = str(data.get("option") or "")
+            if option not in options:
+                continue
+            changes = data.get("changes") or {}
+            out.append({"id": data.get("id", ""), "title": data.get("title", ""),
+                        "client": data.get("client", ""), "summary": data.get("summary", ""),
+                        "option": option, "base_option": data.get("base_option", ""),
+                        "base_version": data.get("base_version", ""), "created": data.get("created", ""),
+                        "counts": {k: len(changes.get(k) or ()) for k in ("added", "modified", "removed")}})
+        except (OSError, ValueError, TypeError):
+            continue  # a damaged task file is skipped, not fatal
+    return out
 
 
 def proposal(task_id: str) -> str:
@@ -342,6 +390,7 @@ def accept(task_id: str, resolutions_json: str = "{}") -> str:
         V.delete_option(task.option)
     task.status = "accepted"
     host.session.tasks._write(task)
+    _end_session(task, host.project, "merged")
     D.save_document()
     return B._dump({"ok": True, "status": combined.get("status"), "path": combined.get("path", B._path),
                     "task": task.to_dict()})
@@ -360,8 +409,21 @@ def reject(task_id: str) -> str:
         V.delete_option(task.option)
     task.status = "rejected"
     host.session.tasks._write(task)
+    _end_session(task, host.project, "rejected")
     D.save_document()
     return B._dump({"ok": True, "path": B._path, "task": task.to_dict()})
+
+
+def _end_session(task, project: str, status: str) -> None:
+    """The architect accepted or rejected the task: its stored session ends with it (D111)."""
+    try:
+        from . import sessions
+
+        record = sessions.Store().for_task(task.id, project)
+        if record is not None:
+            sessions.review(record.id, status)
+    except Exception:  # noqa: BLE001  (the review itself must not fail because of the session bookkeeping)
+        pass
 
 
 # called from C++: keep the message text in the app's language

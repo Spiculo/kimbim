@@ -32,7 +32,8 @@ GROUP_HELP = {
     "sheets": "sheets", "schedules": "schedules", "checks": "model checks", "levels": "levels",
     "selection": "the app's selection", "script": "run Python scripts", "snapshot": "pictures of the model",
     "serve": "keep a project open for agent commands", "mcp": "MCP server for AI agents",
-    "setup": "configure an AI client", "help": "this help, or the agent tools as a Markdown table",
+    "setup": "configure an AI client", "sessions": "stored conversations, branches and worktrees (D111)",
+    "help": "this help, or the agent tools as a Markdown table",
 }
 
 _JSONISH = re.compile(r"^\s*([\[{]|-?\d+(\.\d+)?([eE][-+]?\d+)?\s*$|true\s*$|false\s*$|null\s*$)")
@@ -105,6 +106,8 @@ def _add_globals(p: argparse.ArgumentParser, top: bool, skip: frozenset = frozen
             ("no-worker", dict(dest="g_no_worker", action="store_true", default=d(False),
                                help="run in this process instead of the project's background worker")),
             ("task", dict(dest="g_task", default=d(""), metavar="ID", help="the task to work in (default: $KIMBIM_TASK)")),
+            ("session", dict(dest="g_session", default=d(""), metavar="ID",
+                             help="a stored session to work in (default: $KIMBIM_SESSION)")),
             ("client", dict(dest="g_client", default=d("cli"), metavar="NAME",
                             help="who is calling (names the author of agent versions)"))):
         if flag not in skip:
@@ -214,18 +217,19 @@ def _tool_command(ns) -> int:
 def _call(ns, name: str, args: dict) -> int:
     project = discover(ns.g_project)
     task = ns.g_task or os.environ.get("KIMBIM_TASK", "")
+    session = getattr(ns, "g_session", "") or os.environ.get("KIMBIM_SESSION", "")
     if ns.g_no_worker:
-        envelope = _run_in_process(project, name, args, ns.g_client, task)
+        envelope = _run_in_process(project, name, args, ns.g_client, task, session)
     else:
-        envelope = _client.request(project, name, args, client=ns.g_client, task=task)
+        envelope = _client.request(project, name, args, client=ns.g_client, task=task, session=session)
     return _report(name, envelope, ns.g_json, args)
 
 
-def _run_in_process(project: str, name: str, args: dict, client: str, task: str) -> dict:
+def _run_in_process(project: str, name: str, args: dict, client: str, task: str, session_id: str = "") -> dict:
     from .worker import _stop  # parks an open task, saves, closes: what the worker does when it ends
 
     try:
-        session = Session.open(project, client)
+        session = Session.open(project, client, session_id)
     except AgentError as ex:
         return ex.envelope()
     except Exception as ex:  # noqa: BLE001  (an agent sees an error, not a traceback)
@@ -496,15 +500,43 @@ def _people(group, top) -> None:
     s.add_argument("--select", action="append", default=[], metavar="GLOBALID",
                    help="elements the script sees as the selection (repeatable)")
     s.add_argument("--dry-run", action="store_true", help="on a project: report what would change, then roll it back")
+    s = leaf("sessions", "list", _sessions_list, help="list stored sessions for the project",
+             description="List the stored conversations (id, status, title). They live in the app's data folder, "
+                         "not in the project.")
+    s.add_argument("--all", action="store_true", help="include archived sessions")
+    s = leaf("sessions", "new", _sessions_new, help="start a stored session",
+             description="Start a stored conversation: a branch agent/<slug> and, for a folder project, its own "
+                         "worktree. Prints the session id.")
+    s.add_argument("title", nargs="?")
+    s.add_argument("--provider", default="")
+    s.add_argument("--model", default="")
+    s = leaf("sessions", "show", _sessions_show, help="show a session and its transcript")
+    s.add_argument("id")
+    s = leaf("sessions", "rename", _sessions_rename, help="rename a session")
+    s.add_argument("id")
+    s.add_argument("title")
+    s = leaf("sessions", "archive", _sessions_archive, help="archive a session (it cannot write)")
+    s.add_argument("id")
+    s = leaf("sessions", "restore", _sessions_restore, help="restore an archived session")
+    s.add_argument("id")
+    s = leaf("sessions", "delete", _sessions_delete, help="delete a session's transcript and worktree")
+    s.add_argument("id")
+    s.add_argument("--confirm", action="store_true", help="also delete a proposal that is waiting for review")
+    s.add_argument("--branch", action="store_true", help="also delete its design option (branch)")
+    s = leaf("sessions", "fork", _sessions_fork, help="copy a session to try another answer")
+    s.add_argument("id")
+    s.add_argument("--title", default="")
     sp = top.add_parser("serve", help=GROUP_HELP["serve"], description=GROUP_HELP["serve"])
     sp.add_argument("project")
+    sp.add_argument("--session", default="", help="a stored session: keep its worktree open")
     sp.add_argument("--idle", type=float, default=None, help="seconds without a request before exiting")
     sp.set_defaults(handler=_serve)
-    only_project = frozenset({"json", "no-worker", "task", "client"})
+    only_project = frozenset({"json", "no-worker", "task", "client", "session"})
     mp = top.add_parser("mcp", help=GROUP_HELP["mcp"], description=GROUP_HELP["mcp"] + " (stdio). Without --project, "
                         "every tool call names its project.")
     _add_globals(mp, False, only_project,
                  project_help="the project: a folder, .kim or .ifc (default: none; every tool call names it)")
+    mp.add_argument("--session", default="", metavar="ID", help="a stored session to work in")
     mp.set_defaults(handler=_mcp)
     st = top.add_parser("setup", help=GROUP_HELP["setup"],
                         description="Write the AI client's configuration for `kimbim mcp` (merged into its file).")
@@ -806,16 +838,116 @@ def _export_dxf(ns) -> int:
     return 1 if errors else 0
 
 
+def _sessions_store(ns):
+    from . import sessions as S
+
+    return S, S.Store()
+
+
+def _sessions_project(ns) -> str:
+    return ns.g_project or ""
+
+
+def _sessions_list(ns) -> int:
+    S, store = _sessions_store(ns)
+    project = _sessions_project(ns)
+    records = store.all(project, include_archived=ns.all)
+    if ns.g_json:
+        print(json.dumps([r.to_dict() for r in records], ensure_ascii=False, indent=1))
+        return 0
+    for r in records:
+        print(f"{r.id}  {r.status:8}  {r.updated}  {r.title}")
+    if not records:
+        print(_t("cli_no_sessions"))
+    return 0
+
+
+def _sessions_new(ns) -> int:
+    S, store = _sessions_store(ns)
+    project = _sessions_project(ns)
+    if not project:
+        project = discover(None)
+    record = store.create(project, ns.title or "", provider=ns.provider, model=ns.model)
+    if ns.g_json:
+        print(json.dumps(record.to_dict(), ensure_ascii=False, indent=1))
+    else:
+        print(record.id)
+    return 0
+
+
+def _sessions_show(ns) -> int:
+    S, store = _sessions_store(ns)
+    record = store.get(ns.id)
+    data = {"session": record.to_dict(), "transcript": store.transcript(ns.id)}
+    if ns.g_json:
+        print(json.dumps(data, ensure_ascii=False, indent=1))
+        return 0
+    print(f"{record.id}  {record.status}  {record.title}")
+    print(f"  project: {record.project}")
+    print(f"  branch: {record.branch or '-'}  worktree: {record.worktree or '-'}")
+    for entry in data["transcript"]:
+        role = entry.get("role", "")
+        if role == "tool":
+            print(f"  · {entry.get('summary') or entry.get('name', '')}")
+        elif entry.get("text"):
+            print(f"  {role}: {entry['text']}")
+    return 0
+
+
+def _sessions_rename(ns) -> int:
+    S, store = _sessions_store(ns)
+    record = store.rename(ns.id, ns.title)
+    print(f"{record.id}  {record.title}")
+    return 0
+
+
+def _sessions_archive(ns) -> int:
+    S, store = _sessions_store(ns)
+    record = store.archive(ns.id)
+    print(f"{record.id}  {record.status}")
+    return 0
+
+
+def _sessions_restore(ns) -> int:
+    S, store = _sessions_store(ns)
+    record = store.restore(ns.id)
+    print(f"{record.id}  {record.status}")
+    return 0
+
+
+def _sessions_delete(ns) -> int:
+    S, store = _sessions_store(ns)
+    out = store.delete(ns.id, confirm=ns.confirm, remove_branch=ns.branch)
+    if ns.g_json:
+        print(json.dumps(out, ensure_ascii=False, indent=1))
+    return 0
+
+
+def _sessions_fork(ns) -> int:
+    S, store = _sessions_store(ns)
+    record = store.fork(ns.id, ns.title)
+    if ns.g_json:
+        print(json.dumps(record.to_dict(), ensure_ascii=False, indent=1))
+    else:
+        print(record.id)
+    return 0
+
+
 def _serve(ns) -> int:
     from .worker import main as serve_main
 
-    return serve_main([ns.project] + ([] if ns.idle is None else ["--idle", str(ns.idle)]))
+    args = [ns.project]
+    if ns.session:
+        args += ["--session", ns.session]
+    if ns.idle is not None:
+        args += ["--idle", str(ns.idle)]
+    return serve_main(args)
 
 
 def _mcp(ns) -> int:
     from .mcp_server import serve
 
-    return serve(ns.g_project)
+    return serve(ns.g_project, ns.session)
 
 
 def _setup(ns) -> int:

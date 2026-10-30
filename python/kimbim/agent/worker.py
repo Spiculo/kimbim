@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import select
 import signal
 import socket
@@ -55,7 +56,16 @@ def idle_seconds() -> float:
 
 # ---------------------------------------------------------------- discovery file
 
-def discovery_path(project) -> Path:
+def _session_dir_name(session: str) -> str:
+    """A session id is a hex name (D111); anything else must not become a path out of the data folder."""
+    return session if re.fullmatch(r"[A-Za-z0-9_-]{1,64}", session or "") else "_invalid"
+
+
+def discovery_path(project, session: str = "") -> Path:
+    """A stored session's worker lives in the session's folder (D111), so two sessions on one project each
+    have their own worker and worktree; without a session, the project's single worker is in the data folder."""
+    if session:
+        return D.data_dir() / "agent" / "sessions" / _session_dir_name(session) / "worker.json"
     return D.data_dir() / "agent" / "sessions" / f"{K.path_hash(project)}.json"
 
 
@@ -69,8 +79,10 @@ def live_discovery_path(project) -> Path:
     return p.with_name(p.name + ".agent-live.json")
 
 
-def error_path(project, pid: int) -> Path:
+def error_path(project, pid: int, session: str = "") -> Path:
     """Where worker `pid` leaves its start error for the client that spawned it."""
+    if session:
+        return D.data_dir() / "agent" / "sessions" / _session_dir_name(session) / f"worker.{pid}.error.json"
     return D.data_dir() / "agent" / "sessions" / f"{K.path_hash(project)}.{pid}.error.json"
 
 
@@ -254,45 +266,61 @@ def _handle(session, request) -> dict:
         return AgentError("bad_input", hint="a request is an object").envelope()
     name = request.get("tool")
     if name == "_ping":
-        return {"ok": True, "result": {"pid": os.getpid(), "project": session.source}}
-    return call_tool(session, str(name or ""), request.get("args") or {}, client=str(request.get("client") or "cli"),
-                     task_id=str(request.get("task") or ""))
+        return {"ok": True, "result": {"pid": os.getpid(), "project": session.source,
+                                       "session": session.stored_id}}
+    sid = str(request.get("session") or "")
+    rebound = bool(sid and session.stored_id != sid)
+    before = (session.store, session.stored, session.stored_id)
+    if rebound:  # a .kim/IFC session: it shares this worker, but owns its task
+        session.bind_stored(sid)
+    try:
+        return call_tool(session, str(name or ""), request.get("args") or {},
+                         client=str(request.get("client") or "cli"), task_id=str(request.get("task") or ""))
+    finally:
+        if rebound:  # a session worker keeps its record: the task just updated it
+            session.store, session.stored, session.stored_id = before
 
 
-def _fail_start(project: str, envelope: dict) -> int:
-    write_json(error_path(project, os.getpid()), {"error": envelope, "pid": os.getpid(), "project": project})
+def _fail_start(project: str, envelope: dict, session: str = "") -> int:
+    write_json(error_path(project, os.getpid(), session),
+               {"error": envelope, "pid": os.getpid(), "project": project, "session": session})
     return 1
 
 
-def serve(project: str, idle: float) -> int:
-    """Open `project` and serve requests until idle for `idle` seconds, told to shut down or signalled."""
+def serve(project: str, idle: float, session_id: str = "") -> int:
+    """Open `project` (or a stored session's worktree, D111) and serve requests until idle for `idle` seconds,
+    told to shut down or signalled."""
     from .session import Session
 
     project = os.path.abspath(project)
-    found = discovery_path(project)
+    found = discovery_path(project, session_id)
     other = read_discovery(found)
-    live = read_discovery(live_discovery_path(project))
+    # A session with a worktree does not conflict with the app's own working copy; one without a worktree
+    # (.kim/IFC) does, so it must not start beside the live host.
+    worktree = bool(session_id) and Path(project).is_dir()
+    live = None if worktree else read_discovery(live_discovery_path(project))
     if (entry_alive(other) and not other.get("stopping")) or (entry_alive(live) and not live.get("stopping")):
         _log(f"a session for {project} is already running (pid {(other or live)['pid']})")
         return 0
     wakeup = _install_signals()
-    _log(f"opening {project}")
+    _log(f"opening {project}" + (f" (session {session_id})" if session_id else ""))
     try:
-        session = Session.open(project, "cli")
+        session = Session.open(project, "cli", session_id)
     except SystemExit as ex:  # a signal before there is a session: tell the client instead of vanishing
         _log(f"signal while opening {project}: {ex.code}")
-        return _fail_start(project, AgentError("worker_failed", hint=f"signal {ex.code} while opening").envelope())
+        return _fail_start(project, AgentError("worker_failed", hint=f"signal {ex.code} while opening").envelope(),
+                           session_id)
     except AgentError as ex:
         _log(f"cannot open {project}: {ex.code} {ex}")
-        return _fail_start(project, ex.envelope())
+        return _fail_start(project, ex.envelope(), session_id)
     except Exception as ex:  # noqa: BLE001
         _log(f"cannot open {project}: {ex}")
-        return _fail_start(project, AgentError("bridge_error", hint=str(ex)).envelope())
+        return _fail_start(project, AgentError("bridge_error", hint=str(ex)).envelope(), session_id)
     authkey = os.urandom(32)
     address = _address(project)
     entry = {"address": address, "authkey": authkey.hex(), "pid": os.getpid(),
              "started": process_started(os.getpid()), "project": project, "kind": "worker",
-             "since": datetime.now().isoformat(timespec="seconds")}
+             "session": session_id, "since": datetime.now().isoformat(timespec="seconds")}
     listener = None
     watchdog = None
     stopped = False
@@ -307,7 +335,7 @@ def serve(project: str, idle: float) -> int:
             _log(f"cannot listen on {address}: {ex}")
             _stop(session)
             stopped = True
-            return _fail_start(project, AgentError("worker_failed", hint=str(ex)).envelope())
+            return _fail_start(project, AgentError("worker_failed", hint=str(ex)).envelope(), session_id)
         write_json(found, entry)  # we hold the project lock: no other live worker owns this entry
         _log(f"serving {project} on {address} (idle exit after {idle:g} s)")
         watchdog = _Watchdog(address, authkey, idle, wakeup)
@@ -382,6 +410,7 @@ def serve(project: str, idle: float) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="kimbim serve", description="Keep a project open for agent commands.")
     parser.add_argument("project")
+    parser.add_argument("--session", default="", help="a stored session (agent/sessions): work in its worktree")
     parser.add_argument("--idle", type=float, default=None, help="seconds without a request before exiting")
     args = parser.parse_args(argv)
-    return serve(args.project, idle_seconds() if args.idle is None else args.idle)
+    return serve(args.project, idle_seconds() if args.idle is None else args.idle, args.session)

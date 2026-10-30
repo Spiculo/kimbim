@@ -89,6 +89,35 @@ fn branches_and_switch() {
 }
 
 #[test]
+fn worktrees_keep_their_own_branch() {
+    let dir = tempfile::tempdir().unwrap();
+    let project = dir.path().join("project");
+    std::fs::create_dir(&project).unwrap();
+    let repo = Repo::init(&project).unwrap();
+    let base = repo.commit(&changes(&[("a.json", Some("1"))]), "base", &sig(1)).unwrap();
+    repo.create_branch("agent/one", &base).unwrap();
+    repo.create_branch("agent/two", &base).unwrap();
+
+    let w1 = dir.path().join("work-one");
+    let w2 = dir.path().join("work-two");
+    let one = Repo::open_worktree(&project, &w1).unwrap();
+    let two = Repo::open_worktree(&project, &w2).unwrap();
+    assert_eq!(one.current_branch().unwrap(), "main");
+    assert_eq!(one.head().unwrap().as_deref(), Some(base.as_str()));
+
+    one.switch("agent/one").unwrap();
+    two.switch("agent/two").unwrap();
+    let c1 = one.commit(&changes(&[("a.json", Some("one"))]), "one", &sig(2)).unwrap();
+    let c2 = two.commit(&changes(&[("a.json", Some("two"))]), "two", &sig(3)).unwrap();
+    assert_eq!(one.head().unwrap().as_deref(), Some(c1.as_str()));
+    assert_eq!(two.head().unwrap().as_deref(), Some(c2.as_str()));
+    assert_eq!(repo.current_branch().unwrap(), "main");
+    assert_eq!(repo.head().unwrap().as_deref(), Some(base.as_str()));
+    assert_eq!(repo.read_blob_at("agent/one", "a.json").unwrap().unwrap(), b"one");
+    assert_eq!(repo.read_blob_at("agent/two", "a.json").unwrap().unwrap(), b"two");
+}
+
+#[test]
 fn rejects_bad_paths_and_revs() {
     let dir = tempfile::tempdir().unwrap();
     let repo = Repo::init(dir.path()).unwrap();

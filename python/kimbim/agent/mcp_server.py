@@ -72,8 +72,9 @@ class KimbimMcp:
     """What the server does, apart from the MCP plumbing: tool list, calls and the remembered tasks.
     `request` is `client.request` (a stand-in in tests)."""
 
-    def __init__(self, project: str | None = None, request=None):
+    def __init__(self, project: str | None = None, request=None, session: str = ""):
         self.project = os.path.abspath(project) if project else None
+        self.session = session
         self.request = request or _client.request
         self.names = {mcp_name(n): n for n in TOOLS if not n.startswith("_")}
         self.tasks: dict[tuple[str, str], str] = {}  # (client, project) -> the task this server started
@@ -94,14 +95,15 @@ class KimbimMcp:
         key = (client, os.path.abspath(project))
         with self.lock:
             task = self.tasks.get(key, "")
-        envelope = self.request(project, tool, args, client=client, task=task)
+        extra = {"session": self.session} if self.session else {}
+        envelope = self.request(project, tool, args, client=client, task=task, **extra)
         code = (envelope.get("error") or {}).get("code") if not envelope.get("ok") else None
         if task and code in _STALE:
             with self.lock:
                 if self.tasks.get(key) == task:
                     del self.tasks[key]
             if not tool.startswith("task."):  # nothing ran: once more in whatever task is open now
-                envelope = self.request(project, tool, args, client=client, task="")
+                envelope = self.request(project, tool, args, client=client, task="", **extra)
         if envelope.get("ok"):
             with self.lock:
                 if tool == "task.start":
@@ -142,11 +144,11 @@ def client_id(ctx) -> str:
     return f"mcp-{name}" if name else "mcp"
 
 
-def build_server(project: str | None = None, request=None) -> Server:
-    """The MCP server for `project` (None: every call names its project)."""
+def build_server(project: str | None = None, request=None, session: str = "") -> Server:
+    """The MCP server for `project` (None: every call names its project) and its stored `session` (D111)."""
     from .. import agent  # noqa: F401  (importing the package fills the catalogue)
 
-    core = KimbimMcp(project, request)
+    core = KimbimMcp(project, request, session)
 
     async def list_tools(ctx, params):
         return types.ListToolsResult(tools=core.tools())
@@ -188,11 +190,11 @@ def _version() -> str:
         return "dev"
 
 
-def serve(project: str | None = None) -> int:
+def serve(project: str | None = None, session: str = "") -> int:
     """`kimbim mcp`: serve over stdin/stdout until the client closes them."""
     from mcp.server.stdio import stdio_server
 
-    server = build_server(project)
+    server = build_server(project, session=session)
 
     async def run():
         async with stdio_server() as (read, write):

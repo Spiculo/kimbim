@@ -71,7 +71,7 @@ def _work() -> pathlib.Path | None:
     work = documents._doc.get("work")
     if work:
         return pathlib.Path(work)
-    return pathlib.Path(V._project.path) if V._project is not None else None
+    return pathlib.Path(V._project.work) if V._project is not None else None
 
 
 def store_dir() -> pathlib.Path:

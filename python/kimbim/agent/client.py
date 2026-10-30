@@ -9,12 +9,14 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
 from multiprocessing import AuthenticationError
 from multiprocessing.connection import Client
 from pathlib import Path
+
 
 from .. import documents as D
 from .. import kimfile as K
@@ -46,14 +48,17 @@ def _wait(cond, timeout: float) -> bool:
     return cond()
 
 
-def _paths(project: str) -> tuple[Path, Path]:
-    """The live app's entry (in the project) first, then an offline worker's (in the data folder)."""
+def _paths(project: str, session: str = "") -> tuple[Path, ...]:
+    """A stored session's own worker (D111) has a worktree, so the live app's entry is not it. Without a
+    session: the live app's entry (in the project) first, then an offline worker's (in the data folder)."""
+    if session:
+        return (discovery_path(project, session),)
     return live_discovery_path(project), discovery_path(project)
 
 
-def _entry(project: str) -> dict | None:
+def _entry(project: str, session: str = "") -> dict | None:
     """The project's live or worker entry if its process is alive (it may be `stopping`); stale ones are removed."""
-    for path in _paths(project):
+    for path in _paths(project, session):
         data = read_discovery(path)
         if data is None:
             continue
@@ -63,21 +68,23 @@ def _entry(project: str) -> dict | None:
     return None
 
 
-def _path_for(project: str, info: dict) -> Path:
+def _path_for(project: str, info: dict, session: str = "") -> Path:
     """The discovery file that holds `info` (live first)."""
-    for path in _paths(project):
+    for path in _paths(project, session):
         if same_entry(read_discovery(path), info):
             return path
-    return discovery_path(project)
+    return discovery_path(project, session)
 
 
-def _log_path(project: str) -> Path:
-    return D.data_dir() / "agent" / "logs" / f"{K.path_hash(project)}.log"
+def _log_path(project: str, session: str = "") -> Path:
+    name = f"session-{session}" if session else K.path_hash(project)
+    return D.data_dir() / "agent" / "logs" / f"{name}.log"
 
 
 def _env() -> dict:
     """The worker imports this same kimbim package (a dev checkout isn't installed: add python/ to the path)."""
     env = dict(os.environ)
+    env["KIMBIM_DATA_DIR"] = str(D.data_dir())  # the worker must see the same sessions and worktrees
     root = str(Path(__file__).resolve().parents[2])
     parts = [p for p in env.get("PYTHONPATH", "").split(os.pathsep) if p]
     if root not in parts:
@@ -85,16 +92,39 @@ def _env() -> dict:
     return env
 
 
-def _spawn(project: str) -> subprocess.Popen:
-    log = _log_path(project)
+def _python_exe() -> str:
+    """The Python to spawn a worker with. In the app, `sys.executable` may be kimbim-app.exe (an embedded
+    interpreter), so prefer a real `python` when one is next to the runtime; KIMBIM_PYTHON_EXE overrides."""
+    override = os.environ.get("KIMBIM_PYTHON_EXE", "")
+    if override:
+        return override
+    exe = sys.executable or ""
+    if Path(exe).name.lower().startswith("python"):
+        return exe
+    candidates = [Path(sys.prefix) / ("python.exe" if os.name == "nt" else "bin/python"),
+                  Path(sys.base_prefix) / ("python.exe" if os.name == "nt" else "bin/python")]
+    found = shutil.which("python")
+    if found:
+        candidates.append(Path(found))
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+    return exe
+
+
+def _spawn(project: str, session: str = "") -> subprocess.Popen:
+    log = _log_path(project, session)
     log.parent.mkdir(parents=True, exist_ok=True)
     kwargs = {}
     if os.name == "nt":
         kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
     else:
         kwargs["start_new_session"] = True
+    cmd = [_python_exe(), "-m", "kimbim", "serve", project]
+    if session:
+        cmd += ["--session", session]
     with open(log, "ab") as out:
-        proc = subprocess.Popen([sys.executable, "-m", "kimbim", "serve", project], stdin=subprocess.DEVNULL,
+        proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL,
                                 stdout=out, stderr=subprocess.STDOUT, close_fds=True, env=_env(), **kwargs)
     _procs[:] = [p for p in _procs if p.poll() is None]
     _procs.append(proc)
@@ -125,14 +155,14 @@ def _unlink_guard(guard: Path, seen: os.stat_result) -> None:
         guard.unlink(missing_ok=True)
 
 
-def _start(project: str) -> dict:
+def _start(project: str, session: str = "") -> dict:
     """Start a worker (or wait for the one another client is starting): its entry, or {"error": envelope}."""
-    path = discovery_path(project)
+    path = discovery_path(project, session)
     guard = path.with_name(path.stem + ".starting")
     guard.parent.mkdir(parents=True, exist_ok=True)
     end = time.monotonic() + start_wait()
     while True:
-        live = _entry(project)
+        live = _entry(project, session)
         if live is not None and not live.get("stopping"):
             return live
         try:
@@ -152,22 +182,22 @@ def _start(project: str) -> dict:
             json.dump({"pid": os.getpid()}, f)
         break
     try:
-        live = _entry(project)  # one may have started between our look and taking the guard
+        live = _entry(project, session)  # one may have started between our look and taking the guard
         if live is not None and not live.get("stopping"):
             return live
         if live is not None:  # the old worker is still saving: it holds the lock until it ends
             _wait(lambda: not entry_alive(read_discovery(path)), start_wait())
-        return _spawn_and_wait(project)
+        return _spawn_and_wait(project, session)
     finally:
         guard.unlink(missing_ok=True)
 
 
-def _spawn_and_wait(project: str) -> dict:
-    proc = _spawn(project)
-    failed = error_path(project, proc.pid)
+def _spawn_and_wait(project: str, session: str = "") -> dict:
+    proc = _spawn(project, session)
+    failed = error_path(project, proc.pid, session)
     end = time.monotonic() + start_wait()
     while time.monotonic() < end:
-        live = _entry(project)
+        live = _entry(project, session)
         if live is not None and not live.get("stopping"):
             return live  # ours, or one that won a race we couldn't see
         error = read_discovery(failed)
@@ -176,39 +206,44 @@ def _spawn_and_wait(project: str) -> dict:
             return {"error": error["error"]}
         if proc.poll() is not None:  # gone without an entry or an error: one last look at both
             time.sleep(0.1)
-            live = _entry(project)
+            live = _entry(project, session)
             if live is not None and not live.get("stopping"):
                 return live
             error = read_discovery(failed)
             failed.unlink(missing_ok=True)
             if error is not None and "error" in error:
                 return {"error": error["error"]}
-            hint = f"the worker exited with code {proc.returncode}; see {_log_path(project)}"
+            hint = f"the worker exited with code {proc.returncode}; see {_log_path(project, session)}"
             return {"error": AgentError("worker_failed", hint=hint).envelope()}
         time.sleep(0.05)
-    return {"error": AgentError("worker_failed", hint=f"no answer in {start_wait():g} s; see {_log_path(project)}")
+    return {"error": AgentError("worker_failed",
+                                hint=f"no answer in {start_wait():g} s; see {_log_path(project, session)}")
             .envelope()}
 
 
 def request(project: str, tool: str, args: dict | None = None, *, client: str = "cli", task: str = "",
-            start: bool = True, timeout: float = 120) -> dict:
-    """Run `tool` with `args` in the project's worker (started if needed and `start`) and return the envelope."""
+            start: bool = True, timeout: float = 120, session: str = "") -> dict:
+    """Run `tool` with `args` in the project's worker (started if needed and `start`) and return the envelope.
+    With `session`, a folder project's session worker and worktree are used (D111); a `.kim`/IFC session is
+    sent to the project's live/worker session, which binds the stored record."""
     project = os.path.abspath(str(project))
-    message = {"tool": tool, "args": args or {}, "client": client, "task": task}
+    # Only a versioned folder has somewhere to check out a second working copy.
+    route = session if Path(project).is_dir() and (Path(project) / ".git" / "HEAD").is_file() else ""
+    message = {"tool": tool, "args": args or {}, "client": client, "task": task, "session": session}
     problem = ""
     for _attempt in range(ATTEMPTS):
-        info = _entry(project)
+        info = _entry(project, route)
         if info is not None and info.get("stopping"):  # shutting down: it holds the lock until it ends
-            _wait(lambda: not same_entry(read_discovery(_path_for(project, info)), info) or not entry_alive(info),
+            _wait(lambda: not same_entry(read_discovery(_path_for(project, info, route)), info) or not entry_alive(info),
                   start_wait())
             continue
         if info is None:
             if not start:
                 return AgentError("no_session").envelope()
-            info = _start(project)
+            info = _start(project, route)
             if "error" in info:
                 return info["error"]
-        path = _path_for(project, info)
+        path = _path_for(project, info, route)
         try:
             conn = Client(info["address"], family=FAMILY, authkey=bytes.fromhex(info["authkey"]))
         except (FileNotFoundError, ConnectionRefusedError) as ex:

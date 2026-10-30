@@ -26,6 +26,7 @@ These documents guide development. They come from the original spec (`../doc.md`
 | 15 | [Scripting](15-scripting.md) | The Python console: the open model, selection, undoable edits, running scripts |
 | 16 | [Parametric Objects](16-parametric-objects.md) | Customisable library objects as data: parameters, formulas, parts, anchors, the Object Editor |
 | 17 | [Agent Tools](17-agent-tools.md) | AI agents on a project: the `kimbim` command line, MCP server and in-app Assistant, live and offline sessions, the review bar, snapshots, the tool list |
+| 18 | [Agent Tools: Scope, Parity and Sessions](18-agent-tools-and-sessions.md) | The full tool scope, the user-to-agent parity gaps, project-change context, and stored sessions with branches/worktrees |
 | — | [Decision Log](decisions.md) | Every architectural decision and its status |
 | — | [Open Questions](open-questions.md) | What is still undecided |
 | — | [Glossary](glossary.md) | BIM / IFC / VCS terms |
