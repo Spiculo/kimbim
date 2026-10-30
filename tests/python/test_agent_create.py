@@ -47,6 +47,22 @@ def param(guid, name):
     return Lib._object_of(B._model.by_guid(guid))[1][name]
 
 
+def test_agent_model_tools_create_place_and_follow_edits(s):
+    created = run(s, "models.create", name="Apartment")
+    assert created["ok"], created
+    model = created["result"]["guid"]
+    level = next(s for s in json.loads(A.storeys())["storeys"] if not s.get("model"))["guid"]
+    wall = run(s, "create.wall", level=model, start=[0, 0], end=[4, 0])
+    assert wall["ok"], wall
+    placed = run(s, "models.place", model=model, level=level, at=[1, 1])
+    assert placed["ok"], placed
+    assert run(s, "elements.rename", elements=[wall["result"]["guids"][0]], name="Unit wall")["ok"]
+    instance = A._instances()[placed["result"]["instance"]]
+    assert "Unit wall" in {e.Name for e in instance}
+    listed = run(s, "models.list")
+    assert listed["result"]["models"][0]["instances"] == 1
+
+
 def test_create_wall_with_units(s):
     r = run(s, "create.wall", level="Level 2", start=[20, 20], end=["25m", "20"], height="280cm")
     assert r["ok"], r

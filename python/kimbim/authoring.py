@@ -2461,14 +2461,8 @@ def _current_transform(model, target, elements, info):
     return _instance_transform(model, target, info["X"], info["Y"], info["Angle"])
 
 
-def update_model_instances(model_guid: str) -> str:
-    """Re-apply the model's current content to every instance; elements that still exist in the
-    model keep their GlobalIds in each instance (identity for versioning)."""
-    if B._model is None:
-        return _fail("no model open")
-    model = _by_guid(model_guid)
-    if model is None or not _is_model(model):
-        return _fail("not a model")
+def _instance_plans(model) -> list:
+    """(instance id, elements, target level, transform, keep) for every placement of `model`."""
     plans = []
     for instance_id, elements in _instances().items():
         info = _instance_info(elements[0])
@@ -2477,25 +2471,78 @@ def update_model_instances(model_guid: str) -> str:
         target = ifcopenshell.util.element.get_container(next(e for e in elements if not getattr(e, "FillsVoids", None)))
         keep = {_instance_info(e)["Source"]: e.GlobalId for e in elements}
         plans.append((instance_id, elements, target, _current_transform(model, target, elements, info), keep))
-    if not plans:
+    return plans
+
+
+def _update_model_in_action(model) -> list:
+    """Inside the running action: re-copy every placement. The old and new GlobalIds are returned so
+    the app can re-mesh what exists and remove what the model no longer has."""
+    changed = []
+    for instance_id, elements, target, transform, keep in _instance_plans(model):
+        old = [e.GlobalId for e in elements]
+        _remove_products(elements)
+        pairs = _place_instance(model, target, transform, instance_id, keep_guids=keep)
+        changed += old + [c.GlobalId for _, c in pairs]
+    return changed
+
+
+def update_model_instances(model_guid: str) -> str:
+    """Re-apply the model's current content to every instance; elements that still exist in the
+    model keep their GlobalIds in each instance (identity for versioning)."""
+    if B._model is None:
+        return _fail("no model open")
+    model = _by_guid(model_guid)
+    if model is None or not _is_model(model):
+        return _fail("not a model")
+    if not _instance_plans(model):
         return _fail("the model has no instances")
 
     def action():
-        changed, removed = [], []
-        for instance_id, elements, target, transform, keep in plans:
-            old = [e.GlobalId for e in elements]
-            _remove_products(elements)
-            pairs = _place_instance(model, target, transform, instance_id, keep_guids=keep)
-            new = [c.GlobalId for _, c in pairs]
-            changed += new
-            removed += [g for g in old if g not in new]
-        return len(plans), changed, removed
+        changed = _update_model_in_action(model)
+        return len(changed), changed, []
 
     try:
         r = B._run(action)
     except Exception as ex:
         return _fail(f"{type(ex).__name__}: {ex}")
     return B._dump(r)
+
+
+def _follow_model_edits(changed, removed) -> list:
+    """AFTER_ACTION: a model is a unit drawn once and placed on many levels. Editing its content (or
+    deleting a source element) refreshes every placement in the same undo step, so the floors follow
+    without asking for *Update model instances* again."""
+    if B._model is None or not changed and not removed:
+        return []
+    stores = [s for s in B._model.by_type("IfcBuildingStorey") if _is_model(s)]
+    if not stores:
+        return []
+    models = {}
+    for guid in changed:
+        e = _by_guid(guid)
+        if e is None:
+            continue
+        container = ifcopenshell.util.element.get_container(e)
+        if container is not None and _is_model(container):
+            models[container.GlobalId] = container
+    if removed:
+        gone = set(removed)
+        for _instance_id, elements in _instances().items():
+            if any(_instance_info(e).get("Source") in gone for e in elements):
+                info = _instance_info(elements[0])
+                model = _by_guid(info.get("Model", ""))
+                if model is not None and _is_model(model):
+                    models[model.GlobalId] = model
+    out = []
+    for model in models.values():
+        try:
+            out += _update_model_in_action(model)
+        except Exception:  # noqa: BLE001  (the edit's own result is the one to report)
+            continue
+    return out
+
+
+B.AFTER_ACTION.append(_follow_model_edits)
 
 
 def explode_instance(instance_id: str) -> str:

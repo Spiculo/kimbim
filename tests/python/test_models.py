@@ -93,6 +93,22 @@ def test_updating_instances_follows_the_model_and_keeps_identity(apartment):
     assert len([e for e in contained(apartment["l1"]) if e.is_a("IfcWall")]) == 2
 
 
+def test_editing_a_model_updates_every_instance_automatically(apartment):
+    """The owner changed a model after placing it on the floors and expected the floors to follow
+    without running Model > Update model instances again (D58 amended by D111)."""
+    call("place_model", apartment["model"], apartment["l1"], 10, 0, 0)
+    call("place_model", apartment["model"], apartment["l2"], 10, 0, 0)
+    call("set_name", g(apartment["walls"][1]), "Muro automatico")
+    for level in (apartment["l1"], apartment["l2"]):
+        assert "Muro automatico" in {e.Name for e in contained(level)}
+    extra = call("create_wall", apartment["model"], apartment["type"], 0, 4, 6, 4, 3.0, "", "")["guid"]
+    for level in (apartment["l1"], apartment["l2"]):
+        assert len([e for e in contained(level) if e.is_a("IfcWall")]) == 3
+    call("delete_elements", g(extra))
+    for level in (apartment["l1"], apartment["l2"]):
+        assert len([e for e in contained(level) if e.is_a("IfcWall")]) == 2
+
+
 def test_explode_unlinks_an_instance(apartment):
     r = call("place_model", apartment["model"], apartment["l1"], 10, 0, 0)
     assert call("explode_instance", r["instance"])["ok"]

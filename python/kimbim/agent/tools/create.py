@@ -35,7 +35,12 @@ def _type(kind: str, ref) -> str:
 
 def _level_info(level: str) -> dict:
     guid = level_guid(level)
-    return next(r for r in json.loads(L.levels_table())["levels"] if r["guid"] == guid)
+    info = next((r for r in json.loads(L.levels_table())["levels"] if r["guid"] == guid), None)
+    if info is not None:
+        return info
+    # A KimBim model is a storey below the building: the create tools can draw the unit in it too.
+    storey = next(r for r in json.loads(A.storeys())["storeys"] if r["guid"] == guid)
+    return {**storey, "height": storey.get("height") or 3.0}
 
 
 def _level_height(info: dict) -> float:
