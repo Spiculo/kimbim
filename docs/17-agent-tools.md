@@ -67,14 +67,18 @@ Every change an agent makes belongs to a **task**, such as *"Widen first-floor w
 
 A write tool called without a task starts one on its own, so nothing skips review.
 
-**Reviewing.** The app lists finished proposals in a bar above the views: *"Agent proposal: Widen first-floor
+**Reviewing.** The app lists finished proposals in a bar above the status strip: *"Agent proposal: Widen first-floor
 windows (4 changed)"* with **Review**, **Accept** and **Reject**.
 
 | To | Do this |
 |----|---------|
-| See the proposal | **Review** switches to the `agent/...` option and compares it with the version the task started from; Compare colours what changed (added, modified, removed) |
-| Accept it | **Accept** combines the option into its base option, saves the combined version and deletes the agent option. If both sides changed the same property, the existing Combine dialog asks which value to keep |
+| See the proposal | **Review** opens the proposal window on the base option: **Changes** lists every added, modified and removed element and shows the selected element field by field (base vs agent, changed fields highlighted); **Conflicts** shows the common version, the base option and the agent option side by side, with a choice per conflict. *Show in 3D* selects the element in the view |
+| Accept it | **Accept** combines the option into its base option, saves the combined version and deletes the agent option. If both sides changed the same property, the proposal window's **Conflicts** tab asks which value to keep before Accept is enabled |
 | Reject it | **Reject** deletes the agent option and leaves your model unchanged |
+
+The bar reads the project's ready task files even when the live agent session could not start (for example a
+read-only window), so a waiting proposal is never invisible. Review/Accept/Reject try to start the session on
+demand and say why if they cannot.
 
 The same review works offline: open the project and the proposal appears. You can also use *Versions › Design
 options*, *Combine options...* and *Delete option...* by hand. Agents cannot accept, combine or delete options, and
@@ -128,9 +132,20 @@ external agent, so its changes are undo steps and its tasks appear in the review
 
 Set the provider in *Edit › Preferences › Assistant*: **Anthropic**, or **OpenAI-compatible** (a base URL and a
 model name, which covers OpenRouter, DeepSeek, Ollama and similar). The API key is stored in the operating system's
-credential store, never in `preferences.json` or the project. The panel sends the current selection and view as
-context; tool calls appear as compact lines and snapshots inline. *Clear* forgets the conversation; history is per
-window and is not saved in the project.
+credential store, never in `preferences.json` or the project. The panel sends the current selection and view, and
+the current project state (option, recent versions, element counts, unsaved changes) plus a "since your previous
+answer" delta, so the model knows the project changed between messages. Tool calls appear as compact lines and
+snapshots inline.
+
+The conversation is a **stored session** (D111, [18](18-agent-tools-and-sessions.md#4-sessions)): the picker at
+the top lists the project's sessions with *New*, *Rename...*, *Fork*, *Archive* and *Delete...*. *Clear* starts a
+new session; the old one stays in the list. The transcript lives in the app's data folder, not in the project. A
+versioned folder project gets its own worktree per session, so the Assistant and the architect never write the same
+working state; a `.kim`/IFC session uses the app's live document (one at a time). The agent's task and design
+option stay in the project, and accepting or rejecting the proposal ends the session.
+
+From the command line, `kimbim sessions list|new|show|rename|archive|delete|fork` manages them, and
+`--session ID` (or `$KIMBIM_SESSION`) runs a tool command in one; `kimbim mcp --session ID` does the same over MCP.
 
 ## The tools
 
@@ -205,6 +220,11 @@ would change and changes nothing. This table is the output of `kimbim help --mar
 | `selection_set` | `kimbim selection set` | Select elements in the app's window. |  |
 | `script_run` | `kimbim script run` | Run a Python script in the project's console (the model is `ifc`, KimBim commands are in `bridge`). | yes |
 | `snapshot_take` | `kimbim snapshot take` | Take a picture of the model to check your work: a 3D view (optionally framed on elements, with what your task changed coloured as the app's Compare shows it), a floor plan, a section or elevation, any drawing, or a sheet. |  |
+| `models_create` | `kimbim models create` | Create an empty model container below the building; draw the unit in it, then place it on levels. | yes |
+| `models_explode` | `kimbim models explode` | Unlink an instance: its elements become ordinary elements that no longer follow the model. | yes |
+| `models_list` | `kimbim models list` | List the project's models (units drawn once and placed on levels) with their GlobalId, name, elevation and how many places use them. |  |
+| `models_place` | `kimbim models place` | Place a model on a building level as one linked instance (a copy of its elements that follows later edits to the model). | yes |
+| `models_update` | `kimbim models update` | Apply the model's current content to every place it is used; edits already do this automatically, so this is for a project loaded with stale instances. | yes |
 <!-- tools:end -->
 
 Every answer has the same shape: `{"ok": true, "result": ..., "changes": ..., "warnings": [...]}`, or
@@ -282,9 +302,9 @@ What these show:
   commands use an offline worker instead. `selection_get` and `selection_set` work live and answer `needs_app`
   offline.
 - **One open task per client.** A second `task_start` from the same client answers `task_busy`; another client may
-  have its own task and option. Live tasks share the app's one working model: each call switches to its task's
-  option, so the architect's view follows the agent at work. Separate working copies per client (undisturbed views)
-  are not built yet.
+  have its own task and option. A stored session on a **versioned folder** project works in its own worktree, so the
+  architect's view stays on their option; a `.kim`/IFC session (and every older ad-hoc CLI/MCP call) still shares
+  the app's one working model, so each call switches to its task's option and the architect's view follows it.
 - **Review is a bar, not a dialog.** A proposal with conflicting property edits opens the existing Combine dialog;
   otherwise Accept combines and saves in one step.
 - **Long calls on large models.** The command line and the MCP server wait 120 s for an answer. On the Clinic,

@@ -11,6 +11,7 @@
 #include "ToolOptionsBar.h"
 #include "ToolPalette.h"
 #include "ProposalBar.h"
+#include "ProposalDialog.h"
 #include "AssistantPanel.h"
 #include "ViewCube.h"
 #include "TitleBar.h"
@@ -77,6 +78,7 @@
 #include <QEventLoop>
 #include <QTabBar>
 #include <QTabWidget>
+#include <QProgressDialog>
 #include <QTimer>
 #include <QHeaderView>
 #include <QTableWidget>
@@ -96,7 +98,9 @@
 #include "Cuts.h"
 #include "DrawingView.h"
 #include "DrawingsPanel.h"
+#include "SectionPath.h"
 #include "SheetExport.h"
+#include "SheetDialog.h"
 #include "SheetsPanel.h"
 #include "SchedulesDialog.h"
 #include "ElementBatch.h"
@@ -228,12 +232,37 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
         m_gridSnap->setIconText(tr("Grid snap"));
         m_status->addToggle(m_gridSnap);
     }
-    // D102 phase 2: the agent's proposal bar and the live session's queue.
+    // D102 phase 2: the agent's proposal bar and the live session's queue. It lives in its own toolbar
+    // under the title bar: a plain overlay on the 3D view can be hidden by the OpenGL surface (owner
+    // feedback), and the top is always in sight.
     m_proposalBar = new ProposalBar(this);
-    // bottom->addWidget(m_proposalBar); // D75 keeps the title bar the only top row
+    m_proposalToolbar = new QToolBar(tr("Agent proposals"), this);
+    m_proposalToolbar->setObjectName(QStringLiteral("proposalToolbar"));
+    m_proposalToolbar->setMovable(false);
+    m_proposalToolbar->setFloatable(false);
+    m_proposalBar->setMinimumWidth(640);
+    m_proposalBar->setMinimumHeight(30);
+    m_proposalToolbar->addWidget(m_proposalBar);
+    m_proposalToolbar->setMinimumHeight(36);
+    // Top, under the menu: the bottom area is where the 3D surface has been seen to overdraw on a
+    // scaled Windows display. A waiting proposal must be impossible to miss.
+    addToolBar(Qt::TopToolBarArea, m_proposalToolbar);
+    m_proposalToolbar->hide();
     connect(m_proposalBar, &ProposalBar::reviewRequested, this, &MainWindow::reviewProposal);
-    connect(m_proposalBar, &ProposalBar::acceptRequested, this, &MainWindow::acceptProposal);
+    connect(m_proposalBar, &ProposalBar::acceptRequested, this,
+        [this](const QString& task) { acceptProposal(task); });
     connect(m_proposalBar, &ProposalBar::rejectRequested, this, &MainWindow::rejectProposal);
+    connect(m_proposalBar, &ProposalBar::proposalsChanged, this, [this](bool any) {
+        // A QWidgetAction inside a hidden toolbar keeps its widget hidden; show the toolbar first and
+        // then the bar itself, and hide the bar before the toolbar.
+        if (any) {
+            m_proposalToolbar->setVisible(true);
+            m_proposalBar->setVisible(true);
+        } else {
+            m_proposalBar->setVisible(false);
+            m_proposalToolbar->setVisible(false);
+        }
+    });
     connect(m_status, &StatusStrip::agentDisconnectRequested, this, &MainWindow::stopAgentLive);
     m_agentPoll = new QTimer(this);
     m_agentPoll->setInterval(150);
@@ -259,8 +288,6 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     // D71: the 3D view is the first center tab; plans, drawings and sheets open next to it, and any
     // tab can be dragged out to its own window.
     m_dock = new DockLayout(this);
-    m_proposalBar->setParent(m_dock->manager()); // an overlay on the views: no effect on the window minimum
-    m_proposalBar->raise();
     auto* host = new ViewHost(m_viewport);
     m_hosts.insert(QStringLiteral("3d"), host);
     host->adoptChrome(nullptr, m_cutColumn);
@@ -350,8 +377,10 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
         [this](double x, double y, double z, double nx, double ny, double nz) {
             if (m_cutTool != CutTool::Face)
                 return;
-            if (addFaceCut(gp_Pnt(x, y, z), gp_Dir(nx, ny, nz)))
-                m_status->showMessage(tr("Click another face, or Esc to finish"));
+            if (addFaceCut(gp_Pnt(x, y, z), gp_Dir(nx, ny, nz))) {
+                setTool(Tool::None); // one cut, then back to selection (owner feedback)
+                m_status->showMessage(tr("Cut added. Select it in the Cut planes panel to move, hide or delete it."));
+            }
         }); });
     onEachView([this](Viewport* v) { connect(v, &Viewport::hovered, this, [this](const QString& guid, const QPoint& at) {
         const QString hint = guid.isEmpty() ? QString() : m_tree->hintFor(guid);
@@ -397,16 +426,47 @@ void MainWindow::clampWindowSize()
     QScreen* s = screen();
     const QRect avail = s ? s->availableGeometry() : QRect(0, 0, 1920, 1080);
     const int capW = avail.width() * 4, capH = avail.height() * 4;
-    if (m_clamping || (width() <= capW && height() <= capH && minimumWidth() <= capW && minimumHeight() <= capH))
+    const bool huge = width() > capW || height() > capH || minimumWidth() > capW || minimumHeight() > capH;
+    if (m_clamping)
         return;
-    qWarning("KimBim: the window asked for %dx%d (minimum %dx%d); back to 1280x800", width(), height(),
-        minimumWidth(), minimumHeight());
+    if (isMaximized() && !huge) {
+        const QRect frame = frameGeometry();
+        if (frame.left() >= avail.left() && frame.top() >= avail.top()
+            && frame.right() <= avail.right() && frame.bottom() <= avail.bottom())
+            return; // the window manager fits it and the taskbar is respected
+        // A frameless maximized window can cover the taskbar, hiding the status and proposal bars.
+        // Fill the available work area explicitly instead.
+        m_clamping = true;
+        setWindowState(windowState() & ~Qt::WindowMaximized);
+        setGeometry(avail);
+        m_clamping = false;
+        return;
+    }
+    // A geometry saved on a larger monitor can put the bottom toolbar (status strip, proposal bar)
+    // below the screen. Fit the whole window, not only the absurd sizes that used to crash Qt.
+    const bool tooWide = width() > avail.width();
+    const bool tooTall = height() > avail.height();
+    const bool offScreen = x() + width() > avail.right() + 1 || y() + height() > avail.bottom() + 1
+        || x() < avail.left() || y() < avail.top();
+    if (!huge && !tooWide && !tooTall && !offScreen)
+        return;
+    if (huge)
+        qWarning("KimBim: the window asked for %dx%d (minimum %dx%d); clamping it to the screen", width(),
+            height(), minimumWidth(), minimumHeight());
     m_clamping = true;
-    m_dock->restoreLayout(QByteArray()); // the default layout: resets the splitter sizes
-    setContentsMargins(0, 0, 0, 0);      // a maximized window's frame margins (TitleBar) count in its minimum
-    setMinimumSize(0, 0);
-    resize(1280, 800);
-    move(std::max(0, avail.x() + (avail.width() - width()) / 2), std::max(0, avail.y() + (avail.height() - height()) / 2));
+    if (huge) {
+        m_dock->restoreLayout(QByteArray()); // the default layout: resets the splitter sizes
+        setContentsMargins(0, 0, 0, 0); // a maximized window's frame margins (TitleBar) count in its minimum
+        setMinimumSize(0, 0);
+    }
+    const int w = std::min(width(), avail.width());
+    const int h = std::min(height(), avail.height());
+    resize(w, h);
+    // A window whose layout minimum is wider/taller than the screen cannot fit: put it at the top-left
+    // instead of an undefined std::clamp(low > high).
+    const int maxX = std::max(avail.left(), avail.right() - w + 1);
+    const int maxY = std::max(avail.top(), avail.bottom() - h + 1);
+    move(std::clamp(x(), avail.left(), maxX), std::clamp(y(), avail.top(), maxY));
     m_clamping = false;
 }
 
@@ -423,7 +483,10 @@ void MainWindow::resizeEvent(QResizeEvent* event)
     QMainWindow::resizeEvent(event);
     QScreen* s = screen();
     const QRect avail = s ? s->availableGeometry() : QRect(0, 0, 1920, 1080);
-    if (event->size().width() > avail.width() * 4 || event->size().height() > avail.height() * 4)
+    // Too large for the screen (a geometry restored from a larger monitor, or a corrupt layout): the
+    // bottom toolbar would be out of reach. Keep the whole window, status strip included, on screen.
+    if (event->size().width() > avail.width() || event->size().height() > avail.height()
+        || event->size().width() > avail.width() * 4 || event->size().height() > avail.height() * 4)
         clampWindowSize();
     // D92: on a small screen the side panels shrink first (off by default: the views take it).
     if (m_dock && m_prefs.panelsShrinkFirst()) {
@@ -433,7 +496,6 @@ void MainWindow::resizeEvent(QResizeEvent* event)
             m_dock->setSideWidths(small ? 168 : 216, small ? 220 : 280);
         }
     }
-    positionProposalBar();
 }
 
 MainWindow::~MainWindow()
@@ -675,6 +737,14 @@ void MainWindow::buildMenus()
             m_viewport->fitTo(m_selection);
         else
             m_viewport->fitAll();
+    });
+    QAction* proposals = view->addAction(tr("Agent &proposals"));
+    proposals->setObjectName(QStringLiteral("actionAgentProposals"));
+    proposals->setToolTip(tr("Show the agent proposal bar again, even after hiding it"));
+    connect(proposals, &QAction::triggered, this, [this] {
+        m_proposalBar->showAgain();
+        if (m_proposalBar->isHidden() || m_proposalBar->currentTask().isEmpty())
+            m_status->showMessage(tr("There is no agent proposal waiting for review"));
     });
     // D98: Archicad's construction grid (Grids & Background): shown in plans, snapped to on request.
     m_gridShow = view->addAction(tr("Construction &grid"));
@@ -953,9 +1023,11 @@ void MainWindow::buildDocks()
     connect(m_cutPlanesPanel, &CutPlanesPanel::addObliqueRequested, this, [this] { startCutTool(CutTool::Oblique); });
     connect(m_cutPlanesPanel, &CutPlanesPanel::addFaceRequested, this, [this] { startCutTool(CutTool::Face); });
     connect(m_cutPlanesPanel, &CutPlanesPanel::enabledChanged, this, &MainWindow::setCutPlaneEnabled);
+    connect(m_cutPlanesPanel, &CutPlanesPanel::visibleChanged, this, &MainWindow::setCutPlaneVisible);
     connect(m_cutPlanesPanel, &CutPlanesPanel::offsetChanged, this, &MainWindow::setCutPlaneOffset);
     connect(m_cutPlanesPanel, &CutPlanesPanel::angleChanged, this, &MainWindow::setCutPlaneAngle);
     connect(m_cutPlanesPanel, &CutPlanesPanel::flipRequested, this, &MainWindow::flipCutPlane);
+    connect(m_cutPlanesPanel, &CutPlanesPanel::sectionRequested, this, &MainWindow::createSectionFromCutPlane);
     connect(m_cutPlanesPanel, &CutPlanesPanel::deleteRequested, this, &MainWindow::removeCutPlane);
     connect(m_cutPlanesPanel, &CutPlanesPanel::planeSelected, this, [this](int row) {
         selectCutPlane(row); // -1 clears the translucent rectangle
@@ -978,14 +1050,8 @@ void MainWindow::buildDocks()
     connect(m_drawingsPanel, &DrawingsPanel::openRequested, this, [this](const QString& g) { openDrawing(g); });
     connect(m_sheetsPanel, &SheetsPanel::newRequested, this, &MainWindow::newSheetDialog);
     connect(m_sheetsPanel, &SheetsPanel::openRequested, this, [this](const QString& n) { openSheet(n); });
-    connect(m_sheetsPanel, &SheetsPanel::placeRequested, this, [this](const QString& n) {
-        const QString drawing = m_drawingsPanel->selectedDrawing();
-        if (drawing.isEmpty()) {
-            m_status->showMessage(tr("Select a drawing in the Drawings panel first"));
-            return;
-        }
-        placeOnSheet(n, drawing);
-    });
+    connect(m_sheetsPanel, &SheetsPanel::placeRequested, this, &MainWindow::placeDrawingDialog);
+    connect(m_sheetsPanel, &SheetsPanel::settingsRequested, this, &MainWindow::editSheet);
     connect(m_sheetsPanel, &SheetsPanel::purposeRequested, this, &MainWindow::setSheetPurpose);
     connect(m_sheetsPanel, &SheetsPanel::legendRequested, this, &MainWindow::placeLegend);
     connect(m_sheetsPanel, &SheetsPanel::symbolRequested, this, &MainWindow::placeSheetSymbol); // D87
@@ -1002,6 +1068,8 @@ void MainWindow::buildDocks()
         afterEdit(r);
     });
     connect(m_drawingsPanel, &DrawingsPanel::deleteRequested, this, [this](const QString& g) {
+        if (!confirmDeletePlacedDrawings({g}))
+            return;
         const QJsonObject r = bridge("delete_drawing", {g});
         if (!r.value("ok").toBool())
             m_status->showMessage(tr("Could not delete it: %1").arg(r.value("error").toString()));
@@ -1290,6 +1358,17 @@ bool MainWindow::setCutPlaneEnabled(int index, bool on)
     return true;
 }
 
+bool MainWindow::setCutPlaneVisible(int index, bool on)
+{
+    CutSettings& s = m_cuts[modelView()];
+    if (index < 0 || index >= s.planes.size())
+        return false;
+    s.planes[index].visible = on;
+    applyCutsTo(modelView(), s);
+    pushCutPlanesToPanel();
+    return true;
+}
+
 bool MainWindow::setCutPlaneOffset(int index, double offset)
 {
     CutSettings& s = m_cuts[modelView()];
@@ -1351,6 +1430,10 @@ void MainWindow::startCutTool(CutTool tool)
         return;
     }
     setTool(Tool::None);
+    if (QAction* selectTool = m_toolActions.value(int(Tool::None))) { // the cut tool is not Select
+        const QSignalBlocker block(selectTool);
+        selectTool->setChecked(false);
+    }
     m_cutTool = tool;
     m_cutPoints.clear();
     if (tool == CutTool::Face) {
@@ -1406,8 +1489,12 @@ void MainWindow::cutPlaneClick(const QPointF& p)
         }
         ok = addObliqueCut(a, b, keep, degrees, z);
     }
-    m_status->showMessage(ok ? tr("Click where the next cut line starts")
-                             : tr("The cut line is too short, or the view has no clip plane left"));
+    if (ok) {
+        setTool(Tool::None); // one cut, then back to selection (owner feedback)
+        m_status->showMessage(tr("Cut added. Select it in the Cut planes panel to move, hide or delete it."));
+    } else {
+        m_status->showMessage(tr("The cut line is too short, or the view has no clip plane left"));
+    }
 }
 
 void MainWindow::horizontalCutDialog()
@@ -1478,19 +1565,29 @@ void MainWindow::applyCutsTo(Viewport* view, CutSettings& settings)
     }
     const int room = maxUserPlanes(limit, state.planCut, state.box && !state.bounds.IsVoid());
     int used = 0;
-    for (const CutPlane& p : std::as_const(settings.planes)) {
+    bool selectedClipped = false;
+    for (int i = 0; i < settings.planes.size(); ++i) {
+        const CutPlane& p = settings.planes[i];
         if (!p.enabled)
             continue;
         if (used >= room)
             break; // beyond the driver's limit: no clip plane, so no section either
         ++used;
         keep.push_back(p.plane());
-        sections.push_back(p.plane());
+        if (i == settings.selectedPlane)
+            selectedClipped = true;
     }
+    // The cut face belongs to the selected plane only: other enabled planes cut, but draw no poché
+    // (a row of intersecting cuts used to fill the view with hatch). Visible hides the face and handle
+    // without turning the cut off.
+    const bool hasSelection = settings.selectedPlane >= 0 && settings.selectedPlane < settings.planes.size();
+    if (selectedClipped && settings.planes[settings.selectedPlane].visible)
+        sections.push_back(settings.planes[settings.selectedPlane].plane());
     view->setSectionPlanes(keep, sections);
 
-    // The selected user plane's rectangle and normal handle belong to the 3D view only.
-    if (view == modelView() && settings.selectedPlane >= 0 && settings.selectedPlane < settings.planes.size()) {
+    // The selected plane's rectangle and normal handle belong to the 3D view only; Visible keeps the
+    // plane drawable while it is disabled, so it can be found and turned back on.
+    if (view == modelView() && hasSelection && settings.planes[settings.selectedPlane].visible) {
         const Bnd_Box box = view->boundsOf({});
         double half = 1.5;
         if (!box.IsVoid()) {
@@ -1682,6 +1779,26 @@ bool MainWindow::applyPropertyEdit(const QString& pset, const QString& prop, con
         for (const QString& g : std::as_const(m_selection)) {
             const QString v = value.isDouble() ? QString::number(value.toDouble(), 'g', 17) : value.toString();
             const QJsonObject r = bridge(prop == QLatin1String("Size") ? "set_annotation_size" : "set_annotation_text", {g, v});
+            if (!r.value("ok").toBool())
+                m_status->showMessage(tr("Could not change %1").arg(prop) + QStringLiteral(": ") + r.value("error").toString());
+            all = all && r.value("ok").toBool();
+            afterEdit(r);
+        }
+        return all;
+    }
+    // D110: a section/elevation's own view: the friendly Section group and the raw drawing properties
+    // edit through the drawing's operations, so its placement and its generated drawing follow.
+    const bool drawingView = pset == QLatin1String("Section")
+        || (pset == QLatin1String("KIMBIM_Drawing")
+            && (prop == QLatin1String("Tilt") || prop == QLatin1String("Base") || prop == QLatin1String("Depth")));
+    if (drawingView) {
+        const QString fn = prop.startsWith(QLatin1String("Tilt")) ? QStringLiteral("set_drawing_tilt")
+            : prop.startsWith(QLatin1String("Base"))                  ? QStringLiteral("set_drawing_base")
+                                                                      : QStringLiteral("set_drawing_depth");
+        bool all = true;
+        for (const QString& g : std::as_const(m_selection)) {
+            const QString v = value.isDouble() ? QString::number(value.toDouble(), 'g', 17) : value.toString();
+            const QJsonObject r = bridge(fn.toUtf8().constData(), {g, v});
             if (!r.value("ok").toBool())
                 m_status->showMessage(tr("Could not change %1").arg(prop) + QStringLiteral(": ") + r.value("error").toString());
             all = all && r.value("ok").toBool();
@@ -2487,6 +2604,27 @@ void MainWindow::buildModelingToolbar()
     roofRow->addWidget(m_roofPitch);
     bar->addField(roofBox);
     roofBox->setVisible(false);
+    // D110: a section or elevation marker is a line, a bent polyline or an arc.
+    m_sectionShape = new QComboBox(bar);
+    m_sectionShape->setObjectName(QStringLiteral("sectionShape"));
+    m_sectionShape->addItem(tr("Line"), QStringLiteral("line"));
+    m_sectionShape->addItem(tr("Polyline"), QStringLiteral("polyline"));
+    m_sectionShape->addItem(tr("Curve"), QStringLiteral("curve"));
+    m_sectionShape->setToolTip(tr("Marker shape: line, bent polyline (Enter finishes it) or arc"));
+    auto* sectionBox = new QWidget(bar);
+    auto* sectionRow = new QHBoxLayout(sectionBox);
+    sectionRow->setContentsMargins(0, 0, 0, 0);
+    sectionRow->addWidget(m_sectionShape);
+    bar->addField(sectionBox);
+    sectionBox->setVisible(false);
+    connect(m_sectionShape, &QComboBox::currentIndexChanged, this, [this] {
+        m_annotationPoints.clear();
+        m_sectionBulges.clear();
+        m_sectionPathDone = false;
+        if (m_tool == Tool::Section || m_tool == Tool::Elevation)
+            m_status->showMessage(m_tool == Tool::Section ? tr("Section: click where the section line starts")
+                                                          : tr("Elevation: click where the elevation line starts"));
+    });
     m_lengthInput = new QLineEdit(bar);
     m_lengthInput->setObjectName(QStringLiteral("lengthInput"));
     m_lengthInput->setPlaceholderText(tr("Length (m)"));
@@ -2715,7 +2853,7 @@ void MainWindow::buildModelingToolbar()
         case Tool::Section:
         case Tool::Elevation:
             m_twoPointTool->setTolerance(tolerance);
-            drawingClick(m_twoPointTool->snapper().snap(p, tolerance).point);
+            drawingClick(m_twoPointTool->snapper().snap(p, tolerance).point, mods);
             break;
         case Tool::Mirror: {
             m_twoPointTool->setTolerance(tolerance);
@@ -2846,6 +2984,10 @@ void MainWindow::buildModelingToolbar()
             m_draftTool->finish();
         else if (m_tool == Tool::Stair || m_tool == Tool::Railing)
             m_pathTool->finish(); // D88
+        else if ((m_tool == Tool::Section || m_tool == Tool::Elevation) && m_annotationPoints.size() >= 2) {
+            m_sectionPathDone = true;
+            m_status->showMessage(tr("Click the side the drawing looks at"));
+        }
     }); });
     onEachView([this](Viewport* v) { connect(v, &Viewport::lengthKeyTyped, this, [this](const QString& text) {
         if (m_lengthInput->isHidden() || m_toolOptions->isHidden())
@@ -3165,6 +3307,7 @@ void MainWindow::setTool(Tool tool)
     }
     m_wallHeight->setToolTip(tool == Tool::Roof ? tr("Eaves height above the level") : tr("Wall height"));
     m_roofKind->parentWidget()->setVisible(tool == Tool::Roof);
+    m_sectionShape->parentWidget()->setVisible(tool == Tool::Section || tool == Tool::Elevation);
     m_lengthInput->setVisible(tool == Tool::Wall || tool == Tool::Beam || tool == Tool::Grid || tool == Tool::Move
         || tool == Tool::Rotate || tool == Tool::Stretch || isDraftTool(tool) || tool == Tool::Object);
     const QString unit = m_settings.value("length_unit").toString(QStringLiteral("m"));
@@ -3182,9 +3325,9 @@ void MainWindow::setTool(Tool tool)
                                            : tr("Select something first, then move or rotate it"));
         tool = Tool::None;
         m_tool = tool;
-        for (QAction* a : std::as_const(m_toolActions)) {
-            const QSignalBlocker block(a);
-            a->setChecked(false);
+        for (auto it = m_toolActions.constBegin(); it != m_toolActions.constEnd(); ++it) {
+            const QSignalBlocker block(it.value());
+            it.value()->setChecked(it.key() == int(Tool::None));
         }
         m_viewport->setDrawingMode(false);
         return;
@@ -3220,7 +3363,9 @@ void MainWindow::setTool(Tool tool)
         break;
     case Tool::Stretch:
         m_gripIndex = -1;
-        m_status->showMessage(tr("Stretch: click near a wall end or a point of a line, arc or fill, then its new position"));
+        m_gripDrawing = false;
+        m_gripBulges.clear();
+        m_status->showMessage(tr("Stretch: click near a wall end or a point of a line, arc, fill or section marker, then its new position"));
         break;
     case Tool::Measure:
         m_status->showMessage(m_measure->text());
@@ -3281,10 +3426,20 @@ void MainWindow::setTool(Tool tool)
                                                        : tr("Mirror: click the first point of the mirror line"));
         break;
     case Tool::Section:
-        m_status->showMessage(tr("Section: click where the section line starts"));
+        m_annotationPoints.clear();
+        m_sectionBulges.clear();
+        m_sectionPathDone = false;
+        m_status->showMessage(m_sectionShape->currentData().toString() == QLatin1String("polyline")
+                ? tr("Section: click the corners; Enter finishes the line, then click the side it looks at")
+                : tr("Section: click where the section line starts"));
         break;
     case Tool::Elevation:
-        m_status->showMessage(tr("Elevation: click where the elevation line starts"));
+        m_annotationPoints.clear();
+        m_sectionBulges.clear();
+        m_sectionPathDone = false;
+        m_status->showMessage(m_sectionShape->currentData().toString() == QLatin1String("polyline")
+                ? tr("Elevation: click the corners; Enter finishes the line, then click the side it looks at")
+                : tr("Elevation: click where the elevation line starts"));
         break;
     case Tool::PlaceModel:
         m_status->showMessage(m_types->count() ? tr("Place model: click where its origin goes (Shift: turned 90 degrees)")
@@ -3630,8 +3785,17 @@ void MainWindow::buildPalette()
 
     auto act = [this](const char* name) { return findChild<QAction*>(QLatin1String(name)); };
     auto tool = [this](Tool t) { return m_toolActions.value(int(t)); };
+    // The selection mode as a palette tool (owner feedback): after a cut there is a visible way back
+    // to the controls, besides Esc and choosing any other tool.
+    auto* selectTool = new QAction(tr("&Select"), this);
+    selectTool->setObjectName(QStringLiteral("actionSelectTool"));
+    selectTool->setCheckable(true);
+    selectTool->setToolTip(tr("Select and edit: click an element, drag a box, or choose another tool"));
+    connect(selectTool, &QAction::triggered, this, [this] { setTool(Tool::None); });
+    selectTool->setChecked(true); // selection is the starting mode
+    m_toolActions.insert(int(Tool::None), selectTool);
     m_palette = new ToolPalette(this);
-    m_palette->addGroup(QStringLiteral("3d"), tr("3D"), {tool(Tool::Wall), tool(Tool::Slab), tool(Tool::Column),
+    m_palette->addGroup(QStringLiteral("3d"), tr("3D"), {selectTool, tool(Tool::Wall), tool(Tool::Slab), tool(Tool::Column),
         tool(Tool::Beam), tool(Tool::CurtainWall), tool(Tool::Door), tool(Tool::Window), tool(Tool::Stair), tool(Tool::Railing), tool(Tool::Roof), tool(Tool::Room),
         tool(Tool::SlabOpening), tool(Tool::PlaceModel), tool(Tool::Object)});
     m_palette->addGroup(QStringLiteral("plane"), tr("Plane"), {tool(Tool::Text), tool(Tool::Dimension),
@@ -3774,6 +3938,8 @@ void MainWindow::refreshProject()
         name += QStringLiteral(" [%1]").arg(tr("read-only"));
     setWindowTitle(QStringLiteral("KimBim — %1[*]").arg(name));
     setWindowModified(isDirty());
+    if (m_assistant)
+        m_assistant->refreshSessions(); // D111: the picker follows the project that is open
 }
 
 bool MainWindow::openPath(const QString& path)
@@ -4950,34 +5116,136 @@ void MainWindow::annotationClick(QPointF p, Qt::KeyboardModifiers modifiers)
 
 // ---------------------------------------------------------------- drawings (Slice 14)
 
-void MainWindow::drawingClick(QPointF p)
+void MainWindow::drawingClick(QPointF p, Qt::KeyboardModifiers modifiers)
 {
     const bool section = m_tool == Tool::Section;
-    m_annotationPoints << p;
-    if (m_annotationPoints.size() == 1) {
-        m_status->showMessage(section ? tr("Section: click where the section line ends")
-                                         : tr("Elevation: click where the elevation line ends"));
-    } else if (m_annotationPoints.size() == 2) {
-        m_status->showMessage(tr("Click the side the drawing looks at"));
-    } else {
-        const QVector<QPointF> pts = m_annotationPoints;
+    const QString shape = m_sectionShape ? m_sectionShape->currentData().toString() : QStringLiteral("line");
+    const QString kind = section ? QStringLiteral("section") : QStringLiteral("elevation");
+    auto reset = [this] {
         m_annotationPoints.clear();
-        createDrawing(section ? QStringLiteral("section") : QStringLiteral("elevation"), pts[0], pts[1], pts[2]);
+        m_sectionBulges.clear();
+        m_sectionPathDone = false;
+    };
+    auto finish = [&](QPointF look) {
+        QVector<QPointF> path = m_annotationPoints;
+        if (shape == QLatin1String("curve") && path.size() > 2)
+            path.removeLast(); // the arc's through point is not a vertex
+        const QVector<double> bulges = m_sectionBulges;
+        reset();
+        createDrawing(kind, path, bulges, look, 0.0, m_levels->activeElevation());
         m_status->showMessage(section ? tr("Section: click where the section line starts")
-                                         : tr("Elevation: click where the elevation line starts"));
+                                     : tr("Elevation: click where the elevation line starts"));
+    };
+    if (m_annotationPoints.isEmpty()) { // the first point
+        m_annotationPoints << p;
+        m_sectionPathDone = false;
+        m_status->showMessage(shape == QLatin1String("polyline")
+                ? tr("Click the next corner; Enter finishes the line")
+                : section ? tr("Section: click where the section line ends")
+                          : tr("Elevation: click where the elevation line ends"));
+        return;
     }
+    if (shape == QLatin1String("polyline")) {
+        if (m_sectionPathDone) {
+            finish(p);
+            return;
+        }
+        m_annotationPoints << p;
+        m_status->showMessage(tr("Click the next corner; Enter finishes the line"));
+        return;
+    }
+    if (shape == QLatin1String("curve")) {
+        if (m_annotationPoints.size() == 1) {
+            m_annotationPoints << p;
+            m_status->showMessage(tr("Click a point on the arc"));
+            return;
+        }
+        if (m_annotationPoints.size() == 2) {
+            m_sectionBulges << bulgeThrough(m_annotationPoints[0], m_annotationPoints[1], p);
+            m_annotationPoints << p; // kept as the arc's through point until the look click
+            m_status->showMessage(tr("Click the side the drawing looks at"));
+            return;
+        }
+        finish(p);
+        return;
+    }
+    if (m_sectionPathDone) {
+        finish(p);
+        return;
+    }
+    if (m_annotationPoints.size() == 1) {
+        m_annotationPoints << p;
+        m_status->showMessage(tr("Click the side the drawing looks at (Shift+click adds a corner)"));
+        return;
+    }
+    if (modifiers & Qt::ShiftModifier) { // D110: another corner, as in a dimension chain
+        m_annotationPoints << p;
+        m_sectionBulges << 0.0;
+        m_status->showMessage(tr("Click the next corner, or the side the drawing looks at"));
+        return;
+    }
+    finish(p);
 }
 
-bool MainWindow::createDrawing(const QString& kind, QPointF p1, QPointF p2, QPointF look)
+bool MainWindow::createDrawing(const QString& kind, const QVector<QPointF>& path, const QVector<double>& bulges,
+    QPointF look, double tilt, double base)
 {
     auto num = [](double v) { return QString::number(v, 'g', 17); };
-    const QJsonObject r = bridge(kind == QLatin1String("section") ? "create_section" : "create_elevation",
-        {num(p1.x()), num(p1.y()), num(p2.x()), num(p2.y()), num(look.x()), num(look.y()), QStringLiteral("-1")});
+    QJsonArray pts, arcs;
+    for (const QPointF& p : path)
+        pts.append(QJsonArray{p.x(), p.y()});
+    for (int i = 0; i + 1 < path.size(); ++i)
+        arcs.append(i < bulges.size() ? bulges[i] : 0.0);
+    const QJsonObject r = bridge("create_drawing_path", {kind,
+        QString::fromUtf8(QJsonDocument(pts).toJson(QJsonDocument::Compact)),
+        QString::fromUtf8(QJsonDocument(arcs).toJson(QJsonDocument::Compact)),
+        num(look.x()), num(look.y()), QStringLiteral("-1"), num(tilt), num(base)});
     if (!r.value("ok").toBool()) {
         m_status->showMessage(tr("Could not add it: %1").arg(r.value("error").toString()));
         return false;
     }
     afterEdit(r);
+    return true;
+}
+
+bool MainWindow::createSectionFromCutPlane(int row)
+{
+    const QVector<CutPlane> planes = cutPlanes();
+    if (row < 0 || row >= planes.size())
+        return false;
+    const CutPlane& plane = planes[row];
+    if (plane.kind == CutPlane::Kind::Horizontal) {
+        m_status->showMessage(tr("A horizontal cut plane cannot be a section: use a vertical or oblique one"));
+        return false;
+    }
+    const QPointF horizontalNormal(plane.normal.X(), plane.normal.Y());
+    const double hn = std::hypot(horizontalNormal.x(), horizontalNormal.y());
+    if (hn < 1e-6) {
+        m_status->showMessage(tr("This plane is horizontal: a section needs a vertical or oblique plane"));
+        return false;
+    }
+    const gp_Dir d = plane.direction;
+    const QPointF dir(d.X(), d.Y());
+    const QPointF nh = horizontalNormal / hn;
+    // Size the marker line to the building's extent plus a margin, so its cut crosses the model.
+    Bnd_Box bounds = m_viewport->boundsOf({});
+    double half = 5.0;
+    if (!bounds.IsVoid()) {
+        double x0, y0, z0, x1, y1, z1;
+        bounds.Get(x0, y0, z0, x1, y1, z1);
+        half = std::hypot(x1 - x0, y1 - y0) / 2.0 + 3.0;
+    }
+    const QPointF at(plane.point.X(), plane.point.Y());
+    const double upZ = dir.x() * nh.y() - dir.y() * nh.x();
+    const double tilt = std::atan2(plane.normal.Z() * upZ, hn) * 180.0 / M_PI;
+    if (std::abs(tilt) >= 89.0) {
+        m_status->showMessage(tr("This plane is almost horizontal: a section needs a vertical or oblique plane"));
+        return false;
+    }
+    QVector<QPointF> path{at - dir * half, at + dir * half};
+    if (!createDrawing(QStringLiteral("section"), path, {0.0}, at + nh, tilt, plane.point.Z()))
+        return false;
+    m_status->showMessage(tr("Section created from %1").arg(QString::fromStdString(plane.name)));
     return true;
 }
 
@@ -5001,8 +5269,15 @@ void MainWindow::refreshDrawings()
         if (d.value("kind").toString() == QLatin1String("plan"))
             continue; // floor plans have no marker
         Viewport::Annotation m{d.value("guid").toString(), d.value("kind").toString(), d.value("name").toString(), {}};
+        QVector<QPointF> path;
         for (const auto& p : d.value("points").toArray())
-            m.points << QPointF(p.toArray().at(0).toDouble(), p.toArray().at(1).toDouble());
+            path << QPointF(p.toArray().at(0).toDouble(), p.toArray().at(1).toDouble());
+        QVector<double> bulges;
+        for (const auto& b : d.value("bulges").toArray())
+            bulges << b.toDouble();
+        m.points = path;
+        if (path.size() >= 2)
+            m.curves << markerOutline(path, bulges); // D110: the arc, not just its chord
         const QJsonArray look = d.value("look").toArray();
         m.points << QPointF(look.at(0).toDouble(), look.at(1).toDouble());
         markers << m;
@@ -5203,6 +5478,7 @@ void MainWindow::regenerateDrawing(const QString& guid)
     // headless) every element goes.
     QString include;
     QStringList planGuids, viewGuids;
+    QVector<Viewport::FoldStrip> foldedStrips; // D110: a bent or curved marker
     double planCutZ = 0, planFloorZ = 0;
     gp_Ax2 viewAxes;
     std::optional<gp_Pln> sectionPlane;
@@ -5281,29 +5557,124 @@ void MainWindow::regenerateDrawing(const QString& guid)
             }
         } else {
             const QJsonArray pts = d.value("points").toArray(), look = d.value("look").toArray();
-            if (pts.size() != 2 || look.size() != 2)
+            if (pts.size() < 2 || look.size() != 2)
                 break;
             a = pt(pts.at(0)); b = pt(pts.at(1)); lk = QPointF(look.at(0).toDouble(), look.at(1).toDouble());
         }
         // The drawing camera (drawgen.camera): X is the drawing's right, Y is up, it looks along -Z.
-        const double dx = b.x() - a.x(), dy = b.y() - a.y(), len = std::hypot(dx, dy);
-        if (len > 1e-6) {
+        const QJsonArray ptsArray = d.value("points").toArray();
+        QVector<QPointF> path;
+        for (const auto& p : ptsArray)
+            path << QPointF(p.toArray().at(0).toDouble(), p.toArray().at(1).toDouble());
+        QVector<double> bulges;
+        for (const auto& b : d.value("bulges").toArray())
+            bulges << b.toDouble();
+        if (d.value("auto").toBool() && !d.value("side").toString().isEmpty()) {
+            // D61: a template elevation follows the building's current bounds, not the points it had
+            // when it was last generated.
+            path = {a, b};
+            bulges.clear();
+        }
+        const double tilt = d.value("tilt").toDouble(0.0);
+        const double base = d.value("base").toDouble(0.0);
+        const bool curved = std::any_of(bulges.begin(), bulges.end(), [](double b) { return std::abs(b) > 1e-9; });
+        if (path.size() < 2)
+            break;
+        const double dx = path[1].x() - path[0].x(), dy = path[1].y() - path[0].y(), len = std::hypot(dx, dy);
+        if (len > 1e-6 && !curved && path.size() == 2) {
             double nx = -dy / len, ny = dx / len;
-            if ((lk.x() - a.x()) * nx + (lk.y() - a.y()) * ny < 0) {
+            if ((lk.x() - path[0].x()) * nx + (lk.y() - path[0].y()) * ny < 0) {
                 nx = -nx;
                 ny = -ny;
             }
             const double zc0 = z0 - 1.0, zc1 = z1 + 1.0;
-            viewAxes = gp_Ax2(gp_Pnt((a.x() + b.x()) / 2, (a.y() + b.y()) / 2, (zc0 + zc1) / 2),
-                gp_Dir(-nx, -ny, 0), gp_Dir(ny, -nx, 0));
+            // D110: an oblique section tilts its cut plane about the line; the camera looks square
+            // at that plane (from below when the normal points up).
+            const double rad = tilt * M_PI / 180.0;
+            const double upZ = (dx * ny - dy * nx) / len; // direction x n_h
+            const gp_Dir n3(nx * std::cos(rad), ny * std::cos(rad), upZ * std::sin(rad));
+            viewAxes = gp_Ax2(gp_Pnt((path[0].x() + path[1].x()) / 2, (path[0].y() + path[1].y()) / 2,
+                                 (zc0 + zc1) / 2),
+                gp_Dir(-n3.X(), -n3.Y(), -n3.Z()), gp_Dir(ny, -nx, 0));
             if (d.value("kind").toString() == QLatin1String("section"))
-                sectionPlane = gp_Pln(gp_Pnt(a.x(), a.y(), 0), gp_Dir(nx, ny, 0));
-        }
-        const auto seen = m_viewport->visibleFrom(a, b, lk, z0 - 1.0, z1 + 1.0, depth);
-        if (seen) {
-            viewGuids = QStringList(seen->begin(), seen->end());
-            viewGuids.sort(); // a stable list keeps the drawing cache useful
-            include = QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(viewGuids)).toJson(QJsonDocument::Compact));
+                sectionPlane = gp_Pln(gp_Pnt(path[0].x(), path[0].y(), base), n3);
+            if (std::abs(tilt) > 1e-9) {
+                // A tilted cut sees above the line too: keep every building element for the pass.
+                viewGuids.clear();
+                for (const auto& g : bridge("drawing_bounds").value("guids").toArray())
+                    viewGuids << g.toString();
+                viewGuids.sort();
+                include = QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(viewGuids)).toJson(QJsonDocument::Compact));
+            } else {
+                const auto seen = m_viewport->visibleFrom(path[0], path[1], lk, z0 - 1.0, z1 + 1.0, depth);
+                if (seen) {
+                    viewGuids = QStringList(seen->begin(), seen->end());
+                    viewGuids.sort(); // a stable list keeps the drawing cache useful
+                    include = QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(viewGuids)).toJson(QJsonDocument::Compact));
+                }
+            }
+        } else if (len > 1e-6) {
+            // D110: a bent or curved marker is unfolded strip by strip. Each strip keeps the side it
+            // looks at (the first one sets it, the others stay continuous around the bend).
+            const QVector<MarkerSegment> segments = markerSegments(path, bulges);
+            double prevNx = 0, prevNy = 0;
+            for (int i = 0; i < segments.size(); ++i) {
+                const QPointF segDir = segments[i].b - segments[i].a;
+                const double segLen = std::hypot(segDir.x(), segDir.y());
+                if (segLen < 1e-6)
+                    continue;
+                const QPointF dir = segDir / segLen;
+                QPointF nh(-dir.y(), dir.x());
+                if (i == 0) {
+                    if (QPointF::dotProduct(lk - segments[i].a, nh) < 0)
+                        nh = -nh;
+                } else if (QPointF::dotProduct(nh, QPointF(prevNx, prevNy)) < 0) {
+                    nh = -nh;
+                }
+                prevNx = nh.x();
+                prevNy = nh.y();
+                const double rad = tilt * M_PI / 180.0;
+                const double upZ = dir.x() * nh.y() - dir.y() * nh.x(); // direction x n_h
+                const gp_Dir n3(nh.x() * std::cos(rad), nh.y() * std::cos(rad), upZ * std::sin(rad));
+                const gp_Pnt mid((segments[i].a.x() + segments[i].b.x()) / 2,
+                    (segments[i].a.y() + segments[i].b.y()) / 2, (z0 + z1) / 2);
+                Viewport::FoldStrip strip;
+                strip.view = gp_Ax2(mid, gp_Dir(-n3.X(), -n3.Y(), -n3.Z()), gp_Dir(nh.y(), -nh.x(), 0));
+                strip.cut = gp_Pln(gp_Pnt(segments[i].a.x(), segments[i].a.y(), base), n3);
+                strip.width = segLen;
+                strip.section = d.value("kind").toString() == QLatin1String("section");
+                foldedStrips << strip;
+            }
+            if (!foldedStrips.isEmpty()) {
+                QSet<QString> seenAll;
+                if (std::abs(tilt) > 1e-9) {
+                    for (const auto& g : bridge("drawing_bounds").value("guids").toArray())
+                        seenAll.insert(g.toString());
+                } else {
+                    double prevNx = 0, prevNy = 0;
+                    for (int i = 0; i < segments.size(); ++i) {
+                        const auto& s = segments[i];
+                        const QPointF sd = s.b - s.a;
+                        const double sl = std::hypot(sd.x(), sd.y());
+                        if (sl < 1e-6)
+                            continue;
+                        QPointF nh(-sd.y() / sl, sd.x() / sl);
+                        if (i == 0) {
+                            if (QPointF::dotProduct(lk - s.a, nh) < 0)
+                                nh = -nh;
+                        } else if (QPointF::dotProduct(nh, QPointF(prevNx, prevNy)) < 0) {
+                            nh = -nh;
+                        }
+                        prevNx = nh.x();
+                        prevNy = nh.y();
+                        if (const auto seen = m_viewport->visibleFrom(s.a, s.b, s.a + nh, z0 - 1.0, z1 + 1.0, depth))
+                            seenAll.unite(*seen);
+                    }
+                }
+                viewGuids = QStringList(seenAll.begin(), seenAll.end());
+                viewGuids.sort();
+                include = QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(viewGuids)).toJson(QJsonDocument::Compact));
+            }
         }
         break;
     }
@@ -5316,6 +5687,10 @@ void MainWindow::regenerateDrawing(const QString& guid)
     if (!planGuids.isEmpty()) {
         mode = QStringLiteral("plan");
         geometry = QString::fromUtf8(QJsonDocument(m_viewport->planGeometry(planGuids, planCutZ, planFloorZ))
+                                         .toJson(QJsonDocument::Compact));
+    } else if (!foldedStrips.isEmpty() && !viewGuids.isEmpty()) {
+        mode = QStringLiteral("view");
+        geometry = QString::fromUtf8(QJsonDocument(m_viewport->viewGeometryFolded(viewGuids, foldedStrips, bounds))
                                          .toJson(QJsonDocument::Compact));
     } else if (!viewGuids.isEmpty()) {
         mode = QStringLiteral("view");
@@ -5387,11 +5762,11 @@ QString MainWindow::addSheet(const QString& paper, const QString& title)
     return r.value("number").toString();
 }
 
-bool MainWindow::placeOnSheet(const QString& number, const QString& drawingGuid)
+bool MainWindow::placeOnSheet(const QString& number, const QString& drawingGuid, int scale)
 {
     m_status->showMessage(tr("Placing the drawing..."));
     const QJsonObject r = bridge("place_drawing", {number, drawingGuid, QStringLiteral("-1"), QStringLiteral("-1"),
-        QString::number(m_settings.value("drawing_scale").toInt(100))});
+        QString::number(scale > 0 ? scale : 100)});
     if (!r.value("ok").toBool()) {
         m_status->showMessage(tr("Could not place it: %1").arg(r.value("error").toString()));
         return false;
@@ -5399,6 +5774,102 @@ bool MainWindow::placeOnSheet(const QString& number, const QString& drawingGuid)
     afterEdit(r);
     openSheet(number);
     return true;
+}
+
+void MainWindow::placeDrawingDialog(const QString& number)
+{
+    if (number.isEmpty())
+        return;
+    QSet<QString> placed;
+    for (const auto& value : bridge("sheets").value("sheets").toArray()) {
+        const QJsonObject sheet = value.toObject();
+        if (sheet.value("number").toString() != number)
+            continue;
+        for (const auto& view : sheet.value("views").toArray())
+            placed.insert(view.toObject().value("drawing").toString());
+    }
+    const QString preferred = m_drawingsPanel ? m_drawingsPanel->selectedDrawing() : QString();
+    PlaceDrawingDialog dialog(bridge("drawings").value("drawings").toArray(), placed, preferred,
+        m_settings.value("drawing_scale").toInt(100), this);
+    if (dialog.exec() == QDialog::Accepted && !dialog.drawing().isEmpty())
+        placeOnSheet(number, dialog.drawing(), dialog.scale());
+}
+
+void MainWindow::editSheet(const QString& number)
+{
+    QJsonObject sheet;
+    for (const auto& value : bridge("sheets").value("sheets").toArray()) {
+        const QJsonObject s = value.toObject();
+        if (s.value("number").toString() == number) {
+            sheet = s;
+            break;
+        }
+    }
+    if (sheet.isEmpty())
+        return;
+    SheetSettingsDialog dialog(sheet, this);
+    connect(&dialog, &SheetSettingsDialog::titleBlockRequested, this,
+        [this, number, &dialog] { editTitleBlock(number, &dialog); });
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    QJsonObject changes = dialog.changes();
+    for (const char* key : {"title", "number", "paper", "background"})
+        if (changes.value(QLatin1String(key)) == sheet.value(QLatin1String(key)))
+            changes.remove(QLatin1String(key));
+    if (changes.isEmpty())
+        return;
+    const bool wasOpen = m_dock->viewKeys().contains(QStringLiteral("sheet:") + number);
+    const QJsonObject r = bridge("update_sheet", {number,
+        QString::fromUtf8(QJsonDocument(changes).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not change the sheet"), r.value("error").toString());
+        return;
+    }
+    const QString newNumber = r.value("number").toString(number);
+    afterEdit(r);
+    refreshSheets(true);
+    if (wasOpen && newNumber != number)
+        openSheet(newNumber); // the tab key carried the old number, so refreshSheets closed it
+}
+
+void MainWindow::editPlacedDrawing(const QString& number, const QString& drawingGuid)
+{
+    QJsonObject view;
+    for (const auto& value : bridge("sheets").value("sheets").toArray()) {
+        const QJsonObject sheet = value.toObject();
+        if (sheet.value("number").toString() != number)
+            continue;
+        for (const auto& v : sheet.value("views").toArray())
+            if (v.toObject().value("drawing").toString() == drawingGuid) {
+                view = v.toObject();
+                break;
+            }
+    }
+    if (view.isEmpty())
+        return;
+    PlacedDrawingDialog dialog(view.value("name").toString(), view.value("scale").toInt(100),
+        view.value("x").toDouble(), view.value("y").toDouble(), this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    QJsonObject changes;
+    if (dialog.title() != view.value("name").toString())
+        changes.insert(QStringLiteral("title"), dialog.title());
+    if (dialog.scale() != view.value("scale").toInt(100))
+        changes.insert(QStringLiteral("scale"), dialog.scale());
+    if (std::abs(dialog.x() - view.value("x").toDouble()) > 0.005)
+        changes.insert(QStringLiteral("x"), dialog.x());
+    if (std::abs(dialog.y() - view.value("y").toDouble()) > 0.005)
+        changes.insert(QStringLiteral("y"), dialog.y());
+    if (changes.isEmpty())
+        return;
+    const QJsonObject r = bridge("update_placed", {number, drawingGuid,
+        QString::fromUtf8(QJsonDocument(changes).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Could not change the drawing"), r.value("error").toString());
+        return;
+    }
+    afterEdit(r);
+    refreshSheets(true);
 }
 
 bool MainWindow::placeLegend(const QString& number)
@@ -5463,6 +5934,9 @@ bool MainWindow::openSheet(const QString& number)
         if (!r.value("ok").toBool())
             m_status->showMessage(tr("Could not remove it: %1").arg(r.value("error").toString()));
         afterEdit(r);
+    });
+    connect(view, &DrawingView::placedSettingsRequested, this, [this, number](const QString& drawing) {
+        editPlacedDrawing(number, drawing);
     });
     connect(view, &DrawingView::placedEditRequested, this, [this, number](const QString& drawing) {
         if (drawing == QLatin1String("titleblock")) {
@@ -5603,13 +6077,13 @@ bool MainWindow::setTitleBlock(const QString& number, const QJsonObject& changes
     return r.value("ok").toBool();
 }
 
-void MainWindow::editTitleBlock(const QString& number)
+void MainWindow::editTitleBlock(const QString& number, QWidget* parent)
 {
     const QJsonObject tb = titleBlock(number);
     if (tb.isEmpty())
         return;
     const QJsonObject values = tb.value("fields").toObject();
-    QDialog dialog(this);
+    QDialog dialog(parent ? parent : this);
     dialog.setWindowTitle(tr("Title block"));
     auto* form = new QFormLayout;
     QVector<QPair<QString, QLineEdit*>> fields;
@@ -6640,9 +7114,29 @@ void MainWindow::updateFromLibrary(bool all)
     m_status->showMessage(tr("Updated from the library: %1").arg(done.join(QStringLiteral("; "))));
 }
 
+bool MainWindow::confirmDeletePlacedDrawings(const QStringList& guids)
+{
+    QStringList sheets; // tell the architect before a sheet keeps a broken view
+    for (const auto& value : bridge("sheets").value("sheets").toArray()) {
+        const QJsonObject sheet = value.toObject();
+        for (const auto& view : sheet.value("views").toArray())
+            if (guids.contains(view.toObject().value("drawing").toString())
+                && !sheets.contains(sheet.value("number").toString()))
+                sheets << sheet.value("number").toString();
+    }
+    if (sheets.isEmpty())
+        return true;
+    return QMessageBox::question(this, tr("Delete drawing"),
+               tr("This drawing is placed on sheet(s) %1. Delete it and remove it from those sheets?")
+                   .arg(sheets.join(QStringLiteral(", "))),
+               QMessageBox::Yes | QMessageBox::No, QMessageBox::No) == QMessageBox::Yes;
+}
+
 bool MainWindow::deleteSelection()
 {
     if (m_selection.isEmpty())
+        return false;
+    if (!confirmDeletePlacedDrawings(m_selection))
         return false;
     const QJsonObject r = bridge("delete_elements", {jsonList(m_selection)});
     if (!r.value("ok").toBool())
@@ -6733,10 +7227,27 @@ void MainWindow::startAgentLive()
         return;
     const QJsonObject r = bridge("agent_live_start");
     m_agentLive = r.value("ok").toBool();
-    if (m_agentLive)
+    if (m_agentLive) {
         m_status->setAgentStatus(tr("Agent: live"), true);
-    else
+    } else {
         m_status->setAgentStatus(QString(), false);
+        const QString error = r.value("error").toString();
+        if (!error.isEmpty()) // a read-only or failed session: say why, not just leave the bar empty
+            m_status->showMessage(tr("The agent session could not start: %1").arg(error));
+    }
+}
+
+bool MainWindow::ensureAgentLive()
+{
+    if (m_agentLive)
+        return true;
+    startAgentLive();
+    if (m_agentLive)
+        return true;
+    showError(tr("Agent session"),
+        tr("The agent session is not running, so this proposal can't be reviewed. Check that the project is "
+           "not open read-only, then try again."));
+    return false;
 }
 
 void MainWindow::stopAgentLive()
@@ -6751,31 +7262,46 @@ void MainWindow::stopAgentLive()
 
 void MainWindow::pollAgentLive()
 {
-    if (!m_agentLive || m_loading)
+    if (m_loading)
         return;
-    const QJsonObject pending = bridge("agent_live_pending");
-    const QJsonObject request = pending.value("request").toObject();
-    if (!request.isEmpty()) {
-        const QJsonObject run = bridge("agent_live_run", {request.value("id").toString()});
-        if (!run.value("busy").toBool())
-            applyAgentResult(run);
+    static bool runningRequest = false; // the busy dialog's processEvents() can re-enter this timer
+    if (m_agentLive && !runningRequest) {
+        const QJsonObject pending = bridge("agent_live_pending");
+        const QJsonObject request = pending.value("request").toObject();
+        if (!request.isEmpty()) {
+            const QString tool = request.value(QStringLiteral("tool")).toString();
+            const bool heavy = request.value(QStringLiteral("writes")).toBool()
+                || tool == QLatin1String("snapshot.take") || tool == QLatin1String("checks.run")
+                || tool == QLatin1String("checks.ids_report") || tool == QLatin1String("versions.diff")
+                || tool == QLatin1String("versions.export") || tool == QLatin1String("models.update")
+                || tool == QLatin1String("task.finish");
+            std::unique_ptr<QProgressDialog> busy;
+            runningRequest = true;
+            if (heavy) { // a write or a render can take seconds: say what the app is doing
+                busy = std::make_unique<QProgressDialog>(tr("KimBim is working on the agent's request..."),
+                    QString(), 0, 0, this);
+                busy->setWindowTitle(tr("Agent"));
+                busy->setWindowModality(Qt::ApplicationModal);
+                busy->setCancelButton(nullptr);
+                busy->setMinimumDuration(0);
+                busy->setAutoClose(false);
+                busy->show();
+                QApplication::processEvents();
+            }
+            const QJsonObject run = bridge("agent_live_run", {request.value("id").toString()});
+            if (busy)
+                busy->close();
+            runningRequest = false;
+            if (!run.value("busy").toBool())
+                applyAgentResult(run);
+        }
     }
     if (++m_agentPollTicks % 8 == 0) { // twice a second is enough for the review bar
+        // Proposals are task files in the open project: shown even when the live host could not start,
+        // so a proposal is never invisible (Review will try to start the session on demand).
         const QJsonObject listed = bridge("agent_proposals");
-        const QJsonArray proposals = listed.value("proposals").toArray();
-        m_proposalBar->setProposals(proposals);
-        if (!proposals.isEmpty())
-            positionProposalBar();
+        m_proposalBar->setProposals(listed.value("proposals").toArray());
     }
-}
-
-void MainWindow::positionProposalBar()
-{
-    if (m_proposalBar->isHidden() || !m_dock || !m_dock->manager())
-        return;
-    const int width = qMin(m_proposalBar->sizeHint().width(), qMax(320, m_dock->manager()->width() - 24));
-    m_proposalBar->setGeometry(12, 8, width, m_proposalBar->sizeHint().height());
-    m_proposalBar->raise();
 }
 
 void MainWindow::applyAgentResult(const QJsonObject& result)
@@ -6802,26 +7328,44 @@ void MainWindow::applyAgentResult(const QJsonObject& result)
 
 void MainWindow::reviewProposal(const QString& task)
 {
+    if (!ensureAgentLive())
+        return;
     const QJsonObject r = bridge("agent_proposal", {task});
     const QJsonObject p = r.value("proposal").toObject();
     if (!r.value("ok").toBool() || p.isEmpty()) {
         m_status->showMessage(r.value("error").toString());
         return;
     }
-    const QString base = p.value(QStringLiteral("base_version")).toString();
-    auto connection = std::make_shared<QMetaObject::Connection>();
-    *connection = connect(this, &MainWindow::loadFinished, this,
-        [this, base, connection](int, bool stopped) {
+    const QString base = p.value(QStringLiteral("base_option")).toString();
+    if (!base.isEmpty() && base != m_currentOption) {
+        auto connection = std::make_shared<QMetaObject::Connection>();
+        *connection = connect(this, &MainWindow::loadFinished, this,
+            [this, task, connection](int, bool stopped) {
+                disconnect(*connection);
+                if (!stopped)
+                    reviewProposal(task); // now on the base option: compare against it
+            });
+        if (!switchOption(base))
             disconnect(*connection);
-            if (!stopped && !base.isEmpty())
-                compareWith(base);
-        });
-    if (!switchOption(p.value(QStringLiteral("option")).toString()))
-        disconnect(*connection);
+        return;
+    }
+    ProposalDialog dialog([this](const char* fn, const QStringList& args) { return bridge(fn, args); }, p, this);
+    connect(&dialog, &ProposalDialog::elementActivated, this, [this](const QString& guid) {
+        m_viewport->selectGuids({guid});
+        setSelection({guid});
+        m_viewport->fitTo({guid});
+    });
+    const int result = dialog.exec();
+    if (dialog.rejected())
+        rejectProposal(task);
+    else if (result == QDialog::Accepted)
+        acceptProposal(task, dialog.resolutions());
 }
 
-void MainWindow::acceptProposal(const QString& task)
+void MainWindow::acceptProposal(const QString& task, const QJsonObject& resolutions)
 {
+    if (!ensureAgentLive())
+        return;
     const QJsonObject r = bridge("agent_proposal", {task});
     const QJsonObject p = r.value("proposal").toObject();
     if (!r.value("ok").toBool() || p.isEmpty()) {
@@ -6832,24 +7376,41 @@ void MainWindow::acceptProposal(const QString& task)
     if (!base.isEmpty() && base != m_currentOption) {
         auto connection = std::make_shared<QMetaObject::Connection>();
         *connection = connect(this, &MainWindow::loadFinished, this,
-            [this, task, connection](int, bool stopped) {
+            [this, task, resolutions, connection](int, bool stopped) {
                 disconnect(*connection);
                 if (!stopped)
-                    acceptProposal(task); // now on the base option
+                    acceptProposal(task, resolutions); // now on the base option
             });
         if (!switchOption(base))
             disconnect(*connection);
         return;
     }
     const QString option = p.value(QStringLiteral("option")).toString();
-    const QJsonObject preview = bridge("combine_preview", {option});
-    QJsonObject resolutions;
-    if (!preview.value("unresolved").toArray().isEmpty()) {
-        CombineDialog dialog([this](const char* fn, const QStringList& args) { return bridge(fn, args); },
-                             {option}, this);
-        if (dialog.exec() != QDialog::Accepted)
-            return;
-        resolutions = dialog.resolutions();
+    const QJsonObject preview = bridge("combine_preview",
+        {option, QString::fromUtf8(QJsonDocument(resolutions).toJson(QJsonDocument::Compact))});
+    if (!preview.value(QStringLiteral("ok")).toBool()) {
+        showError(tr("Could not accept the proposal"), preview.value(QStringLiteral("error")).toString());
+        return;
+    }
+    if (preview.value(QStringLiteral("status")).toString() == QLatin1String("up_to_date")) {
+        m_status->showMessage(tr("This proposal is already in the base option"));
+        return;
+    }
+    if (!preview.value(QStringLiteral("unresolved")).toArray().isEmpty()) {
+        // The bar's Accept shortcut can also reach a proposal with conflicts: show the same review
+        // window (changes and conflicts), not a second, different dialog.
+        ProposalDialog dialog([this](const char* fn, const QStringList& args) { return bridge(fn, args); }, p, this);
+        connect(&dialog, &ProposalDialog::elementActivated, this, [this](const QString& guid) {
+            m_viewport->selectGuids({guid});
+            setSelection({guid});
+            m_viewport->fitTo({guid});
+        });
+        const int result = dialog.exec();
+        if (dialog.rejected())
+            rejectProposal(task);
+        else if (result == QDialog::Accepted)
+            acceptProposal(task, dialog.resolutions());
+        return;
     }
     const QJsonObject accepted = bridge("agent_accept",
         {task, QString::fromUtf8(QJsonDocument(resolutions).toJson(QJsonDocument::Compact))});
@@ -6858,7 +7419,7 @@ void MainWindow::acceptProposal(const QString& task)
         return;
     }
     m_proposalBar->setProposals(QJsonArray());
-    const QString path = accepted.value("path").toString();
+    const QString path = accepted.value(QStringLiteral("path")).toString();
     if (!path.isEmpty())
         openFile(path);
     refreshProject();
@@ -6867,6 +7428,8 @@ void MainWindow::acceptProposal(const QString& task)
 
 void MainWindow::rejectProposal(const QString& task)
 {
+    if (!ensureAgentLive())
+        return;
     const QJsonObject rejected = bridge("agent_reject", {task});
     if (!rejected.value("ok").toBool()) {
         showError(tr("Could not reject the proposal"), rejected.value("error").toString());
@@ -6888,7 +7451,10 @@ QJsonObject MainWindow::assistantConfig()
             {QStringLiteral("model"), m_prefs.value(QStringLiteral("assistant_model")).toString()},
             {QStringLiteral("base_url"), m_prefs.value(QStringLiteral("assistant_base_url")).toString()},
             {QStringLiteral("selection"), selection},
-            {QStringLiteral("view"), currentViewKey()}};
+            {QStringLiteral("view"), currentViewKey()},
+            // The model may change between messages: send the current option/head/counts and the delta
+            // since the previous turn. The Assistant panel adds the stored session id (D111).
+            {QStringLiteral("project_context"), true}};
 }
 
 void MainWindow::connectAgentDialog()

@@ -1464,6 +1464,18 @@ def assistant_chat(messages_json: str, config_json: str) -> str:
     return assistant.chat(messages_json, config_json)
 
 
+def assistant_begin() -> str:
+    from .agent import assistant
+
+    return assistant.begin()
+
+
+def assistant_progress(turn: str = "0", since: str = "0") -> str:
+    from .agent import assistant
+
+    return assistant.progress(int(turn or 0), int(since or 0))
+
+
 def assistant_set_key(provider: str, key: str) -> str:
     from .agent import assistant
 

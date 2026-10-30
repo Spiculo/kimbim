@@ -108,6 +108,18 @@ def test_live_task_and_proposal_accept(app_house):
     assert {w.Name for w in B._model.by_type("IfcWall")} == {"Agent wall"}  # combined into the base option
 
 
+def test_ready_proposals_are_listed_when_the_live_host_is_off(app_house):
+    """The proposal bar reads the task files of the open project, so a failed/read-only live host does not
+    hide a proposal waiting for review."""
+    started = call_live(app_house, "task.start", {"title": "Offline proposal"})
+    task = started["envelope"]["result"]["id"]
+    call_live(app_house, "elements.rename", {"elements": {"kind": "wall"}, "name": "Offline wall"}, task=task)
+    call_live(app_house, "task.finish", {"summary": "offline"}, task=task)
+    B.agent_live_stop()
+    listed = json.loads(B.agent_proposals())["proposals"]
+    assert [p["id"] for p in listed] == [task]
+
+
 def test_live_task_and_proposal_reject(app_house):
     started = call_live(app_house, "task.start", {"title": "Reject me"})
     task = started["envelope"]["result"]["id"]

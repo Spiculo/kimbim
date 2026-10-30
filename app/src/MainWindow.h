@@ -130,6 +130,7 @@ public:
     int selectedCutPlane() const;
     bool selectCutPlane(int index);
     bool setCutPlaneEnabled(int index, bool on);
+    bool setCutPlaneVisible(int index, bool on);
     bool setCutPlaneOffset(int index, double offset);
     bool setCutPlaneAngle(int index, double degrees);
     bool flipCutPlane(int index);
@@ -147,6 +148,7 @@ public:
     bool resetToType(const QString& pset, const QString& prop);
     bool isDirty() const;
     bool deleteSelection();
+    bool confirmDeletePlacedDrawings(const QStringList& guids); // asks when a sheet holds one of them
     // Slice 4: new project, levels, plan view.
     bool newProject(); // from KimBim's built-in template
     // D72: office templates. "builtin" is KimBim's default; a template opens as an untitled project.
@@ -318,9 +320,12 @@ public:
     bool explodeSelectedInstance();
     // Plan annotations (Slice 13): kind "text" (1 point), "dimension" (a, b, line point), "mark".
     bool addAnnotation(const QString& kind, const QVector<QPointF>& points, const QString& text);
-    // Sections and elevations (Slice 14, D60/D61). kind "section" or "elevation": the marker line
-    // p1-p2 looking towards `look` (Archicad's third click), infinite depth.
-    bool createDrawing(const QString& kind, QPointF p1, QPointF p2, QPointF look);
+    // Sections and elevations (Slice 14, D60/D61; D110 paths). kind "section" or "elevation": the
+    // marker path looking towards `look` (Archicad's third click), infinite depth. `tilt` tilts the
+    // cut plane about the line; `base` is the height the line lies at (the tilt's pivot).
+    bool createDrawing(const QString& kind, const QVector<QPointF>& path, const QVector<double>& bulges,
+        QPointF look, double tilt = 0.0, double base = 0.0);
+    bool createSectionFromCutPlane(int plane);
     DrawingsPanel* drawingsPanel() const { return m_drawingsPanel; }
     QString drawingGuid(const QString& name); // "" if there is none
     // Open (or show) a drawing's tab and generate it in the background if it is out of date.
@@ -345,7 +350,10 @@ public:
     SchedulesDialog* openSchedules(const QString& scheme = QString());
     SchedulesDialog* schedulesDialog() const { return m_schedules; }
     QString addSheet(const QString& paper, const QString& title); // its number, "" on failure
-    bool placeOnSheet(const QString& number, const QString& drawingGuid);
+    bool placeOnSheet(const QString& number, const QString& drawingGuid, int scale = 100);
+    void placeDrawingDialog(const QString& number); // choose the drawing and its scale in a modal
+    void editSheet(const QString& number); // title, number, paper, background, placed drawings
+    void editPlacedDrawing(const QString& number, const QString& drawingGuid); // title, scale, position
     bool placeLegend(const QString& number); // D74: a legend of the sheet's purpose, at a free spot
     bool openSheet(const QString& number);
     DrawingView* sheetView(const QString& number) const { return m_drawingViews.value(QStringLiteral("sheet:") + number); }
@@ -354,7 +362,7 @@ public:
     // D91: the sheet's title block, moved and its fields edited (saved with the sheet).
     QJsonObject titleBlock(const QString& number);
     bool setTitleBlock(const QString& number, const QJsonObject& changes);
-    void editTitleBlock(const QString& number);
+    void editTitleBlock(const QString& number, QWidget* parent = nullptr);
     // How many elements the last generation sent to the serializer (-1: all, no visible pass).
     int lastDrawingVisibleCount() const { return m_lastDrawingVisible; }
     // Milliseconds the last drawing's visible-element pass spent on the GUI thread (before the worker).
@@ -602,7 +610,7 @@ private:
     void exportSheetDialog(bool pdf);
     void exportDxfDialog(); // D83: File > Export DXF... (DxfExport.cpp)
     void addUnderlayActions(QMenu* file); // D85 (Underlays.cpp)
-    void drawingClick(QPointF p);
+    void drawingClick(QPointF p, Qt::KeyboardModifiers modifiers);
     void onDrawingGenerated(const QString& guid, const QJsonObject& result, const QString& error);
     void activateView(const QString& key);
     void activateElement(const QString& guid); // double-click: properties, or a level's plan
@@ -724,15 +732,16 @@ private:
 
     // D102 phase 2: the live agent session, the status indicator and the proposal review bar.
     void startAgentLive();
+    bool ensureAgentLive(); // start it on demand (Review/Reject/Accept), with the reason on failure
     void stopAgentLive();
     void pollAgentLive();
     void applyAgentResult(const QJsonObject& result);
-    void positionProposalBar();
     void reviewProposal(const QString& task);
-    void acceptProposal(const QString& task);
+    void acceptProposal(const QString& task, const QJsonObject& resolutions = {});
     void rejectProposal(const QString& task);
     void connectAgentDialog();
     ProposalBar* m_proposalBar = nullptr;
+    QToolBar* m_proposalToolbar = nullptr;
     QTimer* m_agentPoll = nullptr;
     bool m_agentLive = false;
     int m_agentPollTicks = 0;
@@ -788,6 +797,8 @@ private:
     QComboBox* m_draftPatternScale = nullptr; // D92: paper or model
     bool m_gripRect = false; // D92: the gripped shape is a rectangle (stays rectangular when asked)
     bool m_gripSlab = false; // D98: the gripped outline is a slab's
+    bool m_gripDrawing = false; // D110: the gripped outline is a section/elevation marker
+    QVector<double> m_gripBulges; // D110: its arcs, one bulge per segment
     QComboBox* m_tagStyle = nullptr;   // D87: Automatic (by kind) or a tag style
     QComboBox* m_tagShape = nullptr;   // the style's, or none / circle / box / hexagon
     QToolButton* m_tagLeader = nullptr;
@@ -835,6 +846,8 @@ private:
     QTimer* m_traceTimer = nullptr;
     bool traceUnderlay(const QString& storey, Underlay* u, std::shared_ptr<const UnderlayLines>* lines);
     QComboBox* m_roofKind = nullptr;
+    QComboBox* m_sectionShape = nullptr; // D110: Line, Polyline or Curve for section/elevation markers
+    bool m_sectionPathDone = false;      // D110: the path is closed; the next click is the look side
     QDoubleSpinBox* m_roofPitch = nullptr;
     bool m_warnedInconsistent = false;
     HistoryPanel* m_history = nullptr;
@@ -845,6 +858,7 @@ private:
     QHash<QString, QString> m_instanceOf; // element -> model instance it belongs to
     QHash<QString, QStringList> m_instanceMembers;
     QVector<QPointF> m_annotationPoints; // the dimension/section tool's clicks so far
+    QVector<double> m_sectionBulges;     // D110: one bulge per segment of the marker being drawn
     QStringList m_clipboard;            // Ctrl+C
     DockLayout* m_dock = nullptr;     // center views and side panels (D71)
     QHash<QString, ViewHost*> m_hosts; // model views by key: "3d", "plan:<guid>"

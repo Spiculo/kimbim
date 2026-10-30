@@ -6,6 +6,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QScreen>
 #include <QSignalSpy>
 #include <QSlider>
 #include <QTemporaryDir>
@@ -14,6 +15,7 @@
 #include <QImage>
 #include <QtTest>
 
+#include <algorithm>
 #include <cmath>
 
 #include "CombineDialog.h"
@@ -46,6 +48,7 @@
 #include <QTableWidget>
 #include "DrawingsPanel.h"
 #include "SheetsPanel.h"
+#include "SheetDialog.h"
 #include "SchedulesDialog.h"
 #include <QCheckBox>
 #include "ElementBatch.h"
@@ -748,7 +751,7 @@ private slots:
         kimbim::ToolPalette* p = w.toolPalette();
         QCOMPARE(p->groups(), QStringList({"3d", "plane", "view", "edit"}));
         const QHash<QString, QStringList> expected = {
-            {"3d", {"actionWallTool", "actionSlabTool", "actionColumnTool", "actionBeamTool", "actionCurtainWallTool", "actionDoorTool",
+            {"3d", {"actionSelectTool", "actionWallTool", "actionSlabTool", "actionColumnTool", "actionBeamTool", "actionCurtainWallTool", "actionDoorTool",
                        "actionWindowTool", "actionStairTool", "actionRailingTool", "actionRoofTool", "actionRoomTool",
                        "actionSlabOpeningTool", "actionPlaceModelTool", "actionObjectTool"}},
             {"plane", {"actionTextTool", "actionDimensionTool", "actionLeaderTool", "actionMarkTool", "actionGridTool",
@@ -817,6 +820,76 @@ private slots:
         QVERIFY(!w.dockLayout()->manager()->findDockWidget("tools")->dockAreaWidget()->titleBar()->isVisible());
     }
 
+    void aWindowLargerThanTheScreenIsClamped()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QScreen* screen = w.screen();
+        QVERIFY(screen);
+        const QRect avail = screen->availableGeometry();
+        w.setWindowState(w.windowState() & ~Qt::WindowMaximized);
+        w.resize(avail.width() + 400, avail.height() + 300);
+        w.show();
+        QApplication::processEvents();
+        // The offscreen test screen can be smaller than the window's layout minimum: the clamp must
+        // shrink it as far as the minimum allows, and never leave it off the top-left of the screen.
+        QVERIFY2(w.width() <= std::max(avail.width(), w.minimumWidth()),
+            qPrintable(QStringLiteral("%1 > %2").arg(w.width()).arg(std::max(avail.width(), w.minimumWidth()))));
+        QVERIFY2(w.height() <= std::max(avail.height(), w.minimumHeight()),
+            qPrintable(QStringLiteral("%1 > %2").arg(w.height()).arg(std::max(avail.height(), w.minimumHeight()))));
+        QVERIFY(w.geometry().left() >= avail.left());
+        QVERIFY(w.geometry().top() >= avail.top());
+        if (w.height() <= avail.height())
+            QVERIFY(w.geometry().bottom() <= avail.bottom());
+    }
+
+    void sheetSettingsAndPlaceDrawingDialogs()
+    {
+        const QJsonObject sheet{{QStringLiteral("number"), QStringLiteral("A01")},
+            {QStringLiteral("title"), QStringLiteral("Plans")},
+            {QStringLiteral("paper"), QStringLiteral("A1")},
+            {QStringLiteral("background"), QStringLiteral("#ffffff")},
+            {QStringLiteral("views"), QJsonArray{QJsonObject{{QStringLiteral("drawing"), QStringLiteral("g1")},
+                                                           {QStringLiteral("name"), QStringLiteral("Plan")},
+                                                           {QStringLiteral("scale"), 100},
+                                                           {QStringLiteral("x"), 10},
+                                                           {QStringLiteral("y"), 20}}}}};
+        kimbim::SheetSettingsDialog settings(sheet);
+        QJsonObject changes = settings.changes();
+        QCOMPARE(changes.value(QStringLiteral("title")).toString(), QStringLiteral("Plans"));
+        QCOMPARE(changes.value(QStringLiteral("number")).toString(), QStringLiteral("A01"));
+        QCOMPARE(changes.value(QStringLiteral("paper")).toString(), QStringLiteral("A1"));
+        QCOMPARE(changes.value(QStringLiteral("background")).toString(), QStringLiteral("#ffffff"));
+        auto* table = settings.placedTable();
+        QCOMPARE(table->rowCount(), 1);
+        auto* spin = qobject_cast<QSpinBox*>(table->cellWidget(0, 1));
+        QVERIFY(spin);
+        spin->setValue(50);
+        changes = settings.changes();
+        QCOMPARE(changes.value(QStringLiteral("placements")).toObject().value(QStringLiteral("g1"))
+                     .toObject().value(QStringLiteral("scale")).toInt(), 50);
+        table->item(0, 2)->setCheckState(Qt::Checked);
+        changes = settings.changes();
+        QCOMPARE(changes.value(QStringLiteral("removed")).toArray().size(), 1);
+
+        const QJsonArray drawings{QJsonObject{{QStringLiteral("guid"), QStringLiteral("g1")},
+                                          {QStringLiteral("name"), QStringLiteral("Plan")},
+                                          {QStringLiteral("kind"), QStringLiteral("plan")}},
+            QJsonObject{{QStringLiteral("guid"), QStringLiteral("g2")},
+                {QStringLiteral("name"), QStringLiteral("Section")},
+                {QStringLiteral("kind"), QStringLiteral("section")}}};
+        kimbim::PlaceDrawingDialog place(drawings, {QStringLiteral("g1")}, QStringLiteral("g1"), 100);
+        QCOMPARE(place.drawing(), QStringLiteral("g2")); // g1 is already on the sheet
+        QCOMPARE(place.scale(), 100);
+        place.findChild<QSpinBox*>(QStringLiteral("placeDrawingScale"))->setValue(50);
+        QCOMPARE(place.scale(), 50);
+
+        kimbim::PlacedDrawingDialog placed(QStringLiteral("Plan"), 100, 10, 20);
+        QCOMPARE(placed.title(), QStringLiteral("Plan"));
+        QCOMPARE(placed.scale(), 100);
+        QCOMPARE(placed.x(), 10.0);
+        QCOMPARE(placed.y(), 20.0);
+    }
+
     void newPlanTabAndNewSheetFromThePalette()
     {
         kimbim::MainWindow w(nullptr, true);
@@ -840,8 +913,11 @@ private slots:
         QVERIFY(!bar->isHidden());
         QVERIFY(w.findChild<QDoubleSpinBox*>(QStringLiteral("wallHeight"))->isVisibleTo(bar));
         QVERIFY(!w.findChild<QComboBox*>(QStringLiteral("roofKind"))->isVisibleTo(bar));
+        QVERIFY(!w.findChild<QComboBox*>(QStringLiteral("sectionShape"))->isVisibleTo(bar));
         w.setTool(kimbim::MainWindow::Tool::Roof);
         QVERIFY(w.findChild<QComboBox*>(QStringLiteral("roofKind"))->isVisibleTo(bar));
+        w.setTool(kimbim::MainWindow::Tool::Section);
+        QVERIFY(w.findChild<QComboBox*>(QStringLiteral("sectionShape"))->isVisibleTo(bar));
         w.setTool(kimbim::MainWindow::Tool::None);
         QVERIFY(bar->isHidden());
         QVERIFY(w.dockLayout()->view(w.currentViewKey())->isAncestorOf(bar)); // in the active tab
@@ -1935,6 +2011,105 @@ private slots:
         QCOMPARE(w.viewport()->annotationCount(), 0); // each level has its own
         QVERIFY(w.close());
     }
+
+    void sectionPathsAndObliqueCuts()
+    {
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        w.setTool(kimbim::MainWindow::Tool::Wall);
+        w.wallTool()->setTolerance(0.05);
+        for (const QPointF& p : {QPointF(0, 0), QPointF(8, 0)})
+            w.wallTool()->click(p);
+        w.setTool(kimbim::MainWindow::Tool::None);
+
+        auto* shape = w.findChild<QComboBox*>(QStringLiteral("sectionShape"));
+        QVERIFY(shape);
+        shape->setCurrentIndex(shape->findData(QStringLiteral("polyline")));
+        w.setTool(kimbim::MainWindow::Tool::Section);
+        for (const QPointF& p : {QPointF(2, -3), QPointF(6, -3), QPointF(6, 3)})
+            emit w.viewport()->workPointClicked(p, 0.01, Qt::NoModifier);
+        emit w.viewport()->drawingConfirmed();
+        emit w.viewport()->workPointClicked(QPointF(4, 0), 0.01, Qt::NoModifier);
+        w.setTool(kimbim::MainWindow::Tool::None);
+        const QString bent = w.drawingGuid(QStringLiteral("Section 1"));
+        QVERIFY(!bent.isEmpty());
+        auto& py = kimbim::PythonEngine::instance();
+        QJsonObject d;
+        for (const auto& v : py.callJson("drawings", {}, nullptr).object().value("drawings").toArray())
+            if (v.toObject().value("guid").toString() == bent)
+                d = v.toObject();
+        QCOMPARE(d.value("points").toArray().size(), 3);
+        QCOMPARE(d.value("bulges").toArray().size(), 2);
+        QCOMPARE(d.value("tilt").toDouble(), 0.0);
+        QVERIFY(w.openDrawing(bent));
+        QTRY_VERIFY_WITH_TIMEOUT(w.drawingView(bent)->hasDrawing(), 60000);
+        QVERIFY(!w.drawingView(bent)->svg().isEmpty());
+        QVERIFY(w.drawingView(bent)->paperSize().width() > 5);
+
+        // D110: the Stretch tool grips the marker's vertices; the path follows.
+        w.setTool(kimbim::MainWindow::Tool::Stretch);
+        emit w.viewport()->workPointClicked(QPointF(2, -3), 0.2, Qt::NoModifier);
+        emit w.viewport()->workPointClicked(QPointF(1, -3.5), 0.2, Qt::NoModifier);
+        w.setTool(kimbim::MainWindow::Tool::None);
+        QJsonObject moved;
+        for (const auto& v : py.callJson("drawings", {}, nullptr).object().value("drawings").toArray())
+            if (v.toObject().value("guid").toString() == bent)
+                moved = v.toObject();
+        QCOMPARE(moved.value("points").toArray().size(), 3);
+        QVERIFY(std::abs(moved.value("points").toArray().first().toArray().first().toDouble() - 1.0) < 1e-6);
+
+        // Clicking an edge's middle adds a vertex there (and picks it up); the next click puts it down.
+        w.setTool(kimbim::MainWindow::Tool::Stretch);
+        emit w.viewport()->workPointClicked(QPointF(3.5, -3.25), 0.2, Qt::NoModifier);
+        emit w.viewport()->workPointClicked(QPointF(3.5, -2.5), 0.2, Qt::NoModifier);
+        w.setTool(kimbim::MainWindow::Tool::None);
+        QJsonObject added;
+        for (const auto& v : py.callJson("drawings", {}, nullptr).object().value("drawings").toArray())
+            if (v.toObject().value("guid").toString() == bent)
+                added = v.toObject();
+        QCOMPARE(added.value("points").toArray().size(), 4);
+        QCOMPARE(added.value("bulges").toArray().size(), 3);
+
+        // D110: the Section group in Properties edits the drawing's own view.
+        w.setSelection({bent});
+        emit w.propertiesPanel()->propertyEdited(QStringLiteral("Section"), QString::fromUtf8("Tilt (°)"),
+            QJsonValue(12.0));
+        QJsonObject tilted;
+        for (const auto& v : py.callJson("drawings", {}, nullptr).object().value("drawings").toArray())
+            if (v.toObject().value("guid").toString() == bent)
+                tilted = v.toObject();
+        QCOMPARE(tilted.value("tilt").toDouble(), 12.0);
+
+        // D110: a curved section: start, end, a point on the arc, then the side it looks at.
+        shape->setCurrentIndex(shape->findData(QStringLiteral("curve")));
+        w.setTool(kimbim::MainWindow::Tool::Section);
+        for (const QPointF& p : {QPointF(0, -4), QPointF(8, -4), QPointF(4, -2), QPointF(4, 0)})
+            emit w.viewport()->workPointClicked(p, 0.01, Qt::NoModifier);
+        w.setTool(kimbim::MainWindow::Tool::None);
+        const QString curved = w.drawingGuid(QStringLiteral("Section 2"));
+        QVERIFY(!curved.isEmpty());
+        QJsonObject c;
+        for (const auto& v : py.callJson("drawings", {}, nullptr).object().value("drawings").toArray())
+            if (v.toObject().value("guid").toString() == curved)
+                c = v.toObject();
+        QCOMPARE(c.value("points").toArray().size(), 2);
+        QCOMPARE(c.value("bulges").toArray().size(), 1);
+        QVERIFY(std::abs(c.value("bulges").toArray().first().toDouble()) > 0.1);
+
+        // An oblique section: the cut plane tilts about the line; the drawing follows.
+        const QJsonObject tiltResult = py.callJson("set_drawing_tilt", {curved, QStringLiteral("25")}).object();
+        QVERIFY(tiltResult.value("ok").toBool());
+        QJsonObject t;
+        for (const auto& v : py.callJson("drawings", {}, nullptr).object().value("drawings").toArray())
+            if (v.toObject().value("guid").toString() == curved)
+                t = v.toObject();
+        QCOMPARE(t.value("tilt").toDouble(), 25.0);
+        QVERIFY(w.openDrawing(curved));
+        QTRY_VERIFY_WITH_TIMEOUT(w.drawingView(curved)->hasDrawing(), 60000);
+        QVERIFY(!w.drawingView(curved)->svg().isEmpty());
+        QVERIFY(w.drawingView(curved)->paperSize().width() > 5);
+    }
+
 
     void sectionsAndElevations()
     {

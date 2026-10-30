@@ -16,6 +16,10 @@ int main(int argc, char* argv[])
     for (int i = 1; i < argc; ++i)
         if (qstrcmp(argv[i], "--export-sheet") == 0 && qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM"))
             qputenv("QT_QPA_PLATFORM", "offscreen");
+    // The 3D view is a native OpenGL window. Without this, Qt turns every one of its siblings (the
+    // toolbars, the status strip) into native windows too; those then paint blank or get overdrawn by
+    // the 3D surface on scaled displays (owner feedback: invisible status/proposal bars, black gap).
+    QApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings);
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("KimBim"));
     QApplication::setOrganizationName(QStringLiteral("KimBim")); // QSettings: the window layout (D71)
