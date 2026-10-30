@@ -4,8 +4,6 @@
 
 KimBim is a desktop BIM application for Windows and Linux built on open standards (IFC). Model your building, cut through it, manage object data, reuse libraries and produce drawings. Then save versions, explore design options, compare them and combine them, the way software developers use Git, but for buildings.
 
-> Status: **early development.** Slice 1 works: versioned IFC projects from the command line. The desktop app comes next. Design docs: [docs/README.md](docs/README.md).
-
 ## Try the desktop app
 
 ```bash
@@ -16,8 +14,6 @@ pixi run app -- --self-test model.ifc --screenshot shot.png   # load, measure fp
 pixi run app -- --self-test model.ifc --create-drawings --open-drawing "South Elevation"   # time a drawing
 pixi run m4                       # M4 exit test: the sample house's sheet exported to build/m4/house-A01.pdf and checked
 ```
-
-Open an IFC file. It appears progressively in the 3D view, with the spatial tree on the left and properties on the right.
 
 | Action | How |
 |---|---|
