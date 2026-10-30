@@ -1514,6 +1514,84 @@ def assistant_key_set(provider: str) -> str:
     return assistant.key_set(provider)
 
 
+def agent_sessions(project: str = "", include_archived: str = "true") -> str:
+    """Stored sessions (D111): the Assistant's picker and the CLI. Without `project`, the open document's."""
+    from .agent import sessions
+
+    try:
+        return _dump({"ok": True, "result": sessions.list_sessions(project, str(include_archived).lower()
+                                                                   not in ("false", "0", "no"))})
+    except sessions.AgentError as ex:
+        return _dump(ex.envelope())
+    except OSError as ex:
+        return _dump({"ok": False, "error": {"code": "bridge_error", "message": str(ex)}})
+
+
+def agent_session_new(project: str = "", title: str = "", provider: str = "", model: str = "") -> str:
+    from .agent import sessions
+
+    try:
+        return _dump({"ok": True, "result": sessions.create(project, title, provider, model)})
+    except sessions.AgentError as ex:
+        return _dump(ex.envelope())
+
+
+def agent_session_load(session_id: str) -> str:
+    from .agent import sessions
+
+    try:
+        return _dump({"ok": True, "result": sessions.load(session_id)})
+    except sessions.AgentError as ex:
+        return _dump(ex.envelope())
+
+
+def agent_session_rename(session_id: str, title: str) -> str:
+    from .agent import sessions
+
+    try:
+        return _dump({"ok": True, "result": sessions.rename(session_id, title)})
+    except sessions.AgentError as ex:
+        return _dump(ex.envelope())
+
+
+def agent_session_archive(session_id: str) -> str:
+    from .agent import sessions
+
+    try:
+        return _dump({"ok": True, "result": sessions.archive(session_id)})
+    except sessions.AgentError as ex:
+        return _dump(ex.envelope())
+
+
+def agent_session_restore(session_id: str) -> str:
+    from .agent import sessions
+
+    try:
+        return _dump({"ok": True, "result": sessions.restore(session_id)})
+    except sessions.AgentError as ex:
+        return _dump(ex.envelope())
+
+
+def agent_session_delete(session_id: str, confirm: str = "", branch: str = "") -> str:
+    from .agent import sessions
+
+    try:
+        out = sessions.delete(session_id, confirm=str(confirm).lower() in ("true", "1", "yes"),
+                              branch=str(branch).lower() in ("true", "1", "yes"))
+        return _dump({"ok": True, "result": out})
+    except sessions.AgentError as ex:
+        return _dump(ex.envelope())
+
+
+def agent_session_fork(session_id: str, title: str = "") -> str:
+    from .agent import sessions
+
+    try:
+        return _dump({"ok": True, "result": sessions.fork(session_id, title)})
+    except sessions.AgentError as ex:
+        return _dump(ex.envelope())
+
+
 def agent_connect_info(client: str, project: str = "") -> str:
     """The configuration or command for `kimbim setup <client> --print` (Help › Connect an AI agent)."""
     from .agent import clients
