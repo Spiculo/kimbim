@@ -32,6 +32,7 @@ MARGIN = 10.0
 TITLE_W, TITLE_H = 180.0, 50.0
 TITLE_BLOCK = "title_block"
 TITLE_FIELDS = ("project", "project_number", "client", "address", "title", "sheet_number", "scale", "date", "issued")
+_HEX = re.compile(r"#[0-9a-fA-F]{6}")
 
 
 def _x3() -> bool:
@@ -224,7 +225,8 @@ def sheets() -> str:
                 p = _placement(ref)
                 legends.append({"id": _link(ref), "x": p["x"], "y": p["y"], "w": round(lw, 3), "h": round(lh, 3)})
         out.append({"number": _number(sheet), "title": sheet.Name or "", "paper": sheet.Scope or "A1",
-                    "width": w, "height": h, "views": views, "legends": legends,
+                    "width": w, "height": h, "background": _sheet_data(sheet).get("background") or "#ffffff",
+                    "views": views, "legends": legends,
                     "symbols": _symbol_listing(sheet), "title_block": _title_block_listing(sheet)})
     return B._dump({"sheets": out})
 
@@ -309,6 +311,86 @@ def edit_sheet(number: str, changes_json: str) -> str:
         return 1
 
     return B._dump(B._run(action, affects_drawings=False))
+
+
+def update_sheet(number: str, changes_json: str) -> str:
+    """The sheet settings dialog's one undo step: {title, number, paper, background,
+    placements: {drawing guid: {scale}}, removed: [drawing guid]}."""
+    sheet = _sheet(number) if B._model is not None else None
+    if sheet is None:
+        return A._fail("unknown sheet")
+    try:
+        changes = json.loads(changes_json or "{}")
+    except ValueError as ex:
+        return A._fail(f"bad input: {ex}")
+    if not isinstance(changes, dict):
+        return A._fail("bad input: expected an object")
+    new_number = str(changes.get("number") or number).strip()
+    if not new_number:
+        return A._fail("bad sheet number")
+    if new_number != number and _sheet(new_number) is not None:
+        return A._fail("that sheet number is taken")
+    paper = changes.get("paper")
+    if paper is not None and paper not in PAPERS:
+        return A._fail("unknown paper size")
+    background = changes.get("background")
+    if background is not None and not (isinstance(background, str) and _HEX.fullmatch(background)):
+        return A._fail("bad background colour")
+    scales = {}
+    placements = changes.get("placements") or {}
+    if not isinstance(placements, dict):
+        return A._fail("bad placements")
+    for guid, placement in placements.items():
+        try:
+            scale = int((placement or {}).get("scale"))
+        except (TypeError, ValueError, AttributeError):
+            return A._fail("bad scale")
+        if scale <= 0:
+            return A._fail("bad scale")
+        scales[str(guid)] = scale
+    removed = changes.get("removed") or []
+    if not isinstance(removed, list):
+        return A._fail("bad removals")
+    removed = {str(g) for g in removed}
+
+    def action():
+        attributes = {}
+        if "title" in changes:
+            attributes["Name"] = str(changes["title"] or "").strip() or None
+        if new_number != number:
+            attributes[_number_attr()] = new_number
+        if paper:
+            attributes["Scope"] = paper
+        if attributes:
+            ifcopenshell.api.document.edit_information(B._model, information=sheet, attributes=attributes)
+        data = _sheet_data(sheet)
+        if "background" in changes:
+            if background and background.lower() != "#ffffff":
+                data["background"] = background.lower()
+            else:
+                data.pop("background", None)
+        _write_sheet_data(sheet, data)
+        for guid, ref in ((_link(r), r) for r in _views(sheet)):
+            if guid in removed:
+                ifcopenshell.api.document.remove_reference(B._model, reference=ref)
+            elif guid in scales:
+                p = _placement(ref)
+                p["scale"] = scales[guid]
+                payload = json.dumps({"x": round(p["x"], 3), "y": round(p["y"], 3), "scale": p["scale"]})
+                for name, value in _data_fields(payload).items():
+                    setattr(ref, name, value)
+        if new_number != number:  # the purpose override follows the sheet
+            from . import settings as S
+
+            current = S.current()
+            purposes = dict(current.get("sheet_purposes", {}))
+            if number in purposes:
+                purposes[new_number] = purposes.pop(number)
+                current["sheet_purposes"] = purposes
+                S.restore(current)
+        return 1
+
+    return B._dump({**B._run_settings(action, affects_drawings=False), "number": new_number})
 
 
 def delete_sheet(number: str) -> str:
@@ -431,6 +513,63 @@ def set_placed_scale(number: str, drawing_guid: str, scale) -> str:
     if scale <= 0:
         return A._fail("bad scale")
     return _edit_placed(number, drawing_guid, lambda p: p.update(scale=scale))
+
+
+def update_placed(number: str, drawing_guid: str, changes_json: str) -> str:
+    """The placed drawing's settings in one undo step: {x, y, scale, title}. A new title renames the
+    drawing itself; a move or a new scale does not make its generated linework stale."""
+    sheet = _sheet(number) if B._model is not None else None
+    ref = next((r for r in _views(sheet) if _link(r) == drawing_guid), None) if sheet else None
+    if ref is None:
+        return A._fail("the drawing is not on that sheet")
+    drawing = D._drawing(drawing_guid)
+    if drawing is None:
+        return A._fail("not a drawing")
+    changes = _symbol_options(changes_json)
+    if changes is None:
+        return A._fail("bad input")
+    try:
+        if "x" in changes:
+            changes["x"] = float(changes["x"])
+        if "y" in changes:
+            changes["y"] = float(changes["y"])
+        if "scale" in changes:
+            changes["scale"] = int(changes["scale"])
+            if changes["scale"] <= 0:
+                return A._fail("bad scale")
+    except (TypeError, ValueError):
+        return A._fail("bad position or scale")
+    title = None
+    if "title" in changes:
+        title = str(changes["title"] or "").strip()
+        if not title:
+            return A._fail("type a name")
+
+    def action():
+        p = _placement(ref)
+        if "x" in changes:
+            p["x"] = round(changes["x"], 3)
+        if "y" in changes:
+            p["y"] = round(changes["y"], 3)
+        if "scale" in changes:
+            p["scale"] = changes["scale"]
+        payload = json.dumps({"x": p["x"], "y": p["y"], "scale": p["scale"]})
+        for name, value in _data_fields(payload).items():
+            setattr(ref, name, value)
+        if title is not None:
+            drawing.Name = title
+        return 1
+
+    return B._dump(B._run(action, affects_drawings=title is not None))
+
+
+def remove_drawing_placements(guid: str) -> None:
+    """Remove every sheet reference that places this drawing (its sheets would otherwise keep a broken
+    view). Called inside delete_drawing's undo step."""
+    for sheet in _sheets():
+        for ref in list(_views(sheet)):
+            if _link(ref) == guid:
+                ifcopenshell.api.document.remove_reference(B._model, reference=ref)
 
 
 def remove_placed(number: str, drawing_guid: str) -> str:
@@ -1017,11 +1156,12 @@ def sheet_svg(number: str) -> str:
             p = _placement(ref)
             parts.append(f'<g class="kimbim-legend" transform="translate({p["x"]:.3f} {p["y"]:.3f})">\n{body}\n</g>')
     parts += symbols_svg(sheet)  # D87: north arrows, scale bars, revision clouds
+    background = _sheet_data(sheet).get("background") or "#ffffff"
     frame = [f'<rect x="{MARGIN}" y="{MARGIN}" width="{width - 2 * MARGIN}" height="{height - 2 * MARGIN}" '
              f'fill="none" stroke="#000" stroke-width="0.7"/>']
     svg = (f'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '
            f'width="{width}mm" height="{height}mm" viewBox="0 0 {width} {height}">\n'
-           + "\n".join(styles) + '\n<rect x="0" y="0" width="100%" height="100%" fill="#ffffff"/>\n'
+           + "\n".join(styles) + f'\n<rect x="0" y="0" width="100%" height="100%" fill="{_esc(background)}"/>\n'
            + "\n".join(frame + parts) + '\n<g class="kimbim-title-block" font-family="sans-serif" fill="#000">\n'
            + "\n".join(_title_block(sheet, width, height, info)) + "\n</g>\n</svg>\n")
     return B._dump({"ok": True, "svg": svg, "width": width, "height": height})

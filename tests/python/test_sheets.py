@@ -90,6 +90,66 @@ def test_sheets_are_numbered_and_hold_drawings_at_scale(house):
     assert call("undo")["ok"] and len(call("sheets")["sheets"]) == 3
 
 
+def test_sheet_settings_change_its_data_and_background(house):
+    before = _sheet_of("A01")
+    r = call("update_sheet", "A01", json.dumps({"title": "Ground plans", "number": "B01", "paper": "A3",
+                                                "background": "#f4f0e6"}))
+    assert r["ok"], r
+    assert r["number"] == "B01"
+    sheet = _sheet_of("B01")
+    assert sheet["title"] == "Ground plans" and sheet["paper"] == "A3"
+    assert sheet["background"] == "#f4f0e6"
+    assert 'fill="#f4f0e6"' in call("sheet_svg", "B01")["svg"]
+    # One undo step puts the number, title, paper and colour back.
+    assert call("undo")["ok"]
+    back = _sheet_of("A01")
+    assert (back["title"], back["paper"], back["background"]) == (before["title"], before["paper"], "#ffffff")
+
+
+def test_sheet_settings_rescale_and_remove_placed_drawings(house):
+    sheet = _sheet_of("A01")
+    guid = sheet["views"][0]["drawing"]
+    assert call("update_sheet", "A01", json.dumps({"placements": {guid: {"scale": 50}}}))["ok"]
+    view = next(v for v in _sheet_of("A01")["views"] if v["drawing"] == guid)
+    assert view["scale"] == 50
+    assert call("update_sheet", "A01", json.dumps({"removed": [guid]}))["ok"]
+    assert all(v["drawing"] != guid for v in _sheet_of("A01")["views"])
+    assert call("undo")["ok"]  # the removal and the scale change are undoable on their own
+    assert any(v["drawing"] == guid for v in _sheet_of("A01")["views"])
+
+
+def test_placed_drawing_settings_move_rescale_and_retitle(house):
+    sheet = _sheet_of("A01")
+    guid = sheet["views"][0]["drawing"]
+    before = next(v for v in sheet["views"] if v["drawing"] == guid)
+    r = call("update_placed", "A01", guid, json.dumps({"x": 25, "y": 30, "scale": 50,
+                                                       "title": "Ground floor"}))
+    assert r["ok"], r
+    after = next(v for v in _sheet_of("A01")["views"] if v["drawing"] == guid)
+    assert (after["x"], after["y"], after["scale"]) == (25, 30, 50)
+    assert after["name"] == "Ground floor"
+    assert call("undo")["ok"]
+    back = next(v for v in _sheet_of("A01")["views"] if v["drawing"] == guid)
+    assert (back["name"], back["scale"]) == (before["name"], before["scale"])
+
+
+def test_deleting_a_drawing_removes_it_from_its_sheets(house):
+    guid = _sheet_of("A01")["views"][0]["drawing"]
+    assert call("delete_drawing", guid)["ok"]
+    assert all(v["drawing"] != guid for s in call("sheets")["sheets"] for v in s["views"])
+    assert call("undo")["ok"]  # the view goes back with the drawing
+    assert any(v["drawing"] == guid for s in call("sheets")["sheets"] for v in s["views"])
+
+
+def test_deleting_a_drawing_as_an_element_also_clears_its_sheets(house):
+    guid = _sheet_of("A01")["views"][0]["drawing"]
+    deleted = call("delete_elements", json.dumps([guid]))
+    assert deleted["ok"], deleted
+    assert all(v["drawing"] != guid for s in call("sheets")["sheets"] for v in s["views"])
+    assert call("undo")["ok"]
+    assert any(v["drawing"] == guid for s in call("sheets")["sheets"] for v in s["views"])
+
+
 def test_listing_sheets_after_an_edit_never_generates_drawings(house, monkeypatch):
     """sheets() runs on the GUI thread after every edit. It measured each placed drawing at the new model
     state by generating it (52 s for a real elevation); it now reuses the last size until the background

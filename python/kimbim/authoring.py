@@ -396,6 +396,11 @@ def _delete_cascade(elements) -> tuple:
                 openings.append(opening)
             for void in getattr(opening, "VoidsElements", ()) or ():
                 hosts.append(void.RelatingBuildingElement)
+    from . import sheets
+
+    for e in elements:
+        if drawgen.is_drawing(e):  # deleting a section/elevation marker also takes it off its sheets
+            sheets.remove_drawing_placements(e.GlobalId)
     removed = [e.GlobalId for e in elements]
     neighbours = []
     for e in elements:

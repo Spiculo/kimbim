@@ -31,6 +31,7 @@ signals:
     void newRequested(const QString& paper);
     void openRequested(const QString& number);
     void placeRequested(const QString& number);
+    void settingsRequested(const QString& number); // title, number, paper, background, placed drawings
     void legendRequested(const QString& number); // D74: place a legend of the sheet's purpose
     void symbolRequested(const QString& number, const QString& kind); // D87: north, scalebar, cloud
     void deleteRequested(const QString& number);

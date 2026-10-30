@@ -1162,6 +1162,8 @@ _EXPORTS = {
         "set_sheet_purpose",
         "sheet_svg",
         "sheets",
+        "update_placed",
+        "update_sheet",
         "place_legend",
         "move_legend",
         "remove_legend",

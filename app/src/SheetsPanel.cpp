@@ -25,12 +25,16 @@ SheetsPanel::SheetsPanel(QWidget* parent)
     menu->addAction(tr("A1 sheet"), this, [this] { emit newRequested(QStringLiteral("A1")); });
     menu->addAction(tr("A3 sheet"), this, [this] { emit newRequested(QStringLiteral("A3")); });
     add->setMenu(menu);
-    auto* place = new QPushButton(tr("Place drawing"), this);
-    place->setToolTip(tr("Place the drawing selected in the Drawings panel on this sheet"));
+    auto* place = new QPushButton(tr("Place drawing..."), this);
+    place->setObjectName(QStringLiteral("sheetPlaceDrawing"));
+    place->setToolTip(tr("Choose a drawing and its scale in a dialog"));
+    auto* settings = new QPushButton(tr("Settings..."), this);
+    settings->setObjectName(QStringLiteral("sheetSettings"));
+    settings->setToolTip(tr("The sheet's title, number, paper and background, and its placed drawings"));
     auto* open = new QPushButton(tr("Open"), this);
     auto* remove = new QPushButton(tr("Delete"), this);
     auto* buttons = new QHBoxLayout;
-    for (QPushButton* b : {add, place, open, remove})
+    for (QPushButton* b : {add, place, settings, open, remove})
         buttons->addWidget(b);
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(2, 2, 2, 2);
@@ -46,6 +50,10 @@ SheetsPanel::SheetsPanel(QWidget* parent)
         if (!selectedSheet().isEmpty())
             emit placeRequested(selectedSheet());
     });
+    connect(settings, &QPushButton::clicked, this, [this] {
+        if (!selectedSheet().isEmpty())
+            emit settingsRequested(selectedSheet());
+    });
     m_list->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(m_list, &QListWidget::customContextMenuRequested, this, [this](const QPoint& at) {
         const QListWidgetItem* item = m_list->itemAt(at);
@@ -53,6 +61,9 @@ SheetsPanel::SheetsPanel(QWidget* parent)
             return;
         QMenu menu(this);
         const QString number = item->data(NumberRole).toString();
+        menu.addAction(tr("Sheet settings..."), this, [this, number] { emit settingsRequested(number); });
+        menu.addAction(tr("Place drawing..."), this, [this, number] { emit placeRequested(number); });
+        menu.addSeparator();
         QMenu* purposes = purposeMenu(number);
         purposes->setParent(&menu, purposes->windowFlags());
         menu.addMenu(purposes);
