@@ -422,6 +422,22 @@ def _elements(guids_json: str) -> list:
     return out
 
 
+def _model_content(elements) -> list:
+    """GlobalIds of edited elements that live in a KimBim model: editing them must refresh every
+    placement, even when the edit has no geometry (a name, a property)."""
+    from . import authoring as A
+
+    out = []
+    for e in elements:
+        try:
+            storey = ifcopenshell.util.element.get_container(e)
+        except Exception:  # noqa: BLE001  (not a product)
+            continue
+        if storey is not None and A._is_model(storey):
+            out.append(e.GlobalId)
+    return out
+
+
 def _schema():
     import ifcopenshell.ifcopenshell_wrapper as W
 
@@ -584,7 +600,7 @@ def set_property(guids_json: str, pset: str, prop: str, value_json: str) -> str:
         for e, ifc_type, converted in plan:
             ps = _own_pset(e, pset) or ifcopenshell.api.pset.add_pset(_model, product=e, name=pset)
             ifcopenshell.api.pset.edit_pset(_model, pset=ps, properties={prop: _model.create_entity(ifc_type, converted)})
-        return len(plan)
+        return len(plan), _model_content([e for e, _, _ in plan]), []
 
     try:
         return _dump(_run(action))
@@ -701,7 +717,7 @@ def set_name(guids_json: str, name: str) -> str:
     def action():
         for e in elements:
             ifcopenshell.api.attribute.edit_attributes(_model, product=e, attributes={"Name": name})
-        return len(elements)
+        return len(elements), _model_content(elements), []
 
     return _dump(_run(action))
 
@@ -1132,6 +1148,7 @@ _EXPORTS = {
     ),
     "drawings": (
         "create_drawings",
+        "create_drawing_path",
         "create_elevation",
         "create_elevations",
         "create_plan",
@@ -1143,8 +1160,11 @@ _EXPORTS = {
         "generate_plan_drawing",
         "generate_view_drawing",
         "rename_drawing",
+        "set_drawing_base",
         "set_drawing_depth",
         "set_drawing_hlr",
+        "set_drawing_path",
+        "set_drawing_tilt",
         "set_drawing_timeout",
         "set_view_depth",
     ),
