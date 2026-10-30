@@ -17,7 +17,8 @@ struct CutPlane {
     enum class Kind { Horizontal, Vertical, Oblique };
 
     std::string name;
-    bool enabled = true;
+    bool enabled = true;  // clips the model
+    bool visible = true;  // draws its face and handle in the view (enabled or not)
     Kind kind = Kind::Oblique;
     gp_Pnt point{0, 0, 0};
     gp_Dir normal{0, 0, -1};  // points into the kept region

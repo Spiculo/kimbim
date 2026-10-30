@@ -890,6 +890,39 @@ def properties_multi(guids_json: str) -> str:
     status = {"value": statuses[0] if statuses and len(set(statuses)) == 1 else None, "varies": len(set(statuses)) > 1}
     names = [e.Name or "" for e in elements]
     same_name = all(n == names[0] for n in names)
+    # Sections and elevations: a small, friendly group for their path and cut plane. The raw
+    # KIMBIM_Drawing properties stay too (they are IFC data), but these edit through the drawing's
+    # own operations, so the placement and the generated drawing follow.
+    settings = []
+    if elements and all(e.is_a("IfcAnnotation") and e.ObjectType == "DRAWING" for e in elements):
+        from . import drawgen as _drawgen
+
+        settings = [_drawgen.settings_of(e) for e in elements]
+    if settings and all(s is not None and s.get("kind") != "plan" for s in settings):
+        def shared(get, ifc_type, editable=True, source="drawing"):
+            values = [get(s) for s in settings]
+            varies = any(v != values[0] for v in values)
+            return {"value": None if varies else values[0], "varies": varies, "ifc_type": ifc_type,
+                    "editable": editable, "source": source, "type_value": None}
+
+        def shape_of(s):
+            if any(abs(b) > 1e-9 for b in s.get("bulges") or []):
+                return "Curved"
+            return "Bent" if len(s.get("points") or []) > 2 else "Straight"
+
+        section = {
+            "Tilt (°)": shared(lambda s: round(float(s.get("tilt", 0.0)), 6), "IfcPlaneAngleMeasure"),
+            "Base (m)": shared(lambda s: round(float(s.get("base", 0.0)), 6), "IfcLengthMeasure"),
+            "Depth (m)": shared(lambda s: -1.0 if s.get("depth") is None else float(s["depth"]),
+                                "IfcLengthMeasure"),
+            "Vertices": shared(lambda s: len(s.get("points") or []), "IfcInteger", editable=False),
+            "Shape": shared(shape_of, "IfcLabel", editable=False),
+        }
+        psets = {"Section": section, **psets}
+        raw = psets.get("KIMBIM_Drawing")
+        if raw:  # the friendly group above stands for these
+            for key in ("Path", "Bulges", "Tilt", "Base", "Depth"):
+                raw.pop(key, None)
     payload = {
         "count": len(elements),
         "guids": [e.GlobalId for e in elements],

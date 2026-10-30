@@ -674,7 +674,7 @@ def level_markers(f, drawing, s, svg: str, to_paper) -> list:
     from . import drawgen as G
 
     m = re.search(r'viewBox="([-\d.]+) ([-\d.]+) ([\d.]+) ([\d.]+)"', svg)
-    if m is None or len(s.get("points") or []) != 2:
+    if m is None or len(s.get("points") or []) < 2:
         return []
     vx, vw = float(m.group(1)), float(m.group(3))
     x0, y0 = s["points"][0]

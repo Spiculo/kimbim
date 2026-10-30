@@ -671,6 +671,153 @@ QJsonObject Viewport::viewGeometry(const QStringList& guids, const gp_Ax2& view,
     return finishViewGeometry(ax3, proj, section);
 }
 
+namespace {
+
+// The part of a line where lo <= x <= hi (Liang-Barsky on x only).
+bool clipLineX(QPointF a, QPointF b, double lo, double hi, QPointF* a2, QPointF* b2)
+{
+    double t0 = 0.0, t1 = 1.0;
+    const double dx = b.x() - a.x();
+    auto accept = [&](double p, double q) {
+        if (std::abs(p) < 1e-12)
+            return q >= 0.0;
+        const double r = q / p;
+        if (p < 0) {
+            if (r > t1)
+                return false;
+            if (r > t0)
+                t0 = r;
+        } else {
+            if (r < t0)
+                return false;
+            if (r < t1)
+                t1 = r;
+        }
+        return true;
+    };
+    if (!accept(-dx, a.x() - lo) || !accept(dx, hi - a.x()) || t1 < t0)
+        return false;
+    *a2 = a + (b - a) * t0;
+    *b2 = a + (b - a) * t1;
+    return std::hypot(b2->x() - a2->x(), b2->y() - a2->y()) > 1e-12;
+}
+
+// Sutherland-Hodgman against one vertical bound (`keepAbove`: x >= bound, else x <= bound).
+QVector<QPointF> clipPolyX(const QVector<QPointF>& poly, double bound, bool keepAbove)
+{
+    QVector<QPointF> out;
+    if (poly.isEmpty())
+        return out;
+    const int n = poly.size();
+    for (int i = 0; i < n; ++i) {
+        const QPointF p = poly[i], q = poly[(i + 1) % n];
+        const bool pin = keepAbove ? p.x() >= bound : p.x() <= bound;
+        const bool qin = keepAbove ? q.x() >= bound : q.x() <= bound;
+        if (pin)
+            out << p;
+        if (pin != qin) {
+            const double t = (bound - p.x()) / (q.x() - p.x());
+            out << QPointF(bound, p.y() + (q.y() - p.y()) * t);
+        }
+    }
+    return out;
+}
+
+// D110: the model's bounds narrowed to one strip's window, so its hidden-line image has the strip's
+// resolution (a curved facade can otherwise be 1% of a whole-building image).
+Bnd_Box stripBounds(const Bnd_Box& model, const gp_Ax2& view, double width)
+{
+    if (model.IsVoid())
+        return model;
+    double x0, y0, z0, x1, y1, z1;
+    model.Get(x0, y0, z0, x1, y1, z1);
+    const gp_Ax3 ax3(view);
+    const gp_Pnt o = ax3.Location();
+    const gp_Dir ux = ax3.XDirection(), uy = ax3.YDirection(), uz = ax3.Direction();
+    double loX = 1e30, hiX = -1e30, loY = 1e30, hiY = -1e30, loZ = 1e30, hiZ = -1e30;
+    for (double x : {x0, x1})
+        for (double y : {y0, y1})
+            for (double z : {z0, z1}) {
+                const gp_Vec v(o, gp_Pnt(x, y, z));
+                const double px = v.Dot(gp_Vec(ux)), py = v.Dot(gp_Vec(uy)), pz = v.Dot(gp_Vec(uz));
+                loX = std::min(loX, px); hiX = std::max(hiX, px);
+                loY = std::min(loY, py); hiY = std::max(hiY, py);
+                loZ = std::min(loZ, pz); hiZ = std::max(hiZ, pz);
+            }
+    const double half = width / 2.0;
+    loX = std::max(loX, -half);
+    hiX = std::min(hiX, half);
+    if (loX >= hiX) { // the strip lies beside the model: keep its window, the image will be empty
+        loX = -half;
+        hiX = half;
+    }
+    Bnd_Box box;
+    for (double x : {loX, hiX})
+        for (double y : {loY, hiY})
+            for (double z : {loZ, hiZ})
+                box.Add(gp_Pnt(o.X() + ux.X() * x + uy.X() * y + uz.X() * z,
+                    o.Y() + ux.Y() * x + uy.Y() * y + uz.Y() * z,
+                    o.Z() + ux.Z() * x + uy.Z() * y + uz.Z() * z));
+    return box;
+}
+
+} // namespace
+
+QJsonObject Viewport::viewGeometryFolded(const QStringList& guids, const QVector<FoldStrip>& strips,
+    const Bnd_Box& bounds)
+{
+    QJsonArray projOut, cutOut, stripsOut;
+    double offset = 0.0;
+    QJsonArray firstView;
+    for (const FoldStrip& strip : strips) {
+        const double lo = -strip.width / 2.0, hi = strip.width / 2.0;
+        const double shift = offset + strip.width / 2.0;
+        const Bnd_Box stripBox = stripBounds(bounds, strip.view, strip.width);
+        const QJsonObject g = viewGeometry(guids, strip.view, strip.section ? &strip.cut : nullptr, stripBox);
+        if (firstView.isEmpty())
+            firstView = g.value("view").toArray();
+        for (const auto& v : g.value("proj").toArray()) {
+            const QJsonObject entry = v.toObject();
+            QJsonArray lines;
+            for (const auto& l : entry.value("lines").toArray()) {
+                const QJsonArray p = l.toArray();
+                if (p.size() != 4)
+                    continue;
+                QPointF a(p[0].toDouble(), p[1].toDouble()), b(p[2].toDouble(), p[3].toDouble()), a2, b2;
+                if (!clipLineX(a, b, lo, hi, &a2, &b2))
+                    continue;
+                lines.append(QJsonArray{a2.x() + shift, a2.y(), b2.x() + shift, b2.y()});
+            }
+            if (!lines.isEmpty())
+                projOut.append(QJsonObject{{"guid", entry.value("guid")}, {"lines", lines}});
+        }
+        for (const auto& v : g.value("cut").toArray()) {
+            const QJsonObject entry = v.toObject();
+            QJsonArray loops;
+            for (const auto& l : entry.value("loops").toArray()) {
+                QVector<QPointF> poly;
+                for (const auto& q : l.toArray())
+                    poly << QPointF(q.toArray().at(0).toDouble(), q.toArray().at(1).toDouble());
+                poly = clipPolyX(clipPolyX(poly, lo, true), hi, false);
+                if (poly.size() < 3)
+                    continue;
+                QJsonArray loop;
+                for (const QPointF& q : poly)
+                    loop.append(QJsonArray{q.x() + shift, q.y()});
+                loops.append(loop);
+            }
+            if (!loops.isEmpty()) {
+                QJsonObject out{{"guid", entry.value("guid")}, {"loops", loops}};
+                out.insert(QStringLiteral("strip"), stripsOut.size()); // for the layers' world mapping
+                cutOut.append(out);
+            }
+        }
+        stripsOut.append(QJsonObject{{"view", g.value("view")}, {"x", shift}});
+        offset += strip.width;
+    }
+    return QJsonObject{{"proj", projOut}, {"cut", cutOut}, {"view", firstView}, {"strips", stripsOut}};
+}
+
 QJsonObject Viewport::finishViewGeometry(const gp_Ax3& ax3, const QJsonArray& proj, const gp_Pln* section) const
 {
     QJsonArray cut;
@@ -837,10 +984,44 @@ void Viewport::paintEvent(QPaintEvent*)
     }
 }
 
+void Viewport::recreateWindow()
+{
+    if (m_view->Window().IsNull())
+        return;
+    m_view->SetWindow(Handle(Aspect_Window)());
+    ensureWindow();
+    update();
+}
+
+void Viewport::ensureWindowSize()
+{
+    if (m_view->Window().IsNull())
+        return;
+    m_view->MustBeResized();
+    // A tab hidden while the window was resized can keep the old native window size; when shown again
+    // the model is drawn off-centre with a black gap above it and clicks no longer line up. If the size
+    // still does not match, attach a fresh native window.
+    int ww = 0, hh = 0;
+    m_view->Window()->Size(ww, hh);
+    const double dpr = devicePixelRatioF();
+    if (ww != int(std::lround(width() * dpr)) || hh != int(std::lround(height() * dpr)))
+        recreateWindow();
+}
+
 void Viewport::resizeEvent(QResizeEvent*)
 {
     if (!m_view->Window().IsNull())
         m_view->MustBeResized();
+    // After the layout settles, check that the native window took the new size.
+    QTimer::singleShot(0, this, [this] { ensureWindowSize(); });
+}
+
+void Viewport::showEvent(QShowEvent* event)
+{
+    QWidget::showEvent(event);
+    if (!m_view->Window().IsNull())
+        m_view->MustBeResized(); // a tab hidden while the window was resized kept the old viewport
+    QTimer::singleShot(0, this, [this] { ensureWindowSize(); });
 }
 
 NCollection_Vec2<int> Viewport::toPixels(const QPointF& p) const
@@ -1496,18 +1677,20 @@ private:
     gp_Pnt at(QPointF p) const { return gp_Pnt(p.x(), p.y(), m_z); }
     bool isMarker() const
     {
-        return (m_a.kind == QLatin1String("section") || m_a.kind == QLatin1String("elevation")) && m_a.points.size() == 3;
+        return (m_a.kind == QLatin1String("section") || m_a.kind == QLatin1String("elevation")) && m_a.points.size() >= 3;
     }
-    // A marker's line direction u and the unit normal n towards the side it looks at.
+    // A marker's line direction u and the unit normal n towards the side it looks at (first segment).
     bool markerFrame(QPointF* u, QPointF* n) const
     {
+        if (m_a.points.size() < 3)
+            return false;
         const QPointF a = m_a.points[0], b = m_a.points[1], d = b - a;
         const double len = std::hypot(d.x(), d.y());
         if (len < 1e-9)
             return false;
         *u = d / len;
         *n = QPointF(-u->y(), u->x());
-        if (QPointF::dotProduct(m_a.points[2] - a, *n) < 0)
+        if (QPointF::dotProduct(m_a.points.last() - a, *n) < 0)
             *n = -*n;
         return true;
     }
@@ -1563,8 +1746,10 @@ private:
             return at(m_a.points.last() + QPointF(0.1, 0));
         QPointF u, n;
         if (isMarker() && markerFrame(&u, &n)) { // the name beside the start of the line, behind it
-            return m_a.kind == QLatin1String("section") ? at(m_a.points[0] - u * 0.6)
-                                                        : at((m_a.points[0] + m_a.points[1]) / 2 - n * 0.6);
+            const QPointF last = m_a.points[m_a.points.size() - 2];
+            return m_a.kind == QLatin1String("section")
+                ? at(m_a.points[0] - u * 0.6)
+                : at((m_a.points[0] + last) * 0.5 - n * 0.6);
         }
         return m_a.points.isEmpty() ? gp_Pnt(0, 0, m_z) : at(m_a.points.first());
     }
@@ -1598,21 +1783,67 @@ private:
                 out.push_back({at(tip), at(tip + v * 0.25 - w * 0.08)});
             }
         } else if (QPointF u, n; isMarker() && markerFrame(&u, &n)) {
-            const QPointF a = m_a.points[0], b = m_a.points[1];
+            const QVector<QPointF> path = m_a.points.mid(0, m_a.points.size() - 1);
+            if (!m_a.curves.isEmpty()) {
+                for (const auto& curve : m_a.curves)
+                    for (int i = 0; i + 1 < curve.size(); ++i)
+                        out.push_back({at(curve[i]), at(curve[i + 1])});
+            } else {
+                for (int i = 0; i + 1 < path.size(); ++i)
+                    out.push_back({at(path[i]), at(path[i + 1])});
+            }
+            auto segNormal = [&](int i) {
+                const QPointF d = path[i + 1] - path[i];
+                const double len = std::hypot(d.x(), d.y());
+                QPointF sn = len < 1e-9 ? n : QPointF(-d.y() / len, d.x() / len);
+                if (QPointF::dotProduct(sn, n) < 0)
+                    sn = -sn;
+                return sn;
+            };
             if (m_a.kind == QLatin1String("section")) {
-                out.push_back({at(a), at(b)});
                 // Archicad-style: a flag at each end with an arrow towards the side looked at.
-                for (const QPointF& e : {a, b}) {
-                    const QPointF tip = e + n * 0.8;
-                    out.push_back({at(e), at(tip)});
-                    out.push_back({at(tip), at(tip - n * 0.25 + u * 0.15)});
-                    out.push_back({at(tip), at(tip - n * 0.25 - u * 0.15)});
+                const QPointF dLast = path.last() - path[path.size() - 2];
+                const double lenLast = std::hypot(dLast.x(), dLast.y());
+                const QPointF dirLast = lenLast > 1e-9 ? dLast / lenLast : u;
+                struct End { QPointF e, dir, sn; };
+                const End ends[] = {{path.first(), u, segNormal(0)},
+                    {path.last(), dirLast, segNormal(std::max(0, int(path.size()) - 2))}};
+                for (const End& end : ends) {
+                    const QPointF tip = end.e + end.sn * 0.8;
+                    out.push_back({at(end.e), at(tip)});
+                    out.push_back({at(tip), at(tip - end.sn * 0.25 + end.dir * 0.15)});
+                    out.push_back({at(tip), at(tip - end.sn * 0.25 - end.dir * 0.15)});
                 }
-            } else { // elevation (Archicad): the marker, a triangle pointing where it looks, and the
-                     // ends of its range as short ticks, without the full line
-                for (const QPointF& e : {a, b})
+                for (int i = 1; i + 1 < path.size(); ++i) { // a tick at each bend
+                    const QPointF sn = segNormal(i);
+                    out.push_back({at(path[i]), at(path[i] + sn * 0.35)});
+                }
+            } else { // elevation (Archicad): a triangle pointing where it looks, ends as short ticks
+                for (const QPointF& e : {path.first(), path.last()})
                     out.push_back({at(e), at(e + n * 0.4)});
-                const QPointF m = (a + b) / 2, tip = m + n * 0.6, l = m - u * 0.4, r = m + u * 0.4;
+                const QVector<QPointF> line = m_a.curves.isEmpty() ? path : m_a.curves.first();
+                double total = 0.0;
+                for (int i = 0; i + 1 < line.size(); ++i)
+                    total += std::hypot(line[i + 1].x() - line[i].x(), line[i + 1].y() - line[i].y());
+                double walked = 0.0;
+                QPointF m = (path.first() + path.last()) / 2, dir = u;
+                bool found = false;
+                for (int i = 0; !found && i + 1 < line.size(); ++i) {
+                    const QPointF d = line[i + 1] - line[i];
+                    const double len = std::hypot(d.x(), d.y());
+                    if (len < 1e-9)
+                        continue;
+                    if (walked + len >= total / 2) {
+                        m = line[i] + d * ((total / 2 - walked) / len);
+                        dir = d / len;
+                        found = true;
+                    }
+                    walked += len;
+                }
+                QPointF en(-dir.y(), dir.x());
+                if (QPointF::dotProduct(en, n) < 0)
+                    en = -en;
+                const QPointF tip = m + en * 0.6, l = m - dir * 0.4, r = m + dir * 0.4;
                 out.push_back({at(l), at(r)});
                 out.push_back({at(l), at(tip)});
                 out.push_back({at(tip), at(r)});

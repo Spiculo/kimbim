@@ -164,30 +164,53 @@ def _item_points(item):
     return []
 
 
-def camera(points, look, bounds, depth=None):
-    """Camera matrix (metres, world) and box size (w, h, d) for a marker line p1-p2 looking towards
-    `look` (a point on the side the drawing looks at). Infinite depth (None) reaches past the model."""
-    (x1, y1), (x2, y2) = points
+def marker_frame(points, look, tilt=0.0):
+    """The marker's plan frame: unit along the first segment (`d`), its horizontal look normal
+    (`n_h`), and the cut plane's normal (`n`) tilted about the line by `tilt` degrees.
+
+    The camera looks along +n: it stands on the kept side of the cut, as a section does. A positive
+    tilt lifts the normal on the same side as `direction x n_h` (the convention of Cuts.setAngle)."""
+    (x1, y1), (x2, y2) = points[0], points[1]
     dx, dy = x2 - x1, y2 - y1
     length = math.hypot(dx, dy)
     if length < 1e-6:
         raise ValueError("the marker line needs two different points")
-    nx, ny = -dy / length, dx / length
-    if (look[0] - x1) * nx + (look[1] - y1) * ny < 0:
-        nx, ny = -nx, -ny  # the normal points to the side looked at
+    d = np.array([dx / length, dy / length, 0.0])
+    n_h = np.array([-d[1], d[0], 0.0])
+    if (look[0] - x1) * n_h[0] + (look[1] - y1) * n_h[1] < 0:
+        n_h = -n_h  # the normal points to the side looked at
+    up = np.cross(d, n_h)  # = +Z for a +X line looking +Y, as in Cuts.setAngle
+    a = math.radians(tilt)
+    n = n_h * math.cos(a) + up * math.sin(a)
+    if np.linalg.norm(n) < 1e-9:
+        n = n_h
+    return d, n_h, n / np.linalg.norm(n)
+
+
+def marker_length(points) -> float:
+    """The marker's total length along its path (the unfolded width of a folded section)."""
+    return sum(math.dist(points[i], points[i + 1]) for i in range(len(points) - 1))
+
+
+def camera(points, look, bounds, depth=None, tilt=0.0):
+    """Camera matrix (metres, world) and box size (w, h, d) for a marker path looking towards `look`
+    (a point on the side the drawing looks at). Infinite depth (None) reaches past the model. For a
+    multi-segment path the camera is the first segment's; the drawing itself is unfolded by the app."""
+    _d, n_h, n = marker_frame(points, look, tilt)
+    x1, y1 = points[0]
     lo, hi = bounds
     z0, z1 = lo[2] - MARGIN, hi[2] + MARGIN
     if depth is None:
         corners = [(x, y) for x in (lo[0], hi[0]) for y in (lo[1], hi[1])]
-        depth = max(0.0, *((cx - x1) * nx + (cy - y1) * ny for cx, cy in corners)) + MARGIN
+        depth = max(0.0, *((cx - x1) * n_h[0] + (cy - y1) * n_h[1] for cx, cy in corners)) + MARGIN
     depth = max(float(depth), 0.01)  # zero depth: the cut only
-    z = np.array([-nx, -ny, 0.0])  # the camera looks along -z
-    y = np.array([0.0, 0.0, 1.0])
-    x = np.cross(y, z)
+    z = -n  # the camera looks along -z (= +n)
+    x = np.array([n_h[1], -n_h[0], 0.0])  # keeps the drawing's up = world Z for a vertical section
+    y = np.cross(z, x)
     m = np.eye(4)
     m[:3, 0], m[:3, 1], m[:3, 2] = x, y, z
-    m[:3, 3] = [(x1 + x2) / 2, (y1 + y2) / 2, (z0 + z1) / 2]
-    return m, (length, z1 - z0, depth)
+    m[:3, 3] = [(points[0][0] + points[1][0]) / 2, (points[0][1] + points[1][1]) / 2, (z0 + z1) / 2]
+    return m, (marker_length(points), z1 - z0, depth)
 
 
 def marker(drawing):
@@ -212,6 +235,29 @@ def _block(drawing):
     return None
 
 
+def _json_list(value):
+    try:
+        data = json.loads(value) if isinstance(value, str) else value
+    except ValueError:
+        return []
+    return data if isinstance(data, list) else []
+
+
+def _path_world(drawing, local):
+    """Stored local marker points (u along the camera's X, v along its horizontal look normal) to
+    world plan metres. Moving or rotating the drawing moves its path with it."""
+    unit = ifcopenshell.util.unit.calculate_unit_scale(drawing.file)
+    m = ifcopenshell.util.placement.get_local_placement(drawing.ObjectPlacement)
+    o, x = m[:3, 3] * unit, m[:3, 0]
+    n = -m[:3, 2]
+    n_h = np.array([n[0], n[1], 0.0])
+    if np.linalg.norm(n_h) < 1e-9:
+        n_h = np.array([0.0, 1.0, 0.0])
+    n_h = n_h / np.linalg.norm(n_h)
+    return [[float(o[0] + x[0] * u + n_h[0] * v), float(o[1] + x[1] * u + n_h[1] * v)]
+            for u, v in local if isinstance(u, (int, float)) and isinstance(v, (int, float))]
+
+
 def settings_of(drawing) -> dict | None:
     data = ifcopenshell.util.element.get_pset(drawing, PSET) or {}
     if data.get("Kind") not in KINDS:
@@ -220,12 +266,19 @@ def settings_of(drawing) -> dict | None:
         depth = data.get("ViewDepth")
         return {"kind": "plan", "points": [], "look": [], "depth": None, "auto": True, "side": "",
                 "storey": data.get("Storey") or "", "cut": float(data.get("Cut") or PLAN_CUT),
-                "view_depth": None if depth is None or depth < 0 else float(depth)}
+                "view_depth": None if depth is None or depth < 0 else float(depth),
+                "bulges": [], "tilt": 0.0, "base": 0.0}
     points, look = marker(drawing) or ([], [])
+    stored = _json_list(data.get("Path"))
+    if len(stored) >= 2:
+        points = _path_world(drawing, stored)
+    bulges = [float(v) for v in _json_list(data.get("Bulges")) if isinstance(v, (int, float))]
+    bulges = (bulges + [0.0] * max(0, len(points) - 1))[: max(0, len(points) - 1)]
     depth = data.get("Depth")
     return {"kind": data["Kind"], "points": points, "look": look,
             "depth": None if depth is None or depth < 0 else float(depth), "auto": bool(data.get("Auto")),
-            "side": data.get("Side") or ""}
+            "side": data.get("Side") or "", "bulges": bulges,
+            "tilt": float(data.get("Tilt") or 0.0), "base": float(data.get("Base") or 0.0)}
 
 
 def auto_marker(side: str, bounds):
@@ -288,7 +341,7 @@ def place(f, drawing, s, bounds, view_depth=PLAN_DEPTH):
             raise ValueError("the drawing's story no longer exists")
         m, (w, h, d) = plan_camera(storey, s["cut"], bounds, view_depth)
     else:
-        m, (w, h, d) = camera(s["points"], s["look"], bounds, s["depth"])
+        m, (w, h, d) = camera(s["points"], s["look"], bounds, s["depth"], s.get("tilt", 0.0))
     ifcopenshell.api.geometry.edit_object_placement(f, product=drawing, matrix=m, is_si=True)
     w, h, d = (v / unit for v in (w, h, d))
     block = f.createIfcBlock(f.createIfcAxis2Placement3D(f.createIfcCartesianPoint((-w / 2, -h / 2, -d))), w, h, d)
@@ -299,11 +352,43 @@ def place(f, drawing, s, bounds, view_depth=PLAN_DEPTH):
     ifcopenshell.api.geometry.assign_representation(f, product=drawing, representation=rep)
 
 
+def store_path(f, drawing, s, points=None):
+    """Write the marker path in the drawing's own frame, so moving or rotating it carries the path
+    (a bent or curved marker is not a straight line any more)."""
+    if s["kind"] == "plan" or s.get("auto"):
+        return
+    world = points if points is not None else s.get("points") or []
+    if len(world) < 2 or drawing.ObjectPlacement is None:
+        return
+    unit = ifcopenshell.util.unit.calculate_unit_scale(f)
+    m = ifcopenshell.util.placement.get_local_placement(drawing.ObjectPlacement)
+    o, x = m[:3, 3] * unit, m[:3, 0]
+    n = -m[:3, 2]
+    n_h = np.array([n[0], n[1], 0.0])
+    if np.linalg.norm(n_h) < 1e-9:
+        n_h = np.array([0.0, 1.0, 0.0])
+    n_h = n_h / np.linalg.norm(n_h)
+    local = [[float((np.array([px, py, 0.0]) - o) @ x),
+              float((np.array([px, py, 0.0]) - o) @ n_h)] for px, py in world]
+    bulges = list(s.get("bulges") or [])
+    bulges = (bulges + [0.0] * max(0, len(world) - 1))[: max(0, len(world) - 1)]
+    pset = ifcopenshell.util.element.get_pset(drawing, PSET)
+    pset = f.by_id(pset["id"]) if pset else ifcopenshell.api.pset.add_pset(f, product=drawing, name=PSET)
+    ifcopenshell.api.pset.edit_pset(f, pset=pset, properties={
+        "Path": json.dumps([[round(u, 9), round(v, 9)] for u, v in local], separators=(",", ":")),
+        "Bulges": json.dumps([round(float(b), 9) for b in bulges], separators=(",", ":")),
+        "Tilt": float(s.get("tilt", 0.0)), "Base": float(s.get("base", 0.0))})
+
+
 def release(f, drawing):
     """A template elevation the user moved stays where it was put (no longer follows the model)."""
     pset = ifcopenshell.util.element.get_pset(drawing, PSET)
     if pset and pset.get("Auto"):
+        # Keep the path it has now, in its own frame, before it stops following the model.
+        s = settings_of(drawing)
         ifcopenshell.api.pset.edit_pset(f, pset=f.by_id(pset["id"]), properties={"Auto": False})
+        s["auto"] = False
+        store_path(f, drawing, s)
 
 
 def write_settings(f, drawing, s):
@@ -311,6 +396,7 @@ def write_settings(f, drawing, s):
     pset = f.by_id(pset["id"]) if pset else ifcopenshell.api.pset.add_pset(f, product=drawing, name=PSET)
     ifcopenshell.api.pset.edit_pset(f, pset=pset, properties={
         "Kind": s["kind"], "Depth": -1.0 if s["depth"] is None else float(s["depth"]), "Auto": bool(s["auto"]),
+        "Tilt": float(s.get("tilt", 0.0)), "Base": float(s.get("base", 0.0)),
         **({"Side": s["side"]} if s.get("side") else {}),
         **({"Storey": s["storey"], "Cut": float(s["cut"]),
             "ViewDepth": -1.0 if s.get("view_depth") is None else float(s["view_depth"])}

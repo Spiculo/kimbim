@@ -175,10 +175,14 @@ void DrawingView::contextMenuEvent(QContextMenuEvent* event)
             QMenu menu(this);
             QAction* edit = kind == QLatin1String("text") ? menu.addAction(tr("Edit text..."))
                 : kind == QLatin1String("titleblock") ? menu.addAction(tr("Edit title block...")) : nullptr;
+            QAction* settings = kind.isEmpty() && !guid.startsWith(QLatin1String("legend:"))
+                ? menu.addAction(tr("Drawing settings...")) : nullptr;
             QAction* remove = kind == QLatin1String("titleblock") ? nullptr : menu.addAction(tr("Remove from sheet"));
             QAction* chosen = menu.exec(event->globalPos());
             if (chosen && chosen == edit)
                 emit placedEditRequested(guid);
+            else if (chosen && chosen == settings)
+                emit placedSettingsRequested(guid);
             else if (chosen && chosen == remove)
                 emit placedRemoveRequested(guid);
             return;

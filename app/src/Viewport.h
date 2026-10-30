@@ -38,6 +38,8 @@
 
 #include <Image_PixMap.hxx>
 
+class QShowEvent;
+
 #include "ElementBatch.h"
 #include "Scene.h"
 #include "Underlay.h"
@@ -285,6 +287,10 @@ public:
     int viewClipPlaneCount() const; // the cut planes on this view's V3d_View
     int clipPlaneLimit() const;     // the graphics driver's limit (0 when it cannot tell)
     // D95: the selected cut plane (translucent rectangle and normal handle); nullopt removes it.
+    // Re-attach the OCCT window at the widget's current size (a hidden/resized tab can keep a native
+    // window bigger than its widget, which draws over the toolbars and offsets clicks).
+    void recreateWindow();
+    void ensureWindowSize(); // re-attach the native window if it kept an old size
     void setCutPlaneOverlay(const std::optional<gp_Pln>& plane, double halfSize = 0);
     void clearCutPlaneOverlay() { setCutPlaneOverlay(std::nullopt); }
     bool hasCutPlaneOverlay() const { return !m_cutOverlay.IsNull(); }
@@ -359,6 +365,16 @@ public:
     // outlines. View-plane metres (x right, y up), plus the view->world matrix for the SVG.
     // {proj: [{guid, lines: [x1,y1,x2,y2, ...]}], cut: [{guid, loops}], view: [16 numbers]}.
     QJsonObject viewGeometry(const QStringList& guids, const gp_Ax2& view, const gp_Pln* section, const Bnd_Box& bounds);
+    // D110: a folded (bent or curved) section/elevation. Each strip is a straight camera segment;
+    // its geometry is clipped to the segment's width and laid beside the previous ones, so the
+    // drawing unfolds corner by corner. `section` false for an elevation.
+    struct FoldStrip {
+        gp_Ax2 view;
+        gp_Pln cut;
+        double width = 1.0;
+        bool section = true;
+    };
+    QJsonObject viewGeometryFolded(const QStringList& guids, const QVector<FoldStrip>& strips, const Bnd_Box& bounds);
     QJsonObject finishViewGeometry(const gp_Ax3& ax3, const QJsonArray& proj, const gp_Pln* section) const;
 
 signals:
@@ -391,6 +407,7 @@ protected:
     QPaintEngine* paintEngine() const override { return nullptr; }
     void paintEvent(QPaintEvent*) override;
     void resizeEvent(QResizeEvent*) override;
+    void showEvent(QShowEvent*) override;
     void mousePressEvent(QMouseEvent*) override;
     void mouseReleaseEvent(QMouseEvent*) override;
     void mouseMoveEvent(QMouseEvent*) override;

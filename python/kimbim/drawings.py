@@ -92,6 +92,7 @@ def drawings() -> str:
                 continue  # its level was deleted
             out.append({"guid": d.GlobalId, "name": d.Name or "", "kind": s["kind"], "depth": s["depth"],
                         "auto": s["auto"], "side": s.get("side") or "", "points": s["points"], "look": s["look"],
+                        "bulges": s.get("bulges") or [], "tilt": float(s.get("tilt", 0.0)),
                         **({"storey": s["storey"], "elevation": round(G.storey_elevation(storey), 6),
                             "cut": float(s.get("cut", G.PLAN_CUT)),
                             "view_depth": resolve_view_depth(s["storey"], s)} if storey else {}),
@@ -130,6 +131,7 @@ def _new(name: str, s: dict, bounds=None):
     # `bounds` is worked out once by the caller: model_bounds walks every product (the Centro Educativo
     # is 1.6 s), and creating a plan and four elevations would pay it once per drawing otherwise.
     G.place(f, drawing, s, G.model_bounds(f) if bounds is None else bounds)
+    G.store_path(f, drawing, s)  # a bent or curved marker keeps its path in the drawing's own frame
     return drawing
 
 
@@ -230,18 +232,25 @@ def _next_name(prefix: str) -> str:
     return f"{prefix} {n}"
 
 
-def _create(kind, x1, y1, x2, y2, look_x, look_y, depth) -> str:
+def _create(kind, points, bulges, look_x, look_y, depth, tilt=0.0, base=0.0) -> str:
     if B._model is None:
         return A._fail("no model open")
     try:
-        points = [[float(x1), float(y1)], [float(x2), float(y2)]]
+        points = [[float(p[0]), float(p[1])] for p in points]
+        bulges = [float(b) for b in bulges]
         look = [float(look_x), float(look_y)]
         depth = float(depth)
-    except (TypeError, ValueError) as ex:
+        tilt = float(tilt)
+        base = float(base)
+    except (TypeError, ValueError, IndexError) as ex:
         return A._fail(f"bad input: {ex}")
-    if math.dist(*points) < 1e-6:
+    if len(points) < 2 or any(math.dist(points[i], points[i + 1]) < 1e-6 for i in range(len(points) - 1)):
         return A._fail("draw the line with two different points")
-    s = {"kind": kind, "points": points, "look": look, "depth": None if depth < 0 else depth, "auto": False}
+    if abs(tilt) >= 89.0 or not math.isfinite(tilt):
+        return A._fail("the tilt must be less than 89 degrees")
+    bulges = (bulges + [0.0] * max(0, len(points) - 1))[: len(points) - 1]
+    s = {"kind": kind, "points": points, "look": look, "depth": None if depth < 0 else depth, "auto": False,
+         "bulges": bulges, "tilt": tilt, "base": base}
     made = {}
 
     def action():
@@ -256,12 +265,28 @@ def _create(kind, x1, y1, x2, y2, look_x, look_y, depth) -> str:
 def create_section(x1, y1, x2, y2, look_x, look_y, depth=-1.0) -> str:
     """A section along x1,y1-x2,y2 (world metres) looking towards the side of look_x,look_y (D61:
     Archicad's third click). depth < 0 = infinite (Archicad's default), 0 = the cut only."""
-    return _create("section", x1, y1, x2, y2, look_x, look_y, depth)
+    return _create("section", [[x1, y1], [x2, y2]], [], look_x, look_y, depth)
 
 
 def create_elevation(x1, y1, x2, y2, look_x, look_y, depth=-1.0) -> str:
     """An elevation marker placed by hand (same input as create_section)."""
-    return _create("elevation", x1, y1, x2, y2, look_x, look_y, depth)
+    return _create("elevation", [[x1, y1], [x2, y2]], [], look_x, look_y, depth)
+
+
+def create_drawing_path(kind, points_json, bulges_json, look_x, look_y, depth=-1.0, tilt=0.0, base=0.0) -> str:
+    """A section or elevation along a path: `points_json` is [[x, y], ...] in world metres (a bend is
+    several points; a curve is a segment with a non-zero bulge), `bulges_json` a bulge per segment
+    (tan of a quarter of the sweep, 0 = straight), `tilt` the cut plane's angle about the line and
+    `base` the height the line lies at (the tilt's pivot)."""
+    try:
+        import json as _json
+        points = _json.loads(points_json) if isinstance(points_json, str) else points_json
+        bulges = _json.loads(bulges_json) if isinstance(bulges_json, str) else bulges_json
+    except ValueError as ex:
+        return A._fail(f"bad input: {ex}")
+    if not isinstance(points, list) or not isinstance(bulges, list):
+        return A._fail("bad input: the path needs a list of points")
+    return _create(kind, points, bulges, look_x, look_y, depth, tilt, base)
 
 
 def _edit(guid: str, change) -> str:
@@ -290,6 +315,89 @@ def set_drawing_depth(guid: str, depth) -> str:
         G.place(B._model, d, s, G.model_bounds(B._model))
 
     return _edit(guid, change)
+
+
+def set_drawing_path(guid: str, points_json: str, bulges_json: str = "[]", tilt=None, base=None) -> str:
+    """Replace a section or elevation's marker path (world metres) and its bulges (one per segment).
+    `tilt` and `base` keep their current values when omitted."""
+    try:
+        points = json.loads(points_json)
+        bulges = json.loads(bulges_json) if bulges_json else []
+        if not isinstance(points, list) or len(points) < 2:
+            raise ValueError("the path needs two points")
+        points = [[float(p[0]), float(p[1])] for p in points]
+        bulges = [float(b) for b in bulges]
+    except (TypeError, ValueError, IndexError) as ex:
+        return A._fail(f"bad path: {ex}")
+    if any(math.dist(points[i], points[i + 1]) < 1e-6 for i in range(len(points) - 1)):
+        return A._fail("two points of the path are the same")
+    if tilt is not None and abs(float(tilt)) >= 89.0:
+        return A._fail("the tilt must be less than 89 degrees")
+
+    def change(d):
+        s = G.settings_of(d)
+        if s is None or s["kind"] == "plan":
+            raise ValueError("not a section or elevation")
+        s.update({"points": points, "auto": False,
+                  "bulges": (bulges + [0.0] * max(0, len(points) - 1))[: len(points) - 1],
+                  "tilt": float(s.get("tilt", 0.0)) if tilt is None else float(tilt),
+                  "base": float(s.get("base", 0.0)) if base is None else float(base)})
+        G.write_settings(B._model, d, s)
+        G.place(B._model, d, s, G.model_bounds(B._model))
+        G.store_path(B._model, d, s)
+
+    try:
+        return _edit(guid, change)
+    except ValueError as ex:
+        return A._fail(str(ex))
+
+
+def set_drawing_tilt(guid: str, degrees) -> str:
+    """The cut plane's angle about the marker line (0 = vertical section)."""
+    try:
+        tilt = float(degrees)
+    except (TypeError, ValueError):
+        return A._fail("bad angle")
+    if not math.isfinite(tilt) or abs(tilt) >= 89.0:
+        return A._fail("the tilt must be less than 89 degrees")
+
+    def change(d):
+        s = G.settings_of(d)
+        if s is None or s["kind"] == "plan":
+            raise ValueError("not a section or elevation")
+        s["tilt"] = tilt
+        G.write_settings(B._model, d, s)
+        G.place(B._model, d, s, G.model_bounds(B._model))
+        G.store_path(B._model, d, s)
+
+    try:
+        return _edit(guid, change)
+    except ValueError as ex:
+        return A._fail(str(ex))
+
+
+def set_drawing_base(guid: str, metres) -> str:
+    """The height the marker line lies at: the pivot of an oblique cut plane."""
+    try:
+        base = float(metres)
+    except (TypeError, ValueError):
+        return A._fail("bad height")
+    if not math.isfinite(base):
+        return A._fail("bad height")
+
+    def change(d):
+        s = G.settings_of(d)
+        if s is None or s["kind"] == "plan":
+            raise ValueError("not a section or elevation")
+        s["base"] = base
+        G.write_settings(B._model, d, s)
+        G.place(B._model, d, s, G.model_bounds(B._model))
+        G.store_path(B._model, d, s)
+
+    try:
+        return _edit(guid, change)
+    except ValueError as ex:
+        return A._fail(str(ex))
 
 
 def set_view_depth(guid: str, depth) -> str:
@@ -327,7 +435,13 @@ def rename_drawing(guid: str, name: str) -> str:
 
 
 def delete_drawing(guid: str) -> str:
-    return _edit(guid, lambda d: ifcopenshell.api.root.remove_product(B._model, product=d))
+    def change(d):
+        from . import sheets  # late: sheets imports this module
+
+        sheets.remove_drawing_placements(guid)  # no broken views left on its sheets
+        ifcopenshell.api.root.remove_product(B._model, product=d)
+
+    return _edit(guid, change)
 
 
 def _python() -> str:
@@ -728,14 +842,18 @@ def _view_base_svg(g) -> str:
         body = "".join(path([(x1, y1), (x2, y2)], False) for x1, y1, x2, y2 in e["lines"])
         if body:
             parts.append(f'<g class="projection" ifc:guid="{e["guid"]}">{body}</g>')
-    view = np.asarray(plane, dtype=float)
+    plane = np.asarray(g["view"], dtype=float).reshape(4, 4)
+    strips = g.get("strips") or [{"view": plane.reshape(-1).tolist(), "x": 0.0}]
     for e in g["cut"]:
+        strip = strips[min(int(e.get("strip", 0)), len(strips) - 1)]
+        view = np.asarray(strip["view"], dtype=float).reshape(4, 4)
+        shift = float(strip.get("x", 0.0))
         group = _cut_group(e["guid"], e["loops"], to_paper,
-                           lambda x, y: tuple((view @ np.array([x, y, 0.0, 1.0]))[:3]),
+                           lambda x, y, v=view, s=shift: tuple((v @ np.array([x - s, y, 0.0, 1.0]))[:3]),
                            lambda loop: path([(x, y) for x, y in loop], True))
         if group:
             parts.append(group)
-    plane_json = json.dumps(plane, separators=(",", ":"))
+    plane_json = json.dumps(plane.tolist(), separators=(",", ":"))
     m3_json = json.dumps(m3, separators=(",", ":"))
     return ('<svg xmlns="http://www.w3.org/2000/svg" xmlns:ifc="http://www.ifcopenshell.org/ns" '
             'width="1mm" height="1mm" viewBox="0 0 1 1">\n'

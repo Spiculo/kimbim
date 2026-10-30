@@ -29,10 +29,12 @@ signals:
     void addObliqueRequested();
     void addFaceRequested();
     void enabledChanged(int index, bool on);
+    void visibleChanged(int index, bool on);
     void offsetChanged(int index, double offset);
     void angleChanged(int index, double degrees);
     void flipRequested(int index);
     void deleteRequested(int index);
+    void sectionRequested(int index); // D110: make a section drawing from this cut plane
     void planeSelected(int index);
 
 private:
@@ -41,6 +43,7 @@ private:
 
     QTableWidget* m_table = nullptr;
     QPushButton* m_flip = nullptr;
+    QPushButton* m_section = nullptr;
     QPushButton* m_delete = nullptr;
     bool m_filling = false;
 };

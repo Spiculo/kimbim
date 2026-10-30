@@ -4,16 +4,21 @@
 #include <QDoubleSpinBox>
 #include <QJsonObject>
 #include <QLabel>
+#include <QPushButton>
 #include <QStandardPaths>
 #include <QTableWidget>
 #include <QToolButton>
 #include <DockManager.h>
+#include <DockWidget.h>
 #include <QtTest>
 
 #include "CutPlanesPanel.h"
 #include "DockLayout.h"
+#include "DrawingView.h"
+#include "DrawingsPanel.h"
 #include "LevelsBar.h"
 #include "MainWindow.h"
+#include "PythonEngine.h"
 #include "WallTool.h"
 #include "Viewport.h"
 
@@ -117,6 +122,97 @@ private slots:
         QCOMPARE(w.cutPlanes().front().kind, kimbim::CutPlane::Kind::Oblique);
     }
 
+    void visibleHidesThePlaneWithoutTurningTheCutOff()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        QVERIFY(w.addVerticalCut({0, 0}, {0, 5}, {1, 0}, 0));
+        QCOMPARE(w.viewport()->clipPlaneCount(), 1);
+        QVERIFY(w.viewport()->hasCutPlaneOverlay());
+
+        QVERIFY(w.setCutPlaneVisible(0, false)); // hidden: still cuts, no blue plane
+        QCOMPARE(w.viewport()->clipPlaneCount(), 1);
+        QVERIFY(!w.viewport()->hasCutPlaneOverlay());
+        QCOMPARE(w.viewport()->sectionPlaneCount(), 0);
+
+        QVERIFY(w.setCutPlaneVisible(0, true));
+        QVERIFY(w.viewport()->hasCutPlaneOverlay());
+        QVERIFY(w.setCutPlaneEnabled(0, false)); // off but visible: the plane can still be found
+        QCOMPARE(w.viewport()->clipPlaneCount(), 0);
+        QVERIFY(w.viewport()->hasCutPlaneOverlay());
+        QVERIFY(w.setCutPlaneEnabled(0, true));
+    }
+
+    void onlyTheSelectedCutDrawsItsFace()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        w.setTool(kimbim::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({5, 0});
+        w.wallTool()->finish();
+        w.setTool(kimbim::MainWindow::Tool::None);
+        QVERIFY(w.addVerticalCut({-1, 0.05}, {6, 0.05}, {0, 1}, 0));   // keep y >= 0.05
+        QVERIFY(w.cutPlanes()[0].normal.Y() > 0.99);
+        QCOMPARE(w.viewport()->sectionPlaneCount(), 1); // the only cut, selected: its face
+        QVERIFY(w.addVerticalCut({-1, 0.15}, {6, 0.15}, {0, -1}, 0));  // keep y <= 0.15
+        QVERIFY(w.cutPlanes()[1].normal.Y() < -0.99);
+        QCOMPARE(w.viewport()->clipPlaneCount(), 2);
+        QCOMPARE(w.selectedCutPlane(), 1);
+        QCOMPARE(w.viewport()->sectionPlaneCount(), 1); // only the selected cut's face
+        QVERIFY(w.selectCutPlane(0));
+        QCOMPARE(w.viewport()->sectionPlaneCount(), 1);
+        QVERIFY(w.setCutPlaneVisible(0, false));
+        QCOMPARE(w.viewport()->sectionPlaneCount(), 0);
+        QCOMPARE(w.viewport()->clipPlaneCount(), 2); // both still cut
+    }
+
+    void theSelectToolReturnsToTheControls()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        auto* select = w.findChild<QAction*>(QStringLiteral("actionSelectTool"));
+        QVERIFY(select);
+        QVERIFY(select->isChecked()); // selection is the starting mode
+        w.findChild<QAction*>(QStringLiteral("actionWallTool"))->trigger();
+        QVERIFY(!select->isChecked());
+        select->trigger();
+        QCOMPARE(w.tool(), kimbim::MainWindow::Tool::None);
+        QVERIFY(select->isChecked());
+    }
+
+    void aSectionCanBeMadeFromAnObliqueCutPlane()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        w.setTool(kimbim::MainWindow::Tool::Wall);
+        w.wallTool()->click({0, 0});
+        w.wallTool()->click({5, 0});
+        w.wallTool()->finish();
+        w.setTool(kimbim::MainWindow::Tool::None);
+        QVERIFY(w.addObliqueCut({-1, -2}, {6, -2}, {0, 1}, 30, 0));
+        QCOMPARE(w.selectedCutPlane(), 0);
+        auto* dock = w.dockLayout()->manager()->findDockWidget(QStringLiteral("cutplanes"));
+        QVERIFY(dock);
+        auto* make = dock->widget()->findChild<QPushButton*>(QStringLiteral("cutSection"));
+        QVERIFY(make && make->isEnabled());
+        const int before = w.drawingsPanel()->count();
+        make->click();
+        QCOMPARE(w.drawingsPanel()->count(), before + 1);
+        const QString guid = w.drawingGuid(QStringLiteral("Section 1"));
+        QVERIFY(!guid.isEmpty());
+        QJsonObject d;
+        for (const auto& v : kimbim::PythonEngine::instance().callJson("drawings", {}, nullptr)
+                                  .object().value("drawings").toArray())
+            if (v.toObject().value("guid").toString() == guid)
+                d = v.toObject();
+        QCOMPARE(d.value("points").toArray().size(), 2);
+        QVERIFY(std::abs(d.value("tilt").toDouble() - 30.0) < 1e-6);
+        QVERIFY(w.openDrawing(guid));
+        QTRY_VERIFY_WITH_TIMEOUT(w.drawingView(guid)->hasDrawing(), 60000);
+        QVERIFY(!w.drawingView(guid)->svg().isEmpty());
+    }
+
     void cutPlanesTravelWithSavedViews()
     {
         kimbim::MainWindow w(nullptr, true);
@@ -164,7 +260,8 @@ private slots:
         QCOMPARE(w.cutPlanes().size(), 1);
         QCOMPARE(w.cutPlanes().front().kind, kimbim::CutPlane::Kind::Vertical);
         QVERIFY(w.cutPlanes().front().contains(gp_Pnt(1, 3, 1)));
-        QVERIFY(w.viewport()->isDrawingMode()); // the tool stays for the next cut
+        QVERIFY(!w.viewport()->isDrawingMode()); // one cut, then back to the controls
+        QCOMPARE(w.tool(), kimbim::MainWindow::Tool::None);
 
         // Oblique cut: the same three clicks, tilted about the line (30 deg in quiet mode).
         w.findChild<QAction*>(QStringLiteral("actionCutOblique"))->trigger();

@@ -85,7 +85,7 @@ QJsonObject cutPlaneToJson(const CutPlane& p)
     const char* kind = p.kind == CutPlane::Kind::Horizontal ? "horizontal"
         : p.kind == CutPlane::Kind::Vertical                    ? "vertical"
                                                                  : "oblique";
-    return QJsonObject{{"name", QString::fromStdString(p.name)}, {"enabled", p.enabled},
+    return QJsonObject{{"name", QString::fromStdString(p.name)}, {"enabled", p.enabled}, {"visible", p.visible},
         {"kind", QLatin1String(kind)},
         {"point", QJsonArray{p.point.X(), p.point.Y(), p.point.Z()}},
         {"normal", QJsonArray{p.normal.X(), p.normal.Y(), p.normal.Z()}},
@@ -114,6 +114,7 @@ CutPlane cutPlaneFromJson(const QJsonObject& j, bool* ok)
         p.direction = gp_Dir(1, 0, 0);
     p.name = j.value(QStringLiteral("name")).toString().toStdString();
     p.enabled = j.value(QStringLiteral("enabled")).toBool(true);
+    p.visible = j.value(QStringLiteral("visible")).toBool(true);
     const QString kind = j.value(QStringLiteral("kind")).toString();
     p.kind = kind == QLatin1String("horizontal") ? CutPlane::Kind::Horizontal
         : kind == QLatin1String("vertical")      ? CutPlane::Kind::Vertical

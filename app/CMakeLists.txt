@@ -36,9 +36,11 @@ qt_add_library(kimbim_core STATIC
     src/CutPlaneOverlay.cpp src/CutPlaneOverlay.h src/CutPlanesPanel.cpp src/CutPlanesPanel.h
     src/DrawingsPanel.cpp src/DrawingsPanel.h
     src/DrawingView.cpp src/DrawingView.h
+    src/SectionPath.cpp src/SectionPath.h
     src/SheetExport.cpp src/SheetExport.h
     src/SnapshotServer.cpp src/SnapshotServer.h
     src/SheetsPanel.cpp src/SheetsPanel.h
+    src/SheetDialog.cpp src/SheetDialog.h
     src/SchedulesDialog.cpp src/SchedulesDialog.h
     src/DockLayout.cpp src/DockLayout.h
     src/Scene.cpp src/Scene.h
@@ -104,6 +106,7 @@ kimbim_test(test_main_window)
 kimbim_test(test_agent_live)
 kimbim_test(test_cuts)
 kimbim_test(test_cut_planes)
+kimbim_test(test_section_path)
 kimbim_test(test_model_loader)
 kimbim_test(test_navigation)
 kimbim_test(test_selection)

@@ -49,6 +49,7 @@ signals:
     void placedMoved(const QString& drawing, QPointF topLeftMm);
     void placedRemoveRequested(const QString& drawing); // right-click > Remove from sheet
     void placedEditRequested(const QString& drawing);   // right-click > Edit text (a sheet text)
+    void placedSettingsRequested(const QString& drawing); // right-click > Drawing settings (title, scale, position)
     void placedResized(const QString& drawing, double widthMm); // D98: a picture's corner dragged
 
 protected:

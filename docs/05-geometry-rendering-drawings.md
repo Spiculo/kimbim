@@ -57,6 +57,31 @@ derived cache  (.kimbim/cache, keyed by record hash + kernel version)
 
 ## Drawings (2D)
 
+**Sections and elevations as paths (D110).** A drawing marker may be a straight line, a bent polyline
+or a curve:
+
+- `KIMBIM_Drawing` keeps `Path` in the drawing's own frame (`u` along the first segment, `v` along its
+  look normal), `Bulges` (one per segment, DXF's `tan(sweep/4)`) and `Tilt` / `Base`; moving or
+  rotating the marker carries its path, and a template elevation that is moved stores the path it had.
+- **Line** is still two clicks plus the look side. **Polyline** takes corners, Enter closes the path,
+  then the look side; Shift+click adds a corner in Line mode. **Curve** takes start, end and a point on
+  the arc (bulge = 2 x sagitta / chord), then the look side.
+- **Unfolding:** a bent or curved marker is sampled into straight strips (at most 10 degrees per arc
+  piece). Each strip gets its own camera and cut plane, its hidden-line pass is clipped to the strip's
+  width, and the strips are laid side by side in the SVG; each cut loop keeps the strip's view matrix,
+  so layer poché still maps back to the right world position. A single straight marker keeps the old
+  infinite-width view.
+- **Oblique:** `Tilt` rotates the cut plane about the marker line; the camera looks square at that
+  plane, so the cut's section is true shape. `Base` is the height the line lies at (the pivot).
+- **From a cut plane:** the Cut planes panel's *Section...* builds a section marker from the selected
+  D95 plane (vertical or oblique; horizontal is refused). The plane's direction is the marker line,
+  its normal gives the look side and the tilt.
+- **Editing:** the Properties panel's *Section* group holds Tilt, Base, Depth, Vertices and Shape; the
+  Stretch tool grips the marker's vertices (click an edge's middle to add one, Ctrl+click a vertex to
+  remove it), splitting an arc into two arcs of half the sweep.
+- Level markers on a folded drawing use the first strip's plane; tilted wings may need their own
+  elevation annotations in a later pass.
+
 **Reuse:** the IfcOpenShell **SVG serializer** (used by IfcConvert and by Bonsai's drawing system) produces plans and sections with:
 
 - hidden-line removal;

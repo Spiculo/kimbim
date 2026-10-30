@@ -36,13 +36,14 @@ CutPlanesPanel::CutPlanesPanel(QWidget* parent)
 
     m_table = new QTableWidget(this);
     m_table->setObjectName(QStringLiteral("cutPlanesTable"));
-    m_table->setColumnCount(5);
-    m_table->setHorizontalHeaderLabels({tr("On"), tr("Name"), tr("Kind"), tr("Offset (m)"), tr("Angle (°)")});
+    m_table->setColumnCount(6);
+    m_table->setHorizontalHeaderLabels({tr("Enabled"), tr("Visible"), tr("Name"), tr("Kind"),
+        tr("Offset (m)"), tr("Angle (°)")});
     m_table->verticalHeader()->setVisible(false);
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->setSelectionMode(QAbstractItemView::SingleSelection);
     m_table->horizontalHeader()->setStretchLastSection(false);
-    m_table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+    m_table->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
     m_table->setEditTriggers(QAbstractItemView::DoubleClicked | QAbstractItemView::SelectedClicked
         | QAbstractItemView::EditKeyPressed);
     layout->addWidget(m_table, 1);
@@ -50,9 +51,13 @@ CutPlanesPanel::CutPlanesPanel(QWidget* parent)
     auto* edits = new QHBoxLayout;
     m_flip = new QPushButton(tr("Flip side"), this);
     m_flip->setObjectName(QStringLiteral("cutFlip"));
+    m_section = new QPushButton(tr("Section..."), this);
+    m_section->setObjectName(QStringLiteral("cutSection"));
+    m_section->setToolTip(tr("Create a section drawing from the selected cut plane"));
     m_delete = new QPushButton(tr("Delete"), this);
     m_delete->setObjectName(QStringLiteral("cutDelete"));
     edits->addWidget(m_flip);
+    edits->addWidget(m_section);
     edits->addStretch(1);
     edits->addWidget(m_delete);
     layout->addLayout(edits);
@@ -63,6 +68,11 @@ CutPlanesPanel::CutPlanesPanel(QWidget* parent)
         const int row = selectedRow();
         if (row >= 0)
             emit flipRequested(row);
+    });
+    connect(m_section, &QPushButton::clicked, this, [this] {
+        const int row = selectedRow();
+        if (row >= 0)
+            emit sectionRequested(row);
     });
     connect(m_delete, &QPushButton::clicked, this, [this] {
         const int row = selectedRow();
@@ -83,21 +93,27 @@ void CutPlanesPanel::setPlanes(const QVector<CutPlane>& planes, int selected)
         auto* on = new QTableWidgetItem;
         on->setFlags(Qt::ItemIsUserCheckable | Qt::ItemIsEnabled | Qt::ItemIsSelectable);
         on->setCheckState(p.enabled ? Qt::Checked : Qt::Unchecked);
+        on->setToolTip(tr("On: the plane cuts the model; off: it only keeps its place in the list"));
         m_table->setItem(row, 0, on);
+        auto* visible = new QTableWidgetItem;
+        visible->setFlags(Qt::ItemIsUserCheckable | Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+        visible->setCheckState(p.visible ? Qt::Checked : Qt::Unchecked);
+        visible->setToolTip(tr("Show the selected plane's face and handle in the view"));
+        m_table->setItem(row, 1, visible);
         auto* name = new QTableWidgetItem(QString::fromStdString(p.name));
         name->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
-        m_table->setItem(row, 1, name);
+        m_table->setItem(row, 2, name);
         const QString kind = p.kind == CutPlane::Kind::Horizontal ? tr("Horizontal")
             : p.kind == CutPlane::Kind::Vertical                    ? tr("Vertical")
                                                                     : tr("Oblique");
         auto* kindItem = new QTableWidgetItem(kind);
         kindItem->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
-        m_table->setItem(row, 2, kindItem);
-        m_table->setItem(row, 3, new QTableWidgetItem(locale.toString(p.offset(), 'f', 3)));
+        m_table->setItem(row, 3, kindItem);
+        m_table->setItem(row, 4, new QTableWidgetItem(locale.toString(p.offset(), 'f', 3)));
         auto* angle = new QTableWidgetItem(locale.toString(p.angle, 'f', 1));
         if (p.kind != CutPlane::Kind::Oblique)
             angle->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
-        m_table->setItem(row, 4, angle);
+        m_table->setItem(row, 5, angle);
     }
     m_filling = false;
     if (selected >= 0 && selected < planes.size())
@@ -105,6 +121,7 @@ void CutPlanesPanel::setPlanes(const QVector<CutPlane>& planes, int selected)
     else
         m_table->clearSelection();
     m_flip->setEnabled(selected >= 0);
+    m_section->setEnabled(selected >= 0);
     m_delete->setEnabled(selected >= 0);
 }
 
@@ -123,13 +140,17 @@ void CutPlanesPanel::onItemChanged(QTableWidgetItem* item)
         emit enabledChanged(row, item->checkState() == Qt::Checked);
         return;
     }
+    if (item->column() == 1) {
+        emit visibleChanged(row, item->checkState() == Qt::Checked);
+        return;
+    }
     const QLocale locale;
     bool ok = false;
-    if (item->column() == 3) {
+    if (item->column() == 4) {
         const double value = locale.toDouble(item->text(), &ok);
         if (ok)
             emit offsetChanged(row, value);
-    } else if (item->column() == 4) {
+    } else if (item->column() == 5) {
         const double value = locale.toDouble(item->text(), &ok);
         if (ok)
             emit angleChanged(row, value);
@@ -140,6 +161,7 @@ void CutPlanesPanel::onSelectionChanged()
 {
     const int row = selectedRow();
     m_flip->setEnabled(row >= 0);
+    m_section->setEnabled(row >= 0);
     m_delete->setEnabled(row >= 0);
     if (!m_filling)
         emit planeSelected(row);

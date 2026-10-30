@@ -189,7 +189,80 @@ def test_create_elevations_adds_the_missing_ones_to_an_opened_file(tmp_path):
 
 
 
-# ---------------------------------------------------------------- Slice 15: floor plans
+# ---------------------------------------------------------------- D110: bent, curved and oblique markers
+
+def test_a_bent_section_keeps_its_path_and_moves_with_it(house):
+    r = call("create_drawing_path", "section", json.dumps([[0.0, 4.5], [6.0, 4.5], [6.0, 8.0]]),
+             json.dumps([0.0, 0.0]), 4.0, 8.0, -1)
+    assert r["ok"], r
+    d = drawing(r["guid"])
+    assert d["kind"] == "section" and d["points"] == [[0.0, 4.5], [6.0, 4.5], [6.0, 8.0]]
+    assert d["bulges"] == [0.0, 0.0]
+    assert d["tilt"] == 0.0
+    # The path lives in the drawing's own frame: moving and rotating carry every vertex.
+    assert call("move_elements", json.dumps([r["guid"]]), 1.0, 2.0, 0.0)["ok"]
+    assert drawing(r["guid"])["points"] == [[1.0, 6.5], [7.0, 6.5], [7.0, 10.0]]
+    assert call("rotate_elements", json.dumps([r["guid"]]), 0.0, 0.0, math.pi / 2)["ok"]
+    pts = drawing(r["guid"])["points"]
+    assert [[round(c, 6) for c in p] for p in pts] == [[-6.5, 1.0], [-6.5, 7.0], [-10.0, 7.0]]
+
+
+def test_a_curved_section_stores_its_bulge(house):
+    # Start, end, and a point on the arc 1 m from the 8 m chord: bulge = 2 * 1 / 8 = 0.25.
+    r = call("create_drawing_path", "section", json.dumps([[0.0, 4.5], [8.0, 4.5]]),
+             json.dumps([0.25]), 4.0, 8.0, -1)
+    assert r["ok"], r
+    d = drawing(r["guid"])
+    assert d["points"] == [[0.0, 4.5], [8.0, 4.5]] and d["bulges"] == [0.25]
+    # A path edit keeps the arcs it is given, and refuses a degenerate one.
+    assert call("set_drawing_path", r["guid"], json.dumps([[0.0, 4.5], [6.0, 4.5], [6.0, 8.0]]),
+                json.dumps([0.5, 0.0]))["ok"]
+    d = drawing(r["guid"])
+    assert d["points"] == [[0.0, 4.5], [6.0, 4.5], [6.0, 8.0]] and d["bulges"] == [0.5, 0.0]
+    assert not call("set_drawing_path", r["guid"], json.dumps([[0.0, 4.5], [0.0, 4.5]]), "[]")["ok"]
+
+
+def test_an_oblique_section_tilts_about_its_line(house):
+    guid = call("create_section", 0.0, 4.5, 10.0, 4.5, 5.0, 8.0, -1)["guid"]
+    assert drawing(guid)["tilt"] == 0.0
+    assert call("set_drawing_tilt", guid, 25)["ok"]
+    assert drawing(guid)["tilt"] == 25.0
+    assert call("set_drawing_base", guid, 1.4)["ok"]
+    from kimbim import drawgen
+    m, (_w, _h, _d) = drawgen.camera(drawing(guid)["points"], drawing(guid)["look"],
+                                     drawgen.EMPTY_BOUNDS, None, 25.0)
+    # The camera looks square at the tilted plane: its Z has the plane's tilt.
+    assert abs(-m[2, 2] - math.sin(math.radians(25))) < 1e-6
+    assert not call("set_drawing_tilt", guid, 89)["ok"]  # a section cannot collapse to horizontal
+    assert not call("set_drawing_tilt", guid, "steep")["ok"]
+
+
+def test_properties_show_the_section_group(house):
+    guid = call("create_section", 0.0, 4.5, 10.0, 4.5, 5.0, 8.0, -1)["guid"]
+    assert call("set_drawing_tilt", guid, 10)["ok"]
+    props = call("properties_multi", json.dumps([guid]))["psets"]["Section"]
+    assert props["Tilt (°)"]["value"] == 10.0 and props["Tilt (°)"]["editable"]
+    assert props["Base (m)"]["editable"] and props["Depth (m)"]["editable"]
+    assert props["Vertices"]["value"] == 2 and not props["Vertices"]["editable"]
+    assert props["Shape"]["value"] == "Straight"
+
+
+def test_a_folded_view_is_laid_out_strip_by_strip(house):
+    """The app sends strips (one camera per segment); the SVG places their geometry side by side,
+    keeps the cut's per-strip world mapping, and crops to the result."""
+    guid = call("create_drawing_path", "section", json.dumps([[0.0, 4.5], [6.0, 4.5], [6.0, 8.0]]),
+                json.dumps([0.0, 0.0]), 4.0, 8.0, -1)["guid"]
+    identity = [1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 1]
+    geom = {"proj": [{"guid": guid, "lines": [[0, 0, 2, 0], [5, 0, 8, 0]]}],
+            "cut": [{"guid": guid, "loops": [[[0, 0], [1, 0], [1, 1], [0, 1]]], "strip": 1}],
+            "view": identity,
+            "strips": [{"view": identity, "x": 2.5}, {"view": identity, "x": 8.5}]}
+    r = call("generate_view_drawing", guid, json.dumps(geom))
+    assert r["ok"], r
+    assert r["svg"].count("<path") >= 2 and 'ifc:guid="' + guid + '"' in r["svg"]
+    assert 'class="section"' in r["svg"] and "ifc:matrix3" in r["svg"]
+
+
 
 def test_every_level_gets_a_floor_plan_and_an_opened_file_can_add_them(tmp_path):
     assert call("new_project", "Casa")["ok"]
