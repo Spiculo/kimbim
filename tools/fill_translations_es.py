@@ -339,6 +339,33 @@ ES = {
     "Section: click where the section line ends": "Sección: haga clic donde termina la línea de sección",
     "Elevation: click where the elevation line ends": "Alzado: haga clic donde termina la línea de alzado",
     "Click the side the drawing looks at": "Haga clic en el lado hacia el que mira el dibujo",
+    "Click the side the drawing looks at (Shift+click adds a corner)":
+        "Haga clic en el lado hacia el que mira el dibujo (Mayús+clic añade una esquina)",
+    "Click the next corner; Enter finishes the line": "Haga clic en la siguiente esquina; Intro termina la línea",
+    "Click the next corner, or the side the drawing looks at":
+        "Haga clic en la siguiente esquina, o en el lado hacia el que mira el dibujo",
+    "Click a point on the arc": "Haga clic en un punto del arco",
+    "Click the point's new position (click an edge's middle to add one)":
+        "Haga clic en la nueva posición del punto (haga clic en el centro de un borde para añadir uno)",
+    "Marker shape: line, bent polyline (Enter finishes it) or arc":
+        "Forma del marcador: línea, polilínea quebrada (Intro la termina) o arco",
+    "Section: click the corners; Enter finishes the line, then click the side it looks at":
+        "Sección: haga clic en las esquinas; Intro termina la línea y después haga clic en el lado hacia el que mira",
+    "Elevation: click the corners; Enter finishes the line, then click the side it looks at":
+        "Alzado: haga clic en las esquinas; Intro termina la línea y después haga clic en el lado hacia el que mira",
+    "Section...": "Sección...",
+    "Create a section drawing from the selected cut plane":
+        "Crear un dibujo de sección desde el plano de corte seleccionado",
+    "A horizontal cut plane cannot be a section: use a vertical or oblique one":
+        "Un plano de corte horizontal no puede ser una sección: use uno vertical u oblicuo",
+    "This plane is horizontal: a section needs a vertical or oblique plane":
+        "Este plano es horizontal: una sección necesita un plano vertical u oblicuo",
+    "This plane is almost horizontal: a section needs a vertical or oblique plane":
+        "Este plano es casi horizontal: una sección necesita un plano vertical u oblicuo",
+    "Section created from %1": "Sección creada desde %1",
+    "Curve": "Curva",
+    "Stretch: click near a wall end or a point of a line, arc, fill or section marker, then its new position":
+        "Estirar: haga clic cerca del extremo de un muro o de un punto de una línea, arco, relleno o marcador de sección, y después en su nueva posición",
     "Could not generate the drawing: %1": "No se pudo generar el dibujo: %1",
     "Create &elevations": "Crear &alzados",
     "Add the North, South, East and West elevations the model is missing":
@@ -1824,6 +1851,27 @@ ES = {
     "You": "Usted",
     "Thinking...": "Pensando...",
     "Assistant": "Asistente",
+    # D111: stored sessions in the Assistant and their picker.
+    "New": "Nueva",
+    "New session": "Sesión nueva",
+    "Rename…": "Renombrar…",
+    "Fork": "Bifurcar",
+    "Archive": "Archivar",
+    "Delete…": "Borrar…",
+    "Untitled session": "Sesión sin título",
+    "archived": "archivada",
+    "review": "revisar",
+    "New conversation. Clear starts another one; the old one stays in the list.":
+        "Conversación nueva. Borrar inicia otra; la anterior sigue en la lista.",
+    "Continue this conversation.": "Continúe esta conversación.",
+    "Rename session": "Renombrar sesión",
+    "Title:": "Título:",
+    "Delete session": "Borrar sesión",
+    "Delete this conversation and its worktree? Its design option is kept.":
+        "¿Borrar esta conversación y su árbol de trabajo? Su opción de diseño se conserva.",
+    "Proposal waiting": "Propuesta pendiente",
+    "This session's proposal is waiting for review. Delete it anyway?":
+        "La propuesta de esta sesión está pendiente de revisión. ¿Borrar de todos modos?",
     "Could not ask the model: %1": "No se pudo consultar el modelo: %1",
     "Agent proposals": "Propuestas del agente",
     "Connect an AI &agent...": "Conectar un &agente de IA...",
