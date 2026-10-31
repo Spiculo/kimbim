@@ -167,6 +167,8 @@ private slots:
     void theModelViewGetsMostOfTheWidth()
     {
         kimbim::MainWindow w(nullptr, true);
+        if (w.screen()->availableGeometry().width() < 1600)
+            QSKIP("the offscreen screen is narrower than the window this test needs");
         w.resize(1600, 1000);
         w.show();
         QCoreApplication::processEvents();
@@ -758,7 +760,7 @@ private slots:
                           "actionLineTool", "actionPolylineTool", "actionArcTool", "actionRectangleTool", "actionFillTool",
                           "actionTagTool", "actionAngleDimensionTool", "actionRadialDimensionTool", "actionLevelDimensionTool",
                           "actionNorthArrowTool", "actionScaleBarTool", "actionCloudTool"}},
-            {"view", {"actionSectionTool", "actionElevationTool", "actionNewPlanTab", "actionNewSheet"}},
+            {"view", {"actionSectionTool", "actionElevationTool", "actionDetailTool", "actionNewPlanTab", "actionNewSheet"}},
             {"edit", {"actionMoveTool", "actionRotateTool", "actionStretchTool", "actionSplitTool", "actionTrimTool",
                          "actionJoinTool", "actionMirror", "actionCopyToLevel", "actionMeasureTool"}}};
         QStringList seen;
@@ -950,7 +952,8 @@ private slots:
     {
         kimbim::MainWindow w(nullptr, true);
         for (QToolBar* b : w.findChildren<QToolBar*>())
-            QVERIFY(w.toolBarArea(b) != Qt::TopToolBarArea);
+            if (b->objectName() != QLatin1String("proposalToolbar")) // D111: the proposal bar is a top toolbar
+                QVERIFY(w.toolBarArea(b) != Qt::TopToolBarArea);
         kimbim::TitleBar* bar = w.titleBar();
         QCOMPARE(w.menuWidget(), static_cast<QWidget*>(bar));
         QVERIFY(w.windowFlags() & Qt::FramelessWindowHint);
@@ -972,6 +975,8 @@ private slots:
     void narrowTitleBarCollapsesTheMenus()
     {
         kimbim::MainWindow w(nullptr, true);
+        if (w.screen()->availableGeometry().width() < 1600)
+            QSKIP("the offscreen screen is narrower than the window this test needs");
         w.resize(1600, 900);
         w.show();
         QVERIFY(QTest::qWaitForWindowExposed(&w));
@@ -1708,6 +1713,23 @@ private slots:
     }
 
     // D74: a legend placed on a sheet tab is drawn, dragged and removed like a placed drawing.
+    // A drawing list and a sheet list are tables on the sheet, dragged and removed like drawings.
+    void sheetListsGoOnTheSheet()
+    {
+        kimbim::MainWindow w(nullptr, /*quiet=*/true);
+        QVERIFY(w.newProject());
+        const QString number = w.addSheet(QStringLiteral("A3"), QStringLiteral("Tables"));
+        QVERIFY(!number.isEmpty());
+        QVERIFY(w.placeSheetList(number, QStringLiteral("drawings")));
+        QVERIFY(w.placeSheetList(number, QStringLiteral("sheets")));
+        kimbim::DrawingView* view = w.sheetView(number);
+        QVERIFY(view);
+        int lists = 0;
+        for (const kimbim::DrawingView::Placed& p : view->placed())
+            lists += p.guid.startsWith(QLatin1String("list:")) ? 1 : 0;
+        QCOMPARE(lists, 2);
+    }
+
     void sheetLegendPlacedDraggedRemoved()
     {
         kimbim::MainWindow w(nullptr, /*quiet=*/true);
@@ -2909,6 +2931,8 @@ private slots:
     void panelsShrinkFirstWhenAsked()
     {
         kimbim::MainWindow w(nullptr, /*quiet=*/true);
+        if (w.screen()->availableGeometry().width() < 1300)
+            QSKIP("the offscreen screen is narrower than the window this test needs");
         QVERIFY(w.newProject());
         QSignalSpy widths(w.dockLayout(), &kimbim::DockLayout::sideWidthsChanged);
         w.show(); // resize events are delivered once the window is shown (offscreen here)
@@ -3075,6 +3099,31 @@ private slots:
         QCOMPARE(w.documentState().value("name").toString(), QString("a.kim"));
         QVERIFY(w.save());
         QVERIFY(w.close());
+    }
+
+    // The parity round: georeferencing, terrain, issues (BCF) and purging unused types are in the menus.
+    void parityRoundActionsExist()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        for (const char* name : {"actionGeoreferencing", "actionTerrain", "actionIssues", "actionPurgeTypes",
+                 "actionDetailTool", "actionExportIfc", "actionLinkModel", "actionLinks",
+                 "actionCurtainWallSettings", "actionBuildingPad"})
+            QVERIFY2(action(w, name), name);
+    }
+
+    // BCF viewpoints restore the camera: eye, target, up and projection.
+    void bcfViewpointRestoresTheCamera()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QVERIFY(w.newProject());
+        kimbim::Viewport* v = w.viewport();
+        v->setCamera(gp_Pnt(10, -5, 2), gp_Pnt(0, 0, 1), gp_Dir(0, 0, 1), true, 55.0, 1.0);
+        QVERIFY(v->isPerspective());
+        QCOMPARE(v->view()->Camera()->Eye().X(), 10.0);
+        QCOMPARE(v->view()->Camera()->Center().Z(), 1.0);
+        v->setCamera(gp_Pnt(3, 4, 5), gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0), false, 60.0, 2.0);
+        QVERIFY(!v->isPerspective());
+        QCOMPARE(v->view()->Camera()->Eye().Y(), 4.0);
     }
 };
 

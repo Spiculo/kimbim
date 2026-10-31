@@ -176,7 +176,8 @@ public:
         Line, Polyline, ArcCircle, Rectangle, Fill, // 2D drafting (D84, DraftTools.cpp)
         Tag, NorthArrow, ScaleBar, Cloud, AngleDimension, RadialDimension, LevelDimension, // D87, MarkupTools.cpp
         Object, // D86: a library object (LibraryTools.cpp)
-        Railing, CurtainWall }; // D88, StairTools.cpp; D109 curtain wall
+        Railing, CurtainWall, // D88, StairTools.cpp; D109 curtain wall
+        Detail }; // D116: an enlarged, cropped plan detail
     void setTool(Tool tool);
     Tool tool() const { return m_tool; }
     WallTool* wallTool() const { return m_wallTool; }
@@ -355,6 +356,10 @@ public:
     void editSheet(const QString& number); // title, number, paper, background, placed drawings
     void editPlacedDrawing(const QString& number, const QString& drawingGuid); // title, scale, position
     bool placeLegend(const QString& number); // D74: a legend of the sheet's purpose, at a free spot
+    bool placeSchedule(const QString& number); // a schedule table on the sheet
+    bool placeSheetList(const QString& number, const QString& kind); // auto drawing/sheet list
+    bool saveTitleBlockTemplate(const QString& number); // a reusable title block / master layout
+    bool applyTitleBlockTemplate(const QString& number);
     bool openSheet(const QString& number);
     DrawingView* sheetView(const QString& number) const { return m_drawingViews.value(QStringLiteral("sheet:") + number); }
     bool exportSheet(const QString& number, const QString& path); // .pdf or .svg
@@ -430,6 +435,7 @@ public:
     void setWallToolActive(bool on) { setTool(on ? Tool::Wall : Tool::None); }
     bool createWall(const WallSegment& segment);
     bool createSlab(const QVector<QPointF>& outline);
+    bool createDetail(const QVector<QPointF>& outline); // D116
     bool slabFromWalls(const QStringList& walls);
     // D109: slab edges (IfcMember) and a slope (rise over run) on the selected slabs.
     bool addSlabEdges();
@@ -605,6 +611,13 @@ private:
     void filletDialog();
     void refreshDrawings();
     void refreshSheets(bool changed = true); // changed: the model changed, sheets need composing again
+    void georefDialog();
+    void terrainDialog();
+    void issuesDialog();
+    void linkModelDialog();
+    void linksDialog();
+    void curtainWallDialog();
+    void terrainPadDialog();
     void projectInfoDialog();
     void roomScheduleDialog();
     void exportSheetDialog(bool pdf);
@@ -847,6 +860,7 @@ private:
     bool traceUnderlay(const QString& storey, Underlay* u, std::shared_ptr<const UnderlayLines>* lines);
     QComboBox* m_roofKind = nullptr;
     QComboBox* m_sectionShape = nullptr; // D110: Line, Polyline or Curve for section/elevation markers
+    QSpinBox* m_detailScale = nullptr;   // D116: the detail view's 1:n
     bool m_sectionPathDone = false;      // D110: the path is closed; the next click is the look side
     QDoubleSpinBox* m_roofPitch = nullptr;
     bool m_warnedInconsistent = false;

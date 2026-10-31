@@ -94,6 +94,9 @@ public:
     // Perspective camera (D76), per view; plan views stay orthographic (the setting comes back in 3D).
     void setPerspective(bool on);
     bool isPerspective() const { return m_perspective; }
+    // BCF viewpoints: restore a camera (eye, target, up) and projection.
+    void setCamera(const gp_Pnt& eye, const gp_Pnt& center, const gp_Dir& up, bool perspective,
+        double fov = 60.0, double scale = 1.0);
     bool isAnimating() const;
     void setAnimationDuration(double seconds) { m_animationSeconds = seconds; }
     // D92: the plan view's north indicator (a view option, on once true north is set). Display only;

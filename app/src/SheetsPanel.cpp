@@ -68,6 +68,14 @@ SheetsPanel::SheetsPanel(QWidget* parent)
         purposes->setParent(&menu, purposes->windowFlags());
         menu.addMenu(purposes);
         menu.addAction(tr("Place legend"), this, [this, number] { emit legendRequested(number); });
+        menu.addAction(tr("Place schedule..."), this, [this, number] { emit scheduleRequested(number); });
+        menu.addAction(tr("Place drawing list"), this, [this, number] { emit listRequested(number, QStringLiteral("drawings")); });
+        menu.addAction(tr("Place sheet list"), this, [this, number] { emit listRequested(number, QStringLiteral("sheets")); });
+        menu.addSeparator();
+        menu.addAction(tr("Save title block as template..."), this,
+            [this, number] { emit saveTitleBlockTemplateRequested(number); });
+        menu.addAction(tr("Apply title block template..."), this,
+            [this, number] { emit applyTitleBlockTemplateRequested(number); });
         menu.addAction(tr("Place north arrow"), this, [this, number] { emit symbolRequested(number, QStringLiteral("north")); });
         menu.addAction(tr("Place scale bar"), this, [this, number] { emit symbolRequested(number, QStringLiteral("scalebar")); });
         menu.addAction(tr("Place revision cloud"), this, [this, number] { emit symbolRequested(number, QStringLiteral("cloud")); });

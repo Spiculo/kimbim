@@ -34,6 +34,10 @@ signals:
     void settingsRequested(const QString& number); // title, number, paper, background, placed drawings
     void legendRequested(const QString& number); // D74: place a legend of the sheet's purpose
     void symbolRequested(const QString& number, const QString& kind); // D87: north, scalebar, cloud
+    void scheduleRequested(const QString& number); // a schedule table on the sheet
+    void listRequested(const QString& number, const QString& kind); // "drawings" or "sheets"
+    void saveTitleBlockTemplateRequested(const QString& number);
+    void applyTitleBlockTemplateRequested(const QString& number);
     void deleteRequested(const QString& number);
     void purposeRequested(const QString& number, const QString& purpose); // "" = the current purpose
 

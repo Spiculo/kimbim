@@ -3250,6 +3250,28 @@ void Viewport::applyProjection()
     m_view->Invalidate();
 }
 
+void Viewport::setCamera(const gp_Pnt& eye, const gp_Pnt& center, const gp_Dir& up, bool perspective,
+    double fov, double scale)
+{
+    m_planView = false;
+    m_perspective = perspective;
+    const Handle(Graphic3d_Camera)& camera = m_view->Camera();
+    camera->SetEye(eye);
+    camera->SetCenter(center);
+    camera->SetUp(up);
+    camera->OrthogonalizeUp();
+    if (perspective) {
+        camera->SetProjectionType(Graphic3d_Camera::Projection_Perspective);
+        camera->SetFOVy(fov > 0.0 ? fov : g_fieldOfView);
+    } else {
+        camera->SetProjectionType(Graphic3d_Camera::Projection_Orthographic);
+        if (scale > 0.0)
+            camera->SetScale(scale);
+    }
+    m_view->Invalidate();
+    update();
+}
+
 void Viewport::setFieldOfView(double degrees)
 {
     g_fieldOfView = degrees;

@@ -2907,6 +2907,700 @@ Intro ejecuta, Mayús+Intro añade una línea, Arriba/Abajo recuperan entradas a
       <translation>&amp;Información del proyecto...</translation>
     </message>
     <message>
+      <location filename="../src/MainWindow.cpp" line="563" />
+      <source>Geo&amp;referencing...</source>
+      <translation>Geo&amp;referencia...</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="565" />
+      <source>The survey point, project rotation, projected CRS and true north</source>
+      <translation>El punto de levantamiento, la rotación del proyecto, el CRS proyectado y el norte verdadero</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6247" />
+      <source>Georeferencing</source>
+      <translation>Georreferenciación</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6272" />
+      <source>Easting (m):</source>
+      <translation>Este (m):</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6273" />
+      <source>Northing (m):</source>
+      <translation>Norte (m):</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6274" />
+      <source>Height (m):</source>
+      <translation>Altura (m):</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6275" />
+      <source>Rotation (degrees):</source>
+      <translation>Rotación (grados):</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6276" />
+      <source>Scale:</source>
+      <translation>Escala:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6277" />
+      <source>True north (degrees):</source>
+      <translation>Norte verdadero (grados):</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6278" />
+      <source>CRS name:</source>
+      <translation>Nombre del CRS:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6279" />
+      <source>Geodetic datum:</source>
+      <translation>Datum geodésico:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6280" />
+      <source>Map projection:</source>
+      <translation>Proyección cartográfica:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6281" />
+      <source>Map zone:</source>
+      <translation>Zona cartográfica:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6285" />
+      <source>Clear</source>
+      <translation>Borrar</translation>
+    </message>
+    <message>
+      <location filename="../src/SheetsPanel.cpp" line="71" />
+      <source>Place schedule...</source>
+      <translation>Colocar tabla...</translation>
+    </message>
+    <message>
+      <location filename="../src/SheetsPanel.cpp" line="72" />
+      <source>Place drawing list</source>
+      <translation>Colocar lista de planos</translation>
+    </message>
+    <message>
+      <location filename="../src/SheetsPanel.cpp" line="73" />
+      <source>Place sheet list</source>
+      <translation>Colocar lista de láminas</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="5922" />
+      <source>Schedule</source>
+      <translation>Tabla</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="5924" />
+      <source>There are no schedules to place</source>
+      <translation>No hay tablas para colocar</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="5935" />
+      <source>Schedule:</source>
+      <translation>Tabla:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="5939" />
+      <source>Width:</source>
+      <translation>Ancho:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="5940" />
+      <source>Merge identical items</source>
+      <translation>Combinar elementos idénticos</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="5962" />
+      <source>List</source>
+      <translation>Lista</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="552" />
+      <source>&amp;Export IFC...</source>
+      <translation>&amp;Exportar IFC...</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="554" />
+      <source>Export the model, a selection, a level or some classes to an IFC file</source>
+      <translation>Exportar el modelo, una selección, un nivel o algunas clases a un archivo IFC</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6530" />
+      <source>Export IFC</source>
+      <translation>Exportar IFC</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6546" />
+      <source>Property renames:</source>
+      <translation>Renombrar propiedades:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6547" />
+      <source>Pset.Property=NewName, one per line</source>
+      <translation>Pset.Propiedad=NuevoNombre, uno por línea</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6549" />
+      <source>File:</source>
+      <translation>Archivo:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6547" />
+      <source>Scope:</source>
+      <translation>Alcance:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6548" />
+      <source>Levels:</source>
+      <translation>Niveles:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6549" />
+      <source>Classes:</source>
+      <translation>Clases:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6550" />
+      <source>Include annotations</source>
+      <translation>Incluir anotaciones</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6552" />
+      <source>Include spaces</source>
+      <translation>Incluir espacios</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6554" />
+      <source>Include openings</source>
+      <translation>Incluir huecos</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6572" />
+      <source>Choose a file</source>
+      <translation>Elija un archivo</translation>
+    </message>
+    <message numerus="yes">
+      <location filename="../src/MainWindow.cpp" line="6597" />
+      <source>IFC exported: %n product(s)</source>
+      <translation>
+        <numerusform>IFC exportado: %n producto</numerusform>
+        <numerusform>IFC exportados: %n productos</numerusform>
+      </translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="558" />
+      <source>Link &amp;model...</source>
+      <translation>&amp;Vincular modelo...</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="560" />
+      <source>Show another IFC file in this project as a read-only reference</source>
+      <translation>Mostrar otro archivo IFC en este proyecto como referencia de solo lectura</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6320" />
+      <source>Link model</source>
+      <translation>Vincular modelo</translation>
+    </message>
+    <message numerus="yes">
+      <location filename="../src/MainWindow.cpp" line="6331" />
+      <source>Linked model: %n element(s)</source>
+      <translation>
+        <numerusform>Modelo vinculado: %n elemento</numerusform>
+        <numerusform>Modelos vinculados: %n elementos</numerusform>
+      </translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6338" />
+      <source>Linked models</source>
+      <translation>Modelos vinculados</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6342" />
+      <source>Name</source>
+      <translation>Nombre</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6342" />
+      <source>Path</source>
+      <translation>Ruta</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6342" />
+      <source>Elements</source>
+      <translation>Elementos</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6342" />
+      <source>Updated</source>
+      <translation>Actualizado</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6376" />
+      <source>Update</source>
+      <translation>Actualizar</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6377" />
+      <source>Unlink</source>
+      <translation>Desvincular</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6396" />
+      <source>Remove the link to "%1"?</source>
+      <translation>¿Quitar el vínculo con «%1»?</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="2470" />
+      <source>&amp;Links...</source>
+      <translation>&amp;Vínculos...</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="2472" />
+      <source>Update or remove the linked IFC references</source>
+      <translation>Actualizar o quitar las referencias IFC vinculadas</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="5875" />
+      <source>Title block template</source>
+      <translation>Plantilla de cajetín</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="5877" />
+      <source>Template name:</source>
+      <translation>Nombre de la plantilla:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="5877" />
+      <source>Office</source>
+      <translation>Oficina</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="5884" />
+      <source>Title block template saved</source>
+      <translation>Plantilla de cajetín guardada</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="5893" />
+      <source>There are no title block templates yet</source>
+      <translation>Todavía no hay plantillas de cajetín</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="5900" />
+      <source>Apply title block template</source>
+      <translation>Aplicar plantilla de cajetín</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="5901" />
+      <source>Template:</source>
+      <translation>Plantilla:</translation>
+    </message>
+    <message>
+      <location filename="../src/SheetsPanel.cpp" line="74" />
+      <source>Save title block as template...</source>
+      <translation>Guardar cajetín como plantilla...</translation>
+    </message>
+    <message>
+      <location filename="../src/SheetsPanel.cpp" line="76" />
+      <source>Apply title block template...</source>
+      <translation>Aplicar plantilla de cajetín...</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="2474" />
+      <source>Curtain &amp;wall settings...</source>
+      <translation>Ajustes del muro &amp;cortina...</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="2476" />
+      <source>Height, mullion spacing and panel thickness of the selected curtain wall</source>
+      <translation>Altura, separación de montantes y espesor del panel del muro cortina seleccionado</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6603" />
+      <source>Curtain wall settings</source>
+      <translation>Ajustes del muro cortina</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6607" />
+      <source>Select one curtain wall first</source>
+      <translation>Primero seleccione un muro cortina</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6612" />
+      <source>Curtain wall</source>
+      <translation>Muro cortina</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6629" />
+      <source>Mullion spacing:</source>
+      <translation>Separación de montantes:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6632" />
+      <source>Mullion width:</source>
+      <translation>Ancho del montante:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6633" />
+      <source>Mullion depth:</source>
+      <translation>Profundidad del montante:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6634" />
+      <source>Rail depth:</source>
+      <translation>Profundidad del travesaño:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6630" />
+      <source>Panel thickness:</source>
+      <translation>Espesor del panel:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6650" />
+      <source>Curtain wall updated</source>
+      <translation>Muro cortina actualizado</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="2470" />
+      <source>Building &amp;pad...</source>
+      <translation>Plataforma del &amp;edificio...</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="2472" />
+      <source>Flatten a polygonal part of a terrain to a building pad elevation</source>
+      <translation>Aplanar una parte poligonal de un terreno a la cota de una plataforma</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6310" />
+      <source>Building pad</source>
+      <translation>Plataforma del edificio</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6312" />
+      <source>Create a terrain first</source>
+      <translation>Primero cree un terreno</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6330" />
+      <source>Pad elevation:</source>
+      <translation>Cota de la plataforma:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6331" />
+      <source>Outline:</source>
+      <translation>Contorno:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6333" />
+      <source>One point per line: x, y (metres); the polygon closes itself</source>
+      <translation>Un punto por línea: x, y (metros); el polígono se cierra solo</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6337" />
+      <source>Add pad</source>
+      <translation>Añadir plataforma</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6338" />
+      <source>Clear pads</source>
+      <translation>Borrar plataformas</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6348" />
+      <source>Building pads cleared</source>
+      <translation>Plataformas borradas</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6375" />
+      <source>Enter at least three points as x, y</source>
+      <translation>Introduzca al menos tres puntos como x, y</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6385" />
+      <source>Building pad applied</source>
+      <translation>Plataforma aplicada</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6327" />
+      <source>Terrain:</source>
+      <translation>Terreno:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="2325" />
+      <source>&amp;Detail</source>
+      <translation>&amp;Detalle</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="2326" />
+      <source>Detail: click the corners of the area to enlarge, then Enter; the scale is in the options bar</source>
+      <translation>Detalle: haga clic en las esquinas del área a ampliar y pulse Intro; la escala está en la barra de opciones</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="2655" />
+      <source>Detail scale (1:n)</source>
+      <translation>Escala del detalle (1:n)</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="3480" />
+      <source>Detail: click the corners of the area to enlarge, then Enter</source>
+      <translation>Detalle: haga clic en las esquinas del área a ampliar y pulse Intro</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="7290" />
+      <source>Detail</source>
+      <translation>Detalle</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="7300" />
+      <source>Detail created: %1</source>
+      <translation>Detalle creado: %1</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6120" />
+      <source>Show viewpoint</source>
+      <translation>Mostrar punto de vista</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6155" />
+      <source>Viewpoint of "%1"</source>
+      <translation>Punto de vista de «%1»</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="2449" />
+      <source>&amp;Issues...</source>
+      <translation>&amp;Incidencias...</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="2451" />
+      <source>Issues with viewpoints and comments; import and export BCF</source>
+      <translation>Incidencias con puntos de vista y comentarios; importar y exportar BCF</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6060" />
+      <source>Issues</source>
+      <translation>Incidencias</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6062" />
+      <source>Description:</source>
+      <translation>Descripción:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6082" />
+      <source>Status:</source>
+      <translation>Estado:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6084" />
+      <source>Priority:</source>
+      <translation>Prioridad:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6086" />
+      <source>Assigned to:</source>
+      <translation>Asignado a:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6088" />
+      <source>Use the current selection as the viewpoint</source>
+      <translation>Usar la selección actual como punto de vista</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6087" />
+      <source>New issue</source>
+      <translation>Nueva incidencia</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6087" />
+      <source>Edit issue</source>
+      <translation>Editar incidencia</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6116" />
+      <source>New...</source>
+      <translation>Nueva...</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6117" />
+      <source>Edit...</source>
+      <translation>Editar...</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6119" />
+      <source>Comment...</source>
+      <translation>Comentar...</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6123" />
+      <source>Import BCF...</source>
+      <translation>Importar BCF...</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6124" />
+      <source>Export BCF...</source>
+      <translation>Exportar BCF...</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6098" />
+      <source>An issue needs a title</source>
+      <translation>Una incidencia necesita un título</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6135" />
+      <source>Comment</source>
+      <translation>Comentario</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6136" />
+      <source>Comment on "%1":</source>
+      <translation>Comentario sobre «%1»:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6152" />
+      <source>Delete issue</source>
+      <translation>Eliminar incidencia</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6153" />
+      <source>Delete "%1"?</source>
+      <translation>¿Eliminar «%1»?</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6166" />
+      <source>Import BCF</source>
+      <translation>Importar BCF</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6167" />
+      <source>BCF files (*.bcfzip *.bcf);;All files (*)</source>
+      <translation>Archivos BCF (*.bcfzip *.bcf);;Todos los archivos (*)</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6182" />
+      <source>BCF files (*.bcfzip)</source>
+      <translation>Archivos BCF (*.bcfzip)</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6178" />
+      <source>BCF imported: %1 added, %2 updated</source>
+      <translation>BCF importado: %1 añadidas, %2 actualizadas</translation>
+    </message>
+    <message numerus="yes">
+      <location filename="../src/MainWindow.cpp" line="6190" />
+      <source>BCF exported: %n issue(s)</source>
+      <translation>
+        <numerusform>BCF exportado: %n incidencia</numerusform>
+        <numerusform>BCF exportado: %n incidencias</numerusform>
+      </translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6076" />
+      <source>In Progress</source>
+      <translation>En curso</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6077" />
+      <source>Resolved</source>
+      <translation>Resuelta</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6078" />
+      <source>Closed</source>
+      <translation>Cerrada</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6081" />
+      <source>Low</source>
+      <translation>Baja</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6082" />
+      <source>Normal</source>
+      <translation>Normal</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6083" />
+      <source>High</source>
+      <translation>Alta</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="2452" />
+      <source>Ter&amp;rain...</source>
+      <translation>Ter&amp;reno...</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="2454" />
+      <source>Create a triangulated site mesh from survey points or contour polylines</source>
+      <translation>Crear una malla triangulada del terreno desde puntos de levantamiento o curvas de nivel</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6301" />
+      <source>Terrain</source>
+      <translation>Terreno</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6304" />
+      <source>The model has no level to put the terrain on</source>
+      <translation>El modelo no tiene ningún nivel donde poner el terreno</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6313" />
+      <source>Survey points</source>
+      <translation>Puntos de levantamiento</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6314" />
+      <source>Contour polylines</source>
+      <translation>Polilíneas de nivel</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6325" />
+      <source>Contour spacing:</source>
+      <translation>Separación de curvas:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6319" />
+      <source>From:</source>
+      <translation>Desde:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6318" />
+      <source>Level:</source>
+      <translation>Nivel:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6326" />
+      <source>Points:</source>
+      <translation>Puntos:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6322" />
+      <source>One point per line: x, y, z (metres).
+Contours: a blank line between polylines.</source>
+      <translation>Un punto por línea: x, y, z (metros).
+Curvas: una línea en blanco entre polilíneas.</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6357" />
+      <source>Enter at least three points (or two contours) as x, y, z</source>
+      <translation>Introduzca al menos tres puntos (o dos curvas) como x, y, z</translation>
+    </message>
+    <message numerus="yes">
+      <location filename="../src/MainWindow.cpp" line="6371" />
+      <source>Terrain created: %n triangle(s)</source>
+      <translation>
+        <numerusform>Terreno creado: %n triángulo</numerusform>
+        <numerusform>Terreno creado: %n triángulos</numerusform>
+      </translation>
+    </message>
+    <message>
       <location filename="../src/MainWindow.cpp" line="567" />
       <source>Export sheet as &amp;PDF...</source>
       <translation>Exportar lámina como &amp;PDF...</translation>
@@ -4788,6 +5482,29 @@ Licencia: GPL-3.0 o posterior</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="2449" />
+      <source>Purge unused t&amp;ypes</source>
+      <translation>Purgar t&amp;ipos sin uso</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="2451" />
+      <source>Remove the types that no element uses</source>
+      <translation>Eliminar los tipos que ningún elemento usa</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="2457" />
+      <source>Types</source>
+      <translation>Tipos</translation>
+    </message>
+    <message numerus="yes">
+      <location filename="../src/MainWindow.cpp" line="2462" />
+      <source>%n unused type(s) removed</source>
+      <translation>
+        <numerusform>%n tipo sin uso eliminado</numerusform>
+        <numerusform>%n tipos sin uso eliminados</numerusform>
+      </translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="2449" />
       <source>&amp;Classifications...</source>
       <translation>&amp;Clasificaciones...</translation>
     </message>
@@ -6590,6 +7307,21 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       <location filename="../src/MainWindow.cpp" line="6379" />
       <source>Polar (rotate each copy around a centre)</source>
       <translation>Polar (cada copia girada alrededor de un centro)</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6380" />
+      <source>Rectangular (a grid of copies)</source>
+      <translation>Rectangular (una cuadrícula de copias)</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6394" />
+      <source>Copies in X (grid):</source>
+      <translation>Copias en X (cuadrícula):</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6395" />
+      <source>Copies in Y (grid):</source>
+      <translation>Copias en Y (cuadrícula):</translation>
     </message>
     <message>
       <location filename="../src/MainWindow.cpp" line="6392" />

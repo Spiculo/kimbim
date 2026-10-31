@@ -32,6 +32,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <algorithm>
+#include <array>
 
 #include <QElapsedTimer>
 #include <QInputDialog>
@@ -75,10 +76,12 @@
 #include <QStatusBar>
 #include <QPointer>
 #include <QProgressDialog>
+#include <QPushButton>
 #include <QEventLoop>
 #include <QTabBar>
 #include <QTabWidget>
 #include <QProgressDialog>
+#include <QPushButton>
 #include <QTimer>
 #include <QHeaderView>
 #include <QTableWidget>
@@ -545,6 +548,14 @@ void MainWindow::buildMenus()
     QAction* saveFolder = file->addAction(tr("Save as project f&older..."));
     saveFolder->setObjectName(QStringLiteral("actionSaveAsFolder"));
     connect(saveFolder, &QAction::triggered, this, &MainWindow::saveAsFolderDialog);
+    QAction* exportIfc = file->addAction(tr("&Export IFC...")); // D117: what to export
+    exportIfc->setObjectName(QStringLiteral("actionExportIfc"));
+    exportIfc->setToolTip(tr("Export the model, a selection, a level or some classes to an IFC file"));
+    connect(exportIfc, &QAction::triggered, this, &MainWindow::exportIfcDialog);
+    QAction* linkModel = file->addAction(tr("Link &model...")); // D117: an external reference
+    linkModel->setObjectName(QStringLiteral("actionLinkModel"));
+    linkModel->setToolTip(tr("Show another IFC file in this project as a read-only reference"));
+    connect(linkModel, &QAction::triggered, this, &MainWindow::linkModelDialog);
     QAction* saveTemplate = file->addAction(tr("Save as &template..."));
     saveTemplate->setObjectName(QStringLiteral("actionSaveAsTemplate"));
     connect(saveTemplate, &QAction::triggered, this, &MainWindow::saveAsTemplateDialog);
@@ -561,6 +572,10 @@ void MainWindow::buildMenus()
     settingsAction->setObjectName(QStringLiteral("actionProjectSettings"));
     connect(settingsAction, &QAction::triggered, this, &MainWindow::projectSettingsDialog);
     file->addSeparator();
+    QAction* geo = file->addAction(tr("Geo&referencing...")); // survey point, rotation, CRS, true north
+    geo->setObjectName(QStringLiteral("actionGeoreferencing"));
+    geo->setToolTip(tr("The survey point, project rotation, projected CRS and true north"));
+    connect(geo, &QAction::triggered, this, &MainWindow::georefDialog);
     QAction* info = file->addAction(tr("Project &info..."));
     info->setObjectName(QStringLiteral("actionProjectInfo"));
     connect(info, &QAction::triggered, this, &MainWindow::projectInfoDialog);
@@ -1055,6 +1070,10 @@ void MainWindow::buildDocks()
     connect(m_sheetsPanel, &SheetsPanel::purposeRequested, this, &MainWindow::setSheetPurpose);
     connect(m_sheetsPanel, &SheetsPanel::legendRequested, this, &MainWindow::placeLegend);
     connect(m_sheetsPanel, &SheetsPanel::symbolRequested, this, &MainWindow::placeSheetSymbol); // D87
+    connect(m_sheetsPanel, &SheetsPanel::scheduleRequested, this, &MainWindow::placeSchedule);
+    connect(m_sheetsPanel, &SheetsPanel::listRequested, this, &MainWindow::placeSheetList);
+    connect(m_sheetsPanel, &SheetsPanel::saveTitleBlockTemplateRequested, this, &MainWindow::saveTitleBlockTemplate);
+    connect(m_sheetsPanel, &SheetsPanel::applyTitleBlockTemplateRequested, this, &MainWindow::applyTitleBlockTemplate);
     connect(m_sheetsPanel, &SheetsPanel::deleteRequested, this, [this](const QString& n) {
         const QJsonObject r = bridge("delete_sheet", {n});
         if (!r.value("ok").toBool())
@@ -2316,6 +2335,8 @@ void MainWindow::buildModelingToolbar()
             tr("Section: click the two ends of the section line, then the side it looks at")},
         {Tool::Elevation, "actionElevationTool", tr("&Elevation"), QKeyCombination(Qt::SHIFT, Qt::Key_V),
             tr("Elevation: click the two ends of the elevation line, then the side it looks at")},
+        {Tool::Detail, "actionDetailTool", tr("&Detail"), QKeyCombination::fromCombined(0),
+            tr("Detail: click the corners of the area to enlarge, then Enter; the scale is in the options bar")},
         {Tool::Measure, "actionMeasureTool", tr("Mea&sure"), QKeyCombination(Qt::SHIFT, Qt::Key_M),
             tr("Measure distances, angles and areas: click points (they snap); Enter stops, Esc clears. Changes nothing")},
         {Tool::Line, "actionLineTool", tr("L&ine"), QKeyCombination(Qt::SHIFT, Qt::Key_L),
@@ -2438,6 +2459,26 @@ void MainWindow::buildModelingToolbar()
     QAction* heightAction = model->addAction(tr("Wall &height..."));
     heightAction->setObjectName(QStringLiteral("actionWallHeight"));
     connect(heightAction, &QAction::triggered, this, &MainWindow::wallHeightDialog);
+    QAction* terrainAction = model->addAction(tr("Ter&rain...")); // site mesh from points or contours
+    terrainAction->setObjectName(QStringLiteral("actionTerrain"));
+    terrainAction->setToolTip(tr("Create a triangulated site mesh from survey points or contour polylines"));
+    connect(terrainAction, &QAction::triggered, this, &MainWindow::terrainDialog);
+    QAction* padAction = model->addAction(tr("Building &pad...")); // D118: flatten a terrain
+    padAction->setObjectName(QStringLiteral("actionBuildingPad"));
+    padAction->setToolTip(tr("Flatten a polygonal part of a terrain to a building pad elevation"));
+    connect(padAction, &QAction::triggered, this, &MainWindow::terrainPadDialog);
+    QAction* linksAction = model->addAction(tr("&Links...")); // D117: linked models
+    linksAction->setObjectName(QStringLiteral("actionLinks"));
+    linksAction->setToolTip(tr("Update or remove the linked IFC references"));
+    connect(linksAction, &QAction::triggered, this, &MainWindow::linksDialog);
+    QAction* curtainAction = model->addAction(tr("Curtain &wall settings...")); // D116
+    curtainAction->setObjectName(QStringLiteral("actionCurtainWallSettings"));
+    curtainAction->setToolTip(tr("Height, mullion spacing and panel thickness of the selected curtain wall"));
+    connect(curtainAction, &QAction::triggered, this, &MainWindow::curtainWallDialog);
+    QAction* issuesAction = model->addAction(tr("&Issues...")); // BCF issue management
+    issuesAction->setObjectName(QStringLiteral("actionIssues"));
+    issuesAction->setToolTip(tr("Issues with viewpoints and comments; import and export BCF"));
+    connect(issuesAction, &QAction::triggered, this, &MainWindow::issuesDialog);
     QAction* checkAction = model->addAction(tr("Chec&k model...")); // D81: the Checks panel (Checks.cpp)
     checkAction->setObjectName(QStringLiteral("actionCheckModel"));
     checkAction->setToolTip(tr("Schema validation, IDS, clash detection and model checks"));
@@ -2446,6 +2487,18 @@ void MainWindow::buildModelingToolbar()
     typesAction->setObjectName(QStringLiteral("actionTypeManager"));
     typesAction->setToolTip(tr("List the model's types, make one from the selection, assign, edit and update all"));
     connect(typesAction, &QAction::triggered, this, &MainWindow::openTypeManager);
+    QAction* purgeTypesAction = model->addAction(tr("Purge unused t&ypes")); // M2
+    purgeTypesAction->setObjectName(QStringLiteral("actionPurgeTypes"));
+    purgeTypesAction->setToolTip(tr("Remove the types that no element uses"));
+    connect(purgeTypesAction, &QAction::triggered, this, [this] {
+        const QJsonObject r = bridge("purge_unused");
+        if (!r.value("ok").toBool()) {
+            showError(tr("Types"), r.value("error").toString());
+            return;
+        }
+        afterEdit(r);
+        m_status->showMessage(tr("%n unused type(s) removed", nullptr, r.value("removed").toInt()));
+    });
     QAction* classAction = model->addAction(tr("&Classifications...")); // M2
     classAction->setObjectName(QStringLiteral("actionClassifications"));
     classAction->setToolTip(tr("Uniclass, OmniClass and local classification systems and their codes"));
@@ -2617,6 +2670,14 @@ void MainWindow::buildModelingToolbar()
     sectionRow->addWidget(m_sectionShape);
     bar->addField(sectionBox);
     sectionBox->setVisible(false);
+    m_detailScale = new QSpinBox(bar);
+    m_detailScale->setObjectName(QStringLiteral("detailScale"));
+    m_detailScale->setRange(1, 500);
+    m_detailScale->setValue(20);
+    m_detailScale->setPrefix(QStringLiteral("1:"));
+    m_detailScale->setToolTip(tr("Detail scale (1:n)"));
+    bar->addField(m_detailScale);
+    m_detailScale->setVisible(false);
     connect(m_sectionShape, &QComboBox::currentIndexChanged, this, [this] {
         m_annotationPoints.clear();
         m_sectionBulges.clear();
@@ -2687,6 +2748,7 @@ void MainWindow::buildModelingToolbar()
             break;
         case Tool::Slab:
         case Tool::Roof:
+        case Tool::Detail:
             m_polygonTool->setTolerance(tolerance);
             m_polygonTool->setOrtho(ortho);
             m_polygonTool->move(p);
@@ -2804,6 +2866,7 @@ void MainWindow::buildModelingToolbar()
             break;
         case Tool::Slab:
         case Tool::Roof:
+        case Tool::Detail:
             m_polygonTool->setTolerance(tolerance);
             m_polygonTool->setOrtho(ortho);
             m_polygonTool->click(p);
@@ -2943,7 +3006,8 @@ void MainWindow::buildModelingToolbar()
         }
         if (m_tool == Tool::Wall && m_wallTool->isDrawing())
             m_wallTool->finish();
-        else if ((m_tool == Tool::Slab || m_tool == Tool::SlabOpening || m_tool == Tool::Roof) && m_polygonTool->isDrawing())
+        else if ((m_tool == Tool::Slab || m_tool == Tool::SlabOpening || m_tool == Tool::Roof
+                     || m_tool == Tool::Detail) && m_polygonTool->isDrawing())
             m_polygonTool->cancel();
         else if ((m_tool == Tool::Beam || m_tool == Tool::CurtainWall || m_tool == Tool::Grid || m_tool == Tool::Move || m_tool == Tool::Stair)
             && m_twoPointTool->isDrawing())
@@ -2976,7 +3040,8 @@ void MainWindow::buildModelingToolbar()
     onEachView([this](Viewport* v) { connect(v, &Viewport::drawingConfirmed, this, [this] {
         if (m_tool == Tool::Wall)
             m_wallTool->finish();
-        else if (m_tool == Tool::Slab || m_tool == Tool::SlabOpening || m_tool == Tool::Roof)
+        else if (m_tool == Tool::Slab || m_tool == Tool::SlabOpening || m_tool == Tool::Roof
+            || m_tool == Tool::Detail)
             m_polygonTool->finish();
         else if (m_tool == Tool::Measure)
             m_measure->finish();
@@ -3017,6 +3082,8 @@ void MainWindow::buildModelingToolbar()
             addSlabOpening(outline);
         else if (m_tool == Tool::Roof)
             createRoof(outline);
+        else if (m_tool == Tool::Detail)
+            createDetail(outline);
         else
             createSlab(outline);
     });
@@ -3152,6 +3219,7 @@ void MainWindow::updateToolPreview()
         return;
     case Tool::SlabOpening:
     case Tool::Roof:
+    case Tool::Detail:
     case Tool::Slab: {
         // The outline as thin walls of the slab's depth, its top at the level.
         QVector<QPointF> pts = m_polygonTool->points();
@@ -3308,6 +3376,8 @@ void MainWindow::setTool(Tool tool)
     m_wallHeight->setToolTip(tool == Tool::Roof ? tr("Eaves height above the level") : tr("Wall height"));
     m_roofKind->parentWidget()->setVisible(tool == Tool::Roof);
     m_sectionShape->parentWidget()->setVisible(tool == Tool::Section || tool == Tool::Elevation);
+    if (m_detailScale)
+        m_detailScale->setVisible(tool == Tool::Detail);
     m_lengthInput->setVisible(tool == Tool::Wall || tool == Tool::Beam || tool == Tool::Grid || tool == Tool::Move
         || tool == Tool::Rotate || tool == Tool::Stretch || isDraftTool(tool) || tool == Tool::Object);
     const QString unit = m_settings.value("length_unit").toString(QStringLiteral("m"));
@@ -3440,6 +3510,9 @@ void MainWindow::setTool(Tool tool)
         m_status->showMessage(m_sectionShape->currentData().toString() == QLatin1String("polyline")
                 ? tr("Elevation: click the corners; Enter finishes the line, then click the side it looks at")
                 : tr("Elevation: click where the elevation line starts"));
+        break;
+    case Tool::Detail:
+        m_status->showMessage(tr("Detail: click the corners of the area to enlarge, then Enter"));
         break;
     case Tool::PlaceModel:
         m_status->showMessage(m_types->count() ? tr("Place model: click where its origin goes (Shift: turned 90 degrees)")
@@ -3804,7 +3877,7 @@ void MainWindow::buildPalette()
         tool(Tool::RadialDimension), tool(Tool::LevelDimension), tool(Tool::NorthArrow), tool(Tool::ScaleBar),
         tool(Tool::Cloud)});
     m_palette->addGroup(QStringLiteral("view"), tr("View"), {tool(Tool::Section), tool(Tool::Elevation),
-        newPlan, newSheet});
+        tool(Tool::Detail), newPlan, newSheet});
     m_palette->addGroup(QStringLiteral("edit"), tr("Edit"), {tool(Tool::Move), tool(Tool::Rotate),
         tool(Tool::Stretch), tool(Tool::Split), tool(Tool::Trim), tool(Tool::Join), mirror, act("actionCopyToLevel"), tool(Tool::Measure)});
     // D90: related tools share one flyout button (the last one used shows on it).
@@ -3813,7 +3886,7 @@ void MainWindow::buildPalette()
     m_palette->addFlyout(QStringLiteral("plane"), {tool(Tool::Line), tool(Tool::Polyline), tool(Tool::ArcCircle),
         tool(Tool::Rectangle)});
     m_palette->addFlyout(QStringLiteral("plane"), {tool(Tool::NorthArrow), tool(Tool::ScaleBar), tool(Tool::Cloud)});
-    m_palette->addFlyout(QStringLiteral("view"), {tool(Tool::Section), tool(Tool::Elevation)});
+    m_palette->addFlyout(QStringLiteral("view"), {tool(Tool::Section), tool(Tool::Elevation), tool(Tool::Detail)});
     m_palette->addFlyout(QStringLiteral("edit"), {tool(Tool::Split), tool(Tool::Trim), tool(Tool::Join)}); // D92
     m_palette->addFlyout(QStringLiteral("3d"), {tool(Tool::Slab), tool(Tool::SlabOpening)});
     m_palette->setMode(ToolPalette::modeFromKey(m_prefs.value(QStringLiteral("palette_mode")).toString()));
@@ -5885,6 +5958,110 @@ bool MainWindow::placeLegend(const QString& number)
     return true;
 }
 
+bool MainWindow::placeSchedule(const QString& number)
+{
+    const QJsonArray schemes = bridge("schedule_schemes").value("schemes").toArray();
+    if (schemes.isEmpty()) {
+        showError(tr("Schedule"), tr("There are no schedules to place"));
+        return false;
+    }
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Place schedule"));
+    auto* form = new QFormLayout(&dialog);
+    auto* scheme = new QComboBox(&dialog);
+    for (const auto& value : schemes) {
+        const QJsonObject s = value.toObject();
+        scheme->addItem(s.value("name").toString(), s.value("id").toString());
+    }
+    auto* merge = new QCheckBox(tr("Merge identical items"), &dialog);
+    auto* width = new QDoubleSpinBox(&dialog);
+    width->setRange(60.0, 400.0);
+    width->setDecimals(1);
+    width->setValue(180.0);
+    width->setSuffix(tr(" mm"));
+    form->addRow(tr("Schedule:"), scheme);
+    form->addRow(tr("Width:"), width);
+    form->addRow(merge);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    form->addRow(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    if (dialog.exec() != QDialog::Accepted)
+        return false;
+    const QJsonObject r = bridge("place_schedule", {number, scheme->currentData().toString(),
+        QStringLiteral("-1"), QStringLiteral("-1"), QString::number(width->value(), 'f', 1),
+        merge->isChecked() ? QStringLiteral("true") : QStringLiteral("false")});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Schedule"), r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
+    openSheet(number);
+    refreshSheets(true);
+    return true;
+}
+
+bool MainWindow::placeSheetList(const QString& number, const QString& kind)
+{
+    const QJsonObject r = bridge(kind == QLatin1String("drawings") ? "place_drawing_list" : "place_sheet_list",
+        {number});
+    if (!r.value("ok").toBool()) {
+        showError(tr("List"), r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
+    openSheet(number);
+    refreshSheets(true);
+    return true;
+}
+
+bool MainWindow::saveTitleBlockTemplate(const QString& number)
+{
+    bool ok = false;
+    const QString name = QInputDialog::getText(this, tr("Title block template"),
+        tr("Template name:"), QLineEdit::Normal, tr("Office"), &ok);
+    if (!ok || name.trimmed().isEmpty())
+        return false;
+    const QJsonObject r = bridge("save_title_block_template", {name.trimmed(), number});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Title block template"), r.value("error").toString());
+        return false;
+    }
+    m_status->showMessage(tr("Title block template saved"));
+    return true;
+}
+
+bool MainWindow::applyTitleBlockTemplate(const QString& number)
+{
+    const QJsonArray templates = bridge("title_block_templates").value("templates").toArray();
+    if (templates.isEmpty()) {
+        showError(tr("Title block template"), tr("There are no title block templates yet"));
+        return false;
+    }
+    QStringList names;
+    for (const auto& value : templates) {
+        const QJsonObject t = value.toObject();
+        names << QStringLiteral("%1 (%2)").arg(t.value("name").toString(), t.value("paper").toString());
+    }
+    bool ok = false;
+    const QString chosen = QInputDialog::getItem(this, tr("Apply title block template"),
+        tr("Template:"), names, 0, false, &ok);
+    if (!ok)
+        return false;
+    const int index = names.indexOf(chosen);
+    if (index < 0)
+        return false;
+    const QJsonObject r = bridge("apply_title_block_template",
+        {number, templates[index].toObject().value("id").toString()});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Title block template"), r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
+    refreshSheets(true);
+    return true;
+}
+
 bool MainWindow::openSheet(const QString& number)
 {
     const QString key = QStringLiteral("sheet:") + number;
@@ -5903,10 +6080,14 @@ bool MainWindow::openSheet(const QString& number)
         const bool titleBlock = drawing == QLatin1String("titleblock");
         const bool legend = drawing.startsWith(QLatin1String("legend:"));
         const bool symbol = drawing.startsWith(QLatin1String("symbol:")); // D87
+        const bool schedule = drawing.startsWith(QLatin1String("schedule:"));
+        const bool list = drawing.startsWith(QLatin1String("list:"));
+        const QString tableIndex = schedule ? drawing.mid(9) : list ? drawing.mid(5) : QString();
         const QJsonObject r = titleBlock
             ? bridge("move_title_block", {number, QString::number(topLeft.x(), 'f', 1), QString::number(topLeft.y(), 'f', 1)})
-            : bridge(symbol ? "move_sheet_symbol" : legend ? "move_legend" : "move_placed",
-                {number, legend || symbol ? drawing.mid(7) : drawing,
+            : bridge(schedule ? "move_schedule" : list ? "move_list" : symbol ? "move_sheet_symbol"
+                    : legend ? "move_legend" : "move_placed",
+                {number, schedule || list ? tableIndex : legend || symbol ? drawing.mid(7) : drawing,
                 QString::number(topLeft.x(), 'f', 1), QString::number(topLeft.y(), 'f', 1)});
         if (!r.value("ok").toBool())
             m_status->showMessage(tr("Could not move it: %1").arg(r.value("error").toString()));
@@ -5929,8 +6110,12 @@ bool MainWindow::openSheet(const QString& number)
             return; // the title block belongs to the sheet: it can be moved, not removed
         const bool legend = drawing.startsWith(QLatin1String("legend:"));
         const bool symbol = drawing.startsWith(QLatin1String("symbol:")); // D87
-        const QJsonObject r = bridge(symbol ? "remove_sheet_symbol" : legend ? "remove_legend" : "remove_placed",
-            {number, legend || symbol ? drawing.mid(7) : drawing});
+        const bool schedule = drawing.startsWith(QLatin1String("schedule:"));
+        const bool list = drawing.startsWith(QLatin1String("list:"));
+        const QString tableIndex = schedule ? drawing.mid(9) : list ? drawing.mid(5) : QString();
+        const QJsonObject r = bridge(schedule ? "remove_schedule" : list ? "remove_list"
+                : symbol ? "remove_sheet_symbol" : legend ? "remove_legend" : "remove_placed",
+            {number, schedule || list ? tableIndex : legend || symbol ? drawing.mid(7) : drawing});
         if (!r.value("ok").toBool())
             m_status->showMessage(tr("Could not remove it: %1").arg(r.value("error").toString()));
         afterEdit(r);
@@ -6004,6 +6189,23 @@ void MainWindow::refreshSheets(bool changed)
             placed.push_back({QStringLiteral("titleblock"),
                 QRectF(tb.value("x").toDouble(), tb.value("y").toDouble(), tb.value("w").toDouble(), tb.value("h").toDouble()),
                 QStringLiteral("titleblock")});
+        const QJsonObject tables = it->value("has_tables").toBool()
+            ? bridge("sheet_schedules", {it->value("number").toString()}) // schedules and lists
+            : QJsonObject();
+        for (const auto& sv : tables.value("schedules").toArray()) {
+            const QJsonObject s = sv.toObject();
+            placed.push_back({QStringLiteral("schedule:") + QString::number(s.value("index").toInt()),
+                QRectF(s.value("x").toDouble(), s.value("y").toDouble(), s.value("width").toDouble(),
+                    s.value("height").toDouble()),
+                QStringLiteral("schedule")});
+        }
+        for (const auto& lv : tables.value("lists").toArray()) {
+            const QJsonObject l = lv.toObject();
+            placed.push_back({QStringLiteral("list:") + QString::number(l.value("index").toInt()),
+                QRectF(l.value("x").toDouble(), l.value("y").toDouble(), l.value("width").toDouble(),
+                    l.value("height").toDouble()),
+                QStringLiteral("list")});
+        }
         view->setPlaced(placed);
         m_dock->setTitle(key, tr("Sheet %1").arg(it->value("number").toString()));
         if (changed && !m_generating.contains(view->guid()) && view->hasDrawing()) {
@@ -6229,6 +6431,711 @@ SchedulesDialog* MainWindow::openSchedules(const QString& scheme)
     return m_schedules;
 }
 
+void MainWindow::terrainPadDialog()
+{
+    const QJsonArray terrains = bridge("list_terrains").value("terrains").toArray();
+    if (terrains.isEmpty()) {
+        showError(tr("Building pad"), tr("Create a terrain first"));
+        return;
+    }
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Building pad"));
+    auto* form = new QFormLayout(&dialog);
+    auto* terrain = new QComboBox(&dialog);
+    for (const auto& value : terrains) {
+        const QJsonObject t = value.toObject();
+        terrain->addItem(t.value("name").toString(), t.value("guid").toString());
+    }
+    auto* elevation = new QDoubleSpinBox(&dialog);
+    elevation->setRange(-1000.0, 10000.0);
+    elevation->setDecimals(3);
+    elevation->setSuffix(tr(" m"));
+    auto* points = new QPlainTextEdit(&dialog);
+    points->setPlaceholderText(tr("One point per line: x, y (metres); the polygon closes itself"));
+    points->setMinimumSize(380, 180);
+    form->addRow(tr("Terrain:"), terrain);
+    form->addRow(tr("Pad elevation:"), elevation);
+    form->addRow(tr("Outline:"), points);
+    auto* buttons = new QDialogButtonBox(&dialog);
+    auto* add = buttons->addButton(tr("Add pad"), QDialogButtonBox::AcceptRole);
+    auto* clear = buttons->addButton(tr("Clear pads"), QDialogButtonBox::ResetRole);
+    auto* close = buttons->addButton(tr("Close"), QDialogButtonBox::RejectRole);
+    form->addRow(buttons);
+    connect(close, &QPushButton::clicked, &dialog, &QDialog::reject);
+    connect(clear, &QPushButton::clicked, &dialog, [&] {
+        const QJsonObject r = bridge("clear_building_pads", {terrain->currentData().toString()});
+        if (!r.value("ok").toBool()) {
+            showError(tr("Building pad"), r.value("error").toString());
+            return;
+        }
+        afterEdit(r);
+        m_status->showMessage(tr("Building pads cleared"));
+    });
+    connect(add, &QPushButton::clicked, &dialog, [&] {
+        QJsonArray outline;
+        for (const QString& raw : points->toPlainText().split(QLatin1Char('\n'))) {
+            const QString line = raw.trimmed();
+            if (line.isEmpty())
+                continue;
+            const QStringList parts = line.split(QRegularExpression(QStringLiteral("[,;\\s]+")), Qt::SkipEmptyParts);
+            if (parts.size() < 2)
+                continue;
+            bool okX = false, okY = false;
+            const double x = parts[0].toDouble(&okX), y = parts[1].toDouble(&okY);
+            if (okX && okY)
+                outline.append(QJsonArray{x, y});
+        }
+        if (outline.size() < 3) {
+            showError(tr("Building pad"), tr("Enter at least three points as x, y"));
+            return;
+        }
+        const QJsonObject r = bridge("set_building_pad", {terrain->currentData().toString(),
+            QString::fromUtf8(QJsonDocument(outline).toJson(QJsonDocument::Compact)),
+            QString::number(elevation->value(), 'f', 3)});
+        if (!r.value("ok").toBool()) {
+            showError(tr("Building pad"), r.value("error").toString());
+            return;
+        }
+        afterEdit(r);
+        m_status->showMessage(tr("Building pad applied"));
+    });
+    dialog.exec();
+}
+
+void MainWindow::linkModelDialog()
+{
+    const QString path = QFileDialog::getOpenFileName(this, tr("Link model"), QString(),
+        tr("IFC files (*.ifc);;All files (*)"));
+    if (path.isEmpty())
+        return;
+    const QJsonObject r = bridge("link_model", {path});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Link model"), r.value("error").toString());
+        return;
+    }
+    afterEdit(r);
+    m_status->showMessage(tr("Linked model: %n element(s)", nullptr, r.value("elements").toInt()));
+}
+
+void MainWindow::linksDialog()
+{
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Linked models"));
+    dialog.resize(760, 360);
+    auto* layout = new QVBoxLayout(&dialog);
+    auto* table = new QTableWidget(&dialog);
+    table->setColumnCount(4);
+    table->setHorizontalHeaderLabels({tr("Name"), tr("Path"), tr("Elements"), tr("Updated")});
+    table->horizontalHeader()->setStretchLastSection(true);
+    table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+    table->setSelectionBehavior(QAbstractItemView::SelectRows);
+    table->setSelectionMode(QAbstractItemView::SingleSelection);
+    table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    layout->addWidget(table, 1);
+    auto* buttons = new QHBoxLayout;
+    layout->addLayout(buttons);
+    QJsonArray links;
+    auto refresh = [&] {
+        links = bridge("list_links").value("links").toArray();
+        table->setRowCount(links.size());
+        for (int i = 0; i < links.size(); ++i) {
+            const QJsonObject link = links[i].toObject();
+            auto* name = new QTableWidgetItem(link.value("name").toString());
+            name->setData(Qt::UserRole, link.value("guid").toString());
+            table->setItem(i, 0, name);
+            auto* path = new QTableWidgetItem(link.value("path").toString());
+            path->setToolTip(link.value("path").toString());
+            table->setItem(i, 1, path);
+            table->setItem(i, 2, new QTableWidgetItem(QString::number(link.value("elements").toInt())));
+            table->setItem(i, 3, new QTableWidgetItem(link.value("updated").toString()));
+        }
+        if (table->rowCount())
+            table->selectRow(0);
+    };
+    refresh();
+    auto current = [&]() -> QJsonObject {
+        const int row = table->currentRow();
+        return row >= 0 && row < links.size() ? links[row].toObject() : QJsonObject();
+    };
+    auto* update = new QPushButton(tr("Update"), &dialog);
+    auto* remove = new QPushButton(tr("Unlink"), &dialog);
+    auto* close = new QPushButton(tr("Close"), &dialog);
+    buttons->addWidget(update);
+    buttons->addWidget(remove);
+    buttons->addStretch(1);
+    buttons->addWidget(close);
+    connect(update, &QPushButton::clicked, &dialog, [&] {
+        const QJsonObject link = current();
+        if (link.isEmpty())
+            return;
+        const QJsonObject r = bridge("update_link", {link.value("guid").toString()});
+        if (!r.value("ok").toBool()) {
+            showError(tr("Linked models"), r.value("error").toString());
+            return;
+        }
+        afterEdit(r);
+        refresh();
+    });
+    connect(remove, &QPushButton::clicked, &dialog, [&] {
+        const QJsonObject link = current();
+        if (link.isEmpty())
+            return;
+        if (QMessageBox::question(&dialog, tr("Unlink"),
+                tr("Remove the link to \"%1\"?").arg(link.value("name").toString())) != QMessageBox::Yes)
+            return;
+        const QJsonObject r = bridge("unlink", {link.value("guid").toString()});
+        if (!r.value("ok").toBool()) {
+            showError(tr("Linked models"), r.value("error").toString());
+            return;
+        }
+        afterEdit(r);
+        refresh();
+    });
+    connect(close, &QPushButton::clicked, &dialog, &QDialog::accept);
+    dialog.exec();
+}
+
+void MainWindow::exportIfcDialog()
+{
+    const QJsonObject options = bridge("export_options");
+    if (!options.value("ok").toBool()) {
+        showError(tr("Export IFC"), options.value("error").toString());
+        return;
+    }
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Export IFC"));
+    auto* form = new QFormLayout(&dialog);
+    auto* path = new QLineEdit(&dialog);
+    auto* browse = new QPushButton(tr("Browse..."), &dialog);
+    auto* pathRow = new QHBoxLayout;
+    pathRow->addWidget(path, 1);
+    pathRow->addWidget(browse);
+    auto* scope = new QComboBox(&dialog);
+    for (const char* s : {"all", "selection", "level", "class"})
+        scope->addItem(tr(s), QString::fromLatin1(s));
+    auto* levels = new QListWidget(&dialog);
+    levels->setSelectionMode(QAbstractItemView::MultiSelection);
+    for (const auto& value : options.value("levels").toArray()) {
+        const QJsonObject level = value.toObject();
+        auto* item = new QListWidgetItem(level.value("name").toString(), levels);
+        item->setData(Qt::UserRole, level.value("guid").toString());
+    }
+    auto* classes = new QListWidget(&dialog);
+    classes->setSelectionMode(QAbstractItemView::MultiSelection);
+    for (const auto& value : options.value("classes").toArray()) {
+        const QJsonObject cls = value.toObject();
+        auto* item = new QListWidgetItem(QStringLiteral("%1 (%2)").arg(cls.value("name").toString(),
+            QString::number(cls.value("count").toInt())), classes);
+        item->setData(Qt::UserRole, cls.value("name").toString());
+    }
+    auto* annotations = new QCheckBox(tr("Include annotations"), &dialog);
+    annotations->setChecked(true);
+    auto* spaces = new QCheckBox(tr("Include spaces"), &dialog);
+    spaces->setChecked(true);
+    auto* openings = new QCheckBox(tr("Include openings"), &dialog);
+    openings->setChecked(true);
+    auto* renames = new QPlainTextEdit(&dialog);
+    renames->setPlaceholderText(tr("Pset.Property=NewName, one per line"));
+    renames->setMaximumHeight(70);
+    form->addRow(tr("Property renames:"), renames);
+    form->addRow(tr("File:"), pathRow);
+    form->addRow(tr("Scope:"), scope);
+    form->addRow(tr("Levels:"), levels);
+    form->addRow(tr("Classes:"), classes);
+    form->addRow(annotations);
+    form->addRow(spaces);
+    form->addRow(openings);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    form->addRow(buttons);
+    connect(browse, &QPushButton::clicked, &dialog, [&] {
+        const QString chosen = QFileDialog::getSaveFileName(&dialog, tr("Export IFC"), path->text(),
+            tr("IFC files (*.ifc)"));
+        if (!chosen.isEmpty())
+            path->setText(chosen);
+    });
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    if (path->text().trimmed().isEmpty()) {
+        showError(tr("Export IFC"), tr("Choose a file"));
+        return;
+    }
+    QJsonArray levelGuids, classNames;
+    for (QListWidgetItem* item : levels->selectedItems())
+        levelGuids.append(item->data(Qt::UserRole).toString());
+    for (QListWidgetItem* item : classes->selectedItems())
+        classNames.append(item->data(Qt::UserRole).toString());
+    QJsonArray guids;
+    for (const QString& guid : m_selection)
+        guids.append(guid);
+    QJsonObject propertyMap;
+    for (const QString& raw : renames->toPlainText().split(QLatin1Char('\n'))) {
+        const QString line = raw.trimmed();
+        const int eq = line.indexOf(QLatin1Char('='));
+        const int dot = line.indexOf(QLatin1Char('.'));
+        if (eq <= dot || dot < 0)
+            continue;
+        const QString pset = line.left(dot).trimmed();
+        const QString prop = line.mid(dot + 1, eq - dot - 1).trimmed();
+        const QString target = line.mid(eq + 1).trimmed();
+        if (pset.isEmpty() || prop.isEmpty() || target.isEmpty())
+            continue;
+        QJsonObject psetMap = propertyMap.value(pset).toObject();
+        psetMap.insert(prop, target);
+        propertyMap.insert(pset, psetMap);
+    }
+    QJsonObject values{{"scope", scope->currentData().toString()}, {"guids", guids},
+        {"levels", levelGuids}, {"classes", classNames},
+        {"include_annotations", annotations->isChecked()}, {"include_spaces", spaces->isChecked()},
+        {"include_openings", openings->isChecked()}, {"property_map", propertyMap}};
+    const QJsonObject r = bridge("ifc_export", {path->text().trimmed(),
+        QString::fromUtf8(QJsonDocument(values).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Export IFC"), r.value("error").toString());
+        return;
+    }
+    m_status->showMessage(tr("IFC exported: %n product(s)", nullptr, r.value("products").toInt()));
+}
+
+void MainWindow::curtainWallDialog()
+{
+    if (m_selection.size() != 1) {
+        m_status->showMessage(tr("Select one curtain wall first"));
+        return;
+    }
+    const QJsonObject current = bridge("curtain_wall_info", {m_selection.first()});
+    if (!current.value("ok").toBool()) {
+        showError(tr("Curtain wall"), current.value("error").toString());
+        return;
+    }
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Curtain wall settings"));
+    auto* form = new QFormLayout(&dialog);
+    auto spin = [&](double lo, double hi, double value, int decimals, const QString& suffix) {
+        auto* box = new QDoubleSpinBox(&dialog);
+        box->setRange(lo, hi);
+        box->setDecimals(decimals);
+        box->setValue(value);
+        box->setSuffix(suffix);
+        return box;
+    };
+    auto* height = spin(0.1, 100.0, current.value("height").toDouble(3.0), 3, tr(" m"));
+    auto* spacing = spin(0.1, 20.0, current.value("spacing").toDouble(1.5), 3, tr(" m"));
+    auto* thickness = spin(0.005, 0.5, current.value("panel_thickness").toDouble(0.04), 3, tr(" m"));
+    auto* mullionWidth = spin(0.01, 0.5, current.value("mullion_width").toDouble(0.05), 3, tr(" m"));
+    auto* mullionDepth = spin(0.01, 0.5, current.value("mullion_depth").toDouble(0.05), 3, tr(" m"));
+    auto* railDepth = spin(0.01, 0.5, current.value("rail_depth").toDouble(0.05), 3, tr(" m"));
+    form->addRow(tr("Height:"), height);
+    form->addRow(tr("Mullion spacing:"), spacing);
+    form->addRow(tr("Panel thickness:"), thickness);
+    form->addRow(tr("Mullion width:"), mullionWidth);
+    form->addRow(tr("Mullion depth:"), mullionDepth);
+    form->addRow(tr("Rail depth:"), railDepth);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    form->addRow(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    QJsonObject values{{"height", height->value()}, {"spacing", spacing->value()},
+        {"panel_thickness", thickness->value()}, {"mullion_width", mullionWidth->value()},
+        {"mullion_depth", mullionDepth->value()}, {"rail_depth", railDepth->value()}};
+    const QJsonObject r = bridge("update_curtain_wall", {m_selection.first(),
+        QString::fromUtf8(QJsonDocument(values).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Curtain wall"), r.value("error").toString());
+        return;
+    }
+    afterEdit(r);
+    m_status->showMessage(tr("Curtain wall updated"));
+}
+
+void MainWindow::issuesDialog()
+{
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Issues"));
+    dialog.resize(820, 460);
+    auto* layout = new QVBoxLayout(&dialog);
+    auto* table = new QTableWidget(&dialog);
+    table->setObjectName(QStringLiteral("issuesTable"));
+    table->setColumnCount(4);
+    table->setHorizontalHeaderLabels({tr("Title"), tr("Status"), tr("Priority"), tr("Assigned to")});
+    table->horizontalHeader()->setStretchLastSection(true);
+    table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    table->setSelectionBehavior(QAbstractItemView::SelectRows);
+    table->setSelectionMode(QAbstractItemView::SingleSelection);
+    table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    layout->addWidget(table, 1);
+    auto* buttons = new QHBoxLayout;
+    layout->addLayout(buttons);
+
+    QJsonArray issues;
+    const auto current = [&]() -> QJsonObject {
+        const int row = table->currentRow();
+        return row >= 0 && row < issues.size() ? issues[row].toObject() : QJsonObject();
+    };
+    auto refresh = [&] {
+        const QJsonObject r = bridge("list_issues");
+        issues = r.value("issues").toArray();
+        table->setRowCount(issues.size());
+        for (int i = 0; i < issues.size(); ++i) {
+            const QJsonObject issue = issues[i].toObject();
+            auto* title = new QTableWidgetItem(issue.value("title").toString());
+            title->setData(Qt::UserRole, issue.value("id").toString());
+            title->setToolTip(issue.value("description").toString());
+            table->setItem(i, 0, title);
+            table->setItem(i, 1, new QTableWidgetItem(issue.value("status").toString()));
+            table->setItem(i, 2, new QTableWidgetItem(issue.value("priority").toString()));
+            table->setItem(i, 3, new QTableWidgetItem(issue.value("assigned_to").toString()));
+        }
+        if (table->rowCount())
+            table->selectRow(0);
+    };
+    refresh();
+
+    auto button = [&](const QString& text) {
+        auto* b = new QPushButton(text, &dialog);
+        buttons->addWidget(b);
+        return b;
+    };
+    auto editIssue = [&](const QJsonObject& issue, bool creating) {
+        QDialog sub(&dialog);
+        sub.setWindowTitle(creating ? tr("New issue") : tr("Edit issue"));
+        auto* form = new QFormLayout(&sub);
+        auto* title = new QLineEdit(issue.value("title").toString(), &sub);
+        auto* description = new QPlainTextEdit(issue.value("description").toString(), &sub);
+        description->setMinimumSize(420, 140);
+        auto* status = new QComboBox(&sub);
+        for (const char* s : {"Open", "In Progress", "Resolved", "Closed"})
+            status->addItem(tr(s), QString::fromLatin1(s));
+        status->setCurrentIndex(std::max(0, status->findData(issue.value("status").toString())));
+        auto* priority = new QComboBox(&sub);
+        for (const char* p : {"Low", "Normal", "High"})
+            priority->addItem(tr(p), QString::fromLatin1(p));
+        priority->setCurrentIndex(std::max(0, priority->findData(issue.value("priority").toString())));
+        auto* assigned = new QLineEdit(issue.value("assigned_to").toString(), &sub);
+        auto* useSelection = new QCheckBox(tr("Use the current selection as the viewpoint"), &sub);
+        useSelection->setChecked(!m_selection.isEmpty() && creating);
+        form->addRow(tr("Title:"), title);
+        form->addRow(tr("Description:"), description);
+        form->addRow(tr("Status:"), status);
+        form->addRow(tr("Priority:"), priority);
+        form->addRow(tr("Assigned to:"), assigned);
+        form->addRow(useSelection);
+        auto* ok = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &sub);
+        form->addRow(ok);
+        connect(ok, &QDialogButtonBox::accepted, &sub, &QDialog::accept);
+        connect(ok, &QDialogButtonBox::rejected, &sub, &QDialog::reject);
+        if (sub.exec() != QDialog::Accepted)
+            return;
+        if (title->text().trimmed().isEmpty()) {
+            showError(tr("Issues"), tr("An issue needs a title"));
+            return;
+        }
+        QJsonObject values{{"title", title->text().trimmed()},
+            {"description", description->toPlainText()}, {"status", status->currentData().toString()},
+            {"priority", priority->currentData().toString()}, {"assigned_to", assigned->text().trimmed()}};
+        if (useSelection->isChecked()) {
+            QJsonArray components;
+            for (const QString& guid : m_selection)
+                components.append(guid);
+            values.insert("viewpoint", QJsonObject{{"components", components}});
+        }
+        const QJsonObject r = creating
+            ? bridge("create_issue", {QString::fromUtf8(QJsonDocument(values).toJson(QJsonDocument::Compact))})
+            : bridge("update_issue", {issue.value("id").toString(),
+                  QString::fromUtf8(QJsonDocument(values).toJson(QJsonDocument::Compact))});
+        if (!r.value("ok").toBool()) {
+            showError(tr("Issues"), r.value("error").toString());
+            return;
+        }
+        afterEdit(r);
+        refresh();
+    };
+
+    auto* add = button(tr("New..."));
+    auto* edit = button(tr("Edit..."));
+    auto* showViewpoint = button(tr("Show viewpoint"));
+    auto* comment = button(tr("Comment..."));
+    auto* remove = button(tr("Delete"));
+    auto* import = button(tr("Import BCF..."));
+    auto* exportBcf = button(tr("Export BCF..."));
+    buttons->addStretch(1);
+    auto* close = button(tr("Close"));
+    connect(add, &QPushButton::clicked, &dialog, [&] { editIssue(QJsonObject(), true); });
+    connect(edit, &QPushButton::clicked, &dialog, [&] {
+        if (current().isEmpty())
+            return;
+        editIssue(current(), false);
+    });
+    connect(table, &QTableWidget::itemDoubleClicked, &dialog, [&](QTableWidgetItem*) {
+        if (!current().isEmpty())
+            editIssue(current(), false);
+    });
+    connect(showViewpoint, &QPushButton::clicked, &dialog, [&] {
+        const QJsonObject issue = current();
+        if (issue.isEmpty())
+            return;
+        const QJsonObject r = bridge("issue_viewpoint", {issue.value("id").toString()});
+        if (!r.value("ok").toBool()) {
+            showError(tr("Issues"), r.value("error").toString());
+            return;
+        }
+        const QJsonObject camera = r.value("camera").toObject();
+        const auto vec = [](const QJsonArray& a, std::array<double, 3> fallback) {
+            return a.size() == 3 ? std::array<double, 3>{a[0].toDouble(), a[1].toDouble(), a[2].toDouble()}
+                                 : fallback;
+        };
+        const auto eye = vec(camera.value("eye").toArray(), {0, 0, 0});
+        const auto target = vec(camera.value("target").toArray(), {0, 0, 0});
+        const auto up = vec(camera.value("up").toArray(), {0, 0, 1});
+        if (!camera.isEmpty()) {
+            if (m_viewport->isPlanView())
+                m_viewport->set3DView();
+            m_viewport->setCamera(gp_Pnt(eye[0], eye[1], eye[2]), gp_Pnt(target[0], target[1], target[2]),
+                gp_Dir(up[0], up[1], up[2]), camera.value("type").toString() == QLatin1String("perspective"),
+                camera.value("fov").toDouble(60.0), camera.value("scale").toDouble(1.0));
+        }
+        QStringList components;
+        for (const auto& value : r.value("components").toArray())
+            components << value.toString();
+        if (!components.isEmpty()) {
+            m_viewport->selectGuids(components);
+            setSelection(components);
+        }
+        m_status->showMessage(tr("Viewpoint of \"%1\"").arg(issue.value("title").toString()));
+    });
+    connect(comment, &QPushButton::clicked, &dialog, [&] {
+        const QJsonObject issue = current();
+        if (issue.isEmpty())
+            return;
+        bool ok = false;
+        const QString text = QInputDialog::getMultiLineText(&dialog, tr("Comment"),
+            tr("Comment on \"%1\":").arg(issue.value("title").toString()), QString(), &ok);
+        if (!ok || text.trimmed().isEmpty())
+            return;
+        const QJsonObject r = bridge("add_comment", {issue.value("id").toString(), text});
+        if (!r.value("ok").toBool()) {
+            showError(tr("Issues"), r.value("error").toString());
+            return;
+        }
+        afterEdit(r);
+        refresh();
+    });
+    connect(remove, &QPushButton::clicked, &dialog, [&] {
+        const QJsonObject issue = current();
+        if (issue.isEmpty())
+            return;
+        if (QMessageBox::question(&dialog, tr("Delete issue"),
+                tr("Delete \"%1\"?").arg(issue.value("title").toString())) != QMessageBox::Yes)
+            return;
+        const QJsonObject r = bridge("delete_issue", {issue.value("id").toString()});
+        if (!r.value("ok").toBool()) {
+            showError(tr("Issues"), r.value("error").toString());
+            return;
+        }
+        afterEdit(r);
+        refresh();
+    });
+    connect(import, &QPushButton::clicked, &dialog, [&] {
+        const QString path = QFileDialog::getOpenFileName(&dialog, tr("Import BCF"), QString(),
+            tr("BCF files (*.bcfzip *.bcf);;All files (*)"));
+        if (path.isEmpty())
+            return;
+        const QJsonObject r = bridge("import_bcf", {path});
+        if (!r.value("ok").toBool()) {
+            showError(tr("Issues"), r.value("error").toString());
+            return;
+        }
+        afterEdit(r);
+        refresh();
+        m_status->showMessage(tr("BCF imported: %1 added, %2 updated")
+            .arg(r.value("added").toInt()).arg(r.value("updated").toInt()));
+    });
+    connect(exportBcf, &QPushButton::clicked, &dialog, [&] {
+        QString path = QFileDialog::getSaveFileName(&dialog, tr("Export BCF"), QString(),
+            tr("BCF files (*.bcfzip)"));
+        if (path.isEmpty())
+            return;
+        if (!path.endsWith(QLatin1String(".bcfzip"), Qt::CaseInsensitive))
+            path += QStringLiteral(".bcfzip");
+        const QJsonObject r = bridge("export_bcf", {path});
+        if (!r.value("ok").toBool()) {
+            showError(tr("Issues"), r.value("error").toString());
+            return;
+        }
+        m_status->showMessage(tr("BCF exported: %n issue(s)", nullptr, r.value("topics").toInt()));
+    });
+    connect(close, &QPushButton::clicked, &dialog, &QDialog::accept);
+    dialog.exec();
+}
+
+void MainWindow::terrainDialog()
+{
+    const QJsonArray storeys = bridge("storeys").value("storeys").toArray();
+    if (storeys.isEmpty()) {
+        showError(tr("Terrain"), tr("The model has no level to put the terrain on"));
+        return;
+    }
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Terrain"));
+    auto* form = new QFormLayout(&dialog);
+    auto* level = new QComboBox(&dialog);
+    for (const auto& v : storeys)
+        level->addItem(v.toObject().value("name").toString(), v.toObject().value("guid").toString());
+    auto* source = new QComboBox(&dialog);
+    source->addItem(tr("Survey points"), QStringLiteral("points"));
+    source->addItem(tr("Contour polylines"), QStringLiteral("contours"));
+    auto* name = new QLineEdit(tr("Terrain"), &dialog);
+    auto* spacing = new QDoubleSpinBox(&dialog);
+    spacing->setRange(0.01, 1000.0);
+    spacing->setDecimals(3);
+    spacing->setValue(2.0);
+    spacing->setSuffix(tr(" m"));
+    auto* points = new QPlainTextEdit(&dialog);
+    points->setPlaceholderText(tr("One point per line: x, y, z (metres).\nContours: a blank line between polylines."));
+    points->setMinimumSize(420, 220);
+    form->addRow(tr("Level:"), level);
+    form->addRow(tr("From:"), source);
+    form->addRow(tr("Name:"), name);
+    form->addRow(tr("Contour spacing:"), spacing);
+    form->addRow(tr("Points:"), points);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    form->addRow(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    const auto parse = [](const QString& text, bool contours) {
+        QJsonArray all;
+        QJsonArray current;
+        for (const QString& raw : text.split(QLatin1Char('\n'))) {
+            const QString line = raw.trimmed();
+            if (line.isEmpty()) {
+                if (contours && !current.isEmpty()) {
+                    all.append(current);
+                    current = QJsonArray();
+                }
+                continue;
+            }
+            const QStringList parts = line.split(QRegularExpression(QStringLiteral("[,;\\s]+")), Qt::SkipEmptyParts);
+            if (parts.size() < 2)
+                return QJsonArray();
+            QJsonArray point;
+            for (int i = 0; i < 3; ++i) {
+                bool ok = false;
+                const double value = i < parts.size() ? parts[i].toDouble(&ok) : 0.0;
+                if (i < parts.size() && !ok)
+                    return QJsonArray();
+                point.append(value);
+            }
+            current.append(point);
+        }
+        if (contours) {
+            if (!current.isEmpty())
+                all.append(current);
+            return all;
+        }
+        return current;
+    };
+    const bool contours = source->currentData().toString() == QLatin1String("contours");
+    const QJsonArray data = parse(points->toPlainText(), contours);
+    if (data.isEmpty() || (!contours && data.size() < 3) || (contours && data.size() < 2)) {
+        showError(tr("Terrain"), tr("Enter at least three points (or two contours) as x, y, z"));
+        return;
+    }
+    QJsonObject options{{"name", name->text().trimmed()}};
+    if (contours)
+        options.insert("spacing", spacing->value());
+    const QJsonObject r = bridge(contours ? "create_terrain_from_contours" : "create_terrain",
+        {level->currentData().toString(),
+         QString::fromUtf8(QJsonDocument(data).toJson(QJsonDocument::Compact)),
+         QString::fromUtf8(QJsonDocument(options).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Terrain"), r.value("error").toString());
+        return;
+    }
+    afterEdit(r);
+    m_status->showMessage(tr("Terrain created: %n triangle(s)", nullptr, r.value("triangles").toInt()));
+    if (r.value("guid").isString()) {
+        m_viewport->selectGuids({r.value("guid").toString()});
+        setSelection({r.value("guid").toString()});
+    }
+}
+
+void MainWindow::georefDialog()
+{
+    const QJsonObject current = bridge("georef_state");
+    if (!current.value("ok").toBool()) {
+        showError(tr("Georeferencing"), current.value("error").toString());
+        return;
+    }
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Georeferencing"));
+    auto* form = new QFormLayout(&dialog);
+    auto spin = [&](double lo, double hi, double value, int decimals) {
+        auto* box = new QDoubleSpinBox(&dialog);
+        box->setRange(lo, hi);
+        box->setDecimals(decimals);
+        box->setValue(value);
+        return box;
+    };
+    const QJsonObject crs = current.value("crs").toObject();
+    QDoubleSpinBox* east = spin(-1e9, 1e9, current.value("eastings").toDouble(), 3);
+    QDoubleSpinBox* north = spin(-1e9, 1e9, current.value("northings").toDouble(), 3);
+    QDoubleSpinBox* height = spin(-1e6, 1e6, current.value("height").toDouble(), 3);
+    QDoubleSpinBox* rotation = spin(-360, 360, current.value("rotation").toDouble(), 3);
+    QDoubleSpinBox* scale = spin(0.000001, 1000, current.value("scale").toDouble(1.0), 6);
+    QDoubleSpinBox* trueNorth = spin(-360, 360, current.value("true_north").toDouble(0.0), 3);
+    auto* crsName = new QLineEdit(crs.value("name").toString(), &dialog);
+    auto* datum = new QLineEdit(crs.value("geodetic_datum").toString(), &dialog);
+    auto* projection = new QLineEdit(crs.value("map_projection").toString(), &dialog);
+    auto* zone = new QLineEdit(crs.value("map_zone").toString(), &dialog);
+    for (QLineEdit* field : {crsName, datum, projection, zone})
+        field->setMinimumWidth(240);
+    form->addRow(tr("Easting (m):"), east);
+    form->addRow(tr("Northing (m):"), north);
+    form->addRow(tr("Height (m):"), height);
+    form->addRow(tr("Rotation (degrees):"), rotation);
+    form->addRow(tr("Scale:"), scale);
+    form->addRow(tr("True north (degrees):"), trueNorth);
+    form->addRow(tr("CRS name:"), crsName);
+    form->addRow(tr("Geodetic datum:"), datum);
+    form->addRow(tr("Map projection:"), projection);
+    form->addRow(tr("Map zone:"), zone);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    auto* clear = new QPushButton(tr("Clear"), &dialog);
+    buttons->addButton(clear, QDialogButtonBox::ResetRole);
+    form->addRow(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    connect(clear, &QPushButton::clicked, &dialog, [this, &dialog] {
+        const QJsonObject r = bridge("clear_georeferencing");
+        if (!r.value("ok").toBool()) {
+            showError(tr("Georeferencing"), r.value("error").toString());
+            return;
+        }
+        afterEdit(r);
+        dialog.accept();
+    });
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    QJsonObject values{
+        {"eastings", east->value()}, {"northings", north->value()}, {"height", height->value()},
+        {"rotation", rotation->value()}, {"scale", scale->value()}, {"true_north", trueNorth->value()},
+        {"crs_name", crsName->text().trimmed()}, {"geodetic_datum", datum->text().trimmed()},
+        {"map_projection", projection->text().trimmed()}, {"map_zone", zone->text().trimmed()}};
+    const QJsonObject r = bridge("set_georeferencing",
+        {QString::fromUtf8(QJsonDocument(values).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Georeferencing"), r.value("error").toString());
+        return;
+    }
+    afterEdit(r);
+}
+
 void MainWindow::projectInfoDialog()
 {
     const QJsonObject current = bridge("project_info");
@@ -6377,6 +7284,7 @@ void MainWindow::multiplyDialog()
     auto* kind = new QComboBox(&dialog);
     kind->addItem(tr("Linear (move each copy by a distance)"), QStringLiteral("linear"));
     kind->addItem(tr("Polar (rotate each copy around a centre)"), QStringLiteral("polar"));
+    kind->addItem(tr("Rectangular (a grid of copies)"), QStringLiteral("rectangular"));
     auto spin = [&](double lo, double hi, double value, int decimals) {
         auto* b = new QDoubleSpinBox(&dialog);
         b->setRange(lo, hi);
@@ -6387,10 +7295,18 @@ void MainWindow::multiplyDialog()
     auto* count = new QSpinBox(&dialog);
     count->setRange(1, 1000);
     count->setValue(3);
+    auto* nx = new QSpinBox(&dialog);
+    nx->setRange(1, 1000);
+    nx->setValue(2);
+    auto* ny = new QSpinBox(&dialog);
+    ny->setRange(1, 1000);
+    ny->setValue(2);
     QDoubleSpinBox *dx = spin(-1e4, 1e4, 1.0, 3), *dy = spin(-1e4, 1e4, 0.0, 3);
     QDoubleSpinBox *cx = spin(-1e5, 1e5, 0.0, 3), *cy = spin(-1e5, 1e5, 0.0, 3), *angle = spin(-360, 360, 90, 2);
     form->addRow(tr("Kind:"), kind);
     form->addRow(tr("Number of copies:"), count);
+    form->addRow(tr("Copies in X (grid):"), nx);
+    form->addRow(tr("Copies in Y (grid):"), ny);
     form->addRow(tr("Distance X (m):"), dx);
     form->addRow(tr("Distance Y (m):"), dy);
     form->addRow(tr("Centre X (m):"), cx);
@@ -6402,8 +7318,12 @@ void MainWindow::multiplyDialog()
     connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
     if (dialog.exec() != QDialog::Accepted)
         return;
-    if (kind->currentData().toString() == QLatin1String("linear"))
+    const QString mode = kind->currentData().toString();
+    if (mode == QLatin1String("linear"))
         multiplySelection(QStringLiteral("linear"), {{"dx", dx->value()}, {"dy", dy->value()}, {"count", count->value()}});
+    else if (mode == QLatin1String("rectangular"))
+        multiplySelection(QStringLiteral("rectangular"), {{"dx", dx->value()}, {"dy", dy->value()},
+            {"nx", nx->value()}, {"ny", ny->value()}});
     else
         multiplySelection(QStringLiteral("polar"), {{"cx", cx->value()}, {"cy", cy->value()},
             {"angle", angle->value() * M_PI / 180.0}, {"count", count->value()}});
@@ -6766,6 +7686,23 @@ bool MainWindow::createSegment(QPointF p1, QPointF p2)
         return false;
     }
     afterEdit(r);
+    return true;
+}
+
+bool MainWindow::createDetail(const QVector<QPointF>& outline)
+{
+    QJsonArray points;
+    for (const QPointF& p : outline)
+        points.append(QJsonArray{p.x(), p.y()});
+    const QJsonObject r = bridge("create_detail", {m_levels->activeStorey(),
+        QString::fromUtf8(QJsonDocument(points).toJson(QJsonDocument::Compact)),
+        QString::number(m_detailScale ? m_detailScale->value() : 20), QString()});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Detail"), r.value("error").toString());
+        return false;
+    }
+    afterEdit(r);
+    m_status->showMessage(tr("Detail created: %1").arg(r.value("name").toString()));
     return true;
 }
 
@@ -7627,13 +8564,6 @@ void MainWindow::saveAsFolderDialog()
     const QString folder = QFileDialog::getExistingDirectory(this, tr("Choose an empty folder for the project"));
     if (!folder.isEmpty())
         saveAsFolder(folder);
-}
-
-void MainWindow::exportIfcDialog()
-{
-    const QString path = QFileDialog::getSaveFileName(this, tr("Export IFC"), QString(), tr("IFC files (*.ifc)"));
-    if (!path.isEmpty())
-        exportIfc(path);
 }
 
 void MainWindow::newProjectDialog()
