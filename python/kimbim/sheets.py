@@ -214,7 +214,7 @@ def sheets() -> str:
         for ref in _views(sheet):
             p = _placement(ref)
             size = _cached_size(_link(ref))
-            k = 100.0 / p["scale"]
+            k = _native_scale(_link(ref)) / p["scale"]
             views.append({"drawing": _link(ref), "name": _name(ref), "x": p["x"], "y": p["y"],
                           "w": round(size[0] * k, 3), "h": round(size[1] * k, 3), "scale": p["scale"]})
         legends = []
@@ -227,7 +227,8 @@ def sheets() -> str:
         out.append({"number": _number(sheet), "title": sheet.Name or "", "paper": sheet.Scope or "A1",
                     "width": w, "height": h, "background": _sheet_data(sheet).get("background") or "#ffffff",
                     "views": views, "legends": legends,
-                    "symbols": _symbol_listing(sheet), "title_block": _title_block_listing(sheet)})
+                    "symbols": _symbol_listing(sheet), "title_block": _title_block_listing(sheet),
+                    "has_tables": bool(_schedule_entries(sheet) or _list_entries(sheet))})
     return B._dump({"sheets": out})
 
 
@@ -235,8 +236,21 @@ _sizes: dict[str, tuple] = {}  # drawing GlobalId -> (model state, size): the la
 
 
 def _svg_size(svg: str):
+    """A drawing's paper size (mm). The width/height attributes are authoritative: a detail's
+    viewBox is in metres (D112), while a plan's is its paper millimetres at 1:100."""
+    m = re.search(r'\bwidth="([\d.]+)mm"\s+height="([\d.]+)mm"', svg)
+    if m:
+        return float(m.group(1)), float(m.group(2))
     m = re.search(r'viewBox="([-\d.]+) ([-\d.]+) ([\d.]+) ([\d.]+)"', svg)
     return (float(m.group(3)), float(m.group(4))) if m else (0.0, 0.0)
+
+
+def _native_scale(guid: str) -> int:
+    """The scale a drawing is generated at: a detail's own 1:n, 1:100 for plans, sections and
+    elevations (their SVG is drawn at 1:100 and scaled when placed)."""
+    d = D._drawing(guid) if B._model is not None else None
+    s = D._detail_settings(d) if d is not None else None
+    return int(s.get("scale") or 20) if s is not None else 100
 
 
 def _cached_size(guid: str):
@@ -422,6 +436,8 @@ def _free_spot(sheet, w, h):
         taken.append((p["x"], p["y"], lw, lh))
     for item in _symbol_listing(sheet):  # D87
         taken.append((item["x"], item["y"], item["w"], item["h"]))
+    for item in _placed_tables(sheet):  # schedules and lists (Archicad: a schedule is a layout item)
+        taken.append(item)
     tx, ty = _title_block_geometry(sheet)
     taken.append((tx, ty, TITLE_W, TITLE_H))
     y = MARGIN + 5
@@ -465,7 +481,10 @@ def place_drawing(number: str, drawing_guid: str, x=-1, y=-1, scale=100) -> str:
     size, _ = _drawing_size(drawing_guid)
     if size is None:
         return A._fail("could not generate the drawing")
-    k = 100.0 / scale
+    native = _native_scale(drawing_guid)
+    if scale == 100 and native != 100:  # a detail goes on the sheet at its own scale by default
+        scale = native
+    k = native / scale  # the size attributes are at the drawing's native scale
     if x < 0 or y < 0:
         x, y = _free_spot(sheet, size[0] * k, size[1] * k)
 
@@ -978,6 +997,460 @@ def _symbol_listing(sheet) -> list:
     return out
 
 
+# ---------------------------------------------------------------- schedules and lists on sheets
+# Archicad's Interactive Schedule on a layout: a table placed on the sheet, stored in the sheet's own
+# JSON (Description) so it is versioned and undoable with the sheet. The same for the auto-generated
+# drawing list and sheet list (Archicad's Drawing list / Layout list).
+
+SCHEDULES = "schedules"
+LISTS = "lists"
+LIST_KINDS = ("drawings", "sheets")
+TABLE_TITLE_H = 6.0
+TABLE_HEADER_H = 6.0
+TABLE_ROW_H = 6.0
+TABLE_TEXT = 3.5
+TABLE_HEADER_TEXT = 4.0
+TABLE_MIN_COL = 10.0
+TABLE_PAD = 1.5
+TABLE_CHAR = 0.55  # average glyph width, as a fraction of the font size
+
+
+def _num(value, default) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def _schedule_entries(sheet) -> list:
+    entries = _sheet_data(sheet).get(SCHEDULES)
+    return [e for e in entries if isinstance(e, dict)] if isinstance(entries, list) else []
+
+
+def _list_entries(sheet) -> list:
+    entries = _sheet_data(sheet).get(LISTS)
+    return [e for e in entries if isinstance(e, dict)] if isinstance(entries, list) else []
+
+
+def _scheme_ref(scheme):
+    """The scheme as the sheet stores it: an id (built-in or stored) or the scheme object itself."""
+    if isinstance(scheme, dict):
+        return scheme
+    text = str(scheme or "").strip()
+    if text.startswith("{"):
+        try:
+            return json.loads(text)
+        except ValueError:
+            return None
+    return text
+
+
+def _schedule_data(entry) -> dict:
+    """The computed schedule of a placement, or an error dict (never raises)."""
+    from . import schedules as Sch
+
+    try:
+        return Sch.compute(entry.get("scheme"), Sch._truthy(entry.get("merge")))
+    except Exception as ex:
+        return {"ok": False, "error": f"{type(ex).__name__}: {ex}"}
+
+
+def _schedule_height(entry) -> float:
+    data = _schedule_data(entry)
+    if not data.get("ok"):
+        return TABLE_TITLE_H + TABLE_HEADER_H
+    totals = data.get("totals") or []
+    rows = len(data.get("rows") or [])
+    total_row = TABLE_ROW_H if any(v is not None for v in totals) else 0.0
+    return TABLE_TITLE_H + TABLE_HEADER_H + rows * TABLE_ROW_H + total_row
+
+
+def _list_rows(kind: str):
+    """(header, rows) of a drawing or sheet list, naturally sorted; only what exists is listed."""
+    from . import schedules as Sch
+
+    if kind == "drawings":
+        where: dict = {}
+        for sheet in _sheets():
+            for ref in _views(sheet):
+                where.setdefault(_link(ref), []).append((_number(sheet) or "", _placement(ref)["scale"]))
+        rows = []
+        for d in D._drawings():
+            spots = where.get(d.GlobalId, [])
+            scales = sorted({s for _, s in spots}, key=Sch._natural)
+            numbers = sorted({n for n, _ in spots}, key=Sch._natural)
+            rows.append([d.Name or "", ", ".join(f"1:{s}" for s in scales), ", ".join(numbers)])
+        rows.sort(key=lambda r: Sch._natural(r[0]))
+        return ["Drawing", "Scale", "Sheet"], rows
+    rows = []
+    for sheet in sorted(_sheets(), key=lambda s: Sch._natural(_number(s) or "")):
+        rows.append([_number(sheet) or "", sheet.Name or "", sheet.Scope or "",
+                     _title_block_fields(sheet).get("date") or ""])
+    return ["Sheet", "Title", "Paper", "Date"], rows
+
+
+def _list_height(entry) -> float:
+    kind = entry.get("kind")
+    if kind not in LIST_KINDS:
+        return 0.0
+    _header, rows = _list_rows(kind)
+    return TABLE_TITLE_H + TABLE_HEADER_H + len(rows) * TABLE_ROW_H
+
+
+def _placed_tables(sheet) -> list:
+    """(x, y, w, h) of the schedules and lists on a sheet, for the free-spot search."""
+    out = []
+    try:
+        for entry in _schedule_entries(sheet):
+            out.append((float(entry.get("x", MARGIN)), float(entry.get("y", MARGIN)),
+                        float(entry.get("width", TITLE_W)), _schedule_height(entry)))
+        for entry in _list_entries(sheet):
+            out.append((float(entry.get("x", MARGIN)), float(entry.get("y", MARGIN)),
+                        float(entry.get("width", TITLE_W)), _list_height(entry)))
+    except Exception:  # a hand-edited placement never stops a drawing from being placed
+        pass
+    return out
+
+
+def _fit(text, width: float, size: float) -> str:
+    """Cut a cell's text to its column (the table never runs past its placed width)."""
+    text = str(text)
+    room = max(0.0, width - 2 * TABLE_PAD)
+    limit = max(1, int(room / (size * TABLE_CHAR)))
+    return text if len(text) <= limit else text[:max(1, limit - 1)] + "\u2026"
+
+
+def _column_widths(header, body, total_row, width: float) -> list:
+    """Columns proportional to their content, at least TABLE_MIN_COL wide, scaled to the placed width."""
+    n = len(header)
+    if n == 0:
+        return []
+    rows = [header] + body + ([total_row] if total_row else [])
+    natural = []
+    for i in range(n):
+        widest = max(((str(r[i]) if i < len(r) else "") for r in rows), key=len)
+        natural.append(max(TABLE_MIN_COL, len(widest) * TABLE_HEADER_TEXT * TABLE_CHAR + 2 * TABLE_PAD))
+    total = sum(natural)
+    if total <= width:  # short columns share the placed width, keeping their proportions
+        return [w * width / total for w in natural]
+    floor = min(TABLE_MIN_COL, width / n)
+    widths = list(natural)
+    for _ in range(24):  # shrink the wider columns first, down to the minimum
+        excess = sum(widths) - width
+        if excess <= 1e-9:
+            break
+        flex = [i for i, w in enumerate(widths) if w > floor + 1e-9]
+        if not flex:
+            break
+        room = sum(widths[i] - floor for i in flex)
+        for i in flex:
+            widths[i] -= excess * (widths[i] - floor) / room
+    total = sum(widths)
+    if total > width:  # every column is at its minimum: scale them all to fit
+        widths = [w * width / total for w in widths]
+    return widths
+
+
+def _table_svg(title, header, body, total_row, entry, css, attr, value) -> str:
+    """One table in sheet millimetres: title, bold header with a rule, body rows, optional totals row."""
+    try:
+        x, y = float(entry.get("x", MARGIN)), float(entry.get("y", MARGIN))
+        width = float(entry.get("width", TITLE_W))
+    except (TypeError, ValueError):
+        x, y, width = MARGIN, MARGIN, TITLE_W
+    if width <= 0:
+        width = TITLE_W
+    widths = _column_widths(header, body, total_row, width)
+    if not widths:
+        return ""
+    height = TABLE_TITLE_H + TABLE_HEADER_H + len(body) * TABLE_ROW_H + (TABLE_ROW_H if total_row else 0.0)
+    shown = _esc(str(value)).replace('"', "&quot;")
+    out = [f'<g class="{css}" data-{attr}="{shown}" font-family="sans-serif" fill="#000">',
+           f'<rect x="{x:.3f}" y="{y:.3f}" width="{width:.3f}" height="{height:.3f}" '
+           f'fill="none" stroke="#000" stroke-width="0.35"/>',
+           f'<text x="{x + TABLE_PAD:.3f}" y="{y + 4.2:.3f}" font-size="{TABLE_HEADER_TEXT:g}" '
+           f'font-weight="bold">{_esc(title)}</text>']
+    top = y + TABLE_TITLE_H
+    out.append(f'<path d="M{x:.3f},{top:.3f} L{x + width:.3f},{top:.3f}" stroke="#000" stroke-width="0.35"/>')
+
+    def row(cells, size, bold=False):
+        nonlocal top
+        cx = x
+        for i, w in enumerate(widths):
+            cell = cells[i] if i < len(cells) else ""
+            weight = ' font-weight="bold"' if bold else ""
+            out.append(f'<text x="{cx + TABLE_PAD:.3f}" y="{top + 4.2:.3f}" font-size="{size:g}"{weight}>'
+                       f'{_esc(_fit(cell, w, size))}</text>')
+            cx += w
+        top += TABLE_ROW_H
+
+    row(header, TABLE_HEADER_TEXT, True)
+    out.append(f'<path d="M{x:.3f},{top:.3f} L{x + width:.3f},{top:.3f}" stroke="#000" stroke-width="0.4"/>')
+    for i, cells in enumerate(body):
+        row(cells, TABLE_TEXT)
+        if not (total_row and i == len(body) - 1):
+            out.append(f'<path d="M{x:.3f},{top:.3f} L{x + width:.3f},{top:.3f}" stroke="#000" stroke-width="0.12"/>')
+    if total_row:
+        out.append(f'<path d="M{x:.3f},{top:.3f} L{x + width:.3f},{top:.3f}" stroke="#000" stroke-width="0.35"/>')
+        row(total_row, TABLE_TEXT, True)
+    cx = x  # column separators
+    for w in widths[:-1]:
+        cx += w
+        out.append(f'<path d="M{cx:.3f},{y + TABLE_TITLE_H:.3f} L{cx:.3f},{y + height:.3f}" '
+                   f'stroke="#000" stroke-width="0.12"/>')
+    out.append("</g>")
+    return "\n".join(out)
+
+
+def _schedule_group(entry, index):
+    """(svg group, error): a placed schedule as a table, or the reason it cannot be computed."""
+    from . import schedules as Sch
+
+    data = _schedule_data(entry)
+    if not data.get("ok"):
+        return None, data.get("error") or "unknown schedule"
+    columns = data.get("columns") or []
+    unit = data.get("unit") or "m"
+    kinds = [c["kind"] for c in columns]
+    header = [c["label"] + Sch.unit_suffix(c["kind"], unit) for c in columns]
+    body = [[Sch._cell_text(v, k) for v, k in zip(r.get("values") or (), kinds)] for r in data.get("rows") or []]
+    totals = data.get("totals") or []
+    total_row = None
+    if any(v is not None for v in totals):
+        total_row = [Sch._cell_text(v, k) for v, k in zip(totals, kinds)]
+        if total_row and not total_row[0]:
+            total_row[0] = "Total"
+    name = (data.get("scheme") or {}).get("name") or ""
+    return _table_svg(name, header, body, total_row, entry, "kimbim-schedule", "schedule", name or index), None
+
+
+def _list_group(entry, index):
+    kind = entry.get("kind")
+    if kind not in LIST_KINDS:
+        return ""
+    header, rows = _list_rows(kind)
+    title = "Drawing list" if kind == "drawings" else "Sheet list"
+    return _table_svg(title, header, rows, None, entry, "kimbim-list", "list", kind)
+
+
+def table_groups(sheet) -> list:
+    """Every placed schedule and list as (kind, svg) in sheet millimetres: "schedule" or "list", the
+    order the sheet composes them in. A schedule that cannot be computed raises ValueError (the sheet's
+    SVG fails the same way, so exports never silently drop a table)."""
+    number = _number(sheet)
+    out = []
+    for i, entry in enumerate(_schedule_entries(sheet)):
+        try:
+            group, error = _schedule_group(entry, i)
+        except Exception as ex:  # a hand-edited placement is reported, never raised raw
+            group, error = None, f"{type(ex).__name__}: {ex}"
+        if error is not None:
+            raise ValueError(f"could not compute schedule {i + 1} on sheet {number}: {error}")
+        if group:
+            out.append(("schedule", group))
+    for i, entry in enumerate(_list_entries(sheet)):
+        try:
+            group = _list_group(entry, i)
+        except Exception as ex:
+            raise ValueError(f"could not build list {i + 1} on sheet {number}: {type(ex).__name__}: {ex}") from ex
+        if group:
+            out.append(("list", group))
+    return out
+
+
+def place_schedule(number: str, scheme: str, x=-1, y=-1, width=180, merge="false") -> str:
+    """Place a schedule table (an id, built-in or stored, or the scheme itself as JSON) on a sheet.
+    x, y < 0 finds a free spot clear of the drawings, the title block and other tables."""
+    sheet = _sheet(number) if B._model is not None else None
+    if sheet is None:
+        return A._fail("unknown sheet")
+    from . import schedules as Sch
+
+    ref = _scheme_ref(scheme)
+    resolved = Sch._resolve(ref) if ref else None
+    if resolved is None:
+        return A._fail(f"unknown schedule {scheme}")
+    if (err := Sch.scheme_error(resolved)) is not None:
+        return A._fail(err)
+    try:
+        x, y, width = float(x), float(y), float(width)
+    except (TypeError, ValueError):
+        return A._fail("bad position or width")
+    if width <= 0:
+        return A._fail("bad width")
+    entry = {"scheme": ref, "x": round(x, 3), "y": round(y, 3), "width": round(width, 3),
+             "merge": Sch._truthy(merge)}
+    if x < 0 or y < 0:
+        x, y = _free_spot(sheet, width, _schedule_height(entry))
+        entry["x"], entry["y"] = round(x, 3), round(y, 3)
+
+    def action():
+        data = _sheet_data(sheet)
+        data.setdefault(SCHEDULES, []).append(entry)
+        _write_sheet_data(sheet, data)
+        return 1
+
+    try:
+        r = B._run(action, affects_drawings=False)
+    except Exception as ex:
+        return A._fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "index": len(_schedule_entries(sheet)) - 1})
+
+
+def remove_schedule(number: str, index: int) -> str:
+    sheet = _sheet(number) if B._model is not None else None
+    if sheet is None:
+        return A._fail("unknown sheet")
+    try:
+        i = int(index)
+    except (TypeError, ValueError):
+        return A._fail("bad schedule index")
+    if i < 0 or i >= len(_schedule_entries(sheet)):
+        return A._fail("no such schedule on that sheet")
+
+    def action():
+        data = _sheet_data(sheet)
+        entries = data.get(SCHEDULES) or []
+        entries.pop(i)
+        if entries:
+            data[SCHEDULES] = entries
+        else:
+            data.pop(SCHEDULES, None)
+        _write_sheet_data(sheet, data)
+        return 1
+
+    return B._dump(B._run(action, affects_drawings=False))
+
+
+def _place_list(number: str, kind: str, x=-1, y=-1, width=180) -> str:
+    sheet = _sheet(number) if B._model is not None else None
+    if sheet is None:
+        return A._fail("unknown sheet")
+    try:
+        x, y, width = float(x), float(y), float(width)
+    except (TypeError, ValueError):
+        return A._fail("bad position or width")
+    if width <= 0:
+        return A._fail("bad width")
+    entry = {"kind": kind, "x": round(x, 3), "y": round(y, 3), "width": round(width, 3)}
+    if x < 0 or y < 0:
+        x, y = _free_spot(sheet, width, _list_height(entry))
+        entry["x"], entry["y"] = round(x, 3), round(y, 3)
+
+    def action():
+        data = _sheet_data(sheet)
+        data.setdefault(LISTS, []).append(entry)
+        _write_sheet_data(sheet, data)
+        return 1
+
+    try:
+        r = B._run(action, affects_drawings=False)
+    except Exception as ex:
+        return A._fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "index": len(_list_entries(sheet)) - 1})
+
+
+def place_drawing_list(number: str, x=-1, y=-1, width=180) -> str:
+    """An auto-generated list of the project's drawings (name, scale, the sheets that show them)."""
+    return _place_list(number, "drawings", x, y, width)
+
+
+def place_sheet_list(number: str, x=-1, y=-1, width=180) -> str:
+    """An auto-generated list of the project's sheets (number, title, paper, date)."""
+    return _place_list(number, "sheets", x, y, width)
+
+
+def remove_list(number: str, index: int) -> str:
+    sheet = _sheet(number) if B._model is not None else None
+    if sheet is None:
+        return A._fail("unknown sheet")
+    try:
+        i = int(index)
+    except (TypeError, ValueError):
+        return A._fail("bad list index")
+    if i < 0 or i >= len(_list_entries(sheet)):
+        return A._fail("no such list on that sheet")
+
+    def action():
+        data = _sheet_data(sheet)
+        entries = data.get(LISTS) or []
+        entries.pop(i)
+        if entries:
+            data[LISTS] = entries
+        else:
+            data.pop(LISTS, None)
+        _write_sheet_data(sheet, data)
+        return 1
+
+    return B._dump(B._run(action, affects_drawings=False))
+
+
+def _move_table(number: str, key: str, index: int, x, y) -> str:
+    """Move a placed schedule or list; x, y are its top-left in sheet millimetres."""
+    sheet = _sheet(number) if B._model is not None else None
+    if sheet is None:
+        return A._fail("unknown sheet")
+    entries = _schedule_entries(sheet) if key == SCHEDULES else _list_entries(sheet)
+    try:
+        i, x, y = int(index), float(x), float(y)
+    except (TypeError, ValueError):
+        return A._fail("bad position or index")
+    if i < 0 or i >= len(entries):
+        return A._fail("no such table on that sheet")
+
+    def action():
+        data = _sheet_data(sheet)
+        current = data.get(key) or []
+        if i >= len(current):
+            raise ValueError("no such table on that sheet")
+        current[i]["x"] = round(x, 3)
+        current[i]["y"] = round(y, 3)
+        data[key] = current
+        _write_sheet_data(sheet, data)
+        return 1
+
+    try:
+        return B._dump(B._run(action, affects_drawings=False))
+    except Exception as ex:
+        return A._fail(f"{type(ex).__name__}: {ex}")
+
+
+def move_schedule(number: str, index: int, x, y) -> str:
+    """Move the schedule at `index` (see `sheet_schedules`) to (x, y) mm."""
+    return _move_table(number, SCHEDULES, index, x, y)
+
+
+def move_list(number: str, index: int, x, y) -> str:
+    """Move the drawing or sheet list at `index` to (x, y) mm."""
+    return _move_table(number, LISTS, index, x, y)
+
+
+def sheet_schedules(number: str) -> str:
+    """The schedules and lists placed on a sheet, for the UI: their stored data, name and rendered height."""
+    sheet = _sheet(number) if B._model is not None else None
+    if sheet is None:
+        return A._fail("unknown sheet")
+    from . import schedules as Sch
+
+    try:
+        schedules = []
+        for i, entry in enumerate(_schedule_entries(sheet)):
+            resolved = Sch._resolve(entry.get("scheme"))
+            schedules.append({"index": i, "scheme": entry.get("scheme"),
+                              "name": (resolved or {}).get("name") or "",
+                              "merge": Sch._truthy(entry.get("merge")),
+                              "x": _num(entry.get("x"), MARGIN), "y": _num(entry.get("y"), MARGIN),
+                              "width": _num(entry.get("width"), TITLE_W),
+                              "height": round(_schedule_height(entry), 3)})
+        lists = [{"index": i, "kind": entry.get("kind"),
+                  "x": _num(entry.get("x"), MARGIN), "y": _num(entry.get("y"), MARGIN),
+                  "width": _num(entry.get("width"), TITLE_W),
+                  "height": round(_list_height(entry), 3)} for i, entry in enumerate(_list_entries(sheet))]
+    except Exception as ex:  # a hand-edited placement is reported, never raised
+        return A._fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({"ok": True, "schedules": schedules, "lists": lists})
+
+
 # ---------------------------------------------------------------- composing the sheet
 
 def _esc(value: str) -> str:
@@ -1119,6 +1592,159 @@ def move_title_block(number: str, x, y) -> str:
         return A._fail("bad position")
 
 
+# ---------------------------------------------------------------- title block templates (master layouts)
+# A reusable title block, as Archicad's master layout carries one: where it sits, its field overrides and
+# (optionally) its paper size. Stored in the project settings under "title_block_templates" (id -> template)
+# so it travels with the project and its versions; the id comes from the name and stays on rename.
+
+TEMPLATES = "title_block_templates"
+
+
+def _template_slug(name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", (name or "").strip().lower()).strip("-")
+    return slug or "template"
+
+
+def _template_table() -> dict:
+    from . import settings as S
+
+    table = S.current().get(TEMPLATES)
+    return dict(table) if isinstance(table, dict) else {}
+
+
+def _template_entry(template_id: str, data: dict) -> dict:
+    """A stored template as the UI reads it: paper "" when it does not carry one."""
+    fields = data.get("fields")
+    fields = {str(k): str(v) for k, v in fields.items() if k in TITLE_FIELDS} if isinstance(fields, dict) else {}
+    paper = data.get("paper") if data.get("paper") in PAPERS else ""
+    return {"id": template_id, "name": str(data.get("name") or template_id), "paper": paper,
+            "x": _num(data.get("x"), 0.0), "y": _num(data.get("y"), 0.0), "fields": fields}
+
+
+def _template_by_name(table: dict, name: str):
+    label = (name or "").strip().lower()
+    return next((k for k, v in table.items() if isinstance(v, dict)
+                 and str(v.get("name") or "").strip().lower() == label), None)
+
+
+def title_block_templates() -> str:
+    """{ok, templates: [{id, name, paper, x, y, fields}]}: the project's reusable title blocks."""
+    templates = [_template_entry(k, v) for k, v in _template_table().items() if isinstance(v, dict)]
+    templates.sort(key=lambda t: (t["name"].lower(), t["id"]))
+    return B._dump({"ok": True, "templates": templates})
+
+
+def _save_templates(table: dict) -> dict:
+    from . import settings as S
+
+    return json.loads(S.set_project_settings(json.dumps({TEMPLATES: table})))
+
+
+def save_title_block_template(name: str, source_sheet: str, options_json: str = "") -> str:
+    """Save a sheet's title block as a template: its position, its field overrides and its paper size
+    (options {"paper": false} leaves the paper out). A name is required; an existing name replaces that
+    template, keeping its id."""
+    sheet = _sheet(source_sheet) if B._model is not None else None
+    if sheet is None:
+        return A._fail("unknown sheet")
+    label = str(name or "").strip()
+    if not label:
+        return A._fail("type a name")
+    options = _symbol_options(options_json)
+    if options is None:
+        return A._fail("bad options")
+    x, y = _title_block_geometry(sheet)
+    block = _sheet_data(sheet).get(TITLE_BLOCK)
+    overrides = block.get("fields") if isinstance(block, dict) else None
+    data = {"name": label, "x": round(x, 3), "y": round(y, 3),
+            "fields": {str(k): str(v) for k, v in overrides.items() if k in TITLE_FIELDS}
+                      if isinstance(overrides, dict) else {}}
+    if options.get("paper", True) is not False:
+        data["paper"] = sheet.Scope or "A1"
+    table = _template_table()
+    template_id = _template_by_name(table, label)
+    if template_id is None:
+        base = template_id = _template_slug(label)
+        n = 2
+        while template_id in table:
+            template_id, n = f"{base}-{n}", n + 1
+    table[template_id] = data
+    r = _save_templates(table)
+    if not r.get("ok"):
+        return B._dump(r)
+    return B._dump({"ok": True, "template": _template_entry(template_id, data)})
+
+
+def apply_title_block_template(number: str, template_id: str, options_json: str = "") -> str:
+    """Put a template's title block on a sheet: its position and fields (the sheet's own overrides are
+    replaced by the template's), and its paper size unless options {"paper": false}. One undo step;
+    returns the sheet's title block listing."""
+    sheet = _sheet(number) if B._model is not None else None
+    if sheet is None:
+        return A._fail("unknown sheet")
+    entry = _template_table().get(str(template_id or "").strip())
+    if not isinstance(entry, dict):
+        return A._fail("unknown title block template")
+    options = _symbol_options(options_json)
+    if options is None:
+        return A._fail("bad options")
+    x, y = _num(entry.get("x"), 0.0), _num(entry.get("y"), 0.0)
+    fields = entry.get("fields")
+    fields = {str(k): str(v) for k, v in fields.items() if k in TITLE_FIELDS} if isinstance(fields, dict) else {}
+    paper = (entry.get("paper") or None) if options.get("paper", True) is not False else None
+    if paper is not None and paper not in PAPERS:
+        return A._fail("unknown paper size")
+
+    def action():
+        data = _sheet_data(sheet)
+        block = {"x": round(x, 3), "y": round(y, 3)}
+        if fields:
+            block["fields"] = fields
+        data[TITLE_BLOCK] = block
+        _write_sheet_data(sheet, data)
+        if paper:
+            ifcopenshell.api.document.edit_information(B._model, information=sheet, attributes={"Scope": paper})
+        return 1
+
+    r = B._run(action, affects_drawings=False)
+    return B._dump({**r, "title_block": _title_block_listing(sheet)})
+
+
+def delete_title_block_template(template_id: str) -> str:
+    """Remove a template from the project settings."""
+    table = _template_table()
+    key = str(template_id or "").strip()
+    if key not in table:
+        return A._fail("unknown title block template")
+    table.pop(key)
+    r = _save_templates(table)
+    if not r.get("ok"):
+        return B._dump(r)
+    return B._dump({"ok": True, "deleted": key})
+
+
+def rename_title_block_template(template_id: str, name: str) -> str:
+    """Give a template a new name; its id stays, so sheets and menus keep referring to it."""
+    table = _template_table()
+    key = str(template_id or "").strip()
+    entry = table.get(key)
+    if not isinstance(entry, dict):
+        return A._fail("unknown title block template")
+    label = str(name or "").strip()
+    if not label:
+        return A._fail("type a name")
+    other = _template_by_name(table, label)
+    if other is not None and other != key:
+        return A._fail("a template with that name already exists")
+    data = {**entry, "name": label}
+    table[key] = data
+    r = _save_templates(table)
+    if not r.get("ok"):
+        return B._dump(r)
+    return B._dump({"ok": True, "template": _template_entry(key, data)})
+
+
+
 def sheet_svg(number: str) -> str:
     """The sheet as one SVG in millimetres: border, title block, each drawing at its scale with its title."""
     sheet = _sheet(number) if B._model is not None else None
@@ -1135,7 +1761,9 @@ def sheet_svg(number: str) -> str:
         if size is None:
             return A._fail(f"could not generate {_name(ref)}: {svg}")
         p = _placement(ref)
-        k = 100.0 / p["scale"]
+        # A plan's SVG is in paper millimetres at 1:100; a detail's content is in metres (D112), so
+        # its factor is millimetres per metre at the placed scale.
+        k = (1000.0 if _native_scale(_link(ref)) != 100 else 100.0) / p["scale"]
         svg = graphics.style_svg(svg, resolved, k)  # a pen prints at its weight at any scale
         m = re.search(r'viewBox="([-\d.]+) ([-\d.]+) ([\d.]+) ([\d.]+)"', svg)
         vx, vy = (float(m.group(1)), float(m.group(2))) if m else (0.0, 0.0)
@@ -1156,6 +1784,10 @@ def sheet_svg(number: str) -> str:
             p = _placement(ref)
             parts.append(f'<g class="kimbim-legend" transform="translate({p["x"]:.3f} {p["y"]:.3f})">\n{body}\n</g>')
     parts += symbols_svg(sheet)  # D87: north arrows, scale bars, revision clouds
+    try:  # Archicad: Interactive Schedules and the drawing/sheet lists are layout items
+        parts += [group for _kind, group in table_groups(sheet)]
+    except ValueError as ex:
+        return A._fail(str(ex))
     background = _sheet_data(sheet).get("background") or "#ffffff"
     frame = [f'<rect x="{MARGIN}" y="{MARGIN}" width="{width - 2 * MARGIN}" height="{height - 2 * MARGIN}" '
              f'fill="none" stroke="#000" stroke-width="0.7"/>']

@@ -260,6 +260,34 @@ def test_sheet_a01_is_a_paper_space_layout(house, tmp_path):
     assert all(i.dxf.xscale == 1 for i in doc.modelspace().query("INSERT"))
 
 
+def test_sheet_schedules_and_lists_reach_the_dxf(house, tmp_path):
+    """D112: a placed schedule and a drawing list are part of the layout, not only of the SVG."""
+    from kimbim import sheets as Sh
+
+    number = call("add_sheet", "A3", "Tables")["number"]
+    assert call("place_drawing", number, drawing("Level 1 Floor Plan"), 10, 10, 100)["ok"]
+    assert json.loads(Sh.place_schedule(number, "doors", 20, 150, 220))["ok"]
+    assert json.loads(Sh.place_drawing_list(number, 20, 220, 220))["ok"]
+    r = call("export_sheet_dxf", number, str(tmp_path / "tables.dxf"), "")
+    assert r["ok"], r
+    doc = read(r["path"])
+    layout = doc.layouts.get(r["layout"])
+    texts = [t.dxf.text for t in layout.query("TEXT")]
+    # The schedule: its title, a header with the schedule's unit and a cell.
+    assert "Doors" in texts, texts
+    assert "Width (m)" in texts, texts
+    assert "Level 1" in texts, texts
+    # The auto-generated drawing list: its title and its columns.
+    assert "Drawing list" in texts, texts
+    assert "Drawing" in texts and "Scale" in texts and "Sheet" in texts, texts
+    layers = {layer.dxf.name for layer in doc.layers}
+    assert {"A-ANNO-SCHD", "A-ANNO-LIST"} <= layers, layers
+    assert layout.query('*[layer=="A-ANNO-SCHD"]')  # real entities, not just the layer table
+    assert layout.query('*[layer=="A-ANNO-LIST"]')
+    assert {e.dxftype() for e in layout.query('*[layer=="A-ANNO-SCHD"]')} <= {"TEXT", "LINE", "LWPOLYLINE"}
+    assert r["entities"] >= len(list(layout))
+
+
 def test_batch_export_to_a_folder(house, tmp_path):
     targets = call("dxf_targets")
     assert {"Level 1 Floor Plan.dxf", "Section 1.dxf"} <= {d["file"] for d in targets["drawings"]}

@@ -61,6 +61,7 @@ DEFAULTS = {
     "sheet_files": [],  # D98: the picture files placed on sheets (so versions and .kim files keep them)
     "texture_files": [],  # D96: the surfaces' texture pictures (likewise)
     "tag_styles": {},  # tag styles by id: the project's own and its edited built-ins (D87)
+    "title_block_templates": {},  # reusable title blocks / master layouts by id (D116)
     "stair_rules": {},  # building-code limits for stair and ramp warnings (D88; empty: the defaults)
     "check_tolerance": 0.002,   # D92: clash hard tolerance (m)
     "check_clearance": 0.05,    # D92: clash clearance (m)

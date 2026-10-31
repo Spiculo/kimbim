@@ -70,7 +70,8 @@ ISO_LAYERS = {
     "grids": "S-GRID", "other": "A-GENM",
 }
 DIMENSION_LAYER = "A-ANNO-DIMS"
-SHEET_LAYERS = {"frame": "A-ANNO-TTLB", "title": "A-ANNO-TITL", "legend": "A-ANNO-LGND"}
+SHEET_LAYERS = {"frame": "A-ANNO-TTLB", "title": "A-ANNO-TITL", "legend": "A-ANNO-LGND",
+                "schedule": "A-ANNO-SCHD", "list": "A-ANNO-LIST"}
 _INSUNITS = {0.001: 4, 0.01: 5, 1.0: 6, 0.0254: 1, 0.3048: 2}  # metres per unit -> $INSUNITS
 _BAD_NAME = re.compile(r'[<>/\\":;?*|=`,]')
 _BAD_FILE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
@@ -968,6 +969,12 @@ def sheet_document(number: str, opts: dict):
                         {**base, "layer": SHEET_LAYERS["legend"]})
     for symbol in S.symbols_svg(sheet):  # D87: north arrows, scale bars, revision clouds
         chrome.walk(ET.fromstring(symbol), {**base, "layer": OVERLAY_LAYERS["marker"]})
+    try:  # D112: Interactive Schedules and the drawing/sheet lists as TEXT and LINE on the layout
+        tables = S.table_groups(sheet)
+    except ValueError as ex:
+        return None, f"sheet {number}: {ex}"
+    for kind, group in tables:
+        chrome.walk(ET.fromstring(group), {**base, "layer": SHEET_LAYERS[kind]})
     info = json.loads(S.project_info())
     frame = (f'<rect x="{S.MARGIN}" y="{S.MARGIN}" width="{width - 2 * S.MARGIN}" height="{height - 2 * S.MARGIN}" '
              f'fill="none" stroke="#000" stroke-width="0.7"/>')

@@ -9,6 +9,7 @@ import ifcopenshell.validate
 import pytest
 
 from kimbim import app_bridge as b
+from kimbim import sheets as Sh
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
 import make_house  # noqa: E402
@@ -371,3 +372,198 @@ def test_a_title_block_never_overlaps_a_drawing_placed_on_a_free_spot(house):
     tb = _sheet_of(number)["title_block"]
     assert not (view["x"] < tb["x"] + tb["w"] and tb["x"] < view["x"] + view["w"]
                 and view["y"] < tb["y"] + tb["h"] and tb["y"] < view["y"] + view["h"])
+
+
+# ---------------------------------------------------------------- schedules and lists on sheets
+
+def _sheet_entity(number):
+    sheet = Sh._sheet(number)
+    assert sheet is not None
+    return sheet
+
+
+def _schedule_group(svg):
+    m = re.search(r'<g class="kimbim-schedule".*?</g>', svg, re.S)
+    return m.group(0) if m else ""
+
+
+def _list_group(svg, kind):
+    m = re.search(rf'<g class="kimbim-list" data-list="{kind}".*?</g>', svg, re.S)
+    return m.group(0) if m else ""
+
+
+def test_a_schedule_is_placed_rendered_persisted_and_removed(house):
+    number = call("add_sheet", "A3", "Schedules")["number"]
+    r = json.loads(Sh.place_schedule(number, "doors", 20, 20, 220))
+    assert r["ok"], r
+    assert r["index"] == 0
+    svg = call("sheet_svg", number)["svg"]
+    group = _schedule_group(svg)
+    assert group, svg
+    assert ">Doors<" in group              # the scheme's name
+    assert "Width (m)" in group            # a header with its unit
+    assert "Level 1" in group              # a cell value
+    assert "font-weight=\"bold\"" in group  # header row bold
+    # The placement lives in the sheet's own JSON (Description), versioned with the sheet.
+    stored = json.loads(_sheet_entity(number).Description)
+    assert stored["schedules"] == [{"scheme": "doors", "x": 20.0, "y": 20.0, "width": 220.0, "merge": False}]
+    listed = json.loads(Sh.sheet_schedules(number))
+    assert listed["ok"] and listed["schedules"][0]["scheme"] == "doors"
+    assert listed["schedules"][0]["name"] == "Doors" and listed["schedules"][0]["index"] == 0
+    # Removing it is undoable and the table leaves the composed SVG.
+    assert json.loads(Sh.remove_schedule(number, 0))["ok"]
+    assert "kimbim-schedule" not in call("sheet_svg", number)["svg"]
+    assert json.loads(Sh.sheet_schedules(number))["schedules"] == []
+    assert call("undo")["ok"]
+    assert "kimbim-schedule" in call("sheet_svg", number)["svg"]
+    assert json.loads(Sh.remove_schedule(number, 0))["ok"]
+
+
+def test_a_schedule_placed_without_a_position_clears_the_drawings_and_title_block(house):
+    number = call("add_sheet", "A3", "Auto")["number"]
+    assert call("place_drawing", number, drawing("Level 1 Floor Plan"), 15, 15, 100)["ok"]
+    r = json.loads(Sh.place_schedule(number, "doors", -1, -1, 120, "true"))
+    assert r["ok"], r
+    (entry,) = json.loads(Sh.sheet_schedules(number))["schedules"]
+    assert entry["merge"] is True and entry["x"] >= 10 and entry["y"] >= 10
+    (view,) = _sheet_of(number)["views"]
+    tb = _sheet_of(number)["title_block"]
+    boxes = [(entry["x"], entry["y"], entry["width"], entry["height"]),
+             (view["x"], view["y"], view["w"], view["h"]), (tb["x"], tb["y"], tb["w"], tb["h"])]
+    for i, a in enumerate(boxes):
+        for b_ in boxes[i + 1:]:
+            assert not (a[0] < b_[0] + b_[2] and b_[0] < a[0] + a[2]
+                        and a[1] < b_[1] + b_[3] and b_[1] < a[1] + a[3]), (a, b_)
+
+
+def test_drawing_and_sheet_lists_are_placed_rendered_and_removed(house):
+    number = call("add_sheet", "A3", "Lists")["number"]
+    plan = drawing("Level 1 Floor Plan")
+    assert call("place_drawing", number, plan, 10, 10, 100)["ok"]
+    r = json.loads(Sh.place_drawing_list(number, 20, 200, 150))
+    assert r["ok"] and r["index"] == 0, r
+    assert json.loads(Sh.place_sheet_list(number, 20, 240, 150))["ok"]
+    svg = call("sheet_svg", number)["svg"]
+    drawings = _list_group(svg, "drawings")
+    assert "Drawing list" in drawings and "Level 1 Floor Plan" in drawings
+    assert number in drawings and "1:100" in drawings  # where it is placed and at what scale
+    sheets = _list_group(svg, "sheets")
+    assert "Sheet list" in sheets and number in sheets and "Lists" in sheets and "A3" in sheets
+    # Stored under "lists" in the sheet data and returned for the UI.
+    stored = json.loads(_sheet_entity(number).Description)["lists"]
+    assert [x["kind"] for x in stored] == ["drawings", "sheets"]
+    assert [x["index"] for x in json.loads(Sh.sheet_schedules(number))["lists"]] == [0, 1]
+    # Removing the drawing list leaves the sheet list alone.
+    assert json.loads(Sh.remove_list(number, 0))["ok"]
+    svg = call("sheet_svg", number)["svg"]
+    assert 'data-list="drawings"' not in svg and 'data-list="sheets"' in svg
+    assert json.loads(Sh.remove_list(number, 0))["ok"]
+    assert 'data-list="sheets"' not in call("sheet_svg", number)["svg"]
+
+
+def test_an_unknown_schedule_sheet_or_index_fails_cleanly(house):
+    number = call("add_sheet", "A3", "Bad")["number"]
+    r = json.loads(Sh.place_schedule(number, "nope"))
+    assert not r["ok"] and "unknown schedule" in r["error"]
+    assert not json.loads(Sh.place_schedule("Z99", "walls"))["ok"]
+    assert not json.loads(Sh.place_drawing_list("Z99"))["ok"]
+    assert not json.loads(Sh.place_sheet_list("Z99"))["ok"]
+    assert not json.loads(Sh.remove_schedule(number, 0))["ok"]
+    assert not json.loads(Sh.remove_list(number, 0))["ok"]
+    assert not json.loads(Sh.sheet_schedules("Z99"))["ok"]
+    assert not json.loads(Sh.place_schedule(number, "walls", 20, 20, 0))["ok"]
+
+
+def test_a_schedule_that_cannot_be_computed_fails_the_sheet(house):
+    number = call("add_sheet", "A3", "Broken")["number"]
+    scheme = {"name": "Temp", "classes": ["IfcWall"],
+              "fields": [{"source": "quantity", "name": "length"}]}
+    assert call("save_schedule_scheme", json.dumps(scheme))["ok"]
+    assert json.loads(Sh.place_schedule(number, "temp", 20, 20, 150))["ok"]
+    assert call("sheet_svg", number)["ok"]
+    assert call("delete_schedule_scheme", "temp")["ok"]
+    r = call("sheet_svg", number)
+    assert not r["ok"] and "schedule" in r["error"].lower()
+    assert json.loads(Sh.remove_schedule(number, 0))["ok"]
+    assert call("sheet_svg", number)["ok"]
+
+def test_a_schedule_can_be_moved_on_the_sheet(house):
+    number = call("add_sheet", "A3", "Move")["number"]
+    assert json.loads(Sh.place_schedule(number, "doors", 20, 20, 180))["ok"]
+    moved = json.loads(Sh.move_schedule(number, 0, 40, 55))
+    assert moved["ok"], moved
+    entry = json.loads(Sh.sheet_schedules(number))["schedules"][0]
+    assert (entry["x"], entry["y"]) == (40.0, 55.0)
+    assert call("undo")["ok"]
+    entry = json.loads(Sh.sheet_schedules(number))["schedules"][0]
+    assert (entry["x"], entry["y"]) == (20.0, 20.0)
+    assert not json.loads(Sh.move_schedule(number, 5, 0, 0))["ok"]
+
+
+# ---------------------------------------------------------------- title block templates (master layouts)
+
+def test_a_title_block_template_is_saved_applied_replaced_and_deleted(house):
+    from kimbim import settings as S
+
+    assert json.loads(S.set_project_settings(json.dumps({"title_block_templates": {}})))["ok"]
+    source = call("add_sheet", "A1", "Master")["number"]
+    target = call("add_sheet", "A3", "Plans")["number"]
+    assert call("move_title_block", source, 25, 30)["ok"]
+    fields = {"project": "Casa Lecot", "client": "Familia Lecot", "issued": "Estudio"}
+    assert call("set_title_block", source, json.dumps({"fields": fields}))["ok"]
+
+    saved = json.loads(Sh.save_title_block_template("House master", source))
+    assert saved["ok"], saved
+    template = saved["template"]
+    assert template["id"] == "house-master" and template["name"] == "House master"
+    assert template["paper"] == "A1" and (template["x"], template["y"]) == (25, 30)
+    assert template["fields"] == fields  # only the sheet's overrides, never the derived defaults
+    assert [t["id"] for t in json.loads(Sh.title_block_templates())["templates"]] == ["house-master"]
+    # It lives in the project settings, so it travels with the project and its versions.
+    assert S.current()["title_block_templates"]["house-master"]["paper"] == "A1"
+
+    # Applying it puts the position, the fields and the paper size on another sheet, in one undo step.
+    applied = json.loads(Sh.apply_title_block_template(target, "house-master"))
+    assert applied["ok"], applied
+    assert (applied["title_block"]["x"], applied["title_block"]["y"]) == (25, 30)
+    assert {k: applied["title_block"]["fields"][k] for k in fields} == fields  # the listing shows them
+    sheet = _sheet_of(target)
+    assert sheet["paper"] == "A1" and sheet["title_block"]["fields"]["client"] == "Familia Lecot"
+    assert call("undo")["ok"]
+    back = _sheet_of(target)
+    assert back["paper"] == "A3"
+    assert (back["title_block"]["x"], back["title_block"]["y"]) == (420 - 10 - 180, 297 - 10 - 50)
+    assert back["title_block"]["fields"]["client"] != "Familia Lecot"
+
+    # Saving a name that exists replaces that template, keeping its id; {"paper": false} leaves the paper out.
+    assert call("move_title_block", source, 40, 50)["ok"]
+    again = json.loads(Sh.save_title_block_template("House master", source, json.dumps({"paper": False})))
+    assert again["ok"], again
+    assert again["template"]["id"] == "house-master"
+    assert (again["template"]["x"], again["template"]["y"]) == (40, 50)
+    assert again["template"]["paper"] == ""
+    assert len(json.loads(Sh.title_block_templates())["templates"]) == 1
+    applied = json.loads(Sh.apply_title_block_template(target, "house-master", json.dumps({"paper": False})))
+    assert applied["ok"] and _sheet_of(target)["paper"] == "A3"  # the sheet keeps its paper
+    assert (_sheet_of(target)["title_block"]["x"], _sheet_of(target)["title_block"]["y"]) == (40, 50)
+
+    # Rename keeps the id (menus and sheets keep referring to it); delete removes it.
+    renamed = json.loads(Sh.rename_title_block_template("house-master", "Casa master"))
+    assert renamed["ok"], renamed
+    assert renamed["template"]["id"] == "house-master" and renamed["template"]["name"] == "Casa master"
+    assert [t["name"] for t in json.loads(Sh.title_block_templates())["templates"]] == ["Casa master"]
+    assert json.loads(Sh.delete_title_block_template("house-master"))["ok"]
+    assert json.loads(Sh.title_block_templates())["templates"] == []
+    assert not json.loads(Sh.delete_title_block_template("house-master"))["ok"]
+
+
+def test_title_block_templates_fail_cleanly(house):
+    number = call("add_sheet", "A3", "Bad")["number"]
+    assert not json.loads(Sh.save_title_block_template("", number))["ok"]
+    assert not json.loads(Sh.save_title_block_template("Master", "Z99"))["ok"]
+    assert not json.loads(Sh.save_title_block_template("Master", number, "{nope"))["ok"]
+    assert not json.loads(Sh.apply_title_block_template(number, "nope"))["ok"]
+    assert not json.loads(Sh.apply_title_block_template("Z99", "nope"))["ok"]
+    assert not json.loads(Sh.apply_title_block_template(number, "nope", "{nope"))["ok"]
+    assert not json.loads(Sh.rename_title_block_template("nope", "Master"))["ok"]
+    assert not json.loads(Sh.rename_title_block_template("nope", ""))["ok"]
