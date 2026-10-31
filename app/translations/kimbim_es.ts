@@ -3333,6 +3333,144 @@ Intro ejecuta, Mayús+Intro añade una línea, Arriba/Abajo recuperan entradas a
       <translation>Terreno:</translation>
     </message>
     <message>
+      <location filename="../src/MainWindow.cpp" line="565" />
+      <source>Import &amp;mesh...</source>
+      <translation>Importar &amp;malla...</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="567" />
+      <source>Import an OBJ, STL or PLY mesh as an object on a level</source>
+      <translation>Importar una malla OBJ, STL o PLY como objeto en un nivel</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6040" />
+      <source>Import mesh</source>
+      <translation>Importar malla</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6042" />
+      <source>Meshes (*.obj *.stl *.ply);;All files (*)</source>
+      <translation>Mallas (*.obj *.stl *.ply);;Todos los archivos (*)</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6060" />
+      <source>Rotation:</source>
+      <translation>Rotación:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6061" />
+      <source> degrees</source>
+      <translation> grados</translation>
+    </message>
+    <message numerus="yes">
+      <location filename="../src/MainWindow.cpp" line="6105" />
+      <source>Mesh imported: %n triangle(s)</source>
+      <translation>
+        <numerusform>Malla importada: %n triángulo</numerusform>
+        <numerusform>Malla importada: %n triángulos</numerusform>
+      </translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6111" />
+      <source>Attribute manager</source>
+      <translation>Gestor de atributos</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="988" />
+      <source>&amp;Attribute manager...</source>
+      <translation>Gestor de &amp;atributos...</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="990" />
+      <source>Export or import pens, line types, styles, layers and materials</source>
+      <translation>Exportar o importar plumas, tipos de línea, estilos, capas y materiales</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6126" />
+      <source>Export attributes</source>
+      <translation>Exportar atributos</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6132" />
+      <source>Import attributes</source>
+      <translation>Importar atributos</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6128" />
+      <source>KimBim attributes (*.json)</source>
+      <translation>Atributos KimBim (*.json)</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6144" />
+      <source>Attributes exported</source>
+      <translation>Atributos exportados</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6156" />
+      <source>Attributes imported</source>
+      <translation>Atributos importados</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="2478" />
+      <source>&amp;Keynotes...</source>
+      <translation>&amp;Notas clave...</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="2480" />
+      <source>Edit the keynote table used by keynote annotations</source>
+      <translation>Editar la tabla de notas clave que usan las anotaciones</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6010" />
+      <source>Keynotes</source>
+      <translation>Notas clave</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6015" />
+      <source>Code</source>
+      <translation>Código</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6015" />
+      <source>Text</source>
+      <translation>Texto</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6015" />
+      <source>Category</source>
+      <translation>Categoría</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6036" />
+      <source>New keynote</source>
+      <translation>Nueva nota clave</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6036" />
+      <source>Edit keynote</source>
+      <translation>Editar nota clave</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6042" />
+      <source>Code:</source>
+      <translation>Código:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6043" />
+      <source>Text:</source>
+      <translation>Texto:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6044" />
+      <source>Category:</source>
+      <translation>Categoría:</translation>
+    </message>
+    <message>
+      <location filename="../src/MainWindow.cpp" line="6078" />
+      <source>Refresh</source>
+      <translation>Actualizar</translation>
+    </message>
+    <message>
       <location filename="../src/MainWindow.cpp" line="2325" />
       <source>&amp;Detail</source>
       <translation>&amp;Detalle</translation>

@@ -552,6 +552,10 @@ void MainWindow::buildMenus()
     exportIfc->setObjectName(QStringLiteral("actionExportIfc"));
     exportIfc->setToolTip(tr("Export the model, a selection, a level or some classes to an IFC file"));
     connect(exportIfc, &QAction::triggered, this, &MainWindow::exportIfcDialog);
+    QAction* importMesh = file->addAction(tr("Import &mesh...")); // general mesh import
+    importMesh->setObjectName(QStringLiteral("actionImportMesh"));
+    importMesh->setToolTip(tr("Import an OBJ, STL or PLY mesh as an object on a level"));
+    connect(importMesh, &QAction::triggered, this, &MainWindow::importMeshDialog);
     QAction* linkModel = file->addAction(tr("Link &model...")); // D117: an external reference
     linkModel->setObjectName(QStringLiteral("actionLinkModel"));
     linkModel->setToolTip(tr("Show another IFC file in this project as a read-only reference"));
@@ -979,6 +983,10 @@ void MainWindow::buildMenus()
     editor("actionPenSets", tr("&Pen sets..."), [this](const QJsonObject& r) { return new PenSetsDialog(r, this); });
     editor("actionLineTypes", tr("&Line types..."), [this](const QJsonObject& r) { return new LineTypesDialog(r, this); });
     editor("actionElementStyles", tr("&Element styles..."), [this](const QJsonObject& r) { return new ElementStylesDialog(r, this); });
+    QAction* attributes = graphics->addAction(tr("&Attribute manager...")); // office standards between projects
+    attributes->setObjectName(QStringLiteral("actionAttributeManager"));
+    attributes->setToolTip(tr("Export or import pens, line types, styles, layers and materials"));
+    connect(attributes, &QAction::triggered, this, &MainWindow::attributesDialog);
     graphics->addSeparator();
     // D96: Archicad's element attributes (Surfaces, Building Materials, Composites), one dialog.
     auto materials = [this, graphics](const char* name, const QString& text, MaterialsEdits::Kind kind) {
@@ -2463,6 +2471,10 @@ void MainWindow::buildModelingToolbar()
     terrainAction->setObjectName(QStringLiteral("actionTerrain"));
     terrainAction->setToolTip(tr("Create a triangulated site mesh from survey points or contour polylines"));
     connect(terrainAction, &QAction::triggered, this, &MainWindow::terrainDialog);
+    QAction* keynotesAction = model->addAction(tr("&Keynotes...")); // reusable keynote table
+    keynotesAction->setObjectName(QStringLiteral("actionKeynotes"));
+    keynotesAction->setToolTip(tr("Edit the keynote table used by keynote annotations"));
+    connect(keynotesAction, &QAction::triggered, this, &MainWindow::keynotesDialog);
     QAction* padAction = model->addAction(tr("Building &pad...")); // D118: flatten a terrain
     padAction->setObjectName(QStringLiteral("actionBuildingPad"));
     padAction->setToolTip(tr("Flatten a polygonal part of a terrain to a building pad elevation"));
@@ -6499,6 +6511,219 @@ void MainWindow::terrainPadDialog()
         afterEdit(r);
         m_status->showMessage(tr("Building pad applied"));
     });
+    dialog.exec();
+}
+
+void MainWindow::keynotesDialog()
+{
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Keynotes"));
+    dialog.resize(680, 420);
+    auto* layout = new QVBoxLayout(&dialog);
+    auto* table = new QTableWidget(&dialog);
+    table->setColumnCount(3);
+    table->setHorizontalHeaderLabels({tr("Code"), tr("Text"), tr("Category")});
+    table->horizontalHeader()->setStretchLastSection(true);
+    table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+    table->setSelectionBehavior(QAbstractItemView::SelectRows);
+    table->setSelectionMode(QAbstractItemView::SingleSelection);
+    table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    layout->addWidget(table, 1);
+    auto* buttons = new QHBoxLayout;
+    layout->addLayout(buttons);
+    QJsonArray keynotes;
+    auto refresh = [&] {
+        keynotes = bridge("keynote_table").value("keynotes").toArray();
+        table->setRowCount(keynotes.size());
+        for (int i = 0; i < keynotes.size(); ++i) {
+            const QJsonObject entry = keynotes[i].toObject();
+            table->setItem(i, 0, new QTableWidgetItem(entry.value("code").toString()));
+            table->setItem(i, 1, new QTableWidgetItem(entry.value("text").toString()));
+            table->setItem(i, 2, new QTableWidgetItem(entry.value("category").toString()));
+        }
+        if (table->rowCount())
+            table->selectRow(0);
+    };
+    refresh();
+    auto current = [&]() -> QJsonObject {
+        const int row = table->currentRow();
+        return row >= 0 && row < keynotes.size() ? keynotes[row].toObject() : QJsonObject();
+    };
+    auto editEntry = [&](const QJsonObject& entry) {
+        QDialog sub(&dialog);
+        sub.setWindowTitle(entry.isEmpty() ? tr("New keynote") : tr("Edit keynote"));
+        auto* form = new QFormLayout(&sub);
+        auto* code = new QLineEdit(entry.value("code").toString(), &sub);
+        auto* text = new QLineEdit(entry.value("text").toString(), &sub);
+        auto* category = new QLineEdit(entry.value("category").toString(), &sub);
+        form->addRow(tr("Code:"), code);
+        form->addRow(tr("Text:"), text);
+        form->addRow(tr("Category:"), category);
+        auto* ok = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &sub);
+        form->addRow(ok);
+        connect(ok, &QDialogButtonBox::accepted, &sub, &QDialog::accept);
+        connect(ok, &QDialogButtonBox::rejected, &sub, &QDialog::reject);
+        if (sub.exec() != QDialog::Accepted)
+            return;
+        const QJsonObject r = bridge("save_keynote",
+            {code->text().trimmed(), text->text().trimmed(), category->text().trimmed()});
+        if (!r.value("ok").toBool()) {
+            showError(tr("Keynotes"), r.value("error").toString());
+            return;
+        }
+        afterEdit(r);
+        refresh();
+    };
+    auto* add = new QPushButton(tr("New..."), &dialog);
+    auto* edit = new QPushButton(tr("Edit..."), &dialog);
+    auto* remove = new QPushButton(tr("Delete"), &dialog);
+    auto* refreshButton = new QPushButton(tr("Refresh"), &dialog);
+    auto* close = new QPushButton(tr("Close"), &dialog);
+    for (QPushButton* b : {add, edit, remove, refreshButton})
+        buttons->addWidget(b);
+    buttons->addStretch(1);
+    buttons->addWidget(close);
+    connect(add, &QPushButton::clicked, &dialog, [&] { editEntry(QJsonObject()); });
+    connect(edit, &QPushButton::clicked, &dialog, [&] {
+        if (!current().isEmpty())
+            editEntry(current());
+    });
+    connect(table, &QTableWidget::itemDoubleClicked, &dialog, [&](QTableWidgetItem*) {
+        if (!current().isEmpty())
+            editEntry(current());
+    });
+    connect(remove, &QPushButton::clicked, &dialog, [&] {
+        const QJsonObject entry = current();
+        if (entry.isEmpty())
+            return;
+        const QJsonObject r = bridge("delete_keynote", {entry.value("code").toString()});
+        if (!r.value("ok").toBool()) {
+            showError(tr("Keynotes"), r.value("error").toString());
+            return;
+        }
+        afterEdit(r);
+        refresh();
+    });
+    connect(refreshButton, &QPushButton::clicked, &dialog, [&] { refresh(); });
+    connect(close, &QPushButton::clicked, &dialog, &QDialog::accept);
+    dialog.exec();
+}
+
+void MainWindow::importMeshDialog()
+{
+    const QString path = QFileDialog::getOpenFileName(this, tr("Import mesh"), QString(),
+        tr("Meshes (*.obj *.stl *.ply);;All files (*)"));
+    if (path.isEmpty())
+        return;
+    const QJsonArray storeys = bridge("storeys").value("storeys").toArray();
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Import mesh"));
+    auto* form = new QFormLayout(&dialog);
+    auto* level = new QComboBox(&dialog);
+    for (const auto& value : storeys) {
+        const QJsonObject storey = value.toObject();
+        level->addItem(storey.value("name").toString(), storey.value("guid").toString());
+    }
+    auto* name = new QLineEdit(QFileInfo(path).completeBaseName(), &dialog);
+    auto* scale = new QDoubleSpinBox(&dialog);
+    scale->setRange(0.0001, 10000.0);
+    scale->setDecimals(4);
+    scale->setValue(1.0);
+    auto* rotation = new QDoubleSpinBox(&dialog);
+    rotation->setRange(-360.0, 360.0);
+    rotation->setDecimals(2);
+    rotation->setSuffix(tr(" degrees"));
+    auto spin = [&](double lo, double hi, double value) {
+        auto* box = new QDoubleSpinBox(&dialog);
+        box->setRange(lo, hi);
+        box->setDecimals(3);
+        box->setValue(value);
+        box->setSuffix(tr(" m"));
+        return box;
+    };
+    auto* x = spin(-1e6, 1e6, 0.0);
+    auto* y = spin(-1e6, 1e6, 0.0);
+    auto* z = spin(-1e6, 1e6, 0.0);
+    form->addRow(tr("Level:"), level);
+    form->addRow(tr("Name:"), name);
+    form->addRow(tr("Scale:"), scale);
+    form->addRow(tr("Rotation:"), rotation);
+    form->addRow(tr("X:"), x);
+    form->addRow(tr("Y:"), y);
+    form->addRow(tr("Z:"), z);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    form->addRow(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    QJsonObject options{{"name", name->text().trimmed()}, {"scale", scale->value()},
+        {"rotation", rotation->value()}, {"x", x->value()}, {"y", y->value()}, {"z", z->value()}};
+    const QJsonObject r = bridge("import_mesh", {path, level->currentData().toString(),
+        QString::fromUtf8(QJsonDocument(options).toJson(QJsonDocument::Compact))});
+    if (!r.value("ok").toBool()) {
+        showError(tr("Import mesh"), r.value("error").toString());
+        return;
+    }
+    afterEdit(r);
+    if (r.value("guid").isString()) {
+        m_viewport->selectGuids({r.value("guid").toString()});
+        setSelection({r.value("guid").toString()});
+    }
+    m_status->showMessage(tr("Mesh imported: %n triangle(s)", nullptr, r.value("triangles").toInt()));
+}
+
+void MainWindow::attributesDialog()
+{
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Attribute manager"));
+    auto* layout = new QVBoxLayout(&dialog);
+    const QJsonObject catalogue = bridge("attribute_catalogue");
+    auto* summary = new QLabel(&dialog);
+    QStringList counts;
+    const QJsonObject groups = catalogue.value("groups").toObject();
+    for (auto it = groups.begin(); it != groups.end(); ++it)
+        counts << QStringLiteral("%1: %2").arg(it.key()).arg(it.value().toInt());
+    summary->setText(counts.join(QStringLiteral(" · ")));
+    summary->setWordWrap(true);
+    layout->addWidget(summary);
+    auto* buttons = new QHBoxLayout;
+    auto* exportButton = new QPushButton(tr("Export..."), &dialog);
+    auto* importButton = new QPushButton(tr("Import..."), &dialog);
+    auto* close = new QPushButton(tr("Close"), &dialog);
+    buttons->addWidget(exportButton);
+    buttons->addWidget(importButton);
+    buttons->addStretch(1);
+    buttons->addWidget(close);
+    layout->addLayout(buttons);
+    connect(exportButton, &QPushButton::clicked, &dialog, [&] {
+        QString path = QFileDialog::getSaveFileName(&dialog, tr("Export attributes"), QString(),
+            tr("KimBim attributes (*.json)"));
+        if (path.isEmpty())
+            return;
+        if (!path.endsWith(QLatin1String(".json"), Qt::CaseInsensitive))
+            path += QStringLiteral(".json");
+        const QJsonObject r = bridge("export_attributes", {path});
+        if (!r.value("ok").toBool()) {
+            showError(tr("Attribute manager"), r.value("error").toString());
+            return;
+        }
+        m_status->showMessage(tr("Attributes exported"));
+    });
+    connect(importButton, &QPushButton::clicked, &dialog, [&] {
+        const QString path = QFileDialog::getOpenFileName(&dialog, tr("Import attributes"), QString(),
+            tr("KimBim attributes (*.json)"));
+        if (path.isEmpty())
+            return;
+        const QJsonObject r = bridge("import_attributes", {path});
+        if (!r.value("ok").toBool()) {
+            showError(tr("Attribute manager"), r.value("error").toString());
+            return;
+        }
+        afterEdit(r);
+        m_status->showMessage(tr("Attributes imported"));
+    });
+    connect(close, &QPushButton::clicked, &dialog, &QDialog::accept);
     dialog.exec();
 }
 

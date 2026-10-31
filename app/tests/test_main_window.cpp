@@ -3107,7 +3107,8 @@ private slots:
         kimbim::MainWindow w(nullptr, true);
         for (const char* name : {"actionGeoreferencing", "actionTerrain", "actionIssues", "actionPurgeTypes",
                  "actionDetailTool", "actionExportIfc", "actionLinkModel", "actionLinks",
-                 "actionCurtainWallSettings", "actionBuildingPad"})
+                 "actionCurtainWallSettings", "actionBuildingPad", "actionImportMesh",
+                 "actionAttributeManager", "actionKeynotes"})
             QVERIFY2(action(w, name), name);
     }
 

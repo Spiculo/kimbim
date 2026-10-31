@@ -618,6 +618,9 @@ private:
     void linksDialog();
     void curtainWallDialog();
     void terrainPadDialog();
+    void importMeshDialog();
+    void attributesDialog();
+    void keynotesDialog();
     void projectInfoDialog();
     void roomScheduleDialog();
     void exportSheetDialog(bool pdf);
