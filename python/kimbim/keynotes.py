@@ -22,7 +22,7 @@ from . import authoring as A
 from . import settings
 
 KEY = "keynotes"  # the project settings key: {code: {"code", "text", "category"}}
-PSET = N.PSET
+PSET = "KIMBIM_Annotation"
 CODE_FIELD = "Keynote"
 MAX_CODE = 40
 
