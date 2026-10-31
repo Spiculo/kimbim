@@ -746,10 +746,102 @@ def add_slab_edge(slab_guid: str, width=0.02, depth=0.2) -> str:
     return B._dump({**r, "edges": made})
 
 
+CURTAIN_PSET = "KIMBIM_CurtainWall"
+
+
+def _curtain_members(f, wall, p1, p2, base, height, spacing, mullion_width=0.05,
+                     mullion_depth=0.05, rail_depth=0.05) -> list:
+    """Inside an action: mullions every `spacing` and top/bottom rails as IfcMembers of the wall."""
+    length = math.dist(p1, p2)
+    dx, dy = (p2[0] - p1[0]) / length, (p2[1] - p1[1]) / length
+    parts = []
+
+    def member(name, along, z, length_, height_, thickness_):
+        m = ifcopenshell.api.root.create_entity(f, ifc_class="IfcMember", name=name)
+        rep = ifcopenshell.api.geometry.add_wall_representation(
+            f, context=_body_context(), length=length_, height=height_, thickness=thickness_)
+        ifcopenshell.api.geometry.assign_representation(f, product=m, representation=rep)
+        matrix = np.array([[dx, -dy, 0, p1[0] + dx * along],
+                           [dy, dx, 0, p1[1] + dy * along],
+                           [0, 0, 1, z], [0, 0, 0, 1]], dtype=float)
+        ifcopenshell.api.geometry.edit_object_placement(f, product=m, matrix=matrix, is_si=True)
+        ifcopenshell.api.aggregate.assign_object(f, products=[m], relating_object=wall)
+        layers.assign_active(m)
+        renovation.stamp_new(m)
+        parts.append(m.GlobalId)
+
+    step, t = max(spacing, 0.3), 0.0
+    while t < length - 0.01:
+        member("Curtain wall mullion", t, base, mullion_width, height, mullion_depth)
+        t += step
+    member("Curtain wall mullion", max(length - mullion_width, 0.0), base, mullion_width, height, mullion_depth)
+    member("Curtain wall bottom rail", 0.0, base, length, rail_depth, rail_depth)
+    member("Curtain wall top rail", 0.0, base + height - rail_depth, length, rail_depth, rail_depth)
+    return parts
+
+
+def _curtain_parts(wall) -> list:
+    """The IfcMembers aggregated to a curtain wall (the mullions and rails it owns)."""
+    return [obj for rel in (getattr(wall, "IsDecomposedBy", ()) or ())
+            for obj in (rel.RelatedObjects or ()) if obj.is_a("IfcMember")]
+
+
+def _curtain_body_length(wall) -> float:
+    """The panel's length along its axis (metres), read from its swept profile."""
+    rep = ifcopenshell.util.representation.get_representation(wall, "Model", "Body", "MODEL_VIEW")
+    for item in (getattr(rep, "Items", ()) or ()):
+        curve = getattr(getattr(item, "SweptArea", None), "OuterCurve", None)
+        if curve is None:
+            continue
+        if curve.is_a("IfcIndexedPolyCurve") and curve.Points is not None:
+            coordinates = curve.Points.CoordList or ()
+        elif curve.is_a("IfcPolyline"):
+            coordinates = [p.Coordinates for p in curve.Points or ()]
+        else:
+            continue
+        xs = [float(c[0]) for c in coordinates]
+        if xs:
+            return (max(xs) - min(xs)) * _scale()
+    return 0.0
+
+
+def _curtain_frame(wall, values) -> tuple:
+    """(p1, p2, base) in world metres, from the pset, else the wall's placement and body."""
+    p1 = p2 = None
+    axis = values.get("Axis")
+    try:
+        data = json.loads(axis) if isinstance(axis, str) else axis
+        if isinstance(data, (list, tuple)) and len(data) == 4:
+            p1 = (float(data[0]), float(data[1]))
+            p2 = (float(data[2]), float(data[3]))
+    except (TypeError, ValueError):
+        p1 = p2 = None
+    if p1 is None or math.dist(p1, p2) < MIN_WALL_LENGTH:
+        matrix = ifcopenshell.util.placement.get_local_placement(wall.ObjectPlacement)
+        s = _scale()
+        p1 = (float(matrix[0][3]) * s, float(matrix[1][3]) * s)
+        length = _curtain_body_length(wall)
+        p2 = (p1[0] + float(matrix[0][0]) * length, p1[1] + float(matrix[1][0]) * length)
+    try:
+        base = float(values.get("Base"))
+    except (TypeError, ValueError):
+        base = float(ifcopenshell.util.placement.get_local_placement(wall.ObjectPlacement)[2][3]) * _scale()
+    return p1, p2, base
+
+
+def _curtain_ranges(height, spacing, panel_thickness) -> str:
+    """The shared creation/update validation; "" when valid."""
+    if height <= 0:
+        return "the curtain wall needs a positive height"
+    if spacing <= 0.1 or not 0.005 <= panel_thickness <= 0.5:
+        return "the mullion spacing and panel thickness are out of range"
+    return ""
+
+
 def create_curtain_wall(storey_guid: str, x1, y1, x2, y2, height, spacing=1.5,
                         panel_thickness=0.04) -> str:
     """An IfcCurtainWall from (x1, y1) to (x2, y2) with a glazed panel of `panel_thickness`; the
-    mullion spacing is kept in `KIMBIM_CurtainWall` (the IFC body is the panel)."""
+    mullion spacing and the axis/base used to rebuild it are kept in `KIMBIM_CurtainWall`."""
     if B._model is None:
         return _fail("no model open")
     try:
@@ -760,10 +852,11 @@ def create_curtain_wall(storey_guid: str, x1, y1, x2, y2, height, spacing=1.5,
     storey = _by_guid(storey_guid)
     if storey is None or not storey.is_a("IfcBuildingStorey"):
         return _fail("unknown level")
-    if math.dist(p1, p2) < MIN_WALL_LENGTH or height <= 0:
-        return _fail("the curtain wall needs a length and a positive height")
-    if spacing <= 0.1 or not 0.005 <= panel_thickness <= 0.5:
-        return _fail("the mullion spacing and panel thickness are out of range")
+    if math.dist(p1, p2) < MIN_WALL_LENGTH:
+        return _fail("the curtain wall needs a length")
+    error = _curtain_ranges(height, spacing, panel_thickness)
+    if error:
+        return _fail(error)
     made = {}
 
     def action():
@@ -774,42 +867,19 @@ def create_curtain_wall(storey_guid: str, x1, y1, x2, y2, height, spacing=1.5,
                                                           name="Curtain Wall")
         wall = ifcopenshell.api.root.create_entity(f, ifc_class="IfcCurtainWall", name="Curtain Wall",
                                                    predefined_type="USERDEFINED")
+        wall.ObjectType = "Curtain Wall"  # USERDEFINED requires it (IfcCurtainWall.CorrectPredefinedType)
         ifcopenshell.api.type.assign_type(f, related_objects=[wall], relating_type=cw_type)
+        base = _elevation(storey)
         representation = ifcopenshell.api.geometry.create_2pt_wall(
             f, element=wall, context=_body_context(), p1=tuple(p1), p2=tuple(p2),
-            elevation=_elevation(storey), height=height, thickness=panel_thickness, is_si=True)
+            elevation=base, height=height, thickness=panel_thickness, is_si=True)
         ifcopenshell.api.geometry.assign_representation(f, product=wall, representation=representation)
         ifcopenshell.api.spatial.assign_container(f, products=[wall], relating_structure=storey)
-        ps = ifcopenshell.api.pset.add_pset(f, product=wall, name="KIMBIM_CurtainWall")
+        ps = ifcopenshell.api.pset.add_pset(f, product=wall, name=CURTAIN_PSET)
         ifcopenshell.api.pset.edit_pset(f, pset=ps, properties={
-            "Height": height, "MullionSpacing": spacing, "PanelThickness": panel_thickness})
-        # Mullions (vertical, every spacing) and top/bottom rails as IfcMembers aggregated to the wall.
-        base = _elevation(storey)
-        length = math.dist(p1, p2)
-        dx, dy = (p2[0] - p1[0]) / length, (p2[1] - p1[1]) / length
-        parts = []
-
-        def member(name, along, z, length_, height_, thickness_):
-            m = ifcopenshell.api.root.create_entity(f, ifc_class="IfcMember", name=name)
-            rep = ifcopenshell.api.geometry.add_wall_representation(
-                f, context=_body_context(), length=length_, height=height_, thickness=thickness_)
-            ifcopenshell.api.geometry.assign_representation(f, product=m, representation=rep)
-            matrix = np.array([[dx, -dy, 0, p1[0] + dx * along],
-                               [dy, dx, 0, p1[1] + dy * along],
-                               [0, 0, 1, z], [0, 0, 0, 1]], dtype=float)
-            ifcopenshell.api.geometry.edit_object_placement(f, product=m, matrix=matrix, is_si=True)
-            ifcopenshell.api.aggregate.assign_object(f, products=[m], relating_object=wall)
-            layers.assign_active(m)
-            renovation.stamp_new(m)
-            parts.append(m.GlobalId)
-
-        step, t = max(spacing, 0.3), 0.0
-        while t < length - 0.01:
-            member("Curtain wall mullion", t, base, 0.05, height, 0.05)
-            t += step
-        member("Curtain wall mullion", max(length - 0.05, 0.0), base, 0.05, height, 0.05)
-        member("Curtain wall bottom rail", 0.0, base, length, 0.05, 0.05)
-        member("Curtain wall top rail", 0.0, base + height - 0.05, length, 0.05, 0.05)
+            "Height": height, "MullionSpacing": spacing, "PanelThickness": panel_thickness,
+            "Axis": json.dumps([p1[0], p1[1], p2[0], p2[1]]), "Base": base})
+        parts = _curtain_members(f, wall, p1, p2, base, height, spacing)
         layers.assign_active(wall)
         renovation.stamp_new(wall)
         made["wall"] = wall
@@ -823,13 +893,93 @@ def create_curtain_wall(storey_guid: str, x1, y1, x2, y2, height, spacing=1.5,
     return B._dump({**r, "guid": made["wall"].GlobalId, "parts": made.get("parts", [])})
 
 
+def update_curtain_wall(guid: str, changes_json: str) -> str:
+    """Change a curtain wall's height, mullion spacing and/or panel thickness and rebuild it.
+
+    `changes_json` is {"height": m, "spacing": m, "panel_thickness": m}; omitted keys keep their
+    value. The panel and every mullion/rail are rebuilt from the axis/base kept at creation. One
+    undo step.
+    """
+    if B._model is None:
+        return _fail("no model open")
+    wall = _by_guid(guid)
+    if wall is None or not wall.is_a("IfcCurtainWall"):
+        return _fail("unknown curtain wall")
+    try:
+        changes = json.loads(changes_json)
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    if not isinstance(changes, dict):
+        return _fail("changes must be an object")
+    values = ifcopenshell.util.element.get_pset(wall, CURTAIN_PSET)
+    if not values:
+        return _fail("not a KimBim curtain wall")
+    try:
+        height = float(changes.get("height", values.get("Height")))
+        spacing = float(changes.get("spacing", values.get("MullionSpacing")))
+        panel_thickness = float(changes.get("panel_thickness", values.get("PanelThickness")))
+        mullion_width = float(changes.get("mullion_width", values.get("MullionWidth", 0.05)))
+        mullion_depth = float(changes.get("mullion_depth", values.get("MullionDepth", 0.05)))
+        rail_depth = float(changes.get("rail_depth", values.get("RailDepth", 0.05)))
+    except (TypeError, ValueError) as ex:
+        return _fail(str(ex))
+    error = _curtain_ranges(height, spacing, panel_thickness)
+    if error:
+        return _fail(error)
+    if not all(0.01 <= v <= 0.5 for v in (mullion_width, mullion_depth, rail_depth)):
+        return _fail("the mullion and rail sizes must be between 1 and 50 cm")
+    p1, p2, base = _curtain_frame(wall, values)
+    if math.dist(p1, p2) < MIN_WALL_LENGTH:
+        return _fail("the curtain wall has no length")
+    old_parts = _curtain_parts(wall)
+    made = {}
+
+    def action():
+        f = B._model
+        for member in old_parts:
+            ifcopenshell.api.root.remove_product(f, product=member)
+        representation = ifcopenshell.api.geometry.create_2pt_wall(
+            f, element=wall, context=_body_context(), p1=tuple(p1), p2=tuple(p2),
+            elevation=base, height=height, thickness=panel_thickness, is_si=True)
+        _replace_body(wall, representation)
+        parts = _curtain_members(f, wall, p1, p2, base, height, spacing,
+                                 mullion_width, mullion_depth, rail_depth)
+        ps = next((rel.RelatingPropertyDefinition for rel in (getattr(wall, "IsDefinedBy", ()) or ())
+                   if rel.is_a("IfcRelDefinesByProperties")
+                   and rel.RelatingPropertyDefinition.is_a("IfcPropertySet")
+                   and rel.RelatingPropertyDefinition.Name == CURTAIN_PSET), None)
+        if ps is None:
+            ps = ifcopenshell.api.pset.add_pset(f, product=wall, name=CURTAIN_PSET)
+        ifcopenshell.api.pset.edit_pset(f, pset=ps, properties={
+            "Height": height, "MullionSpacing": spacing, "PanelThickness": panel_thickness,
+            "MullionWidth": mullion_width, "MullionDepth": mullion_depth, "RailDepth": rail_depth,
+            "Axis": json.dumps([p1[0], p1[1], p2[0], p2[1]]), "Base": base})
+        made["parts"] = parts
+        return 1 + len(parts), [wall.GlobalId, *parts], [m.GlobalId for m in old_parts]
+
+    try:
+        r = B._run(action)
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+    return B._dump({**r, "guid": guid, "height": height, "spacing": spacing,
+                    "panel_thickness": panel_thickness, "mullion_width": mullion_width,
+                    "mullion_depth": mullion_depth, "rail_depth": rail_depth,
+                    "parts": len(made.get("parts", []))})
+
+
 def curtain_wall_info(guid: str) -> str:
     wall = _by_guid(guid)
     if wall is None or not wall.is_a("IfcCurtainWall"):
         return _fail("unknown curtain wall")
-    values = ifcopenshell.util.element.get_pset(wall, "KIMBIM_CurtainWall") or {}
-    return B._dump({"ok": True, "guid": guid, "height": values.get("Height"),
-                    "spacing": values.get("MullionSpacing"), "panel_thickness": values.get("PanelThickness")})
+    values = ifcopenshell.util.element.get_pset(wall, CURTAIN_PSET) or {}
+    info = {"ok": True, "guid": guid, "height": values.get("Height"),
+            "spacing": values.get("MullionSpacing"), "panel_thickness": values.get("PanelThickness"),
+            "mullion_width": values.get("MullionWidth", 0.05),
+            "mullion_depth": values.get("MullionDepth", 0.05), "rail_depth": values.get("RailDepth", 0.05)}
+    if values:
+        p1, p2, base = _curtain_frame(wall, values)
+        info.update({"axis": [p1[0], p1[1], p2[0], p2[1]], "base": base})
+    return B._dump(info)
 
 
 def slab_outline_from_walls(walls_json: str) -> str:

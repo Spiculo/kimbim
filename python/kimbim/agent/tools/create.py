@@ -108,6 +108,26 @@ def curtain_wall(session, level, start, end, height=None, spacing="1.5m", panel_
     return {"guids": [r["guid"]], "length_m": round(math.dist((x1, y1), (x2, y2)), 6), "height_m": round(h, 6)}
 
 
+@tool("create.update_curtain_wall", {"required": ["curtain_wall"], "properties": {
+    "curtain_wall": {"type": "string", "description": "GlobalId of the curtain wall."},
+    "height": _LENGTH, "spacing": {**_LENGTH, "description": "Mullion spacing."},
+    "panel_thickness": {**_LENGTH, "description": "Glass panel thickness."}}}, writes=True)
+def update_curtain_wall(session, curtain_wall, height=None, spacing=None, panel_thickness=None):
+    """Change a curtain wall's height, mullion spacing or panel thickness and rebuild its members."""
+    changes = {}
+    if height is not None:
+        changes["height"] = lengths(session, height)[0]
+    if spacing is not None:
+        changes["spacing"] = lengths(session, spacing)[0]
+    if panel_thickness is not None:
+        changes["panel_thickness"] = lengths(session, panel_thickness)[0]
+    if not changes:
+        raise AgentError("bad_input", hint="give height, spacing or panel_thickness")
+    r = bridge(A.update_curtain_wall, curtain_wall, json.dumps(changes))
+    return {"guids": [r["guid"]], "height_m": round(r["height"], 6), "spacing_m": round(r["spacing"], 6),
+            "panel_thickness_m": round(r["panel_thickness"], 6), "parts": r["parts"]}
+
+
 @tool("create.slab_edge", {"required": ["slab"], "properties": {
     "slab": {"type": "string", "description": "GlobalId of the slab."},
     "width": _LENGTH, "depth": _LENGTH}},
