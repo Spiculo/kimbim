@@ -33,6 +33,8 @@ PSET = "KIMBIM_Annotation"
 # Kind -> (fewest points, most points); None = no limit. A dimension is a chain: the measured points,
 # then a point the dimension line passes through. A leader: arrow tip, bends, then where the text sits.
 KINDS = {"text": (1, 1), "dimension": (3, None), "mark": (1, 1), "leader": (2, None),
+         # a detail marker (drawings.create_detail): its bubble and the region point its leader reaches
+         "detail": (2, 2),
          # 2D drafting (D84, module drafting): a line, a polyline, an arc (start, a point on it, end), a
          # circle (centre, a point on it), a fill (its outline)
          "line": (2, 2), "polyline": (2, None), "arc": (3, 3), "circle": (2, 2), "fill": (3, None),
@@ -40,7 +42,7 @@ KINDS = {"text": (1, 1), "dimension": (3, None), "mark": (1, 1), "leader": (2, N
          # the annotation pack (D87, module symbols): tags, north arrows, scale bars, revision clouds,
          # angle, radius, diameter, level and spot-elevation dimensions
          **S.POINTS}
-EXTRA = D.EXTRA + S.EXTRA  # pset keys beside Kind/Text/Points/Size/Pen
+EXTRA = D.EXTRA + S.EXTRA + ("Drawing",)  # pset keys beside Kind/Text/Points/Size/Pen
 TEXT_SIZE = 2.5  # millimetres on paper (Slice 15: text size in paper units, doc 13)
 DRAWING_SCALE = 100  # 1:100 until drawings get a scale setting
 MARK_RADIUS = 0.4  # metres
@@ -125,6 +127,11 @@ def _representation(kind, text, points, size=TEXT_SIZE, data=None):
     elif kind == "leader":
         items.append(f.createIfcPolyline([pt(p) for p in points]))
         items.append(literal(points[-1], text))
+    elif kind == "detail":  # a detail marker: the bubble, the leader to its region and the number
+        items.append(f.createIfcCircle(f.createIfcAxis2Placement2D(pt(points[0]), None), MARK_RADIUS / s))
+        if len(points) >= 2:
+            items.append(f.createIfcPolyline([pt(p) for p in points]))
+        items.append(literal(points[0], text))
     else:  # mark
         items.append(f.createIfcCircle(f.createIfcAxis2Placement2D(pt(points[0]), None), MARK_RADIUS / s))
         items.append(literal(points[0], text))
@@ -180,7 +187,8 @@ def add_annotation(storey_guid: str, kind: str, points_json: str, text: str) -> 
     storey = A._by_guid(storey_guid)
     if storey is None or not storey.is_a("IfcBuildingStorey"):
         return A._fail("unknown level")
-    if kind not in KINDS or kind in D.KINDS or kind in S.KINDS:  # drafting.add_drafting, symbols.add_symbol
+    if kind not in KINDS or kind in D.KINDS or kind in S.KINDS or kind == "detail":
+        # detail markers are drawings.create_detail's (they link a drawing)
         return A._fail(f"unknown annotation kind {kind}")
     try:
         points = [(float(x), float(y)) for x, y in json.loads(points_json)]
@@ -310,6 +318,8 @@ def annotations(storey_guid: str) -> str:
                 # D92: an automatic elevation follows the project's reference without a model edit.
                 text = S.elevation_text(S.elevation_at(storey, points[0]), storey)
             item = {"guid": a.GlobalId, "kind": kind, "text": text, "points": points, "size": size, "pen": pen}
+            if kind == "detail":  # the drawing its marker calls out (drawings.create_detail)
+                item["drawing"] = extra_of(a).get("Drawing") or ""
             if kind in D.KINDS:
                 item.update(D.shape_data(kind, points, extra_of(a), DRAWING_SCALE / 1000.0))
                 item["rect"] = bool(extra_of(a).get("Rect"))  # D92: a rectangle stays a rectangle

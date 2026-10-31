@@ -1,9 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Sections and elevations in the app (Slice 14, D60/D61). Same protocol as app_bridge.
+"""Sections, elevations and detail views in the app (Slice 14, D60/D61). Same protocol as app_bridge.
 
 A drawing is model data (an IfcAnnotation DRAWING, see drawgen); its SVG is a cache keyed by the
 model state, never model data. Generation runs in a child Python process from a snapshot of the
 model, because IfcOpenShell's SVG serializer holds the GIL for seconds on real files (spike S6).
+
+A detail view is a plan drawing of a level cropped to a polygonal region (drawgen Kind "detail"),
+at its own scale, with an IfcAnnotation DETAIL on the level as its plan marker (create_detail).
 """
 from __future__ import annotations
 
@@ -18,7 +21,9 @@ import tempfile
 import threading
 from pathlib import Path
 
+import ifcopenshell.api.geometry
 import ifcopenshell.api.root
+import ifcopenshell.api.spatial
 import ifcopenshell.util.element
 import numpy as np
 
@@ -90,15 +95,18 @@ def drawings() -> str:
             storey = G._storey(d, s) if s["kind"] == "plan" else None
             if s["kind"] == "plan" and storey is None:
                 continue  # its level was deleted
+            detail = s["kind"] == "detail"
             out.append({"guid": d.GlobalId, "name": d.Name or "", "kind": s["kind"], "depth": s["depth"],
                         "auto": s["auto"], "side": s.get("side") or "", "points": s["points"], "look": s["look"],
                         "bulges": s.get("bulges") or [], "tilt": float(s.get("tilt", 0.0)),
+                        **({"scale": s.get("scale", G.DETAIL_SCALE), "region": s.get("region") or [],
+                            "source_level": s.get("storey", "")} if detail else {}),
                         **({"storey": s["storey"], "elevation": round(G.storey_elevation(storey), 6),
                             "cut": float(s.get("cut", G.PLAN_CUT)),
                             "view_depth": resolve_view_depth(s["storey"], s)} if storey else {}),
                         "stale": not any(k[:2] == key for k in _cache.get(d.GlobalId, {}))})
-        # Archicad's Project Map order: floor plans (by story height), sections, elevations.
-        order = {"plan": 0, "section": 1, "elevation": 2}
+        # Archicad's Project Map order: floor plans (by story height), sections, elevations, details.
+        order = {"plan": 0, "section": 1, "elevation": 2, "detail": 3}
         out.sort(key=lambda d: (order[d["kind"]], d.get("elevation", 0.0), d["name"]))
     return B._dump({"drawings": out})
 
@@ -438,10 +446,245 @@ def delete_drawing(guid: str) -> str:
     def change(d):
         from . import sheets  # late: sheets imports this module
 
+        marker = _detail_marker(guid)  # a detail's callout goes with it
+        if marker is not None:
+            ifcopenshell.api.root.remove_product(B._model, product=marker)
         sheets.remove_drawing_placements(guid)  # no broken views left on its sheets
         ifcopenshell.api.root.remove_product(B._model, product=d)
 
     return _edit(guid, change)
+
+
+# ---------------------------------------------------------------- detail views (linked, cropped plans)
+# A detail is a plan drawing of a source level cropped to a polygonal region (KIMBIM_Drawing Kind
+# "detail", Region in world metres, Scale 1:n) plus a plan marker (an IfcAnnotation DETAIL) that
+# references it. Its SVG is the plan's own content at the detail's scale, framed by the region's
+# bounding box in metres (see drawgen.detail_frame), so it is the same coordinate system as the plan.
+
+DETAIL_KIND = "detail"
+DETAIL_MIN_SCALE = 1
+DETAIL_MAX_SCALE = 1000
+
+
+def _detail_settings(drawing):
+    s = G.settings_of(drawing) if drawing is not None else None
+    return s if s is not None and s.get("kind") == DETAIL_KIND else None
+
+
+def _detail_marker(guid: str):
+    """The detail's plan marker (an IfcAnnotation whose KIMBIM_Annotation.Drawing is `guid`)."""
+    if B._model is None:
+        return None
+    for a in B._model.by_type("IfcAnnotation"):
+        if a.ObjectType != "DETAIL":
+            continue
+        data = ifcopenshell.util.element.get_pset(a, "KIMBIM_Annotation") or {}
+        if data.get("Drawing") == guid:
+            return a
+    return None
+
+
+def _region(points_json) -> list:
+    """A detail's region: [[x, y], ...] world metres, at least three points, no self-crossing."""
+    try:
+        points = json.loads(points_json) if isinstance(points_json, str) else points_json
+        points = [[float(p[0]), float(p[1])] for p in points]
+    except (TypeError, ValueError, IndexError, KeyError) as ex:
+        raise ValueError(f"bad region: {ex}")
+    if len(points) > 1 and math.dist(points[0], points[-1]) < 1e-9:
+        points = points[:-1]  # a closed outline's repeated last point
+    if len(points) < 3:
+        raise ValueError("a detail needs at least three points")
+    if any(not (math.isfinite(x) and math.isfinite(y)) for x, y in points):
+        raise ValueError("the region's points must be numbers")
+    if any(math.dist(points[i], points[(i + 1) % len(points)]) < 1e-9 for i in range(len(points))):
+        raise ValueError("two points of the region are the same")
+    from . import drafting
+
+    if not drafting.is_simple(points):
+        raise ValueError("the region's outline crosses itself")
+    return points
+
+
+def _detail_scale(scale) -> int:
+    try:
+        value = int(scale)
+    except (TypeError, ValueError):
+        raise ValueError("bad scale")
+    if not DETAIL_MIN_SCALE <= value <= DETAIL_MAX_SCALE:
+        raise ValueError("the scale must be between 1 and 1000")
+    return value
+
+
+def _detail_bubble(region):
+    """Where a detail marker's bubble sits (just outside the region) and the region point its leader
+    reaches (the nearest one on the outline)."""
+    xs, ys = [p[0] for p in region], [p[1] for p in region]
+    bubble = [(min(xs) + max(xs)) / 2, max(ys) + 1.5]
+    best, target = None, (bubble[0], max(ys))
+    for i, a in enumerate(region):
+        b = region[(i + 1) % len(region)]
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        length = dx * dx + dy * dy
+        t = 0.0 if length < 1e-12 else max(0.0, min(1.0, ((bubble[0] - a[0]) * dx + (bubble[1] - a[1]) * dy) / length))
+        q = (a[0] + dx * t, a[1] + dy * t)
+        distance = math.dist(bubble, q)
+        if best is None or distance < best:
+            best, target = distance, q
+    return bubble, target
+
+
+def _place_marker(marker, at, storey):
+    """Inside an action: put a marker's bubble at `at` (world metres) at its level's height."""
+    matrix = np.eye(4)
+    matrix[0][3], matrix[1][3], matrix[2][3] = at[0], at[1], A._elevation(storey)
+    ifcopenshell.api.geometry.edit_object_placement(B._model, product=marker, matrix=matrix, is_si=True)
+
+
+def _new_detail_marker(storey, label, bubble, target, drawing_guid):
+    """Inside an action: the plan callout of a detail (a bubble with its number, a leader to the
+    region), its KIMBIM_Annotation.Drawing linking the drawing."""
+    from . import annotations as N
+    from . import layers, settings
+
+    f = B._model
+    marker = ifcopenshell.api.root.create_entity(f, ifc_class="IfcAnnotation", name=label)
+    marker.ObjectType = "DETAIL"
+    ifcopenshell.api.spatial.assign_container(f, products=[marker], relating_structure=storey)
+    _place_marker(marker, bubble, storey)
+    N._set(marker, "detail", label,
+           [(0.0, 0.0), (target[0] - bubble[0], target[1] - bubble[1])],
+           pen=settings.current().get("current_pen"), extra={"Drawing": drawing_guid})
+    layers.assign_active(marker)
+    return marker
+
+
+def _detail_label(storey) -> str:
+    """The next free number for a detail marker on `storey` (Archicad numbers them 1, 2, 3...)."""
+    taken = set()
+    for a in B._model.by_type("IfcAnnotation"):
+        if a.ObjectType != "DETAIL" or ifcopenshell.util.element.get_container(a) != storey:
+            continue
+        data = ifcopenshell.util.element.get_pset(a, "KIMBIM_Annotation") or {}
+        taken.add((data.get("Text") or "").strip())
+    n = 1
+    while str(n) in taken:
+        n += 1
+    return str(n)
+
+
+def create_detail(level_guid: str, points_json: str, scale: int = 20, name: str = "") -> str:
+    """An enlarged, cropped plan of `level_guid` over the region `points_json` ([[x, y], ...] world
+    metres, at least three points), at 1:`scale` (20 by default), with its plan marker. One undo step.
+    Returns {ok, guid, marker, name}."""
+    if B._model is None:
+        return A._fail("no model open")
+    storey = A._by_guid(level_guid)
+    if storey is None or not storey.is_a("IfcBuildingStorey"):
+        return A._fail("unknown level")
+    try:
+        region = _region(points_json)
+        scale = _detail_scale(scale)
+    except ValueError as ex:
+        return A._fail(str(ex))
+    name = (name or "").strip() or _next_name("Detail")
+    s = {"kind": DETAIL_KIND, "points": [], "look": [], "depth": None, "auto": True, "side": "",
+         "storey": storey.GlobalId, "cut": G.PLAN_CUT, "view_depth": None, "bulges": [], "tilt": 0.0,
+         "base": 0.0, "region": region, "scale": scale}
+    made = {}
+
+    def action():
+        drawing = _new(name, s, G.EMPTY_BOUNDS)  # the camera frames the region: no model walk
+        bubble, target = _detail_bubble(region)
+        marker = _new_detail_marker(storey, _detail_label(storey), bubble, target, drawing.GlobalId)
+        made.update(guid=drawing.GlobalId, marker=marker.GlobalId)
+        return 1
+
+    r = B._run(action)
+    return B._dump({**r, "guid": made["guid"], "marker": made["marker"], "name": name})
+
+
+def detail_info(guid: str) -> str:
+    """{ok, kind: "detail", region, scale, source_level, name} for a detail drawing."""
+    d = _drawing(guid)
+    s = _detail_settings(d)
+    if s is None:
+        return A._fail("not a detail")
+    return B._dump({"ok": True, "kind": DETAIL_KIND,
+                    "region": [[round(float(x), 6), round(float(y), 6)] for x, y in s.get("region") or []],
+                    "scale": int(s.get("scale") or G.DETAIL_SCALE), "source_level": s.get("storey", ""),
+                    "name": d.Name or ""})
+
+
+def update_detail(guid: str, changes_json: str) -> str:
+    """Change a detail's name, scale and/or region ({"name": ..., "scale": ..., "region": [[x, y], ...]}).
+    The drawing's camera and its plan marker follow the new region. One undo step."""
+    d = _drawing(guid)
+    s = _detail_settings(d)
+    if s is None:
+        return A._fail("not a detail")
+    try:
+        changes = json.loads(changes_json) if isinstance(changes_json, str) else changes_json
+    except ValueError as ex:
+        return A._fail(f"bad changes: {ex}")
+    if not isinstance(changes, dict):
+        return A._fail("bad changes")
+    try:
+        region = _region(changes["region"]) if "region" in changes else None
+        scale = _detail_scale(changes["scale"]) if "scale" in changes else None
+    except ValueError as ex:
+        return A._fail(str(ex))
+    name = None
+    if "name" in changes:
+        name = str(changes["name"] or "").strip()
+        if not name:
+            return A._fail("type a name")
+    storey = G._storey(d, s)
+    if storey is None:
+        return A._fail("the detail's level no longer exists")
+
+    def action():
+        if name is not None:
+            d.Name = name
+        if region is not None:
+            s["region"] = region
+        if scale is not None:
+            s["scale"] = scale
+        G.write_settings(B._model, d, s)
+        G.place(B._model, d, s, G.EMPTY_BOUNDS, resolve_view_depth(s["storey"], s))
+        if region is not None:
+            marker = _detail_marker(guid)
+            if marker is not None:  # the callout follows the region
+                bubble, target = _detail_bubble(region)
+                from . import annotations as N
+
+                data = ifcopenshell.util.element.get_pset(marker, N.PSET) or {}
+                _place_marker(marker, bubble, storey)
+                N._set(marker, "detail", data.get("Text") or "",
+                       [(0.0, 0.0), (target[0] - bubble[0], target[1] - bubble[1])],
+                       float(data.get("Size") or N.TEXT_SIZE), N._pen(data))
+        return 1
+
+    return B._dump(B._run(action))
+
+
+def delete_detail(guid: str) -> str:
+    """Remove a detail drawing and its plan marker (one undo step)."""
+    d = _drawing(guid)
+    if _detail_settings(d) is None:
+        return A._fail("not a detail")
+
+    def action():
+        from . import sheets  # late: sheets imports this module
+
+        marker = _detail_marker(guid)
+        if marker is not None:
+            ifcopenshell.api.root.remove_product(B._model, product=marker)
+        sheets.remove_drawing_placements(guid)
+        ifcopenshell.api.root.remove_product(B._model, product=d)
+        return 1
+
+    return B._dump(B._run(action))
 
 
 def _python() -> str:
@@ -622,7 +865,8 @@ def raw_drawing(guid: str, include_json: str = "", hidden=()) -> dict:
     from . import settings as S
     plan_symbols = bool(S.current().get("plan_symbols", True))
     s = G.settings_of(d)
-    view_depth = resolve_view_depth(s.get("storey", ""), s) if s and s.get("kind") == "plan" else G.PLAN_DEPTH
+    view_depth = resolve_view_depth(s.get("storey", ""), s) if s and s.get("kind") in ("plan", "detail") \
+        else G.PLAN_DEPTH
     key = (*_state_key(), include_json or "", plan_symbols, view_depth)  # state, elements, D91's choices
     hit = _cache.get(guid, {}).get(key)
     if hit is not None:
@@ -666,7 +910,11 @@ def generate_drawing(guid: str, include_json: str = "", purpose: str = "") -> st
     resolved = graphics.resolve(purpose or None)
     r = raw_drawing(guid, include_json, resolved["hidden"])
     if r.get("ok"):
-        r["svg"] = graphics.style_svg(r["svg"], resolved, 1.0)
+        # A detail's content is in metres (viewBox) at its own scale: a pen's millimetres are that many
+        # metres over the scale (graphics.style_svg divides by `k`).
+        s = G.settings_of(_drawing(guid))
+        k = 1000.0 / max(1, int(s.get("scale") or G.DETAIL_SCALE)) if s and s["kind"] == "detail" else 1.0
+        r["svg"] = graphics.style_svg(r["svg"], resolved, k)
     return B._dump(r)
 
 
@@ -730,11 +978,11 @@ def _cut_group(guid, loops, to_paper, to_world, path) -> str:
     return f'<g ifc:guid="{guid}">{layers}{outline}</g>'
 
 
-def _plan_base_svg(g) -> str:
+def _plan_base_svg(g, scale=G.SCALE) -> str:
     """A plan drawing's base SVG from the app's meshes (no hidden-line pass). `g` is the geometry the
     viewport extracted: cut loops (poché) and projection loops, world x,y. Paper millimetres at the
     drawing scale, north up, with the plane/matrix3 the overlay and drafting expect."""
-    scale = 1000.0 / G.SCALE  # paper millimetres per metre
+    scale = 1000.0 / scale  # paper millimetres per metre
     x0, y0, x1, y1 = (float(v) for v in g["bounds"])
     plane = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
     m3 = [[scale, 0, -x0 * scale], [0, scale, y1 * scale], [0, 0, 1]]
@@ -786,14 +1034,18 @@ def generate_plan_drawing(guid: str, geometry_json: str) -> str:
     if d is None:
         return A._fail("not a drawing")
     s = G.settings_of(d)
-    if s is None or s.get("kind") != "plan":
+    if s is None or s.get("kind") not in ("plan", "detail"):
         return A._fail("not a plan drawing")
-    key = (*_state_key(), "plan", hash(geometry_json))
+    detail = s["kind"] == "detail"
+    scale = max(1, int(s.get("scale") or G.DETAIL_SCALE)) if detail else G.SCALE
+    key = (*_state_key(), "plan", scale, hash(geometry_json))
     hit = _cache.get(guid, {}).get(key)
     if hit is None:
         try:
             g = json.loads(geometry_json)
-            svg = G.overlay(B._model, d, s, _plan_base_svg(g), None)
+            svg = G.overlay(B._model, d, s, _plan_base_svg(g, scale), None)
+            if detail:  # framed before caching: the cache holds what raw_drawing (sheets) measures
+                svg = G.detail_frame(B._model, d, s, svg)
         except Exception as ex:
             return A._fail(f"{type(ex).__name__}: {ex}")
         entries = _cache.setdefault(guid, {})
@@ -802,7 +1054,10 @@ def generate_plan_drawing(guid: str, geometry_json: str) -> str:
         while len(entries) > _CACHE_SIZE:
             entries.pop(next(iter(entries)))
         hit = svg
-    svg = graphics.style_svg(G.crop(_drafted(hit, d)), graphics.resolve(), 1.0)
+    if detail:  # content in metres: a pen's millimetres are that many metres over the scale
+        svg = graphics.style_svg(_drafted(hit, d), graphics.resolve(), 1000.0 / scale)
+    else:
+        svg = graphics.style_svg(G.crop(_drafted(hit, d)), graphics.resolve(), 1.0)
     return B._dump({"ok": True, "svg": svg, "cached": False})
 
 
@@ -871,7 +1126,7 @@ def generate_view_drawing(guid: str, geometry_json: str) -> str:
     if d is None:
         return A._fail("not a drawing")
     s = G.settings_of(d)
-    if s is None or s.get("kind") == "plan":
+    if s is None or s.get("kind") not in ("section", "elevation"):
         return A._fail("not a section or elevation")
     key = (*_state_key(), "view", hash(geometry_json))
     hit = _cache.get(guid, {}).get(key)

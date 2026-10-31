@@ -37,8 +37,11 @@ import numpy as np
 
 W = ifcopenshell.ifcopenshell_wrapper
 PSET = "KIMBIM_Drawing"
-KINDS = ("section", "elevation", "plan")
-TARGET_VIEW = {"section": "SECTION_VIEW", "elevation": "ELEVATION_VIEW", "plan": "PLAN_VIEW"}
+KINDS = ("section", "elevation", "plan", "detail")
+TARGET_VIEW = {"section": "SECTION_VIEW", "elevation": "ELEVATION_VIEW", "plan": "PLAN_VIEW",
+               "detail": "PLAN_VIEW"}
+DETAIL_SCALE = 20  # 1:20: Archicad's default for a detail view
+DETAIL_BUBBLE = 4.0  # millimetres on paper: a detail marker's bubble radius
 PLAN_CUT = 1.10  # metres above the story: Archicad's default floor plan cut plane
 PLAN_DEPTH = 0.5  # metres below the story a plan still sees (D91: Revit's view range)
 TEXT_SIZE = 2.5  # millimetres on paper, the default for annotation text
@@ -243,6 +246,17 @@ def _json_list(value):
     return data if isinstance(data, list) else []
 
 
+def _region_of(value) -> list:
+    """A detail's region (world metres, [[x, y], ...]) from its pset's JSON; [] when it is unreadable."""
+    out = []
+    for p in _json_list(value):
+        try:
+            out.append([float(p[0]), float(p[1])])
+        except (TypeError, ValueError, IndexError):
+            return []
+    return out
+
+
 def _path_world(drawing, local):
     """Stored local marker points (u along the camera's X, v along its horizontal look normal) to
     world plan metres. Moving or rotating the drawing moves its path with it."""
@@ -262,12 +276,17 @@ def settings_of(drawing) -> dict | None:
     data = ifcopenshell.util.element.get_pset(drawing, PSET) or {}
     if data.get("Kind") not in KINDS:
         return None
-    if data["Kind"] == "plan":
+    if data["Kind"] in ("plan", "detail"):
         depth = data.get("ViewDepth")
-        return {"kind": "plan", "points": [], "look": [], "depth": None, "auto": True, "side": "",
-                "storey": data.get("Storey") or "", "cut": float(data.get("Cut") or PLAN_CUT),
-                "view_depth": None if depth is None or depth < 0 else float(depth),
-                "bulges": [], "tilt": 0.0, "base": 0.0}
+        out = {"kind": data["Kind"], "points": [], "look": [], "depth": None, "auto": True, "side": "",
+               "storey": (data.get("Storey") if data["Kind"] == "plan" else data.get("SourceLevel")) or "",
+               "cut": float(data.get("Cut") or PLAN_CUT),
+               "view_depth": None if depth is None or depth < 0 else float(depth),
+               "bulges": [], "tilt": 0.0, "base": 0.0}
+        if data["Kind"] == "detail":
+            out["region"] = _region_of(data.get("Region"))
+            out["scale"] = int(data.get("Scale") or DETAIL_SCALE)
+        return out
     points, look = marker(drawing) or ([], [])
     stored = _json_list(data.get("Path"))
     if len(stored) >= 2:
@@ -335,11 +354,19 @@ def place(f, drawing, s, bounds, view_depth=PLAN_DEPTH):
     unit = ifcopenshell.util.unit.calculate_unit_scale(f)
     if s["auto"] and s.get("side"):
         s["points"], s["look"] = auto_marker(s["side"], bounds)
-    if s["kind"] == "plan":
+    if s["kind"] in ("plan", "detail"):
         storey = _storey(drawing, s)
         if storey is None:
             raise ValueError("the drawing's story no longer exists")
-        m, (w, h, d) = plan_camera(storey, s["cut"], bounds, view_depth)
+        view = bounds
+        if s["kind"] == "detail":
+            region = s.get("region") or []
+            if len(region) >= 3:  # the camera frames the region, not the whole building
+                z = storey_elevation(storey)
+                lo = np.array([min(p[0] for p in region), min(p[1] for p in region), z])
+                hi = np.array([max(p[0] for p in region), max(p[1] for p in region), z])
+                view = (lo, hi)
+        m, (w, h, d) = plan_camera(storey, s["cut"], view, view_depth)
     else:
         m, (w, h, d) = camera(s["points"], s["look"], bounds, s["depth"], s.get("tilt", 0.0))
     ifcopenshell.api.geometry.edit_object_placement(f, product=drawing, matrix=m, is_si=True)
@@ -355,7 +382,7 @@ def place(f, drawing, s, bounds, view_depth=PLAN_DEPTH):
 def store_path(f, drawing, s, points=None):
     """Write the marker path in the drawing's own frame, so moving or rotating it carries the path
     (a bent or curved marker is not a straight line any more)."""
-    if s["kind"] == "plan" or s.get("auto"):
+    if s["kind"] in ("plan", "detail") or s.get("auto"):
         return
     world = points if points is not None else s.get("points") or []
     if len(world) < 2 or drawing.ObjectPlacement is None:
@@ -394,17 +421,24 @@ def release(f, drawing):
 def write_settings(f, drawing, s):
     pset = ifcopenshell.util.element.get_pset(drawing, PSET)
     pset = f.by_id(pset["id"]) if pset else ifcopenshell.api.pset.add_pset(f, product=drawing, name=PSET)
-    ifcopenshell.api.pset.edit_pset(f, pset=pset, properties={
-        "Kind": s["kind"], "Depth": -1.0 if s["depth"] is None else float(s["depth"]), "Auto": bool(s["auto"]),
-        "Tilt": float(s.get("tilt", 0.0)), "Base": float(s.get("base", 0.0)),
-        **({"Side": s["side"]} if s.get("side") else {}),
-        **({"Storey": s["storey"], "Cut": float(s["cut"]),
-            "ViewDepth": -1.0 if s.get("view_depth") is None else float(s["view_depth"])}
-           if s["kind"] == "plan" else {})})
+    props = {"Kind": s["kind"], "Depth": -1.0 if s["depth"] is None else float(s["depth"]), "Auto": bool(s["auto"]),
+             "Tilt": float(s.get("tilt", 0.0)), "Base": float(s.get("base", 0.0)),
+             **({"Side": s["side"]} if s.get("side") else {})}
+    if s["kind"] == "plan":
+        props.update({"Storey": s["storey"], "Cut": float(s["cut"]),
+                      "ViewDepth": -1.0 if s.get("view_depth") is None else float(s["view_depth"])})
+    elif s["kind"] == "detail":
+        props.update({"SourceLevel": s["storey"], "Cut": float(s["cut"]),
+                      "ViewDepth": -1.0 if s.get("view_depth") is None else float(s["view_depth"]),
+                      "Region": json.dumps([[round(float(x), 6), round(float(y), 6)] for x, y in s["region"]],
+                                           separators=(",", ":")),
+                      "Scale": int(s.get("scale") or DETAIL_SCALE)})
+    ifcopenshell.api.pset.edit_pset(f, pset=pset, properties=props)
     epset = ifcopenshell.util.element.get_pset(drawing, "EPset_Drawing")
     epset = f.by_id(epset["id"]) if epset else ifcopenshell.api.pset.add_pset(f, product=drawing, name="EPset_Drawing")
+    scale = int(s.get("scale") or SCALE) if s["kind"] == "detail" else SCALE
     ifcopenshell.api.pset.edit_pset(f, pset=epset, properties={
-        "TargetView": TARGET_VIEW[s["kind"]], "Scale": f"1/{SCALE}", "HumanScale": f"1:{SCALE}"})
+        "TargetView": TARGET_VIEW[s["kind"]], "Scale": f"1/{scale}", "HumanScale": f"1:{scale}"})
 
 
 # ---------------------------------------------------------------- overlay (Slice 15)
@@ -838,7 +872,7 @@ def markers(f, to_paper, z):
         if not is_drawing(d):
             continue
         s = settings_of(d)
-        if s is None or s["kind"] == "plan" or len(s["points"]) != 2:
+        if s is None or s["kind"] not in ("section", "elevation") or len(s["points"]) != 2:
             continue
         (x1, y1), (x2, y2) = s["points"]
         look = s["look"]
@@ -868,6 +902,57 @@ def markers(f, to_paper, z):
             out.append(_text(lx, ly, d.Name or "", TEXT_SIZE, anchor=anchor, baseline="central"))
             continue
         out.append(_text(lx, ly, d.Name or "", TEXT_SIZE, baseline="central"))
+    return out
+
+
+def detail_markers(storey, to_paper):
+    """Detail markers on a plan (Archicad's callouts): the detail's region outlined, a bubble with its
+    number beside it and a leader from the bubble to the region. The marker's annotation pset carries
+    the linked drawing's GlobalId (`Drawing`), so the region and the number come from one source."""
+    f = storey.file
+    unit = ifcopenshell.util.unit.calculate_unit_scale(f)
+    z = storey_elevation(storey)
+    out = []
+    for a in f.by_type("IfcAnnotation"):
+        data = ifcopenshell.util.element.get_pset(a, ANNOTATION_PSET) or {}
+        if data.get("Kind") != "detail" or a.ObjectPlacement is None:
+            continue
+        if ifcopenshell.util.element.get_container(a) != storey:
+            continue
+        try:
+            local = json.loads(data.get("Points") or "[]")
+        except ValueError:
+            continue
+        if not local:
+            continue
+        m = ifcopenshell.util.placement.get_local_placement(a.ObjectPlacement)
+
+        def W(x, y, m=m):
+            w = m @ np.array([x / unit, y / unit, 0.0, 1.0]) * unit
+            return to_paper(float(w[0]), float(w[1]), z)
+
+        parts = []
+        region = []
+        try:
+            drawing = f.by_guid(data["Drawing"]) if data.get("Drawing") else None
+            if drawing is not None:
+                region = (settings_of(drawing) or {}).get("region") or []
+        except RuntimeError:  # the linked drawing was deleted: the marker keeps its bubble only
+            drawing = None
+        if len(region) >= 3:
+            parts.append(_path([to_paper(x, y, z) for x, y in region], closed=True))
+        c = W(float(local[0][0]), float(local[0][1]))
+        if len(local) >= 2:
+            t = W(float(local[1][0]), float(local[1][1]))
+            dx, dy = t[0] - c[0], t[1] - c[1]
+            n = math.hypot(dx, dy)
+            if n > DETAIL_BUBBLE:
+                parts.append(_path([(c[0] + dx / n * DETAIL_BUBBLE, c[1] + dy / n * DETAIL_BUBBLE), t]))
+        parts.append(f'<circle cx="{_f(c[0])}" cy="{_f(c[1])}" r="{_f(DETAIL_BUBBLE)}" fill="none"/>')
+        parts.append(_text(c[0], c[1], data.get("Text") or "", TEXT_SIZE, baseline="central"))
+        out.append(f'<g data-kind="marker" data-detail="{a.GlobalId}">')
+        out += parts
+        out.append("</g>")
     return out
 
 
@@ -1046,7 +1131,7 @@ def overlay(f, drawing, s, svg: str, include=None, plan_symbols: bool = True) ->
     if to_paper is None:
         return svg
     parts = []
-    if s["kind"] == "plan":
+    if s["kind"] in ("plan", "detail"):
         storey = _storey(drawing, s)
         if storey is not None:
             for e in f.by_type("IfcDoor"):
@@ -1060,8 +1145,9 @@ def overlay(f, drawing, s, svg: str, include=None, plan_symbols: bool = True) ->
             # is the room stamp tag style's, a project setting this process does not see.
             parts += _tagged("stair", stair_symbols_svg(storey, to_paper, s.get("cut", PLAN_CUT)))  # D88
             parts += plan_annotations(storey, to_paper)  # tags each annotation (guid, pen) itself
-            if not _is_worksheet(storey):  # D98: a worksheet shows no building markers
-                parts += _tagged("marker", markers(f, to_paper, storey_elevation(storey)))
+            if s["kind"] == "plan" and not _is_worksheet(storey):  # D98: a worksheet shows no markers
+                parts += _tagged("marker", markers(f, to_paper, storey_elevation(storey))
+                                 + detail_markers(storey, to_paper))
     if not parts:
         return svg
     group = ('<g class="kimbim-overlay" fill="none" stroke="#000000" stroke-width="0.18" '
@@ -1097,23 +1183,61 @@ def crop(svg: str, margin: float = 5.0) -> str:
                   svg, count=1)
 
 
+def detail_frame(f, drawing, s, svg: str) -> str:
+    """Frame a detail: its plan's content in world metres (x, -y: SVG's y grows downward), the viewBox
+    the region's bounding box in metres and the width/height the region at the detail's scale in mm,
+    clipped to the region's polygon. The camera and the content are already at that scale, so text,
+    pens and symbols keep their paper size."""
+    region = s.get("region") or []
+    storey = _storey(drawing, s)
+    to_paper = paper_mapping(svg)
+    if to_paper is None or storey is None or len(region) < 3:
+        return svg
+    scale = max(1, int(s.get("scale") or DETAIL_SCALE))
+    k = scale / 1000.0  # paper mm at 1:scale -> the content's unit (metres)
+    z = storey_elevation(storey)
+    p00 = to_paper(0.0, 0.0, z)
+    ox, oy = k * p00[0], k * p00[1]  # where the world's origin lands in the content's units
+    xs = [k * to_paper(x, y, z)[0] for x, y in region]
+    ys = [k * to_paper(x, y, z)[1] for x, y in region]
+    w, h = max(xs) - min(xs), max(ys) - min(ys)
+    if w < 1e-9 or h < 1e-9:
+        return svg
+    body = re.sub(r"^.*?<svg[^>]*>", "", svg, count=1, flags=re.DOTALL)
+    body = body.rsplit("</svg>", 1)[0]
+    # The region in world metres, y negated (the content's frame once the plan's offset is removed).
+    poly = " ".join(f"{x:.4f},{-y:.4f}" for x, y in region)
+    clip_id = f"kimbim-detail-{drawing.GlobalId}"
+    return ('<svg xmlns="http://www.w3.org/2000/svg" xmlns:ifc="http://www.ifcopenshell.org/ns" '
+            f'width="{w * 1000 / scale:.2f}mm" height="{h * 1000 / scale:.2f}mm" '
+            f'viewBox="{min(x for x, _ in region):.4f} {-max(y for _, y in region):.4f} {w:.4f} {h:.4f}">\n'
+            f'<defs><clipPath id="{clip_id}" clipPathUnits="userSpaceOnUse">'
+            f'<polygon points="{poly}"/></clipPath></defs>\n'
+            f'<g transform="translate({-ox:.6f} {-oy:.6f}) scale({k:.10g})">'
+            f'<g clip-path="url(#{clip_id})">\n'
+            + body + '\n</g></g>\n</svg>\n')
+
+
 def generate(f, drawing, include=None, bounds=None, plan_symbols: bool = True,
              view_depth: float = PLAN_DEPTH) -> tuple[str, dict]:
-    """SVG of `drawing` (paper millimetres). `f` may be changed (a snapshot): infinite ranges and
-    template elevations are re-fitted to the model first. `include`: GlobalIds of the elements to
-    draw (the visible ones); default all drawn elements. `bounds`: the model's (lo, hi) in metres,
-    already computed by the caller; when None it is worked out here (the child sizes a subset file,
-    where the full model is not present, so the caller passes the bounds)."""
+    """SVG of `drawing`: paper millimetres for plans, sections and elevations; for a detail, its
+    content in metres framed by the region (see detail_frame). `f` may be changed (a snapshot):
+    infinite ranges and template elevations are re-fitted to the model first. `include`: GlobalIds of
+    the elements to draw (the visible ones); default all drawn elements. `bounds`: the model's
+    (lo, hi) in metres, already computed by the caller; when None it is worked out here (the child
+    sizes a subset file, where the full model is not present, so the caller passes the bounds)."""
     t0 = time.perf_counter()
     s = settings_of(drawing)
+    detail = s is not None and s["kind"] == "detail"
+    scale = max(1, int(s.get("scale") or DETAIL_SCALE)) if detail else SCALE
     products = drawn_products(f)
-    if s is not None and s["kind"] == "plan":
+    if s is not None and s["kind"] in ("plan", "detail"):
         # D91: an object's own depth below may reach further than the view's: open the camera for it.
         view_depth = max([view_depth, *(d for d in (element_view_depth(p) for p in products) if d is not None)])
     if s is not None:
         if s["auto"] or s["depth"] is None:
             place(f, drawing, s, bounds if bounds is not None else model_bounds(f), view_depth)
-    if s is not None and s["kind"] == "plan":
+    if s is not None and s["kind"] in ("plan", "detail"):
         storey = _storey(drawing, s)
         symbols = symbol_objects(f, plan_symbols)  # D86: drawn from their plan symbol (overlay), not cut
         # D91: an element shows on its own level by default; a rule widens that (one up, all, a range).
@@ -1124,11 +1248,13 @@ def generate(f, drawing, include=None, bounds=None, plan_symbols: bool = True,
         wanted = set(include)
         products = [p for p in products if p.GlobalId in wanted]
     gs = ifcopenshell.geom.settings(ELEMENT_HIERARCHY=True)
+    # A detail is drawn at its own scale (1:20), so the page is bigger in mm by the same factor.
+    page = f"{round(1189 * SCALE / scale)}x{round(841 * SCALE / scale)}" if detail else "1189x841"
     opts = {
         "dimensionality": W.CURVES_SURFACES_AND_SOLIDS, "iterator-output": W.NATIVE,
         "apply-default-materials": True, "elevation-ref-guid": drawing.GlobalId,
         "svg-without-storeys": True, "svg-write-poly": True, "svg-xmlns": True,
-        "svg-project": True, "bounds": "1189x841", "scale": str(1 / SCALE),
+        "svg-project": True, "bounds": page, "scale": str(1 / scale),
         "door-arcs": True, "svg-poly": False, "svg-prefilter": True, "svg-unify-inputs": False,
         # D73: projection lines grouped per element (styled by graphics.style_svg), no CSS
         "svg-segment-projection": True, "svg-no-css": True,
@@ -1154,7 +1280,7 @@ def generate(f, drawing, include=None, bounds=None, plan_symbols: bool = True,
     svg = buffer.get_value()
     if s is not None:
         svg = overlay(f, drawing, s, svg, set(include) if include is not None else None, plan_symbols)
-    svg = crop(svg)
+    svg = detail_frame(f, drawing, s, svg) if detail else crop(svg)
     return svg, {"elements": count, "prepare_s": round(t1 - t0, 3), "geometry_s": round(t2 - t1, 3),
                  "hlr_s": round(t3 - t2, 3), "total_s": round(time.perf_counter() - t0, 3)}
 
