@@ -1056,6 +1056,11 @@ from . import sun as _sun  # noqa: E402
 from . import worksheets as _worksheets  # noqa: E402
 from . import classifications as _classifications  # noqa: E402
 from . import typemanager as _typemanager  # noqa: E402
+from . import georef as _georef  # noqa: E402
+from . import terrain as _terrain  # noqa: E402
+from . import bcf as _bcf  # noqa: E402
+from . import ifcexport as _ifcexport  # noqa: E402
+from . import links as _links  # noqa: E402
 _EXPORTS = {
     "authoring": (
         "add_grid_axis",
@@ -1076,6 +1081,7 @@ _EXPORTS = {
         "create_column",
         "create_curtain_wall",
         "curtain_wall_info",
+        "update_curtain_wall",
         "add_slab_edge",
         "set_slab_slope",
         "slab_slope",
@@ -1147,13 +1153,16 @@ _EXPORTS = {
         "set_annotation_text",
     ),
     "drawings": (
+        "create_detail",
         "create_drawings",
         "create_drawing_path",
         "create_elevation",
         "create_elevations",
         "create_plan",
         "create_section",
+        "delete_detail",
         "delete_drawing",
+        "detail_info",
         "drawings",
         "drawing_bounds",
         "generate_drawing",
@@ -1167,6 +1176,7 @@ _EXPORTS = {
         "set_drawing_tilt",
         "set_drawing_timeout",
         "set_view_depth",
+        "update_detail",
     ),
     "sheets": (
         "add_sheet",
@@ -1189,6 +1199,19 @@ _EXPORTS = {
         "remove_legend",
         "move_title_block",
         "set_title_block",
+        "move_list",
+        "move_schedule",
+        "place_schedule",
+        "remove_schedule",
+        "title_block_templates",
+        "save_title_block_template",
+        "apply_title_block_template",
+        "delete_title_block_template",
+        "rename_title_block_template",
+        "sheet_schedules",
+        "place_drawing_list",
+        "place_sheet_list",
+        "remove_list",
         "place_sheet_image",
         "place_sheet_symbol",
         "move_sheet_symbol",
@@ -1371,9 +1394,42 @@ _EXPORTS = {
         "create_type",
         "edit_type",
         "list_types",
+        "purge_unused",
         "type_details",
         "type_of",
         "update_type_all",
+    ),
+    "georef": (
+        "clear_georeferencing",
+        "georef_state",
+        "set_georeferencing",
+    ),
+    "terrain": (
+        "clear_building_pads",
+        "create_terrain",
+        "create_terrain_from_contours",
+        "delete_terrain",
+        "list_building_pads",
+        "list_terrains",
+        "set_building_pad",
+    ),
+    "ifcexport": ("export_options",),
+    "links": (
+        "link_model",
+        "list_links",
+        "set_link_transform",
+        "unlink",
+        "update_link",
+    ),
+    "bcf": (
+        "add_comment",
+        "create_issue",
+        "delete_issue",
+        "export_bcf",
+        "import_bcf",
+        "issue_viewpoint",
+        "list_issues",
+        "update_issue",
     ),
     "worksheets": (
         "create_worksheet",
@@ -1618,6 +1674,13 @@ def __getattr__(name: str):
 
 def __dir__():
     return sorted({*globals(), *_EXPORTED})
+
+
+def ifc_export(path: str, options_json: str = "") -> str:
+    """Configurable IFC export (D117), kept apart from documents.export_ifc."""
+    from . import ifcexport
+
+    return ifcexport.export_ifc(path, options_json)
 
 
 # DXF export (D83): ezdxf takes most of a second to import, so kimbim.dxf loads on the first export.
