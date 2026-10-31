@@ -1061,6 +1061,9 @@ from . import terrain as _terrain  # noqa: E402
 from . import bcf as _bcf  # noqa: E402
 from . import ifcexport as _ifcexport  # noqa: E402
 from . import links as _links  # noqa: E402
+from . import meshimport as _meshimport  # noqa: E402
+from . import keynotes as _keynotes  # noqa: E402
+from . import attributes as _attributes  # noqa: E402
 _EXPORTS = {
     "authoring": (
         "add_grid_axis",
@@ -1414,6 +1417,22 @@ _EXPORTS = {
         "set_building_pad",
     ),
     "ifcexport": ("export_options",),
+    "attributes": (
+        "attribute_catalogue",
+        "export_attributes",
+        "import_attributes",
+    ),
+    "meshimport": (
+        "import_mesh",
+        "mesh_formats",
+    ),
+    "keynotes": (
+        "delete_keynote",
+        "keynote_table",
+        "place_keynote",
+        "save_keynote",
+        "update_keynote_annotations",
+    ),
     "links": (
         "link_model",
         "list_links",

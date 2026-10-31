@@ -62,6 +62,7 @@ DEFAULTS = {
     "texture_files": [],  # D96: the surfaces' texture pictures (likewise)
     "tag_styles": {},  # tag styles by id: the project's own and its edited built-ins (D87)
     "title_block_templates": {},  # reusable title blocks / master layouts by id (D116)
+    "keynotes": {},  # the keynote table: code -> {code, text, category}
     "stair_rules": {},  # building-code limits for stair and ramp warnings (D88; empty: the defaults)
     "check_tolerance": 0.002,   # D92: clash hard tolerance (m)
     "check_clearance": 0.05,    # D92: clash clearance (m)
