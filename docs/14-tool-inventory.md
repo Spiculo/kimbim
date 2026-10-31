@@ -153,7 +153,7 @@ release notes, so check before relying on a single cell.
 | Ceilings | RV VW | ⬜ | new | Archicad uses slabs |
 | Zones / rooms / spaces (auto from walls, area, name, number) | all | ✅ | P1 | Slice 18 (D65): Room tool (Z), stamps, room schedule |
 | Area plans (gross, rentable) | RV VW | ⬜ | new | |
-| Generic object (extrusion, revolve, mesh import) | all | ⬜ | P1 | Part of the parametric object system ([16](16-parametric-objects.md)) |
+| Generic object (extrusion, revolve, mesh import) | all | 🟡 | P1 | D120: File > *Import mesh...* brings OBJ, ASCII/binary STL and ASCII PLY as `IfcBuildingElementProxy` bodies (scale/rotation/position); extrusion/revolve authoring is still part of the parametric object system ([16](16-parametric-objects.md)) |
 | Morph / free-form modelling, push/pull | AC SU VW | ⬜ | new | Massing and odd shapes |
 | Conceptual massing with floor areas | RV VW | ⬜ | new | |
 | Models / modules placed on several levels | AC RV VW | ✅ | — | D58 (Archicad Hotlinked Modules, Revit Groups) |
@@ -207,7 +207,7 @@ release notes, so check before relying on a single cell.
 | Graphic overrides and model view options (visibility by kind, rules) | AC RV VW | ✅ | new | D73: visibility sets, override rules (property, layer, material), layer combinations in purposes |
 | Line types and fill patterns (hatches) | all | ✅ | new | D73: line types (dash patterns in mm); D84: fill patterns; D96: cut fills hatched on screen, in print and DXF |
 | Surfaces / textures for 3D and rendering | all | ✅ | new | D96: surfaces (colour, transparency, shine, picture texture, box-mapped) per face in 3D, per-side overrides (D97); no rendering |
-| Attribute manager (import/export standards between projects) | AC RV VW | ⬜ | new | |
+| Attribute manager (import/export standards between projects) | AC RV VW | ✅ | new | D121: Graphics > *Attribute manager...* exports/imports pens, line types, fills, styles, purposes, layers, materials, surfaces and composites (merge or replace, group selection) |
 
 ## 11. Drawings (views made from the model)
 
@@ -249,7 +249,7 @@ release notes, so check before relying on a single cell.
 | Revision clouds | AC RV VW | ✅ | new | D87: on plans and sheets, revision in a triangle; no revision schedule yet |
 | Section, elevation and detail markers | all | ✅ | P1 | Section and elevation markers in plan (Slice 14); D112: detail markers (bubble, leader, linked drawing) |
 | North arrow, scale bar | all | ✅ | new | D87: on plans and sheets; north follows IFC TrueNorth; the sheet's bar shows its drawing's scale |
-| Keynotes | RV VW AC | ⬜ | new | |
+| Keynotes | RV VW AC | ✅ | new | D122: Model > *Keynotes...* table (code/text/category), `place_keynote` with optional leader, and refresh of placed keynotes from the table |
 | Room / zone stamps (name, number, area) | all | ✅ | P1 | Slice 18; D87: their text is the Room stamp tag style |
 
 ## 14. Sheets and output
@@ -309,7 +309,7 @@ release notes, so check before relying on a single cell.
 | Re-import with reconciliation report | — | ✅ | P1 | D104: `kimbim versions import` matches by GlobalId, Tag, then a reviewed heuristic; dry run and JSON report |
 | DWG/DXF import (underlay and convert) | all | 🟡 | new | D85: DXF as an underlay (units, exploded blocks, snapping to ends, midpoints, crossings). No DWG yet, no convert to 2D elements. Architects receive most survey and consultant data as DWG |
 | PDF import | AC RV VW | 🟡 | new | D85: a PDF page as an underlay (an image); no vectors |
-| SketchUp, Rhino, OBJ, FBX import | AC RV VW | ⬜ | new | |
+| SketchUp, Rhino, OBJ, FBX import | AC RV VW | 🟡 | new | D120: OBJ, STL and PLY. SketchUp/Rhino/FBX and live links are still to do |
 | Point clouds | AC RV VW | ⬜ | new | |
 | Rhino / Grasshopper live link | AC RV VW | ⬜ | new | |
 
@@ -357,7 +357,7 @@ What now most often stops an architect from finishing a real project, roughly in
 10. ✅ **BCF issues** (§17): D113 (topics, viewpoints, comments, BCF 2.1 import/export, Issues dialog); D119 restores a viewpoint camera and components.
 11. ✅ **Title block templates / master layouts** (§14): D118 (position, field overrides and paper in project settings; save, apply, rename, delete).
 12. ✅ **IFC export settings and external references** (§18): D117 (scopes, include flags and property renames; linked models as read-only references). A live, editable hotlink and copy/monitor are still future.
-13. **Point clouds and more imports** (§18): SketchUp/Rhino/OBJ/FBX, vector PDF; the DXF underlay is the current survey path.
+13. 🟡 **Point clouds and more imports** (§18): D120 adds OBJ/STL/PLY meshes; SketchUp/Rhino/FBX, vector PDF and point clouds are still to do.
 14. **The deeper documentation/visualisation tail** (§11, §16): 3D documents, crop/view-range UI, model view options by scale, rendering and VR.
 
 Next step: the owner confirms or reorders the remaining list. 04 is then updated to match. The documentation pack (5, 6), BCF (10), terrain (9), title block templates (11), IFC export/linked models (12) and the deeper detail/curtain/pad UI are in; the largest remaining Archicad gaps are point clouds and more imports (13), the visualisation tail (14), live hotlinks and panel-level curtain-wall editing.

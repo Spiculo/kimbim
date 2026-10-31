@@ -221,14 +221,24 @@ would change and changes nothing. This table is the output of `kimbim help --mar
 | `selection_set` | `kimbim selection set` | Select elements in the app's window. |  |
 | `script_run` | `kimbim script run` | Run a Python script in the project's console (the model is `ifc`, KimBim commands are in `bridge`). | yes |
 | `snapshot_take` | `kimbim snapshot take` | Take a picture of the model to check your work: a 3D view (optionally framed on elements, with what your task changed coloured as the app's Compare shows it), a floor plan, a section or elevation, any drawing, or a sheet. |  |
+| `attributes_catalogue` | `kimbim attributes catalogue` | List the project's attribute groups with their counts, and its layers, materials, surfaces and composites, so an attribute file can be exported or imported with the right groups selected. |  |
+| `attributes_export` | `kimbim attributes export` | Write the project's pens, line types, fill patterns, element styles, visibility and override sets, layer combinations, purposes, renovation styles, layers, materials, surfaces and composites to one self-contained JSON file, to carry the office's standards to another project. |  |
+| `attributes_import` | `kimbim attributes import` | Import an attribute file into the open project: settings tables merge by name, IFC layers, materials, surfaces and composites are created where missing (or updated with replace). | yes |
 | `export_ifc` | `kimbim export ifc` | Export the model as an IFC file. |  |
 | `export_options` | `kimbim export options` | List what an IFC export can include: scopes, product classes with counts, levels and defaults. |  |
+| `import_formats` | `kimbim import formats` | List the mesh file formats the importer reads (OBJ, STL and PLY). |  |
+| `import_mesh` | `kimbim import mesh` | Import an OBJ, STL or PLY mesh as a proxy on a level, scaled, rotated about Z and moved. | yes |
 | `issues_comment` | `kimbim issues comment` | Add a comment to an issue. | yes |
 | `issues_create` | `kimbim issues create` | Create a BCF issue with a viewpoint (camera, selected elements) and optional comments. | yes |
 | `issues_export_bcf` | `kimbim issues export-bcf` | Export the project's issues as a BCF 2.1 .bcfzip for another BIM tool. |  |
 | `issues_import_bcf` | `kimbim issues import-bcf` | Merge a .bcfzip into the project's issues by topic GUID; components are matched by IFC GlobalId. | yes |
 | `issues_list` | `kimbim issues list` | List the project's BCF issues: id, title, type, status, priority, assignee, comments and viewpoint. |  |
 | `issues_update` | `kimbim issues update` | Change an issue's title, description, type, status, priority, assignee, viewpoint or comments. | yes |
+| `keynotes_delete` | `kimbim keynotes delete` | Remove a keynote from the table; the keynotes already placed keep the text they show. | yes |
+| `keynotes_list` | `kimbim keynotes list` | List the project's keynotes: code, text and category, sorted by code. |  |
+| `keynotes_place` | `kimbim keynotes place` | Place a keynote on a plan: its text at [x, y], optionally with a leader to another point. | yes |
+| `keynotes_refresh` | `kimbim keynotes refresh` | Rewrite every placed keynote's text from the table (one undo step); returns how many changed. | yes |
+| `keynotes_save` | `kimbim keynotes save` | Add or change a keynote in the table; run keynotes.refresh to rewrite the keynotes already placed. | yes |
 | `links_add` | `kimbim links add` | Link an IFC file as a read-only reference on a level (default the first), with a placement. | yes |
 | `links_list` | `kimbim links list` | List the linked models: GlobalId, name, path, source element count, triangles, transform and update time. |  |
 | `links_remove` | `kimbim links remove` | Remove a linked model from the project (the linked file itself is left alone). | yes |
