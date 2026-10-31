@@ -93,7 +93,8 @@ def duplicate_elements(guids_json: str) -> str:
 
 def array_elements(guids_json: str, kind: str, params_json: str) -> str:
     """Multiply (Archicad): `linear` {dx, dy, count}: count copies, each (dx, dy) further; `polar`
-    {cx, cy, angle, count}: count copies, each turned `angle` radians further around (cx, cy)."""
+    {cx, cy, angle, count}: count copies, each turned `angle` radians further around (cx, cy);
+    `rectangular` {dx, dy, nx, ny}: an nx by ny grid of copies (the original is the first cell)."""
     if B._model is None:
         return A._fail("no model open")
     elements, error = _check(guids_json)
@@ -101,13 +102,20 @@ def array_elements(guids_json: str, kind: str, params_json: str) -> str:
         return error
     try:
         p = json.loads(params_json)
-        count = int(p["count"])
-        if kind == "linear":
+        if kind == "rectangular":
             dx, dy = float(p["dx"]), float(p["dy"])
-        elif kind == "polar":
-            cx, cy, angle = float(p["cx"]), float(p["cy"]), float(p["angle"])
+            nx, ny = int(p["nx"]), int(p["ny"])
+            count = nx * ny - 1
+            if nx < 1 or ny < 1:
+                return A._fail("the grid must have at least one row and one column")
         else:
-            return A._fail(f"unknown array kind {kind}")
+            count = int(p["count"])
+            if kind == "linear":
+                dx, dy = float(p["dx"]), float(p["dy"])
+            elif kind == "polar":
+                cx, cy, angle = float(p["cx"]), float(p["cy"]), float(p["angle"])
+            else:
+                return A._fail(f"unknown array kind {kind}")
     except (KeyError, TypeError, ValueError) as ex:
         return A._fail(f"bad parameters: {ex}")
     if not 1 <= count <= 1000:
@@ -115,6 +123,13 @@ def array_elements(guids_json: str, kind: str, params_json: str) -> str:
 
     def make():
         pairs = []
+        if kind == "rectangular":
+            for i in range(nx):
+                for j in range(ny):
+                    if i == 0 and j == 0:
+                        continue  # the original
+                    pairs += _copies(elements, _translation(dx * i, dy * j))
+            return pairs
         for i in range(1, count + 1):
             if kind == "linear":
                 t = _translation(dx * i, dy * i)

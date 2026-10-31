@@ -132,6 +132,14 @@ def test_multiply_linear_and_polar(room):
     assert pts == sorted([(15.0, -5.0), (10.0, -10.0), (5.0, -5.0)])
     assert not call("array_elements", g(c), "linear", json.dumps({"dx": 1, "dy": 0, "count": 0}))["ok"]
 
+    # Rectangular: a 2 x 2 grid, the original in the first cell, three copies.
+    r = call("array_elements", g(c), "rectangular", json.dumps({"dx": 2, "dy": 3, "nx": 2, "ny": 2}))
+    assert r["ok"] and len(r["guids"]) == 3
+    pts = sorted((round(authoring._world(b._model.by_guid(x))[0], 6), round(authoring._world(b._model.by_guid(x))[1], 6))
+                 for x in r["guids"])
+    assert pts == sorted([(12.0, 0.0), (10.0, 3.0), (12.0, 3.0)])
+    assert not call("array_elements", g(c), "rectangular", json.dumps({"dx": 1, "dy": 1, "nx": 0, "ny": 2}))["ok"]
+
 
 def test_offset_copies_a_wall_parallel_and_grows_a_slab(room):
     r = call("offset_elements", g(room["w1"]), 1.0)

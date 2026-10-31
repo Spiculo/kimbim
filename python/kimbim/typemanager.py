@@ -224,6 +224,30 @@ def update_type_all(type_guid: str) -> str:
         return _fail(f"{type(ex).__name__}: {ex}")
 
 
+def purge_unused() -> str:
+    """Remove every type that no element uses (Archicad's purge unused attributes), one undo step."""
+    if B._model is None:
+        return _fail("no model open")
+    removed = []
+
+    def action():
+        f = B._model
+        used = {rel.RelatingType.id() for rel in f.by_type("IfcRelDefinesByType")
+                if rel.RelatingType is not None}
+        for t in list(f.by_type("IfcTypeObject")):
+            if t.id() in used or f.get_total_inverses(t) > 0:
+                continue
+            removed.append(t.Name or t.is_a())
+            ifcopenshell.util.element.remove_deep2(f, t)
+        return len(removed)
+
+    try:
+        out = B._run(action)
+        return B._dump({"ok": True, "removed": out.get("changed", 0), "names": removed[:50]})
+    except Exception as ex:
+        return _fail(f"{type(ex).__name__}: {ex}")
+
+
 def type_details(type_guid: str) -> str:
     """A type's name, properties and the elements that use it."""
     if B._model is None:

@@ -68,6 +68,21 @@ def test_create_assign_edit_and_update_all(model):
     assert call("type_of", g(items[2].GlobalId))["types"][0]["count"] == 3
 
 
+def test_purge_unused_removes_only_unused_types(model):
+    import ifcopenshell.api.root
+
+    used = call("create_type", g(walls(model)[0].GlobalId), "Used Wall")
+    assert used["ok"], used
+    unused = ifcopenshell.api.root.create_entity(model, ifc_class="IfcWallType", name="Unused Wall")
+    assert {t["name"] for t in call("list_types")["types"]} == {"Used Wall", "Unused Wall"}
+
+    out = call("purge_unused")
+    assert out["ok"] and out["removed"] == 1 and out["names"] == ["Unused Wall"]
+    remaining = [t.Name for t in model.by_type("IfcWallType")]
+    assert remaining == ["Used Wall"]
+    assert not any(t.id() == unused.id() for t in model.by_type("IfcTypeObject"))
+
+
 def test_a_class_without_a_type_class_is_refused(model):
     space = model.by_type("IfcSite")[0]
     assert "has no IFC type class" in call("create_type", g(space.GlobalId), "Site")["error"]
