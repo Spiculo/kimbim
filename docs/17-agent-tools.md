@@ -193,6 +193,7 @@ would change and changes nothing. This table is the output of `kimbim help --mar
 | `create_slab` | `kimbim create slab` | Create a slab on a level from an outline or from a closed loop of walls (the outline follows their outer faces). | yes |
 | `create_slab_edge` | `kimbim create slab-edge` | Add a raised edge around a slab, one IfcMember per side. | yes |
 | `create_types` | `kimbim create types` | List the types you can create of a kind: GlobalId, name and size (wall thickness, default door/window sizes). |  |
+| `create_update_curtain_wall` | `kimbim create update-curtain-wall` | Change a curtain wall's height, mullion spacing or panel thickness and rebuild its members. | yes |
 | `create_wall` | `kimbim create wall` | Create a straight wall on a level. | yes |
 | `objects_assign_version` | `kimbim objects assign-version` | Move placed library objects to a saved version. | yes |
 | `objects_library` | `kimbim objects library` | List the library objects (furniture, sanitary, kitchen...): id, name, category, IFC class, size (metres) and parameters with their kind, default and limits. |  |
@@ -220,11 +221,31 @@ would change and changes nothing. This table is the output of `kimbim help --mar
 | `selection_set` | `kimbim selection set` | Select elements in the app's window. |  |
 | `script_run` | `kimbim script run` | Run a Python script in the project's console (the model is `ifc`, KimBim commands are in `bridge`). | yes |
 | `snapshot_take` | `kimbim snapshot take` | Take a picture of the model to check your work: a 3D view (optionally framed on elements, with what your task changed coloured as the app's Compare shows it), a floor plan, a section or elevation, any drawing, or a sheet. |  |
+| `export_ifc` | `kimbim export ifc` | Export the model as an IFC file. |  |
+| `export_options` | `kimbim export options` | List what an IFC export can include: scopes, product classes with counts, levels and defaults. |  |
+| `issues_comment` | `kimbim issues comment` | Add a comment to an issue. | yes |
+| `issues_create` | `kimbim issues create` | Create a BCF issue with a viewpoint (camera, selected elements) and optional comments. | yes |
+| `issues_export_bcf` | `kimbim issues export-bcf` | Export the project's issues as a BCF 2.1 .bcfzip for another BIM tool. |  |
+| `issues_import_bcf` | `kimbim issues import-bcf` | Merge a .bcfzip into the project's issues by topic GUID; components are matched by IFC GlobalId. | yes |
+| `issues_list` | `kimbim issues list` | List the project's BCF issues: id, title, type, status, priority, assignee, comments and viewpoint. |  |
+| `issues_update` | `kimbim issues update` | Change an issue's title, description, type, status, priority, assignee, viewpoint or comments. | yes |
+| `links_add` | `kimbim links add` | Link an IFC file as a read-only reference on a level (default the first), with a placement. | yes |
+| `links_list` | `kimbim links list` | List the linked models: GlobalId, name, path, source element count, triangles, transform and update time. |  |
+| `links_remove` | `kimbim links remove` | Remove a linked model from the project (the linked file itself is left alone). | yes |
+| `links_set_transform` | `kimbim links set-transform` | Move, rotate or scale a linked model and rebuild it. | yes |
+| `links_update` | `kimbim links update` | Re-read a linked model's file and rebuild its geometry (same GlobalId). | yes |
 | `models_create` | `kimbim models create` | Create an empty model container below the building; draw the unit in it, then place it on levels. | yes |
 | `models_explode` | `kimbim models explode` | Unlink an instance: its elements become ordinary elements that no longer follow the model. | yes |
 | `models_list` | `kimbim models list` | List the project's models (units drawn once and placed on levels) with their GlobalId, name, elevation and how many places use them. |  |
 | `models_place` | `kimbim models place` | Place a model on a building level as one linked instance (a copy of its elements that follows later edits to the model). | yes |
 | `models_update` | `kimbim models update` | Apply the model's current content to every place it is used; edits already do this automatically, so this is for a project loaded with stale instances. | yes |
+| `terrain_clear_pads` | `kimbim terrain clear-pads` | Remove a terrain's building pads and restore the surface kept before the first pad. | yes |
+| `terrain_create` | `kimbim terrain create` | Create a terrain mesh from survey points ([x, y, z]) on a level, triangulated in plan. | yes |
+| `terrain_delete` | `kimbim terrain delete` | Delete a terrain. | yes |
+| `terrain_from_contours` | `kimbim terrain from-contours` | Create a terrain mesh from contour polylines, sampled along each segment before triangulating. | yes |
+| `terrain_list` | `kimbim terrain list` | List the terrains: GlobalId, name, point count, triangle count and world bounds. |  |
+| `terrain_pad` | `kimbim terrain pad` | Flatten the terrain vertices inside a closed outline to one elevation (a building pad). | yes |
+| `terrain_pads` | `kimbim terrain pads` | List a terrain's building pads: outline points and elevation. |  |
 <!-- tools:end -->
 
 Every answer has the same shape: `{"ok": true, "result": ..., "changes": ..., "warnings": [...]}`, or
