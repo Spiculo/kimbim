@@ -76,7 +76,7 @@ Display (Slice 4b): every element has border lines (outline and creases); View �
 | Edit properties, add/remove property sets, custom psets | P0 | `ifcopenshell.api.pset` |
 | Standard pset templates (Pset_WallCommon…) with validation of types/enums | P0 | IfcOpenShell bundled pset templates |
 | Classifications (Uniclass, OmniClass, local systems) | P1 | ✅ D106: Model › Classifications... (systems and codes, assign/unassign to the selection); Properties lists them; `ifcopenshell.api.classification`; bSDD lookup in P2 |
-| Materials: single, layer sets, profile sets, constituents | P0 | `ifcopenshell.api.material` |
+| Materials: single, layer sets, profile sets, constituents | P0 | `ifcopenshell.api.material`; D121: *Graphics › Attribute manager…* moves pens, styles, layers, materials, surfaces and composites between projects |
 | Type / instance: assign type, edit type to update all instances | P0 | ✅ D106: Model › Type manager... (list, make from selection, assign, edit, update all); D50 per-property type edits |
 | Quantity take-off (auto-calculated quantities) | P1 | IfcOpenShell `ifc5d` / qto utilities |
 | **Bulk edit**: set a property on a selection | P0 | |
@@ -100,8 +100,8 @@ All modeling goes through commands, with undo/redo ([01](01-architecture.md#engi
 | Roofs (flat; pitched later) | P1 | |
 | Spaces / rooms (auto from boundaries), area | P1 | |
 | Stairs and railings (basic parametric) | P1 | Straight-flight stair ✅ Slice 7 (own generator: ifcopenshell has none outside Bonsai); landings, other shapes and railings: later |
-| Curtain walls | P2 | 🟡 D109: `create.curtain_wall` (IfcCurtainWall panel with height/spacing metadata); Curtain wall tool in the 3D palette (panel, mullions and rails) |
-| Generic object (extrusion, mesh import) | P1 | |
+| Curtain walls | P2 | 🟡 D109: `create.curtain_wall` (IfcCurtainWall panel with height/spacing metadata); Curtain wall tool in the 3D palette (panel, mullions and rails); D116: *Model › Curtain wall settings…* (height, spacing, panel and mullion/rail sizes) |
+| Generic object (extrusion, mesh import) | P1 | 🟡 D120: *File › Import mesh…* reads OBJ, ASCII/binary STL and ASCII PLY as an `IfcBuildingElementProxy` with scale/rotation/position; extrusion/revolve authoring is still open |
 | Snapping (endpoint, midpoint, perpendicular, grid, axis) and work planes | P0 | ✅ Slice 4 (on wall, 15° angles, ortho with Shift; work plane = active level) |
 | Precise input (typed distances/angles) | P0 | Typed lengths ✅ Slice 4; typed angles: later |
 | Edit geometry: move, rotate, stretch/extend wall, change height | P0 | ✅ Slice 6. Joined walls follow a moved wall (Revit-like, owner decision D54); Ctrl detaches |
@@ -136,8 +136,8 @@ Clones get **new KimBim IDs and GlobalIds**. They never share identity with the 
 | Feature | Pri | Notes / reuse |
 |---------|-----|---------------|
 | Generate plans, sections, elevations from the model | P1 | IfcOpenShell **SVG serializer** (hidden-line removal, cut fills), as used by Bonsai. ✅ Sections and elevations (Slice 14, D60/D61); plans: Slice 15 |
-| Annotations: dimensions, text, tags (door/window/room tags), level marks | P1 | IFC annotation entities (`IfcAnnotation`), stored in the model |
-| Sheets with title blocks; place drawings at scale | P1 | Bonsai's drawing/sheet approach (SVG-based) |
+| Annotations: dimensions, text, tags (door/window/room tags), level marks, keynotes | P1 | IFC annotation entities (`IfcAnnotation`), stored in the model; D122: *Model › Keynotes…* table and keynote annotations with an optional leader |
+| Sheets with title blocks; place drawings at scale | P1 | Bonsai's drawing/sheet approach (SVG-based); D112: schedules and lists on sheets; D118: title block templates / master layouts |
 | Export PDF / SVG; DXF (D83) | P1 | |
 | Drawings update automatically when the model changes | P1 | 🟡 Slice 14: marked out of date, regenerated in the background when shown or on Regenerate |
 | Show version/milestone on the title block (from repo) | P2 | Bonsai already does this with `git describe` |

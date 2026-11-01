@@ -5,7 +5,7 @@ A checklist of the tools that mainstream BIM and CAD apps give architects, with 
 Use it to pick the next slices. [04](04-app-features.md) stays the source of decided priorities; this document is
 wider and lists tools 04 does not mention yet.
 
-**Status as of `main` (2026-10-31, after D112–D119).**
+**Status as of `main` (2026-10-31, after D112–D122).**
 
 ## How to read it
 

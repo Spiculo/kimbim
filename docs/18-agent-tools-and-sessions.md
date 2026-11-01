@@ -27,6 +27,13 @@ option. `dry_run` reports without changing.
 | `selection` | `get`, `set` | Live selection only |
 | `snapshot` | `take` | 3D, plan, section, elevation, drawing or sheet, with changes coloured |
 | `script` | `run` | Python in the session, gated by the owner |
+| `terrain` | `create`, `from_contours`, `pad`, `pads`, `clear_pads`, `list`, `delete` | Site meshes and building pads |
+| `issues` | `list`, `create`, `update`, `comment`, `export_bcf`, `import_bcf` | BCF issues, viewpoints and comments |
+| `links` | `add`, `list`, `update`, `set_transform`, `remove` | Linked IFC references |
+| `export` | `options`, `ifc` | Configurable IFC export |
+| `import` | `formats`, `mesh` | OBJ/STL/PLY mesh import |
+| `attributes` | `catalogue`, `export`, `import` | Office standards between projects |
+| `keynotes` | `list`, `save`, `delete`, `place`, `refresh` | Keynote table and annotations |
 
 ## 2. Parity: what the user can do that the agent cannot
 
@@ -51,14 +58,14 @@ tool; *gap* is missing; *gated* is deliberate.
 | Roofs, stairs, railings, ramps, slab openings | gap | `create.roof`, `create.stair`, `create.railing`, `create.slab_opening` |
 | Grid lines, grid systems | gap | `create.grid`, `grids.create_system`, `grids.edit` |
 | 2D drafting: line, polyline, spline, arc/circle, rectangle, fill, hatch | gap | `draft.*` with layer/pen and closed/open shapes |
-| Text, dimensions, marks, leaders, tags, angle/radial/level dimensions | gap | `annotations.*` |
+| Text, dimensions, marks, leaders, tags, angle/radial/level dimensions, keynotes | partial (keynotes: `keynotes.*`) | `annotations.*` |
 | Revision clouds, north arrows, scale bars | gap | `annotations.revision_cloud`, `annotations.north_arrow`, `annotations.scale_bar` |
 | Object placements and parameters | yes | Placement settings (gravity, fit to walls) and object editor drafts |
 | Rooms: name, number, area, boundary | partial (`create.room`, `set_properties`) | `rooms.set_boundary`, room tag tools |
 | Materials, surfaces, composites | read-only through properties | `materials.list`, `materials.create`, `elements.assign_material`, `surfaces.*`, `composites.*` |
 | Classifications, types, type manager | types read via `create.types`; no write | `classifications.*`, `types.create/edit/delete`, `types.assign` |
 | Layers: create, rename, delete, visibility, lock, active | read/set element layer only | `layers.list/create/rename/delete/set_visible/set_locked` |
-| Visibility sets, overrides, pen sets, purposes | gap | `graphics.*` (owner-level settings, probably gated) |
+| Visibility sets, overrides, pen sets, purposes, office standards | partial (attribute manager: `attributes.*`) | `graphics.*` (owner-level settings, probably gated) |
 | Renovation status and filters | `elements.set_status` | `renovation.filters.*` |
 | Groups, zones, spaces | gap | `groups.*`, `zones.*` |
 | Library object editor, object drafts | library/place/parameters | `objects.create_draft`, `objects.save_version` |
