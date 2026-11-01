@@ -1,17 +1,20 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-# 17 — Agent tools: the `kimbim` command line and MCP server
+# 17 — Agent tools: the in-app Assistant, the `kimbim` command line and MCP server
 
 An AI agent (Claude, opencode, or any program that speaks MCP) can read, picture and change a KimBim project for
 you. You ask *"make every window on the first floor 50 cm wider"*, the agent does it in seconds, and you review the
 result in KimBim before anything reaches your model (decision D102,
 [spec](superpowers/specs/2026-10-25-agent-tools-design.md)).
 
-The same set of tools is available three ways:
+The same set of tools is available three ways. The **Assistant panel** inside the app is the main one; the other two
+are optional transports for the same catalogue.
 
-- **`kimbim mcp`**, an MCP server. Claude Desktop, Claude Code and opencode connect to it and see the tools.
+- **The Assistant panel** inside the app (View › Panels › Assistant), using your own model provider and API key. It
+  loads the whole catalogue, so a new tool needs no setup to appear there.
 - **`kimbim`**, a command line, for agents that run shell commands and for you. `kimbim elements find --elements
   '{"kind": "window"}'` is the same call as the MCP tool `elements_find`.
-- **The Assistant panel** inside the app (View › Panels › Assistant), using your own model provider and API key.
+- **`kimbim mcp`**, an optional MCP server. Claude Desktop, Claude Code and opencode connect to it and see the
+  tools; not required to add tooling or to use the Assistant.
 
 Agents work **live**, while the project is open in KimBim, or **offline**, with the app closed. In live mode the
 app hosts a local session: each write is one undo step, the views redraw, and a review bar lists finished agent
@@ -23,9 +26,9 @@ proposals. In offline mode a background worker keeps the project open between co
   openings, the drawings, sheets and schedules, the saved versions and design options.
 - **Look** at it: a picture of the model in 3D, a floor plan, a section or elevation, any drawing or a sheet, drawn
   by KimBim itself, so it looks like what you see in the app. The picture can colour what the agent changed.
-- **Change** it: resize doors and windows, move, rotate, copy, mirror, rename and delete elements, set properties,
-  layers and renovation status, add walls, slabs, columns, beams, doors, windows and rooms, place and adjust library
-  objects, add levels, drawings and sheets.
+- **Change** it: resize doors and windows, move, rotate, copy, mirror, array, offset, fillet, scale, stretch, split,
+  trim, join, rename and delete elements, edit slab outlines, set properties, layers and renovation status, add walls,
+  slabs, columns, beams, doors, windows and rooms, place and adjust library objects, add levels, drawings and sheets.
 - **Produce** outputs: export drawings (SVG, DXF), sheets (PDF, SVG, DXF), schedules (CSV) and versions (IFC), and
   run the model checks (schema, IDS, clash, model).
 
@@ -169,22 +172,34 @@ would change and changes nothing. This table is the output of `kimbim help --mar
 | `task_finish` | `kimbim task finish` | Finish the task: save its changes as a version (on its option, ready for review, or in place in direct mode) and return what changed. |  |
 | `task_start` | `kimbim task start` | Start a task: the changes that follow go in a design option agent/<title> for the architect to review (or straight into the model in direct mode). |  |
 | `task_status` | `kimbim task status` | Show the open task (or the named one) with what it changed so far, and every task of the project. |  |
+| `elements_array` | `kimbim elements array` | Multiply elements: a linear row, a polar turn, or a rectangular grid of copies. | yes |
 | `elements_copy` | `kimbim elements copy` | Copy elements, shifted by dx, dy, dz, optionally onto another level. | yes |
 | `elements_copy_to_level` | `kimbim elements copy-to-level` | Copy elements to another level at the same plan position (walls bring their doors and windows). | yes |
 | `elements_delete` | `kimbim elements delete` | Delete elements (and the doors/windows they host). | yes |
+| `elements_fillet` | `kimbim elements fillet` | Round (fillet) or cut (chamfer) the corners of slabs, 2D polylines/fills, or two meeting walls. | yes |
 | `elements_find` | `kimbim elements find` | Find elements and list them: GlobalId, label, kind and level, a page at a time. |  |
 | `elements_get` | `kimbim elements get` | Describe elements in full: class, type, level, dimensions (metres), property sets, host and openings. |  |
+| `elements_get_slab_outline` | `kimbim elements get-slab-outline` | A slab's outline points in world metres, for moving, adding or deleting corners. |  |
 | `elements_get_slab_slope` | `kimbim elements get-slab-slope` | A slab's slope (rise over run). |  |
+| `elements_join` | `kimbim elements join` | Join two walls (L or T) or merge two collinear walls or beams into the first. | yes |
 | `elements_mirror` | `kimbim elements mirror` | Mirror elements across a line on the plan. | yes |
 | `elements_move` | `kimbim elements move` | Move elements by dx, dy, dz. | yes |
+| `elements_offset` | `kimbim elements offset` | Offset walls as a parallel copy and grow or shrink slabs in place (negative shrinks). | yes |
 | `elements_remove_properties` | `kimbim elements remove-properties` | Remove properties from elements. | yes |
 | `elements_rename` | `kimbim elements rename` | Give elements a name. | yes |
+| `elements_resize` | `kimbim elements resize` | Scale elements about a point on the plan; thicknesses and heights stay. | yes |
 | `elements_rotate` | `kimbim elements rotate` | Rotate elements around a point on the plan; joined walls follow. | yes |
 | `elements_set_dimensions` | `kimbim elements set-dimensions` | Change dimensions of elements: width, height and sill of doors/windows, height or length of walls, columns and beams. | yes |
 | `elements_set_layer` | `kimbim elements set-layer` | Move elements to a layer. | yes |
 | `elements_set_properties` | `kimbim elements set-properties` | Set property values on elements, creating the property set when needed. | yes |
+| `elements_set_slab_outline` | `kimbim elements set-slab-outline` | Give a slab a new outline (moving, adding or deleting corners); its thickness and level stay. | yes |
 | `elements_set_slab_slope` | `kimbim elements set-slab-slope` | Tilt slabs: 0, 0 returns them to horizontal. | yes |
 | `elements_set_status` | `kimbim elements set-status` | Set the renovation status of elements: existing, demolish, new, temporary or auxiliary. | yes |
+| `elements_split` | `kimbim elements split` | Split a wall or beam at a point on its axis; doors and windows stay with the piece they are in. | yes |
+| `elements_stretch` | `kimbim elements stretch` | Move one end of a wall to a point, stretching or shortening it; joins at that end are dropped. | yes |
+| `elements_trim` | `kimbim elements trim` | Trim or extend a wall or beam to a boundary wall/beam or line, keeping the side the point is on. | yes |
+| `elements_trim_corner` | `kimbim elements trim-corner` | Trim or extend two walls or beams to their corner, keeping the side each point is on. | yes |
+| `elements_unjoin` | `kimbim elements unjoin` | Break the joins between walls or beams (one element: all its joins), giving them plain ends. | yes |
 | `create_beam` | `kimbim create beam` | Create a beam between two points on a level. | yes |
 | `create_column` | `kimbim create column` | Create a column standing on a level. | yes |
 | `create_curtain_wall` | `kimbim create curtain-wall` | Create an IfcCurtainWall on a level, with its glazed panel and mullion spacing. | yes |
@@ -257,6 +272,10 @@ would change and changes nothing. This table is the output of `kimbim help --mar
 | `terrain_pad` | `kimbim terrain pad` | Flatten the terrain vertices inside a closed outline to one elevation (a building pad). | yes |
 | `terrain_pads` | `kimbim terrain pads` | List a terrain's building pads: outline points and elevation. |  |
 <!-- tools:end -->
+
+The list is generated from the catalogue (112 exposed tools today). What is still missing on the agent side — in the
+tool surface, the client/transport setup and remote sessions — is listed in
+[18 §6](18-agent-tools-and-sessions.md#6-pending-integrations).
 
 Every answer has the same shape: `{"ok": true, "result": ..., "changes": ..., "warnings": [...]}`, or
 `{"ok": false, "error": {"code", "message", "hint"}}`. The `code` is in English; the message and the hint follow

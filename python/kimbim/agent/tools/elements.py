@@ -12,10 +12,11 @@ from ... import authoring as A
 from ... import editing as E
 from ... import graphics as G
 from ... import layers as Ly
+from ... import modify as M
 from ... import renovation as R
 from .. import messages, units
 from ..catalogue import SELECTOR, AgentError, ToolResult, bridge, tool
-from .common import lengths, level_guid
+from .common import lengths, level_guid, point
 
 
 def _offset(cursor: str) -> int:
@@ -253,6 +254,203 @@ def delete(session, elements):
     guids = session.resolve(elements)
     bridge(A.delete_elements, _guids(guids))
     return {"requested": len(guids)}
+
+
+# ---------------------------------------------------------------- split / trim / join (D80)
+
+_ELEMENT = {"type": "string", "description": "GlobalId of a wall or beam."}
+_SPOT = {"type": "array", "items": _NUMBER, "description": "[x, y] in project units or strings with units."}
+_OPENINGS = {"type": "string", "enum": ["refuse", "delete", "keep"],
+             "description": "What to do with a door, window or opening the trim would leave outside the wall: "
+                            "refuse (default), delete it, or keep it."}
+
+
+@tool("elements.split", {"required": ["element", "at"], "properties": {
+    "element": _ELEMENT, "at": _SPOT,
+    "join": {"type": "boolean", "description": "Join the two pieces (default true)."}}}, writes=True)
+def split(session, element, at, join=True):
+    """Split a wall or beam at a point on its axis; doors and windows stay with the piece they are in."""
+    x, y = point(session, at, "at")
+    r = bridge(M.split_element, element, x, y, join)
+    return {"element": element, "piece": r.get("piece", "")}
+
+
+@tool("elements.trim", {"required": ["element", "at"], "properties": {
+    "element": _ELEMENT, "at": _SPOT,
+    "boundary": {"type": "string", "description": "GlobalId of the wall or beam to trim to."},
+    "line": {"type": "array", "items": {"type": "array", "items": _NUMBER},
+             "description": "[[x1, y1], [x2, y2]]: a boundary line (for example a grid line) instead of a boundary element."},
+    "join": {"type": "boolean", "description": "Join the element to a boundary wall (default true)."},
+    "openings": _OPENINGS}}, writes=True)
+def trim(session, element, at, boundary="", line=None, join=True, openings="refuse"):
+    """Trim or extend a wall or beam to a boundary wall/beam or line, keeping the side the point is on."""
+    if bool(boundary) == (line is not None):
+        raise AgentError("bad_input", hint="give boundary or line, not both")
+    x, y = point(session, at, "at")
+    bx1 = by1 = bx2 = by2 = 0.0
+    if line is not None:
+        if len(line) != 2 or any(len(p) != 2 for p in line):
+            raise AgentError("bad_input", hint="line must be [[x1, y1], [x2, y2]]")
+        bx1, by1, bx2, by2 = lengths(session, line[0][0], line[0][1], line[1][0], line[1][1])
+    bridge(M.trim_extend, element, x, y, boundary or "", bx1, by1, bx2, by2, join, openings)
+    return {"element": element}
+
+
+@tool("elements.trim_corner", {"required": ["first", "first_at", "second", "second_at"], "properties": {
+    "first": _ELEMENT, "first_at": _SPOT, "second": _ELEMENT, "second_at": _SPOT,
+    "join": {"type": "boolean", "description": "Join the two walls in an L at the corner (default true)."},
+    "openings": _OPENINGS}}, writes=True)
+def trim_corner(session, first, first_at, second, second_at, join=True, openings="refuse"):
+    """Trim or extend two walls or beams to their corner, keeping the side each point is on."""
+    x1, y1 = point(session, first_at, "first_at")
+    x2, y2 = point(session, second_at, "second_at")
+    bridge(M.trim_corner, first, x1, y1, second, x2, y2, join, openings)
+    return {"elements": [first, second]}
+
+
+@tool("elements.join", {"required": ["first", "second"], "properties": {
+    "first": {**_ELEMENT, "description": "GlobalId of the first wall or beam; a merge keeps its GlobalId."},
+    "second": {**_ELEMENT, "description": "GlobalId of the second wall or beam."},
+    "props": {"type": "string", "enum": ["keep", "refuse"],
+              "description": "Merging collinear walls whose properties differ: keep the first's (default) or refuse."}}},
+    writes=True)
+def join(session, first, second, props="keep"):
+    """Join two walls (L or T) or merge two collinear walls or beams into the first."""
+    r = bridge(M.join_elements, first, second, props)
+    return {"merged": bool(r.get("merged")), "first": first, "second": second}
+
+
+@tool("elements.unjoin", {"required": ["elements"], "properties": {"elements": SELECTOR}}, writes=True)
+def unjoin(session, elements):
+    """Break the joins between walls or beams (one element: all its joins), giving them plain ends."""
+    guids = session.resolve(elements)
+    bridge(M.unjoin_elements, _guids(guids))
+    return {"elements": len(guids)}
+
+
+@tool("elements.stretch", {"required": ["element", "end", "to"], "properties": {
+    "element": _ELEMENT,
+    "end": {"type": "string", "enum": ["start", "end"], "description": "The wall end to move."},
+    "to": _SPOT}}, writes=True)
+def stretch(session, element, end, to):
+    """Move one end of a wall to a point, stretching or shortening it; joins at that end are dropped."""
+    from ... import curved_walls
+
+    x, y = point(session, to, "to")
+    try:
+        e = B._model.by_guid(element) if B._model is not None else None
+    except RuntimeError:
+        e = None
+    if e is None:
+        raise AgentError("not_found", what=element)
+    if not e.is_a("IfcWall"):
+        raise AgentError("bad_input", hint="element must be a wall")
+    axis = A._axis_world(e)
+    if axis is None and curved_walls.is_curved(e):
+        axis = tuple(tuple(float(c) for c in p) for p in curved_walls.ends_world(e))
+    if axis is None:
+        raise AgentError("bad_input", hint="not a wall with an axis")
+    (x1, y1), (x2, y2) = axis
+    if end == "start":
+        x1, y1 = x, y
+    else:
+        x2, y2 = x, y
+    bridge(A.set_wall_axis, element, x1, y1, x2, y2)
+    return {"element": element}
+
+
+# ---------------------------------------------------------------- array / offset / fillet / resize
+
+@tool("elements.array", {"required": ["elements", "kind"], "properties": {
+    "elements": SELECTOR,
+    "kind": {"type": "string", "enum": ["linear", "polar", "rectangular"]},
+    "dx": _NUMBER, "dy": _NUMBER,
+    "count": {"type": "integer", "minimum": 1, "maximum": 1000, "description": "Number of copies (linear, polar)."},
+    "center": {"type": "array", "items": _NUMBER, "description": "Polar: [x, y] to turn around."},
+    "angle": {"type": ["number", "string"], "description": "Polar: degrees (90, \"90deg\") or \"1.57rad\"."},
+    "nx": {"type": "integer", "minimum": 1, "description": "Rectangular: columns."},
+    "ny": {"type": "integer", "minimum": 1, "description": "Rectangular: rows."}}}, writes=True)
+def array(session, elements, kind, dx=0, dy=0, count=1, center=None, angle=None, nx=1, ny=1):
+    """Multiply elements: a linear row, a polar turn, or a rectangular grid of copies."""
+    guids = session.resolve(elements)
+    if kind == "linear":
+        params = {"dx": lengths(session, dx)[0], "dy": lengths(session, dy)[0], "count": int(count)}
+    elif kind == "polar":
+        if center is None or angle is None:
+            raise AgentError("bad_input", hint="polar needs center [x, y] and angle")
+        cx, cy = point(session, center, "center")
+        try:
+            radians = math.radians(units.parse_angle(angle))
+        except ValueError:
+            raise AgentError("bad_input", hint=messages.text("hint_bad_angle", value=angle)) from None
+        params = {"cx": cx, "cy": cy, "angle": radians, "count": int(count)}
+    else:
+        params = {"dx": lengths(session, dx)[0], "dy": lengths(session, dy)[0], "nx": int(nx), "ny": int(ny)}
+    r = bridge(E.array_elements, _guids(guids), kind, json.dumps(params))
+    return {"copies": r.get("guids", []), "count": len(r.get("guids", []))}
+
+
+@tool("elements.offset", {"required": ["elements", "distance"], "properties": {
+    "elements": SELECTOR,
+    "distance": {**_NUMBER, "description": "Perpendicular distance in project units; negative offsets the other way."}}},
+    writes=True)
+def offset(session, elements, distance):
+    """Offset walls as a parallel copy and grow or shrink slabs in place (negative shrinks)."""
+    guids = session.resolve(elements)
+    r = bridge(E.offset_elements, _guids(guids), lengths(session, distance)[0])
+    return {"copies": r.get("guids", []), "count": len(r.get("guids", []))}
+
+
+@tool("elements.fillet", {"required": ["elements", "size"], "properties": {
+    "elements": SELECTOR,
+    "size": {**_NUMBER, "description": "Radius (fillet) or setback distance (chamfer) in project units."},
+    "mode": {"type": "string", "enum": ["fillet", "chamfer"], "description": "Default fillet."}}}, writes=True)
+def fillet(session, elements, size, mode="fillet"):
+    """Round (fillet) or cut (chamfer) the corners of slabs, 2D polylines/fills, or two meeting walls."""
+    guids = session.resolve(elements)
+    bridge(E.fillet_corners, _guids(guids), lengths(session, size)[0], mode)
+    return {"elements": len(guids), "mode": mode}
+
+
+@tool("elements.resize", {"required": ["elements", "factor"], "properties": {
+    "elements": SELECTOR,
+    "factor": {"type": "number", "description": "Scale factor, more than 0 and not 1."},
+    "center": {"type": "array", "items": _NUMBER,
+               "description": "[x, y] to scale about (project units); default the selection's middle."}}}, writes=True)
+def resize(session, elements, factor, center=None):
+    """Scale elements about a point on the plan; thicknesses and heights stay."""
+    guids = session.resolve(elements)
+    try:
+        k = float(factor)
+    except (TypeError, ValueError):
+        raise AgentError("bad_input", hint="factor must be a number") from None
+    if k <= 0 or abs(k - 1.0) < 1e-12:
+        raise AgentError("bad_input", hint="factor must be more than 0 and not 1")
+    cx = cy = ""
+    if center is not None:
+        cx, cy = point(session, center, "center")
+    bridge(E.resize_elements, _guids(guids), cx, cy, k)
+    return {"elements": len(guids), "factor": k}
+
+
+@tool("elements.get_slab_outline", {"required": ["element"], "properties": {
+    "element": {"type": "string", "description": "GlobalId of a slab."}}})
+def get_slab_outline(session, element):
+    """A slab's outline points in world metres, for moving, adding or deleting corners."""
+    return bridge(E.slab_outline, element)
+
+
+@tool("elements.set_slab_outline", {"required": ["element", "points"], "properties": {
+    "element": {"type": "string", "description": "GlobalId of a slab."},
+    "points": {"type": "array", "items": {"type": "array", "items": _NUMBER},
+               "description": "The new outline [x, y] points (at least 3, not crossing itself)."}}}, writes=True)
+def set_slab_outline(session, element, points):
+    """Give a slab a new outline (moving, adding or deleting corners); its thickness and level stay."""
+    if not isinstance(points, (list, tuple)) or len(points) < 3:
+        raise AgentError("bad_input", hint="points must be at least three [x, y] pairs")
+    pts = [list(point(session, p, "points")) for p in points]
+    bridge(E.set_slab_outline, element, json.dumps(pts))
+    return {"element": element, "points": pts}
 
 
 @tool("elements.set_slab_slope", {"required": ["elements"], "properties": {

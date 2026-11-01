@@ -7,17 +7,18 @@ add for full *user -> agent* parity, and how sessions should be stored. The day-
 
 ## 1. What the agent has today
 
-64 tools, all from one catalogue (`kimbim.agent.catalogue`), available over MCP, the `kimbim` CLI and the in-app
-Assistant. Every write is one undo step; every change goes through a task and (by default) a reviewable design
-option. `dry_run` reports without changing.
+112 tools, all from one catalogue (`kimbim.agent.catalogue`), available first in the in-app **Assistant**, and also
+over the `kimbim` CLI and MCP. Every write is one undo step; every change goes through a task and (by default) a
+reviewable design option. `dry_run` reports without changing. The count is the exposed set (`_owner_save` is
+internal): 113 registered, 112 listed by `kimbim help --markdown` and `list_tools`.
 
 | Group | Tools | Covers |
 |---|---|---|
 | `project` | `info`, `settings`, `set_settings` | Read the project; settings are read, and the two agent settings are reserved to the owner |
 | `versions` | `log`, `diff`, `options`, `milestones`, `element_history`, `export` | Read history and options, compare versions, export IFC |
 | `task` | `start`, `finish`, `abandon`, `status` | The task/review protocol |
-| `elements` | `find`, `get`, `set_dimensions`, `set_properties`, `remove_properties`, `rename`, `move`, `rotate`, `copy`, `copy_to_level`, `mirror`, `delete`, `set_layer`, `set_status`, `set_slab_slope`, `get_slab_slope` | Select and edit existing elements |
-| `create` | `wall`, `slab`, `slab_edge`, `column`, `beam`, `curtain_wall`, `opening`, `room`, `types` | Basic construction and doors/windows |
+| `elements` | `find`, `get`, `set_dimensions`, `set_properties`, `remove_properties`, `rename`, `move`, `rotate`, `copy`, `copy_to_level`, `mirror`, `delete`, `split`, `trim`, `trim_corner`, `join`, `unjoin`, `array`, `offset`, `fillet`, `resize`, `stretch`, `get_slab_outline`, `set_slab_outline`, `set_layer`, `set_status`, `set_slab_slope`, `get_slab_slope` | Select and edit existing elements |
+| `create` | `wall`, `slab`, `slab_edge`, `column`, `beam`, `curtain_wall`, `update_curtain_wall`, `opening`, `room`, `types` | Basic construction and doors/windows |
 | `levels` | `list`, `add`, `edit`, `delete` | The level table |
 | `objects` | `library`, `versions`, `place`, `set_parameters`, `assign_version`, `update_from_library` | Library objects and their parameters |
 | `drawings` | `list`, `create`, `export` | Plans, sections/elevations, SVG/DXF |
@@ -30,6 +31,7 @@ option. `dry_run` reports without changing.
 | `terrain` | `create`, `from_contours`, `pad`, `pads`, `clear_pads`, `list`, `delete` | Site meshes and building pads |
 | `issues` | `list`, `create`, `update`, `comment`, `export_bcf`, `import_bcf` | BCF issues, viewpoints and comments |
 | `links` | `add`, `list`, `update`, `set_transform`, `remove` | Linked IFC references |
+| `models` | `create`, `place`, `update`, `explode`, `list` | Models drawn once and placed on levels |
 | `export` | `options`, `ifc` | Configurable IFC export |
 | `import` | `formats`, `mesh` | OBJ/STL/PLY mesh import |
 | `attributes` | `catalogue`, `export`, `import` | Office standards between projects |
@@ -51,10 +53,10 @@ tool; *gap* is missing; *gated* is deliberate.
 | Draw walls, slabs, columns, beams, curtain walls, doors/windows, rooms | yes | — |
 | Wall settings: reference line, height, type, slant, double slant, top link, flip | partial (type/height on create) | `elements.set_wall_settings` (reference, slant, top link) and `walls.flip` |
 | Complex profiles / profile manager | gap | `profiles.list`, `profiles.create_from_shape`, `walls.set_profile` |
-| Split, trim/extend, join/unjoin, merge | gap | `elements.split`, `elements.trim`, `elements.join` |
+| Split, trim/extend, join/unjoin, merge | `elements.split`, `elements.trim`, `elements.trim_corner`, `elements.join`, `elements.unjoin` | — |
 | Move/rotate/copy/mirror/delete | yes | — |
-| Array/multiply, offset, fillet/chamfer, resize, stretch | gap | `elements.array`, `elements.offset`, `elements.fillet`, `elements.resize`, `elements.stretch` |
-| Slab outline, slab opening, slab edge | partial (slab edge; no opening/outline edit) | `elements.set_slab_outline`, `create.slab_opening` |
+| Array/multiply, offset, fillet/chamfer, resize, stretch | `elements.array`, `elements.offset`, `elements.fillet`, `elements.resize`, `elements.stretch` | — |
+| Slab outline, slab opening, slab edge | partial (slab edge and outline edit; no opening) | `create.slab_opening` |
 | Roofs, stairs, railings, ramps, slab openings | gap | `create.roof`, `create.stair`, `create.railing`, `create.slab_opening` |
 | Grid lines, grid systems | gap | `create.grid`, `grids.create_system`, `grids.edit` |
 | 2D drafting: line, polyline, spline, arc/circle, rectangle, fill, hatch | gap | `draft.*` with layer/pen and closed/open shapes |
@@ -69,7 +71,7 @@ tool; *gap* is missing; *gated* is deliberate.
 | Renovation status and filters | `elements.set_status` | `renovation.filters.*` |
 | Groups, zones, spaces | gap | `groups.*`, `zones.*` |
 | Library object editor, object drafts | library/place/parameters | `objects.create_draft`, `objects.save_version` |
-| Place model, worksheets | gap | `models.place`, `worksheets.*` |
+| Place model, worksheets | models (`create`, `place`, `update`, `explode`, `list`) | `worksheets.*` |
 | Underlays, pictures in 3D | gap | `underlays.*`, `pictures.place` |
 | Measure, snaps, trace reference | gap (no measurement tool) | `measure.distance/area` (read-only), `view.trace_reference` |
 
@@ -84,10 +86,10 @@ tool; *gap* is missing; *gated* is deliberate.
 | Title block: move and edit its fields | gap | `sheets.set_title_block` |
 | Legends, north arrows, scale bars, revision clouds, sheet text, pictures | gap | `sheets.place_legend`, `sheets.place_symbol`, `sheets.set_symbol`, `sheets.remove_symbol` |
 | Sheet purpose | gap | `sheets.set_purpose` |
-| Export PDF/SVG/DXF/DWG | `drawings.export`, `sheets.export` (SVG/DXF/PDF?) | Explicit formats and `versions.export_dwg` |
+| Export PDF/SVG/DXF/DWG | `drawings.export` (SVG/DXF), `sheets.export` (PDF/SVG/DXF) | `export.dwg` (or `versions.export_dwg`) |
 | Schedules: create/edit schemes, place on sheets | read/export only | `schedules.create/edit`, `sheets.place_schedule` |
 | Checks: choose checks, save IDS/clash sets | `checks.run`, `checks.ids_report` | `checks.save_ids`, `checks.clash_sets`, `checks.report` |
-| BCF / issue export | gap | `issues.export_bcf` |
+| BCF / issue export | `issues.list/create/update/comment/import_bcf/export_bcf` | — |
 
 ### Project, history and application
 
@@ -109,7 +111,8 @@ tool; *gap* is missing; *gated* is deliberate.
 
 If the goal is the smallest set that lets an agent do almost anything an architect does, build these first:
 
-1. **Editing operations**: split, trim/extend, join, array, offset, fillet/chamfer, resize, stretch, slab outline.
+1. **Editing operations**: ✅ built (split, trim/extend, join, array, offset, fillet/chamfer, resize, stretch and
+   slab outline).
 2. **Construction**: roof, stair, railing, grid/grid system, slab opening, wall settings and profiles.
 3. **Drafting and annotations**: line/polyline/spline/arc/rectangle/fill, text, dimensions, marks, leaders, tags,
    revision cloud, north arrow, scale bar.
@@ -118,8 +121,9 @@ If the goal is the smallest set that lets an agent do almost anything an archite
 5. **Attributes and graphics**: materials, surfaces, composites, classifications, types, layers, renovation filters,
    visibility/overrides/pen sets (some gated).
 6. **Project control**: save version/milestone, option create (not accept), saved views, cut planes, hide/isolate.
-7. **Context and sessions**: the state delta described below, persistent sessions with branches/worktrees, and a
-   session picker in the Assistant.
+7. **Context and sessions**: ✅ built 2026-10-30 (D111): the state delta below, stored sessions with
+   branches/worktrees, and the Assistant's session picker. Still pending: remote sync and worktree isolation for
+   `.kim`/IFC sessions (§6).
 
 Gated (owner-only) by design: accepting/rejecting/combining an agent's work, deleting options, the agent settings
 (`agent_changes`, `agent_scripts`), remotes/credentials, opening another project, and anything that changes the
@@ -237,3 +241,67 @@ session; `kimbim mcp --session ID` does the same for MCP.
 - Agents never drive menus, docks, dialogs or drag and drop; UI-only actions are either exposed as an operation
   tool or stay owner-only.
 - A write always belongs to a task; a task always has a way back (a design option or a saved version).
+
+## 6. Pending integrations
+
+This section is the current edge of the agent integration: what is wired to an agent today, and what is not. The
+parity list in §2 covers operations inside the model; this covers the client, transport, settings and session work
+around them.
+
+### Wired today
+
+- One catalogue (`kimbim.agent.catalogue`, **112 exposed tools**) shared by the in-app Assistant, the CLI and MCP.
+- The **Assistant is the primary consumer**: *View › Panels › Assistant* gets the whole catalogue with no setup.
+- Two execution modes: **live** (the app hosts the session; each write is an undo step) and **offline** (a background
+  worker keeps the project open), plus the `kimbim group verb` CLI for scripts and batch work.
+- Optional MCP setup for **Claude Desktop**, **Claude Code** and **opencode** (`kimbim setup ...`), including the
+  marked `CLAUDE.md`/`AGENTS.md` section. MCP is a transport, not a requirement for adding or using tools.
+- One MCP resource, `kimbim://project/info` (only when MCP is used), and the task/review protocol (design options,
+  proposal bar, owner-only accept/reject/combine).
+
+### Optional MCP clients and transport
+
+The Assistant needs none of this. These are the external-agent paths and what is still missing around them.
+
+| Item | Today | Pending |
+|---|---|---|
+| MCP clients | `kimbim setup` writes Claude Desktop, Claude Code and opencode | Verified configs for other MCP clients (Cursor, VS Code, Windsurf, Zed, Continue…); they can start `kimbim mcp` by hand, but setup does not write their files |
+| Transport | stdio only (`kimbim mcp`) | HTTP/SSE or streamable HTTP for a remote agent, and authentication for it (local stdio needs none) |
+| Config writer | Merges JSON, keeps other servers and settings; refuses a commented `opencode.jsonc` and prints a paste-ready snippet | In-place JSONC editing |
+| MCP surface | 112 tools and the `kimbim://project/info` resource | More resources or prompts (current selection, current view, task state) to save round trips |
+
+### Tool surface still to integrate
+
+These are the §2 gaps that remain after the 2026-10-31/11-01 round (terrain, building pads, mesh import, attributes,
+keynotes, models, links, issues, IFC export options are already in):
+
+1. **Construction**: roof, stair, ramp, railing, grid/grid system, slab opening, wall settings and profiles.
+2. **Drafting and annotations**: line, polyline, arc/circle, rectangle, fill, text, dimensions, marks, leaders, tags,
+   revision clouds, north arrows, scale bars.
+3. **Documentation**: drawing settings/rename/delete, sheet data/title block/placements/legends/symbols/purpose,
+   schedule definitions, DWG export.
+4. **Attributes and graphics**: assigning materials, surfaces and composites; classifications; types write;
+   layer management; renovation filters; visibility, overrides and pen sets (some gated).
+5. **Project control**: explicit `versions.save` and milestones, option creation (not acceptance), saved views, cut
+   planes, hide/isolate, measure and trace reference.
+6. **Underlays and pictures in 3D**.
+
+### Sessions and remote
+
+- Built (D111): the local session store, transcript, session picker, branch/worktree per session, and the
+  open/parked/ready/merged/rejected/archived lifecycle.
+- Pending: remote session sync, encryption at rest on a server, and resuming a session on another machine (§4,
+  *Remote (future, opt-in)*).
+- Pending: worktree isolation for `.kim`/IFC projects. Those sessions still share the app's one working document and
+  fall back to the open/lock path, so two such sessions cannot write at once.
+
+### In-app settings and operational limits
+
+- The Assistant speaks **Anthropic** and **OpenAI-compatible** APIs (Chat Completions or Responses); the key lives
+  in the OS credential store. Other provider protocols are not integrated.
+- There is no dialog for `agent_changes` or `agent_scripts` yet; they are set from the Python console and saved with
+  the project. Scripts are off by default.
+- Known limits that a client integration has to live with: the CLI/MCP client waits **120 s** per call (large-model
+  `task_finish` and `changes` snapshots can exceed it); **one open task per client**; option mode needs saved
+  versions; resizing imported Revit doors/windows is refused; the first 3D snapshot in a session starts the
+  renderer and takes longer.
