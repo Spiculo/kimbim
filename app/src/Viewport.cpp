@@ -176,6 +176,9 @@ void Viewport::setPlanView(double elevation)
     ensureNorthArrow(); // D92: the plan north indicator
     m_view->Camera()->SetProjectionType(Graphic3d_Camera::Projection_Orthographic);
     m_view->SetProj(V3d_Zpos); // looking down, north (+Y) up
+    m_view->Camera()->SetUp(
+        gp_Dir(-std::sin(m_planRotation), std::cos(m_planRotation), 0.0));
+    m_view->Invalidate();
     applyNavigationPreset();
     if (!wasPlan && (!m_markerData.isEmpty() || !m_annotationData.isEmpty()))
         displayAnnotations(); // section/elevation markers and drafting (D84) belong to the plan
@@ -183,6 +186,18 @@ void Viewport::setPlanView(double elevation)
         displayConstructionGrid(); // D98: plans only
     if (ensureWindow())
         fitAll();
+    update();
+}
+
+void Viewport::setPlanRotation(double radians)
+{
+    m_planRotation = radians;
+    if (!m_planView)
+        return;
+    ensureWindow();
+    m_view->Camera()->SetUp(
+        gp_Dir(-std::sin(radians), std::cos(radians), 0.0));
+    m_view->Invalidate();
     update();
 }
 
@@ -1389,7 +1404,20 @@ void Viewport::rebuildSections()
     m_sections.clear();
     m_sectionElements = 0;
     m_sectionPlaneCount = 0;
+    m_pocheSkipped = false;
     if (m_sectionPlanes.empty()) {
+        update();
+        return;
+    }
+    // Poché means a section loop per element for every cut plane. On a very large model that is
+    // minutes of OCCT work; the clip planes still cut correctly, only the cut fills are left out.
+    std::size_t visible = 0;
+    for (const auto& b : m_scene->batches)
+        for (int i = 0; i < b->elementCount(); ++i)
+            if (!b->isHidden(i))
+                ++visible;
+    if (visible > 20'000) {
+        m_pocheSkipped = true;
         update();
         return;
     }

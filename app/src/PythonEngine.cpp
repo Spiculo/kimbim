@@ -16,6 +16,12 @@ namespace {
 
 PyObject* asModule(void* p) { return static_cast<PyObject*>(p); }
 
+struct BusyGuard {
+    std::atomic<bool>& flag;
+    explicit BusyGuard(std::atomic<bool>& f) : flag(f) { flag.store(true); }
+    ~BusyGuard() { flag.store(false); }
+};
+
 QString fetchError()
 {
     PyObject *type = nullptr, *value = nullptr, *tb = nullptr;
@@ -64,6 +70,7 @@ PythonEngine& PythonEngine::instance()
 
 bool PythonEngine::start(QString* error)
 {
+    QMutexLocker lock(&m_mutex);
     if (m_module)
         return true;
     const QByteArray prefix = qgetenv("CONDA_PREFIX");
@@ -107,6 +114,7 @@ bool PythonEngine::start(QString* error)
 
 void PythonEngine::stop()
 {
+    QMutexLocker lock(&m_mutex);
     if (!m_module)
         return;
     PyEval_RestoreThread(static_cast<PyThreadState*>(m_mainThreadState));
@@ -130,6 +138,8 @@ QJsonDocument PythonEngine::callJson(const char* fn, const QStringList& args, QS
 
 bool PythonEngine::callParts(const char* fn, const QStringList& args, QList<QByteArray>* out, bool* isNone, QString* error)
 {
+    QMutexLocker lock(&m_mutex);
+    BusyGuard busy(m_busy);
     out->clear();
     *isNone = false;
     if (!m_module) {

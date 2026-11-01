@@ -1,7 +1,10 @@
 # Build output
 /build/
 /out/
+/dist/
 /target/
+/tools/interop-xbim/bin/
+/tools/interop-xbim/obj/
 *.o
 *.obj
 *.pdb

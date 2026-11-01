@@ -307,7 +307,12 @@ int runSelfTest(const SelfTestOptions& options)
     bool stopped = false;
     QElapsedTimer timer, quitTimer;
     qint64 quitMs = -1;
+    qint64 firstFrameMs = -1;
     QObject::connect(&window, &MainWindow::loadFailed, &loop, [&](const QString& e) { loadError = e; loop.quit(); });
+    QObject::connect(&window, &MainWindow::firstChunkShown, &window, [&] {
+        if (firstFrameMs < 0)
+            firstFrameMs = timer.elapsed();
+    });
     QObject::connect(&window, &MainWindow::loadFinished, &loop, [&](int, bool s) {
         stopped = s;
         if (!options.quitDuringLoad) // in quit mode only the close ends the test
@@ -338,8 +343,15 @@ int runSelfTest(const SelfTestOptions& options)
     const double loadS = double(timer.elapsed()) / 1000.0;
     if (options.linesOnly)
         window.findChild<QAction*>(QStringLiteral("actionLinesOnly"))->setChecked(true);
-    if (options.planView)
+    double planViewMs = -1;
+    if (options.planView) {
+        QElapsedTimer t;
+        t.start();
         window.findChild<QAction*>(QStringLiteral("actionPlanView"))->trigger();
+        QApplication::processEvents();
+        window.viewport()->repaint(); // the first full plan paint belongs to the view switch
+        planViewMs = double(t.elapsed());
+    }
     QJsonObject underlay;
     if (!options.underlay.isEmpty()) { // D85
         const QStringList parts = options.underlay.split(QLatin1Char(';'));
@@ -385,13 +397,35 @@ int runSelfTest(const SelfTestOptions& options)
     }
     QApplication::processEvents();
     const double fps = viewport->measureFps(options.frames);
+    double setToolMs = -1;
+    double planPaintMs = -1;
+    if (options.benchSnap) {
+        QElapsedTimer t;
+        t.start();
+        window.setTool(MainWindow::Tool::Wall);
+        setToolMs = double(t.elapsed());
+        // The plan cut/poché is built by the first paint after drawing mode turns on; keep it out
+        // of the tool-activation measurement and report it separately.
+        QElapsedTimer paint;
+        paint.start();
+        QApplication::processEvents();
+        planPaintMs = double(paint.elapsed());
+    }
 
     QJsonObject result{{"ok", !stopped},
         {"elements", viewport->elementCount()},
         {"batches", viewport->batchCount()},
         {"triangles", double(viewport->triangleCount())},
         {"load_s", loadS},
+        {"first_frame_s", firstFrameMs >= 0 ? double(firstFrameMs) / 1000.0 : -1.0},
+        {"set_tool_ms", setToolMs},
+        {"plan_view_ms", planViewMs},
+        {"plan_paint_ms", planPaintMs},
         {"fps", fps}};
+    QJsonObject loadSteps;
+    for (auto it = window.timings().constBegin(); it != window.timings().constEnd(); ++it)
+        loadSteps.insert(it.key(), it.value());
+    result.insert(QStringLiteral("load_steps_ms"), loadSteps);
     for (auto it = navigation.constBegin(); it != navigation.constEnd(); ++it)
         result.insert(it.key(), it.value());
     const Bnd_Box bounds = viewport->boundsOf({});

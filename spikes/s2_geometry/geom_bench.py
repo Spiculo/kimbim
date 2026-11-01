@@ -22,7 +22,10 @@ import ifcopenshell.api.root
 import ifcopenshell.api.spatial
 import ifcopenshell.api.unit
 import ifcopenshell.geom
-import psutil
+try:
+    import psutil
+except ImportError:  # the model generator does not need it; the benchmark does
+    psutil = None
 
 HERE = pathlib.Path(__file__).parent
 

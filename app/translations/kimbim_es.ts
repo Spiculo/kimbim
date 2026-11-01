@@ -9370,6 +9370,18 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       <source>Slab slope applied</source>
       <translation>Pendiente aplicada</translation>
     </message>
+    <message>
+      <source>&amp;Keyboard shortcuts</source>
+      <translation>&amp;Atajos de teclado</translation>
+    </message>
+    <message>
+      <source>Show every command and its shortcut</source>
+      <translation>Muestra todos los comandos y sus atajos</translation>
+    </message>
+    <message>
+      <source>Plan cut: poché omitted above 20,000 visible elements</source>
+      <translation>Corte de planta: se omite el relleno por encima de 20.000 elementos visibles</translation>
+    </message>
   </context>
   <context>
     <name>kimbim::MaterialsDialog</name>
@@ -13343,6 +13355,37 @@ Editar el IFC directamente lo abre de inmediato, sin historial de versiones, opc
       <location filename="../src/RuleDialogs.cpp" line="360" />
       <source>Hidden element kinds:</source>
       <translation>Tipos de elemento ocultos:</translation>
+    </message>
+  </context>
+  <context>
+    <name>kimbim::ShortcutsDialog</name>
+    <message>
+      <source>Keyboard shortcuts</source>
+      <translation>Atajos de teclado</translation>
+    </message>
+    <message>
+      <source>Search commands or keys</source>
+      <translation>Buscar comandos o teclas</translation>
+    </message>
+    <message>
+      <source>Command</source>
+      <translation>Comando</translation>
+    </message>
+    <message>
+      <source>Shortcut</source>
+      <translation>Atajo</translation>
+    </message>
+    <message>
+      <source>Tools</source>
+      <translation>Herramientas</translation>
+    </message>
+    <message>
+      <source>Other</source>
+      <translation>Otros</translation>
+    </message>
+    <message>
+      <source>Shortcuts are fixed in this version.</source>
+      <translation>Los atajos son fijos en esta versión.</translation>
     </message>
   </context>
 </TS>

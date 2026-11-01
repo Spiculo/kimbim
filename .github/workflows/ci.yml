@@ -3,6 +3,7 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
 jobs:
   test:
     strategy:
@@ -31,6 +32,14 @@ jobs:
         run: pixi run check-translations
       - name: M3 exit test - two-storey house validates (schema + EXPRESS rules) and opens in web-ifc
         run: pixi run interop
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: M3 interop - xBIM (independent .NET parser) opens the same house
+        run: pixi run interop-xbim
+      - name: Rust decomposer stage 1 - C++ IfcParse dump matches IfcOpenShell (Windows)
+        if: runner.os == 'Windows'
+        run: pixi run ifcdump-check
       # Informational (Slice 14 risk check): drawing generation times on Clinic, read from the log.
       - name: Spike S6 - drawing generation timing on Clinic (informational)
         if: runner.os == 'Linux'
@@ -41,11 +50,48 @@ jobs:
       - name: Desktop app - build and tests that need no GPU (Windows)
         if: runner.os == 'Windows'
         run: pixi run app-test-nogui
+      - name: Desktop app - live-agent test (child process, own data dir)
+        # Runs standalone rather than through CTest: the child CLI must share the parent's data dir
+        # and discovery paths. The live host binds its pipe before publishing discovery, which
+        # removed the startup race; the runner also retries once for a rare child-process crash.
+        run: pixi run app-test-agent
+      # GUI self-tests open a real OpenGL window. GitHub's Windows runners have no usable hardware
+      # OpenGL, but Qt's bundled opengl32sw (software) renders well enough for the self-tests, and
+      # this is the only Windows coverage of the native window, scaled displays and the 3D view.
+      - name: Desktop app - GUI self-tests (Windows, software OpenGL)
+        if: runner.os == 'Windows'
+        run: pixi run ctest --test-dir build/app --output-on-failure -L gui
+        env:
+          QT_OPENGL: software
+          KIMBIM_PYTHON_PATH: ${{ github.workspace }}/python
+      # The packaged desktop build: app + Python sources + a relocatable conda runtime. The check
+      # removes CONDA/PIXI/PYTHON from the environment, so it proves the package does not need pixi.
+      - name: Portable package - build (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          pixi install -e pack
+          pixi run app-build
+          pixi run ifcdump-build
+          pixi run house
+          pixi run -e pack package
+      - name: Portable package - starts without pixi (Windows)
+        if: runner.os == 'Windows'
+        run: pixi run check-package
+      # A tag also gets the distributable zip; regular pushes only run the smoke test above.
+      - name: Portable package - zip (Windows, tags)
+        if: runner.os == 'Windows' && startsWith(github.ref, 'refs/tags/')
+        run: pixi run -e pack package-zip
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows' && startsWith(github.ref, 'refs/tags/')
+        with:
+          name: KimBim-${{ github.ref_name }}-windows-x64
+          path: dist/KimBim-*.zip
+          if-no-files-found: error
       - name: Desktop app - build and tests that need no GPU (Linux, virtual display)
         if: runner.os == 'Linux'
         run: xvfb-run -a -s "-screen 0 1920x1080x24" pixi run app-test-nogui
-      # GUI self-tests open a real OpenGL window. Windows runners have no usable OpenGL; on Linux,
-      # Xvfb + Mesa (software rendering, fine on CI) works. Non-blocking until proven on the runner.
+      # GUI self-tests open a real OpenGL window. On Linux, Xvfb + Mesa (software rendering, fine on
+      # CI) works. Non-blocking until proven on the runner.
       - name: Desktop app - GUI self-tests (Linux, virtual display)
         if: runner.os == 'Linux'
         continue-on-error: true
@@ -66,3 +112,23 @@ jobs:
         run: xvfb-run -a -s "-screen 0 1920x1080x24" pixi run build/app/app/kimbim-app --self-test "$(find tests/corpus/files -name Clinic_Architectural.ifc | head -1)" --frames 1 --create-drawings --open-drawing "South Elevation"
         env:
           KIMBIM_PYTHON_PATH: ${{ github.workspace }}/python
+
+  # Release gate: a 100k-object model. Runs on tags and on demand, not on every pull request:
+  # generating the model and loading it takes about ten minutes.
+  benchmark:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: prefix-dev/setup-pixi@v0.10.2
+        with:
+          cache: true
+      - name: Build the Rust engine and the desktop app
+        run: |
+          pixi run build
+          pixi run app-build
+      - name: Generate the 100k-object model
+        run: pixi run bench-model
+      - name: Release gate - first frame under 15 s, warm decomposition under 15 s
+        run: pixi run bench-100k

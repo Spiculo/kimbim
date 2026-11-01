@@ -101,7 +101,7 @@ class MainWindow : public QMainWindow {
     friend class ObjectEditorDialog; // D101: so does saving a draft to the project
 public:
     // quiet: report errors through signals only (no dialogs), for --self-test and automation.
-    explicit MainWindow(QWidget* parent = nullptr, bool quiet = false, int chunkSize = 1000);
+    explicit MainWindow(QWidget* parent = nullptr, bool quiet = false, int chunkSize = 500);
     ~MainWindow() override;
 
     void openFile(const QString& path);
@@ -148,6 +148,8 @@ public:
     bool resetToType(const QString& pset, const QString& prop);
     bool isDirty() const;
     bool deleteSelection();
+    bool solidOperate(const QString& op);
+    void solidBatchFromSets();
     bool confirmDeletePlacedDrawings(const QStringList& guids); // asks when a sheet holds one of them
     // Slice 4: new project, levels, plan view.
     bool newProject(); // from KimBim's built-in template
@@ -205,6 +207,10 @@ public:
     void setStairShape(const QString& kind, const QString& shape, const QString& turn = QStringLiteral("left"));
     bool addSlabOpening(const QVector<QPointF>& outline);
     double heightToNextLevel();
+    double workPlaneZ();
+    double workPlaneAngle();
+    void editWorkPlane();
+    void editWorkPlaneRotation();
     // Versioned projects (Slice 8, docs/03).
     bool enableVersioning(const QString& folder, const QString& message = QString());
     // D72: files. openPath picks by kind: a folder (project folder), .kim, or .ifc (per preference).
@@ -600,6 +606,7 @@ private:
     void enableVersioningDialog();
     void refreshProject();
     void refreshLayers();
+    void refreshLayerState();
     void refreshGraphics();
     void regenerateOpenDrawings();
     void editPurposePieces();
@@ -624,6 +631,7 @@ private:
     void projectInfoDialog();
     void roomScheduleDialog();
     void exportSheetDialog(bool pdf);
+    void exportAllSheetsDialog();
     void exportDxfDialog(); // D83: File > Export DXF... (DxfExport.cpp)
     void addUnderlayActions(QMenu* file); // D85 (Underlays.cpp)
     void drawingClick(QPointF p, Qt::KeyboardModifiers modifiers);
@@ -766,6 +774,16 @@ private:
     void onChunk(const MeshChunk& chunk);
     void onFinished(int elements, bool stopped);
     void onFailed(const QString& error);
+    void finishOpen(quint64 token); // the heavy panels, after the model has loaded
+    void completeOpen(quint64 token);
+    void startOpenTask(quint64 token, std::function<QJsonObject()> job,
+        std::function<void(const QJsonObject&)> apply);
+    void runBridgeAsync(std::function<QJsonObject()> job, std::function<void(const QJsonObject&)> apply,
+        std::function<void()> done = {});
+    void applyProjectState(const QJsonObject& state, const QJsonObject& history, const QJsonObject& doc);
+    void applyGraphics(const QJsonObject& state);
+    void applySnapData(const QJsonObject& data, quint64 token);
+    void startSnapRequest(quint64 token, const QString& storey, const QString& mesh);
 
     bool m_quiet;
     QString m_importStatusAnswer;
@@ -775,6 +793,13 @@ private:
     std::function<LargeIfc(const QString&, double)> m_largeIfcAnswer;
     Preferences m_prefs; // D72: user preferences (in memory only in quiet mode)
     bool m_loading = false;
+    bool m_needsOpenRefresh = false;
+    quint64 m_openToken = 0;
+    int m_openPending = 0;
+    int m_openElements = 0;
+    quint64 m_snapToken = 0;
+    quint64 m_snapWanted = 0;
+    bool m_snapPending = false;
     int m_loadedElements = 0;
     QString m_path;
     QElapsedTimer m_loadTimer;

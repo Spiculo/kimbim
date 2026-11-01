@@ -72,8 +72,10 @@ class LiveHost:
     # ------------------------------------------------------------ server
 
     def start(self) -> dict:
-        worker.write_json(worker.live_discovery_path(self.project), self.entry())
+        # Bind the listener before publishing the discovery entry: the CLI may read the file and
+        # connect immediately, and an entry whose pipe is not bound yet looks stale and is removed.
         self._listener = worker.Listener(self.address, family=worker.FAMILY, authkey=self.authkey)
+        worker.write_json(worker.live_discovery_path(self.project), self.entry())
         self._thread = threading.Thread(target=self._serve, name="kimbim-live", daemon=True)
         self._thread.start()
         return {"ok": True, "project": self.project, "address": self.address, "kind": "live"}

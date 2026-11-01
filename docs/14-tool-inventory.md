@@ -5,7 +5,7 @@ A checklist of the tools that mainstream BIM and CAD apps give architects, with 
 Use it to pick the next slices. [04](04-app-features.md) stays the source of decided priorities; this document is
 wider and lists tools 04 does not mention yet.
 
-**Status as of `main` (2026-10-31, after D112–D122).**
+**Status as of `main` (2026-11-01, after D112–D122).**
 
 ## How to read it
 
@@ -32,7 +32,8 @@ release notes, so check before relying on a single cell.
 
 | Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
-| Open / save IFC | AC RV VW BB | ✅ | P0 | IFC4; IFC2X3 import through IfcOpenShell (not tested yet) |
+| Open / save IFC | AC RV VW BB | ✅ | P0 | IFC4; IFC2X3 opens, edits and saves (Duplex and Clinic corpus files; `test_e2e`, `test_levels`, `test_dxf`) |
+| Installer / portable build | AC RV VW | 🟡 | P0 | `pixi run -e pack package` writes a relocatable `dist/KimBim` (app, Python, runtime); `pixi run check-package` launches it with pixi removed and exports the sample sheet. No installer, file association or code signing yet |
 | New project | all | ✅ | P0 | IFC4 in mm, levels |
 | Project templates (units, levels, types, views, title blocks) | AC RV VW | ✅ | P0 | D72: office templates (File › New from template, Save as template) |
 | Autosave, crash recovery | AC RV VW | ✅ | P0 | D72: recovery copies on a timer, offered again after a crash; no oplog yet ([03](03-versioning.md)) |
@@ -104,7 +105,7 @@ release notes, so check before relying on a single cell.
 | Resize / scale | AC VW SU | ✅ | new | D98: Edit › Resize (about the selection's middle) |
 | Pick up and inject settings (eyedropper / match properties) | AC RV VW | ✅ | new | D97: Edit › Pick up / Inject settings (Ctrl+Alt+C / V) |
 | Edit by polygon points (add, move, delete vertices; curve an edge) | AC RV VW | 🟡 | new | D98: Stretch tool on slabs and 2D shapes: move, add at an edge's middle, Ctrl+click delete; no curved edges |
-| Solid element operations (subtract, intersect, add) | AC RV VW | ⬜ | new | |
+| Solid element operations (subtract, intersect, add) | AC RV VW | 🟡 | new | Edit > *Solid cut*, *Solid intersection* and *Solid union* take the selected elements (target first, then one or more tools) and run `kimbim.solids.boolean_elements`, which folds `IfcBooleanResult` DIFFERENCE/INTERSECTION/UNION in the target's Body representation (one undo step). `kimbim.solids.boolean_batch` applies one operation to several targets with the same tools, also one undo step. Edit > *Solid operation on selection sets...* picks a saved target set, a tool set (or the current selection) and an operator, then runs that batch; named sets are managed in Find & Select |
 | Lock / pin elements | AC RV VW | 🟡 | new | Layers can be locked; elements cannot |
 | Group / ungroup | AC VW SU | 🟡 | P1 | Models (D58) do the repeated-unit job; no plain groups |
 
@@ -119,7 +120,7 @@ release notes, so check before relying on a single cell.
 | Coordinate input (absolute and relative x, y; polar) | AC VW | ✅ | new | D89: tracker beside the cursor in every point tool; Tab between boxes, `a`/`#` absolute |
 | Guide lines, temporary references, inference lines | AC VW SU | 🟡 | new | D89: temporary guides (rest 0.5 s on a snap point), extensions and parallels; no dragged or permanent guide lines |
 | Snap to perpendicular, tangent, intersection, wall faces | all | 🟡 | P0 | D89: intersections and parallels added; no tangent |
-| Work planes (custom drawing planes) | AC RV VW SU | 🟡 | P0 | The active level only; D98 construction grid (spacing, angle, origin, grid snap) |
+| Work planes (custom drawing planes) | AC RV VW SU | 🟡 | P0 | Free horizontal work plane at a user height independent of the active level: `work_plane` / `set_work_plane` in the bridge, kept in project settings (height, enabled, angle), and the viewport uses it for drawing/snapping when enabled. View > *Free work plane...* sets the height, View > *Work plane rotation...* rotates the plan and drawing/snapping frame in degrees, and View > *Use level work plane* returns to the level. Arbitrary tilted planes are still to do; D98 construction grid (spacing, angle, origin, grid snap) remains |
 | Tool presets / favourites (saved tool settings) | AC VW | ✅ | new | D97: the Favourites button in the tool strip, kept in the project |
 
 ## 6. Building elements
@@ -134,7 +135,7 @@ release notes, so check before relying on a single cell.
 | Wall attached to a slab or roof above | AC RV | 🟡 | new | D97: top linked to the level above (Properties › Geometry › Top link); Model › Trim walls to roof |
 | Slabs by outline or from walls | all | ✅ | P0 | |
 | Slab openings | all | ✅ | P0 | |
-| Sloped slabs, slab edges | AC RV VW | 🟡 | new | D109: `elements.set_slab_slope` tilts a slab about its local X/Y (rise over run; 0 returns flat, base kept in `KIMBIM_Slab`) and `create.slab_edge` adds `IfcMember` edges around a slab. CLI/agent only; no tool-palette fields yet |
+| Sloped slabs, slab edges | AC RV VW | 🟡 | new | D109: `elements.set_slab_slope` tilts a slab about its local X/Y (rise over run; 0 returns flat, base kept in `KIMBIM_Slab`) and `create.slab_edge` adds `IfcMember` edges around a slab. The Model menu has *Slab slope...* and *Add slab edge*; the Slab tool has no fields for them yet |
 | Doors and windows in walls (parametric) | all | ✅ | P0 | Basic types |
 | Door/window variety: sliding, double, corner window, skylight, storefront | all | 🟡 | new | D97: double, sliding, double sliding doors; two- and three-panel windows; no corner windows, skylights or storefronts |
 | Door swing and window symbols in plan | all | ✅ | new | Door leaves and swing arcs in plan drawings (drawgen.door_swings) |
@@ -261,7 +262,7 @@ release notes, so check before relying on a single cell.
 | Drawing and sheet lists (auto-numbered) | AC RV VW | ✅ | new | D112: Sheets › Place drawing list / Place sheet list (natural sort, live from the project; dragged and removed like drawings) |
 | Revisions / issue management | AC RV VW | ⬜ | new | Could use versions and milestones (P2 item in 04) |
 | Print, PDF export | all | ✅ | P1 | Slice 16: PDF and SVG per sheet (Qt, vector) |
-| Batch publishing (sets of sheets to PDF/DWG) | AC RV VW | 🟡 | new | D83: File › Export DXF... exports ticked drawings and sheets to a folder (DXF; PDF stays one sheet at a time) |
+| Batch publishing (sets of sheets to PDF/DWG) | AC RV VW | 🟡 | new | File › *Export all sheets as PDF...* publishes every sheet to a folder (one PDF per sheet, collision-safe names); `kimbim-app --export-sheets OUT_DIR model.ifc [--sheets A01,A02]` does it headless. File › *Export DXF...* with the DWG format, or `app_bridge.export_dwg`, batch-converts every ticked drawing/sheet through LibreDWG (`dxf2dwg`); covered by `tests/python/test_batch_dwg.py`. LibreDWG is a separate pixi environment and is not bundled in the portable build, so DWG needs it installed (DXF always works) |
 | DWG/DXF export | AC RV VW BB | 🟡 | P1 | D83: DXF (ezdxf): drawings in model space at real size, sheets as paper-space layouts; lineweights, colours, linetypes from pens; poché hatches; real dimensions; layers by KimBim layer or kind. DWG not yet (open question) |
 
 ## 15. Schedules and quantities
@@ -304,7 +305,7 @@ release notes, so check before relying on a single cell.
 
 | Tool | Has | KimBim | Pri | Notes |
 |------|-----|--------|-----|-------|
-| IFC export, valid against the schema | all | ✅ | P0 | Checked in CI |
+| IFC export, valid against the schema | all | ✅ | P0 | Checked in CI: IfcOpenShell validator (schema + EXPRESS rules), web-ifc geometry and the independent xBIM .NET parser (`pixi run interop`, `pixi run interop-xbim`) |
 | IFC export settings (what to export, property mapping) | AC RV VW | ✅ | new | D117: File > *Export IFC...* (all, selection, levels or classes; annotations/spaces/openings; property renames) through `ifcexport.export_ifc` |
 | Re-import with reconciliation report | — | ✅ | P1 | D104: `kimbim versions import` matches by GlobalId, Tag, then a reviewed heuristic; dry run and JSON report |
 | DWG/DXF import (underlay and convert) | all | 🟡 | new | D85: DXF as an underlay (units, exploded blocks, snapping to ends, midpoints, crossings). No DWG yet, no convert to 2D elements. Architects receive most survey and consultant data as DWG |
@@ -332,7 +333,7 @@ release notes, so check before relying on a single cell.
 | Python console with the model API | RV(pyRevit) BB | ✅ | P1 | D82: Console panel, `edit()` as one undo step, Stop; [15](15-scripting.md) |
 | Visual programming | AC RV VW | ⬜ | new | Grasshopper, Dynamo, Marionette |
 | Plugins / add-ons | all | ⬜ | P2 | |
-| Customisable shortcuts, toolbars and workspaces | all | ⬜ | new | |
+| Customisable shortcuts, toolbars and workspaces | all | 🟡 | new | Help › *Keyboard shortcuts* lists every command with its keys (searchable) and lets you rebind it; changes are saved per user and Reset restores the built-in key. Toolbars and workspaces are still to do |
 | UI languages | all | ✅ | P0 | English and Spanish |
 | AI assistant | AC RV VW | 🔮 | — | [08](08-future.md) |
 

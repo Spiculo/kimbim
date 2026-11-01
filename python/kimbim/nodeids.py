@@ -12,12 +12,11 @@ from .layout import blob_oid, path_to_key
 from .records import FORMAT, decompose, h
 
 
-def decompose_against_head(
-    f,
+def _against_head(
     head_entries: dict[str, str],
     read_blobs: Callable[[list[str]], list[bytes]],
+    run: Callable[[Callable[[str, bytes], str | None]], tuple[dict[str, bytes], object]],
     *,
-    format_tag: str = FORMAT,
     max_rounds: int = 5,
 ):
     head_nodes = {path_to_key(p)[2:]: oid for p, oid in head_entries.items() if p.startswith("nodes/")}
@@ -37,7 +36,7 @@ def decompose_against_head(
         return fresh
 
     head_types: dict[str, str] = {}
-    recs, d = decompose(f, format_tag=format_tag, resolve_node_id=resolver)
+    recs, d = run(resolver)
     for _ in range(max_rounds):
         new_ids = {k[2:] for k in recs if k.startswith("n/")}
         unmatched_old = sorted(taken - new_ids)
@@ -63,5 +62,40 @@ def decompose_against_head(
                     added += 1
         if not added:
             break
-        recs, d = decompose(f, format_tag=format_tag, resolve_node_id=resolver)
+        recs, d = run(resolver)
     return recs, d
+
+
+def decompose_against_head(
+    f,
+    head_entries: dict[str, str],
+    read_blobs: Callable[[list[str]], list[bytes]],
+    *,
+    format_tag: str = FORMAT,
+    max_rounds: int = 5,
+):
+    return _against_head(
+        head_entries,
+        read_blobs,
+        lambda resolver: decompose(f, format_tag=format_tag, resolve_node_id=resolver),
+        max_rounds=max_rounds,
+    )
+
+
+def decompose_dump_against_head(
+    dump: str,
+    head_entries: dict[str, str],
+    read_blobs: Callable[[list[str]], list[bytes]],
+    *,
+    format_tag: str = FORMAT,
+    max_rounds: int = 5,
+):
+    """Same stable-id loop over the Rust decomposer's `ifcdump` payload."""
+    from .records import decompose_dump
+
+    return _against_head(
+        head_entries,
+        read_blobs,
+        lambda resolver: (decompose_dump(dump, format_tag=format_tag, resolve_node_id=resolver), None),
+        max_rounds=max_rounds,
+    )

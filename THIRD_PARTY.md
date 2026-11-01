@@ -24,9 +24,13 @@ KimBim is GPL-3.0-or-later. These are the components it uses, how each is linked
 | Git | GPL-2.0-only (program) | `git fast-import`, repack, branch | Separate program |
 | gix (gitoxide) | MIT OR Apache-2.0 | Reading the Git object database | Static (Rust) |
 | rayon | MIT OR Apache-2.0 | Parallel reads | Static (Rust) |
+| serde_json | MIT OR Apache-2.0 | Parsing the IfcParse dump in the Rust decomposer | Static (Rust) |
+| blake3 (Rust) | Apache-2.0 / CC0-1.0 | Content hashes in the Rust decomposer | Static (Rust) |
 | thiserror | MIT OR Apache-2.0 | Error types | Static (Rust) |
 | PyO3 | MIT OR Apache-2.0 | Python ↔ Rust bindings | Static (Rust) |
 | maturin | MIT OR Apache-2.0 | Build tool | Build only |
+| conda-pack | BSD-3-Clause | Relocatable runtime for the portable build (`tools/package_app.py`) | Build only |
+| xBIM Essentials 6.1.605 | CDDL-1.0 | Independent IFC interop check (`tools/interop-xbim`) | Test only, separate .NET process |
 | pytest | MIT | Tests | Development only |
 | tempfile | MIT OR Apache-2.0 | Rust tests | Development only |
 | pixi | BSD-3-Clause | Environment manager | Development only |

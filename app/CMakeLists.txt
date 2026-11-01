@@ -52,6 +52,7 @@ qt_add_library(kimbim_core STATIC
     src/ProposalDialog.cpp src/ProposalDialog.h
     src/AssistantPanel.cpp src/AssistantPanel.h
     src/TitleBar.cpp src/TitleBar.h
+    src/ShortcutsDialog.cpp src/ShortcutsDialog.h
     src/Graphics.cpp src/Graphics.h
     src/PenGrid.cpp src/PenGrid.h
     src/GraphicsDialogs.cpp src/GraphicsDialogs.h src/RuleDialogs.cpp src/PurposeDialogs.cpp src/RenovationDialogs.cpp
@@ -105,6 +106,13 @@ kimbim_test(test_model_tree)
 kimbim_test(test_visibility)
 kimbim_test(test_main_window)
 kimbim_test(test_agent_live)
+# The live-host test starts the `kimbim` CLI as a separate process; it must run from the project root
+# (relative test data and the CLI's own discovery paths are resolved against it).
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test-data-agent)
+set_tests_properties(test_agent_live PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    LABELS agent
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;KIMBIM_PYTHON_PATH=${PROJECT_SOURCE_DIR}/python;CONDA_PREFIX=$ENV{CONDA_PREFIX};KIMBIM_DATA_DIR=${CMAKE_BINARY_DIR}/test-data-agent"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$ENV{CONDA_PREFIX};PATH=path_list_prepend:$ENV{CONDA_PREFIX}/Library/bin;PATH=path_list_prepend:$ENV{CONDA_PREFIX}/Scripts")
 kimbim_test(test_cuts)
 kimbim_test(test_cut_planes)
 kimbim_test(test_section_path)
@@ -141,6 +149,8 @@ kimbim_test(test_materials_dialog)
 kimbim_test(test_object_settings)
 kimbim_test(test_types)
 kimbim_test(test_object_editor)
+kimbim_test(test_shortcuts)
+kimbim_test(test_sheet_batch)
 
 # GUI self-tests: need a real OpenGL window (GPU, or Mesa on the Linux CI runner). Label "gui".
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/broken.ifc "ISO-10303-21;
@@ -195,3 +205,28 @@ set_tests_properties(app_snapshot_server PROPERTIES
     LABELS gui
     TIMEOUT 600
     ENVIRONMENT "KIMBIM_PYTHON_PATH=${PROJECT_SOURCE_DIR}/python;KIMBIM_APP=$<TARGET_FILE:kimbim-app>;KIMBIM_HOUSE=${PROJECT_SOURCE_DIR}/build/house.ifc")
+
+# A launcher for the built app that carries its pixi environment, so it can be run (or double-clicked)
+# without `pixi run app`: it sets CONDA_PREFIX, KIMBIM_PYTHON_PATH and the library path.
+file(TO_NATIVE_PATH "${PROJECT_SOURCE_DIR}" KIMBIM_LAUNCH_ROOT)
+file(TO_NATIVE_PATH "${PROJECT_SOURCE_DIR}/.pixi/envs/default" KIMBIM_LAUNCH_ENV)
+if(WIN32)
+    configure_file(launch/kimbim-app.cmd.in ${CMAKE_BINARY_DIR}/kimbim-app.cmd @ONLY)
+else()
+    configure_file(launch/kimbim-app.sh.in ${CMAKE_BINARY_DIR}/kimbim-app.sh @ONLY)
+    file(CHMOD ${CMAKE_BINARY_DIR}/kimbim-app.sh
+        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+endif()
+
+# The launcher is a product surface: keep it from rotting (it sets its own environment, so this also
+# proves the app starts without `pixi run`).
+if(WIN32)
+    set(KIMBIM_LAUNCHER ${CMAKE_BINARY_DIR}/kimbim-app.cmd)
+else()
+    set(KIMBIM_LAUNCHER ${CMAKE_BINARY_DIR}/kimbim-app.sh)
+endif()
+add_test(NAME app_launcher_version
+    COMMAND ${CMAKE_COMMAND} -DLAUNCHER=${KIMBIM_LAUNCHER} -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_launcher.cmake)
+set_tests_properties(app_launcher_version PROPERTIES
+    PASS_REGULAR_EXPRESSION "launcher OK"
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

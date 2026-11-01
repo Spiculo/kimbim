@@ -2,6 +2,7 @@
 #define _USE_MATH_DEFINES
 #include "MainWindow.h"
 #include "DockLayout.h"
+#include "ShortcutsDialog.h"
 #include <DockManager.h>
 #include <DockWidget.h>
 #include "Scene.h"
@@ -308,6 +309,7 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     buildModelingToolbar();
     buildVersions();       // the Versions menu and the title bar's Versions button
     buildPalette();
+    applyShortcutOverrides(this); // saved user rebindings, after every menu/tool action exists
     applyTitleBarPreferences(); // D92: which title bar controls the preferences keep
     m_status->showMessage(tr("Ready"));
 
@@ -403,7 +405,7 @@ MainWindow::MainWindow(QWidget* parent, bool quiet, int chunkSize)
     applyDrawingPrefs();
     m_sinceVersion.start();
     connect(&m_recoveryTimer, &QTimer::timeout, this, [this] {
-        if (isDirty())
+        if (!PythonEngine::instance().busy() && isDirty())
             writeRecovery();
     });
     restartRecoveryTimer();
@@ -586,6 +588,10 @@ void MainWindow::buildMenus()
     QAction* pdf = file->addAction(tr("Export sheet as &PDF..."));
     pdf->setObjectName(QStringLiteral("actionExportSheetPdf"));
     connect(pdf, &QAction::triggered, this, [this] { exportSheetDialog(true); });
+    QAction* allPdf = file->addAction(tr("Export &all sheets as PDF..."));
+    allPdf->setObjectName(QStringLiteral("actionExportAllSheetsPdf"));
+    allPdf->setToolTip(tr("Publish every sheet as a separate PDF in one folder"));
+    connect(allPdf, &QAction::triggered, this, &MainWindow::exportAllSheetsDialog);
     QAction* svgExport = file->addAction(tr("Export sheet as S&VG..."));
     svgExport->setObjectName(QStringLiteral("actionExportSheetSvg"));
     connect(svgExport, &QAction::triggered, this, [this] { exportSheetDialog(false); });
@@ -629,6 +635,22 @@ void MainWindow::buildMenus()
     del->setObjectName(QStringLiteral("actionDelete"));
     del->setShortcut(QKeySequence::Delete);
     connect(del, &QAction::triggered, this, &MainWindow::deleteSelection);
+    QAction* solidCut = editMenu->addAction(tr("Solid &cut (target with tool)"));
+    solidCut->setObjectName(QStringLiteral("actionSolidCut"));
+    solidCut->setToolTip(tr("Select two or more elements: the first is cut with the others"));
+    connect(solidCut, &QAction::triggered, this, [this] { solidOperate(QStringLiteral("DIFFERENCE")); });
+    QAction* solidIntersect = editMenu->addAction(tr("Solid &intersection (target with tool)"));
+    solidIntersect->setObjectName(QStringLiteral("actionSolidIntersect"));
+    solidIntersect->setToolTip(tr("Select two or more elements: keep only what they share"));
+    connect(solidIntersect, &QAction::triggered, this, [this] { solidOperate(QStringLiteral("INTERSECTION")); });
+    QAction* solidUnion = editMenu->addAction(tr("Solid &union (target with tools)"));
+    solidUnion->setObjectName(QStringLiteral("actionSolidUnion"));
+    solidUnion->setToolTip(tr("Select two or more elements: join them into the first"));
+    connect(solidUnion, &QAction::triggered, this, [this] { solidOperate(QStringLiteral("UNION")); });
+    QAction* solidSets = editMenu->addAction(tr("Solid operation on selection &sets..."));
+    solidSets->setObjectName(QStringLiteral("actionSolidSets"));
+    solidSets->setToolTip(tr("Apply a cut, intersection or union to all members of a saved selection set"));
+    connect(solidSets, &QAction::triggered, this, &MainWindow::solidBatchFromSets);
     editMenu->addSeparator();
     // Slice 17: Archicad's Edit menu and shortcuts.
     auto editAction = [&](const QString& text, const char* name, const QKeySequence& key, auto slot) {
@@ -692,6 +714,23 @@ void MainWindow::buildMenus()
     planView->setObjectName(QStringLiteral("actionPlanView"));
     planView->setShortcut(Qt::Key_P);
     connect(planView, &QAction::triggered, this, [this] { setPlanView(true); });
+    view->addSeparator();
+    QAction* freePlane = view->addAction(tr("Free work &plane..."));
+    freePlane->setObjectName(QStringLiteral("actionFreeWorkPlane"));
+    freePlane->setToolTip(tr("Draw and snap at a height independent of the active level"));
+    connect(freePlane, &QAction::triggered, this, &MainWindow::editWorkPlane);
+    QAction* levelPlane = view->addAction(tr("Use &level work plane"));
+    levelPlane->setObjectName(QStringLiteral("actionUseLevelWorkPlane"));
+    connect(levelPlane, &QAction::triggered, this, [this] {
+        bridge("set_work_plane", {QString::number(workPlaneZ()), QStringLiteral("false"),
+            QString::number(workPlaneAngle())});
+        m_viewport->setWorkPlaneZ(m_levels->activeElevation());
+        m_status->showMessage(tr("Drawing on the active level"));
+    });
+    QAction* rotatePlane = view->addAction(tr("Work plane &rotation..."));
+    rotatePlane->setObjectName(QStringLiteral("actionWorkPlaneRotation"));
+    rotatePlane->setToolTip(tr("Rotate the plan and the drawing/snapping frame; geometry follows the clicks"));
+    connect(rotatePlane, &QAction::triggered, this, &MainWindow::editWorkPlaneRotation);
     QAction* view3D = view->addAction(tr("&3D view"));
     view3D->setObjectName(QStringLiteral("action3DView"));
     view3D->setShortcut(Qt::Key_3);
@@ -1018,6 +1057,14 @@ void MainWindow::buildMenus()
     m_graphicsMenu = graphics;
     QMenu* help = m_menuBar->addMenu(tr("&Help"));
     m_helpMenu = help;
+    QAction* shortcuts = help->addAction(tr("&Keyboard shortcuts"));
+    shortcuts->setObjectName(QStringLiteral("actionKeyboardShortcuts"));
+    shortcuts->setShortcut(QKeySequence::HelpContents);
+    shortcuts->setToolTip(tr("Show every command and its shortcut"));
+    connect(shortcuts, &QAction::triggered, this, [this] {
+        ShortcutsDialog dialog(this);
+        dialog.exec();
+    });
     QAction* connectAgent = help->addAction(tr("Connect an AI &agent..."));
     connectAgent->setObjectName(QStringLiteral("actionConnectAgent"));
     connect(connectAgent, &QAction::triggered, this, &MainWindow::connectAgentDialog);
@@ -1189,7 +1236,10 @@ void MainWindow::buildCutsToolbar()
             return;
         }
         updateCutSliderRange();
-        m_viewport->setWorkPlaneZ(elevation);
+        const QJsonObject freePlane = bridge("work_plane");
+        m_viewport->setWorkPlaneZ(freePlane.value("ok").toBool() && freePlane.value("enabled").toBool()
+                ? freePlane.value("z").toDouble() : elevation);
+        m_viewport->setPlanRotation(workPlaneAngle());
         // A plan tab keeps its level and its camera (D71); only a 3D view put in plan mode follows.
         if (m_viewport->isPlanView() && m_hosts.value(m_dock->current()) && m_hosts.value(m_dock->current())->storey().isEmpty())
             m_viewport->setPlanView(elevation);
@@ -1611,6 +1661,8 @@ void MainWindow::applyCutsTo(Viewport* view, CutSettings& settings)
     if (selectedClipped && settings.planes[settings.selectedPlane].visible)
         sections.push_back(settings.planes[settings.selectedPlane].plane());
     view->setSectionPlanes(keep, sections);
+    if (view->pocheSkipped())
+        m_status->showMessage(tr("Plan cut: poché omitted above 20,000 visible elements"));
 
     // The selected plane's rectangle and normal handle belong to the 3D view only; Visible keeps the
     // plane drawable while it is disabled, so it can be found and turned back on.
@@ -1654,6 +1706,10 @@ void MainWindow::openDialog()
 void MainWindow::openFile(const QString& path)
 {
     stopLoading();
+    ++m_openToken; // a previous model's background panels must not land here
+    m_openPending = 0;
+    ++m_snapToken; // and its snap data
+    m_snapWanted = m_snapToken;
     closePlanTabs(); // the old model's levels
     m_viewport->clear();
     m_tree->clear();
@@ -1715,7 +1771,7 @@ QJsonObject MainWindow::bridgeInBackground(const char* fn, const QStringList& ar
     QThread* worker = QThread::create([&] { r = PythonEngine::instance().callJson(name.constData(), args, &error).object(); });
     QProgressDialog progress(label, QString(), 0, 0, this);
     progress.setWindowTitle(QStringLiteral("KimBim"));
-    progress.setWindowModality(Qt::WindowModal);
+    progress.setWindowModality(Qt::ApplicationModal);
     progress.setCancelButton(nullptr); // the Python call can't be interrupted
     progress.setMinimumDuration(m_quiet ? std::numeric_limits<int>::max() : 300);
     QEventLoop loop;
@@ -1732,7 +1788,44 @@ QJsonObject MainWindow::bridgeInBackground(const char* fn, const QStringList& ar
     return r;
 }
 
+void MainWindow::runBridgeAsync(std::function<QJsonObject()> job, std::function<void(const QJsonObject&)> apply,
+    std::function<void()> done)
+{
+    // The Python call runs off the GUI thread; `apply` and `done` run on the GUI thread. Callers
+    // pass a token in their lambda and ignore a result that belongs to a model they left behind.
+    QPointer<MainWindow> self(this);
+    QThread* worker = QThread::create([self, job = std::move(job), apply = std::move(apply), done = std::move(done)] {
+        QJsonObject result;
+        try {
+            result = job();
+        } catch (...) {
+            result = QJsonObject{{"ok", false}};
+        }
+        if (!self)
+            return;
+        // The receiver is the window: Qt drops the queued call if it is already destroyed.
+        QMetaObject::invokeMethod(self.data(), [apply, done, result] {
+            if (apply)
+                apply(result);
+            if (done)
+                done();
+        }, Qt::QueuedConnection);
+    });
+    connect(worker, &QThread::finished, worker, &QObject::deleteLater);
+    worker->start();
+}
+
 namespace {
+
+// A bridge call with no MainWindow dependency, for background jobs (the window may be gone).
+QJsonObject bridgeCall(const char* fn, const QStringList& args = {})
+{
+    QString error;
+    QJsonObject r = PythonEngine::instance().callJson(fn, args, &error).object();
+    if (r.isEmpty() && !error.isEmpty())
+        r = QJsonObject{{"ok", false}, {"error", error}};
+    return r;
+}
 
 QString jsonList(const QStringList& list)
 {
@@ -3186,8 +3279,39 @@ void MainWindow::refreshTypes()
 
 void MainWindow::refreshSnapData()
 {
-    const QJsonObject data = bridge("snap_data",
-        {m_levels->activeStorey(), m_prefs.meshVertexSnaps() ? QStringLiteral("1") : QStringLiteral("0")}); // D92
+    if (!m_levels)
+        return;
+    const QString storey = m_levels->activeStorey();
+    const QString mesh = m_prefs.meshVertexSnaps() ? QStringLiteral("1") : QStringLiteral("0"); // D92
+    const quint64 token = ++m_snapToken;
+    m_snapWanted = token;
+    // Small models fit in a synchronous call (and a tool must have its walls and grid at once).
+    // Large models get the data in the background; the view stays responsive while it computes.
+    if (m_loadedElements <= 10'000) {
+        applySnapData(bridge("snap_data", {storey, mesh}), token);
+        return;
+    }
+    if (m_snapPending)
+        return; // the running worker starts the newest request when it finishes
+    startSnapRequest(token, storey, mesh);
+}
+
+void MainWindow::startSnapRequest(quint64 token, const QString& storey, const QString& mesh)
+{
+    m_snapPending = true;
+    runBridgeAsync([storey, mesh] {
+        return PythonEngine::instance().callJson("snap_data", {storey, mesh}, nullptr).object();
+    }, [this, token](const QJsonObject& data) {
+        m_snapPending = false;
+        if (token == m_snapToken)
+            applySnapData(data, token);
+        if (m_snapWanted != token)
+            refreshSnapData(); // a newer edit or level asked while this one ran
+    });
+}
+
+void MainWindow::applySnapData(const QJsonObject& data, quint64)
+{
     const QVector<SnapWall> walls = Snapper::parse(data);
     const QVector<SnapLine> lines = Snapper::parseGrid(data);
     const QVector<SnapPoint> points = Snapper::parsePoints(data); // D84: drafting shapes' points
@@ -3365,10 +3489,10 @@ void MainWindow::setTool(Tool tool)
     if (m_viewport)
         m_viewport->setRightClickMenu(tool == Tool::Object); // D100: the quick switcher, not the end
     m_measureCopy->setVisible(tool == Tool::Measure);
-    startModifyTool(tool); // D80: its mode list in the options bar
-    startDraftTool(tool);  // D84: line type, arc mode, fill pattern
-    startStairTool(tool);  // D88: stair or ramp, shape, sizes; railing mode
-    startMarkupTool(tool); // D87: tag style, shape, leader; radius/diameter, level/spot; revision
+    { StepTimer _(m_timings, "tool:modify"); startModifyTool(tool); } // D80: its mode list in the options bar
+    { StepTimer _(m_timings, "tool:draft"); startDraftTool(tool); }  // D84: line type, arc mode, fill pattern
+    { StepTimer _(m_timings, "tool:stair"); startStairTool(tool); }  // D88: stair or ramp, shape, sizes; railing mode
+    { StepTimer _(m_timings, "tool:markup"); startMarkupTool(tool); } // D87: tag style, shape, leader; radius/diameter, level/spot; revision
     m_twoPointTool->snapper().setFaceSnapping(tool == Tool::Dimension); // dimensions measure wall faces
     for (auto it = m_toolActions.constBegin(); it != m_toolActions.constEnd(); ++it) {
         const QSignalBlocker block(it.value());
@@ -3414,14 +3538,14 @@ void MainWindow::setTool(Tool tool)
         m_viewport->setDrawingMode(false);
         return;
     }
-    refreshTypes();
+    { StepTimer _(m_timings, "tool:refreshTypes"); refreshTypes(); }
     if (tool == Tool::None) {
         m_viewport->setDrawingMode(false);
         m_status->clearMessage();
         return;
     }
-    refreshSnapData();
-    m_viewport->setDrawingMode(true, m_levels->activeElevation());
+    { StepTimer _(m_timings, "tool:snap"); refreshSnapData(); }
+    { StepTimer _(m_timings, "tool:drawingMode"); m_viewport->setDrawingMode(true, m_levels->activeElevation()); }
     m_viewport->setFocus();
     switch (tool) {
     case Tool::Wall:
@@ -3670,6 +3794,61 @@ void MainWindow::openingSizeDialog()
     connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
     if (dialog.exec() == QDialog::Accepted)
         resizeOpening(m_selection.first(), width->value(), height->value(), sill->value());
+}
+
+void MainWindow::editWorkPlane()
+{
+    bool ok = false;
+    const double z = QInputDialog::getDouble(this, tr("Free work plane"),
+        tr("Height above project zero (m). Drawing and snapping use this plane instead of the active level:"),
+        workPlaneZ(), -1000.0, 1000.0, 3, &ok);
+    if (!ok)
+        return;
+    const QJsonObject result = bridge("set_work_plane", {QString::number(z), QStringLiteral("true"),
+        QString::number(workPlaneAngle())});
+    if (!result.value("ok").toBool()) {
+        showError(tr("Work plane"), result.value("error").toString());
+        return;
+    }
+    m_viewport->setWorkPlaneZ(z);
+    m_status->showMessage(tr("Drawing at work plane %1 m").arg(z));
+}
+
+double MainWindow::workPlaneAngle()
+{
+    const QJsonObject plane = bridge("work_plane");
+    return plane.value("ok").toBool() ? plane.value("angle").toDouble() : 0.0;
+}
+
+void MainWindow::editWorkPlaneRotation()
+{
+    bool ok = false;
+    const double degrees = QInputDialog::getDouble(this, tr("Work plane rotation"),
+        tr("Plan rotation in degrees (positive turns the plan counter-clockwise):"),
+        workPlaneAngle() * 180.0 / M_PI, -180.0, 180.0, 1, &ok);
+    if (!ok)
+        return;
+    const QJsonObject plane = bridge("work_plane");
+    const QJsonObject result = bridge("set_work_plane",
+        {QString::number(workPlaneZ()), plane.value("enabled").toBool() ? QStringLiteral("true")
+                                                                    : QStringLiteral("false"),
+            QString::number(degrees * M_PI / 180.0)});
+    if (!result.value("ok").toBool()) {
+        showError(tr("Work plane"), result.value("error").toString());
+        return;
+    }
+    m_viewport->setPlanRotation(degrees * M_PI / 180.0);
+    m_status->showMessage(tr("Plan rotated %1 degrees").arg(degrees));
+}
+
+double MainWindow::workPlaneZ()
+{
+    // A free work plane overrides the active level for drawing and snapping; it is a project
+    // setting, so it survives reopen and versions like the rest of the tool state.
+    const QJsonObject plane = bridge("work_plane");
+    if (plane.value("ok").toBool() && plane.value("enabled").toBool())
+        return plane.value("z").toDouble();
+    return m_levels->activeElevation();
 }
 
 double MainWindow::heightToNextLevel()
@@ -3977,6 +4156,12 @@ void MainWindow::newSheetDialog(const QString& paper)
 void MainWindow::refreshProject()
 {
     const QJsonObject s = bridge("project_state");
+    const QJsonObject history = s.value("versioned").toBool() ? bridge("history", {QStringLiteral("200")}) : QJsonObject();
+    applyProjectState(s, history, documentState());
+}
+
+void MainWindow::applyProjectState(const QJsonObject& s, const QJsonObject& history, const QJsonObject& doc)
+{
     m_versioned = s.value("versioned").toBool();
     for (QAction* a : std::as_const(m_projectActions))
         a->setVisible(m_versioned);
@@ -4011,11 +4196,10 @@ void MainWindow::refreshProject()
             });
             m_optionActions << a;
         }
-        m_history->setVersions(bridge("history", {QStringLiteral("200")}).value("versions").toArray());
+        m_history->setVersions(history.value("versions").toArray());
     }
     m_currentOption = option;
     updateVersionsButton();
-    const QJsonObject doc = documentState();
     QString name = doc.value("untitled").toBool() ? tr("Untitled") : doc.value("name").toString();
     if (m_versioned)
         name += QStringLiteral(" (%1)").arg(option);
@@ -4216,7 +4400,8 @@ bool MainWindow::saveVersion(const QString& message)
 
 bool MainWindow::commitVersion(const QString& message)
 {
-    const QJsonObject r = bridge("save_version", {message});
+    const QJsonObject r = bridgeInBackground("save_version", {message},
+        tr("Saving the version...\nThe model is decomposed and written to the project; large models can take a few minutes."));
     if (!r.value("ok").toBool()) {
         m_status->showMessage(tr("No version saved: %1").arg(r.value("error").toString()));
         if (r.value("blocked").toBool()) {
@@ -4362,7 +4547,8 @@ QJsonArray MainWindow::history()
 
 bool MainWindow::compareWith(const QString& revA, const QString& revB)
 {
-    const QJsonObject r = bridge("compare", {revA, revB});
+    const QJsonObject r = bridgeInBackground("compare", {revA, revB},
+        tr("Comparing the versions...\nLarge models can take a few minutes."));
     if (!r.value("ok").toBool()) {
         m_status->showMessage(tr("Could not compare: %1").arg(r.value("error").toString()));
         return false;
@@ -4452,8 +4638,9 @@ void MainWindow::milestoneDialog()
 
 bool MainWindow::combineOptions(const QString& option, const QJsonObject& choices)
 {
-    const QJsonObject r = bridge("combine_options",
-        {option, QString::fromUtf8(QJsonDocument(choices).toJson(QJsonDocument::Compact))});
+    const QJsonObject r = bridgeInBackground("combine_options",
+        {option, QString::fromUtf8(QJsonDocument(choices).toJson(QJsonDocument::Compact))},
+        tr("Combining the options...\nLarge models can take a few minutes."));
     if (!r.value("ok").toBool()) {
         showError(tr("Could not combine the options"), r.value("error").toString());
         return false;
@@ -4765,6 +4952,13 @@ bool MainWindow::dragFinished(QPointF start, QPointF current, double tolerance, 
 
 void MainWindow::refreshLayers()
 {
+    refreshLayerState();
+    refreshGraphics(); // new and changed elements get the purpose's styles
+    refreshUnderlays(); // D85: their layers' states
+}
+
+void MainWindow::refreshLayerState()
+{
     const QJsonObject state = bridge("layer_members"); // one pass over the model per edit
     const QJsonObject members = state.value("layers").toObject();
     QJsonArray listing;
@@ -4807,13 +5001,16 @@ void MainWindow::refreshLayers()
     for (const auto& v : bridge("views").value("views").toArray())
         names << v.toObject().value("name").toString();
     m_layersPanel->setViews(names, m_currentView);
-    refreshGraphics(); // new and changed elements get the purpose's styles
-    refreshUnderlays(); // D85: their layers' states
 }
 
 void MainWindow::refreshGraphics()
 {
-    m_viewport->setGraphics(Graphics::fromJson(bridge("graphics_state")), m_prefs.trueLineWeights());
+    applyGraphics(bridge("graphics_state"));
+}
+
+void MainWindow::applyGraphics(const QJsonObject& state)
+{
+    m_viewport->setGraphics(Graphics::fromJson(state), m_prefs.trueLineWeights());
     const Graphics& g = m_viewport->graphics();
     const LineStyle pen = g.pen(g.currentPen());
     m_status->setPen(g.currentPen(), pen.color, pen.weight);
@@ -5454,7 +5651,8 @@ void MainWindow::activateView(const QString& key)
     if (switched) {
         updateCutSliderRange();
         m_cutLabel->setText(formatLength(m_cutHeight->value()));
-        m_viewport->setWorkPlaneZ(m_levels->activeElevation());
+        m_viewport->setWorkPlaneZ(workPlaneZ());
+        m_viewport->setPlanRotation(workPlaneAngle());
         applyCuts();
         refreshAnnotations(); // this view's level notes, grid and markers
         refreshNorthArrow();  // D92: the plan north indicator
@@ -6231,12 +6429,14 @@ void MainWindow::refreshSheets(bool changed)
 bool MainWindow::exportSheet(const QString& number, const QString& path)
 {
     if (path.endsWith(QLatin1String(".svg"), Qt::CaseInsensitive)) {
-        const QJsonObject r = bridge("export_sheet_svg", {number, path});
+        const QJsonObject r = bridgeInBackground("export_sheet_svg", {number, path},
+            tr("Exporting sheet %1...").arg(number));
         if (!r.value("ok").toBool())
             showError(tr("Could not export the sheet"), r.value("error").toString());
         return r.value("ok").toBool();
     }
-    const QJsonObject sheet = bridge("sheet_svg", {number});
+    const QJsonObject sheet = bridgeInBackground("sheet_svg", {number},
+        tr("Composing sheet %1...\nLarge sheets can take a minute.").arg(number));
     QString error;
     if (!sheet.value("ok").toBool()
         || !exportSvgToPdf(sheet.value("svg").toString().toUtf8(), sheet.value("width").toDouble(),
@@ -6261,6 +6461,39 @@ void MainWindow::exportSheetDialog(bool pdf)
         number + (pdf ? QStringLiteral(".pdf") : QStringLiteral(".svg")), pdf ? tr("PDF (*.pdf)") : tr("SVG (*.svg)"));
     if (!path.isEmpty())
         exportSheet(number, path);
+}
+
+void MainWindow::exportAllSheetsDialog()
+{
+    const QJsonArray sheets = bridge("sheets").value("sheets").toArray();
+    if (sheets.isEmpty()) {
+        showError(tr("No sheets"), tr("Add a sheet in the Sheets panel first."));
+        return;
+    }
+    const QString folderPath = QFileDialog::getExistingDirectory(this, tr("Export all sheets as PDF"));
+    if (folderPath.isEmpty())
+        return;
+    const QDir folder(folderPath);
+    QSet<QString> used;
+    QStringList failed;
+    int done = 0;
+    for (const auto& value : sheets) {
+        const QJsonObject sheet = value.toObject();
+        const QString number = sheet.value("number").toString();
+        const QString base = sheetFileName(number);
+        QString name = base;
+        for (int suffix = 2; used.contains(name.toLower()); ++suffix)
+            name = QStringLiteral("%1-%2").arg(base).arg(suffix);
+        used.insert(name.toLower());
+        if (exportSheet(number, folder.filePath(name + QStringLiteral(".pdf"))))
+            ++done;
+        else
+            failed << number;
+    }
+    if (failed.isEmpty())
+        m_status->showMessage(tr("Exported %1 sheet(s) to %2").arg(done).arg(folderPath));
+    else
+        showError(tr("Some sheets were not exported"), failed.join(QStringLiteral(", ")));
 }
 
 bool MainWindow::setProjectInfo(const QJsonObject& info)
@@ -8307,6 +8540,92 @@ bool MainWindow::deleteSelection()
     return r.value("ok").toBool();
 }
 
+void MainWindow::solidBatchFromSets()
+{
+    const QJsonObject sets = m_settings.value("selection_sets").toObject();
+    if (sets.isEmpty()) {
+        showError(tr("Solid operation"), tr("Save a selection set in Find & Select first."));
+        return;
+    }
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Solid operation on selection sets"));
+    auto* form = new QFormLayout(&dialog);
+    auto* targets = new QComboBox(&dialog);
+    targets->setObjectName(QStringLiteral("solidTargetSet"));
+    auto* tools = new QComboBox(&dialog);
+    tools->setObjectName(QStringLiteral("solidToolSet"));
+    auto* op = new QComboBox(&dialog);
+    op->setObjectName(QStringLiteral("solidOperator"));
+    for (const QString& name : sets.keys()) {
+        targets->addItem(name, name);
+        tools->addItem(name, name);
+    }
+    tools->addItem(tr("Current selection"), QStringLiteral("__selection__"));
+    op->addItem(tr("Cut (difference)"), QStringLiteral("DIFFERENCE"));
+    op->addItem(tr("Intersection"), QStringLiteral("INTERSECTION"));
+    op->addItem(tr("Union"), QStringLiteral("UNION"));
+    form->addRow(tr("Target set"), targets);
+    form->addRow(tr("Tool set"), tools);
+    form->addRow(tr("Operation"), op);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    form->addRow(buttons);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    const QString targetName = targets->currentData().toString();
+    const QString toolName = tools->currentData().toString();
+    if (toolName == targetName) {
+        showError(tr("Solid operation"), tr("Choose a different tool set (or the current selection)."));
+        return;
+    }
+    const QJsonObject targetReply = bridge("selection_set_members", {targetName});
+    if (!targetReply.value("ok").toBool()) {
+        showError(tr("Solid operation"), targetReply.value("error").toString());
+        return;
+    }
+    QStringList toolGuids;
+    if (toolName == QLatin1String("__selection__")) {
+        toolGuids = m_selection;
+    } else {
+        const QJsonObject toolReply = bridge("selection_set_members", {toolName});
+        if (!toolReply.value("ok").toBool()) {
+            showError(tr("Solid operation"), toolReply.value("error").toString());
+            return;
+        }
+        toolGuids.clear();
+        for (const auto& value : toolReply.value("guids").toArray())
+            toolGuids << value.toString();
+    }
+    QStringList targetGuids;
+    for (const auto& value : targetReply.value("guids").toArray())
+        targetGuids << value.toString();
+    if (targetGuids.isEmpty() || toolGuids.isEmpty()) {
+        showError(tr("Solid operation"), tr("Both the target set and the tool set must contain elements."));
+        return;
+    }
+    const QJsonObject result = bridge("boolean_batch",
+        {jsonList(targetGuids), jsonList(toolGuids), op->currentData().toString()});
+    if (!result.value("ok").toBool())
+        showError(tr("Solid operation"), result.value("error").toString());
+    afterEdit(result);
+}
+
+bool MainWindow::solidOperate(const QString& op)
+{
+    if (m_selection.size() < 2) {
+        showError(tr("Solid operation"), tr("Select at least two elements: the target first, then the tools."));
+        return false;
+    }
+    const QJsonObject result = bridge("boolean_elements",
+        {m_selection.at(0), jsonList(m_selection.mid(1)), op});
+    if (!result.value("ok").toBool())
+        showError(tr("Solid operation"), result.value("error").toString());
+    afterEdit(result);
+    return result.value("ok").toBool();
+}
+
 bool MainWindow::treeHasGuid(const QString& guid) const
 {
     return m_tree->itemFor(guid) != nullptr;
@@ -8424,8 +8743,8 @@ void MainWindow::stopAgentLive()
 
 void MainWindow::pollAgentLive()
 {
-    if (m_loading)
-        return;
+    if (m_loading || m_snapPending)
+        return; // a 100k snap worker owns the interpreter; poll again next tick
     static bool runningRequest = false; // the busy dialog's processEvents() can re-enter this timer
     if (m_agentLive && !runningRequest) {
         const QJsonObject pending = bridge("agent_live_pending");
@@ -8548,8 +8867,9 @@ void MainWindow::acceptProposal(const QString& task, const QJsonObject& resoluti
         return;
     }
     const QString option = p.value(QStringLiteral("option")).toString();
-    const QJsonObject preview = bridge("combine_preview",
-        {option, QString::fromUtf8(QJsonDocument(resolutions).toJson(QJsonDocument::Compact))});
+    const QJsonObject preview = bridgeInBackground("combine_preview",
+        {option, QString::fromUtf8(QJsonDocument(resolutions).toJson(QJsonDocument::Compact))},
+        tr("Preparing the proposal...\nLarge models can take a few minutes."));
     if (!preview.value(QStringLiteral("ok")).toBool()) {
         showError(tr("Could not accept the proposal"), preview.value(QStringLiteral("error")).toString());
         return;
@@ -8775,7 +9095,8 @@ bool MainWindow::enableVersioning(const QString& folder, const QString& message)
 
 bool MainWindow::exportIfc(const QString& path)
 {
-    const QJsonObject r = bridge("export_ifc", {path});
+    const QJsonObject r = bridgeInBackground("export_ifc", {path},
+        tr("Exporting the IFC...\nLarge models can take a few minutes."));
     if (!r.value("ok").toBool()) {
         showError(tr("Could not export"), r.value("error").toString());
         return false;
@@ -9113,22 +9434,110 @@ void MainWindow::addPropertySetDialog()
 
 void MainWindow::onOpened(const QJsonObject& info)
 {
-    refreshLevels();
+    StepTimer openedTimer(m_timings, "onOpened");
     m_types->clear();
     m_warnedInconsistent = false;
     m_undo->setEnabled(false);
     m_redo->setEnabled(false);
-    QString error;
-    const QJsonObject tree = PythonEngine::instance().callJson("spatial_tree", {}, &error).object();
-    m_tree->setTree(tree);
-    loadProjectSettings();
     m_currentView.clear();
-    refreshProject();
-    refreshLayers();
-    refreshAnnotations();
-    refreshDrawings();
-    refreshSheets();
+    // The heavy panels (settings, project header, levels, model tree, layers, graphics, annotations,
+    // drawings) wait until the model has loaded. On a 100k-object model they cost seconds each;
+    // doing them here would hold the first mesh chunk behind them and the first frame would be
+    // minutes away.
+    m_needsOpenRefresh = true;
     m_status->showMessage(tr("Loading %1 (%2)...").arg(QFileInfo(m_path).fileName(), info.value("schema").toString()));
+}
+
+void MainWindow::startOpenTask(quint64 token, std::function<QJsonObject()> job,
+    std::function<void(const QJsonObject&)> apply)
+{
+    ++m_openPending;
+    runBridgeAsync(std::move(job),
+        [this, token, apply = std::move(apply)](const QJsonObject& data) {
+            if (token == m_openToken)
+                apply(data);
+        },
+        [this, token] {
+            if (token != m_openToken)
+                return; // a newer model owns the window
+            if (--m_openPending == 0)
+                completeOpen(token);
+        });
+}
+
+void MainWindow::finishOpen(quint64 token)
+{
+    StepTimer _(m_timings, "finishOpen");
+    m_status->showMessage(tr("Preparing the model tree and graphics..."));
+    {
+        StepTimer _(m_timings, "finish:settings");
+        loadProjectSettings();
+    }
+    {
+        StepTimer _(m_timings, "finish:levels");
+        const QSignalBlocker block(m_levels); // the active-level handler would refresh everything below
+        refreshLevels();
+    }
+    updateCutSliderRange();
+    m_viewport->setWorkPlaneZ(workPlaneZ());
+    m_viewport->setPlanRotation(workPlaneAngle());
+    applyCuts();
+    {
+        StepTimer _(m_timings, "finish:layers");
+        refreshLayerState();
+    }
+    refreshUnderlays(); // D85: their layers' states
+    {
+        StepTimer _(m_timings, "finish:annotations");
+        refreshAnnotations();
+    }
+    {
+        StepTimer _(m_timings, "finish:drawings");
+        refreshDrawings();
+    }
+    {
+        StepTimer _(m_timings, "finish:sheets");
+        refreshSheets();
+    }
+
+    // The three expensive reads run in the background; the window keeps painting and the model is
+    // already visible. `completeOpen` emits loadFinished when all three have been applied.
+    startOpenTask(token, [] {
+        const QJsonObject state = bridgeCall("project_state");
+        const QJsonObject history = state.value("versioned").toBool()
+            ? bridgeCall("history", {QStringLiteral("200")})
+            : QJsonObject();
+        return QJsonObject{{"project", state}, {"history", history}, {"document", bridgeCall("document_state")}};
+    }, [this](const QJsonObject& r) {
+        const QJsonObject doc = r.value("document").toObject();
+        m_document = doc;
+        applyProjectState(r.value("project").toObject(), r.value("history").toObject(), doc);
+    });
+    startOpenTask(token, [] {
+        return bridgeCall("spatial_tree");
+    }, [this](const QJsonObject& tree) {
+        m_tree->setTree(tree);
+    });
+    startOpenTask(token, [] {
+        return bridgeCall("graphics_state");
+    }, [this](const QJsonObject& state) {
+        applyGraphics(state);
+    });
+    if (m_openPending == 0)
+        completeOpen(token);
+}
+
+void MainWindow::completeOpen(quint64 token)
+{
+    if (token != m_openToken)
+        return;
+    m_needsOpenRefresh = false;
+    m_status->showMessage(tr("%n element(s) loaded in %1 s", nullptr, m_openElements)
+                                 .arg(double(m_loadTimer.elapsed()) / 1000.0, 0, 'f', 1));
+    startAgentLive(); // D102 phase 2: the project is open and ready for live commands
+    emit loadFinished(m_openElements, false);
+    if (std::exchange(m_askImportStatus, false)) // D74: after the other load-finished work
+        QMetaObject::invokeMethod(this, &MainWindow::askImportStatus, Qt::QueuedConnection);
 }
 
 void MainWindow::onChunk(const MeshChunk& chunk)
@@ -9136,10 +9545,14 @@ void MainWindow::onChunk(const MeshChunk& chunk)
     if (!m_loading)
         return; // a stopped load's late chunk
     const bool first = m_viewport->batchCount() == 0;
-    m_viewport->addBatch(new ElementBatch(chunk));
+    {
+        StepTimer _(m_timings, "chunk:addBatch");
+        m_viewport->addBatch(new ElementBatch(chunk));
+    }
     m_loadedElements += chunk.elementCount();
     m_status->showMessage(tr("Loading... %n element(s)", nullptr, m_loadedElements));
     if (first) {
+        StepTimer _(m_timings, "chunk:fitAll");
         m_viewport->fitAll();
         emit firstChunkShown();
     }
@@ -9150,6 +9563,13 @@ void MainWindow::onFinished(int elements, bool stopped)
     m_loading = false;
     if (!stopped) {
         m_viewport->fitAll();
+        if (m_needsOpenRefresh) {
+            const quint64 token = ++m_openToken;
+            m_openPending = 0;
+            m_openElements = elements;
+            finishOpen(token);
+            return; // completeOpen emits loadFinished
+        }
         m_status->showMessage(tr("%n element(s) loaded in %1 s", nullptr, elements)
                                      .arg(double(m_loadTimer.elapsed()) / 1000.0, 0, 'f', 1));
         startAgentLive(); // D102 phase 2: the project is open and ready for live commands
@@ -9162,6 +9582,9 @@ void MainWindow::onFinished(int elements, bool stopped)
 void MainWindow::onFailed(const QString& error)
 {
     m_loading = false;
+    m_needsOpenRefresh = false;
+    ++m_openToken; // ignore a previous model's background panels
+    m_openPending = 0;
     stopAgentLive();
     showError(tr("Could not open the model"), error);
     emit loadFailed(error);

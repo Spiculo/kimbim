@@ -11,18 +11,24 @@ import tempfile
 import time as _time
 from dataclasses import dataclass, field
 
+import blake3
 import ifcopenshell
 import ifcopenshell.validate
 
 from . import _core
 from .content import Changed, Contents, references, schema_of, without_owner_history
+from .ifcdump import dump as ifcdump_dump
 from .layout import (CHECKS_PATH, META_PATH, SETTINGS_PATH, WORK_FILES_DIR, blob_oid, is_file_path, is_record_path,
                      key_to_path, path_to_key, referenced_files)
-from .nodeids import decompose_against_head
+from .nodeids import decompose_against_head, decompose_dump_against_head
 from .records import compose, unshare
 
 REPACK_THRESHOLD = 10_000  # changed records; D39
 GLOBALID = re.compile(r"[0-9A-Za-z_$]{22}")  # IFC GlobalId: 22 chars of the IFC base-64 alphabet
+# Working decomposition cache (docs/09: the 100k benchmark). Bump when the canonical record format
+# or the decomposer changes, so old entries are not reused.
+DECOMPOSE_CACHE_VERSION = 2
+DECOMPOSE_CACHE_KEEP = 3  # files per project (about 100 MB each on a 100k-object model)
 
 
 class KimbimError(Exception):
@@ -333,30 +339,92 @@ class Project:
                 writes[p] = data
         return writes
 
+    def _decompose_cache_dir(self) -> pathlib.Path:
+        return self.work / ".kimbim" / "cache" / "decompose"
+
     def _decompose_file(self, ifc_path) -> dict[str, bytes]:
-        f = ifcopenshell.open(str(ifc_path))
+        path = pathlib.Path(ifc_path)
+        try:
+            payload = path.read_bytes()
+        except OSError:
+            payload = b""
         current = self.schema()
-        if current and f.schema_identifier != current:
-            raise SchemaMismatch(
-                f"{ifc_path} is {f.schema_identifier} but this project is {current}; "
-                "KimBim never converts schemas silently (docs/02, D30)"
-            )
-        bad = [r for r in f.by_type("IfcRoot") if not GLOBALID.fullmatch(r.GlobalId or "")]
-        if bad:
-            raise InvalidInput(
-                f"{ifc_path} has {len(bad)} malformed GlobalId(s); KimBim needs valid IFC GlobalIds to track objects",
-                [f"#{r.id()} {r.is_a()}: GlobalId {r.GlobalId!r}" for r in bad[:50]],
-            )
-        records, _ = decompose_against_head(f, self._head_entries(), self.repo.read_blobs)
+        head = self.repo.head() or ""
+        cache_path = None
+        if payload:
+            file_hash = blake3.blake3(payload).hexdigest()
+            seed = f"v{DECOMPOSE_CACHE_VERSION}\0{current or ''}\0{head}\0{file_hash}".encode()
+            cache_path = self._decompose_cache_dir() / f"{blake3.blake3(seed).hexdigest()}.json"
+            try:
+                cached = json.loads(cache_path.read_text(encoding="utf-8"))
+                if isinstance(cached, dict) and all(isinstance(v, str) for v in cached.values()):
+                    return {k: v.encode("utf-8") for k, v in cached.items()}
+            except (OSError, ValueError):
+                pass  # no cache, or a damaged one: decompose again
+
+        records = None
+        schema = None
+        dump_text = ifcdump_dump(ifc_path)
+        if dump_text:
+            try:
+                candidate, _ = decompose_dump_against_head(
+                    dump_text, self._head_entries(), self.repo.read_blobs
+                )
+            except ValueError:
+                candidate = None  # malformed dump or input: the reference path reports it precisely
+            if candidate is not None:
+                meta = json.loads(candidate["meta"])
+                schema = meta["schema"]
+                bad_keys = [
+                    k for k in candidate
+                    if k.startswith("o/") and not GLOBALID.fullmatch(k[2:].split("~", 1)[0])
+                ]
+                if not bad_keys:
+                    records = candidate
+        if records is None:
+            f = ifcopenshell.open(str(ifc_path))
+            schema = f.schema_identifier
+            if current and schema != current:
+                raise SchemaMismatch(
+                    f"{ifc_path} is {schema} but this project is {current}; "
+                    "KimBim never converts schemas silently (docs/02, D30)"
+                )
+            bad = [r for r in f.by_type("IfcRoot") if not GLOBALID.fullmatch(r.GlobalId or "")]
+            if bad:
+                raise InvalidInput(
+                    f"{ifc_path} has {len(bad)} malformed GlobalId(s); KimBim needs valid IFC GlobalIds to track objects",
+                    [f"#{r.id()} {r.is_a()}: GlobalId {r.GlobalId!r}" for r in bad[:50]],
+                )
+            records, _ = decompose_against_head(f, self._head_entries(), self.repo.read_blobs)
+        else:
+            f = None
+            if current and schema != current:
+                raise SchemaMismatch(
+                    f"{ifc_path} is {schema} but this project is {current}; "
+                    "KimBim never converts schemas silently (docs/02, D30)"
+                )
         try:
             compose(records)  # records must be writable back to IFC (lossless guarantee, D36)
         except RuntimeError as e:
+            if f is None:
+                f = ifcopenshell.open(str(ifc_path))
             log = ifcopenshell.validate.json_logger()
             ifcopenshell.validate.validate(f, log)
             messages = [str(s.get("message", s)) for s in log.statements] or [str(e)]
             raise InvalidInput(
-                f"{ifc_path} is not valid {f.schema_identifier} and cannot be stored losslessly", messages
+                f"{ifc_path} is not valid {schema} and cannot be stored losslessly", messages
             ) from None
+        if cache_path is not None:
+            try:
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                tmp = cache_path.with_suffix(".tmp")
+                tmp.write_text(json.dumps({k: v.decode("utf-8") for k, v in records.items()}), encoding="utf-8")
+                tmp.replace(cache_path)
+                old = sorted(cache_path.parent.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+                for stale in old[DECOMPOSE_CACHE_KEEP:]:
+                    stale.unlink(missing_ok=True)
+            except (OSError, UnicodeDecodeError):
+                pass  # a full or read-only cache never blocks a commit
         return records
 
     # ---- commands ----

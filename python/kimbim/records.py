@@ -294,6 +294,20 @@ def decompose(f: ifcopenshell.file, *, format_tag: str = FORMAT, resolve_node_id
     return recs, d
 
 
+def decompose_dump(dump: str, *, format_tag: str = FORMAT, resolve_node_id: Callable[[str, bytes], str | None] | None = None):
+    """Rust decomposer over a `tools/ifcdump` payload (docs/19 stage 3).
+
+    Byte-identical to `decompose()` on the checked corpus; callers keep using `decompose()` until a
+    model has been verified. The dump is produced by the C++ IfcParse bridge, so no Python
+    IfcOpenShell object graph is built.
+    """
+    from . import _core
+
+    result = _core.decompose_dump(dump, format_tag, resolve_node_id)
+    return {k: bytes(v) for k, v in result.items()}
+
+
+
 class Composer:
     """records -> ifcopenshell.file, with deterministic step ids."""
 

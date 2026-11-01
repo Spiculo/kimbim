@@ -23,6 +23,7 @@ struct SelfTestOptions {
     bool linesOnly = false;       // lines-only display before measuring/screenshot
     QStringList trigger;          // --real-open: actions (object names) triggered before the screenshot
     bool benchTools = false;      // time tool previews and wall creation (ms), report them
+    bool benchSnap = false;       // time selecting the Wall tool (the 100k snap-data gate)
     bool house = false;           // new project: walls, slab from walls, a door and a window
     QString drawWalls;            // "x,y;x,y;...": new project, draw this wall polyline with the wall tool
     bool createDrawings = false; // View > Create floor plans and elevations after loading (an opened IFC has none)

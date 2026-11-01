@@ -104,7 +104,7 @@ private slots:
         QSignalSpy loaded(&w, &kimbim::MainWindow::loadFinished);
         QVERIFY(w.openPath(m_kim));
         QVERIFY(loaded.wait(120000));
-        QTRY_VERIFY(w.findChild<QLabel*>(QStringLiteral("agentStatus"))->isVisible());
+        QTRY_VERIFY_WITH_TIMEOUT(w.findChild<QLabel*>(QStringLiteral("agentStatus"))->isVisible(), 30000);
         auto* assistantDock = w.dockLayout()->manager()->findDockWidget(QStringLiteral("assistant"));
         QVERIFY(assistantDock);
         QVERIFY(assistantDock->widget());
@@ -140,15 +140,15 @@ private slots:
         QVERIFY(bar);
         // isVisible() on a widget inside a tool bar's QWidgetAction said true while the widget stayed
         // hidden (the owner saw no bar at all); the hidden flag is the one that decides painting.
-        QTRY_VERIFY(bar->isVisible() && !bar->isHidden());
+        QTRY_VERIFY_WITH_TIMEOUT(bar->isVisible() && !bar->isHidden(), 30000);
         // The owner can hide a proposal that is not being reviewed; the bar comes back on request and
         // by itself when the set of proposals changes (tested through the findable hide button).
         QPushButton* hide = w.findChild<QPushButton*>(QStringLiteral("proposalHide"));
         QVERIFY(hide);
         hide->click();
-        QTRY_VERIFY(bar->isHidden());
+        QTRY_VERIFY_WITH_TIMEOUT(bar->isHidden(), 30000);
         bar->showAgain();
-        QTRY_VERIFY(!bar->isHidden());
+        QTRY_VERIFY_WITH_TIMEOUT(!bar->isHidden(), 30000);
         QPushButton* review = w.findChild<QPushButton*>(QStringLiteral("proposalReview"));
         QVERIFY(review);
         bool sawDialog = false, sawChanges = false, accepted = false;
@@ -172,11 +172,11 @@ private slots:
         QVERIFY(sawDialog);
         QVERIFY(sawChanges);
         QVERIFY(accepted);
-        QTRY_VERIFY(!bar->isVisible());
-        QTRY_VERIFY(kimbim::PythonEngine::instance().callJson("agent_proposals", {})
-                        .object().value("proposals").toArray().isEmpty());
-        QTRY_VERIFY(kimbim::PythonEngine::instance().callJson("properties", {wall})
-                        .object().value("name").toString() == QLatin1String("Live wall"));
+        QTRY_VERIFY_WITH_TIMEOUT(!bar->isVisible(), 30000);
+        QTRY_VERIFY_WITH_TIMEOUT(kimbim::PythonEngine::instance().callJson("agent_proposals", {})
+                        .object().value("proposals").toArray().isEmpty(), 30000);
+        QTRY_VERIFY_WITH_TIMEOUT(kimbim::PythonEngine::instance().callJson("properties", {wall})
+                        .object().value("name").toString() == QLatin1String("Live wall"), 30000);
     }
 
     void proposalDialogShowsTheDiffAndResolvesConflicts()

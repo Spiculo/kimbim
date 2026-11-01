@@ -14,6 +14,18 @@ pixi run fetch-corpus   # download the IFC test corpus (~95 MB, not committed)
 pixi run golden         # golden-hash tests against the corpus
 pixi run kimbim --help  # the CLI (agent tools and versions, docs/17)
 pixi run agent          # agent tools exit check (MCP, on the sample house)
+pixi run app-build      # the Qt desktop app
+pixi run app-test       # desktop tests (the live-agent test runs separately)
+pixi run app-test-agent # the live host + kimbim CLI test, in its own process
+pixi run house          # write the sample two-storey house (build/house.ifc)
+pixi install -e pack    # conda-pack, for the portable build
+pixi run -e pack package   # portable build in dist/KimBim (app + Python + relocatable runtime)
+pixi run check-package     # start it with CONDA/PIXI/PYTHON removed and export the sample sheet
+pixi run interop-xbim      # independent .NET (xBIM) interop check on the sample house
+pixi run ifcdump-check     # stage 1 of the Rust decomposer: C++ IfcParse bridge vs IfcOpenShell
+pixi run pytest tests/python/test_rust_canon.py -q   # stage 2: Rust canonical JSON vs records.canon
+pixi run bench-model       # generate the 100k-object benchmark model
+pixi run bench-100k        # release gate: first frame < 15 s, warm decomposition < 15 s
 ```
 
 ## Rules

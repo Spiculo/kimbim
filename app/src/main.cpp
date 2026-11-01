@@ -45,7 +45,7 @@ int main(int argc, char* argv[])
     parser.addOption(quitDuringLoad);
     parser.addOption(planCut);
     QCommandLineOption chunk(QStringLiteral("chunk"), QStringLiteral("Self-test: elements per mesh chunk."),
-        QStringLiteral("n"), QStringLiteral("1000"));
+        QStringLiteral("n"), QStringLiteral("500"));
     parser.addOption(chunk);
     QCommandLineOption boxSelect(QStringLiteral("box-select"), QStringLiteral("Self-test: box-select the whole view."));
     parser.addOption(boxSelect);
@@ -116,6 +116,8 @@ int main(int argc, char* argv[])
     parser.addOption(house);
     QCommandLineOption benchTools(QStringLiteral("bench-tools"), QStringLiteral("Self-test: time tool previews and wall placement."));
     parser.addOption(benchTools);
+    QCommandLineOption benchSnap(QStringLiteral("bench-snap"), QStringLiteral("Self-test: time selecting the Wall tool (snap data must not block)."));
+    parser.addOption(benchSnap);
     QCommandLineOption createDrawings(QStringLiteral("create-drawings"),
         QStringLiteral("Self-test: View > Create floor plans and elevations after loading."));
     parser.addOption(createDrawings);
@@ -143,6 +145,14 @@ int main(int argc, char* argv[])
         QStringLiteral("Export sheet <number> of the IFC file to <out.pdf|out.svg|out.dxf> and exit (no window)."),
         QStringLiteral("number"));
     parser.addOption(exportSheet);
+    QCommandLineOption exportSheets(QStringLiteral("export-sheets"),
+        QStringLiteral("Export every sheet of the IFC file to <out-dir> as <number>.pdf and exit (no window)."),
+        QStringLiteral("dir"));
+    parser.addOption(exportSheets);
+    QCommandLineOption sheetNumbers(QStringLiteral("sheets"),
+        QStringLiteral("With --export-sheets: only these sheet numbers (comma-separated)."),
+        QStringLiteral("numbers"));
+    parser.addOption(sheetNumbers);
     QCommandLineOption snapshotServer(QStringLiteral("snapshot-server"),
         QStringLiteral("Agent tools (D102): render snapshots for JSON requests read from stdin, one per line, "
                        "without showing a window; exits at the end of input."));
@@ -167,6 +177,16 @@ int main(int argc, char* argv[])
             return 2;
         }
         return kimbim::exportSheetCommand(args.at(0), parser.value(exportSheet), args.at(1));
+    }
+
+    if (parser.isSet(exportSheets)) {
+        const QStringList args = parser.positionalArguments();
+        if (args.size() != 1) {
+            std::fprintf(stderr, "usage: kimbim-app --export-sheets OUT_DIR model.ifc [--sheets A01,A02]\n");
+            return 2;
+        }
+        const QStringList numbers = parser.value(sheetNumbers).split(QLatin1Char(','), Qt::SkipEmptyParts);
+        return kimbim::exportSheetsCommand(args.at(0), parser.value(exportSheets), numbers);
     }
 
     if (parser.isSet(snapshotServer))
@@ -203,6 +223,7 @@ int main(int argc, char* argv[])
         options.selectThrough = parser.isSet(selectThrough);
         options.house = parser.isSet(house);
         options.benchTools = parser.isSet(benchTools);
+        options.benchSnap = parser.isSet(benchSnap);
         options.screenshot = parser.value(screenshot);
         if (const QStringList wh = parser.value(windowSize).split(QLatin1Char('x')); wh.size() == 2)
             options.windowSize = QSize(wh[0].toInt(), wh[1].toInt());

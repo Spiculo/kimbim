@@ -15,12 +15,17 @@ pixi run app -- --self-test model.ifc --create-drawings --open-drawing "South El
 pixi run m4                       # M4 exit test: the sample house's sheet exported to build/m4/house-A01.pdf and checked
 ```
 
+After the first build, the app can also be started without `pixi run`: `build/app/kimbim-app.cmd` on Windows or `build/app/kimbim-app.sh` on Linux. The generated launcher carries the pixi environment with it (and accepts `KIMBIM_ENV` to point at another one), so the 3D view, embedded Python and the CLI-backed tools all start as they do under pixi.
+
+To build the portable package instead — the app, its Python sources and a relocatable runtime in one folder — run `pixi run app-build`, then `pixi run house`, then `pixi run -e pack package`. It writes `dist/KimBim` and `pixi run check-package` starts it with `CONDA_PREFIX`, `PIXI_*` and `PYTHON*` removed, then exports the sample house's A01 sheet. An installer with file associations and code signing is still future work.
+
 | Action | How |
 |---|---|
 | Pan / orbit / zoom | Middle-drag / **Shift**+middle-drag (around the point under the mouse) / wheel (toward the cursor) |
 | Select / add / toggle | Click / **Ctrl**+click / **Shift**+click; left-drag draws a selection box (only visible elements; **Alt**+drag also takes hidden ones) |
 | Edit | Double-click a value in Properties (applies to every selected element); right-click to add or remove properties, edit a value on the type, or reset to the type value (dimmed values come from the type) |
 | Undo / redo / save | **Ctrl+Z** / **Ctrl+Y** / **Ctrl+S** (**Ctrl+Shift+S** to save as) |
+| Find a command by key | **F1** (Help › *Keyboard shortcuts*) lists every menu command and tool with its shortcut |
 | Hide / isolate / show all | **H** / **I** / **Shift+H** |
 | Plan cut / section box / fit | **C** (height above the active level, in the Cuts toolbar) / **B** / **F** |
 | New project / add a level | **Ctrl+N** / *Add level…* in the Levels toolbar (the active level is where you draw) |
@@ -72,6 +77,19 @@ The in-app **Assistant** panel uses your own provider and key. Connect a client 
 Each version stores the model as canonical, object-level records in a standard Git repository (`my-house/.git`). A one-property edit on a 10,000-object Revit model is stored as **one changed record**. Exports are lossless and byte-identical on Windows and Linux. See [docs/11](docs/11-spike-results.md) for how that was validated.
 
 Development: see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Status and known limitations
+
+KimBim is pre-1.0. The modeling, drawing, versioning and agent-tool workflows described on this page work and are covered by tests, but these limits matter before using it on a real project:
+
+- **Distribution:** `pixi run app-build`, `pixi run house`, then `pixi run -e pack package` builds a portable `dist/KimBim` folder (about 1.7 GB) that starts without pixi; there is no installer, file association or code signing yet. Run from a pixi environment (`pixi run app`) during development.
+- **Platforms:** Windows and Linux. macOS is not targeted for the first releases. The 3D view needs OpenGL 3.3 or newer.
+- **Interchange:** IFC4 is the written format; IFC2X3 files open and edit and are covered by the corpus tests. IFC4X3 is not supported yet. A `.kim` file is KimBim's own project container (model, settings and history); IFC is the way out.
+- **Scale:** a 100k-object model reaches its first frame in about 11 s; all geometry takes about 2.5 minutes and a cold working decomposition about 110 s (the Rust decomposer; the Python fallback is slower). The 1M-object target is future work (see [docs/07](docs/07-roadmap.md)). `pixi run bench-100k` is the release gate.
+- **Collaboration:** history and design options are local. Git remotes exist on the CLI but have no app UI yet, and there is no concurrent editing.
+- **Feature gaps that stop some real projects:** solid element operations, free work planes, point clouds, photorealistic rendering/VR, a plugin system, customisable toolbars and workspaces, and batch PDF publishing. Shortcuts can already be rebound in Help > Keyboard shortcuts (saved per user). The full list with priorities is [docs/14](docs/14-tool-inventory.md).
+- **Large-model cap:** above 20,000 visible elements the plan cut still clips the model but omits the filled cut outlines (poché), which keeps the first plan paint responsive. This is a performance guard, not a modelling rule.
+- **AI:** the Assistant and agent tools write through reviewable design options, but they are optional and use your own provider and key.
 
 - Built on [IfcOpenShell](https://ifcopenshell.org), [OpenCASCADE](https://dev.opencascade.org), [Qt](https://www.qt.io) and Rust.
 - Local-first: no server, no account, no network required.

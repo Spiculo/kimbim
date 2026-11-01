@@ -5,7 +5,9 @@ use std::path::PathBuf;
 
 use pyo3::create_exception;
 use pyo3::prelude::*;
-use pyo3::types::PyBytes;
+use pyo3::types::{PyAny, PyBool, PyBytes, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
+
+mod decompose;
 
 create_exception!(_core, RepoError, pyo3::exceptions::PyException);
 
@@ -185,5 +187,141 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Commit>()?;
     m.add_class::<Tag>()?;
     m.add("RepoError", m.py().get_type::<RepoError>())?;
+    m.add_function(wrap_pyfunction!(canon, m)?)?;
+    m.add_function(wrap_pyfunction!(decompose_dump, m)?)?;
     Ok(())
+}
+
+// ---------------------------------------------------------------- canonical JSON (records.canon)
+//
+// The cold decomposer will build its record dicts in Rust. This encoder is the exact-byte reference:
+// sorted keys, `(",", ":")` separators, UTF-8 (ensure_ascii=False), Python float repr, -0.0 preserved.
+// It is already useful for tests and lets the Python records module compare against it.
+
+fn json_escape(text: &str, out: &mut String) {
+    out.push('"');
+    for c in text.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            '\u{8}' => out.push_str("\\b"),
+            '\u{c}' => out.push_str("\\f"),
+            c if (c as u32) < 0x20 => {
+                use std::fmt::Write as _;
+                let _ = write!(out, "\\u{:04x}", c as u32);
+            }
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+}
+
+fn write_canonical(value: &Bound<'_, PyAny>, out: &mut String) -> PyResult<()> {
+    if value.is_none() {
+        out.push_str("null");
+        return Ok(());
+    }
+    if value.cast::<PyBool>().is_ok() {
+        out.push_str(if value.extract::<bool>()? { "true" } else { "false" });
+        return Ok(());
+    }
+    if value.cast::<PyInt>().is_ok() {
+        out.push_str(&value.extract::<i64>()?.to_string());
+        return Ok(());
+    }
+    if value.cast::<PyFloat>().is_ok() {
+        // Python's json module uses float.__repr__; keep the same text (1.0, 1e-05, -0.0...).
+        let text = value.repr()?.to_str()?.to_owned();
+        if text == "inf" || text == "-inf" || text == "nan" {
+            return Err(pyo3::exceptions::PyValueError::new_err("NaN/Inf not allowed in canonical JSON"));
+        }
+        out.push_str(&text);
+        return Ok(());
+    }
+    if value.cast::<PyString>().is_ok() {
+        json_escape(value.extract::<&str>()?, out);
+        return Ok(());
+    }
+    if let Ok(list) = value.cast::<PyList>() {
+        out.push('[');
+        for (i, item) in list.iter().enumerate() {
+            if i > 0 {
+                out.push(',');
+            }
+            write_canonical(&item, out)?;
+        }
+        out.push(']');
+        return Ok(());
+    }
+    if let Ok(tuple) = value.cast::<PyTuple>() {
+        out.push('[');
+        for (i, item) in tuple.iter().enumerate() {
+            if i > 0 {
+                out.push(',');
+            }
+            write_canonical(&item, out)?;
+        }
+        out.push(']');
+        return Ok(());
+    }
+    if let Ok(dict) = value.cast::<PyDict>() {
+        let mut entries: Vec<(String, Bound<'_, PyAny>)> = Vec::with_capacity(dict.len());
+        for (key, item) in dict.iter() {
+            let key = key.extract::<String>().map_err(|_| {
+                pyo3::exceptions::PyTypeError::new_err("canonical JSON keys must be strings")
+            })?;
+            entries.push((key, item));
+        }
+        entries.sort_by(|a, b| a.0.cmp(&b.0));
+        out.push('{');
+        for (i, (key, item)) in entries.into_iter().enumerate() {
+            if i > 0 {
+                out.push(',');
+            }
+            json_escape(&key, out);
+            out.push(':');
+            write_canonical(&item, out)?;
+        }
+        out.push('}');
+        return Ok(());
+    }
+    Err(pyo3::exceptions::PyTypeError::new_err(format!(
+        "cannot canonicalise {} in a record",
+        value.get_type().name()?
+    )))
+}
+
+#[pyfunction]
+fn canon<'py>(py: Python<'py>, value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyBytes>> {
+    let mut out = String::new();
+    write_canonical(value, &mut out)?;
+    Ok(PyBytes::new(py, out.as_bytes()))
+}
+
+/// Stage 3 of docs/19: decompose an `ifcdump` payload entirely in Rust. `records.py` remains the
+/// reference until the golden/versioning comparisons are byte-identical.
+#[pyfunction]
+#[pyo3(signature = (dump, format_tag, resolver=None))]
+fn decompose_dump<'py>(
+    py: Python<'py>,
+    dump: &str,
+    format_tag: &str,
+    resolver: Option<Py<PyAny>>,
+) -> PyResult<Bound<'py, PyDict>> {
+    let mut decomposer =
+        decompose::Decomp::parse(dump).map_err(pyo3::exceptions::PyValueError::new_err)?;
+    if let Some(resolver) = resolver {
+        decomposer.set_resolver(resolver);
+    }
+    decomposer
+        .run(format_tag)
+        .map_err(pyo3::exceptions::PyValueError::new_err)?;
+    let out = PyDict::new(py);
+    for (key, bytes) in decomposer.records {
+        out.set_item(key, PyBytes::new(py, &bytes))?;
+    }
+    Ok(out)
 }

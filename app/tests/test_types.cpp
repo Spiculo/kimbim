@@ -45,6 +45,7 @@ private slots:
         QVERIFY(w.findChild<QAction*>(QStringLiteral("actionCurtainWallTool")));
         QVERIFY(w.findChild<QAction*>(QStringLiteral("actionAddSlabEdge")));
         QVERIFY(w.findChild<QAction*>(QStringLiteral("actionSlabSlope")));
+        QVERIFY(w.findChild<QAction*>(QStringLiteral("actionKeyboardShortcuts")));
 
         kimbim::TypeManagerDialog manager(w.selection(), &w);
         QVERIFY(manager.types());

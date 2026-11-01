@@ -3,8 +3,11 @@
 
 #include <QByteArray>
 #include <QJsonDocument>
+#include <QMutex>
 #include <QString>
 #include <QStringList>
+
+#include <atomic>
 
 namespace kimbim {
 
@@ -28,10 +31,19 @@ public:
     // Returns false and leaves `out` empty for None; sets *error on failure.
     bool callParts(const char* fn, const QStringList& args, QList<QByteArray>* out, bool* isNone, QString* error);
 
+    // A long background Python call owns the interpreter. Periodic timers check this and skip their
+    // own bridge call instead of blocking behind a 100k snap/decomposition read.
+    bool busy() const { return m_busy.load(); }
+
 private:
     PythonEngine() = default;
     void* m_module = nullptr; // PyObject*, kept opaque so Python.h stays out of headers
     void* m_mainThreadState = nullptr;
+    // One Python call at a time across the GUI, loader and background workers. The GIL protects
+    // Python's own state, but IfcOpenShell's C++ objects behind an open model are not safe to use
+    // from two callers at once (a model switch could free the object another call is reading).
+    QMutex m_mutex;
+    std::atomic<bool> m_busy{false};
 };
 
 } // namespace kimbim

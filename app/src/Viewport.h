@@ -69,6 +69,8 @@ public:
 
     // Plan view (Slice 4): straight down on a level, no orbit. set3DView() returns to the 3D view.
     void setPlanView(double elevation);
+    void setPlanRotation(double radians); // rotated-horizontal work plane (plan turns, geometry stays as drawn)
+    double planRotation() const { return m_planRotation; }
     void set3DView();
     bool isPlanView() const { return m_planView; }
     // Preset views (D76, D91): the camera turns (~250 ms) to look from that side or corner and fits
@@ -255,6 +257,7 @@ public:
     void setSectionPlanes(const std::vector<gp_Pln>& keepRegion, const std::vector<gp_Pln>& sectionPlanes);
     int sectionElementCount() const { return m_sectionElements; }
     int sectionPlaneCount() const { return m_sectionPlaneCount; }
+    bool pocheSkipped() const { return m_pocheSkipped; } // very large model: clip cut, no cut fills
     int gridLineCount() const { return m_gridLineCount; }
     void clear();
     void fitAll();
@@ -492,6 +495,7 @@ private:
     std::vector<gp_Pln> m_sectionPlanes;
     int m_sectionElements = 0;
     int m_sectionPlaneCount = 0;
+    bool m_pocheSkipped = false;
     void rebuildSections();
     void keepHere(const Handle(AIS_InteractiveObject)& obj);
     void keepOverlaysHere();
@@ -505,6 +509,7 @@ private:
     void removeUnderlays();
     bool workPoint(const QPointF& widgetPos, QPointF* point, double* tolerance);
     double m_planElevation = 0.0;
+    double m_planRotation = 0.0; // radians: the rotated-horizontal work plane
     double m_fitScale = 0.0; // the view's scale when fitted (100%)
     double m_lastZoom = -1.0;
     std::vector<Handle(Graphic3d_ClipPlane)> m_clipPlanes;

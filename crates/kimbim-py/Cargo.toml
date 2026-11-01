@@ -9,5 +9,7 @@ name = "_core"
 crate-type = ["cdylib"]
 
 [dependencies]
+blake3 = "1"
 kimbim-repo = { path = "../kimbim-repo" }
 pyo3 = "0.29"
+serde_json = { version = "1", features = ["float_roundtrip"] }

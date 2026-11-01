@@ -23,6 +23,7 @@ The same things can be drawn by hand in the app with the Wall (W), Door (D), Win
 
 1. **IFC4 validation:** IfcOpenShell's validator, covering the schema (types, cardinalities, inverse attributes) **and the EXPRESS WHERE rules and functions**. Result: 0 issues.
 2. **A second, independent engine:** [web-ifc](https://github.com/ThatOpen/engine_web-ifc) 0.0.78, the parser and geometry kernel behind That Open / IFC.js viewers, which shares no code with IfcOpenShell. It opens the file and must produce geometry for every building element. Result: 24/24 elements meshed, no warnings.
+3. **A third, independent parser:** xBIM (the .NET engine behind Xplorer), via `pixi run interop-xbim`: it opens the house with its own reader and must count 3 storeys and 8 walls. Result: 75 products, 8 walls, 3 storeys, 2 doors, 8 windows.
 
 The first web-ifc run found one real interoperability issue: profiles without an explicit `Position` (optional in IFC4). KimBim now always writes it.
 

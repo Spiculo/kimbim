@@ -1064,6 +1064,7 @@ from . import links as _links  # noqa: E402
 from . import meshimport as _meshimport  # noqa: E402
 from . import keynotes as _keynotes  # noqa: E402
 from . import attributes as _attributes  # noqa: E402
+from . import solids as _solids  # noqa: E402
 _EXPORTS = {
     "authoring": (
         "add_grid_axis",
@@ -1254,10 +1255,17 @@ _EXPORTS = {
         "detach_walls_from_roof",
         "roof_info",
     ),
+    "solids": (
+        "boolean_batch",
+        "boolean_elements",
+        "cut_elements",
+    ),
     "settings": (
         "load_settings_file",
         "project_settings",
         "set_project_settings",
+        "set_work_plane",
+        "work_plane",
     ),
     "queries": (
         "find_elements",

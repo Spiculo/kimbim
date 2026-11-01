@@ -3126,6 +3126,35 @@ private slots:
         QVERIFY(!v->isPerspective());
         QCOMPARE(v->view()->Camera()->Eye().Y(), 4.0);
     }
+
+    // View menu: the free work plane actions go through the bridge; "Use level" disables it.
+    void workPlaneCommands()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        QAction* freePlane = w.findChild<QAction*>(QStringLiteral("actionFreeWorkPlane"));
+        QAction* levelPlane = w.findChild<QAction*>(QStringLiteral("actionUseLevelWorkPlane"));
+        QVERIFY(freePlane && levelPlane);
+        QVERIFY(w.findChild<QAction*>(QStringLiteral("actionWorkPlaneRotation")));
+        QVERIFY(w.newProject());
+        w.viewport()->setPlanView(0);
+        w.viewport()->setPlanRotation(M_PI / 2);
+        QVERIFY(std::abs(w.viewport()->planRotation() - M_PI / 2) < 1e-9);
+        const gp_Dir up = w.viewport()->view()->Camera()->Up();
+        QVERIFY(std::abs(up.X() + 1.0) < 1e-6 && std::abs(up.Y()) < 1e-6);
+        kimbim::PythonEngine::instance().callJson("set_work_plane", {QStringLiteral("2.5"), QStringLiteral("true")});
+        levelPlane->trigger();
+        const QJsonObject state = kimbim::PythonEngine::instance().callJson("work_plane", {}).object();
+        QVERIFY(!state.value("enabled").toBool());
+    }
+    // Edit menu: the three solid operations are wired (the bridge operations are covered in Python).
+    void solidCutAction()
+    {
+        kimbim::MainWindow w(nullptr, true);
+        for (const char* name : {"actionSolidCut", "actionSolidIntersect", "actionSolidUnion", "actionSolidSets"})
+            QVERIFY2(w.findChild<QAction*>(QLatin1String(name)), name);
+        QVERIFY(w.findChild<QAction*>(QStringLiteral("actionSolidCut"))->toolTip().contains(
+            QStringLiteral("two or more")));
+    }
 };
 
 QTEST_MAIN(TestMainWindow)

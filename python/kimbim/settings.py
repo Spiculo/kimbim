@@ -75,6 +75,7 @@ DEFAULTS = {
     "stair_arrow": "top",  # D92: the plan symbol's arrow: top (default), bottom or both
     "stair_riser_numbers": False,  # D92: number the risers on the plan
     "construction_grid": {"spacing": 1.0, "subdivisions": 4, "angle": 0.0, "origin": [0.0, 0.0]},  # D98
+    "work_plane": {"enabled": False, "z": 0.0, "angle": 0.0},  # free horizontal work plane and plan rotation
     "wall_reference_line": "Outside face",
     "layers_in_3d": True,
     "member_material_scope": "element",  # D97: a column's or beam's material: its own (Archicad) or its type's (Revit)
@@ -365,3 +366,22 @@ def load_settings_file(path: str) -> str:
         return B._dump({"ok": False, "error": f"cannot read {path}: {ex}"})
     load(from_bytes(data))
     return B._dump({"ok": True, "settings": current()})
+
+
+def work_plane() -> str:
+    """The free work plane: a user height and plan rotation independent of the active level."""
+    value = current().get("work_plane") or DEFAULTS["work_plane"]
+    return B._dump({"ok": True, "enabled": bool(value.get("enabled")),
+                    "z": float(value.get("z", 0.0)), "angle": float(value.get("angle", 0.0))})
+
+
+def set_work_plane(z, enabled="true", angle="0") -> str:
+    try:
+        height = float(z)
+        rotation = float(angle)
+    except (TypeError, ValueError) as ex:
+        return B._dump({"ok": False, "error": f"bad height or angle: {ex}"})
+    on = str(enabled).strip().lower() in ("1", "true", "yes", "on")
+    result = json.loads(set_project_settings(json.dumps(
+        {"work_plane": {"enabled": on, "z": height, "angle": rotation}})))
+    return B._dump({**result, "enabled": on, "z": height, "angle": rotation})
